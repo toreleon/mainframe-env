@@ -117,9 +117,11 @@
       "priority": "P0",
       "domain": "bms-csd",
       "title": "Parse and install reached BMS and CSD resources",
-      "state": "open",
+      "state": "passed",
       "depends_on": ["CD-009"],
       "commit_subject": "Install BMS and CICS resource catalogs",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-010.json",
+      "evidence_digest": "sha256:c36fa5b51c47af8a2f764736654941b6c2069a56893d7d87b047eaffce580ed3",
       "acceptance": ["21 mapsets/maps and field metadata parse with continuation and macro options", "25 transactions, 26 program definitions, eight base files, and TDQUEUE resources install", "CSD program, map, transaction, and file cross-references validate", "CDV1/COCRDSEC remains an explicit unresolved or accepted correction"]
     },
     {

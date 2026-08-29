@@ -6,8 +6,8 @@ use mainframe_env_conformance::{
     verify_carddemo_application_package_from_env, verify_carddemo_control_flow_from_env,
     verify_carddemo_core_semantics_from_env, verify_carddemo_corpus_from_env,
     verify_carddemo_data_layouts_from_env, verify_carddemo_file_call_semantics_from_env,
-    verify_carddemo_host_operands_from_env, verify_carddemo_source_closures_from_env,
-    verify_carddemo_source_preprocessing_from_env,
+    verify_carddemo_host_operands_from_env, verify_carddemo_resources_from_env,
+    verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -63,12 +63,13 @@ fn run() -> TaskResult {
         "carddemo-file-call" => check_carddemo_file_call(&root),
         "carddemo-host" => check_carddemo_host(&root),
         "carddemo-package" => check_carddemo_package(&root),
+        "carddemo-resources" => check_carddemo_resources(&root),
         "digest" => print_digest(&root),
         "release" if check => check_release_artifacts(&root),
         "release" => generate_release_artifacts(&root),
         "help" | "--help" | "-h" => {
             println!(
-                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|digest|release> --check"
+                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|digest|release> --check"
             );
             Ok(())
         }
@@ -78,6 +79,35 @@ fn run() -> TaskResult {
     if check {
         println!("{command}: pass");
     }
+    Ok(())
+}
+
+fn check_carddemo_resources(root: &Path) -> TaskResult {
+    let inventory_path = root.join("conformance/0.1.1/inventory/carddemo-corpus.json");
+    let receipt = verify_carddemo_resources_from_env(&inventory_path)
+        .map_err(|problem| problem.to_string())?;
+    let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
+    let receipt_bytes = serde_json::to_vec(&receipt_value).map_err(|error| error.to_string())?;
+    let receipt_digest = format!("sha256:{:x}", Sha256::digest(receipt_bytes));
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&receipt).map_err(|e| e.to_string())?
+    );
+    let evidence = json(&root.join("conformance/0.1.1/evidence/issues/CD-010.json"))?;
+    require(
+        evidence["issue"] == Value::String("CD-010".into())
+            && evidence["derived"] == Value::Bool(true)
+            && evidence["status"] == Value::String("pass".into()),
+        "CD-010 evidence is not a derived pass",
+    )?;
+    require(
+        evidence["resource_receipt"] == receipt_value,
+        "CD-010 resource receipt is stale",
+    )?;
+    require(
+        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
+        "CD-010 evidence digest differs from resource receipt",
+    )?;
     Ok(())
 }
 

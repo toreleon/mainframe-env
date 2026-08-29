@@ -2,7 +2,7 @@
 
 use mainframe_env_application::{
     ApplicationInstaller, ApplicationManifest, ApplicationPackage, EntryKind, InstallProblem,
-    InstallState, PackageEntry, package_identity,
+    InstallState, PackageEntry, package_identity, parse_bms, parse_csd,
 };
 use mainframe_env_compiler::{
     CobolCompiler, ControlEdgeKind, ControlRole, DataCategory, StatementKind, StorageSection,
@@ -265,6 +265,24 @@ pub struct CardDemoPackageReceipt {
     pub committed_ready: bool,
     pub idempotent_reinstall: bool,
     pub negative_controls: usize,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoResourceReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub bms_sources: usize,
+    pub mapsets: usize,
+    pub maps: usize,
+    pub fields: usize,
+    pub transactions: usize,
+    pub programs: usize,
+    pub files: usize,
+    pub tdqueues: usize,
+    pub cross_references: usize,
+    pub unresolved: Vec<String>,
+    pub resource_sha256: String,
 }
 
 pub fn verify_carddemo_corpus_from_env(
@@ -1496,6 +1514,129 @@ const fn package_kind_slug(kind: EntryKind) -> &'static str {
         EntryKind::Profile => "profile",
         EntryKind::Migration => "migration",
     }
+}
+
+pub fn verify_carddemo_resources_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoResourceReceipt, CorpusProblem> {
+    let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required for CardDemo gates",
+        )
+    })?;
+    let corpus_dir = Path::new(&corpus_dir);
+    let corpus = verify_carddemo_corpus(corpus_dir, inventory_path)?;
+    let bms_paths = collect_paths(
+        corpus_dir,
+        &[
+            "app/bms",
+            "app/app-authorization-ims-db2-mq/bms",
+            "app/app-transaction-type-db2/bms",
+        ],
+        "bms",
+    )?;
+    let csd_paths = collect_paths(
+        corpus_dir,
+        &[
+            "app/csd",
+            "app/app-authorization-ims-db2-mq/csd",
+            "app/app-transaction-type-db2/csd",
+            "app/app-vsam-mq/csd",
+        ],
+        "csd",
+    )?;
+    let source_paths = collect_paths(
+        corpus_dir,
+        &[
+            "app/cbl",
+            "app/app-authorization-ims-db2-mq/cbl",
+            "app/app-transaction-type-db2/cbl",
+            "app/app-vsam-mq/cbl",
+        ],
+        "cbl",
+    )?;
+    let available_programs = source_paths
+        .iter()
+        .filter_map(|path| Path::new(path).file_stem().and_then(|name| name.to_str()))
+        .map(str::to_ascii_uppercase)
+        .collect::<BTreeSet<_>>();
+    let mut mapsets = BTreeSet::new();
+    let mut maps = BTreeSet::new();
+    let mut fields = 0usize;
+    let mut digest = Sha256::new();
+    for path in &bms_paths {
+        let source = String::from_utf8(read_corpus_file(corpus_dir, &corpus_dir.join(path))?)
+            .map_err(|_| CorpusProblem::new("carddemo.resource.invalid", "BMS is not UTF-8"))?;
+        let parsed = parse_bms(&source).map_err(|problem| {
+            CorpusProblem::new(
+                "carddemo.resource.bms_invalid",
+                format!("{path}: {problem:?}"),
+            )
+        })?;
+        mapsets.insert(parsed.mapset.clone());
+        maps.insert(format!("{}.{}", parsed.mapset, parsed.name));
+        fields += parsed.fields.len();
+        digest_field(&mut digest, path.as_bytes());
+        digest_field(&mut digest, format!("{parsed:?}").as_bytes());
+    }
+    let mut resources = BTreeMap::new();
+    for path in &csd_paths {
+        let source = String::from_utf8(read_corpus_file(corpus_dir, &corpus_dir.join(path))?)
+            .map_err(|_| CorpusProblem::new("carddemo.resource.invalid", "CSD is not UTF-8"))?;
+        for resource in parse_csd(&source).map_err(|problem| {
+            CorpusProblem::new(
+                "carddemo.resource.csd_invalid",
+                format!("{path}: {problem:?}"),
+            )
+        })? {
+            let key = format!("{}.{}", resource.kind, resource.name);
+            digest_field(&mut digest, key.as_bytes());
+            digest_field(&mut digest, format!("{:?}", resource.properties).as_bytes());
+            resources.insert(key, resource);
+        }
+    }
+    let programs = resources
+        .values()
+        .filter(|resource| resource.kind == "PROGRAM")
+        .map(|resource| resource.name.clone())
+        .collect::<BTreeSet<_>>();
+    let mut cross_references = 0usize;
+    let mut unresolved = Vec::new();
+    for transaction in resources
+        .values()
+        .filter(|resource| resource.kind == "TRANSACTION")
+    {
+        if let Some(program) = transaction.properties.get("PROGRAM") {
+            cross_references += 1;
+            if !programs.contains(program) || !available_programs.contains(program) {
+                unresolved.push(format!("{}->{program}", transaction.name));
+            }
+        }
+    }
+    unresolved.sort();
+    let count = |kind: &str| {
+        resources
+            .values()
+            .filter(|resource| resource.kind == kind)
+            .count()
+    };
+    Ok(CardDemoResourceReceipt {
+        schema_version: "mainframe-env.carddemo-resource-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit: corpus.commit,
+        bms_sources: bms_paths.len(),
+        mapsets: mapsets.len(),
+        maps: maps.len(),
+        fields,
+        transactions: count("TRANSACTION"),
+        programs: programs.len(),
+        files: count("FILE"),
+        tdqueues: count("TDQUEUE"),
+        cross_references,
+        unresolved,
+        resource_sha256: format!("{:x}", digest.finalize()),
+    })
 }
 
 fn digest_field(digest: &mut Sha256, bytes: &[u8]) {

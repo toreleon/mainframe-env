@@ -24,11 +24,13 @@ mod carddemo;
 pub use carddemo::{
     CardDemoClosureReceipt, CardDemoControlReceipt, CardDemoCoreReceipt, CardDemoCorpusReceipt,
     CardDemoFileCallReceipt, CardDemoHostReceipt, CardDemoLayoutReceipt, CardDemoPackageReceipt,
-    CardDemoSourceReceipt, CorpusProblem, verify_carddemo_application_package_from_env,
-    verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
-    verify_carddemo_corpus, verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
+    CardDemoResourceReceipt, CardDemoSourceReceipt, CorpusProblem,
+    verify_carddemo_application_package_from_env, verify_carddemo_control_flow_from_env,
+    verify_carddemo_core_semantics_from_env, verify_carddemo_corpus,
+    verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
     verify_carddemo_file_call_semantics_from_env, verify_carddemo_host_operands_from_env,
-    verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
+    verify_carddemo_resources_from_env, verify_carddemo_source_closures_from_env,
+    verify_carddemo_source_preprocessing_from_env,
 };
 
 pub const HELLO_SOURCE: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. HELLO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MSG PIC X(12) VALUE 'HELLO WORLD!'.\nPROCEDURE DIVISION.\nDISPLAY MSG.\nSTOP RUN.\n";

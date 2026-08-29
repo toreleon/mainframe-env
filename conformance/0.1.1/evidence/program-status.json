@@ -6,9 +6,9 @@
   "current_product": "0.1.0-alpha.0",
   "target_product": "0.1.1",
   "source_identity": {
-    "base_commit": "b203b9d7e73047af8b74af5d919280cad97316f3",
+    "base_commit": "6a8c7ccec048d3e9e2fd5a3f47608962debe8829",
     "dirty_tree_algorithm": "sha256 of sorted sha256sum records, excluding .git, target, docs/delivery/CARDEMO-0.1.1-STATUS.md, and conformance/0.1.1/evidence/program-status.json",
-    "dirty_tree_digest": "sha256:1ceba56607a427a859838db8dbd555b0cfa762fb7f93d77b34b15c59e4dddc02"
+    "dirty_tree_digest": "sha256:9a0da9699a03504a3c3974a292eb6ce382d8e41dc8dc1298637756e88376d260"
   },
   "corpus": {
     "environment_key": "CARDEMO_CORPUS_DIR",
@@ -21,8 +21,8 @@
     "license": "Apache-2.0",
     "license_sha256": "09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b"
   },
-  "current_issue": "CD-009",
-  "issues": {"total":27,"completed":9,"in_progress":0,"open":18},
+  "current_issue": "CD-010",
+  "issues": {"total":27,"completed":10,"in_progress":0,"open":17},
   "journeys": {"total":20,"passed":0,"failed_or_not_run":20},
   "completed_issues": [
     {
@@ -93,8 +93,16 @@
       "id": "CD-009",
       "state": "pass",
       "commit_subject": "Add generic mainframe application packages",
+      "commit_identity": "6a8c7ccec048d3e9e2fd5a3f47608962debe8829",
       "evidence": "conformance/0.1.1/evidence/issues/CD-009.json",
       "evidence_digest": "sha256:aebf2c87b6891e6018ee13652cfcc30609d5a2635634730338d52aba8c48c317"
+    },
+    {
+      "id": "CD-010",
+      "state": "pass",
+      "commit_subject": "Install BMS and CICS resource catalogs",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-010.json",
+      "evidence_digest": "sha256:c36fa5b51c47af8a2f764736654941b6c2069a56893d7d87b047eaffce580ed3"
     }
   ],
   "commands": [
@@ -163,6 +171,6 @@
     "Resolve 0.1.0-alpha.0 release ordering before cutting 0.1.1."
   ],
   "blockers": [],
-  "next_issue": "CD-010",
-  "next_step": "Implement CD-010 BMS/CSD parsing and installation for exact maps, transactions, programs, files, queues, and cross-reference validation."
+  "next_issue": "CD-011",
+  "next_step": "Implement CD-011 installed CICS program/generation resolution and XCTL/LINK/RETURN frame semantics with COMMAREA propagation."
 }
