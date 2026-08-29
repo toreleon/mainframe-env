@@ -1,8 +1,9 @@
 use crate::{DefaultProgramRouter, ServerConfig, default_program_router};
 use axum::http::StatusCode;
+use base64::Engine;
 use mainframe_env_application::ApplicationInstaller;
 use mainframe_env_batch::{BatchService, JclBundle};
-use mainframe_env_cics::{CicsService, cics_provider};
+use mainframe_env_cics::{CicsService, CicsTerminalSnapshot, cics_provider};
 use mainframe_env_dataset::{DatasetService, dataset_providers};
 use mainframe_env_execution_api::{
     ArtifactRef, CapabilityId, ExecutionId, IdempotencyKey, Invocation, InvocationLimits,
@@ -12,7 +13,7 @@ use mainframe_env_host_api::{
     AccessIntent, CapabilityDescriptor, ClockRequest, DatasetAttributes, DatasetName,
     DatasetOrganization, DatasetRequest, DatasetResult, EffectRequest, EffectResult, HostLimits,
     HostProblem, HostProvider, HostRequest, HostResult, MemberName, Mutation, RecordFormat,
-    RegistrySnapshot, ResourceName, ScopedHostService, SecretRef, SecurityDecision,
+    RegistrySnapshot, ResourceName, ScopedHostService, SecretRef, SecurityDecision, SessionId,
 };
 use mainframe_env_racf::{MemorySecretResolver, RacfService, racf_providers};
 use mainframe_env_store::{LocalArtifactStore, MemoryStore};
@@ -22,6 +23,7 @@ use mainframe_env_store_api::{
 use mainframe_env_zosmf::{
     Authentication, GatewayProblem, GatewayRequest, GatewayResponse, ZosmfBackend, ZosmfLimits,
 };
+use ring::rand::{SecureRandom, SystemRandom};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
@@ -57,6 +59,7 @@ pub struct ProductServer {
     store: Arc<dyn PlatformStore>,
     secrets: Arc<MemorySecretResolver>,
     racf: Arc<RacfService>,
+    cics: Arc<CicsService>,
     batch: Arc<BatchService>,
     artifacts: LocalArtifactStore,
     host: Arc<ScopedHostService>,
@@ -141,6 +144,7 @@ impl ProductServer {
             store,
             secrets,
             racf,
+            cics,
             batch,
             artifacts,
             host,
@@ -168,6 +172,11 @@ impl ProductServer {
     #[must_use]
     pub fn application_installer(&self) -> ApplicationInstaller {
         self.applications.clone()
+    }
+
+    #[must_use]
+    pub fn cics_service(&self) -> Arc<CicsService> {
+        self.cics.clone()
     }
 
     pub fn bootstrap_user(&self, user: &str, secret: &[u8]) -> Result<(), HostProblem> {
@@ -739,6 +748,138 @@ impl ProductServer {
             GatewayRequest::ConsoleLogs | GatewayRequest::ConsoleLog => {
                 self.console_logs(&principal)
             }
+            GatewayRequest::CicsLaunch {
+                transaction,
+                rows,
+                columns,
+            } => {
+                let session_token = self.secure_token("cics")?;
+                let csrf_token = self.secure_token("csrf")?;
+                let session = SessionId::new(
+                    &session_token,
+                    InvocationLimits::default().max_binding_bytes,
+                )
+                .map_err(|_| gateway_problem(HostProblem::InfrastructureFailure))?;
+                let invocation = self.cics_invocation(&principal, &transaction)?;
+                let snapshot = self
+                    .cics
+                    .launch_terminal(
+                        invocation,
+                        &session,
+                        &transaction,
+                        rows,
+                        columns,
+                        &csrf_token,
+                        current_tick()?,
+                        15 * 60 * 1_000,
+                    )
+                    .map_err(gateway_problem)?;
+                Ok(GatewayResponse::json(
+                    StatusCode::CREATED,
+                    json!({"session":snapshot.session,"csrf_token":csrf_token,"terminal":terminal_json(&snapshot)}),
+                ))
+            }
+            GatewayRequest::CicsScreen { session, tn3270 } => {
+                let session = terminal_session_id(&session)?;
+                let principal = terminal_principal(&principal)?;
+                let tick = current_tick()?;
+                if tn3270 {
+                    let bytes = self
+                        .cics
+                        .tn3270_screen(&session, &principal, tick)
+                        .map_err(gateway_problem)?;
+                    let mut response = GatewayResponse::bytes(StatusCode::OK, bytes);
+                    response
+                        .headers
+                        .insert("content-type".into(), "application/octet-stream".into());
+                    Ok(response)
+                } else {
+                    let snapshot = self
+                        .cics
+                        .terminal_snapshot(&session, &principal, tick)
+                        .map_err(gateway_problem)?;
+                    Ok(GatewayResponse::json(
+                        StatusCode::OK,
+                        terminal_json(&snapshot),
+                    ))
+                }
+            }
+            GatewayRequest::CicsInput {
+                session,
+                csrf_token,
+                aid,
+                fields,
+            } => {
+                let snapshot = self
+                    .cics
+                    .submit_terminal_input(
+                        &terminal_session_id(&session)?,
+                        &terminal_principal(&principal)?,
+                        &csrf_token,
+                        aid,
+                        &fields,
+                        current_tick()?,
+                    )
+                    .map_err(gateway_problem)?;
+                Ok(GatewayResponse::json(
+                    StatusCode::OK,
+                    terminal_json(&snapshot),
+                ))
+            }
+            GatewayRequest::CicsTn3270Input {
+                session,
+                csrf_token,
+                record,
+            } => {
+                let snapshot = self
+                    .cics
+                    .submit_tn3270(
+                        &terminal_session_id(&session)?,
+                        &terminal_principal(&principal)?,
+                        &csrf_token,
+                        &record,
+                        current_tick()?,
+                    )
+                    .map_err(gateway_problem)?;
+                Ok(GatewayResponse::json(
+                    StatusCode::OK,
+                    terminal_json(&snapshot),
+                ))
+            }
+            GatewayRequest::CicsResume {
+                session,
+                csrf_token,
+            } => {
+                let session = terminal_session_id(&session)?;
+                let principal_id = terminal_principal(&principal)?;
+                let snapshot = self
+                    .cics
+                    .terminal_snapshot(&session, &principal_id, current_tick()?)
+                    .map_err(gateway_problem)?;
+                let invocation = self.cics_invocation(&principal, &snapshot.transaction)?;
+                let snapshot = self
+                    .cics
+                    .resume_terminal(invocation, &session, &csrf_token, current_tick()?)
+                    .map_err(gateway_problem)?;
+                Ok(GatewayResponse::json(
+                    StatusCode::OK,
+                    terminal_json(&snapshot),
+                ))
+            }
+            GatewayRequest::CicsDisconnect {
+                session,
+                csrf_token,
+            } => {
+                self.cics
+                    .disconnect_terminal(
+                        &terminal_session_id(&session)?,
+                        &terminal_principal(&principal)?,
+                        &csrf_token,
+                        current_tick()?,
+                    )
+                    .map_err(gateway_problem)?;
+                Ok(GatewayResponse::empty(StatusCode::NO_CONTENT))
+            }
             GatewayRequest::Info | GatewayRequest::Authenticate => {
                 Err(gateway_problem(HostProblem::Malformed))
             }
@@ -779,8 +920,7 @@ impl ProductServer {
     }
 
     fn create_session(&self, user: &str) -> Result<String, HostProblem> {
-        let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
-        let token = format!("session-{sequence:016x}");
+        let token = secure_random_token("session")?;
         let mut sessions = self
             .sessions
             .lock()
@@ -1030,6 +1170,31 @@ impl ProductServer {
             InvocationLimits::default(),
         )
         .map_err(|_| HostProblem::InfrastructureFailure)
+    }
+
+    fn secure_token(&self, kind: &str) -> Result<String, GatewayProblem> {
+        secure_random_token(kind).map_err(gateway_problem)
+    }
+
+    fn cics_invocation(
+        &self,
+        principal: &str,
+        transaction: &str,
+    ) -> Result<Invocation, GatewayProblem> {
+        self.invocation(
+            principal,
+            &format!("cics:{}", transaction.to_ascii_uppercase()),
+            ServiceClass::Interactive,
+            &[
+                "host.security.authorize",
+                "host.cics.execute",
+                "host.dataset.read",
+                "host.dataset.write",
+                "host.program.invoke",
+                "host.clock",
+            ],
+        )
+        .map_err(gateway_problem)
     }
 
     fn ams(&self, principal: &str, control: &[u8]) -> Result<GatewayResponse, GatewayProblem> {
@@ -1362,6 +1527,55 @@ fn civil_from_unix_days(days: i64) -> (i64, i64, i64) {
 fn dataset_name(value: &str) -> Result<DatasetName, GatewayProblem> {
     DatasetName::new(value.to_ascii_uppercase(), 128)
         .map_err(|_| gateway_problem(HostProblem::Malformed))
+}
+
+fn terminal_session_id(value: &str) -> Result<SessionId, GatewayProblem> {
+    SessionId::new(value, InvocationLimits::default().max_binding_bytes)
+        .map_err(|_| gateway_problem(HostProblem::Malformed))
+}
+
+fn terminal_principal(value: &str) -> Result<PrincipalId, GatewayProblem> {
+    PrincipalId::new(value, InvocationLimits::default())
+        .map_err(|_| gateway_problem(HostProblem::Unauthorized))
+}
+
+fn current_tick() -> Result<u64, GatewayProblem> {
+    u64::try_from(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| gateway_problem(HostProblem::InfrastructureFailure))?
+            .as_millis(),
+    )
+    .map_err(|_| gateway_problem(HostProblem::ResourceExhausted))
+}
+
+fn terminal_json(snapshot: &CicsTerminalSnapshot) -> Value {
+    json!({
+        "schema_version":"mainframe-env.cics-terminal@1",
+        "session":snapshot.session,
+        "principal":snapshot.principal,
+        "transaction":snapshot.transaction,
+        "run_unit":snapshot.run_unit,
+        "rows":snapshot.rows,
+        "columns":snapshot.columns,
+        "aid":snapshot.aid,
+        "screen_base64":base64::engine::general_purpose::STANDARD.encode(&snapshot.screen),
+        "suspended":snapshot.suspended,
+        "connected":snapshot.connected,
+        "expires_at_tick":snapshot.expires_at_tick,
+        "version":snapshot.version
+    })
+}
+
+fn secure_random_token(kind: &str) -> Result<String, HostProblem> {
+    let mut bytes = [0u8; 32];
+    SystemRandom::new()
+        .fill(&mut bytes)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    Ok(format!(
+        "{kind}-{}",
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
+    ))
 }
 
 fn dataset_mutation(request: &DatasetRequest) -> Option<&Mutation> {
@@ -1758,6 +1972,77 @@ mod tests {
             serde_json::from_slice(&to_bytes(response.into_body(), 65536).await.unwrap()).unwrap();
         assert_eq!(job["retcode"], "CC 0000");
         assert!(server.metrics().outbox_delivered >= 5);
+    }
+
+    #[tokio::test]
+    async fn public_cics_cc00_session_requires_authentication_and_csrf() {
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let app = server.router();
+        let unauthenticated = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/mainframe-env/cics/v1/sessions")
+                    .header("x-csrf-zosmf-header", "true")
+                    .body(Body::from(r#"{"transaction":"CC00"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(unauthenticated.status(), StatusCode::UNAUTHORIZED);
+        let launched = call(
+            &app,
+            Method::POST,
+            "/mainframe-env/cics/v1/sessions",
+            r#"{"transaction":"CC00","rows":24,"columns":80}"#,
+        )
+        .await;
+        assert_eq!(launched.status(), StatusCode::CREATED);
+        let launched: Value =
+            serde_json::from_slice(&to_bytes(launched.into_body(), 65536).await.unwrap()).unwrap();
+        let session = launched["session"].as_str().unwrap();
+        let csrf = launched["csrf_token"].as_str().unwrap();
+        assert_eq!(launched["terminal"]["transaction"], "CC00");
+        let screen = call(
+            &app,
+            Method::GET,
+            &format!("/mainframe-env/cics/v1/sessions/{session}"),
+            "",
+        )
+        .await;
+        assert_eq!(screen.status(), StatusCode::OK);
+        let denied = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(Method::DELETE)
+                    .uri(format!("/mainframe-env/cics/v1/sessions/{session}"))
+                    .header("authorization", basic())
+                    .header("x-csrf-zosmf-header", "true")
+                    .header("x-csrf-token", "wrong")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+        let disconnected = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::DELETE)
+                    .uri(format!("/mainframe-env/cics/v1/sessions/{session}"))
+                    .header("authorization", basic())
+                    .header("x-csrf-zosmf-header", "true")
+                    .header("x-csrf-token", csrf)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(disconnected.status(), StatusCode::NO_CONTENT);
+        assert_eq!(server.metrics().active, 0);
     }
 
     #[test]

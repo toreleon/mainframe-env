@@ -1,0 +1,95 @@
+{
+  "schema_version": "mainframe-env.carddemo-issue-evidence@1",
+  "issue": "CD-018",
+  "title": "Expose durable CICS sessions and original terminal compatibility",
+  "derived": true,
+  "status": "pass",
+  "target_product": "0.1.1",
+  "current_product": "0.1.0-alpha.0",
+  "digest_scope": "Recursively lexicographically key-sorted compact UTF-8 JSON serialization of terminal_receipt, with no trailing newline, followed by SHA-256",
+  "evidence_digest": "sha256:aad1b054a1b39aba7fb537ff2562915e9ec17fe724bc5ace930ea688ce3ce5b7",
+  "terminal_receipt": {
+    "schema_version": "mainframe-env.carddemo-terminal-receipt@1",
+    "status": "pass",
+    "corpus_commit": "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e",
+    "launch_transaction": "CC00",
+    "bms_maps_installed": 17,
+    "bms_fields_installed": 441,
+    "public_routes_exercised": 7,
+    "protocol_screen_fetches": 2,
+    "input_submissions": 2,
+    "authentication_controls": 2,
+    "csrf_controls": 2,
+    "restart_resumes": 1,
+    "disconnects": 1,
+    "timeout_controls": 1,
+    "malformed_controls": 2,
+    "idle_worker_count": 0,
+    "terminal_shape_sha256": "49110161d0566f2c56b261fa50594cd7d7d5de1184e497da336d0b1b9d6d21a2"
+  },
+  "acceptance_observations": [
+    "Authenticated public routes launch CC00, fetch protocol-neutral screens, submit AID and named fields, resume after restart, and disconnect through one durable CICS session authority.",
+    "All 17 pinned base BMS maps and 441 named fields install durably. Protocol-neutral JSON and bounded TN3270 Write/WCC, SBA, field, cursor, and AID records operate on the same screen and input state.",
+    "Per-session principal ownership and CSRF hashes fail closed for anonymous, cross-principal, missing-token, and wrong-token requests. Protected and secret BMS values are not accepted or emitted by the TN3270 adapter.",
+    "Malformed JSON and TN3270 records, configured session/run capacity, idle timeout, disconnect, and restart behavior are explicit; idle sessions retain zero CPU workers."
+  ],
+  "commands": [
+    {
+      "command": "cargo test -p mainframe-env-cics carddemo_public_terminal_and_tn3270_share_durable_authority --locked before repair",
+      "exit_code": 1,
+      "result": "focused regression proved no public terminal launch or TN3270 authority existed"
+    },
+    {
+      "command": "CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-terminal --check before CD-018 evidence",
+      "exit_code": 1,
+      "result": "derived receipt had no issue evidence yet"
+    },
+    {
+      "command": "cargo test -p mainframe-env-cics -p mainframe-env-zosmf -p mainframe-env-server --locked",
+      "exit_code": 0,
+      "result": "29 CICS authority, public gateway, product composition, restart, malformed-input, CSRF, timeout, and overload tests passed"
+    },
+    {
+      "command": "affected-package cargo clippy --all-targets --locked -- -D warnings",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-terminal --check",
+      "exit_code": 0,
+      "result": "17-map, 441-field public JSON/TN3270 terminal receipt passed"
+    },
+    {
+      "command": "env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-terminal --check",
+      "exit_code": 1,
+      "result": "expected missing-environment control"
+    },
+    {
+      "command": "cargo xtask architecture --check && cargo xtask runtime-architecture --check && cargo xtask profiles --check && cargo xtask schemas --check && cargo xtask inventory --check",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "cargo check --workspace --all-targets --locked",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "all cumulative CardDemo gates through carddemo-terminal",
+      "exit_code": 0,
+      "result": "18 corpus-derived issue gates passed"
+    },
+    {
+      "command": "env -u CARDEMO_CORPUS_DIR cargo xtask conformance --check",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "cargo fmt --all -- --check && git diff --check && JSON parse checks",
+      "exit_code": 0,
+      "result": "pass"
+    }
+  ],
+  "absolute_local_paths_present": false,
+  "native_or_legacy_fallback_present": false
+}

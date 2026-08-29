@@ -50,6 +50,7 @@ base64 = "0.22"
 tracing = "0.1"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 tokio-rustls = { version = "0.26", default-features = false }
+ring = "0.17"
 
 mainframe-env-source = { path = "crates/foundation/mainframe-env-source" }
 mainframe-env-diagnostics = { path = "crates/foundation/mainframe-env-diagnostics" }

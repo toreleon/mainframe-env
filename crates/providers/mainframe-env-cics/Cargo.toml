@@ -9,6 +9,7 @@ license.workspace = true
 mainframe-env-execution-api.workspace = true
 mainframe-env-host-api.workspace = true
 mainframe-env-store-api.workspace = true
+sha2.workspace = true
 
 [dev-dependencies]
 mainframe-env-store = { path = "../../stores/mainframe-env-store" }

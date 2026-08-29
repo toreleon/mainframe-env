@@ -12,6 +12,7 @@ use mainframe_env_host_api::{
 use mainframe_env_store_api::{
     ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
 };
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
@@ -68,11 +69,36 @@ pub struct BmsMapDefinition {
 struct Session {
     rows: u16,
     columns: u16,
+    principal: String,
+    transaction: String,
+    run_unit: String,
+    csrf_sha256: String,
+    idle_timeout_ticks: u64,
+    expires_at_tick: u64,
+    connected: bool,
     aid: u8,
     screen: Vec<u8>,
     input: Option<Vec<u8>>,
     suspended: bool,
+    mapset: Option<String>,
+    map: Option<String>,
     version: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CicsTerminalSnapshot {
+    pub session: String,
+    pub principal: String,
+    pub transaction: String,
+    pub run_unit: String,
+    pub rows: u16,
+    pub columns: u16,
+    pub aid: u8,
+    pub screen: Vec<u8>,
+    pub suspended: bool,
+    pub connected: bool,
+    pub expires_at_tick: u64,
+    pub version: u64,
 }
 
 #[derive(Clone)]
@@ -151,6 +177,17 @@ impl CicsService {
                 decode_continuation(&row.payload, row.version, limits)?,
             );
         }
+        let mut maps = BTreeMap::new();
+        for row in store
+            .list_provider_state("cics-map", limits.max_maps)
+            .map_err(store_error)?
+        {
+            let map = decode_map(&row.payload, limits)?;
+            let key = (map.mapset.clone(), map.map.clone());
+            if row.key != map_key(&map.mapset, &map.map) || maps.insert(key, map).is_some() {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+        }
         let mut file_aliases = BTreeMap::new();
         for row in store
             .list_provider_state("cics-file-alias", limits.max_file_aliases)
@@ -189,7 +226,7 @@ impl CicsService {
             state: Mutex::new(State {
                 sessions,
                 runs: BTreeMap::new(),
-                maps: BTreeMap::new(),
+                maps,
                 file_aliases,
                 continuations,
                 transient,
@@ -216,10 +253,19 @@ impl CicsService {
         let created = Session {
             rows,
             columns,
+            principal: String::new(),
+            transaction: String::new(),
+            run_unit: String::new(),
+            csrf_sha256: String::new(),
+            idle_timeout_ticks: u64::MAX,
+            expires_at_tick: u64::MAX,
+            connected: true,
             aid: 0,
             screen: Vec::new(),
             input: None,
             suspended: false,
+            mapset: None,
+            map: None,
             version: 1,
         };
         let mut state = self.lock()?;
@@ -232,6 +278,290 @@ impl CicsService {
         self.persist_session(session.as_str(), &created, None)?;
         state.sessions.insert(session.as_str().into(), created);
         Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn launch_terminal(
+        &self,
+        invocation: Invocation,
+        session: &SessionId,
+        transaction: &str,
+        rows: u16,
+        columns: u16,
+        csrf_token: &str,
+        now_tick: u64,
+        idle_timeout_ticks: u64,
+    ) -> Result<CicsTerminalSnapshot, HostProblem> {
+        validate_terminal_identity(transaction, 16)?;
+        validate_terminal_identity(csrf_token, 256)?;
+        if rows == 0 || columns == 0 || idle_timeout_ticks == 0 {
+            return Err(HostProblem::Malformed);
+        }
+        let screen_bytes = usize::from(rows)
+            .checked_mul(usize::from(columns))
+            .ok_or(HostProblem::ResourceExhausted)?;
+        if screen_bytes > self.limits.max_screen_bytes {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        self.authorize_terminal(&invocation, transaction)?;
+        let expires_at_tick = now_tick
+            .checked_add(idle_timeout_ticks)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        let created = Session {
+            rows,
+            columns,
+            principal: invocation.principal.id().as_str().into(),
+            transaction: transaction.to_ascii_uppercase(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            csrf_sha256: terminal_secret_digest(csrf_token),
+            idle_timeout_ticks,
+            expires_at_tick,
+            connected: true,
+            aid: 0,
+            screen: Vec::new(),
+            input: None,
+            suspended: false,
+            mapset: None,
+            map: None,
+            version: 1,
+        };
+        let run = run_for(
+            invocation.clone(),
+            session.as_str(),
+            transaction,
+            "ME01",
+            "S001",
+        );
+        let mut state = self.lock()?;
+        if state.sessions.len() >= self.limits.max_sessions
+            || state.runs.len() >= self.limits.max_runs
+        {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        if state.sessions.contains_key(session.as_str())
+            || state.runs.contains_key(&invocation.run_unit_id)
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        self.persist_session(session.as_str(), &created, None)?;
+        state
+            .sessions
+            .insert(session.as_str().into(), created.clone());
+        state.runs.insert(invocation.run_unit_id.clone(), run);
+        Ok(terminal_snapshot(session.as_str(), &created))
+    }
+
+    pub fn terminal_snapshot(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        now_tick: u64,
+    ) -> Result<CicsTerminalSnapshot, HostProblem> {
+        self.public_session(session, principal, None, now_tick)
+            .map(|value| terminal_snapshot(session.as_str(), &value))
+    }
+
+    pub fn submit_terminal_input(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        csrf_token: &str,
+        aid: u8,
+        fields: &BTreeMap<String, Vec<u8>>,
+        now_tick: u64,
+    ) -> Result<CicsTerminalSnapshot, HostProblem> {
+        if !valid_aid(aid) || fields.len() > self.limits.max_fields {
+            return Err(HostProblem::Malformed);
+        }
+        let current = self.public_session(session, principal, Some(csrf_token), now_tick)?;
+        let mut encoded = Vec::new();
+        let mut normalized = BTreeMap::new();
+        {
+            let state = self.lock()?;
+            let (mapset, map) = current
+                .mapset
+                .as_ref()
+                .zip(current.map.as_ref())
+                .ok_or(HostProblem::NotFound)?;
+            let definition = state
+                .maps
+                .get(&(mapset.clone(), map.clone()))
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            for (name, value) in fields {
+                let definition = definition
+                    .fields
+                    .iter()
+                    .find(|field| field.name.eq_ignore_ascii_case(name))
+                    .ok_or(HostProblem::Malformed)?;
+                if definition.protected || value.len() > usize::from(definition.length) {
+                    return Err(HostProblem::Unauthorized);
+                }
+                if normalized
+                    .insert(name.to_ascii_uppercase(), value.clone())
+                    .is_some()
+                {
+                    return Err(HostProblem::Malformed);
+                }
+            }
+        }
+        for (name, value) in &normalized {
+            validate_terminal_identity(name, 32)?;
+            if value.len() > self.limits.max_screen_bytes {
+                return Err(HostProblem::ResourceExhausted);
+            }
+            field(&mut encoded, name.as_bytes())?;
+            field(&mut encoded, value)?;
+        }
+        let mut next = current.clone();
+        next.version = next
+            .version
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        next.expires_at_tick = now_tick
+            .checked_add(next.idle_timeout_ticks)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        next.aid = aid;
+        next.input = Some(encoded);
+        next.suspended = false;
+        let mut state = self.lock()?;
+        if state
+            .sessions
+            .get(session.as_str())
+            .is_none_or(|value| value.version != current.version)
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        self.persist_session(session.as_str(), &next, Some(current.version))?;
+        state.sessions.insert(session.as_str().into(), next.clone());
+        Ok(terminal_snapshot(session.as_str(), &next))
+    }
+
+    pub fn resume_terminal(
+        &self,
+        invocation: Invocation,
+        session: &SessionId,
+        csrf_token: &str,
+        now_tick: u64,
+    ) -> Result<CicsTerminalSnapshot, HostProblem> {
+        let principal = invocation.principal.id();
+        let current = self.public_session(session, principal, Some(csrf_token), now_tick)?;
+        self.authorize_terminal(&invocation, &current.transaction)?;
+        let run_unit = invocation.run_unit_id.as_str().to_string();
+        let has_continuation = self.lock()?.continuations.contains_key(session.as_str());
+        let resumed_transaction = if has_continuation {
+            let continuation = self.claim_continuation(invocation, session, "ME01", "S001")?;
+            let transaction = continuation.transaction;
+            self.lock()?
+                .runs
+                .get_mut(
+                    &RunUnitId::new(&run_unit, InvocationLimits::default())
+                        .map_err(|_| HostProblem::InfrastructureFailure)?,
+                )
+                .ok_or(HostProblem::InfrastructureFailure)?
+                .retrieve = continuation.commarea;
+            transaction
+        } else {
+            self.register_run(invocation, session, &current.transaction, "ME01", "S001")?;
+            current.transaction.clone()
+        };
+        let mut next = current.clone();
+        next.version = next
+            .version
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        next.expires_at_tick = now_tick
+            .checked_add(next.idle_timeout_ticks)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        next.run_unit = run_unit;
+        next.transaction = resumed_transaction;
+        let mut state = self.lock()?;
+        if state
+            .sessions
+            .get(session.as_str())
+            .is_none_or(|value| value.version != current.version)
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        self.persist_session(session.as_str(), &next, Some(current.version))?;
+        state.sessions.insert(session.as_str().into(), next.clone());
+        Ok(terminal_snapshot(session.as_str(), &next))
+    }
+
+    pub fn disconnect_terminal(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        csrf_token: &str,
+        now_tick: u64,
+    ) -> Result<(), HostProblem> {
+        let current = self.public_session(session, principal, Some(csrf_token), now_tick)?;
+        let mut state = self.lock()?;
+        if state
+            .sessions
+            .get(session.as_str())
+            .is_none_or(|value| value.version != current.version)
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        self.store
+            .delete_provider_state("cics-session", session.as_str(), current.version)
+            .map_err(store_error)?;
+        state.sessions.remove(session.as_str());
+        state.runs.retain(|_, run| run.session != session.as_str());
+        Ok(())
+    }
+
+    pub fn tn3270_screen(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        now_tick: u64,
+    ) -> Result<Vec<u8>, HostProblem> {
+        let current = self.public_session(session, principal, None, now_tick)?;
+        let (mapset, map) = current
+            .mapset
+            .as_ref()
+            .zip(current.map.as_ref())
+            .ok_or(HostProblem::NotFound)?;
+        let state = self.lock()?;
+        let definition = state
+            .maps
+            .get(&(mapset.clone(), map.clone()))
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        encode_tn3270_screen(&current, definition, self.limits)
+    }
+
+    pub fn submit_tn3270(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        csrf_token: &str,
+        record: &[u8],
+        now_tick: u64,
+    ) -> Result<CicsTerminalSnapshot, HostProblem> {
+        if record.len() > self.limits.max_screen_bytes {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let current = self.public_session(session, principal, Some(csrf_token), now_tick)?;
+        let (mapset, map) = current
+            .mapset
+            .as_ref()
+            .zip(current.map.as_ref())
+            .ok_or(HostProblem::NotFound)?;
+        let fields = {
+            let state = self.lock()?;
+            let definition = state
+                .maps
+                .get(&(mapset.clone(), map.clone()))
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            decode_tn3270_input(record, &current, definition, self.limits)?
+        };
+        self.submit_terminal_input(session, principal, csrf_token, record[0], &fields, now_tick)
+    }
+
+    #[must_use]
+    pub const fn active_worker_count(&self) -> usize {
+        0
     }
 
     pub fn register_run(
@@ -390,17 +720,36 @@ impl CicsService {
 
     pub fn register_map(&self, definition: BmsMapDefinition) -> Result<(), HostProblem> {
         validate_map(&definition, self.limits)?;
+        let mut definition = definition;
+        definition.mapset = definition.mapset.to_ascii_uppercase();
+        definition.map = definition.map.to_ascii_uppercase();
+        for field in &mut definition.fields {
+            field.name = field.name.to_ascii_uppercase();
+        }
         let mut state = self.lock()?;
+        let key = (definition.mapset.clone(), definition.map.clone());
+        if let Some(existing) = state.maps.get(&key) {
+            return if existing == &definition {
+                Ok(())
+            } else {
+                Err(HostProblem::IdempotencyConflict)
+            };
+        }
         if state.maps.len() >= self.limits.max_maps {
             return Err(HostProblem::ResourceExhausted);
         }
-        let key = (
-            definition.mapset.to_ascii_uppercase(),
-            definition.map.to_ascii_uppercase(),
-        );
-        if state.maps.insert(key, definition).is_some() {
-            return Err(HostProblem::IdempotencyConflict);
-        }
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "cics-map".into(),
+                    key: map_key(&definition.mapset, &definition.map),
+                    version: 1,
+                    payload: encode_map(&definition)?,
+                },
+                None,
+            )
+            .map_err(store_error)?;
+        state.maps.insert(key, definition);
         Ok(())
     }
 
@@ -684,6 +1033,10 @@ impl CicsService {
         let mut next = current.clone();
         next.version += 1;
         next.screen = payload.clone();
+        if request.operation == CicsOperation::SendMap {
+            next.mapset = Some(argument_text(request, "MAPSET")?.to_ascii_uppercase());
+            next.map = Some(argument_text(request, "MAP")?.to_ascii_uppercase());
+        }
         self.persist_session(&run.session, &next, Some(current.version))?;
         state.sessions.insert(run.session.clone(), next);
         self.response(
@@ -1473,6 +1826,74 @@ impl CicsService {
         })
     }
 
+    fn authorize_terminal(
+        &self,
+        invocation: &Invocation,
+        transaction: &str,
+    ) -> Result<(), HostProblem> {
+        let result = self.host.invoke(
+            invocation,
+            0,
+            false,
+            EffectRequest {
+                run_unit: invocation.run_unit_id.clone(),
+                sequence: 1,
+                deadline_tick: invocation.deadline_tick,
+                idempotency_key: None,
+                request: HostRequest::Security(SecurityRequest::Authorize {
+                    principal: invocation.principal.id().clone(),
+                    class: "TCICSTRN".into(),
+                    resource: ResourceName::new(
+                        format!("CICS.{}", transaction.to_ascii_uppercase()),
+                        246,
+                    )
+                    .map_err(|_| HostProblem::Malformed)?,
+                    intent: AccessIntent::Execute,
+                }),
+            },
+        );
+        match result.effect.outcome? {
+            HostResult::Security(SecurityDecision::Allow) => Ok(()),
+            HostResult::Security(_) => Err(HostProblem::Unauthorized),
+            _ => Err(HostProblem::ProviderFailure),
+        }
+    }
+
+    fn public_session(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        csrf_token: Option<&str>,
+        now_tick: u64,
+    ) -> Result<Session, HostProblem> {
+        let mut state = self.lock()?;
+        let current = state
+            .sessions
+            .get(session.as_str())
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
+        if current.principal.is_empty() || current.principal != principal.as_str() {
+            return Err(HostProblem::Unauthorized);
+        }
+        if let Some(token) = csrf_token
+            && (token.is_empty() || terminal_secret_digest(token) != current.csrf_sha256)
+        {
+            return Err(HostProblem::Unauthorized);
+        }
+        if !current.connected {
+            return Err(HostProblem::NotFound);
+        }
+        if now_tick >= current.expires_at_tick {
+            self.store
+                .delete_provider_state("cics-session", session.as_str(), current.version)
+                .map_err(store_error)?;
+            state.sessions.remove(session.as_str());
+            state.runs.retain(|_, run| run.session != session.as_str());
+            return Err(HostProblem::TimedOut);
+        }
+        Ok(current)
+    }
+
     fn lock(&self) -> Result<std::sync::MutexGuard<'_, State>, HostProblem> {
         self.state
             .lock()
@@ -1566,6 +1987,194 @@ pub fn cics_provider(service: Arc<CicsService>, limits: InvocationLimits) -> Arc
             ready: true,
         },
     })
+}
+
+fn run_for(
+    invocation: Invocation,
+    session: &str,
+    transaction: &str,
+    applid: &str,
+    sysid: &str,
+) -> Run {
+    let retrieve = invocation
+        .bindings
+        .get("cics.retrieve")
+        .map(|value| value.bytes().to_vec())
+        .unwrap_or_default();
+    Run {
+        invocation,
+        session: session.into(),
+        transaction: transaction.to_ascii_uppercase(),
+        applid: applid.to_ascii_uppercase(),
+        sysid: sysid.to_ascii_uppercase(),
+        host_sequence: 0,
+        handlers: BTreeMap::new(),
+        abend_handler: None,
+        retrieve,
+        current_records: BTreeMap::new(),
+        browses: BTreeMap::new(),
+    }
+}
+
+fn terminal_snapshot(session: &str, value: &Session) -> CicsTerminalSnapshot {
+    CicsTerminalSnapshot {
+        session: session.into(),
+        principal: value.principal.clone(),
+        transaction: value.transaction.clone(),
+        run_unit: value.run_unit.clone(),
+        rows: value.rows,
+        columns: value.columns,
+        aid: value.aid,
+        screen: value.screen.clone(),
+        suspended: value.suspended,
+        connected: value.connected,
+        expires_at_tick: value.expires_at_tick,
+        version: value.version,
+    }
+}
+
+fn terminal_secret_digest(value: &str) -> String {
+    format!("{:x}", Sha256::digest(value.as_bytes()))
+}
+
+fn validate_terminal_identity(value: &str, max: usize) -> Result<(), HostProblem> {
+    if value.is_empty()
+        || value.len() > max
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_graphic() && byte != b'/' && byte != b'\\')
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
+}
+
+const fn valid_aid(aid: u8) -> bool {
+    matches!(
+        aid,
+        0x6b..=0x6e | 0x7d | 0xc1..=0xc9 | 0x4a..=0x4c | 0xf1..=0xfc
+    )
+}
+
+fn encode_tn3270_screen(
+    session: &Session,
+    map: &BmsMapDefinition,
+    limits: CicsLimits,
+) -> Result<Vec<u8>, HostProblem> {
+    let displayed = decode_map_payload(&session.screen, limits).unwrap_or_default();
+    let mut out = vec![0xf5, 0xc3];
+    let mut fields = map.fields.iter().collect::<Vec<_>>();
+    fields.sort_by_key(|field| (field.row, field.column, field.name.as_str()));
+    for definition in fields {
+        let address = terminal_field_address(session, definition)?;
+        out.push(0x11);
+        out.extend_from_slice(&encode_terminal_address(address)?);
+        out.push(0x1d);
+        out.push(if definition.protected { 0x20 } else { 0x00 });
+        let value = if definition.secret {
+            Vec::new()
+        } else {
+            displayed
+                .get(&definition.name.to_ascii_uppercase())
+                .cloned()
+                .unwrap_or_else(|| definition.initial.clone())
+        };
+        out.extend(value.into_iter().take(usize::from(definition.length)));
+        if out.len() > limits.max_screen_bytes {
+            return Err(HostProblem::ResourceExhausted);
+        }
+    }
+    Ok(out)
+}
+
+fn decode_tn3270_input(
+    record: &[u8],
+    session: &Session,
+    map: &BmsMapDefinition,
+    limits: CicsLimits,
+) -> Result<BTreeMap<String, Vec<u8>>, HostProblem> {
+    if record.len() < 3 || !valid_aid(record[0]) || record.contains(&0xff) {
+        return Err(HostProblem::Malformed);
+    }
+    decode_terminal_address(record[1], record[2])?;
+    let mut fields = BTreeMap::new();
+    let mut at = 3usize;
+    while at < record.len() {
+        if record.get(at) != Some(&0x11) || at.checked_add(3).is_none_or(|end| end > record.len()) {
+            return Err(HostProblem::Malformed);
+        }
+        let address = decode_terminal_address(record[at + 1], record[at + 2])?;
+        at += 3;
+        let end = record[at..]
+            .iter()
+            .position(|byte| *byte == 0x11)
+            .map_or(record.len(), |offset| at + offset);
+        let definition = map
+            .fields
+            .iter()
+            .find(|field| terminal_field_address(session, field) == Ok(address))
+            .ok_or(HostProblem::Malformed)?;
+        let value = record[at..end].to_vec();
+        if definition.protected
+            || value.len() > usize::from(definition.length)
+            || fields
+                .insert(definition.name.to_ascii_uppercase(), value)
+                .is_some()
+            || fields.len() > limits.max_fields
+        {
+            return Err(HostProblem::Unauthorized);
+        }
+        at = end;
+    }
+    Ok(fields)
+}
+
+fn terminal_field_address(
+    session: &Session,
+    field: &BmsFieldDefinition,
+) -> Result<u16, HostProblem> {
+    let row = field.row.checked_sub(1).ok_or(HostProblem::Malformed)?;
+    let column = field.column.checked_sub(1).ok_or(HostProblem::Malformed)?;
+    row.checked_mul(session.columns)
+        .and_then(|value| value.checked_add(column))
+        .filter(|value| *value < session.rows.saturating_mul(session.columns))
+        .ok_or(HostProblem::Malformed)
+}
+
+fn encode_terminal_address(address: u16) -> Result<[u8; 2], HostProblem> {
+    if address > 0x3fff {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    Ok([(address >> 8) as u8, address as u8])
+}
+
+fn decode_terminal_address(first: u8, second: u8) -> Result<u16, HostProblem> {
+    if first & 0xc0 != 0 {
+        return Err(HostProblem::Unsupported);
+    }
+    Ok((u16::from(first) << 8) | u16::from(second))
+}
+
+fn decode_map_payload(
+    payload: &[u8],
+    limits: CicsLimits,
+) -> Result<BTreeMap<String, Vec<u8>>, HostProblem> {
+    let mut reader = Reader {
+        bytes: payload,
+        at: 0,
+    };
+    let mut fields = BTreeMap::new();
+    while reader.at < payload.len() {
+        let name = String::from_utf8(reader.field(32)?)
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .to_ascii_uppercase();
+        let value = reader.field(limits.max_screen_bytes)?;
+        if fields.insert(name, value).is_some() || fields.len() > limits.max_fields {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+    }
+    Ok(fields)
 }
 
 fn validate_map(map: &BmsMapDefinition, limits: CicsLimits) -> Result<(), HostProblem> {
@@ -2011,12 +2620,150 @@ fn mutation_problem(problem: HostProblem) -> HostProblem {
     }
 }
 
+fn map_key(mapset: &str, map: &str) -> String {
+    format!("{mapset}/{map}")
+}
+
+fn encode_map(map: &BmsMapDefinition) -> Result<Vec<u8>, HostProblem> {
+    let mut out = b"MECM1".to_vec();
+    field(&mut out, map.mapset.as_bytes())?;
+    field(&mut out, map.map.as_bytes())?;
+    out.extend_from_slice(&map.rows.to_be_bytes());
+    out.extend_from_slice(&map.columns.to_be_bytes());
+    out.extend_from_slice(
+        &u32::try_from(map.fields.len())
+            .map_err(|_| HostProblem::ResourceExhausted)?
+            .to_be_bytes(),
+    );
+    for definition in &map.fields {
+        field(&mut out, definition.name.as_bytes())?;
+        out.extend_from_slice(&definition.row.to_be_bytes());
+        out.extend_from_slice(&definition.column.to_be_bytes());
+        out.extend_from_slice(&definition.length.to_be_bytes());
+        field(&mut out, &definition.initial)?;
+        field(
+            &mut out,
+            definition.color.as_deref().unwrap_or("").as_bytes(),
+        )?;
+        field(
+            &mut out,
+            definition.highlight.as_deref().unwrap_or("").as_bytes(),
+        )?;
+        out.push(u8::from(definition.protected));
+        out.push(u8::from(definition.secret));
+    }
+    Ok(out)
+}
+
+fn decode_map(bytes: &[u8], limits: CicsLimits) -> Result<BmsMapDefinition, HostProblem> {
+    let mut reader = Reader { bytes, at: 0 };
+    if reader.take(5)? != b"MECM1" {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let mapset =
+        String::from_utf8(reader.field(16)?).map_err(|_| HostProblem::InfrastructureFailure)?;
+    let map =
+        String::from_utf8(reader.field(16)?).map_err(|_| HostProblem::InfrastructureFailure)?;
+    let rows = u16::from_be_bytes(
+        reader
+            .take(2)?
+            .try_into()
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+    );
+    let columns = u16::from_be_bytes(
+        reader
+            .take(2)?
+            .try_into()
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+    );
+    let count = usize::try_from(u32::from_be_bytes(
+        reader
+            .take(4)?
+            .try_into()
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+    ))
+    .map_err(|_| HostProblem::InfrastructureFailure)?;
+    if count > limits.max_fields {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let mut fields = Vec::with_capacity(count);
+    for _ in 0..count {
+        let name =
+            String::from_utf8(reader.field(32)?).map_err(|_| HostProblem::InfrastructureFailure)?;
+        let row = u16::from_be_bytes(
+            reader
+                .take(2)?
+                .try_into()
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+        );
+        let column = u16::from_be_bytes(
+            reader
+                .take(2)?
+                .try_into()
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+        );
+        let length = u16::from_be_bytes(
+            reader
+                .take(2)?
+                .try_into()
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+        );
+        let initial = reader.field(limits.max_screen_bytes)?;
+        let color =
+            String::from_utf8(reader.field(32)?).map_err(|_| HostProblem::InfrastructureFailure)?;
+        let highlight =
+            String::from_utf8(reader.field(32)?).map_err(|_| HostProblem::InfrastructureFailure)?;
+        let protected = match reader.take(1)?[0] {
+            0 => false,
+            1 => true,
+            _ => return Err(HostProblem::InfrastructureFailure),
+        };
+        let secret = match reader.take(1)?[0] {
+            0 => false,
+            1 => true,
+            _ => return Err(HostProblem::InfrastructureFailure),
+        };
+        fields.push(BmsFieldDefinition {
+            name,
+            row,
+            column,
+            length,
+            initial,
+            color: (!color.is_empty()).then_some(color),
+            highlight: (!highlight.is_empty()).then_some(highlight),
+            protected,
+            secret,
+        });
+    }
+    if reader.at != bytes.len() {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let definition = BmsMapDefinition {
+        mapset,
+        map,
+        rows,
+        columns,
+        fields,
+    };
+    validate_map(&definition, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
+    Ok(definition)
+}
+
 fn encode_session(session: &Session) -> Result<Vec<u8>, HostProblem> {
-    let mut out = b"MECS1".to_vec();
+    let mut out = b"MECS2".to_vec();
     out.extend_from_slice(&session.rows.to_be_bytes());
     out.extend_from_slice(&session.columns.to_be_bytes());
+    field(&mut out, session.principal.as_bytes())?;
+    field(&mut out, session.transaction.as_bytes())?;
+    field(&mut out, session.run_unit.as_bytes())?;
+    field(&mut out, session.csrf_sha256.as_bytes())?;
+    out.extend_from_slice(&session.idle_timeout_ticks.to_be_bytes());
+    out.extend_from_slice(&session.expires_at_tick.to_be_bytes());
+    out.push(u8::from(session.connected));
     out.push(session.aid);
     out.push(u8::from(session.suspended));
+    field(&mut out, session.mapset.as_deref().unwrap_or("").as_bytes())?;
+    field(&mut out, session.map.as_deref().unwrap_or("").as_bytes())?;
     field(&mut out, &session.screen)?;
     match &session.input {
         Some(input) => {
@@ -2030,7 +2777,8 @@ fn encode_session(session: &Session) -> Result<Vec<u8>, HostProblem> {
 
 fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Session, HostProblem> {
     let mut reader = Reader { bytes, at: 0 };
-    if reader.take(5)? != b"MECS1" {
+    let schema = reader.take(5)?;
+    if schema != b"MECS1" && schema != b"MECS2" {
         return Err(HostProblem::InfrastructureFailure);
     }
     let rows = u16::from_be_bytes(
@@ -2045,11 +2793,91 @@ fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Sess
             .try_into()
             .map_err(|_| HostProblem::InfrastructureFailure)?,
     );
+    let (
+        principal,
+        transaction,
+        run_unit,
+        csrf_sha256,
+        idle_timeout_ticks,
+        expires_at_tick,
+        connected,
+    ) = if schema == b"MECS2" {
+        let principal = String::from_utf8(reader.field(128)?)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let transaction =
+            String::from_utf8(reader.field(16)?).map_err(|_| HostProblem::InfrastructureFailure)?;
+        let run_unit = String::from_utf8(reader.field(128)?)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let csrf_sha256 =
+            String::from_utf8(reader.field(64)?).map_err(|_| HostProblem::InfrastructureFailure)?;
+        let idle_timeout_ticks = u64::from_be_bytes(
+            reader
+                .take(8)?
+                .try_into()
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+        );
+        let expires_at_tick = u64::from_be_bytes(
+            reader
+                .take(8)?
+                .try_into()
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+        );
+        let connected = match reader.take(1)?[0] {
+            0 => false,
+            1 => true,
+            _ => return Err(HostProblem::InfrastructureFailure),
+        };
+        let public = !principal.is_empty()
+            && !transaction.is_empty()
+            && !run_unit.is_empty()
+            && csrf_sha256.len() == 64
+            && idle_timeout_ticks != 0;
+        let internal = principal.is_empty()
+            && transaction.is_empty()
+            && run_unit.is_empty()
+            && csrf_sha256.is_empty()
+            && idle_timeout_ticks == u64::MAX
+            && expires_at_tick == u64::MAX;
+        if !public && !internal {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        (
+            principal,
+            transaction,
+            run_unit,
+            csrf_sha256,
+            idle_timeout_ticks,
+            expires_at_tick,
+            connected,
+        )
+    } else {
+        (
+            String::new(),
+            String::new(),
+            String::new(),
+            String::new(),
+            u64::MAX,
+            u64::MAX,
+            true,
+        )
+    };
     let aid = reader.take(1)?[0];
     let suspended = match reader.take(1)?[0] {
         0 => false,
         1 => true,
         _ => return Err(HostProblem::InfrastructureFailure),
+    };
+    let (mapset, map) = if schema == b"MECS2" {
+        let mapset =
+            String::from_utf8(reader.field(16)?).map_err(|_| HostProblem::InfrastructureFailure)?;
+        let map =
+            String::from_utf8(reader.field(16)?).map_err(|_| HostProblem::InfrastructureFailure)?;
+        (
+            (!mapset.is_empty()).then_some(mapset),
+            (!map.is_empty()).then_some(map),
+        )
+    } else {
+        (None, None)
     };
     let screen = reader.field(limits.max_screen_bytes)?;
     let input = match reader.take(1)?[0] {
@@ -2063,10 +2891,19 @@ fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Sess
     Ok(Session {
         rows,
         columns,
+        principal,
+        transaction,
+        run_unit,
+        csrf_sha256,
+        idle_timeout_ticks,
+        expires_at_tick,
+        connected,
         aid,
         screen,
         input,
         suspended,
+        mapset,
+        map,
         version,
     })
 }
@@ -2881,6 +3718,210 @@ mod tests {
                 .windows(7)
                 .any(|value| value == b"ACCOUNT")
         );
+    }
+
+    #[test]
+    fn carddemo_public_terminal_and_tn3270_share_durable_authority() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let initial = service(store.clone());
+        initial
+            .register_map(BmsMapDefinition {
+                mapset: "COSGN00".into(),
+                map: "COSGN0A".into(),
+                rows: 24,
+                columns: 80,
+                fields: vec![
+                    BmsFieldDefinition {
+                        name: "USERID".into(),
+                        row: 2,
+                        column: 1,
+                        length: 8,
+                        initial: Vec::new(),
+                        color: None,
+                        highlight: None,
+                        protected: false,
+                        secret: false,
+                    },
+                    BmsFieldDefinition {
+                        name: "LOCKED".into(),
+                        row: 3,
+                        column: 1,
+                        length: 8,
+                        initial: b"PRIVATE".to_vec(),
+                        color: None,
+                        highlight: None,
+                        protected: true,
+                        secret: true,
+                    },
+                ],
+            })
+            .unwrap();
+        let invocation = invocation_for("public-run", BTreeMap::new());
+        let session = SessionId::new("carddemo-public", 64).unwrap();
+        let launched = initial
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "CC00",
+                24,
+                80,
+                "csrf-carddemo",
+                10,
+                100,
+            )
+            .unwrap();
+        assert_eq!(launched.transaction, "CC00");
+        let mut send = request(
+            CicsOperation::SendMap,
+            BTreeMap::from([
+                ("MAPSET".into(), argument(b"COSGN00")),
+                ("MAP".into(), argument(b"COSGN0A")),
+            ]),
+            1,
+        );
+        send.mutation.as_mut().unwrap().transaction = Some("CC00".into());
+        initial
+            .invoke(&effect(&invocation.run_unit_id, send.clone(), 1), send)
+            .unwrap();
+        let principal = invocation.principal.id();
+        let wire = initial.tn3270_screen(&session, principal, 11).unwrap();
+        assert_eq!(wire[..2], [0xf5, 0xc3]);
+        assert!(!wire.windows(7).any(|value| value == b"PRIVATE"));
+        assert_eq!(
+            initial.submit_terminal_input(
+                &session,
+                principal,
+                "wrong-csrf",
+                0x7d,
+                &BTreeMap::new(),
+                12,
+            ),
+            Err(HostProblem::Unauthorized)
+        );
+        assert_eq!(
+            initial.submit_terminal_input(
+                &session,
+                principal,
+                "csrf-carddemo",
+                0x7d,
+                &BTreeMap::from([("LOCKED".into(), b"CHANGE".to_vec())]),
+                12,
+            ),
+            Err(HostProblem::Unauthorized)
+        );
+        initial
+            .submit_tn3270(
+                &session,
+                principal,
+                "csrf-carddemo",
+                &[0x7d, 0, 0, 0x11, 0, 80, b'U', b'S', b'E', b'R'],
+                12,
+            )
+            .unwrap();
+        let mut receive = request(CicsOperation::ReceiveMap, BTreeMap::new(), 2);
+        receive.mutation.as_mut().unwrap().transaction = Some("CC00".into());
+        let input = initial
+            .invoke(
+                &effect(&invocation.run_unit_id, receive.clone(), 2),
+                receive,
+            )
+            .unwrap();
+        assert!(
+            input
+                .payload
+                .bytes()
+                .windows(4)
+                .any(|value| value == b"USER")
+        );
+        assert_eq!(initial.active_worker_count(), 0);
+
+        drop(initial);
+        let restarted = service(store);
+        assert_eq!(
+            restarted
+                .terminal_snapshot(&session, principal, 13)
+                .unwrap()
+                .transaction,
+            "CC00"
+        );
+        assert_eq!(
+            restarted.submit_tn3270(&session, principal, "csrf-carddemo", &[0x7d, 0], 14,),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            restarted.terminal_snapshot(
+                &session,
+                &PrincipalId::new("OTHER", InvocationLimits::default()).unwrap(),
+                14,
+            ),
+            Err(HostProblem::Unauthorized)
+        );
+        restarted
+            .resume_terminal(
+                invocation_for("resumed-run", BTreeMap::new()),
+                &session,
+                "csrf-carddemo",
+                15,
+            )
+            .unwrap();
+        restarted
+            .disconnect_terminal(&session, principal, "csrf-carddemo", 16)
+            .unwrap();
+        assert_eq!(
+            restarted.terminal_snapshot(&session, principal, 17),
+            Err(HostProblem::NotFound)
+        );
+    }
+
+    #[test]
+    fn carddemo_terminal_timeout_and_overload_fail_closed() {
+        let limits = CicsLimits {
+            max_sessions: 1,
+            max_runs: 1,
+            ..CicsLimits::default()
+        };
+        let service = CicsService::open(
+            authorities(),
+            Arc::new(MemoryStore::new(Default::default())),
+            limits,
+        )
+        .unwrap();
+        let first = invocation_for("first-terminal", BTreeMap::new());
+        let first_session = SessionId::new("first-terminal", 64).unwrap();
+        service
+            .launch_terminal(
+                first.clone(),
+                &first_session,
+                "CC00",
+                24,
+                80,
+                "first-csrf",
+                10,
+                5,
+            )
+            .unwrap();
+        assert_eq!(
+            service.launch_terminal(
+                invocation_for("second-terminal", BTreeMap::new()),
+                &SessionId::new("second-terminal", 64).unwrap(),
+                "CC00",
+                24,
+                80,
+                "second-csrf",
+                11,
+                5,
+            ),
+            Err(HostProblem::ResourceExhausted)
+        );
+        assert_eq!(
+            service.terminal_snapshot(&first_session, first.principal.id(), 15),
+            Err(HostProblem::TimedOut)
+        );
+        assert_eq!(
+            service.terminal_snapshot(&first_session, first.principal.id(), 16),
+            Err(HostProblem::NotFound)
+        );
+        assert_eq!(service.active_worker_count(), 0);
     }
 
     #[test]

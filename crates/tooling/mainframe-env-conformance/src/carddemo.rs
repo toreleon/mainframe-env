@@ -1,25 +1,34 @@
 //! Fail-closed verification for the externally supplied CardDemo corpus.
 
+use axum::body::{Body, to_bytes};
+use axum::http::{Method, Request, StatusCode};
+use base64::Engine;
 use mainframe_env_application::{
     ApplicationInstaller, ApplicationManifest, ApplicationPackage, DatasetCatalog,
     DatasetCatalogEntry, DatasetDefinition, EntryKind, GenerationGroupDefinition, InstallProblem,
     InstallState, PackageEntry, ProgramArtifact, ProgramCatalog, ProgramFrame, ProgramFrames,
     package_identity, parse_bms, parse_csd,
 };
+use mainframe_env_cics::{BmsFieldDefinition, BmsMapDefinition};
 use mainframe_env_compiler::{
     CobolCompiler, ControlEdgeKind, ControlRole, DataCategory, StatementKind, StorageSection,
     compatibility_copybooks, owned_compatibility_library,
 };
 use mainframe_env_dataset::{DatasetLimits, DatasetSeedObject, DatasetService};
 use mainframe_env_execution_api::{
-    IdempotencyKey, InvocationLimits, Machine, MachineDrive, MachineResume, PrincipalId, Quantum,
+    BoundedPayload, IdempotencyKey, InvocationLimits, Machine, MachineDrive, MachineResume,
+    PrincipalId, Quantum, RunUnitId,
 };
 use mainframe_env_host_api::{
-    AccessIntent, AuditEvent, CicsOperation, DatasetAttributes, DatasetName, DatasetOrganization,
-    DatasetRequest, Mutation, RecordFormat, ResourceName, SecretRef, SecurityDecision,
+    AccessIntent, AuditEvent, CicsConditionPolicy, CicsOperation, CicsRequest, DatasetAttributes,
+    DatasetName, DatasetOrganization, DatasetRequest, EffectRequest, Mutation, RecordFormat,
+    ResourceName, SecretRef, SecurityDecision, SessionId,
 };
 use mainframe_env_racf::{
     MemorySecretResolver, RacfManifest, RacfProfileDefinition, RacfService, RacfUserDefinition,
+};
+use mainframe_env_server::{
+    ProductServer, ServerConfig, StoreProfile, TlsConfig, default_program_router,
 };
 use mainframe_env_source::{
     LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLibrary,
@@ -35,6 +44,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 use std::sync::Arc;
+use tower::ServiceExt;
 
 const CORPUS_ENV: &str = "CARDEMO_CORPUS_DIR";
 
@@ -431,6 +441,27 @@ pub struct CardDemoSecurityReceipt {
     pub redacted_fields: usize,
     pub manifest_replay: bool,
     pub security_shape_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoTerminalReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub launch_transaction: String,
+    pub bms_maps_installed: usize,
+    pub bms_fields_installed: usize,
+    pub public_routes_exercised: usize,
+    pub protocol_screen_fetches: usize,
+    pub input_submissions: usize,
+    pub authentication_controls: usize,
+    pub csrf_controls: usize,
+    pub restart_resumes: usize,
+    pub disconnects: usize,
+    pub timeout_controls: usize,
+    pub malformed_controls: usize,
+    pub idle_worker_count: usize,
+    pub terminal_shape_sha256: String,
 }
 
 pub fn verify_carddemo_corpus_from_env(
@@ -3301,6 +3332,595 @@ pub fn verify_carddemo_security_from_env(
         manifest_replay,
         security_shape_sha256: format!("{:x}", shape.finalize()),
     })
+}
+
+pub fn verify_carddemo_terminal_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoTerminalReceipt, CorpusProblem> {
+    let security = verify_carddemo_security_from_env(inventory_path)?;
+    verify_carddemo_resources_from_env(inventory_path)?;
+    let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required",
+        )
+    })?;
+    let corpus_dir = Path::new(&corpus_dir);
+    let mut maps = Vec::new();
+    let mut fields = 0usize;
+    for relative in collect_paths(corpus_dir, &["app/bms"], "bms")? {
+        let source = String::from_utf8(read_corpus_file(corpus_dir, &corpus_dir.join(relative))?)
+            .map_err(|_| {
+            CorpusProblem::new("carddemo.terminal.bms_invalid", "BMS is not UTF-8")
+        })?;
+        let parsed = parse_bms(&source).map_err(package_problem)?;
+        let (rows, columns) = parsed.size.ok_or_else(|| {
+            CorpusProblem::new("carddemo.terminal.bms_invalid", "BMS size is missing")
+        })?;
+        let mut definitions = Vec::new();
+        for field in parsed.fields {
+            let Some(name) = field.name else {
+                continue;
+            };
+            let (row, column) = field.position.ok_or_else(|| {
+                CorpusProblem::new(
+                    "carddemo.terminal.bms_invalid",
+                    format!("{name} position is missing"),
+                )
+            })?;
+            let length = field.length.ok_or_else(|| {
+                CorpusProblem::new(
+                    "carddemo.terminal.bms_invalid",
+                    format!("{name} length is missing"),
+                )
+            })?;
+            let attributes = field
+                .attributes
+                .iter()
+                .map(|value| value.to_ascii_uppercase())
+                .collect::<BTreeSet<_>>();
+            definitions.push(BmsFieldDefinition {
+                name,
+                row: u16::try_from(row).map_err(|_| {
+                    CorpusProblem::new("carddemo.terminal.bms_invalid", "BMS row is too large")
+                })?,
+                column: u16::try_from(column).map_err(|_| {
+                    CorpusProblem::new("carddemo.terminal.bms_invalid", "BMS column is too large")
+                })?,
+                length: u16::try_from(length).map_err(|_| {
+                    CorpusProblem::new("carddemo.terminal.bms_invalid", "BMS field is too large")
+                })?,
+                initial: field.initial.unwrap_or_default().into_bytes(),
+                color: None,
+                highlight: None,
+                protected: attributes.contains("PROT") || attributes.contains("ASKIP"),
+                secret: attributes.contains("DRK"),
+            });
+        }
+        fields = fields
+            .checked_add(definitions.len())
+            .ok_or_else(|| CorpusProblem::new("carddemo.terminal.limit", "field count overflow"))?;
+        maps.push(BmsMapDefinition {
+            mapset: parsed.mapset,
+            map: parsed.name,
+            rows: u16::try_from(rows).map_err(|_| {
+                CorpusProblem::new("carddemo.terminal.bms_invalid", "BMS rows are too large")
+            })?,
+            columns: u16::try_from(columns).map_err(|_| {
+                CorpusProblem::new("carddemo.terminal.bms_invalid", "BMS columns are too large")
+            })?,
+            fields: definitions,
+        });
+    }
+    if maps.len() != 17 {
+        return Err(CorpusProblem::new(
+            "carddemo.terminal.map_drift",
+            "BMS map count differs from installed resources",
+        ));
+    }
+    let login = maps
+        .iter()
+        .find(|map| map.mapset == "COSGN00" && map.map == "COSGN0A")
+        .cloned()
+        .ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.terminal.map_missing",
+                "COSGN00/COSGN0A is missing",
+            )
+        })?;
+    let map_count = maps.len();
+    let input = login
+        .fields
+        .iter()
+        .find(|field| !field.protected && !field.secret)
+        .cloned()
+        .ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.terminal.input_missing",
+                "login map has no public input field",
+            )
+        })?;
+    let artifact_root = env::temp_dir().join(format!(
+        "mainframe-env-carddemo-terminal-{}",
+        std::process::id()
+    ));
+    let config = ServerConfig {
+        store_profile: StoreProfile::Memory,
+        artifact_root: artifact_root.clone(),
+        tls: TlsConfig {
+            enabled: false,
+            certificate_path: None,
+            private_key_reference: None,
+        },
+        ..ServerConfig::default()
+    };
+    let store = Arc::new(MemoryStore::new(Default::default()));
+    let secrets = Arc::new(MemorySecretResolver::default());
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| CorpusProblem::new("carddemo.terminal.runtime", error.to_string()))?;
+    let result = runtime.block_on(exercise_terminal_routes(
+        config, store, secrets, maps, login, input,
+    ));
+    let _ = fs::remove_dir_all(&artifact_root);
+    let exercise = result?;
+    if exercise.public_routes != 7
+        || exercise.protocol_fetches != 2
+        || exercise.input_submissions != 2
+        || exercise.authentication_controls != 2
+        || exercise.csrf_controls != 2
+        || exercise.restart_resumes != 1
+        || exercise.disconnects != 1
+        || exercise.timeout_controls != 1
+        || exercise.malformed_controls != 2
+        || exercise.idle_workers != 0
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.terminal.surface_drift",
+            "terminal route observations differ from the pinned contract",
+        ));
+    }
+    let mut shape = Sha256::new();
+    digest_field(&mut shape, security.corpus_commit.as_bytes());
+    for map in &exercise.map_shapes {
+        digest_field(&mut shape, map.as_bytes());
+    }
+    Ok(CardDemoTerminalReceipt {
+        schema_version: "mainframe-env.carddemo-terminal-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit: security.corpus_commit,
+        launch_transaction: "CC00".into(),
+        bms_maps_installed: map_count,
+        bms_fields_installed: fields,
+        public_routes_exercised: exercise.public_routes,
+        protocol_screen_fetches: exercise.protocol_fetches,
+        input_submissions: exercise.input_submissions,
+        authentication_controls: exercise.authentication_controls,
+        csrf_controls: exercise.csrf_controls,
+        restart_resumes: exercise.restart_resumes,
+        disconnects: exercise.disconnects,
+        timeout_controls: exercise.timeout_controls,
+        malformed_controls: exercise.malformed_controls,
+        idle_worker_count: exercise.idle_workers,
+        terminal_shape_sha256: format!("{:x}", shape.finalize()),
+    })
+}
+
+struct TerminalExercise {
+    public_routes: usize,
+    protocol_fetches: usize,
+    input_submissions: usize,
+    authentication_controls: usize,
+    csrf_controls: usize,
+    restart_resumes: usize,
+    disconnects: usize,
+    timeout_controls: usize,
+    malformed_controls: usize,
+    idle_workers: usize,
+    map_shapes: Vec<String>,
+}
+
+async fn exercise_terminal_routes(
+    config: ServerConfig,
+    store: Arc<MemoryStore>,
+    secrets: Arc<MemorySecretResolver>,
+    maps: Vec<BmsMapDefinition>,
+    login: BmsMapDefinition,
+    input: BmsFieldDefinition,
+) -> Result<TerminalExercise, CorpusProblem> {
+    let server = ProductServer::open(
+        config.clone(),
+        store.clone(),
+        secrets.clone(),
+        default_program_router(),
+    )
+    .map_err(terminal_problem)?;
+    server
+        .bootstrap_user("WEBUSER", b"transport-password")
+        .map_err(terminal_problem)?;
+    let cics = server.cics_service();
+    let mut map_shapes = Vec::new();
+    for map in maps {
+        map_shapes.push(format!(
+            "{}/{}:{}/{}:{}",
+            map.mapset,
+            map.map,
+            map.rows,
+            map.columns,
+            map.fields.len()
+        ));
+        cics.register_map(map).map_err(terminal_problem)?;
+    }
+    let app = server.router();
+    let basic = format!(
+        "Basic {}",
+        base64::engine::general_purpose::STANDARD.encode("WEBUSER:transport-password")
+    );
+    let unauthenticated = terminal_http(
+        &app,
+        Method::POST,
+        "/mainframe-env/cics/v1/sessions",
+        BTreeMap::from([("x-csrf-zosmf-header".into(), "true".into())]),
+        br#"{"transaction":"CC00"}"#.to_vec(),
+    )
+    .await?;
+    if unauthenticated.0 != StatusCode::UNAUTHORIZED {
+        return Err(CorpusProblem::new(
+            "carddemo.terminal.auth_control",
+            "anonymous launch did not fail",
+        ));
+    }
+    let authenticated = terminal_http(
+        &app,
+        Method::POST,
+        "/zosmf/services/authenticate",
+        BTreeMap::from([("authorization".into(), basic)]),
+        Vec::new(),
+    )
+    .await?;
+    require_terminal_status(authenticated.0, StatusCode::OK, "authenticate")?;
+    let authenticated_json: serde_json::Value = serde_json::from_slice(&authenticated.1)
+        .map_err(|error| CorpusProblem::new("carddemo.terminal.response", error.to_string()))?;
+    let bearer = format!(
+        "Bearer {}",
+        authenticated_json["token"].as_str().ok_or_else(|| {
+            CorpusProblem::new("carddemo.terminal.response", "auth token is missing")
+        })?
+    );
+    let malformed_launch = terminal_http(
+        &app,
+        Method::POST,
+        "/mainframe-env/cics/v1/sessions",
+        BTreeMap::from([
+            ("authorization".into(), bearer.clone()),
+            ("x-csrf-zosmf-header".into(), "true".into()),
+        ]),
+        b"{".to_vec(),
+    )
+    .await?;
+    if malformed_launch.0 != StatusCode::BAD_REQUEST {
+        return Err(CorpusProblem::new(
+            "carddemo.terminal.malformed_control",
+            "malformed launch body did not fail",
+        ));
+    }
+    let launched = terminal_http(
+        &app,
+        Method::POST,
+        "/mainframe-env/cics/v1/sessions",
+        BTreeMap::from([
+            ("authorization".into(), bearer.clone()),
+            ("x-csrf-zosmf-header".into(), "true".into()),
+        ]),
+        br#"{"transaction":"CC00","rows":24,"columns":80}"#.to_vec(),
+    )
+    .await?;
+    require_terminal_status(launched.0, StatusCode::CREATED, "launch")?;
+    let launched_json: serde_json::Value = serde_json::from_slice(&launched.1)
+        .map_err(|error| CorpusProblem::new("carddemo.terminal.response", error.to_string()))?;
+    let session = launched_json["session"]
+        .as_str()
+        .ok_or_else(|| CorpusProblem::new("carddemo.terminal.response", "session is missing"))?
+        .to_string();
+    let csrf = launched_json["csrf_token"]
+        .as_str()
+        .ok_or_else(|| CorpusProblem::new("carddemo.terminal.response", "CSRF is missing"))?
+        .to_string();
+    let run = RunUnitId::new(
+        launched_json["terminal"]["run_unit"]
+            .as_str()
+            .ok_or_else(|| {
+                CorpusProblem::new("carddemo.terminal.response", "run unit is missing")
+            })?,
+        InvocationLimits::default(),
+    )
+    .map_err(|_| CorpusProblem::new("carddemo.terminal.response", "run unit is invalid"))?;
+    let mutation_key = IdempotencyKey::new("carddemo-terminal-send", InvocationLimits::default())
+        .expect("static idempotency key");
+    let send = CicsRequest {
+        operation: CicsOperation::SendMap,
+        arguments: BTreeMap::from([
+            ("MAPSET".into(), terminal_argument(&login.mapset)?),
+            ("MAP".into(), terminal_argument(&login.map)?),
+        ]),
+        condition_policy: CicsConditionPolicy::Default,
+        mutation: Some(Mutation {
+            sequence: 1,
+            idempotency_key: mutation_key.clone(),
+            transaction: Some("CC00".into()),
+        }),
+    };
+    cics.invoke(
+        &EffectRequest {
+            run_unit: run,
+            sequence: 1,
+            deadline_tick: 100,
+            idempotency_key: Some(mutation_key),
+            request: mainframe_env_host_api::HostRequest::Cics(send.clone()),
+        },
+        send,
+    )
+    .map_err(terminal_problem)?;
+    let session_uri = format!("/mainframe-env/cics/v1/sessions/{session}");
+    let screen = terminal_http(
+        &app,
+        Method::GET,
+        &session_uri,
+        BTreeMap::from([("authorization".into(), bearer.clone())]),
+        Vec::new(),
+    )
+    .await?;
+    require_terminal_status(screen.0, StatusCode::OK, "screen")?;
+    let tn_uri = format!("{session_uri}/tn3270");
+    let tn_screen = terminal_http(
+        &app,
+        Method::GET,
+        &tn_uri,
+        BTreeMap::from([("authorization".into(), bearer.clone())]),
+        Vec::new(),
+    )
+    .await?;
+    require_terminal_status(tn_screen.0, StatusCode::OK, "TN3270 screen")?;
+    if !tn_screen.1.starts_with(&[0xf5, 0xc3]) {
+        return Err(CorpusProblem::new(
+            "carddemo.terminal.tn3270_invalid",
+            "TN3270 screen does not start with bounded Write/WCC",
+        ));
+    }
+    let address = u16::try_from(
+        (usize::from(input.row) - 1) * usize::from(login.columns) + usize::from(input.column) - 1,
+    )
+    .map_err(|_| CorpusProblem::new("carddemo.terminal.limit", "field address overflow"))?;
+    let mut tn_input = vec![0x7d, 0, 0, 0x11, (address >> 8) as u8, address as u8];
+    tn_input.extend(std::iter::repeat_n(b'U', usize::from(input.length).min(4)));
+    let mutation_headers = BTreeMap::from([
+        ("authorization".into(), bearer.clone()),
+        ("x-csrf-zosmf-header".into(), "true".into()),
+        ("x-csrf-token".into(), csrf.clone()),
+    ]);
+    let tn_submitted = terminal_http(
+        &app,
+        Method::PUT,
+        &tn_uri,
+        mutation_headers.clone(),
+        tn_input,
+    )
+    .await?;
+    require_terminal_status(tn_submitted.0, StatusCode::OK, "TN3270 input")?;
+    let json_input = serde_json::to_vec(&serde_json::json!({
+        "aid":125,
+        "fields":{input.name.clone():"USER"}
+    }))
+    .map_err(|error| CorpusProblem::new("carddemo.terminal.response", error.to_string()))?;
+    let input_uri = format!("{session_uri}/input");
+    let submitted = terminal_http(
+        &app,
+        Method::PUT,
+        &input_uri,
+        mutation_headers.clone(),
+        json_input,
+    )
+    .await?;
+    require_terminal_status(submitted.0, StatusCode::OK, "JSON input")?;
+    let missing_csrf = terminal_http(
+        &app,
+        Method::PUT,
+        &input_uri,
+        BTreeMap::from([
+            ("authorization".into(), bearer.clone()),
+            ("x-csrf-zosmf-header".into(), "true".into()),
+        ]),
+        br#"{"aid":125,"fields":{}}"#.to_vec(),
+    )
+    .await?;
+    if missing_csrf.0 != StatusCode::FORBIDDEN {
+        return Err(CorpusProblem::new(
+            "carddemo.terminal.csrf_control",
+            "missing session CSRF did not fail",
+        ));
+    }
+    let wrong_csrf = terminal_http(
+        &app,
+        Method::PUT,
+        &input_uri,
+        BTreeMap::from([
+            ("authorization".into(), bearer.clone()),
+            ("x-csrf-zosmf-header".into(), "true".into()),
+            ("x-csrf-token".into(), "wrong".into()),
+        ]),
+        br#"{"aid":125,"fields":{}}"#.to_vec(),
+    )
+    .await?;
+    if wrong_csrf.0 != StatusCode::FORBIDDEN {
+        return Err(CorpusProblem::new(
+            "carddemo.terminal.csrf_control",
+            "wrong session CSRF did not fail",
+        ));
+    }
+    let malformed = terminal_http(
+        &app,
+        Method::PUT,
+        &tn_uri,
+        mutation_headers.clone(),
+        vec![0x7d, 0],
+    )
+    .await?;
+    if malformed.0 != StatusCode::BAD_REQUEST {
+        return Err(CorpusProblem::new(
+            "carddemo.terminal.malformed_control",
+            "malformed TN3270 record did not fail",
+        ));
+    }
+    let session_id = SessionId::new(&session, InvocationLimits::default().max_binding_bytes)
+        .map_err(|_| CorpusProblem::new("carddemo.terminal.response", "session is invalid"))?;
+    let before_expiry = launched_json["terminal"]["expires_at_tick"]
+        .as_u64()
+        .and_then(|value| value.checked_sub(1))
+        .ok_or_else(|| CorpusProblem::new("carddemo.terminal.response", "expiry is invalid"))?;
+    if cics.terminal_snapshot(
+        &session_id,
+        &PrincipalId::new("OTHER", InvocationLimits::default()).expect("static principal"),
+        before_expiry,
+    ) != Err(mainframe_env_host_api::HostProblem::Unauthorized)
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.terminal.auth_control",
+            "cross-principal screen fetch did not fail",
+        ));
+    }
+    if server.metrics().active != 0 || cics.active_worker_count() != 0 {
+        return Err(CorpusProblem::new(
+            "carddemo.terminal.idle_worker",
+            "idle terminal retained an active worker",
+        ));
+    }
+    drop(app);
+    drop(cics);
+    drop(server);
+
+    let restarted = ProductServer::open(config, store, secrets, default_program_router())
+        .map_err(terminal_problem)?;
+    let restarted_app = restarted.router();
+    let resumed = terminal_http(
+        &restarted_app,
+        Method::POST,
+        &format!("{session_uri}/resume"),
+        mutation_headers.clone(),
+        Vec::new(),
+    )
+    .await?;
+    require_terminal_status(resumed.0, StatusCode::OK, "restart resume")?;
+    let second = terminal_http(
+        &restarted_app,
+        Method::POST,
+        "/mainframe-env/cics/v1/sessions",
+        BTreeMap::from([
+            ("authorization".into(), bearer.clone()),
+            ("x-csrf-zosmf-header".into(), "true".into()),
+        ]),
+        br#"{"transaction":"CC00"}"#.to_vec(),
+    )
+    .await?;
+    require_terminal_status(second.0, StatusCode::CREATED, "timeout session launch")?;
+    let second_json: serde_json::Value = serde_json::from_slice(&second.1)
+        .map_err(|error| CorpusProblem::new("carddemo.terminal.response", error.to_string()))?;
+    let second_session = SessionId::new(
+        second_json["session"].as_str().ok_or_else(|| {
+            CorpusProblem::new("carddemo.terminal.response", "second session is missing")
+        })?,
+        InvocationLimits::default().max_binding_bytes,
+    )
+    .map_err(|_| CorpusProblem::new("carddemo.terminal.response", "session is invalid"))?;
+    let expires = second_json["terminal"]["expires_at_tick"]
+        .as_u64()
+        .ok_or_else(|| CorpusProblem::new("carddemo.terminal.response", "expiry is missing"))?;
+    if restarted.cics_service().terminal_snapshot(
+        &second_session,
+        &PrincipalId::new("WEBUSER", InvocationLimits::default()).expect("static principal"),
+        expires,
+    ) != Err(mainframe_env_host_api::HostProblem::TimedOut)
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.terminal.timeout_control",
+            "session expiry did not fail closed",
+        ));
+    }
+    let disconnected = terminal_http(
+        &restarted_app,
+        Method::DELETE,
+        &session_uri,
+        mutation_headers,
+        Vec::new(),
+    )
+    .await?;
+    require_terminal_status(disconnected.0, StatusCode::NO_CONTENT, "disconnect")?;
+    Ok(TerminalExercise {
+        public_routes: 7,
+        protocol_fetches: 2,
+        input_submissions: 2,
+        authentication_controls: 2,
+        csrf_controls: 2,
+        restart_resumes: 1,
+        disconnects: 1,
+        timeout_controls: 1,
+        malformed_controls: 2,
+        idle_workers: restarted.cics_service().active_worker_count(),
+        map_shapes,
+    })
+}
+
+async fn terminal_http(
+    app: &axum::Router,
+    method: Method,
+    uri: &str,
+    headers: BTreeMap<String, String>,
+    body: Vec<u8>,
+) -> Result<(StatusCode, Vec<u8>), CorpusProblem> {
+    let mut request = Request::builder().method(method).uri(uri);
+    for (name, value) in headers {
+        request = request.header(name, value);
+    }
+    let response =
+        app.clone()
+            .oneshot(request.body(Body::from(body)).map_err(|error| {
+                CorpusProblem::new("carddemo.terminal.request", error.to_string())
+            })?)
+            .await
+            .map_err(|error| CorpusProblem::new("carddemo.terminal.request", error.to_string()))?;
+    let status = response.status();
+    let body = to_bytes(response.into_body(), 4 * 1024 * 1024)
+        .await
+        .map_err(|error| CorpusProblem::new("carddemo.terminal.response", error.to_string()))?;
+    Ok((status, body.to_vec()))
+}
+
+fn require_terminal_status(
+    actual: StatusCode,
+    expected: StatusCode,
+    operation: &str,
+) -> Result<(), CorpusProblem> {
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(CorpusProblem::new(
+            "carddemo.terminal.status",
+            format!("{operation} returned {actual}, expected {expected}"),
+        ))
+    }
+}
+
+fn terminal_argument(value: &str) -> Result<BoundedPayload, CorpusProblem> {
+    BoundedPayload::new(
+        "mainframe-env.cics.argument@1",
+        value.as_bytes().to_vec(),
+        InvocationLimits::default(),
+    )
+    .map_err(|_| CorpusProblem::new("carddemo.terminal.argument", "argument is too large"))
+}
+
+fn terminal_problem(problem: mainframe_env_host_api::HostProblem) -> CorpusProblem {
+    CorpusProblem::new("carddemo.terminal.provider", problem.to_string())
 }
 
 fn digest_field(digest: &mut Sha256, bytes: &[u8]) {

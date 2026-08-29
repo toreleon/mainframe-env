@@ -1,17 +1,17 @@
 # CardDemo-full 0.1.1 Program Status
 
-Current phase: **CD.D — VSAM and application data**
-Current issue: **CD-017 — least-privilege identities and resource profiles IN PROGRESS**
-Next issue: **CD-018 — durable public CICS sessions and terminal compatibility**
+Current phase: **CD.C — Base CICS and terminal runtime**
+Current issue: **CD-018 — durable public CICS sessions and terminal compatibility IN PROGRESS**
+Next issue: **CD-019 — base online journey certification**
 Current product: **0.1.0-alpha.0**
 Target product: **0.1.1**
 CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Source identity
 
-- mainframe-env base commit: `d1ab85c5ad5fd0e9e13d0b811a10a1dcba37d018`
+- mainframe-env base commit: `a23f9e8373f92ce8ba8c0ea5ccaebc90e7f344a6`
 - current deterministic dirty-tree identity:
-  `sha256:5d08b760dae652267cc4f364bbcd3196225e035a79068e0c3b7c33e037196acb`
+  `sha256:de65775c88c4f4346e91642a59861cda1cd301021b730c2feb524f1d7cf8c4be`
 - dirty-tree algorithm: SHA-256 of the sorted `sha256sum` records for every
   repository file except `.git/`, `target/`, and the two persistent CardDemo
   status ledgers (which carry the identity).
@@ -330,6 +330,24 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   seed shape is
   `sha256:c4c87550be6d017c3bac1076b3b6cba4c757db03a66bb70becda3d2f4ff21b77`.
 
+### CD-017 — least-privilege identities and resource profiles
+
+- State: **PASS**
+- Required commit subject: `Authorize CardDemo application resources`
+- Completion commit identity:
+  `a23f9e8373f92ce8ba8c0ea5ccaebc90e7f344a6`.
+- Evidence: `conformance/0.1.1/evidence/issues/CD-017.json`
+- Evidence digest:
+  `sha256:55f704aafb446c37e1c47ec20096b5a78bd1b661d0c4bb78f52fb0ee83896c38`
+- Two transport identities remain distinct from ten application sign-on
+  records. Sixty-four default-deny profiles and 114 permissions cover every
+  pinned transaction, program, dataset, queue, Db2, IMS, JES, and operator
+  resource with separate regular and administrator decisions.
+- Manifest installation is atomic, capacity-bounded, durable, and replayable.
+  Password, card-number, queue-payload, and protected-field audit values are
+  redacted before durable storage; queue writes now authorize their exact
+  resource before mutation.
+
 ## Commands and exit codes
 
 - `cargo test -p mainframe-env-conformance --locked` — **0**; 19 passed,
@@ -479,10 +497,24 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   expected missing-environment failure.
 - All 17 cumulative CardDemo issue gates, ordinary conformance, JSON,
   formatting, redaction, and diff checks — **0**.
+- Focused pre-repair public terminal regression — **1**; no public CICS launch
+  or TN3270 authority existed.
+- CICS, gateway, server, conformance, and xtask suites — **0**; 70 durable
+  session, public-route, restart, timeout, overload, malformed-input, and
+  compatibility tests passed.
+- Architecture, runtime architecture, profile, schema, and inventory gates —
+  **0**.
+- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-terminal --check`
+  — **0**; 17 base BMS maps, 441 named fields, and seven public terminal routes
+  passed.
+- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-terminal --check` — **1**;
+  expected missing-environment failure.
+- Workspace all-target check, all 18 cumulative CardDemo issue gates, ordinary
+  conformance, JSON, formatting, redaction, and diff checks — **0**.
 
 ## Implementation status
 
-- Issues passed: **16 / 27**
+- Issues passed: **17 / 27**
 - Journeys passed: **0 / 20**
 - Installed CardDemo resources: **0**
 - Executed CardDemo application journeys: **0**
@@ -496,10 +528,10 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 2. The repository is still `0.1.0-alpha.0`. A 0.1.1 release cannot be cut until
    0.1.0 is finalized or an explicit version-line correction is accepted.
 
-Neither decision blocks CD-017. No CD-016 blocker remains.
+Neither decision blocks CD-018. No CD-017 blocker remains.
 
 ## Next smallest executable step
 
-Install distinct application sign-on and transport identities, least-privilege
-transaction/program/dataset/queue/database/JES/operator profiles, and redacted
-authorization audit evidence.
+Expose public, durable protocol-neutral CICS session APIs and a bounded TN3270
+adapter over the same authority, including authentication, disconnect, timeout,
+restart, malformed-input, and overload behavior.

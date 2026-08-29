@@ -5,5 +5,6 @@
 mod service;
 
 pub use service::{
-    BmsFieldDefinition, BmsMapDefinition, CicsContinuation, CicsLimits, CicsService, cics_provider,
+    BmsFieldDefinition, BmsMapDefinition, CicsContinuation, CicsLimits, CicsService,
+    CicsTerminalSnapshot, cics_provider,
 };

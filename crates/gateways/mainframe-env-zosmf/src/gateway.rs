@@ -113,6 +113,34 @@ pub enum GatewayRequest {
     },
     ConsoleLogs,
     ConsoleLog,
+    CicsLaunch {
+        transaction: String,
+        rows: u16,
+        columns: u16,
+    },
+    CicsScreen {
+        session: String,
+        tn3270: bool,
+    },
+    CicsInput {
+        session: String,
+        csrf_token: String,
+        aid: u8,
+        fields: BTreeMap<String, Vec<u8>>,
+    },
+    CicsTn3270Input {
+        session: String,
+        csrf_token: String,
+        record: Vec<u8>,
+    },
+    CicsResume {
+        session: String,
+        csrf_token: String,
+    },
+    CicsDisconnect {
+        session: String,
+        csrf_token: String,
+    },
 }
 
 pub struct GatewayResponse {
@@ -250,6 +278,23 @@ pub fn router(backend: Arc<dyn ZosmfBackend>, limits: ZosmfLimits) -> Router {
         )
         .route("/zosmf/logs", get(console_logs))
         .route("/zosmf/restconsoles/v1/log", get(console_log))
+        .route("/mainframe-env/cics/v1/sessions", post(cics_launch))
+        .route(
+            "/mainframe-env/cics/v1/sessions/{session}",
+            get(cics_screen).delete(cics_disconnect),
+        )
+        .route(
+            "/mainframe-env/cics/v1/sessions/{session}/input",
+            put(cics_input),
+        )
+        .route(
+            "/mainframe-env/cics/v1/sessions/{session}/resume",
+            post(cics_resume),
+        )
+        .route(
+            "/mainframe-env/cics/v1/sessions/{session}/tn3270",
+            get(cics_tn3270_screen).put(cics_tn3270_input),
+        )
         .fallback(not_found)
         .with_state(state)
         .layer(TimeoutLayer::with_status_code(
@@ -614,6 +659,169 @@ async fn console_log(State(state): State<GatewayState>, headers: HeaderMap) -> R
     dispatch(&state, authentication(&headers), GatewayRequest::ConsoleLog)
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CicsLaunchBody {
+    transaction: String,
+    rows: Option<u16>,
+    columns: Option<u16>,
+}
+
+async fn cics_launch(
+    State(state): State<GatewayState>,
+    headers: HeaderMap,
+    bytes: Bytes,
+) -> Response<Body> {
+    if let Some(response) = csrf(&headers) {
+        return response;
+    }
+    let Ok(body) = serde_json::from_slice::<CicsLaunchBody>(&bytes) else {
+        return malformed("CICS launch body is malformed");
+    };
+    dispatch(
+        &state,
+        authentication(&headers),
+        GatewayRequest::CicsLaunch {
+            transaction: body.transaction,
+            rows: body.rows.unwrap_or(24),
+            columns: body.columns.unwrap_or(80),
+        },
+    )
+}
+
+async fn cics_screen(
+    State(state): State<GatewayState>,
+    headers: HeaderMap,
+    Path(session): Path<String>,
+) -> Response<Body> {
+    dispatch(
+        &state,
+        authentication(&headers),
+        GatewayRequest::CicsScreen {
+            session,
+            tn3270: false,
+        },
+    )
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CicsInputBody {
+    aid: u8,
+    fields: BTreeMap<String, String>,
+}
+
+async fn cics_input(
+    State(state): State<GatewayState>,
+    headers: HeaderMap,
+    Path(session): Path<String>,
+    bytes: Bytes,
+) -> Response<Body> {
+    if let Some(response) = csrf(&headers) {
+        return response;
+    }
+    let Some(csrf_token) = terminal_csrf(&headers) else {
+        return malformed_csrf();
+    };
+    let Ok(body) = serde_json::from_slice::<CicsInputBody>(&bytes) else {
+        return malformed("CICS input body is malformed");
+    };
+    dispatch(
+        &state,
+        authentication(&headers),
+        GatewayRequest::CicsInput {
+            session,
+            csrf_token,
+            aid: body.aid,
+            fields: body
+                .fields
+                .into_iter()
+                .map(|(name, value)| (name, value.into_bytes()))
+                .collect(),
+        },
+    )
+}
+
+async fn cics_resume(
+    State(state): State<GatewayState>,
+    headers: HeaderMap,
+    Path(session): Path<String>,
+) -> Response<Body> {
+    if let Some(response) = csrf(&headers) {
+        return response;
+    }
+    let Some(csrf_token) = terminal_csrf(&headers) else {
+        return malformed_csrf();
+    };
+    dispatch(
+        &state,
+        authentication(&headers),
+        GatewayRequest::CicsResume {
+            session,
+            csrf_token,
+        },
+    )
+}
+
+async fn cics_disconnect(
+    State(state): State<GatewayState>,
+    headers: HeaderMap,
+    Path(session): Path<String>,
+) -> Response<Body> {
+    if let Some(response) = csrf(&headers) {
+        return response;
+    }
+    let Some(csrf_token) = terminal_csrf(&headers) else {
+        return malformed_csrf();
+    };
+    dispatch(
+        &state,
+        authentication(&headers),
+        GatewayRequest::CicsDisconnect {
+            session,
+            csrf_token,
+        },
+    )
+}
+
+async fn cics_tn3270_screen(
+    State(state): State<GatewayState>,
+    headers: HeaderMap,
+    Path(session): Path<String>,
+) -> Response<Body> {
+    dispatch(
+        &state,
+        authentication(&headers),
+        GatewayRequest::CicsScreen {
+            session,
+            tn3270: true,
+        },
+    )
+}
+
+async fn cics_tn3270_input(
+    State(state): State<GatewayState>,
+    headers: HeaderMap,
+    Path(session): Path<String>,
+    bytes: Bytes,
+) -> Response<Body> {
+    if let Some(response) = csrf(&headers) {
+        return response;
+    }
+    let Some(csrf_token) = terminal_csrf(&headers) else {
+        return malformed_csrf();
+    };
+    dispatch(
+        &state,
+        authentication(&headers),
+        GatewayRequest::CicsTn3270Input {
+            session,
+            csrf_token,
+            record: bytes.to_vec(),
+        },
+    )
+}
+
 async fn not_found() -> Response<Body> {
     problem(GatewayProblem::new(
         StatusCode::NOT_FOUND,
@@ -699,6 +907,30 @@ fn csrf(headers: &HeaderMap) -> Option<Response<Body>> {
             "X-CSRF-ZOSMF-HEADER is required",
         )))
     }
+}
+
+fn terminal_csrf(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get("x-csrf-token")
+        .and_then(|value| value.to_str().ok())
+        .filter(|value| !value.is_empty() && value.len() <= 256)
+        .map(str::to_string)
+}
+
+fn malformed_csrf() -> Response<Body> {
+    problem(GatewayProblem::new(
+        StatusCode::FORBIDDEN,
+        "csrf_required",
+        "X-CSRF-TOKEN is required for this CICS session mutation",
+    ))
+}
+
+fn malformed(message: &str) -> Response<Body> {
+    problem(GatewayProblem::new(
+        StatusCode::BAD_REQUEST,
+        "malformed",
+        message,
+    ))
 }
 
 fn split_member(dataset: &str, query_member: Option<String>) -> (String, Option<String>) {
@@ -896,5 +1128,110 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(excluded.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn cics_session_routes_are_typed_bounded_and_csrf_guarded() {
+        let backend = Arc::new(Backend {
+            calls: AtomicUsize::new(0),
+        });
+        let app = router(backend.clone(), ZosmfLimits::default());
+        let launch = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/mainframe-env/cics/v1/sessions")
+                    .header("authorization", basic())
+                    .header("x-csrf-zosmf-header", "true")
+                    .body(Body::from(r#"{"transaction":"CC00"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(launch.status(), StatusCode::OK);
+        for uri in [
+            "/mainframe-env/cics/v1/sessions/terminal-1",
+            "/mainframe-env/cics/v1/sessions/terminal-1/tn3270",
+        ] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri(uri)
+                        .header("authorization", basic())
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+        }
+        for (method, uri, body) in [
+            (
+                Method::PUT,
+                "/mainframe-env/cics/v1/sessions/terminal-1/input",
+                r#"{"aid":125,"fields":{"USERID":"USER"}}"#,
+            ),
+            (
+                Method::PUT,
+                "/mainframe-env/cics/v1/sessions/terminal-1/tn3270",
+                "record",
+            ),
+            (
+                Method::POST,
+                "/mainframe-env/cics/v1/sessions/terminal-1/resume",
+                "",
+            ),
+            (
+                Method::DELETE,
+                "/mainframe-env/cics/v1/sessions/terminal-1",
+                "",
+            ),
+        ] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method(method)
+                        .uri(uri)
+                        .header("authorization", basic())
+                        .header("x-csrf-zosmf-header", "true")
+                        .header("x-csrf-token", "session-csrf")
+                        .body(Body::from(body))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+        }
+        let missing_csrf = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(Method::PUT)
+                    .uri("/mainframe-env/cics/v1/sessions/terminal-1/input")
+                    .header("authorization", basic())
+                    .header("x-csrf-zosmf-header", "true")
+                    .body(Body::from(r#"{"aid":125,"fields":{}}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(missing_csrf.status(), StatusCode::FORBIDDEN);
+        let malformed = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/mainframe-env/cics/v1/sessions")
+                    .header("authorization", basic())
+                    .header("x-csrf-zosmf-header", "true")
+                    .body(Body::from("{"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(malformed.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(backend.calls.load(Ordering::SeqCst), 7);
     }
 }

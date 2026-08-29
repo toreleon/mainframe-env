@@ -17,12 +17,18 @@ mainframe-env-host-api.workspace = true
 mainframe-env-compiler.workspace = true
 mainframe-env-interpreter.workspace = true
 mainframe-env-application.workspace = true
+mainframe-env-cics.workspace = true
 mainframe-env-dataset.workspace = true
 mainframe-env-racf.workspace = true
+mainframe-env-server.workspace = true
 mainframe-env-store.workspace = true
+axum.workspace = true
+base64.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+tokio.workspace = true
+tower.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
