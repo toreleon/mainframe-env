@@ -1,0 +1,20 @@
+{
+  "schema_version":"mainframe-env.release-exit-gates@1",
+  "status":"pass",
+  "derived":true,
+  "phase_gates":{"ME.V0":true,"ME.V1":true,"ME.V2":true,"ME.V3":true,"ME.V4":true,"ME.V5":true,"ME.V6":true,"ME.V7":true},
+  "conditions":{
+    "all_phase_gates_pass":true,
+    "compatibility_security_resource_recovery_pass":true,
+    "authority_unique":true,
+    "cutover_complete":true,
+    "inventory_complete":true,
+    "profile_closure_clean":true,
+    "release_artifacts_reproducible":true,
+    "required_phase_commits_v0_v6_present":true,
+    "me_v7_completion_commit_next_protocol_action":true
+  },
+  "expression":"me_v0_pass && me_v1_pass && me_v2_pass && me_v3_pass && me_v4_pass && me_v5_pass && me_v6_pass && me_v7_pass",
+  "functional_result":true,
+  "regenerate":"cargo xtask certification --check"
+}

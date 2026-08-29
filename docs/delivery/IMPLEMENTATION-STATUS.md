@@ -1,9 +1,9 @@
 # mainframe-env 0.1 Implementation Status
 
-Current phase: **ME.V6 — durable z/OSMF product**
-Current work item: the ME.V6 candidate is complete; run the full gate and create the required phase commit.
+Current phase: **ME.V7 — certification and cutover**
+Current work item: the ME.V7 candidate is assembled; run the final gate and create the required phase commit.
 Product version: **0.1.0-alpha.0**
-Source identity: ME.V5 commit `4a752fa` plus the current ME.V6 candidate.
+Source identity: ME.V6 commit `c7f0c6d555709ec0bfb7f64866e29c7d2d04dece` plus the current ME.V7 candidate.
 
 ## Completed deliverables
 
@@ -61,6 +61,10 @@ Source identity: ME.V5 commit `4a752fa` plus the current ME.V6 candidate.
 - Added embedded SQLite/PostgreSQL migration `0001-durable-state`, full durable store contracts,
   immutable local artifacts, SQLite integrity/backup/restore, and PostgreSQL 18 execution/provider
   compatibility. The temporary PostgreSQL test container was stopped and auto-removed after the pass.
+- Committed ME.V6 as `c7f0c6d555709ec0bfb7f64866e29c7d2d04dece` with the required trailers.
+- Completed six-domain differential summaries, accepted corrections, exact authority/profile closure,
+  release-mode 1x/2x/long-run gates, supply-chain/license/advisory checks, cutover/archive decisions,
+  and reproducible alpha manifest/SBOM/checksum/license/provenance artifacts.
 
 Exact machine evidence is in
 `conformance/0.1/evidence/program-status.json` and
@@ -77,8 +81,8 @@ Exact machine evidence is in
 
 ## Known gaps and stop-the-line findings
 
-No V0–V6 stop-the-line finding is open. ME.V7 certification/cutover is pending. Historical oracle
-attribution and explicit unsupported surface are retained in
+No V0–V7 functional stop-the-line finding is open. Historical oracle attribution and explicit
+unsupported surface are retained in
 `conformance/0.1/inventory/known-gaps.json`; they do not create an alternate production route.
 
 ## Commands already run
@@ -88,5 +92,5 @@ passed: COBOL 37, RACF 8, z/OSMF datasets 9, z/OSMF jobs 9, CICS 317, JCL 164, a
 
 ## Next smallest executable step
 
-Run the complete locked ME.V6 gate, record its canonical content digest, review the staged diff, and
-create the dedicated `Complete ME.V6 durable z/OSMF product` commit.
+Run the final locked ME.V7 gate, record its canonical content digest, review the staged diff, and
+create the dedicated `Complete ME.V7 certification and cutover` commit.

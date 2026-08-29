@@ -1,8 +1,8 @@
 {
   "schema_version": "mainframe-env.program-status@1",
-  "current_phase": "ME.V6",
-  "current_work_item": "ME.V6 candidate complete; run the full gate and create the required completion commit",
-  "source_identity": "commit:4a752fa+canonical-content-sha256:05d6e2af6f841c9fd3e6732b38fe51bfdd3040ff9e7b7a26fd0d1628e5b21922",
+  "current_phase": "ME.V7",
+  "current_work_item": "ME.V7 certification candidate assembled; run the final gate and create the required completion commit",
+  "source_identity": "commit:c7f0c6d555709ec0bfb7f64866e29c7d2d04dece+canonical-content-sha256:f3d520a3f6e2eeb17301de6f3e81f94f6dcc01baa9aafc5023cee90fa9ade644",
   "completed_deliverables": [
     {"item":"normative mainframe-env documents read","evidence":"docs/"},
     {"item":"OpenMainframe oracle frozen clean","evidence":"conformance/0.1/inventory/oracle.json"},
@@ -23,6 +23,8 @@
     ,{"item":"ME.V5 bounded JCL workflow and durable JES authority","evidence":"conformance/0.1/evidence/v5-batch-results.json"}
     ,{"item":"ME.V5 completion commit","evidence":"commit 4a752fa"}
     ,{"item":"ME.V6 durable z/OSMF single-node product","evidence":"conformance/0.1/evidence/v6-product-results.json"}
+    ,{"item":"ME.V6 completion commit","evidence":"commit c7f0c6d555709ec0bfb7f64866e29c7d2d04dece"}
+    ,{"item":"ME.V7 compatibility, load, recovery, supply-chain, release-artifact, and cutover pack","evidence":"conformance/0.1/evidence/release-exit-gates.json"}
   ],
   "accepted_decisions": [
     "mainframe-env identity and greenfield direction",
@@ -52,12 +54,15 @@
     ,{"command":"cargo fmt/check/test/clippy/doc/build plus xtask architecture/profiles/versions/schemas/inventory/conformance","exit_code":0,"result":"ME.V5 workspace candidate passed; canonical digest 3ac8047e5db85e5291ed7fb6aa15541c2ac2f7707b0cf6d83e09d655b56c0c05"}
     ,{"command":"MAINFRAME_ENV_POSTGRES_TEST_URL=postgres://... cargo test -p mainframe-env-store postgres18_migration_and_durable_contracts --all-features -- --ignored","exit_code":0,"result":"PostgreSQL 18 migration/provider/execution contract passed; image sha256 4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280"}
     ,{"command":"cargo fmt/check/test/clippy/doc/build plus xtask architecture/profiles/versions/schemas/inventory/conformance and core-server closure","exit_code":0,"result":"ME.V6 workspace candidate passed; canonical digest 05d6e2af6f841c9fd3e6732b38fe51bfdd3040ff9e7b7a26fd0d1628e5b21922"}
+    ,{"command":"cargo run --release -p mainframe-env-server --bin certify --locked -- 1/2/long-run","exit_code":0,"result":"256/256, 512/512, and 10000/10000 succeeded; zero active/session leaks; shutdown drained"}
+    ,{"command":"cargo deny check advisories bans licenses sources","exit_code":0,"result":"advisories ok, bans ok, licenses ok, sources ok"}
+    ,{"command":"cargo xtask release --check","exit_code":0,"result":"release manifest, SBOM, checksums, licenses, and provenance reproducible"}
+    ,{"command":"Rust 1.98 final workspace gate, Rust 1.95 workspace check, all xtask checks, cargo deny, and release load gates","exit_code":0,"result":"ME.V7 functional certification passed; canonical digest f3d520a3f6e2eeb17301de6f3e81f94f6dcc01baa9aafc5023cee90fa9ade644"}
   ],
   "known_gaps": [
-    "ME.V7 certification and cutover is not implemented",
     "Historical oracle evidence remains attributed to its original revision",
     "Six COBOL families and four CICS families remain explicit oracle-matching unsupported surface"
   ],
   "stop_the_line": [],
-  "next_step": "Run the full ME.V6 workspace gate, record the canonical digest, and create Complete ME.V6 durable z/OSMF product."
+  "next_step": "Run the final locked ME.V7 certification gate, record the canonical digest, and create Complete ME.V7 certification and cutover."
 }

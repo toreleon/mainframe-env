@@ -1,0 +1,18 @@
+{
+  "schema_version":"mainframe-env.compatibility-summary@1",
+  "status":"pass",
+  "domains":{
+    "cobol":"pass",
+    "datasets":"pass",
+    "racf_saf":"pass",
+    "cics":"pass",
+    "jcl_jes":"pass",
+    "zosmf":"pass"
+  },
+  "differential_reports":[
+    "differential/cobol-hello.json","differential/dataset.json","differential/racf.json",
+    "differential/cics-carddemo.json","differential/jcl-jes.json","differential/zosmf.json"
+  ],
+  "unsupported_surface":{"cobol_families":6,"cics_families":4,"automatic_fallback":false},
+  "historical_oracle_evidence_relabelled":false
+}

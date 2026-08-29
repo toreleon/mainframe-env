@@ -2,13 +2,14 @@
 
 #![forbid(unsafe_code)]
 
-use serde_json::Value;
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 type TaskResult<T = ()> = Result<T, String>;
 
@@ -40,10 +41,13 @@ fn run() -> TaskResult {
             check_inventory(&root)?;
             check_evidence(&root)
         }
+        "certification" => check_certification(&root),
         "digest" => print_digest(&root),
+        "release" if check => check_release_artifacts(&root),
+        "release" => generate_release_artifacts(&root),
         "help" | "--help" | "-h" => {
             println!(
-                "cargo xtask <versions|architecture|profiles|schemas|inventory|evidence|conformance|digest> --check"
+                "cargo xtask <versions|architecture|profiles|schemas|inventory|evidence|conformance|certification|digest|release> --check"
             );
             Ok(())
         }
@@ -465,6 +469,149 @@ fn check_evidence(root: &Path) -> TaskResult {
     Ok(())
 }
 
+fn check_certification(root: &Path) -> TaskResult {
+    check_versions(root)?;
+    check_architecture(root)?;
+    check_profiles(root)?;
+    check_schemas(root)?;
+    check_inventory(root)?;
+    check_evidence(root)?;
+
+    let inventory = root.join("conformance/0.1/inventory");
+    let packages_path = inventory.join("packages.json");
+    let packages = json(&packages_path)?;
+    let package_names = array(&packages, "packages", &packages_path)?
+        .iter()
+        .map(|row| text(row, "name", &packages_path).map(str::to_string))
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    let metadata_output = Command::new("cargo")
+        .args(["metadata", "--no-deps", "--format-version", "1", "--locked"])
+        .current_dir(root)
+        .output()
+        .map_err(|error| format!("cargo metadata: {error}"))?;
+    require(metadata_output.status.success(), "cargo metadata failed")?;
+    let metadata: Value = serde_json::from_slice(&metadata_output.stdout)
+        .map_err(|error| format!("cargo metadata JSON: {error}"))?;
+    let workspace_names = metadata["packages"]
+        .as_array()
+        .ok_or("metadata packages missing")?
+        .iter()
+        .filter_map(|package| package["name"].as_str().map(str::to_string))
+        .collect::<BTreeSet<_>>();
+    require(
+        workspace_names == package_names,
+        "package inventory differs from Cargo workspace",
+    )?;
+
+    let selectors_path = inventory.join("selectors.json");
+    let selectors = json(&selectors_path)?;
+    for selector in array(&selectors, "selectors", &selectors_path)? {
+        let authority = text(selector, "target_authority", &selectors_path)?;
+        require(
+            package_names.contains(authority),
+            &format!("selector authority {authority} is not a workspace package"),
+        )?;
+        let coverage = text(selector, "coverage", &selectors_path)?;
+        require(
+            inventory.join(coverage).is_file(),
+            &format!("selector coverage {coverage} is missing"),
+        )?;
+    }
+
+    let authority_path = inventory.join("authority-graph.json");
+    let authority = json(&authority_path)?;
+    let mut families = BTreeSet::new();
+    let mut defaults = BTreeSet::new();
+    for row in array(&authority, "authorities", &authority_path)? {
+        require(
+            families.insert(text(row, "family", &authority_path)?),
+            "authority family has more than one default",
+        )?;
+        let selected = text(row, "default", &authority_path)?;
+        require(
+            selected.starts_with("mainframe-env-") && package_names.contains(selected),
+            &format!("default authority {selected} is invalid"),
+        )?;
+        defaults.insert(selected);
+    }
+    require(
+        authority.get("automatic_fallback") == Some(&Value::Bool(false)),
+        "automatic fallback is enabled",
+    )?;
+
+    let gaps_path = inventory.join("known-gaps.json");
+    let gaps = json(&gaps_path)?;
+    for gap in array(&gaps, "gaps", &gaps_path)? {
+        let status = text(gap, "status", &gaps_path)?;
+        let blocks = text(gap, "blocks", &gaps_path)?;
+        require(
+            !status.starts_with("open") || blocks == "none" || blocks.starts_with("none;"),
+            &format!(
+                "open certification blocker: {}",
+                text(gap, "id", &gaps_path)?
+            ),
+        )?;
+    }
+
+    let evidence = root.join("conformance/0.1/evidence");
+    for name in [
+        "compatibility-summary.json",
+        "profile-closure.json",
+        "resource-summary.json",
+        "security-summary.json",
+        "recovery-summary.json",
+        "verification-summary.json",
+        "cutover-summary.json",
+        "release-exit-gates.json",
+    ] {
+        let path = evidence.join(name);
+        let value = json(&path)?;
+        require(
+            value
+                .get("status")
+                .and_then(Value::as_str)
+                .is_some_and(|status| status.starts_with("pass")),
+            &format!("{name} does not pass"),
+        )?;
+    }
+    for name in [
+        "cobol-hello.json",
+        "cics-carddemo.json",
+        "jcl-jes.json",
+        "zosmf.json",
+        "dataset.json",
+        "racf.json",
+    ] {
+        let path = evidence.join("differential").join(name);
+        let value = json(&path)?;
+        require(
+            value
+                .get("status")
+                .and_then(Value::as_str)
+                .is_some_and(|status| status.starts_with("pass")),
+            &format!("differential {name} does not pass"),
+        )?;
+    }
+    for phase in 0..=6 {
+        let subject = format!("Complete ME.V{phase}");
+        let output = Command::new("git")
+            .args(["log", "--format=%B%x00", "--grep", &format!("^{subject}")])
+            .current_dir(root)
+            .output()
+            .map_err(|error| format!("git log: {error}"))?;
+        require(output.status.success(), "git log failed")?;
+        let message = String::from_utf8(output.stdout).map_err(|error| error.to_string())?;
+        require(
+            message.contains(&format!("Phase-Gate: ME.V{phase}=pass"))
+                && message.contains("Evidence-Digest: sha256:")
+                && message.contains("Product-Version: 0.1.0-alpha.0"),
+            &format!("ME.V{phase} completion commit or trailers are missing"),
+        )?;
+    }
+    check_release_artifacts(root)?;
+    Ok(())
+}
+
 fn print_digest(root: &Path) -> TaskResult {
     let mut files = Vec::new();
     collect_files(root, &mut files)?;
@@ -491,6 +638,195 @@ fn print_digest(root: &Path) -> TaskResult {
     }
     println!("sha256:{:x}", digest.finalize());
     Ok(())
+}
+
+fn generate_release_artifacts(root: &Path) -> TaskResult {
+    let documents = release_documents(root)?;
+    for (relative, bytes) in documents {
+        let path = root.join(relative);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
+        }
+        fs::write(&path, bytes).map_err(|error| format!("{}: {error}", path.display()))?;
+    }
+    Ok(())
+}
+
+fn check_release_artifacts(root: &Path) -> TaskResult {
+    for (relative, expected) in release_documents(root)? {
+        let path = root.join(&relative);
+        let actual = fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?;
+        require(
+            actual == expected,
+            &format!("{} is stale; run cargo xtask release", relative.display()),
+        )?;
+    }
+    Ok(())
+}
+
+fn release_documents(root: &Path) -> TaskResult<BTreeMap<PathBuf, Vec<u8>>> {
+    let directory = PathBuf::from("release/0.1.0-alpha.0");
+    let server = root.join("target/release/mainframe-env-server");
+    let cli = root.join("target/release/mainframe-env");
+    require(server.is_file(), "release server binary has not been built")?;
+    require(cli.is_file(), "release CLI binary has not been built")?;
+    let server_digest = file_digest(&server)?;
+    let cli_digest = file_digest(&cli)?;
+    let lock_digest = file_digest(&root.join("Cargo.lock"))?;
+    let config_digest = file_digest(&root.join("config/mainframe-env.toml"))?;
+    let sqlite_migration = file_digest(
+        &root.join("crates/stores/mainframe-env-store/migrations/sqlite/0001-durable-state.sql"),
+    )?;
+    let postgres_migration = file_digest(
+        &root.join("crates/stores/mainframe-env-store/migrations/postgres/0001-durable-state.sql"),
+    )?;
+    let phase_base = command_text(
+        root,
+        "git",
+        &["log", "-1", "--format=%H", "--grep=^Complete ME.V6"],
+    )?;
+    let rustc = command_text(root, "rustc", &["--version"])?;
+    let metadata_output = Command::new("cargo")
+        .args(["metadata", "--format-version", "1", "--locked"])
+        .current_dir(root)
+        .output()
+        .map_err(|error| format!("cargo metadata: {error}"))?;
+    require(metadata_output.status.success(), "cargo metadata failed")?;
+    let metadata: Value = serde_json::from_slice(&metadata_output.stdout)
+        .map_err(|error| format!("cargo metadata JSON: {error}"))?;
+    let packages = metadata
+        .get("packages")
+        .and_then(Value::as_array)
+        .ok_or("cargo metadata has no packages")?;
+    let mut components = packages
+        .iter()
+        .map(|package| {
+            let name = package.get("name").and_then(Value::as_str).unwrap_or("");
+            let version = package.get("version").and_then(Value::as_str).unwrap_or("");
+            let license = package.get("license").and_then(Value::as_str);
+            let source = package.get("source").and_then(Value::as_str);
+            let mut component = json!({
+                "type":if name.starts_with("mainframe-env") {"application"} else {"library"},
+                "bom-ref":format!("pkg:cargo/{name}@{version}"),
+                "name":name,
+                "version":version,
+                "purl":format!("pkg:cargo/{name}@{version}")
+            });
+            if let Some(license) = license {
+                component["licenses"] = json!([{"expression":license}]);
+            }
+            if let Some(source) = source {
+                component["properties"] = json!([{"name":"cargo:source","value":source}]);
+            }
+            component
+        })
+        .collect::<Vec<_>>();
+    components.sort_by(|left, right| {
+        left["name"]
+            .as_str()
+            .cmp(&right["name"].as_str())
+            .then(left["version"].as_str().cmp(&right["version"].as_str()))
+    });
+    let sbom = json!({
+        "bomFormat":"CycloneDX",
+        "specVersion":"1.6",
+        "version":1,
+        "metadata":{
+            "component":{"type":"application","name":"mainframe-env","version":"0.1.0-alpha.0"},
+            "properties":[
+                {"name":"mainframe-env:phase-base","value":phase_base},
+                {"name":"mainframe-env:cargo-lock-sha256","value":lock_digest}
+            ]
+        },
+        "components":components
+    });
+    let manifest = json!({
+        "schema_version":"mainframe-env.release-manifest@1",
+        "product":"mainframe-env",
+        "version":"0.1.0-alpha.0",
+        "channel":"alpha",
+        "phase_base_revision":phase_base,
+        "toolchain":rustc,
+        "target":format!("{}-{}",std::env::consts::ARCH,std::env::consts::OS),
+        "profile":"release/core-server",
+        "contracts":"conformance/0.1/inventory/versions.json",
+        "migration_head":"0001-durable-state",
+        "artifacts":[
+            {"path":"bin/mainframe-env-server","sha256":server_digest},
+            {"path":"bin/mainframe-env","sha256":cli_digest},
+            {"path":"config/mainframe-env.toml","sha256":config_digest},
+            {"path":"migrations/sqlite/0001-durable-state.sql","sha256":sqlite_migration},
+            {"path":"migrations/postgres/0001-durable-state.sql","sha256":postgres_migration}
+        ],
+        "tag":null,
+        "published":false
+    });
+    let provenance = json!({
+        "_type":"https://in-toto.io/Statement/v1",
+        "subject":[
+            {"name":"mainframe-env-server","digest":{"sha256":server_digest}},
+            {"name":"mainframe-env","digest":{"sha256":cli_digest}}
+        ],
+        "predicateType":"https://slsa.dev/provenance/v1",
+        "predicate":{
+            "buildDefinition":{
+                "buildType":"mainframe-env.cargo-release@1",
+                "externalParameters":{"profile":"release","locked":true,"all_features":true},
+                "resolvedDependencies":[{"uri":"Cargo.lock","digest":{"sha256":lock_digest}}]
+            },
+            "runDetails":{"builder":{"id":"local-codex-workspace"},"metadata":{"invocationId":"ME.V7-local"}}
+        }
+    });
+    let mut licenses = packages
+        .iter()
+        .filter_map(|package| package.get("license").and_then(Value::as_str))
+        .map(str::to_string)
+        .collect::<BTreeSet<_>>();
+    licenses.insert("Apache-2.0 (mainframe-env)".into());
+    let notices = format!(
+        "# License expressions\n\nGenerated from locked Cargo metadata. Full dependency texts remain in their source packages.\n\n{}\n",
+        licenses
+            .into_iter()
+            .map(|license| format!("- {license}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+    let checksums = format!(
+        "{server_digest}  bin/mainframe-env-server\n{cli_digest}  bin/mainframe-env\n{config_digest}  config/mainframe-env.toml\n{sqlite_migration}  migrations/sqlite/0001-durable-state.sql\n{postgres_migration}  migrations/postgres/0001-durable-state.sql\n"
+    );
+    Ok(BTreeMap::from([
+        (directory.join("manifest.json"), pretty_json(&manifest)?),
+        (directory.join("sbom.cdx.json"), pretty_json(&sbom)?),
+        (
+            directory.join("provenance.intoto.json"),
+            pretty_json(&provenance)?,
+        ),
+        (directory.join("checksums.sha256"), checksums.into_bytes()),
+        (directory.join("LICENSES.md"), notices.into_bytes()),
+    ]))
+}
+
+fn pretty_json(value: &Value) -> TaskResult<Vec<u8>> {
+    let mut bytes = serde_json::to_vec_pretty(value).map_err(|error| error.to_string())?;
+    bytes.push(b'\n');
+    Ok(bytes)
+}
+
+fn file_digest(path: &Path) -> TaskResult<String> {
+    let bytes = fs::read(path).map_err(|error| format!("{}: {error}", path.display()))?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
+}
+
+fn command_text(root: &Path, program: &str, arguments: &[&str]) -> TaskResult<String> {
+    let output = Command::new(program)
+        .args(arguments)
+        .current_dir(root)
+        .output()
+        .map_err(|error| format!("{program}: {error}"))?;
+    require(output.status.success(), &format!("{program} failed"))?;
+    String::from_utf8(output.stdout)
+        .map(|value| value.trim().to_string())
+        .map_err(|error| error.to_string())
 }
 
 fn excluded_names(root: &Path) -> TaskResult<BTreeSet<String>> {
