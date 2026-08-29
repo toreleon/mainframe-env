@@ -21,6 +21,8 @@
     ["mainframe-env-racf","mainframe-env-host-api"],
     ["mainframe-env-racf","mainframe-env-store-api"],
     ["mainframe-env-cics","mainframe-env-host-api"],
+    ["mainframe-env-cics","mainframe-env-execution-api"],
+    ["mainframe-env-cics","mainframe-env-store-api"],
     ["mainframe-env-batch","mainframe-env-execution-api"],
     ["mainframe-env-batch","mainframe-env-host-api"],
     ["mainframe-env-store","mainframe-env-store-api"],

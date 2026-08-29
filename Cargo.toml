@@ -13,6 +13,7 @@ members = [
     "crates/kernel/mainframe-env-interpreter",
     "crates/providers/mainframe-env-dataset",
     "crates/providers/mainframe-env-racf",
+    "crates/providers/mainframe-env-cics",
     "crates/apps/mainframe-env-cli",
     "crates/tooling/mainframe-env-conformance",
     "xtask",
@@ -50,3 +51,4 @@ mainframe-env-compiler = { path = "crates/kernel/mainframe-env-compiler" }
 mainframe-env-interpreter = { path = "crates/kernel/mainframe-env-interpreter" }
 mainframe-env-dataset = { path = "crates/providers/mainframe-env-dataset" }
 mainframe-env-racf = { path = "crates/providers/mainframe-env-racf" }
+mainframe-env-cics = { path = "crates/providers/mainframe-env-cics" }

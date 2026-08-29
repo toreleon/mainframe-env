@@ -1,10 +1,9 @@
 # mainframe-env 0.1 Implementation Status
 
-Current phase: **ME.V3 — dataset and RACF/SAF authorities**
-Current work item: the ME.V3 candidate is complete; run the full gate and create the required phase commit.
+Current phase: **ME.V4 — typed CICS runtime**
+Current work item: the ME.V4 candidate is complete; run the full gate and create the required phase commit.
 Product version: **0.1.0-alpha.0**
-Source identity: ME.V2 commit `a11034a382ddcb8ccd378926f1f3bb91f0b1bcc2` plus the
-current ME.V3 candidate.
+Source identity: ME.V3 commit `2f8f332` plus the current ME.V4 candidate.
 
 ## Completed deliverables
 
@@ -41,6 +40,13 @@ current ME.V3 candidate.
 - Added a durable SQLx SQLite state adapter and passed close/reopen recovery for datasets, identities,
   groups, and profiles. Host middleware now fails closed on principal/grant, identity, cancellation,
   deadline, request/result bound, missing provider, provider panic, and malformed-result controls.
+- Committed ME.V3 as `2f8f332` with the required trailers.
+- Implemented the sole typed CICS provider for all 22 frozen operation families: 18 executable
+  families and four explicit unsupported oracle-matching families. The shared contract parser
+  distinguishes multiword forms, and interpreter lowering emits named schema-tagged arguments.
+- Added bounded BMS maps, durable protocol-neutral terminal suspension/resume, file and program
+  calls through scoped host services, typed CICS condition/EIB outcomes, transaction identity,
+  transient data bounds, RACF default-deny admission, and SQLite suspended-session recovery.
 
 Exact machine evidence is in
 `conformance/0.1/evidence/program-status.json` and
@@ -57,7 +63,7 @@ Exact machine evidence is in
 
 ## Known gaps and stop-the-line findings
 
-No V0–V3 stop-the-line finding is open. ME.V4–ME.V7 implementation is pending. Current oracle gaps,
+No V0–V4 stop-the-line finding is open. ME.V5–ME.V7 implementation is pending. Current oracle gaps,
 including historical evidence revision differences, partial COBOL/CICS forms, inactive TLS/CSRF,
 and the pending PostgreSQL runner, are recorded in
 `conformance/0.1/inventory/known-gaps.json` and block only their affected later promotions.
@@ -69,5 +75,5 @@ passed: COBOL 37, RACF 8, z/OSMF datasets 9, z/OSMF jobs 9, CICS 317, JCL 164, a
 
 ## Next smallest executable step
 
-Run the complete locked ME.V3 gate, record its canonical content digest, review the staged diff, and
-create the dedicated `Complete ME.V3 dataset and security authorities` commit.
+Run the complete locked ME.V4 gate, record its canonical content digest, review the staged diff, and
+create the dedicated `Complete ME.V4 typed CICS runtime` commit.

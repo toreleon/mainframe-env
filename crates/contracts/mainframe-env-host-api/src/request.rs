@@ -401,6 +401,49 @@ impl CicsOperation {
                 | Self::Syncpoint
         )
     }
+
+    #[must_use]
+    pub fn from_tokens(tokens: &[String]) -> Option<Self> {
+        let words: Vec<String> = tokens
+            .iter()
+            .map(|token| token.to_ascii_uppercase())
+            .filter(|token| !matches!(token.as_str(), "EXEC" | "CICS" | "END-EXEC"))
+            .collect();
+        let first = words.first()?.as_str();
+        Some(match (first, words.get(1).map(String::as_str)) {
+            ("ABEND", _) => Self::Abend,
+            ("ASKTIME", _) => Self::Asktime,
+            ("ASSIGN", _) => Self::Assign,
+            ("DELETE", _) => Self::Delete,
+            ("ENDBR", _) => Self::EndBrowse,
+            ("FORMATTIME", _) => Self::FormatTime,
+            ("HANDLE", Some("ABEND")) => Self::HandleAbend,
+            ("HANDLE", _) => Self::HandleCondition,
+            ("INQUIRE", _) => Self::Inquire,
+            ("READ", _) => Self::Read,
+            ("READNEXT", _) => Self::ReadNext,
+            ("READPREV", _) => Self::ReadPrev,
+            ("RECEIVE", Some("MAP")) => Self::ReceiveMap,
+            ("RETURN", _) => Self::Return,
+            ("REWRITE", _) => Self::Rewrite,
+            ("SEND", Some("MAP")) => Self::SendMap,
+            ("SEND", _) => Self::SendText,
+            ("STARTBR", _) => Self::StartBrowse,
+            ("SYNCPOINT", _) => Self::Syncpoint,
+            ("WRITE", _) => Self::Write,
+            ("WRITEQ", Some("TD")) => Self::WriteTransientData,
+            ("XCTL", _) => Self::Xctl,
+            _ => return None,
+        })
+    }
+
+    #[must_use]
+    pub const fn supported(self) -> bool {
+        !matches!(
+            self,
+            Self::Asktime | Self::FormatTime | Self::Inquire | Self::Syncpoint
+        )
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -419,6 +462,28 @@ pub struct CicsRequest {
     pub arguments: BTreeMap<String, BoundedPayload>,
     pub condition_policy: CicsConditionPolicy,
     pub mutation: Option<Mutation>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CicsDisposition {
+    Complete,
+    Suspended,
+    Transfer,
+    Returned,
+    Abended,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CicsResponse {
+    pub disposition: CicsDisposition,
+    pub condition: String,
+    pub response: i32,
+    pub response2: i32,
+    pub applid: String,
+    pub sysid: String,
+    pub target: Option<String>,
+    pub next_transaction: Option<String>,
+    pub payload: BoundedPayload,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -561,7 +626,7 @@ pub enum HostResult {
         value: Option<Vec<u8>>,
         version: u64,
     },
-    Cics(BoundedPayload),
+    Cics(CicsResponse),
 }
 
 impl HostResult {
@@ -575,11 +640,24 @@ impl HostResult {
             Self::Dataset(DatasetResult::Records { records, .. }) => {
                 validate_records(records, limits)
             }
-            Self::Program(payload)
-            | Self::Spool(payload)
-            | Self::Terminal(payload)
-            | Self::Cics(payload)
+            Self::Program(payload) | Self::Spool(payload) | Self::Terminal(payload)
                 if payload.bytes().len() > limits.max_state_bytes =>
+            {
+                Err(HostProblem::ResourceExhausted)
+            }
+            Self::Cics(response)
+                if response.condition.len() > limits.max_name_bytes
+                    || response.applid.len() > limits.max_name_bytes
+                    || response.sysid.len() > limits.max_name_bytes
+                    || response
+                        .target
+                        .as_ref()
+                        .is_some_and(|value| value.len() > limits.max_name_bytes)
+                    || response
+                        .next_transaction
+                        .as_ref()
+                        .is_some_and(|value| value.len() > limits.max_name_bytes)
+                    || response.payload.bytes().len() > limits.max_state_bytes =>
             {
                 Err(HostProblem::ResourceExhausted)
             }

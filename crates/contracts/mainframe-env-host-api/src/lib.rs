@@ -14,11 +14,11 @@ pub use registry::{
     CapabilityDescriptor, HostProvider, RegistryProblem, RegistryPublisher, RegistrySnapshot,
 };
 pub use request::{
-    AccessIntent, AuditEvent, CicsConditionPolicy, CicsOperation, CicsRequest, ClockRequest,
-    DatasetAttributes, DatasetOrganization, DatasetRequest, DatasetResult, EffectRequest,
-    EffectResult, HostLimits, HostProblem, HostRequest, HostResult, Mutation, ProgramRequest,
-    RecordFormat, SecretRef, SecurityDecision, SecurityRequest, SpoolRequest, StateRequest,
-    TerminalField, TerminalRequest,
+    AccessIntent, AuditEvent, CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest,
+    CicsResponse, ClockRequest, DatasetAttributes, DatasetOrganization, DatasetRequest,
+    DatasetResult, EffectRequest, EffectResult, HostLimits, HostProblem, HostRequest, HostResult,
+    Mutation, ProgramRequest, RecordFormat, SecretRef, SecurityDecision, SecurityRequest,
+    SpoolRequest, StateRequest, TerminalField, TerminalRequest,
 };
 
 pub const HOST_CONTRACT: &str = "mainframe-env.host@1";

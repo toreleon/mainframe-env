@@ -1,0 +1,34 @@
+{
+  "schema_version":"mainframe-env.v4-cics-results@1",
+  "derived":true,
+  "status":"pass",
+  "contract":"mainframe-env.cics@1",
+  "provider_generation":"mainframe-env-cics@1",
+  "conditions":{
+    "frozen_exec_cics_blocks":174,
+    "frozen_operation_families":22,
+    "typed_supported_families":18,
+    "explicit_unsupported_families":4,
+    "one_shared_operation_parser":true,
+    "named_schema_tagged_arguments":true,
+    "raw_command_authority":false,
+    "global_bridge_authority":false,
+    "bms_map_and_field_contracts":true,
+    "terminal_suspend_resume_bounded":true,
+    "idle_worker_or_thread_per_session":false,
+    "dataset_file_routes_use_scoped_host_service":true,
+    "program_transfer_uses_scoped_host_service":true,
+    "racf_default_deny_at_admission":true,
+    "conditions_and_eib_typed":true,
+    "transaction_identity_checked":true,
+    "sqlite_suspended_session_restart":true,
+    "selected_route_registry_test":true
+  },
+  "tests":{"cics_provider":7,"interpreter_named_lowering":1,"host_contract":10},
+  "evidence":[
+    "conformance/0.1/evidence/differential/cics-carddemo.json",
+    "conformance/0.1/inventory/cics-operations.json",
+    "crates/providers/mainframe-env-cics/src/service.rs",
+    "crates/kernel/mainframe-env-interpreter/src/machine.rs"
+  ]
+}

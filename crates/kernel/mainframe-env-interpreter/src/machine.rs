@@ -355,45 +355,20 @@ impl ReferenceMachine {
         )
     }
     fn cics_effect(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
-        let command = args
-            .iter()
-            .find(|arg| !arg.eq_ignore_ascii_case("CICS"))
-            .ok_or(MachineProblem::InvalidOperation)?;
-        let operation = match command.as_str() {
-            "SEND" => CicsOperation::SendText,
-            "RECEIVE" => CicsOperation::ReceiveMap,
-            "READ" => CicsOperation::Read,
-            "WRITE" => CicsOperation::Write,
-            "REWRITE" => CicsOperation::Rewrite,
-            "DELETE" => CicsOperation::Delete,
-            "STARTBR" => CicsOperation::StartBrowse,
-            "READNEXT" => CicsOperation::ReadNext,
-            "READPREV" => CicsOperation::ReadPrev,
-            "ENDBR" => CicsOperation::EndBrowse,
-            "ASSIGN" => CicsOperation::Assign,
-            "RETURN" => CicsOperation::Return,
-            "XCTL" => CicsOperation::Xctl,
-            "ABEND" => CicsOperation::Abend,
-            "ASKTIME" => CicsOperation::Asktime,
-            "FORMATTIME" => CicsOperation::FormatTime,
-            "INQUIRE" => CicsOperation::Inquire,
-            "SYNCPOINT" => CicsOperation::Syncpoint,
-            "HANDLE" => CicsOperation::HandleCondition,
-            "WRITEQ" => CicsOperation::WriteTransientData,
-            _ => return Err(MachineProblem::UnsupportedForm),
+        let operation = CicsOperation::from_tokens(args).ok_or(MachineProblem::UnsupportedForm)?;
+        let arguments = cics_arguments(args)?;
+        let condition_policy = if args.iter().any(|arg| arg.eq_ignore_ascii_case("NOHANDLE")) {
+            CicsConditionPolicy::NoHandle
+        } else if let Some(response) = arguments.get("RESP") {
+            CicsConditionPolicy::Respond {
+                response_field: String::from_utf8_lossy(response.bytes()).into_owned(),
+                response2_field: arguments
+                    .get("RESP2")
+                    .map(|value| String::from_utf8_lossy(value.bytes()).into_owned()),
+            }
+        } else {
+            CicsConditionPolicy::Default
         };
-        let mut arguments = BTreeMap::new();
-        for (index, arg) in args.iter().enumerate() {
-            arguments.insert(
-                format!("arg_{index:03}"),
-                BoundedPayload::new(
-                    "cics.arg@1",
-                    arg.as_bytes().to_vec(),
-                    InvocationLimits::default(),
-                )
-                .map_err(|_| MachineProblem::ResourceExhausted)?,
-            );
-        }
         let mutation = operation
             .is_mutating()
             .then(|| self.mutation())
@@ -402,7 +377,7 @@ impl ReferenceMachine {
             HostRequest::Cics(CicsRequest {
                 operation,
                 arguments,
-                condition_policy: CicsConditionPolicy::Default,
+                condition_policy,
                 mutation,
             }),
             PendingKind::Ignore,
@@ -825,6 +800,67 @@ impl Machine for ReferenceMachine {
     }
 }
 
+fn cics_arguments(tokens: &[String]) -> Result<BTreeMap<String, BoundedPayload>, MachineProblem> {
+    let mut arguments = BTreeMap::new();
+    let command = tokens
+        .iter()
+        .position(|token| {
+            !matches!(
+                token.to_ascii_uppercase().as_str(),
+                "EXEC" | "CICS" | "END-EXEC"
+            )
+        })
+        .ok_or(MachineProblem::InvalidOperation)?;
+    let first = tokens[command].to_ascii_uppercase();
+    let mut index = command + 1;
+    if matches!(first.as_str(), "HANDLE" | "RECEIVE" | "SEND" | "WRITEQ")
+        && tokens.get(index).is_some_and(|token| {
+            matches!(
+                token.to_ascii_uppercase().as_str(),
+                "ABEND" | "CONDITION" | "MAP" | "TEXT" | "TD"
+            )
+        })
+    {
+        index += 1;
+    }
+    while index < tokens.len() {
+        let key = tokens[index].to_ascii_uppercase();
+        if key == "END-EXEC" {
+            break;
+        }
+        if tokens.get(index + 1).is_some_and(|token| token == "(") {
+            let end = tokens[index + 2..]
+                .iter()
+                .position(|token| token == ")")
+                .map(|offset| index + 2 + offset)
+                .ok_or(MachineProblem::InvalidOperation)?;
+            let value = tokens[index + 2..end].join(" ");
+            arguments.insert(
+                key,
+                BoundedPayload::new(
+                    "mainframe-env.cics.argument@1",
+                    value.into_bytes(),
+                    InvocationLimits::default(),
+                )
+                .map_err(|_| MachineProblem::ResourceExhausted)?,
+            );
+            index = end + 1;
+        } else {
+            arguments.insert(
+                format!("OPTION.{key}"),
+                BoundedPayload::new(
+                    "mainframe-env.cics.option@1",
+                    Vec::new(),
+                    InvocationLimits::default(),
+                )
+                .map_err(|_| MachineProblem::ResourceExhausted)?,
+            );
+            index += 1;
+        }
+    }
+    Ok(arguments)
+}
+
 type StorageState = (
     Vec<Vec<u8>>,
     BTreeMap<String, StorageView>,
@@ -1161,5 +1197,24 @@ mod tests {
             m.drive(MachineResume::Start, Quantum::new(100, 1024).unwrap()),
             MachineDrive::Failed(_)
         ));
+    }
+    #[test]
+    fn cics_tokens_lower_to_named_typed_arguments() {
+        let tokens = vec![
+            "EXEC", "CICS", "SEND", "MAP", "MAPSET", "(", "MENUMS", ")", "MAP", "(", "MENU", ")",
+            "ERASE", "END-EXEC",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+        assert_eq!(
+            CicsOperation::from_tokens(&tokens),
+            Some(CicsOperation::SendMap)
+        );
+        let arguments = cics_arguments(&tokens).unwrap();
+        assert_eq!(arguments["MAPSET"].bytes(), b"MENUMS");
+        assert_eq!(arguments["MAP"].bytes(), b"MENU");
+        assert!(arguments.contains_key("OPTION.ERASE"));
+        assert!(arguments.keys().all(|name| !name.starts_with("arg_")));
     }
 }

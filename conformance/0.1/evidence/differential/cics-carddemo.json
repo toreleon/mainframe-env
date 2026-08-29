@@ -1,0 +1,32 @@
+{
+  "schema_version":"mainframe-env.cics-differential@1",
+  "status":"pass",
+  "comparison":"exact frozen operation inventory plus selected typed runtime observations",
+  "oracle":{
+    "revision":"cee4b1df3fa5e32066b7948d528c163f8636a18e",
+    "carddemo_commit":"59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e",
+    "carddemo_tree":"a1253e31c839f78d1f185b01771ba956da63b005",
+    "content_sha256":"a58a827edd293f3e66fdc192cae7dd0ccb4fd1bf1f7302bb9b1d2fb8ee1ba328",
+    "source_files":31,
+    "exec_cics_blocks":174,
+    "operation_families":22
+  },
+  "exact_operation_counts":{
+    "ABEND":4,"ASKTIME":1,"ASSIGN":2,"DELETE":1,"ENDBR":6,"FORMATTIME":1,
+    "HANDLE ABEND":8,"HANDLE CONDITION":1,"INQUIRE":1,"READ":20,"READNEXT":4,
+    "READPREV":6,"RECEIVE MAP":17,"RETURN":27,"REWRITE":5,"SEND TEXT":11,
+    "SEND MAP":20,"STARTBR":6,"SYNCPOINT":3,"WRITE":3,"WRITEQ TD":1,"XCTL":26
+  },
+  "selected_observations":[
+    "BMS map bytes and field metadata",
+    "terminal suspension and input resume",
+    "file record bytes and typed conditions",
+    "XCTL target and COMMAREA payload",
+    "ASSIGN APPLID SYSID TRANSID principal",
+    "RACF default deny and permitted admission",
+    "transaction mismatch failure",
+    "SQLite suspended-session recovery"
+  ],
+  "mutation_comparison":"isolated provider state; no external shadow mutation",
+  "accepted_corrections":[]
+}
