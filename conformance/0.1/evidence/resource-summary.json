@@ -6,7 +6,7 @@
     "host requests/results/audit","dataset catalog/records/members/bytes/cursors/replay",
     "RACF users/groups/profiles/permissions/audit","CICS runs/sessions/maps/fields/screens/queues",
     "JES jobs/queue/active/spool/events/attempts","HTTP body/concurrency/page/timeout",
-    "SQL rows/payload/pools","artifacts/checkpoints/sessions/events/work/effects"
+    "SQL rows/payload/pools","artifacts/checkpoints/sessions/events/work/effects/outbox notifications"
   ],
   "saturation_behavior":"fail before mutation with typed resource exhaustion",
   "unbounded_authoritative_collection":false

@@ -12,7 +12,10 @@
     "profile_closure_clean":true,
     "release_artifacts_reproducible":true,
     "required_phase_commits_v0_v7_present":true,
-    "me_v7_completion_commit":"6c946753cf1d9ba7d4123e96511bd089a0b30423"
+    "me_v7_completion_commit":"6c946753cf1d9ba7d4123e96511bd089a0b30423",
+    "architecture_audit_remediated":true,
+    "runtime_architecture_gate_pass":true,
+    "issue_commits_present":true
   },
   "expression":"me_v0_pass && me_v1_pass && me_v2_pass && me_v3_pass && me_v4_pass && me_v5_pass && me_v6_pass && me_v7_pass",
   "functional_result":true,

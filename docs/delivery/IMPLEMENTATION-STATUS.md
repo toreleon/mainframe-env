@@ -66,6 +66,12 @@ Source identity: ME.V7 commit `6c946753cf1d9ba7d4123e96511bd089a0b30423`.
   release-mode 1x/2x/long-run gates, supply-chain/license/advisory checks, cutover/archive decisions,
   and reproducible alpha manifest/SBOM/checksum/license/provenance artifacts.
 - Committed ME.V7 as `6c946753cf1d9ba7d4123e96511bd089a0b30423` with the required trailers.
+- Completed the post-certification architecture audit: isolated synchronous SQL adapters from Tokio
+  workers, composed the common durable coordinator, added atomic projection/event/effect/checkpoint/
+  outbox journaling and leased work recovery, propagated scoped principals/capabilities through COBOL
+  and CICS, recorded ADR 0005, and made architecture/runtime certification executable.
+- Recorded focused issue commits `e860bdb`, `86f7199`, `93cf4f9`, `7ca6c79`, `a85171d`, and
+  `7e3842a`; the post-audit workspace now passes 127 tests plus PostgreSQL 18 explicitly.
 
 Exact machine evidence is in
 `conformance/0.1/evidence/program-status.json` and

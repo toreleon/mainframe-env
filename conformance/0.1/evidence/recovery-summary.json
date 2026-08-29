@@ -8,9 +8,11 @@
     "JES running-to-queued warm start with bounded attempts",
     "SQLite full durable contracts and VACUUM INTO backup/restore integrity",
     "PostgreSQL 18 migration plus provider/execution transition",
-    "work lease expiry and higher-attempt recovery",
-    "checkpoint and artifact digest rejection",
-    "effect intent/result/unknown-outcome state"
+    "work lease expiry, heartbeat, cancellation, bounded attempts, and dead-letter recovery",
+    "versioned machine checkpoint roundtrip, hostile corruption rejection, and artifact digest rejection",
+    "effect intent/result/unknown-outcome state plus explicit reconciliation",
+    "atomic execution projection/event/effect/checkpoint/outbox journal with rollback on saturation",
+    "release-binary SQLite async-context startup, readiness, and shutdown"
   ],
   "migration_head":"0001-durable-state",
   "exactly_once_claimed":false

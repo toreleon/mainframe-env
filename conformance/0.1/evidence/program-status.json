@@ -1,7 +1,7 @@
 {
   "schema_version": "mainframe-env.program-status@1",
   "current_phase": "ME.V7",
-  "current_work_item": "ME.V0 through ME.V7 complete; no implementation work remains",
+  "current_work_item": "ME.V0 through ME.V7 complete; post-certification architecture audit remediated",
   "source_identity": "commit:6c946753cf1d9ba7d4123e96511bd089a0b30423",
   "completed_deliverables": [
     {"item":"normative mainframe-env documents read","evidence":"docs/"},
@@ -26,12 +26,13 @@
     ,{"item":"ME.V6 completion commit","evidence":"commit c7f0c6d555709ec0bfb7f64866e29c7d2d04dece"}
     ,{"item":"ME.V7 compatibility, load, recovery, supply-chain, release-artifact, and cutover pack","evidence":"conformance/0.1/evidence/release-exit-gates.json"}
     ,{"item":"ME.V7 completion commit","evidence":"commit 6c946753cf1d9ba7d4123e96511bd089a0b30423"}
+    ,{"item":"post-certification architecture audit remediation","evidence":"commits e860bdb, 86f7199, 93cf4f9, 7ca6c79, a85171d, 7e3842a; cargo xtask runtime-architecture --check"}
   ],
   "accepted_decisions": [
     "mainframe-env identity and greenfield direction",
     "0.1 release line starting at 0.1.0-alpha.0",
     "bounded COBOL/CICS/JCL-JES/dataset/RACF-SAF/selected-zOSMF scope",
-    "20-package consolidation where proposed packages lacked independent selection boundaries",
+    "ADR 0005 twenty-package consolidation where proposed packages lacked independent selection boundaries",
     "local phase commits required; remote and release actions not authorized"
   ],
   "unresolved_decisions": [],
@@ -59,6 +60,8 @@
     ,{"command":"cargo deny check advisories bans licenses sources","exit_code":0,"result":"advisories ok, bans ok, licenses ok, sources ok"}
     ,{"command":"cargo xtask release --check","exit_code":0,"result":"release manifest, SBOM, checksums, licenses, and provenance reproducible"}
     ,{"command":"Rust 1.98 final workspace gate, Rust 1.95 workspace check, all xtask checks, cargo deny, and release load gates","exit_code":0,"result":"ME.V7 functional certification passed; canonical digest f3d520a3f6e2eeb17301de6f3e81f94f6dcc01baa9aafc5023cee90fa9ade644"}
+    ,{"command":"cargo xtask runtime-architecture --check","exit_code":0,"result":"exact Cargo graph/profile closure, common coordinator route, async SQLite adapter, scoped COBOL/CICS path, and release-binary HTTP readiness smoke passed"}
+    ,{"command":"post-audit Rust 1.98 workspace gate, Rust 1.95 workspace check, PostgreSQL 18, cargo deny, and release load gates","exit_code":0,"result":"127 workspace tests and one explicit PostgreSQL 18 test passed; 256/256, 512/512, and 10000/10000 load requests passed"}
   ],
   "known_gaps": [
     "Historical oracle evidence remains attributed to its original revision",

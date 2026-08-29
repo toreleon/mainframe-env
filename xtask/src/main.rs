@@ -901,6 +901,58 @@ fn check_certification(root: &Path) -> TaskResult {
             &format!("ME.V{phase} completion commit or trailers are missing"),
         )?;
     }
+    for subject in [
+        "Fix SQL stores in async server contexts",
+        "Route execution through the common coordinator",
+        "Wire transactional execution durability",
+        "Enforce scoped provider capabilities",
+        "Record the twenty-package architecture decision",
+        "Make architecture certification executable",
+    ] {
+        let output = Command::new("git")
+            .args([
+                "log",
+                "-1",
+                "--format=%H",
+                "--grep",
+                &format!("^{subject}$"),
+            ])
+            .current_dir(root)
+            .output()
+            .map_err(|error| format!("git log for {subject}: {error}"))?;
+        require(
+            output.status.success() && !output.stdout.is_empty(),
+            &format!("architecture remediation commit is missing: {subject}"),
+        )?;
+    }
+    let exit_gates_path = evidence.join("release-exit-gates.json");
+    let exit_gates = json(&exit_gates_path)?;
+    for condition in [
+        "architecture_audit_remediated",
+        "runtime_architecture_gate_pass",
+        "issue_commits_present",
+    ] {
+        require(
+            exit_gates["conditions"][condition] == Value::Bool(true),
+            &format!("release exit condition {condition} is not derived true"),
+        )?;
+    }
+    let workspace_tests = Command::new("cargo")
+        .args([
+            "test",
+            "--workspace",
+            "--all-features",
+            "--locked",
+            "--no-fail-fast",
+            "--quiet",
+        ])
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("certification workspace tests: {error}"))?;
+    require(
+        workspace_tests.success(),
+        "certification workspace tests failed",
+    )?;
     check_release_artifacts(root)?;
     Ok(())
 }
