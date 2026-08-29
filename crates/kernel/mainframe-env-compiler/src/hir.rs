@@ -273,12 +273,12 @@ fn build_module(
             });
         let id = builder
             .add_storage(
-                layout.name.to_ascii_lowercase(),
+                layout.qualified_name.to_ascii_lowercase(),
                 layout.length as u64,
                 alias,
             )
             .map_err(|_| HirProblem::InvalidLayout)?;
-        storage.insert(layout.name.clone(), id);
+        storage.insert(layout.qualified_name.clone(), id);
     }
     let region = builder
         .add_region()

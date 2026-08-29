@@ -22,9 +22,10 @@ use std::collections::{BTreeMap, BTreeSet};
 mod carddemo;
 
 pub use carddemo::{
-    CardDemoClosureReceipt, CardDemoCorpusReceipt, CardDemoSourceReceipt, CorpusProblem,
-    verify_carddemo_corpus, verify_carddemo_corpus_from_env,
-    verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
+    CardDemoClosureReceipt, CardDemoCorpusReceipt, CardDemoLayoutReceipt, CardDemoSourceReceipt,
+    CorpusProblem, verify_carddemo_corpus, verify_carddemo_corpus_from_env,
+    verify_carddemo_data_layouts_from_env, verify_carddemo_source_closures_from_env,
+    verify_carddemo_source_preprocessing_from_env,
 };
 
 pub const HELLO_SOURCE: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. HELLO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MSG PIC X(12) VALUE 'HELLO WORLD!'.\nPROCEDURE DIVISION.\nDISPLAY MSG.\nSTOP RUN.\n";

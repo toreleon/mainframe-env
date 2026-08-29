@@ -25,12 +25,12 @@ pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, 
             });
         let id = builder
             .add_storage(
-                layout.name.to_ascii_lowercase(),
+                layout.qualified_name.to_ascii_lowercase(),
                 layout.length as u64,
                 alias,
             )
             .map_err(|_| LowerProblem::InvalidLayout)?;
-        storage.insert(layout.name.clone(), id);
+        storage.insert(layout.qualified_name.clone(), id);
     }
     let region = builder
         .add_region()
@@ -44,10 +44,13 @@ pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, 
         .filter(|layout| layout.length > 0 && layout.alias_of.is_none())
     {
         let id = *storage
-            .get(&layout.name)
+            .get(&layout.qualified_name)
             .ok_or(LowerProblem::InvalidLayout)?;
         let attributes = BTreeMap::from([
-            ("name".into(), Attribute::Text(layout.name.clone())),
+            (
+                "name".into(),
+                Attribute::Text(layout.qualified_name.clone()),
+            ),
             ("initial".into(), Attribute::Bytes(layout.initial.clone())),
             ("offset".into(), Attribute::Integer(layout.offset as i64)),
             ("length".into(), Attribute::Integer(layout.length as i64)),
@@ -90,7 +93,7 @@ pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, 
                     .find(|layout| layout.name == normalized && layout.length > 0)
             {
                 let id = *storage
-                    .get(&layout.name)
+                    .get(&layout.qualified_name)
                     .ok_or(LowerProblem::InvalidLayout)?;
                 references.push(StorageReference {
                     storage: id,

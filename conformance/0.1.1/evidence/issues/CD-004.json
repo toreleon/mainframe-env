@@ -1,0 +1,50 @@
+{
+  "schema_version": "mainframe-env.carddemo-issue-evidence@1",
+  "issue": "CD-004",
+  "title": "Implement hierarchical COBOL data scopes and exact layouts",
+  "derived": true,
+  "status": "pass",
+  "target_product": "0.1.1",
+  "current_product": "0.1.0-alpha.0",
+  "digest_scope": "Recursively lexicographically key-sorted compact UTF-8 JSON serialization of layout_receipt, with no trailing newline, followed by SHA-256",
+  "evidence_digest": "sha256:728eb45dd6cf917e16f25da43bf3b29b5d102da94ef359d7f73ec886de865bc8",
+  "layout_receipt": {
+    "schema_version": "mainframe-env.carddemo-layout-receipt@1",
+    "status": "pass",
+    "corpus_commit": "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e",
+    "programs_checked": 44,
+    "semantic_models": 44,
+    "layouts": 15296,
+    "qualified_duplicate_sets": 89,
+    "redefines": 808,
+    "variable_occurs": 23,
+    "condition_names": 1160,
+    "file_records": 54,
+    "linkage_items": 185,
+    "max_program_storage_bytes": 176272,
+    "layout_sha256": "0b7f24c44302ac0c62ec306e2d79d9f672f7bdf55a1d01a2b67451dd17fe4460"
+  },
+  "acceptance_observations": [
+    "Qualified identities replace global duplicate-name rejection; simple ambiguous names fail resolution while OF/IN and exact qualified paths select one layout.",
+    "Groups receive recursive extents and aggregate initial bytes; sibling REDEFINES and accepted same-name alternate definitions share offsets without advancing unrelated storage.",
+    "Levels 66, 77, 78, and 88, condition values, OCCURS ranges, OCCURS DEPENDING ON, indexes, 1-based subscripts, and reference modification are explicit bounded model state.",
+    "FILE, WORKING-STORAGE, LOCAL-STORAGE, and LINKAGE identities remain distinct while every extent stays within the program storage bound.",
+    "DISPLAY, signed overpunch, numeric-edited, big-endian binary, COMP-5, packed-decimal sign nibble, pointer, and group storage lengths/initial bytes are deterministic.",
+    "The exact length-delimited layout digest covers program path, qualified identity, level, section, offsets, lengths, category, initial bytes, aliases, occurrences, and dependency names for all 44 closures.",
+    "The real login closure now clears semantics and stops at the CD-005 HIR UnknownStatement boundary."
+  ],
+  "commands": [
+    {"command":"full-library CLI COSGN00C compile before repair","exit_code":1,"result":"focused real regression failed in semantic phase with DuplicateName"},
+    {"command":"cargo test -p mainframe-env-compiler --locked","exit_code":0,"result":"21 tests passed"},
+    {"command":"cargo check --workspace --all-targets --locked","exit_code":0,"result":"pass"},
+    {"command":"cargo test -p mainframe-env-compiler -p mainframe-env-conformance -p mainframe-env-cli -p mainframe-env-server -p xtask --locked","exit_code":0,"result":"21 compiler, 19 conformance, 3 CLI, 10 server, and 5 xtask tests passed"},
+    {"command":"affected-package cargo clippy --all-targets --locked -- -D warnings","exit_code":0,"result":"pass"},
+    {"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-layout --check","exit_code":0,"result":"44 semantic models and exact layout digest passed"},
+    {"command":"env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-layout --check","exit_code":1,"result":"expected fail-closed missing-environment control"},
+    {"command":"full-library CLI COSGN00C compile after repair","exit_code":1,"result":"expected CD-005 HIR UnknownStatement proves semantic completion"},
+    {"command":"env -u CARDEMO_CORPUS_DIR cargo xtask conformance --check","exit_code":0,"result":"versions, architecture, profiles, schemas, inventory, and existing evidence pass without CardDemo environment"},
+    {"command":"cargo fmt --all -- --check && git diff --check","exit_code":0,"result":"pass"}
+  ],
+  "absolute_local_paths_present": false,
+  "native_or_legacy_fallback_present": false
+}

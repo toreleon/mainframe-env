@@ -1,7 +1,7 @@
 # CardDemo-full 0.1.1 Program Status
 
 Current phase: **CD.A — corpus and application packaging**
-Current issue: **CD-003 — acceptance passed; focused completion commit in progress**
+Current issue: **CD-004 — acceptance passed; focused completion commit in progress**
 Next issue: **CD-003 — complete source closures and compatibility copybooks**
 Current product: **0.1.0-alpha.0**
 Target product: **0.1.1**
@@ -9,9 +9,9 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Source identity
 
-- mainframe-env base commit: `852aa654547a6df68c876e06b6f63f42559922b0`
+- mainframe-env base commit: `11d32398021b2240a95f757eec152a7607cba3a0`
 - current deterministic dirty-tree identity:
-  `sha256:7f0440059c84e2b880a65cb576e0a7451f7454ec32be4a0c1ba5a3dc9c29dcb3`
+  `sha256:06de0e812699b751b446c5128a3d03fff21f45c32b0c2196b81d106d2c50c3df`
 - dirty-tree algorithm: SHA-256 of the sorted `sha256sum` records for every
   repository file except `.git/`, `target/`, and the two persistent CardDemo
   status ledgers (which carry the identity).
@@ -59,9 +59,8 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 - State: **PASS**
 - Required commit subject: `Load complete CardDemo source closures`
-- Completion commit identity: the focused commit containing this ledger and the
-  `CardDemo-Issue: CD-003=pass` trailer; its hash is recorded on the next
-  continuation to avoid self-reference.
+- Completion commit identity:
+  `11d32398021b2240a95f757eec152a7607cba3a0`.
 - Evidence: `conformance/0.1.1/evidence/issues/CD-003.json`
 - Evidence digest:
   `sha256:b3326477beeb8c0f393ecb4393d057f821728d460fba5754f6cf5d03da53eb14`
@@ -75,6 +74,29 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 - Missing, duplicate, ambiguous, invalid, symbolic-link, and unassigned inputs
   fail before artifact publication. The real login now reaches the expected
   CD-004 semantic `DuplicateName` failure.
+
+### CD-004 — hierarchical data scopes and exact layouts
+
+- State: **PASS**
+- Required commit subject: `Implement CardDemo COBOL data layouts`
+- Completion commit identity: the focused commit containing this ledger and the
+  `CardDemo-Issue: CD-004=pass` trailer; its hash is recorded on the next
+  continuation to avoid self-reference.
+- Evidence: `conformance/0.1.1/evidence/issues/CD-004.json`
+- Evidence digest:
+  `sha256:728eb45dd6cf917e16f25da43bf3b29b5d102da94ef359d7f73ec886de865bc8`
+- Acceptance: all 44 closures produce semantic models with 15,296 qualified
+  layouts, 89 duplicate-name sets resolved by hierarchy, 808 redefinitions,
+  23 variable OCCURS entries, 1,160 condition names, 54 file records, and 185
+  linkage items.
+- The exact length-delimited layout digest is
+  `sha256:0b7f24c44302ac0c62ec306e2d79d9f672f7bdf55a1d01a2b67451dd17fe4460`;
+  maximum bounded program storage is 176,272 bytes.
+- OF/IN qualification, group extents, levels 66/77/78/88, conditions,
+  REDEFINES, OCCURS DEPENDING ON, indexes, subscripts, reference modification,
+  sections, and reached display/edited/binary/packed bytes have focused tests.
+- The full login now clears semantics and stops at CD-005 HIR
+  `UnknownStatement`.
 
 ## Commands and exit codes
 
@@ -120,10 +142,21 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   `DuplicateName`, proving the source closure is complete.
 - JES fixed `SYSIN` plus `SYSLIB` selected-route test — **0**; exact `HELLO`
   execution output.
+- `cargo check --workspace --all-targets --locked` — **0**.
+- Affected compiler/conformance/CLI/server/xtask tests — **0**; 58 passed.
+- Affected-package Clippy with `-D warnings` — **0**.
+- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-layout --check`
+  — **0**; exact CD-004 layout receipt passed.
+- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-layout --check` — **1**;
+  expected missing-environment failure.
+- Full-library CLI login compilation — **1**; expected next-phase HIR
+  `UnknownStatement`.
+- Final format, JSON, redaction, diff, ordinary conformance, and cumulative
+  CD-001–CD-004 gates — **0**.
 
 ## Implementation status
 
-- Issues passed: **3 / 27**
+- Issues passed: **4 / 27**
 - Journeys passed: **0 / 20**
 - Installed CardDemo resources: **0**
 - Executed CardDemo application journeys: **0**
@@ -137,10 +170,10 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 2. The repository is still `0.1.0-alpha.0`. A 0.1.1 release cannot be cut until
    0.1.0 is finalized or an explicit version-line correction is accepted.
 
-Neither decision blocks CD-004. No CD-003 blocker remains.
+Neither decision blocks CD-005. No CD-004 blocker remains.
 
 ## Next smallest executable step
 
-Commit CD-003 locally with its exact subject and evidence trailers. Then record
-that commit hash and begin CD-004 with the real duplicate-name regression,
-hierarchical scope/layout model, and exact reached storage representations.
+Commit CD-004 locally with its exact subject and evidence trailers. Then record
+that commit hash and begin CD-005 from the real HIR `UnknownStatement` cohort,
+replacing period-leading classification with typed structured control flow.

@@ -136,6 +136,24 @@ pub struct CardDemoClosureReceipt {
     pub placeholder_content_present: bool,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoLayoutReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub programs_checked: usize,
+    pub semantic_models: usize,
+    pub layouts: usize,
+    pub qualified_duplicate_sets: usize,
+    pub redefines: usize,
+    pub variable_occurs: usize,
+    pub condition_names: usize,
+    pub file_records: usize,
+    pub linkage_items: usize,
+    pub max_program_storage_bytes: usize,
+    pub layout_sha256: String,
+}
+
 pub fn verify_carddemo_corpus_from_env(
     inventory_path: &Path,
 ) -> Result<CardDemoCorpusReceipt, CorpusProblem> {
@@ -601,6 +619,215 @@ pub fn verify_carddemo_source_closures_from_env(
         unique_source_identities: identities.len(),
         placeholder_content_present,
     })
+}
+
+pub fn verify_carddemo_data_layouts_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoLayoutReceipt, CorpusProblem> {
+    let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required for CardDemo gates",
+        )
+    })?;
+    let corpus_dir = Path::new(&corpus_dir);
+    let closure = verify_carddemo_source_closures_from_env(inventory_path)?;
+    let bundles = explicit_carddemo_bundles(corpus_dir)?;
+    let compiler = CobolCompiler::default();
+    let mut layout_count = 0usize;
+    let mut qualified_duplicate_sets = 0usize;
+    let mut redefines = 0usize;
+    let mut variable_occurs = 0usize;
+    let mut condition_names = 0usize;
+    let mut file_records = 0usize;
+    let mut linkage_items = 0usize;
+    let mut max_program_storage_bytes = 0usize;
+    let mut layout_digest = Sha256::new();
+    for (primary, bundle) in &bundles {
+        let analysis = compiler.analyze(bundle);
+        let semantic = analysis.semantic.ok_or_else(|| {
+            let diagnostic = analysis
+                .diagnostics
+                .first()
+                .map_or("semantic analysis failed", |item| item.public_message());
+            CorpusProblem::new(
+                "carddemo.layout.semantic_failed",
+                format!("program {primary} failed semantic analysis: {diagnostic}"),
+            )
+        })?;
+        let mut simple = BTreeMap::<String, usize>::new();
+        for layout in &semantic.layouts {
+            digest_field(&mut layout_digest, primary.as_bytes());
+            digest_field(&mut layout_digest, layout.qualified_name.as_bytes());
+            digest_field(&mut layout_digest, &[layout.level]);
+            digest_field(
+                &mut layout_digest,
+                format!("{:?}", layout.section).as_bytes(),
+            );
+            digest_field(&mut layout_digest, &(layout.offset as u64).to_be_bytes());
+            digest_field(&mut layout_digest, &(layout.length as u64).to_be_bytes());
+            digest_field(
+                &mut layout_digest,
+                &(layout.element_length as u64).to_be_bytes(),
+            );
+            digest_field(
+                &mut layout_digest,
+                format!("{:?}", layout.category).as_bytes(),
+            );
+            digest_field(&mut layout_digest, &layout.initial);
+            digest_field(
+                &mut layout_digest,
+                layout.alias_of.as_deref().unwrap_or("").as_bytes(),
+            );
+            digest_field(
+                &mut layout_digest,
+                &(layout.occurs_min as u64).to_be_bytes(),
+            );
+            digest_field(&mut layout_digest, &(layout.occurs as u64).to_be_bytes());
+            digest_field(
+                &mut layout_digest,
+                layout.depending_on.as_deref().unwrap_or("").as_bytes(),
+            );
+            *simple.entry(layout.name.clone()).or_default() += 1;
+            if layout.offset.saturating_add(layout.length) > semantic.storage_bytes
+                && layout.category != mainframe_env_compiler::DataCategory::Condition
+            {
+                return Err(CorpusProblem::new(
+                    "carddemo.layout.extent_invalid",
+                    format!("program {primary} contains an out-of-range layout"),
+                ));
+            }
+            redefines += usize::from(layout.alias_of.is_some() && layout.level != 88);
+            variable_occurs += usize::from(layout.occurs_min != layout.occurs);
+            condition_names += usize::from(layout.level == 88);
+            file_records += usize::from(
+                layout.section == mainframe_env_compiler::StorageSection::File && layout.level == 1,
+            );
+            linkage_items +=
+                usize::from(layout.section == mainframe_env_compiler::StorageSection::Linkage);
+        }
+        qualified_duplicate_sets += simple.values().filter(|count| **count > 1).count();
+        layout_count = layout_count
+            .checked_add(semantic.layouts.len())
+            .ok_or_else(|| {
+                CorpusProblem::new(
+                    "carddemo.layout.resource_exhausted",
+                    "layout counter overflow",
+                )
+            })?;
+        max_program_storage_bytes = max_program_storage_bytes.max(semantic.storage_bytes);
+    }
+    Ok(CardDemoLayoutReceipt {
+        schema_version: "mainframe-env.carddemo-layout-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit: closure.corpus_commit,
+        programs_checked: bundles.len(),
+        semantic_models: bundles.len(),
+        layouts: layout_count,
+        qualified_duplicate_sets,
+        redefines,
+        variable_occurs,
+        condition_names,
+        file_records,
+        linkage_items,
+        max_program_storage_bytes,
+        layout_sha256: format!("{:x}", layout_digest.finalize()),
+    })
+}
+
+fn digest_field(digest: &mut Sha256, bytes: &[u8]) {
+    digest.update((bytes.len() as u64).to_be_bytes());
+    digest.update(bytes);
+}
+
+fn explicit_carddemo_bundles(
+    corpus_dir: &Path,
+) -> Result<Vec<(String, SourceBundle)>, CorpusProblem> {
+    let source_paths = collect_paths(
+        corpus_dir,
+        &[
+            "app/cbl",
+            "app/app-authorization-ims-db2-mq/cbl",
+            "app/app-transaction-type-db2/cbl",
+            "app/app-vsam-mq/cbl",
+        ],
+        "cbl",
+    )?;
+    let copy_roots = [
+        "app/app-authorization-ims-db2-mq/cpy",
+        "app/app-authorization-ims-db2-mq/cpy-bms",
+        "app/app-transaction-type-db2/cpy",
+        "app/app-transaction-type-db2/cpy-bms",
+        "app/cpy",
+        "app/cpy-bms",
+    ];
+    let copy_paths = collect_paths(corpus_dir, &copy_roots, "cpy")?;
+    let limits = SourceLimits::default();
+    let copybooks = copy_paths
+        .iter()
+        .map(|path| source_file(corpus_dir, path, limits))
+        .collect::<Result<Vec<_>, _>>()?;
+    let (compatibility, compatibility_library) =
+        owned_compatibility_library(limits).map_err(|error| {
+            CorpusProblem::new(
+                "carddemo.layout.closure_invalid",
+                format!("owned compatibility catalog is invalid: {error}"),
+            )
+        })?;
+    let mut libraries = Vec::new();
+    for (index, root) in copy_roots.iter().enumerate() {
+        let members = collect_paths(corpus_dir, &[*root], "cpy")?
+            .into_iter()
+            .map(|path| LogicalPath::new(path, limits.max_path_bytes))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|error| {
+                CorpusProblem::new(
+                    "carddemo.layout.closure_invalid",
+                    format!("application member path is invalid: {error}"),
+                )
+            })?;
+        libraries.push(
+            SourceLibrary::new(format!("application-{index:02}"), members, limits).map_err(
+                |error| {
+                    CorpusProblem::new(
+                        "carddemo.layout.closure_invalid",
+                        format!("application library is invalid: {error}"),
+                    )
+                },
+            )?,
+        );
+    }
+    libraries.push(compatibility_library);
+    let mut bundles = Vec::new();
+    for primary_path in source_paths {
+        let primary = source_file(corpus_dir, &primary_path, limits)?;
+        let mut files = Vec::with_capacity(1 + copybooks.len() + compatibility.len());
+        files.push(primary);
+        files.extend(copybooks.iter().cloned());
+        files.extend(compatibility.iter().cloned());
+        let logical = LogicalPath::new(&primary_path, limits.max_path_bytes).map_err(|error| {
+            CorpusProblem::new(
+                "carddemo.layout.closure_invalid",
+                format!("program path is invalid: {error}"),
+            )
+        })?;
+        let bundle = SourceBundle::with_libraries(
+            &logical,
+            files,
+            libraries.clone(),
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .map_err(|error| {
+            CorpusProblem::new(
+                "carddemo.layout.closure_invalid",
+                format!("source closure is invalid: {error}"),
+            )
+        })?;
+        bundles.push((primary_path, bundle));
+    }
+    Ok(bundles)
 }
 
 fn collect_paths(

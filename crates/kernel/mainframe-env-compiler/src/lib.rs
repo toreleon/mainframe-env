@@ -11,7 +11,9 @@ mod syntax;
 
 pub use hir::{CobolHir, HirStatement, StatementKind, cobol_hir_catalog};
 pub use lower::{CORE_NAMESPACE, core_mir_catalog, core_mir_profile};
-pub use semantic::{CobolLayout, DataCategory, SemanticModel};
+pub use semantic::{
+    CobolLayout, DataCategory, DataReference, ResolutionProblem, SemanticModel, StorageSection,
+};
 pub use service::{CobolAnalysis, CobolCompiler, CobolCompilerLimits};
 pub use syntax::{
     CobolLanguage, CobolSyntaxKind, Expansion, LosslessSyntax, SourceOrigin, SourceSpan,

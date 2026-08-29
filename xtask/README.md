@@ -18,3 +18,5 @@ pinned checkout is available) `cargo xtask carddemo-corpus --check`.
 source closures through the CD-002 preprocessing surface.
 `cargo xtask carddemo-closure --check` verifies the CD-003 ordered-library and
 owned compatibility closure across every pinned program.
+`cargo xtask carddemo-layout --check` derives the CD-004 qualified layout and
+exact storage digest across the same closures.

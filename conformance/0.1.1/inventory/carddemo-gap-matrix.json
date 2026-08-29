@@ -45,9 +45,11 @@
       "priority": "P0",
       "domain": "compiler-semantics",
       "title": "Implement hierarchical COBOL data scopes and exact layouts",
-      "state": "open",
+      "state": "passed",
       "depends_on": ["CD-002", "CD-003"],
       "commit_subject": "Implement CardDemo COBOL data layouts",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-004.json",
+      "evidence_digest": "sha256:728eb45dd6cf917e16f25da43bf3b29b5d102da94ef359d7f73ec886de865bc8",
       "acceptance": ["legal duplicate names resolve through OF/IN qualification", "groups, levels 66/77/88, REDEFINES, OCCURS and OCCURS DEPENDING ON are modeled", "subscripts, indexes, reference modification, linkage, FD, and record areas resolve", "DISPLAY, COMP, COMP-3, signed, edited, and group storage match exact byte layouts"]
     },
     {
