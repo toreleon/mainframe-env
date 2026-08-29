@@ -592,7 +592,7 @@ fn check_certification(root: &Path) -> TaskResult {
             &format!("differential {name} does not pass"),
         )?;
     }
-    for phase in 0..=6 {
+    for phase in 0..=7 {
         let subject = format!("Complete ME.V{phase}");
         let output = Command::new("git")
             .args(["log", "--format=%B%x00", "--grep", &format!("^{subject}")])

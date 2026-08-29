@@ -1,9 +1,9 @@
 # mainframe-env 0.1 Implementation Status
 
 Current phase: **ME.V7 — certification and cutover**
-Current work item: the ME.V7 candidate is assembled; run the final gate and create the required phase commit.
+Current work item: ME.V0 through ME.V7 are complete; no implementation work remains.
 Product version: **0.1.0-alpha.0**
-Source identity: ME.V6 commit `c7f0c6d555709ec0bfb7f64866e29c7d2d04dece` plus the current ME.V7 candidate.
+Source identity: ME.V7 commit `6c946753cf1d9ba7d4123e96511bd089a0b30423`.
 
 ## Completed deliverables
 
@@ -65,6 +65,7 @@ Source identity: ME.V6 commit `c7f0c6d555709ec0bfb7f64866e29c7d2d04dece` plus th
 - Completed six-domain differential summaries, accepted corrections, exact authority/profile closure,
   release-mode 1x/2x/long-run gates, supply-chain/license/advisory checks, cutover/archive decisions,
   and reproducible alpha manifest/SBOM/checksum/license/provenance artifacts.
+- Committed ME.V7 as `6c946753cf1d9ba7d4123e96511bd089a0b30423` with the required trailers.
 
 Exact machine evidence is in
 `conformance/0.1/evidence/program-status.json` and
@@ -92,5 +93,5 @@ passed: COBOL 37, RACF 8, z/OSMF datasets 9, z/OSMF jobs 9, CICS 317, JCL 164, a
 
 ## Next smallest executable step
 
-Run the final locked ME.V7 gate, record its canonical content digest, review the staged diff, and
-create the dedicated `Complete ME.V7 certification and cutover` commit.
+No implementation step remains. Tagging, publication, deployment, and remote push remain unperformed
+and require separate owner authorization.

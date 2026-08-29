@@ -1,8 +1,8 @@
 # MAINFRAME-ENV 0.1 exit report
 
-Functional result: **PASS** on the ME.V7 candidate based at ME.V6 commit
-`c7f0c6d555709ec0bfb7f64866e29c7d2d04dece`. The required ME.V7 completion
-commit is the next protocol action after this derived gate.
+Functional result: **PASS**. ME.V7 was sealed by completion commit
+`6c946753cf1d9ba7d4123e96511bd089a0b30423` from canonical phase content digest
+`f3d520a3f6e2eeb17301de6f3e81f94f6dcc01baa9aafc5023cee90fa9ade644`.
 
 All eight phase gates derive pass. The 20-package workspace assigns every
 accepted selector to one owner and one default authority. The `core-server`
