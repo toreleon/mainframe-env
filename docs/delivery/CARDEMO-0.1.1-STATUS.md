@@ -1,17 +1,17 @@
 # CardDemo-full 0.1.1 Program Status
 
 Current phase: **CD.A — corpus and application packaging**
-Current issue: **CD-005 — typed structured COBOL control flow PASS**
-Next issue: **CD-006 — exact COBOL core execution semantics**
+Current issue: **CD-006 — exact COBOL core execution semantics PASS**
+Next issue: **CD-007 — file, linkage, and CALL semantics**
 Current product: **0.1.0-alpha.0**
 Target product: **0.1.1**
 CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Source identity
 
-- mainframe-env base commit: `8697e1d1fbe2001415c560eb227325bd2e64bb2e`
+- mainframe-env base commit: `aaec5b737e0b90b98b5ad83ad129c504bfe72c37`
 - current deterministic dirty-tree identity:
-  `sha256:56e60bd25f4210ee5d72fd5292383baaae19a7d794d85f4dde5e86b023b26bc2`
+  `sha256:0b4fa17d9a8a659163cb9da26a66f2d1b598333e7224e7e1eabb0abf095a1978`
 - dirty-tree algorithm: SHA-256 of the sorted `sha256sum` records for every
   repository file except `.git/`, `target/`, and the two persistent CardDemo
   status ledgers (which carry the identity).
@@ -101,7 +101,8 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 - State: **PASS**
 - Required commit subject: `Build structured CardDemo COBOL control flow`
-- Completion commit identity: recorded when CD-006 starts from this issue commit.
+- Completion commit identity:
+  `aaec5b737e0b90b98b5ad83ad129c504bfe72c37`.
 - Evidence: `conformance/0.1.1/evidence/issues/CD-005.json`
 - Evidence digest:
   `sha256:759e61a9a56883c64b632916b33e17cd627fd326270a5bf0eb7bc68a135937b6`
@@ -120,6 +121,34 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   `sha256:f0a73e52901638049da34143b8456768c0b7fb8df541ba57496cf71d8de143cb`.
   The full login reaches HIR completion and stops at the typed CD-006
   `StructuredControl` boundary.
+
+### CD-006 — exact COBOL core execution semantics
+
+- State: **PASS**
+- Required commit subject: `Execute CardDemo COBOL core semantics`
+- Completion commit identity: recorded when CD-007 starts from this issue
+  commit.
+- Evidence: `conformance/0.1.1/evidence/issues/CD-006.json`
+- Evidence digest:
+  `sha256:30752d833bc42b004b693fd5f562a4caf7fc9bd129bde076cc28daeba2efc130`
+- Acceptance: executable IR now carries picture, digits, scale, sign, element,
+  occurrence, parent, and condition metadata over one shared program-storage
+  base, preserving group, child, REDEFINES, rename, subscript, and reference
+  overlap.
+- Checked decimal execution covers 1,111 display, 32 edited, 118 packed, and
+  984 binary layouts; 1,244 signed and 226 scaled items use exact scale,
+  sign/overpunch, precedence, truncation, rounding, and overflow behavior.
+- MOVE/group MOVE, STRING, UNSTRING, INSPECT, INITIALIZE, figuratives,
+  conditions, 1-based subscripts, reference modification, and all 12 reached
+  intrinsic functions have exact positive and typed negative controls.
+- Multiline IF/EVALUATE/PERFORM graphs now lower and execute, including branch
+  convergence, VARYING loops, and schema-2 checkpointed loop state with
+  schema-1 read compatibility. The login closure produces a legal artifact
+  with no diagnostics.
+- The exact core-shape digest is
+  `sha256:b8272836a041f06233c5c948b3bbf8153e2d102314c6fcd8bedc81a2642d0b06`;
+  two exact executable oracles produce
+  `sha256:173a2d4b676bff2baf13a4fa0aaa8183a29751cf4b93d36fa8f1353ccdedd278`.
 
 ## Commands and exit codes
 
@@ -188,10 +217,20 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 - Full-library CLI login inspection — **0**; HIR completion reaches the typed
   CD-006 `StructuredControl` boundary without artifact publication.
 - Ordinary conformance and cumulative CD-001–CD-005 gates — **0**.
+- `cargo test -p mainframe-env-compiler -p mainframe-env-interpreter -p mainframe-env-conformance --locked`
+  — **0**; 27 compiler, 6 interpreter, and 26 conformance tests passed.
+- Workspace check and affected-package Clippy with `-D warnings` — **0**.
+- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-core --check`
+  — **0**; 44 corpus shapes and two exact executable oracles passed.
+- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-core --check` — **1**;
+  expected missing-environment failure.
+- Full-library CLI login compilation — **0**; a legal artifact was emitted with
+  no diagnostics after structured CFG and core semantics lowering.
+- Ordinary conformance and cumulative CD-001–CD-006 gates — **0**.
 
 ## Implementation status
 
-- Issues passed: **5 / 27**
+- Issues passed: **6 / 27**
 - Journeys passed: **0 / 20**
 - Installed CardDemo resources: **0**
 - Executed CardDemo application journeys: **0**
@@ -205,11 +244,11 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 2. The repository is still `0.1.0-alpha.0`. A 0.1.1 release cannot be cut until
    0.1.0 is finalized or an explicit version-line correction is accepted.
 
-Neither decision blocks CD-006. No CD-005 blocker remains.
+Neither decision blocks CD-007. No CD-006 blocker remains.
 
 ## Next smallest executable step
 
-Use the typed CD-005 control graph to implement exact CardDemo moves, group
-moves, decimal arithmetic, STRING/UNSTRING/INSPECT/INITIALIZE, condition names,
-subscripts, reference modification, overflow behavior, and reached intrinsic
-functions without relaxing the fail-closed `StructuredControl` boundary.
+Implement typed SELECT/FD bindings, FILE STATUS and AT END/INVALID KEY updates,
+LINKAGE storage, and by-reference CALL mutation. Start with the pinned
+CBSTM03A-to-CBSTM03B and CSUTLDTC selected routes before generalizing the host
+program and dataset effects.

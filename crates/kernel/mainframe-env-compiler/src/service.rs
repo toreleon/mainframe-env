@@ -344,21 +344,16 @@ mod tests {
         ));
     }
     #[test]
-    fn multiline_structured_control_waits_for_cfg_lowering() {
+    fn multiline_structured_control_publishes_through_cfg_lowering() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. FLOW. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9 VALUE 1. PROCEDURE DIVISION. IF A = 1\n DISPLAY 'YES'\nEND-IF. STOP RUN.";
         let analysis = CobolCompiler::default().analyze(&bundle(source));
-        assert!(analysis.hir.as_ref().is_some_and(|hir| {
-            hir.unsupported()
-                .contains(&crate::StatementKind::StructuredControl)
-        }));
+        assert!(analysis.hir.is_some());
+        assert_eq!(analysis.completeness, Completeness::Complete);
         assert!(matches!(
             CobolCompiler::default()
                 .compile(request(source, CompilationMode::Executable))
                 .unwrap(),
-            CompilerResult::Failed {
-                completeness: Completeness::Unsupported,
-                ..
-            }
+            CompilerResult::Published { .. }
         ));
     }
     #[test]

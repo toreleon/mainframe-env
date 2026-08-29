@@ -22,8 +22,9 @@ use std::collections::{BTreeMap, BTreeSet};
 mod carddemo;
 
 pub use carddemo::{
-    CardDemoClosureReceipt, CardDemoControlReceipt, CardDemoCorpusReceipt, CardDemoLayoutReceipt,
-    CardDemoSourceReceipt, CorpusProblem, verify_carddemo_control_flow_from_env,
+    CardDemoClosureReceipt, CardDemoControlReceipt, CardDemoCoreReceipt, CardDemoCorpusReceipt,
+    CardDemoLayoutReceipt, CardDemoSourceReceipt, CorpusProblem,
+    verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
     verify_carddemo_corpus, verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
     verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
 };
@@ -246,6 +247,123 @@ mod tests {
         match execute(&artifact, 1024) {
             MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"OK\n005\nDONE \n"),
             other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn packed_binary_group_condition_and_intrinsic_semantics_execute() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CORE. DATA DIVISION. WORKING-STORAGE SECTION. 01 PACKED-X PIC S9(5) COMP-3 VALUE 12. 01 BINARY-X PIC S9(4) COMP VALUE 7. 01 DISPLAY-X PIC 9(5). 01 SOURCE-GROUP. 05 TEXT-X PIC X(3) VALUE 'ABC'. 05 COUNT-X PIC 9(2) VALUE 12. 01 GROUP-OUT PIC X(5). 01 TRIM-X PIC X(8) VALUE ' ab '. 01 TEXT-OUT PIC X(8). 01 FLAG-X PIC X VALUE 'N'. 88 FLAG-YES VALUE 'Y'. PROCEDURE DIVISION. ADD 3 TO PACKED-X. MOVE PACKED-X TO DISPLAY-X. DISPLAY DISPLAY-X. MULTIPLY 3 BY BINARY-X. MOVE BINARY-X TO DISPLAY-X. DISPLAY DISPLAY-X. MOVE SOURCE-GROUP TO GROUP-OUT. DISPLAY GROUP-OUT. MOVE FUNCTION UPPER-CASE(FUNCTION TRIM(TRIM-X)) TO TEXT-OUT. DISPLAY TEXT-OUT. SET FLAG-YES TO TRUE. IF FLAG-YES DISPLAY 'YES' END-IF. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => {
+                assert_eq!(done.output.bytes(), b"00015\n00021\nABC12\nAB      \nYES\n")
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn string_unstring_inspect_initialize_and_figuratives_execute() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. TEXTOPS. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC X(6) VALUE 'AB CD '. 01 B PIC X(3) VALUE 'XYZ'. 01 OUT-X PIC X(10). 01 U-SOURCE PIC X(7) VALUE 'ONE,TWO'. 01 U1 PIC X(3). 01 U2 PIC X(3). 01 TALLY-X PIC 9(2). 01 NUM-X PIC 9(3) VALUE 123. 01 ALPHA-X PIC X(3) VALUE 'ABC'. PROCEDURE DIVISION. STRING A DELIMITED BY SPACE B DELIMITED BY SIZE INTO OUT-X. DISPLAY OUT-X. UNSTRING U-SOURCE DELIMITED BY ',' INTO U1 U2. INSPECT U1 REPLACING ALL 'O' BY 'X'. INSPECT U2 TALLYING TALLY-X FOR ALL 'T'. DISPLAY U1. DISPLAY U2. DISPLAY TALLY-X. INITIALIZE NUM-X ALPHA-X. DISPLAY NUM-X. DISPLAY ALPHA-X. MOVE LOW-VALUES TO ALPHA-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => {
+                assert_eq!(done.output.bytes(), b"ABXYZ     \nXNE\nTWO\n01\n000\n   \n")
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn subscript_reference_modification_and_bounds_are_exact() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. REFS. DATA DIVISION. WORKING-STORAGE SECTION. 01 TABLE-X PIC X(3) OCCURS 3 TIMES VALUE 'ABC'. 01 TEXT-X PIC X(6) VALUE '123456'. 01 OUT-X PIC X(3). PROCEDURE DIVISION. MOVE TABLE-X(2) TO OUT-X. DISPLAY OUT-X. MOVE 'XYZ' TO TABLE-X(3). MOVE TABLE-X(3) TO OUT-X. DISPLAY OUT-X. MOVE TEXT-X(2:3) TO OUT-X. DISPLAY OUT-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => {
+                assert_eq!(done.output.bytes(), b"ABC\nXYZ\n234\n")
+            }
+            other => panic!("{other:?}"),
+        }
+
+        let bad = "IDENTIFICATION DIVISION. PROGRAM-ID. BADREF. DATA DIVISION. WORKING-STORAGE SECTION. 01 TABLE-X PIC X OCCURS 2 TIMES. 01 OUT-X PIC X. PROCEDURE DIVISION. MOVE TABLE-X(3) TO OUT-X. STOP RUN.";
+        let artifact = compile(bad).unwrap();
+        assert!(matches!(execute(&artifact, 1024), MachineDrive::Failed(_)));
+    }
+    #[test]
+    fn decimal_scale_sign_rounding_precedence_and_overflow_are_exact() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DECIMAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 PACKED-X PIC S9(3)V99 COMP-3 VALUE -12.34. 01 RESULT-X PIC 9V99 COMP-3. 01 DISPLAY-X PIC S9(4)V99. PROCEDURE DIVISION. ADD 2.34 TO PACKED-X. MOVE PACKED-X TO DISPLAY-X. DISPLAY DISPLAY-X. COMPUTE RESULT-X ROUNDED = 1 / 3. MOVE RESULT-X TO DISPLAY-X. DISPLAY DISPLAY-X. COMPUTE RESULT-X ROUNDED = ( 2 + 3 ) * 4 / 3. MOVE RESULT-X TO DISPLAY-X. DISPLAY DISPLAY-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => {
+                assert_eq!(done.output.bytes(), b"00100}\n000033\n000667\n")
+            }
+            other => panic!("{other:?}"),
+        }
+
+        let overflow = "IDENTIFICATION DIVISION. PROGRAM-ID. OVERFLOW. DATA DIVISION. WORKING-STORAGE SECTION. 01 X PIC 99 VALUE 99. PROCEDURE DIVISION. ADD 1 TO X. STOP RUN.";
+        let artifact = compile(overflow).unwrap();
+        assert!(matches!(execute(&artifact, 1024), MachineDrive::Failed(_)));
+    }
+    #[test]
+    fn reached_intrinsic_date_case_length_numval_and_mod_are_deterministic() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. FUNCTIONS. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATE-X PIC X(21). 01 INTEGER-X PIC 9(7). 01 ROUNDTRIP-X PIC 9(8). 01 MOD-X PIC 9(2). 01 LENGTH-X PIC 9(2). 01 TEXT-X PIC X(8) VALUE ' AbC '. 01 CASE-X PIC X(8). 01 NUMBER-X PIC X(8) VALUE ' 12.50 '. 01 DECIMAL-X PIC 9(3)V99. PROCEDURE DIVISION. MOVE FUNCTION CURRENT-DATE TO DATE-X. DISPLAY DATE-X. MOVE FUNCTION INTEGER-OF-DATE(20240229) TO INTEGER-X. MOVE FUNCTION DATE-OF-INTEGER(INTEGER-X) TO ROUNDTRIP-X. DISPLAY ROUNDTRIP-X. MOVE FUNCTION MOD(17, 5) TO MOD-X. DISPLAY MOD-X. MOVE FUNCTION LENGTH(TEXT-X) TO LENGTH-X. DISPLAY LENGTH-X. MOVE FUNCTION LOWER-CASE(FUNCTION TRIM(TEXT-X)) TO CASE-X. DISPLAY CASE-X. MOVE FUNCTION NUMVAL(NUMBER-X) TO DECIMAL-X. DISPLAY DECIMAL-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(
+                done.output.bytes(),
+                b"1970010100000000+0000\n20240229\n02\n08\nabc     \n01250\n"
+            ),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn multiline_if_evaluate_and_varying_cfg_executes() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. FLOW. DATA DIVISION. WORKING-STORAGE SECTION. 01 N PIC 9 VALUE 1. 01 I PIC 9 VALUE 0. 01 TOTAL PIC 99 VALUE 0. PROCEDURE DIVISION.\nIF N = 1\n DISPLAY 'IF-TRUE'\nELSE\n DISPLAY 'IF-FALSE'\nEND-IF.\nEVALUATE N\n WHEN 1\n  DISPLAY 'EVAL-ONE'\n WHEN OTHER\n  DISPLAY 'EVAL-OTHER'\nEND-EVALUATE.\nPERFORM VARYING I FROM 1 BY 1 UNTIL I > 3\n ADD I TO TOTAL\nEND-PERFORM.\nDISPLAY TOTAL.\nSTOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => {
+                assert_eq!(done.output.bytes(), b"IF-TRUE\nEVAL-ONE\n06\n")
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn structured_loop_checkpoint_preserves_reentry_state() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. FLOWCP. DATA DIVISION. WORKING-STORAGE SECTION. 01 I PIC 9. 01 TOTAL PIC 99. PROCEDURE DIVISION.\nPERFORM VARYING I FROM 1 BY 1 UNTIL I > 3\n ADD I TO TOTAL\nEND-PERFORM.\nDISPLAY TOTAL.\nSTOP RUN.";
+        let artifact = compile(source).unwrap();
+        let invocation = invocation(&artifact, 1024);
+        let mut first = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        for _ in 0..8 {
+            assert_eq!(
+                first.drive(MachineResume::Start, Quantum::new(1, 1024).unwrap()),
+                MachineDrive::Continue
+            );
+        }
+        let checkpoint = first.checkpoint().unwrap();
+        assert_eq!(
+            checkpoint.schema(),
+            "mainframe-env.reference-machine-checkpoint@2"
+        );
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored.restore_checkpoint(&checkpoint).unwrap();
+        assert_eq!(
+            drive_to_terminal(&mut first),
+            drive_to_terminal(&mut restored)
+        );
+    }
+
+    fn drive_to_terminal(
+        machine: &mut ReferenceMachine,
+    ) -> MachineDrive<mainframe_env_host_api::EffectRequest> {
+        loop {
+            match machine.drive(MachineResume::Start, Quantum::new(16, 1024).unwrap()) {
+                MachineDrive::Continue => {}
+                terminal => return terminal,
+            }
         }
     }
     #[test]

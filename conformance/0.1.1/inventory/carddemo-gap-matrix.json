@@ -69,9 +69,11 @@
       "priority": "P0",
       "domain": "interpreter",
       "title": "Execute reached COBOL data, decimal, string, condition, and function semantics",
-      "state": "open",
+      "state": "passed",
       "depends_on": ["CD-004", "CD-005"],
       "commit_subject": "Execute CardDemo COBOL core semantics",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-006.json",
+      "evidence_digest": "sha256:30752d833bc42b004b693fd5f562a4caf7fc9bd129bde076cc28daeba2efc130",
       "acceptance": ["moves, group moves, arithmetic, size/sign/rounding, and condition names are exact", "STRING, UNSTRING, INSPECT, INITIALIZE and reached figurative constants work", "all reached intrinsic functions have exact deterministic results", "subscript, reference, decimal, overflow, malformed, and resource failures are tested"]
     },
     {

@@ -32,6 +32,11 @@ pub struct CobolLayout {
     pub length: usize,
     pub element_length: usize,
     pub category: DataCategory,
+    pub picture: Option<String>,
+    pub digits: usize,
+    pub scale: usize,
+    pub signed: bool,
+    pub sign_separate: bool,
     pub initial: Vec<u8>,
     pub alias_of: Option<String>,
     pub occurs: usize,
@@ -352,7 +357,9 @@ fn layout_siblings(
             .transpose()?
             .map(|layout| (layout.offset, layout.qualified_name.clone()));
         let start = target.as_ref().map_or(*cursor, |(offset, _)| *offset);
-        let (category, elementary_length) = picture(&spec.words);
+        let picture = picture(&spec.words);
+        let category = picture.category;
+        let elementary_length = picture.length;
         let mut child_cursor = start;
         if !spec.children.is_empty() {
             layout_siblings(
@@ -404,6 +411,15 @@ fn layout_siblings(
             } else {
                 DataCategory::Group
             },
+            picture: spec
+                .children
+                .is_empty()
+                .then(|| picture.picture.clone())
+                .flatten(),
+            digits: usize::from(spec.children.is_empty()) * picture.digits,
+            scale: usize::from(spec.children.is_empty()) * picture.scale,
+            signed: spec.children.is_empty() && picture.signed,
+            sign_separate: spec.children.is_empty() && picture.sign_separate,
             initial,
             alias_of: target.map(|(_, qualified)| qualified),
             occurs: spec.occurs_max,
@@ -466,6 +482,11 @@ fn layout_specials(
                 length: 0,
                 element_length: 0,
                 category: DataCategory::Condition,
+                picture: None,
+                digits: 0,
+                scale: 0,
+                signed: false,
+                sign_separate: false,
                 initial: Vec::new(),
                 alias_of: Some(target.qualified_name.clone()),
                 occurs: 1,
@@ -498,6 +519,11 @@ fn layout_specials(
                 length,
                 element_length: length,
                 category: DataCategory::Rename,
+                picture: None,
+                digits: 0,
+                scale: 0,
+                signed: false,
+                sign_separate: false,
                 initial: Vec::new(),
                 alias_of: Some(start.qualified_name.clone()),
                 occurs: 1,
@@ -517,6 +543,11 @@ fn layout_specials(
                 length: 0,
                 element_length: 0,
                 category: DataCategory::Condition,
+                picture: None,
+                digits: 0,
+                scale: 0,
+                signed: false,
+                sign_separate: false,
                 initial: Vec::new(),
                 alias_of: None,
                 occurs: 1,
@@ -682,24 +713,53 @@ fn occurs_range(words: &[String]) -> Result<(usize, usize), SemanticProblem> {
     Ok((minimum, maximum))
 }
 
-fn picture(words: &[String]) -> (DataCategory, usize) {
+struct PictureSpec {
+    category: DataCategory,
+    length: usize,
+    picture: Option<String>,
+    digits: usize,
+    scale: usize,
+    signed: bool,
+    sign_separate: bool,
+}
+
+fn picture(words: &[String]) -> PictureSpec {
     let Some(pic) = find_after_owned(words, "PIC").or_else(|| find_after_owned(words, "PICTURE"))
     else {
         if words
             .iter()
             .any(|word| word == "POINTER" || word == "INDEX")
         {
-            return (DataCategory::Pointer, 8);
+            return PictureSpec {
+                category: DataCategory::Pointer,
+                length: 8,
+                picture: None,
+                digits: 0,
+                scale: 0,
+                signed: false,
+                sign_separate: false,
+            };
         }
-        return (DataCategory::Group, 0);
+        return PictureSpec {
+            category: DataCategory::Group,
+            length: 0,
+            picture: None,
+            digits: 0,
+            scale: 0,
+            signed: false,
+            sign_separate: false,
+        };
     };
     let usage = words.iter().map(String::as_str).collect::<BTreeSet<_>>();
     let details = picture_details(&pic);
-    if usage.contains("COMP-3") || usage.contains("PACKED-DECIMAL") {
-        return (DataCategory::PackedDecimal, (details.digits + 2) / 2);
-    }
-    if usage.contains("COMP") || usage.contains("BINARY") || usage.contains("COMP-5") {
-        return (
+    let separate = words
+        .windows(2)
+        .any(|pair| pair[0] == "SIGN" && pair[1] == "SEPARATE")
+        || words.iter().any(|word| word == "SEPARATE");
+    let (category, length) = if usage.contains("COMP-3") || usage.contains("PACKED-DECIMAL") {
+        (DataCategory::PackedDecimal, (details.digits + 2) / 2)
+    } else if usage.contains("COMP") || usage.contains("BINARY") || usage.contains("COMP-5") {
+        (
             DataCategory::Binary,
             if details.digits <= 4 {
                 2
@@ -708,27 +768,32 @@ fn picture(words: &[String]) -> (DataCategory, usize) {
             } else {
                 8
             },
-        );
-    }
-    if details.numeric && details.edited {
-        return (DataCategory::NumericEdited, details.storage.max(1));
-    }
-    if details.numeric {
-        let separate = words
-            .windows(2)
-            .any(|pair| pair[0] == "SIGN" && pair[1] == "SEPARATE")
-            || words.iter().any(|word| word == "SEPARATE");
-        return (
+        )
+    } else if details.numeric && details.edited {
+        (DataCategory::NumericEdited, details.storage.max(1))
+    } else if details.numeric {
+        (
             DataCategory::NumericDisplay,
             details.storage.max(1) + usize::from(details.signed && separate),
-        );
+        )
+    } else {
+        (DataCategory::Alphanumeric, details.storage.max(1))
+    };
+    PictureSpec {
+        category,
+        length,
+        picture: Some(pic),
+        digits: details.digits,
+        scale: details.scale,
+        signed: details.signed,
+        sign_separate: details.signed && separate,
     }
-    (DataCategory::Alphanumeric, details.storage.max(1))
 }
 
 struct PictureDetails {
     storage: usize,
     digits: usize,
+    scale: usize,
     numeric: bool,
     edited: bool,
     signed: bool,
@@ -741,6 +806,8 @@ fn picture_details(pic: &str) -> PictureDetails {
     let mut numeric = false;
     let mut edited = false;
     let mut signed = false;
+    let mut scale = 0usize;
+    let mut fractional = false;
     let mut index = 0usize;
     while index < bytes.len() {
         let byte = bytes[index].to_ascii_uppercase();
@@ -755,6 +822,9 @@ fn picture_details(pic: &str) -> PictureDetails {
             b'9' => {
                 numeric = true;
                 digits += repeat;
+                if fractional {
+                    scale += repeat;
+                }
                 storage += repeat;
             }
             b'X' | b'A' => storage += repeat,
@@ -762,17 +832,35 @@ fn picture_details(pic: &str) -> PictureDetails {
                 numeric = true;
                 edited = true;
                 digits += repeat;
+                if fractional {
+                    scale += repeat;
+                }
                 storage += repeat;
             }
             b'S' => signed = true,
-            b'V' | b'P' => numeric = true,
+            b'V' => {
+                numeric = true;
+                fractional = true;
+            }
+            b'P' => {
+                numeric = true;
+                digits += repeat;
+                if fractional {
+                    scale += repeat;
+                }
+            }
             b'+' | b'-' => {
                 numeric = true;
                 edited = true;
                 signed = true;
                 storage += repeat;
             }
-            b',' | b'.' | b'$' | b'/' | b'B' | b'0' => {
+            b'.' => {
+                edited = true;
+                fractional = true;
+                storage += repeat;
+            }
+            b',' | b'$' | b'/' | b'B' | b'0' => {
                 edited = true;
                 storage += repeat;
             }
@@ -783,6 +871,7 @@ fn picture_details(pic: &str) -> PictureDetails {
     PictureDetails {
         storage,
         digits,
+        scale,
         numeric,
         edited,
         signed,

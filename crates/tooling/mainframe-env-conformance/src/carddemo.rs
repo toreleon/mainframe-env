@@ -1,9 +1,10 @@
 //! Fail-closed verification for the externally supplied CardDemo corpus.
 
 use mainframe_env_compiler::{
-    CobolCompiler, ControlEdgeKind, ControlRole, compatibility_copybooks,
+    CobolCompiler, ControlEdgeKind, ControlRole, DataCategory, compatibility_copybooks,
     owned_compatibility_library,
 };
+use mainframe_env_execution_api::{Machine, MachineDrive, MachineResume, Quantum};
 use mainframe_env_source::{
     LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLibrary,
     SourceLimits,
@@ -179,6 +180,32 @@ pub struct CardDemoControlReceipt {
     pub transfers: usize,
     pub returns: usize,
     pub control_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoCoreReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub programs_checked: usize,
+    pub semantic_models: usize,
+    pub hir_models: usize,
+    pub layouts: usize,
+    pub statements: usize,
+    pub numeric_display: usize,
+    pub numeric_edited: usize,
+    pub packed_decimal: usize,
+    pub binary: usize,
+    pub groups: usize,
+    pub conditions: usize,
+    pub signed_items: usize,
+    pub scaled_items: usize,
+    pub occurs_items: usize,
+    pub reference_operands: usize,
+    pub reached_functions: BTreeMap<String, usize>,
+    pub oracle_cases: usize,
+    pub oracle_output_sha256: String,
+    pub core_shape_sha256: String,
 }
 
 pub fn verify_carddemo_corpus_from_env(
@@ -877,6 +904,181 @@ fn checked_total(current: usize, increment: usize, name: &str) -> Result<usize, 
             format!("{name} counter overflow"),
         )
     })
+}
+
+pub fn verify_carddemo_core_semantics_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoCoreReceipt, CorpusProblem> {
+    let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required for CardDemo gates",
+        )
+    })?;
+    let corpus_dir = Path::new(&corpus_dir);
+    let closure = verify_carddemo_source_closures_from_env(inventory_path)?;
+    let bundles = explicit_carddemo_bundles(corpus_dir)?;
+    let compiler = CobolCompiler::default();
+    let mut layouts = 0usize;
+    let mut statements = 0usize;
+    let mut numeric_display = 0usize;
+    let mut numeric_edited = 0usize;
+    let mut packed_decimal = 0usize;
+    let mut binary = 0usize;
+    let mut groups = 0usize;
+    let mut conditions = 0usize;
+    let mut signed_items = 0usize;
+    let mut scaled_items = 0usize;
+    let mut occurs_items = 0usize;
+    let mut reference_operands = 0usize;
+    let mut reached_functions = BTreeMap::<String, usize>::new();
+    let mut shape_digest = Sha256::new();
+    for (primary, bundle) in &bundles {
+        let analysis = compiler.analyze(bundle);
+        let semantic = analysis.semantic.ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.core.semantic_failed",
+                format!("program {primary} did not produce a semantic model"),
+            )
+        })?;
+        let hir = analysis.hir.ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.core.hir_failed",
+                format!("program {primary} did not produce HIR"),
+            )
+        })?;
+        digest_field(&mut shape_digest, primary.as_bytes());
+        for layout in &semantic.layouts {
+            digest_field(&mut shape_digest, layout.qualified_name.as_bytes());
+            digest_field(
+                &mut shape_digest,
+                format!("{:?}", layout.category).as_bytes(),
+            );
+            digest_field(
+                &mut shape_digest,
+                layout.picture.as_deref().unwrap_or("").as_bytes(),
+            );
+            digest_field(&mut shape_digest, &(layout.digits as u64).to_be_bytes());
+            digest_field(&mut shape_digest, &(layout.scale as u64).to_be_bytes());
+            digest_field(&mut shape_digest, &[u8::from(layout.signed)]);
+            numeric_display += usize::from(layout.category == DataCategory::NumericDisplay);
+            numeric_edited += usize::from(layout.category == DataCategory::NumericEdited);
+            packed_decimal += usize::from(layout.category == DataCategory::PackedDecimal);
+            binary += usize::from(layout.category == DataCategory::Binary);
+            groups += usize::from(layout.category == DataCategory::Group);
+            conditions += usize::from(layout.category == DataCategory::Condition);
+            signed_items += usize::from(layout.signed);
+            scaled_items += usize::from(layout.scale > 0);
+            occurs_items += usize::from(layout.occurs > 1);
+        }
+        for statement in &hir.statements {
+            digest_field(
+                &mut shape_digest,
+                format!("{:?}", statement.kind).as_bytes(),
+            );
+            for (index, argument) in statement.arguments.iter().enumerate() {
+                if argument == "FUNCTION"
+                    && let Some(name) = statement.arguments.get(index + 1)
+                {
+                    *reached_functions.entry(name.clone()).or_default() += 1;
+                }
+                reference_operands += usize::from(
+                    argument == "("
+                        || argument.contains(':')
+                        || matches!(argument.as_str(), "OF" | "IN"),
+                );
+            }
+        }
+        layouts = checked_total(layouts, semantic.layouts.len(), "layout")?;
+        statements = checked_total(statements, hir.statements.len(), "statement")?;
+    }
+    let oracle_outputs = core_oracle_outputs()?;
+    let mut oracle_digest = Sha256::new();
+    for output in &oracle_outputs {
+        digest_field(&mut oracle_digest, output);
+    }
+    Ok(CardDemoCoreReceipt {
+        schema_version: "mainframe-env.carddemo-core-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit: closure.corpus_commit,
+        programs_checked: bundles.len(),
+        semantic_models: bundles.len(),
+        hir_models: bundles.len(),
+        layouts,
+        statements,
+        numeric_display,
+        numeric_edited,
+        packed_decimal,
+        binary,
+        groups,
+        conditions,
+        signed_items,
+        scaled_items,
+        occurs_items,
+        reference_operands,
+        reached_functions,
+        oracle_cases: oracle_outputs.len(),
+        oracle_output_sha256: format!("{:x}", oracle_digest.finalize()),
+        core_shape_sha256: format!("{:x}", shape_digest.finalize()),
+    })
+}
+
+fn core_oracle_outputs() -> Result<Vec<Vec<u8>>, CorpusProblem> {
+    let cases = [
+        (
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CORE1. DATA DIVISION. WORKING-STORAGE SECTION. 01 P PIC S9(5) COMP-3 VALUE 12. 01 B PIC S9(4) COMP VALUE 7. 01 D PIC 9(5). 01 T PIC X(8) VALUE ' ab '. 01 O PIC X(8). PROCEDURE DIVISION. ADD 3 TO P. MOVE P TO D. DISPLAY D. MULTIPLY 3 BY B. MOVE B TO D. DISPLAY D. MOVE FUNCTION UPPER-CASE(FUNCTION TRIM(T)) TO O. DISPLAY O. STOP RUN.",
+            b"00015\n00021\nAB      \n".as_slice(),
+        ),
+        (
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CORE2. DATA DIVISION. WORKING-STORAGE SECTION. 01 N PIC 9 VALUE 1. 01 I PIC 9. 01 TOTAL PIC 99. PROCEDURE DIVISION.\nIF N = 1\n DISPLAY 'YES'\nELSE\n DISPLAY 'NO'\nEND-IF.\nPERFORM VARYING I FROM 1 BY 1 UNTIL I > 3\n ADD I TO TOTAL\nEND-PERFORM.\nDISPLAY TOTAL.\nSTOP RUN.",
+            b"YES\n06\n".as_slice(),
+        ),
+    ];
+    let mut outputs = Vec::new();
+    for (source, expected) in cases {
+        let artifact = crate::compile(source).map_err(|error| {
+            CorpusProblem::new(
+                "carddemo.core.oracle_failed",
+                format!("core oracle did not compile: {error}"),
+            )
+        })?;
+        let mut machine = mainframe_env_interpreter::ReferenceMachine::from_binary(
+            artifact.payload(),
+            crate::invocation(&artifact, 4096),
+            mainframe_env_ir::CodecLimits::default(),
+        )
+        .map_err(|error| {
+            CorpusProblem::new(
+                "carddemo.core.oracle_failed",
+                format!("core oracle artifact was invalid: {error:?}"),
+            )
+        })?;
+        let output = loop {
+            match machine.drive(
+                MachineResume::Start,
+                Quantum::new(64, 4096).ok_or_else(|| {
+                    CorpusProblem::new("carddemo.core.oracle_failed", "invalid oracle quantum")
+                })?,
+            ) {
+                MachineDrive::Continue => {}
+                MachineDrive::Completed(done) => break done.output.bytes().to_vec(),
+                other => {
+                    return Err(CorpusProblem::new(
+                        "carddemo.core.oracle_failed",
+                        format!("core oracle did not complete: {other:?}"),
+                    ));
+                }
+            }
+        };
+        if output != expected {
+            return Err(CorpusProblem::new(
+                "carddemo.core.oracle_drift",
+                "core oracle output differs from its exact receipt",
+            ));
+        }
+        outputs.push(output);
+    }
+    Ok(outputs)
 }
 
 fn digest_field(digest: &mut Sha256, bytes: &[u8]) {

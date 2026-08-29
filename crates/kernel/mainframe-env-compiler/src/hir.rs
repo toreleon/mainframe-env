@@ -283,23 +283,11 @@ impl CobolHir {
 
     #[must_use]
     pub fn unsupported(&self) -> BTreeSet<StatementKind> {
-        let mut unsupported = self
-            .statements
+        self.statements
             .iter()
             .filter(|statement| !statement.kind.supported())
             .map(|statement| statement.kind)
-            .collect::<BTreeSet<_>>();
-        if self.control_nodes.iter().any(|start| {
-            start.role == ControlRole::BlockStart
-                && self.control_nodes.iter().any(|end| {
-                    end.role == ControlRole::BlockEnd
-                        && end.parent == Some(start.id)
-                        && end.line != start.line
-                })
-        }) {
-            unsupported.insert(StatementKind::StructuredControl);
-        }
-        unsupported
+            .collect()
     }
 }
 

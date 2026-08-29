@@ -26,6 +26,56 @@ struct StorageView {
     length: usize,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum LayoutCategory {
+    Alphanumeric,
+    NumericDisplay,
+    NumericEdited,
+    PackedDecimal,
+    Binary,
+    Pointer,
+    Group,
+    Condition,
+    Rename,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct LayoutMetadata {
+    name: String,
+    simple_name: String,
+    category: LayoutCategory,
+    picture: String,
+    digits: usize,
+    scale: u32,
+    signed: bool,
+    sign_separate: bool,
+    offset: usize,
+    length: usize,
+    element_length: usize,
+    occurs: usize,
+    parent: Option<String>,
+    condition_values: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct ResolvedReference {
+    layout: LayoutMetadata,
+    offset: usize,
+    length: usize,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct Decimal {
+    coefficient: i128,
+    scale: u32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum CobolValue {
+    Bytes(Vec<u8>),
+    Decimal(Decimal),
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum PendingKind {
     Accept { target: String },
@@ -49,6 +99,8 @@ pub struct MachineSnapshot {
     pub base_storage: Vec<Vec<u8>>,
     pub perform_stack: Vec<usize>,
     pub altered_targets: BTreeMap<String, String>,
+    pub loop_reentry: BTreeSet<usize>,
+    pub loop_counts: BTreeMap<usize, i128>,
 }
 
 pub struct ReferenceMachine {
@@ -57,7 +109,12 @@ pub struct ReferenceMachine {
     bases: Vec<Vec<u8>>,
     views: BTreeMap<String, StorageView>,
     views_by_id: BTreeMap<StorageId, StorageView>,
+    layouts: BTreeMap<String, LayoutMetadata>,
+    simple_layouts: BTreeMap<String, Vec<String>>,
     labels: BTreeMap<String, usize>,
+    control_nodes: BTreeMap<usize, usize>,
+    loop_reentry: BTreeSet<usize>,
+    loop_counts: BTreeMap<usize, i128>,
     altered: BTreeMap<String, String>,
     pc: usize,
     output: Vec<u8>,
@@ -84,13 +141,33 @@ impl ReferenceMachine {
             .flat_map(|block| &block.operations)
             .cloned()
             .collect();
+        let (layouts, simple_layouts) = layout_metadata(&operations)?;
         let labels = operations
             .iter()
             .enumerate()
             .filter_map(|(index, operation)| {
                 (operation.identity.name() == "label")
-                    .then(|| argument(operation, 0).map(|name| (normalize(name), index)))
+                    .then(|| {
+                        arguments(operation)
+                            .into_iter()
+                            .next()
+                            .map(|name| (normalize(&name), index))
+                    })
                     .flatten()
+            })
+            .collect();
+        let control_nodes = operations
+            .iter()
+            .enumerate()
+            .filter_map(|(index, operation)| {
+                operation
+                    .attributes
+                    .get("control_node")
+                    .and_then(|attribute| match attribute {
+                        Attribute::Integer(node) => usize::try_from(*node).ok(),
+                        _ => None,
+                    })
+                    .map(|node| (node, index))
             })
             .collect();
         Ok(Self {
@@ -99,7 +176,12 @@ impl ReferenceMachine {
             bases,
             views,
             views_by_id,
+            layouts,
+            simple_layouts,
             labels,
+            control_nodes,
+            loop_reentry: BTreeSet::new(),
+            loop_counts: BTreeMap::new(),
             altered: BTreeMap::new(),
             pc: 0,
             output: Vec::new(),
@@ -113,18 +195,20 @@ impl ReferenceMachine {
     #[must_use]
     pub fn snapshot(&self) -> MachineSnapshot {
         MachineSnapshot {
-            schema_version: 1,
+            schema_version: 2,
             program_counter: self.pc,
             effect_sequence: self.effect_sequence,
             output: self.output.clone(),
             base_storage: self.bases.clone(),
             perform_stack: self.perform_stack.clone(),
             altered_targets: self.altered.clone(),
+            loop_reentry: self.loop_reentry.clone(),
+            loop_counts: self.loop_counts.clone(),
         }
     }
 
     pub fn restore(&mut self, snapshot: MachineSnapshot) -> Result<(), MachineProblem> {
-        if snapshot.schema_version != 1
+        if !matches!(snapshot.schema_version, 1 | 2)
             || snapshot.program_counter > self.operations.len()
             || snapshot.base_storage.iter().map(Vec::len).sum::<usize>()
                 > self.invocation.limits.max_storage_bytes as usize
@@ -137,13 +221,19 @@ impl ReferenceMachine {
         self.bases = snapshot.base_storage;
         self.perform_stack = snapshot.perform_stack;
         self.altered = snapshot.altered_targets;
+        self.loop_reentry = snapshot.loop_reentry;
+        self.loop_counts = snapshot.loop_counts;
         self.pending = None;
         self.deferred_drive = None;
         Ok(())
     }
 
     pub fn restore_checkpoint(&mut self, payload: &BoundedPayload) -> Result<(), MachineProblem> {
-        if payload.schema() != "mainframe-env.reference-machine-checkpoint@1" {
+        if !matches!(
+            payload.schema(),
+            "mainframe-env.reference-machine-checkpoint@1"
+                | "mainframe-env.reference-machine-checkpoint@2"
+        ) {
             return Err(MachineProblem::IncompatibleSnapshot);
         }
         let snapshot = decode_snapshot(
@@ -237,7 +327,11 @@ impl ReferenceMachine {
     fn execute(&mut self, operation: &Operation) -> Result<Step, MachineProblem> {
         let name = operation.identity.name();
         let args = arguments(operation);
+        if let Some(step) = self.execute_control(operation, name, &args)? {
+            return Ok(step);
+        }
         match name {
+            "define" => {}
             "init" => {
                 let bytes = bytes_attribute(operation, "initial")?;
                 let reference = operation
@@ -268,31 +362,12 @@ impl ReferenceMachine {
                 }
                 self.append_output(&line)?;
             }
-            "move" => {
-                let to = position(&args, "TO").ok_or(MachineProblem::InvalidOperation)?;
-                let value = self.resolve(args.first().ok_or(MachineProblem::InvalidOperation)?)?;
-                let target = args.get(to + 1).ok_or(MachineProblem::InvalidOperation)?;
-                self.write(target, &value)?;
-            }
+            "move" => self.move_op(&args)?,
             "add" | "subtract" | "multiply" | "divide" | "compute" => {
                 self.arithmetic(name, &args)?
             }
-            "initialize" => {
-                for target in &args {
-                    if self.views.contains_key(&normalize(target)) {
-                        let length = self.read(target)?.len();
-                        self.write(target, &vec![b' '; length])?;
-                    }
-                }
-            }
-            "set" => {
-                if args.len() >= 3 {
-                    let value = self.resolve(&args[2])?;
-                    self.write(&args[0], &value)?;
-                } else {
-                    return Err(MachineProblem::InvalidOperation);
-                }
-            }
+            "initialize" => self.initialize_op(&args)?,
+            "set" => self.set_op(&args)?,
             "allocate" => {
                 if let Some(target) = args.last() {
                     self.write(target, b"1")?;
@@ -344,7 +419,193 @@ impl ReferenceMachine {
             "stop_run" | "go_back" | "halt" => return Ok(Step::Complete),
             _ => return Err(MachineProblem::InvalidOperation),
         }
+        if optional_integer_attribute(operation, "edge_loop").is_some() {
+            return self.perform_control_end(operation);
+        }
+        if optional_integer_attribute(operation, "edge_return").is_some()
+            && let Some(return_pc) = self.perform_stack.pop()
+        {
+            return Ok(Step::Jump(return_pc));
+        }
+        if optional_integer_attribute(operation, "edge_fallthrough").is_some() {
+            let target = self.control_target(operation, "edge_fallthrough")?;
+            if target != self.pc.saturating_add(1) {
+                return Ok(Step::Jump(target));
+            }
+        }
         Ok(Step::Next)
+    }
+
+    fn execute_control(
+        &mut self,
+        operation: &Operation,
+        name: &str,
+        args: &[String],
+    ) -> Result<Option<Step>, MachineProblem> {
+        let Some(role) = optional_text_attribute(operation, "control_role") else {
+            return Ok(None);
+        };
+        let scope = optional_text_attribute(operation, "control_scope").unwrap_or("");
+        match role {
+            "block_start" if scope == "if" => {
+                if self.eval_condition(args)? {
+                    Ok(Some(Step::Next))
+                } else {
+                    Ok(Some(Step::Jump(
+                        self.control_target(operation, "edge_false")?,
+                    )))
+                }
+            }
+            "block_start" if matches!(scope, "evaluate" | "search") => Ok(Some(Step::Next)),
+            "block_start" if scope == "perform" => {
+                self.perform_control_start(operation, args).map(Some)
+            }
+            "branch" => {
+                if self.control_branch(operation)? {
+                    Ok(Some(Step::Next))
+                } else {
+                    Ok(Some(Step::Jump(
+                        self.control_target(operation, "edge_branch_false")?,
+                    )))
+                }
+            }
+            "block_end" if scope == "perform" => Ok(Some(Step::Next)),
+            "block_end" | "terminator" => Ok(Some(Step::Next)),
+            "transfer" if name == "go_to" || name == "next_sentence" => Ok(Some(Step::Jump(
+                self.control_target(operation, "edge_transfer")?,
+            ))),
+            _ if name == "control" => Ok(Some(Step::Next)),
+            _ => Ok(None),
+        }
+    }
+
+    fn control_target(&self, operation: &Operation, edge: &str) -> Result<usize, MachineProblem> {
+        let node = optional_integer_attribute(operation, edge)
+            .and_then(|node| usize::try_from(node).ok())
+            .ok_or(MachineProblem::InvalidOperation)?;
+        self.control_nodes
+            .get(&node)
+            .copied()
+            .ok_or(MachineProblem::InvalidOperation)
+    }
+
+    fn control_branch(&self, operation: &Operation) -> Result<bool, MachineProblem> {
+        let text = text_attribute(operation, "control_text")?.trim();
+        if text.eq_ignore_ascii_case("ELSE") || text.eq_ignore_ascii_case("WHEN OTHER") {
+            return Ok(true);
+        }
+        let tokens = control_tokens(text);
+        let condition = tokens
+            .strip_prefix(&["WHEN".to_string()])
+            .unwrap_or(tokens.as_slice());
+        let parent = optional_integer_attribute(operation, "control_parent")
+            .and_then(|node| usize::try_from(node).ok())
+            .and_then(|node| self.control_nodes.get(&node))
+            .and_then(|pc| self.operations.get(*pc))
+            .ok_or(MachineProblem::InvalidOperation)?;
+        let scope = optional_text_attribute(parent, "control_scope").unwrap_or("");
+        if scope == "evaluate" {
+            let subject = arguments(parent);
+            if subject.first().is_some_and(|token| token == "TRUE") {
+                self.eval_condition(condition)
+            } else {
+                let left = self.eval_value(&subject)?;
+                let right = self.eval_value(condition)?;
+                Ok(match (left, right) {
+                    (CobolValue::Decimal(left), CobolValue::Decimal(right)) => {
+                        let (left, right) = decimal_aligned(left, right)?;
+                        left.coefficient == right.coefficient
+                    }
+                    (CobolValue::Bytes(left), CobolValue::Bytes(right)) => left == right,
+                    _ => false,
+                })
+            }
+        } else if scope == "search" {
+            self.eval_condition(condition)
+        } else {
+            Ok(true)
+        }
+    }
+
+    fn perform_control_start(
+        &mut self,
+        operation: &Operation,
+        args: &[String],
+    ) -> Result<Step, MachineProblem> {
+        let node = usize::try_from(
+            optional_integer_attribute(operation, "control_node")
+                .ok_or(MachineProblem::InvalidOperation)?,
+        )
+        .map_err(|_| MachineProblem::InvalidOperation)?;
+        let reentry = self.loop_reentry.remove(&node);
+        if let Some(varying) = position(args, "VARYING") {
+            let variable = args
+                .get(varying + 1)
+                .ok_or(MachineProblem::InvalidOperation)?;
+            if !reentry {
+                let from = position(args, "FROM")
+                    .and_then(|index| args.get(index + 1))
+                    .ok_or(MachineProblem::InvalidOperation)?;
+                let value = self.eval_value(std::slice::from_ref(from))?;
+                self.write_value(variable, &value)?;
+            }
+        } else if let Some(times) = position(args, "TIMES") {
+            if !reentry {
+                let count = self.decimal(
+                    args.get(times.saturating_sub(1))
+                        .ok_or(MachineProblem::InvalidOperation)?,
+                )?;
+                if count.scale != 0 || count.coefficient < 0 {
+                    return Err(MachineProblem::DataException);
+                }
+                self.loop_counts.insert(node, count.coefficient);
+            }
+            if self.loop_counts.get(&node).copied().unwrap_or(0) <= 0 {
+                self.loop_counts.remove(&node);
+                return Ok(Step::Jump(self.control_target(operation, "edge_false")?));
+            }
+        }
+        if let Some(until) = position(args, "UNTIL") {
+            let test_after = args.windows(2).any(|pair| pair == ["TEST", "AFTER"]);
+            if (reentry || !test_after) && self.eval_condition(&args[until + 1..])? {
+                self.loop_counts.remove(&node);
+                return Ok(Step::Jump(self.control_target(operation, "edge_false")?));
+            }
+        }
+        Ok(Step::Next)
+    }
+
+    fn perform_control_end(&mut self, operation: &Operation) -> Result<Step, MachineProblem> {
+        let parent = usize::try_from(
+            optional_integer_attribute(operation, "control_parent")
+                .ok_or(MachineProblem::InvalidOperation)?,
+        )
+        .map_err(|_| MachineProblem::InvalidOperation)?;
+        let start_pc = self
+            .control_nodes
+            .get(&parent)
+            .copied()
+            .ok_or(MachineProblem::InvalidOperation)?;
+        let start = self
+            .operations
+            .get(start_pc)
+            .ok_or(MachineProblem::InvalidOperation)?;
+        let args = arguments(start);
+        if let Some(varying) = position(&args, "VARYING") {
+            let variable = args
+                .get(varying + 1)
+                .ok_or(MachineProblem::InvalidOperation)?;
+            let by = position(&args, "BY")
+                .and_then(|index| args.get(index + 1))
+                .ok_or(MachineProblem::InvalidOperation)?;
+            let value = decimal_add(self.decimal(variable)?, self.decimal(by)?)?;
+            self.write_decimal(variable, value)?;
+        }
+        if let Some(count) = self.loop_counts.get_mut(&parent) {
+            *count = count.saturating_sub(1);
+        }
+        self.loop_reentry.insert(parent);
+        Ok(Step::Jump(self.control_target(operation, "edge_loop")?))
     }
 
     fn accept_effect(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
@@ -507,14 +768,56 @@ impl ReferenceMachine {
         .map_err(|_| MachineProblem::ResourceExhausted)
     }
 
+    fn move_op(&mut self, args: &[String]) -> Result<(), MachineProblem> {
+        let to = position(args, "TO").ok_or(MachineProblem::InvalidOperation)?;
+        if to == 0 || to + 1 >= args.len() {
+            return Err(MachineProblem::InvalidOperation);
+        }
+        let value = self.eval_value(&args[..to])?;
+        if args[to + 1..].iter().any(|token| token == "(") {
+            return self.write_reference_value(&args[to + 1..], &value);
+        }
+        for target in args[to + 1..]
+            .iter()
+            .take_while(|target| !matches!(target.as_str(), "ROUNDED" | "ON" | "NOT" | "END-MOVE"))
+        {
+            self.write_value(target, &value)?;
+        }
+        Ok(())
+    }
+
+    fn set_op(&mut self, args: &[String]) -> Result<(), MachineProblem> {
+        if args.len() < 3 || args[1] != "TO" {
+            return Err(MachineProblem::InvalidOperation);
+        }
+        if args[2] == "TRUE" {
+            let condition = self
+                .layout(&args[0])
+                .filter(|layout| layout.category == LayoutCategory::Condition)
+                .cloned()
+                .ok_or(MachineProblem::InvalidOperation)?;
+            let parent = condition.parent.ok_or(MachineProblem::InvalidOperation)?;
+            let value = condition
+                .condition_values
+                .first()
+                .ok_or(MachineProblem::InvalidOperation)?;
+            let value = value.trim_matches(['\'', '"']).as_bytes().to_vec();
+            return self.write(&parent, &value);
+        }
+        let value = self.eval_value(&args[2..3])?;
+        self.write_value(&args[0], &value)
+    }
+
     fn arithmetic(&mut self, name: &str, args: &[String]) -> Result<(), MachineProblem> {
+        let rounded = args.iter().any(|argument| argument == "ROUNDED");
         let (target, value) = match name {
             "compute" => {
                 let target = args
                     .first()
                     .ok_or(MachineProblem::InvalidOperation)?
                     .clone();
-                (target, self.eval_expression(&args[2..])?)
+                let equals = position(args, "=").ok_or(MachineProblem::InvalidOperation)?;
+                (target, self.eval_expression(&args[equals + 1..])?)
             }
             "add" => {
                 let pos = position(args, "TO").ok_or(MachineProblem::InvalidOperation)?;
@@ -524,9 +827,7 @@ impl ReferenceMachine {
                     .clone();
                 (
                     target.clone(),
-                    self.number(&target)?
-                        .checked_add(self.number(&args[0])?)
-                        .ok_or(MachineProblem::SizeError)?,
+                    decimal_add(self.decimal(&target)?, self.decimal(&args[0])?)?,
                 )
             }
             "subtract" => {
@@ -537,9 +838,7 @@ impl ReferenceMachine {
                     .clone();
                 (
                     target.clone(),
-                    self.number(&target)?
-                        .checked_sub(self.number(&args[0])?)
-                        .ok_or(MachineProblem::SizeError)?,
+                    decimal_subtract(self.decimal(&target)?, self.decimal(&args[0])?)?,
                 )
             }
             "multiply" => {
@@ -550,51 +849,151 @@ impl ReferenceMachine {
                     .clone();
                 (
                     target.clone(),
-                    self.number(&target)?
-                        .checked_mul(self.number(&args[0])?)
-                        .ok_or(MachineProblem::SizeError)?,
+                    decimal_multiply(self.decimal(&target)?, self.decimal(&args[0])?)?,
                 )
             }
             "divide" => {
-                let pos = position(args, "INTO").ok_or(MachineProblem::InvalidOperation)?;
-                let target = args
-                    .get(pos + 1)
-                    .ok_or(MachineProblem::InvalidOperation)?
-                    .clone();
-                let divisor = self.number(&args[0])?;
-                if divisor == 0 {
-                    return Err(MachineProblem::SizeError);
-                }
-                (target.clone(), self.number(&target)? / divisor)
+                let (target, dividend, divisor) = if let Some(pos) = position(args, "INTO") {
+                    let target = args
+                        .get(pos + 1)
+                        .ok_or(MachineProblem::InvalidOperation)?
+                        .clone();
+                    (
+                        target.clone(),
+                        self.decimal(&target)?,
+                        self.decimal(&args[0])?,
+                    )
+                } else {
+                    let pos = position(args, "BY").ok_or(MachineProblem::InvalidOperation)?;
+                    let giving =
+                        position(args, "GIVING").ok_or(MachineProblem::InvalidOperation)?;
+                    let target = args
+                        .get(giving + 1)
+                        .ok_or(MachineProblem::InvalidOperation)?
+                        .clone();
+                    (
+                        target,
+                        self.decimal(args.first().ok_or(MachineProblem::InvalidOperation)?)?,
+                        self.decimal(args.get(pos + 1).ok_or(MachineProblem::InvalidOperation)?)?,
+                    )
+                };
+                let scale = self.layout(&target).map_or(0, |layout| layout.scale);
+                (target, decimal_divide(dividend, divisor, scale)?)
             }
             _ => return Err(MachineProblem::InvalidOperation),
         };
-        self.write(&target, value.to_string().as_bytes())
+        self.write_decimal_mode(&target, value, rounded)
     }
-    fn eval_expression(&self, args: &[String]) -> Result<i128, MachineProblem> {
-        let mut iter = args.iter();
-        let mut value = self.number(iter.next().ok_or(MachineProblem::InvalidOperation)?)?;
-        while let Some(op) = iter.next() {
-            let rhs = self.number(iter.next().ok_or(MachineProblem::InvalidOperation)?)?;
-            value = match op.as_str() {
-                "+" => value.checked_add(rhs),
-                "-" => value.checked_sub(rhs),
-                "*" => value.checked_mul(rhs),
-                "/" if rhs != 0 => value.checked_div(rhs),
-                _ => None,
-            }
-            .ok_or(MachineProblem::SizeError)?;
+    fn eval_expression(&self, args: &[String]) -> Result<Decimal, MachineProblem> {
+        let mut position = 0usize;
+        let value = self.expression_additive(args, &mut position)?;
+        if position != args.len() {
+            return Err(MachineProblem::InvalidOperation);
         }
         Ok(value)
     }
-    fn if_op(&mut self, args: &[String]) -> Result<(), MachineProblem> {
-        if args.len() < 4 {
-            return Err(MachineProblem::UnsupportedForm);
+
+    fn expression_additive(
+        &self,
+        args: &[String],
+        position: &mut usize,
+    ) -> Result<Decimal, MachineProblem> {
+        let mut value = self.expression_multiplicative(args, position)?;
+        while let Some(operator) = args
+            .get(*position)
+            .filter(|token| matches!(token.as_str(), "+" | "-"))
+        {
+            *position += 1;
+            let right = self.expression_multiplicative(args, position)?;
+            value = if operator == "+" {
+                decimal_add(value, right)?
+            } else {
+                decimal_subtract(value, right)?
+            };
         }
-        let condition = compare(self.number(&args[0])?, &args[1], self.number(&args[2])?);
-        if condition && let Some(index) = args.iter().position(|arg| arg == "DISPLAY") {
+        Ok(value)
+    }
+
+    fn expression_multiplicative(
+        &self,
+        args: &[String],
+        position: &mut usize,
+    ) -> Result<Decimal, MachineProblem> {
+        let mut value = self.expression_factor(args, position)?;
+        while let Some(operator) = args
+            .get(*position)
+            .filter(|token| matches!(token.as_str(), "*" | "/"))
+        {
+            *position += 1;
+            let right = self.expression_factor(args, position)?;
+            value = if operator == "*" {
+                decimal_multiply(value, right)?
+            } else {
+                decimal_divide(value, right, value.scale.max(right.scale).saturating_add(9))?
+            };
+        }
+        Ok(value)
+    }
+
+    fn expression_factor(
+        &self,
+        args: &[String],
+        position: &mut usize,
+    ) -> Result<Decimal, MachineProblem> {
+        let token = args
+            .get(*position)
+            .ok_or(MachineProblem::InvalidOperation)?;
+        if token == "(" {
+            *position += 1;
+            let value = self.expression_additive(args, position)?;
+            if args.get(*position).is_none_or(|token| token != ")") {
+                return Err(MachineProblem::InvalidOperation);
+            }
+            *position += 1;
+            return Ok(value);
+        }
+        if token == "-" {
+            *position += 1;
+            let mut value = self.expression_factor(args, position)?;
+            value.coefficient = value
+                .coefficient
+                .checked_neg()
+                .ok_or(MachineProblem::SizeError)?;
+            return Ok(value);
+        }
+        let start = *position;
+        if token == "FUNCTION" {
+            let open = args[start..]
+                .iter()
+                .position(|token| token == "(")
+                .map(|offset| start + offset)
+                .ok_or(MachineProblem::InvalidOperation)?;
+            *position = matching_close(args, open)
+                .ok_or(MachineProblem::InvalidOperation)?
+                .saturating_add(1);
+        } else if args.get(start + 1).is_some_and(|token| token == "(") {
+            *position = matching_close(args, start + 1)
+                .ok_or(MachineProblem::InvalidOperation)?
+                .saturating_add(1);
+        } else {
+            *position += 1;
+        }
+        match self.eval_value(&args[start..*position])? {
+            CobolValue::Decimal(value) => Ok(value),
+            CobolValue::Bytes(bytes) => {
+                decimal_text(&String::from_utf8_lossy(&bytes)).ok_or(MachineProblem::DataException)
+            }
+        }
+    }
+    fn if_op(&mut self, args: &[String]) -> Result<(), MachineProblem> {
+        let action = args
+            .iter()
+            .position(|arg| matches!(arg.as_str(), "DISPLAY" | "CONTINUE"))
+            .unwrap_or(args.len());
+        let condition = self.eval_condition(&args[..action])?;
+        if condition && action < args.len() && args[action] == "DISPLAY" {
             let value = self.resolve(
-                args.get(index + 1)
+                args.get(action + 1)
                     .ok_or(MachineProblem::InvalidOperation)?,
             )?;
             self.append_output(&[value.as_slice(), b"\n"].concat())?;
@@ -630,10 +1029,29 @@ impl ReferenceMachine {
     fn string_op(&mut self, args: &[String]) -> Result<(), MachineProblem> {
         let into = position(args, "INTO").ok_or(MachineProblem::InvalidOperation)?;
         let mut value = Vec::new();
-        for arg in &args[..into] {
-            if !matches!(arg.as_str(), "DELIMITED" | "BY" | "SIZE") {
-                value.extend(self.resolve(arg)?);
+        let mut index = 0usize;
+        while index < into {
+            let mut source = self.resolve(&args[index])?;
+            index += 1;
+            if args.get(index).is_some_and(|token| token == "DELIMITED") {
+                if args.get(index + 1).is_none_or(|token| token != "BY") {
+                    return Err(MachineProblem::InvalidOperation);
+                }
+                let delimiter = args
+                    .get(index + 2)
+                    .ok_or(MachineProblem::InvalidOperation)?;
+                if delimiter != "SIZE" {
+                    let delimiter = self.resolve(delimiter)?;
+                    if delimiter.is_empty() {
+                        return Err(MachineProblem::InvalidOperation);
+                    }
+                    if let Some(position) = find_bytes(&source, &delimiter) {
+                        source.truncate(position);
+                    }
+                }
+                index += 3;
             }
+            value.extend(source);
         }
         self.write(
             args.get(into + 1).ok_or(MachineProblem::InvalidOperation)?,
@@ -643,12 +1061,26 @@ impl ReferenceMachine {
     fn unstring_op(&mut self, args: &[String]) -> Result<(), MachineProblem> {
         let into = position(args, "INTO").ok_or(MachineProblem::InvalidOperation)?;
         let source = self.resolve(args.first().ok_or(MachineProblem::InvalidOperation)?)?;
-        let fields: Vec<_> = String::from_utf8_lossy(&source)
-            .split_whitespace()
-            .map(str::to_string)
-            .collect();
-        for (target, value) in args[into + 1..].iter().zip(fields) {
-            self.write(target, value.as_bytes())?;
+        let delimiter = position(args, "DELIMITED")
+            .and_then(|index| args.get(index + 2))
+            .map(|token| self.resolve(token))
+            .transpose()?
+            .unwrap_or_else(|| vec![b' ']);
+        if delimiter.is_empty() {
+            return Err(MachineProblem::InvalidOperation);
+        }
+        let fields = split_bytes(&source, &delimiter);
+        let targets = args[into + 1..]
+            .iter()
+            .take_while(|target| {
+                !matches!(
+                    target.as_str(),
+                    "WITH" | "POINTER" | "TALLYING" | "ON" | "NOT" | "END-UNSTRING"
+                )
+            })
+            .collect::<Vec<_>>();
+        for (target, value) in targets.into_iter().zip(fields) {
+            self.write(target, value)?;
         }
         Ok(())
     }
@@ -657,17 +1089,84 @@ impl ReferenceMachine {
             return Err(MachineProblem::InvalidOperation);
         }
         let source = self.read(&args[0])?;
-        if let Some(replacing) = position(args, "REPLACING")
-            && args.len() > replacing + 3
+        if let Some(replacing) = position(args, "REPLACING") {
+            if args.get(replacing + 1).is_none_or(|token| token != "ALL")
+                || args.get(replacing + 3).is_none_or(|token| token != "BY")
+            {
+                return Err(MachineProblem::UnsupportedForm);
+            }
+            let from = self.resolve(
+                args.get(replacing + 2)
+                    .ok_or(MachineProblem::InvalidOperation)?,
+            )?;
+            let to = self.resolve(
+                args.get(replacing + 4)
+                    .ok_or(MachineProblem::InvalidOperation)?,
+            )?;
+            let replaced = replace_bytes(&source, &from, &to)?;
+            self.write(&args[0], &replaced)?;
+        } else if let Some(tallying) = position(args, "TALLYING") {
+            let target = args
+                .get(tallying + 1)
+                .ok_or(MachineProblem::InvalidOperation)?;
+            let all = args
+                .iter()
+                .skip(tallying + 2)
+                .position(|token| token == "ALL")
+                .map(|offset| tallying + 2 + offset)
+                .ok_or(MachineProblem::UnsupportedForm)?;
+            let needle =
+                self.resolve(args.get(all + 1).ok_or(MachineProblem::InvalidOperation)?)?;
+            let count = count_bytes(&source, &needle)?;
+            self.write_decimal(
+                target,
+                Decimal {
+                    coefficient: count as i128,
+                    scale: 0,
+                },
+            )?;
+        }
+        Ok(())
+    }
+
+    fn initialize_op(&mut self, args: &[String]) -> Result<(), MachineProblem> {
+        for target in args
+            .iter()
+            .take_while(|target| !matches!(target.as_str(), "REPLACING" | "WITH"))
         {
-            let from = self.resolve(&args[replacing + 2])?;
-            let to = self.resolve(&args[replacing + 4])?;
-            if from.len() == 1 && to.len() == 1 {
-                let replaced: Vec<_> = source
-                    .into_iter()
-                    .map(|byte| if byte == from[0] { to[0] } else { byte })
-                    .collect();
-                self.write(&args[0], &replaced)?;
+            let layout = self
+                .layout(target)
+                .cloned()
+                .ok_or(MachineProblem::UnknownStorage)?;
+            let targets = if layout.category == LayoutCategory::Group {
+                self.layouts
+                    .values()
+                    .filter(|candidate| {
+                        candidate.length > 0
+                            && candidate.category != LayoutCategory::Group
+                            && candidate.offset >= layout.offset
+                            && candidate.offset.saturating_add(candidate.length)
+                                <= layout.offset.saturating_add(layout.length)
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>()
+            } else {
+                vec![layout]
+            };
+            for target in targets {
+                if is_numeric(target.category) {
+                    self.write_decimal(
+                        &target.name,
+                        Decimal {
+                            coefficient: 0,
+                            scale: target.scale,
+                        },
+                    )?;
+                } else if target.category == LayoutCategory::Pointer {
+                    self.write_raw(&target.name, &vec![0; target.length])?;
+                } else {
+                    self.write_raw(&target.name, &vec![b' '; target.length])?;
+                }
             }
         }
         Ok(())
@@ -718,31 +1217,518 @@ impl ReferenceMachine {
         self.write(target, value.as_bytes())
     }
 
+    fn eval_value(&self, tokens: &[String]) -> Result<CobolValue, MachineProblem> {
+        if tokens.is_empty() {
+            return Err(MachineProblem::InvalidOperation);
+        }
+        if tokens[0] == "FUNCTION" {
+            return self.eval_function(tokens);
+        }
+        if let Ok(reference) = self.reference(tokens) {
+            let bytes = self.read_reference(&reference)?;
+            if is_numeric(reference.layout.category) && reference.length == reference.layout.length
+            {
+                return Ok(CobolValue::Decimal(decode_decimal(
+                    &reference.layout,
+                    &bytes,
+                )?));
+            }
+            return Ok(CobolValue::Bytes(bytes));
+        }
+        if tokens.len() == 1
+            && let Some(value) = decimal_text(&tokens[0])
+        {
+            return Ok(CobolValue::Decimal(value));
+        }
+        if tokens.len() == 1 {
+            return Ok(CobolValue::Bytes(self.resolve(&tokens[0])?));
+        }
+        Err(MachineProblem::UnsupportedForm)
+    }
+
+    fn eval_function(&self, tokens: &[String]) -> Result<CobolValue, MachineProblem> {
+        let name = tokens.get(1).ok_or(MachineProblem::InvalidOperation)?;
+        if name == "CURRENT-DATE" && tokens.len() == 2 {
+            let value = self
+                .invocation
+                .bindings
+                .get("cobol.current-date")
+                .map(|payload| payload.bytes().to_vec())
+                .unwrap_or_else(|| b"1970010100000000+0000".to_vec());
+            if value.len() != 21 || !value[..16].iter().all(u8::is_ascii_digit) {
+                return Err(MachineProblem::DataException);
+            }
+            return Ok(CobolValue::Bytes(value));
+        }
+        let open = tokens
+            .iter()
+            .position(|token| token == "(")
+            .ok_or(MachineProblem::InvalidOperation)?;
+        let close = matching_close(tokens, open).ok_or(MachineProblem::InvalidOperation)?;
+        let arguments = &tokens[open + 1..close];
+        match name.as_str() {
+            "TRIM" => {
+                let bytes = value_bytes(self.eval_value(arguments)?)?;
+                Ok(CobolValue::Bytes(
+                    String::from_utf8_lossy(&bytes).trim().as_bytes().to_vec(),
+                ))
+            }
+            "UPPER-CASE" => {
+                let bytes = value_bytes(self.eval_value(arguments)?)?;
+                Ok(CobolValue::Bytes(
+                    String::from_utf8_lossy(&bytes)
+                        .to_ascii_uppercase()
+                        .into_bytes(),
+                ))
+            }
+            "LOWER-CASE" => {
+                let bytes = value_bytes(self.eval_value(arguments)?)?;
+                Ok(CobolValue::Bytes(
+                    String::from_utf8_lossy(&bytes)
+                        .to_ascii_lowercase()
+                        .into_bytes(),
+                ))
+            }
+            "LENGTH" => {
+                let bytes = value_bytes(self.eval_value(arguments)?)?;
+                Ok(CobolValue::Decimal(Decimal {
+                    coefficient: bytes.len() as i128,
+                    scale: 0,
+                }))
+            }
+            "NUMVAL" | "NUMVAL-C" => {
+                let bytes = value_bytes(self.eval_value(arguments)?)?;
+                let text = String::from_utf8_lossy(&bytes);
+                Ok(CobolValue::Decimal(
+                    decimal_text(&text).ok_or(MachineProblem::DataException)?,
+                ))
+            }
+            "TEST-NUMVAL" | "TEST-NUMVAL-C" => {
+                let bytes = value_bytes(self.eval_value(arguments)?)?;
+                let text = String::from_utf8_lossy(&bytes);
+                Ok(CobolValue::Decimal(Decimal {
+                    coefficient: i128::from(decimal_text(&text).is_none()),
+                    scale: 0,
+                }))
+            }
+            "INTEGER-OF-DATE" => {
+                let value = match self.eval_value(arguments)? {
+                    CobolValue::Decimal(value) if value.scale == 0 => value.coefficient,
+                    CobolValue::Bytes(bytes) => {
+                        decimal_text(&String::from_utf8_lossy(&bytes))
+                            .ok_or(MachineProblem::DataException)?
+                            .coefficient
+                    }
+                    _ => return Err(MachineProblem::DataException),
+                };
+                let (year, month, day) = split_yyyymmdd(value)?;
+                Ok(CobolValue::Decimal(Decimal {
+                    coefficient: i128::from(cobol_integer_of_date(year, month, day)?),
+                    scale: 0,
+                }))
+            }
+            "DATE-OF-INTEGER" => {
+                let value = match self.eval_value(arguments)? {
+                    CobolValue::Decimal(value) if value.scale == 0 => value.coefficient,
+                    _ => return Err(MachineProblem::DataException),
+                };
+                let value = i64::try_from(value).map_err(|_| MachineProblem::DataException)?;
+                let (year, month, day) = cobol_date_of_integer(value)?;
+                Ok(CobolValue::Decimal(Decimal {
+                    coefficient: i128::from(year) * 10_000
+                        + i128::from(month) * 100
+                        + i128::from(day),
+                    scale: 0,
+                }))
+            }
+            "MOD" => {
+                let split = arguments.iter().position(|token| token == ",").unwrap_or(1);
+                let right_start =
+                    split + usize::from(arguments.get(split).is_some_and(|token| token == ","));
+                let left = self.eval_value(&arguments[..split])?;
+                let right = self.eval_value(&arguments[right_start..])?;
+                let (CobolValue::Decimal(left), CobolValue::Decimal(right)) = (left, right) else {
+                    return Err(MachineProblem::DataException);
+                };
+                let (left, right) = decimal_aligned(left, right)?;
+                if right.coefficient == 0 {
+                    return Err(MachineProblem::SizeError);
+                }
+                Ok(CobolValue::Decimal(Decimal {
+                    coefficient: left.coefficient % right.coefficient,
+                    scale: left.scale,
+                }))
+            }
+            _ => Err(MachineProblem::UnsupportedForm),
+        }
+    }
+
+    fn eval_condition(&self, tokens: &[String]) -> Result<bool, MachineProblem> {
+        let tokens = strip_condition_parentheses(tokens);
+        if let Some(or) = top_level_position(tokens, "OR") {
+            return Ok(
+                self.eval_condition(&tokens[..or])? || self.eval_condition(&tokens[or + 1..])?
+            );
+        }
+        if let Some(and) = top_level_position(tokens, "AND") {
+            return Ok(
+                self.eval_condition(&tokens[..and])? && self.eval_condition(&tokens[and + 1..])?
+            );
+        }
+        if tokens.first().is_some_and(|token| token == "NOT") {
+            return Ok(!self.eval_condition(&tokens[1..])?);
+        }
+        if tokens.len() == 1 {
+            let condition = self
+                .layout(&tokens[0])
+                .filter(|layout| layout.category == LayoutCategory::Condition)
+                .ok_or(MachineProblem::UnsupportedForm)?;
+            let parent = condition
+                .parent
+                .as_deref()
+                .ok_or(MachineProblem::InvalidOperation)?;
+            let actual = self.read(parent)?;
+            return condition_matches(&actual, &condition.condition_values);
+        }
+        if tokens.len() >= 2 {
+            let class = tokens.last().map(String::as_str).unwrap_or_default();
+            if matches!(
+                class,
+                "NUMERIC" | "ALPHABETIC" | "POSITIVE" | "NEGATIVE" | "ZERO"
+            ) {
+                let is = tokens
+                    .iter()
+                    .position(|token| token == "IS")
+                    .unwrap_or(tokens.len() - 1);
+                let negate = tokens[..tokens.len() - 1]
+                    .iter()
+                    .any(|token| token == "NOT");
+                let value = self.eval_value(&tokens[..is])?;
+                let matched = match class {
+                    "NUMERIC" => match value {
+                        CobolValue::Decimal(_) => true,
+                        CobolValue::Bytes(bytes) => {
+                            decimal_text(&String::from_utf8_lossy(&bytes)).is_some()
+                        }
+                    },
+                    "ALPHABETIC" => value_bytes(value)?
+                        .iter()
+                        .all(|byte| byte.is_ascii_alphabetic() || *byte == b' '),
+                    "POSITIVE" => value_decimal(value)?.coefficient > 0,
+                    "NEGATIVE" => value_decimal(value)?.coefficient < 0,
+                    "ZERO" => value_decimal(value)?.coefficient == 0,
+                    _ => false,
+                };
+                return Ok(matched != negate);
+            }
+        }
+        if tokens.len() < 3 {
+            return Err(MachineProblem::UnsupportedForm);
+        }
+        let operator_index = tokens
+            .iter()
+            .position(|token| {
+                matches!(
+                    token.as_str(),
+                    "=" | "<>" | ">" | "<" | ">=" | "<=" | "EQUAL" | "GREATER" | "LESS"
+                )
+            })
+            .ok_or(MachineProblem::UnsupportedForm)?;
+        let mut operator = tokens[operator_index].as_str();
+        let negate = tokens[..operator_index]
+            .last()
+            .is_some_and(|token| token == "NOT");
+        let mut left_end = operator_index - usize::from(negate);
+        if tokens[..left_end].last().is_some_and(|token| token == "IS") {
+            left_end -= 1;
+        }
+        let mut right_start = operator_index + 1;
+        if tokens.get(right_start).is_some_and(|token| token == "TO") {
+            right_start += 1;
+        }
+        if operator == "EQUAL" {
+            operator = "=";
+        } else if operator == "GREATER" {
+            operator = ">";
+            if tokens.get(right_start).is_some_and(|token| token == "THAN") {
+                right_start += 1;
+            }
+        } else if operator == "LESS" {
+            operator = "<";
+            if tokens.get(right_start).is_some_and(|token| token == "THAN") {
+                right_start += 1;
+            }
+        }
+        let left = self.eval_value(&tokens[..left_end])?;
+        let right = self.eval_value(&tokens[right_start..])?;
+        match (left, right) {
+            (CobolValue::Decimal(left), CobolValue::Decimal(right)) => {
+                let (left, right) = decimal_aligned(left, right)?;
+                Ok(compare(left.coefficient, operator, right.coefficient) != negate)
+            }
+            (CobolValue::Bytes(left), CobolValue::Bytes(right)) => {
+                let (left, right) = padded_bytes(left, right);
+                let matched = match operator {
+                    "=" => left == right,
+                    "<>" => left != right,
+                    ">" => left > right,
+                    "<" => left < right,
+                    ">=" => left >= right,
+                    "<=" => left <= right,
+                    _ => false,
+                };
+                Ok(matched != negate)
+            }
+            _ => Err(MachineProblem::DataException),
+        }
+    }
+
+    fn write_value(&mut self, target: &str, value: &CobolValue) -> Result<(), MachineProblem> {
+        match value {
+            CobolValue::Decimal(value) => self.write_decimal(target, *value),
+            CobolValue::Bytes(bytes) => {
+                if self
+                    .layout(target)
+                    .is_some_and(|layout| is_numeric(layout.category))
+                {
+                    let text = String::from_utf8_lossy(bytes);
+                    self.write_decimal(
+                        target,
+                        decimal_text(&text).ok_or(MachineProblem::DataException)?,
+                    )
+                } else {
+                    self.write(target, bytes)
+                }
+            }
+        }
+    }
+
+    fn write_reference_value(
+        &mut self,
+        target: &[String],
+        value: &CobolValue,
+    ) -> Result<(), MachineProblem> {
+        let reference = self.reference(target)?;
+        let bytes = match value {
+            CobolValue::Bytes(bytes) => FixedValue::fit(bytes, reference.length, false)
+                .bytes()
+                .to_vec(),
+            CobolValue::Decimal(value)
+                if reference.length == reference.layout.length
+                    && is_numeric(reference.layout.category) =>
+            {
+                encode_decimal(
+                    &reference.layout,
+                    decimal_rescale(*value, reference.layout.scale)?,
+                )?
+            }
+            CobolValue::Decimal(value) => {
+                FixedValue::fit(decimal_string(*value).as_bytes(), reference.length, false)
+                    .bytes()
+                    .to_vec()
+            }
+        };
+        self.write_reference(&reference, &bytes)
+    }
+
+    fn decimal(&self, token: &str) -> Result<Decimal, MachineProblem> {
+        if let Some(layout) = self.layout(token) {
+            if !is_numeric(layout.category) {
+                return Err(MachineProblem::DataException);
+            }
+            return decode_decimal(layout, &self.read(&layout.name)?);
+        }
+        decimal_text(token).ok_or(MachineProblem::DataException)
+    }
+
+    fn write_decimal(&mut self, target: &str, value: Decimal) -> Result<(), MachineProblem> {
+        self.write_decimal_mode(target, value, false)
+    }
+
+    fn write_decimal_mode(
+        &mut self,
+        target: &str,
+        value: Decimal,
+        rounded: bool,
+    ) -> Result<(), MachineProblem> {
+        let layout = self
+            .layout(target)
+            .cloned()
+            .ok_or(MachineProblem::UnknownStorage)?;
+        let value = if rounded {
+            decimal_rescale_rounded(value, layout.scale)?
+        } else {
+            decimal_rescale(value, layout.scale)?
+        };
+        let bytes = encode_decimal(&layout, value)?;
+        self.write_raw(&layout.name, &bytes)
+    }
+
+    fn reference(&self, tokens: &[String]) -> Result<ResolvedReference, MachineProblem> {
+        if tokens.is_empty() {
+            return Err(MachineProblem::UnknownStorage);
+        }
+        let open = tokens.iter().position(|token| token == "(");
+        let name_tokens = &tokens[..open.unwrap_or(tokens.len())];
+        let layout = self
+            .layout_qualified(name_tokens)
+            .cloned()
+            .ok_or(MachineProblem::UnknownStorage)?;
+        let mut offset = 0usize;
+        let mut length = layout.length;
+        if let Some(open) = open {
+            let close = matching_close(tokens, open).ok_or(MachineProblem::InvalidOperation)?;
+            if close + 1 != tokens.len() {
+                return Err(MachineProblem::InvalidOperation);
+            }
+            let contents = &tokens[open + 1..close];
+            if contents.len() == 1 && contents[0].contains(':') {
+                let (start, requested) = contents[0]
+                    .split_once(':')
+                    .ok_or(MachineProblem::ReferenceModificationError)?;
+                let start = start
+                    .parse::<usize>()
+                    .map_err(|_| MachineProblem::ReferenceModificationError)?;
+                let requested = requested
+                    .parse::<usize>()
+                    .map_err(|_| MachineProblem::ReferenceModificationError)?;
+                if start == 0 || requested == 0 || start - 1 + requested > length {
+                    return Err(MachineProblem::ReferenceModificationError);
+                }
+                offset = start - 1;
+                length = requested;
+            } else {
+                let index = match self.eval_value(contents)? {
+                    CobolValue::Decimal(value) if value.scale == 0 => {
+                        usize::try_from(value.coefficient)
+                            .map_err(|_| MachineProblem::SubscriptError)?
+                    }
+                    _ => return Err(MachineProblem::SubscriptError),
+                };
+                if layout.occurs <= 1 || index == 0 || index > layout.occurs {
+                    return Err(MachineProblem::SubscriptError);
+                }
+                offset = (index - 1)
+                    .checked_mul(layout.element_length)
+                    .ok_or(MachineProblem::SubscriptError)?;
+                length = layout.element_length;
+            }
+        }
+        Ok(ResolvedReference {
+            layout,
+            offset,
+            length,
+        })
+    }
+
+    fn layout_qualified(&self, tokens: &[String]) -> Option<&LayoutMetadata> {
+        let simple = tokens.first()?.to_ascii_uppercase();
+        if tokens.len() == 1 {
+            return self.layout(&simple);
+        }
+        let qualifiers = tokens
+            .iter()
+            .skip(1)
+            .filter(|token| !matches!(token.as_str(), "OF" | "IN"))
+            .map(|token| token.to_ascii_uppercase())
+            .collect::<Vec<_>>();
+        self.simple_layouts
+            .get(&simple)?
+            .iter()
+            .filter_map(|name| self.layouts.get(name))
+            .find(|layout| {
+                let ancestors = layout.name.split('.').rev().skip(1).collect::<Vec<_>>();
+                qualifiers.len() <= ancestors.len()
+                    && qualifiers
+                        .iter()
+                        .zip(ancestors)
+                        .all(|(qualifier, ancestor)| qualifier == ancestor)
+            })
+    }
+
+    fn read_reference(&self, reference: &ResolvedReference) -> Result<Vec<u8>, MachineProblem> {
+        let view = self
+            .views
+            .get(&reference.layout.name)
+            .ok_or(MachineProblem::UnknownStorage)?;
+        let start = view
+            .offset
+            .checked_add(reference.offset)
+            .ok_or(MachineProblem::ResourceExhausted)?;
+        let end = start
+            .checked_add(reference.length)
+            .ok_or(MachineProblem::ResourceExhausted)?;
+        self.bases[view.base]
+            .get(start..end)
+            .map(<[u8]>::to_vec)
+            .ok_or(MachineProblem::SubscriptError)
+    }
+
+    fn write_reference(
+        &mut self,
+        reference: &ResolvedReference,
+        value: &[u8],
+    ) -> Result<(), MachineProblem> {
+        if value.len() != reference.length {
+            return Err(MachineProblem::SizeError);
+        }
+        let view = self
+            .views
+            .get(&reference.layout.name)
+            .ok_or(MachineProblem::UnknownStorage)?
+            .clone();
+        let start = view
+            .offset
+            .checked_add(reference.offset)
+            .ok_or(MachineProblem::ResourceExhausted)?;
+        let end = start
+            .checked_add(reference.length)
+            .ok_or(MachineProblem::ResourceExhausted)?;
+        let target = self.bases[view.base]
+            .get_mut(start..end)
+            .ok_or(MachineProblem::SubscriptError)?;
+        target.copy_from_slice(value);
+        Ok(())
+    }
+
     fn resolve(&self, token: &str) -> Result<Vec<u8>, MachineProblem> {
         let clean = token.trim_matches(['\'', '"']);
         if clean != token {
             return Ok(clean.as_bytes().to_vec());
         }
-        if self.views.contains_key(&normalize(token)) {
+        match normalize(token).as_str() {
+            "SPACE" | "SPACES" => return Ok(vec![b' ']),
+            "ZERO" | "ZEROS" | "ZEROES" => return Ok(vec![b'0']),
+            "LOW-VALUE" | "LOW-VALUES" => return Ok(vec![0]),
+            "HIGH-VALUE" | "HIGH-VALUES" => return Ok(vec![0xff]),
+            _ => {}
+        }
+        if self.layout(token).is_some() || self.views.contains_key(&normalize(token)) {
             self.read(token)
         } else {
             Ok(token.as_bytes().to_vec())
         }
     }
-    fn number(&self, token: &str) -> Result<i128, MachineProblem> {
-        String::from_utf8_lossy(&self.resolve(token)?)
-            .trim()
-            .parse()
-            .map_err(|_| MachineProblem::DataException)
-    }
     fn read(&self, name: &str) -> Result<Vec<u8>, MachineProblem> {
+        let resolved = self
+            .layout(name)
+            .map(|layout| layout.name.clone())
+            .unwrap_or_else(|| normalize(name));
         let view = self
             .views
-            .get(&normalize(name))
+            .get(&resolved)
             .ok_or(MachineProblem::UnknownStorage)?;
         Ok(self.bases[view.base][view.offset..view.offset + view.length].to_vec())
     }
     fn write(&mut self, name: &str, value: &[u8]) -> Result<(), MachineProblem> {
+        let resolved = self
+            .layout(name)
+            .map(|layout| layout.name.clone())
+            .unwrap_or_else(|| normalize(name));
+        self.write_raw(&resolved, value)
+    }
+
+    fn write_raw(&mut self, name: &str, value: &[u8]) -> Result<(), MachineProblem> {
         let view = self
             .views
             .get(&normalize(name))
@@ -764,6 +1750,22 @@ impl ReferenceMachine {
                 .copy_from_slice(fitted.bytes());
         }
         Ok(())
+    }
+
+    fn layout(&self, reference: &str) -> Option<&LayoutMetadata> {
+        let normalized = normalize(reference);
+        if let Some(layout) = self.layouts.get(&normalized) {
+            return Some(layout);
+        }
+        let simple = normalized
+            .split([' ', '(', ':'])
+            .next()
+            .unwrap_or(normalized.as_str());
+        let candidates = self.simple_layouts.get(simple)?;
+        match candidates.as_slice() {
+            [name] => self.layouts.get(name),
+            _ => None,
+        }
     }
     fn write_storage(&mut self, id: StorageId, value: &[u8]) -> Result<(), MachineProblem> {
         let view = self
@@ -876,7 +1878,7 @@ impl Machine for ReferenceMachine {
         }
         let bytes = encode_snapshot(&self.snapshot())?;
         BoundedPayload::new(
-            "mainframe-env.reference-machine-checkpoint@1",
+            "mainframe-env.reference-machine-checkpoint@2",
             bytes,
             InvocationLimits {
                 max_payload_bytes: usize::try_from(
@@ -899,7 +1901,7 @@ impl Machine for ReferenceMachine {
 }
 
 fn encode_snapshot(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
-    let mut bytes = b"MECP0001".to_vec();
+    let mut bytes = b"MECP0002".to_vec();
     bytes.extend_from_slice(&snapshot.schema_version.to_be_bytes());
     bytes.extend_from_slice(&u64::try_from(snapshot.program_counter).ok()?.to_be_bytes());
     bytes.extend_from_slice(&snapshot.effect_sequence.to_be_bytes());
@@ -929,6 +1931,23 @@ fn encode_snapshot(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
         push_bytes(&mut bytes, from.as_bytes())?;
         push_bytes(&mut bytes, to.as_bytes())?;
     }
+    bytes.extend_from_slice(
+        &u32::try_from(snapshot.loop_reentry.len())
+            .ok()?
+            .to_be_bytes(),
+    );
+    for node in &snapshot.loop_reentry {
+        bytes.extend_from_slice(&u64::try_from(*node).ok()?.to_be_bytes());
+    }
+    bytes.extend_from_slice(
+        &u32::try_from(snapshot.loop_counts.len())
+            .ok()?
+            .to_be_bytes(),
+    );
+    for (node, count) in &snapshot.loop_counts {
+        bytes.extend_from_slice(&u64::try_from(*node).ok()?.to_be_bytes());
+        bytes.extend_from_slice(&count.to_be_bytes());
+    }
     Some(bytes)
 }
 
@@ -945,10 +1964,15 @@ fn decode_snapshot(
     max_frames: usize,
 ) -> Result<MachineSnapshot, MachineProblem> {
     let mut input = SnapshotInput::new(bytes);
-    if input.take(8)? != b"MECP0001" {
+    let header = input.take(8)?;
+    let legacy = header == b"MECP0001";
+    if !legacy && header != b"MECP0002" {
         return Err(MachineProblem::IncompatibleSnapshot);
     }
     let schema_version = input.u32()?;
+    if (legacy && schema_version != 1) || (!legacy && schema_version != 2) {
+        return Err(MachineProblem::IncompatibleSnapshot);
+    }
     let program_counter =
         usize::try_from(input.u64()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
     let effect_sequence = input.u64()?;
@@ -992,6 +2016,40 @@ fn decode_snapshot(
             return Err(MachineProblem::IncompatibleSnapshot);
         }
     }
+    let mut loop_reentry = BTreeSet::new();
+    let mut loop_counts = BTreeMap::new();
+    if !legacy {
+        let reentry_count =
+            usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+        if reentry_count > max_frames {
+            return Err(MachineProblem::IncompatibleSnapshot);
+        }
+        for _ in 0..reentry_count {
+            let node =
+                usize::try_from(input.u64()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+            if !loop_reentry.insert(node) {
+                return Err(MachineProblem::IncompatibleSnapshot);
+            }
+        }
+        let loop_count =
+            usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+        if loop_count > max_frames {
+            return Err(MachineProblem::IncompatibleSnapshot);
+        }
+        for _ in 0..loop_count {
+            let node =
+                usize::try_from(input.u64()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+            let count = i128::from_be_bytes(
+                input
+                    .take(16)?
+                    .try_into()
+                    .map_err(|_| MachineProblem::IncompatibleSnapshot)?,
+            );
+            if loop_counts.insert(node, count).is_some() {
+                return Err(MachineProblem::IncompatibleSnapshot);
+            }
+        }
+    }
     if !input.finished() {
         return Err(MachineProblem::IncompatibleSnapshot);
     }
@@ -1003,6 +2061,8 @@ fn decode_snapshot(
         base_storage,
         perform_stack,
         altered_targets,
+        loop_reentry,
+        loop_counts,
     })
 }
 
@@ -1178,6 +2238,15 @@ fn validate_module(module: &Module) -> Result<(), MachineProblem> {
         || operations
             .iter()
             .any(|op| !supported.contains(&op.identity))
+        || operations.iter().any(|operation| {
+            operation
+                .attributes
+                .get("arguments")
+                .is_some_and(|attribute| match attribute {
+                    Attribute::Bytes(bytes) => decode_arguments(bytes).is_none(),
+                    _ => true,
+                })
+        })
     {
         return Err(MachineProblem::InvalidArtifact(
             "illegal operation or terminator".into(),
@@ -1190,6 +2259,8 @@ pub fn supported_operations() -> &'static BTreeSet<OperationIdentity> {
     SET.get_or_init(|| {
         let names = [
             "init",
+            "define",
+            "control",
             "accept",
             "add",
             "allocate",
@@ -1215,6 +2286,7 @@ pub fn supported_operations() -> &'static BTreeSet<OperationIdentity> {
             "json_parse",
             "move",
             "multiply",
+            "next_sentence",
             "open",
             "perform",
             "read",
@@ -1237,6 +2309,9 @@ pub fn supported_operations() -> &'static BTreeSet<OperationIdentity> {
     })
 }
 fn arguments(operation: &Operation) -> Vec<String> {
+    if let Some(Attribute::Bytes(bytes)) = operation.attributes.get("arguments") {
+        return decode_arguments(bytes).unwrap_or_default();
+    }
     operation
         .attributes
         .iter()
@@ -1247,14 +2322,135 @@ fn arguments(operation: &Operation) -> Vec<String> {
         })
         .collect()
 }
-fn argument(operation: &Operation, index: usize) -> Option<&str> {
+
+fn decode_arguments(bytes: &[u8]) -> Option<Vec<String>> {
+    let mut offset = 0usize;
+    let mut arguments = Vec::new();
+    while offset < bytes.len() {
+        let length = u64::from_be_bytes(bytes.get(offset..offset + 8)?.try_into().ok()?);
+        offset += 8;
+        let length = usize::try_from(length).ok()?;
+        let end = offset.checked_add(length)?;
+        arguments.push(String::from_utf8(bytes.get(offset..end)?.to_vec()).ok()?);
+        if arguments.len() > 65_536 {
+            return None;
+        }
+        offset = end;
+    }
+    Some(arguments)
+}
+
+type LayoutState = (
+    BTreeMap<String, LayoutMetadata>,
+    BTreeMap<String, Vec<String>>,
+);
+
+fn layout_metadata(operations: &[Operation]) -> Result<LayoutState, MachineProblem> {
+    let mut layouts = BTreeMap::new();
+    let mut simple = BTreeMap::<String, Vec<String>>::new();
+    for operation in operations
+        .iter()
+        .filter(|operation| operation.identity.name() == "define")
+    {
+        let name = text_attribute(operation, "name")?.to_ascii_uppercase();
+        let simple_name = text_attribute(operation, "simple_name")?.to_ascii_uppercase();
+        let category = match text_attribute(operation, "category")? {
+            "alphanumeric" => LayoutCategory::Alphanumeric,
+            "numeric_display" => LayoutCategory::NumericDisplay,
+            "numeric_edited" => LayoutCategory::NumericEdited,
+            "packed_decimal" => LayoutCategory::PackedDecimal,
+            "binary" => LayoutCategory::Binary,
+            "pointer" => LayoutCategory::Pointer,
+            "group" => LayoutCategory::Group,
+            "condition" => LayoutCategory::Condition,
+            "rename" => LayoutCategory::Rename,
+            _ => {
+                return Err(MachineProblem::InvalidArtifact(
+                    "unknown layout category".into(),
+                ));
+            }
+        };
+        let metadata = LayoutMetadata {
+            name: name.clone(),
+            simple_name: simple_name.clone(),
+            category,
+            picture: text_attribute(operation, "picture")?.to_string(),
+            digits: usize_attribute(operation, "digits")?,
+            scale: u32::try_from(usize_attribute(operation, "scale")?)
+                .map_err(|_| MachineProblem::InvalidOperation)?,
+            signed: integer_attribute(operation, "signed")? != 0,
+            sign_separate: integer_attribute(operation, "sign_separate")? != 0,
+            offset: usize_attribute(operation, "offset")?,
+            length: usize_attribute(operation, "length")?,
+            element_length: usize_attribute(operation, "element_length")?,
+            occurs: usize_attribute(operation, "occurs")?,
+            parent: match text_attribute(operation, "parent")? {
+                "" => None,
+                parent => Some(parent.to_ascii_uppercase()),
+            },
+            condition_values: text_attribute(operation, "condition_values")?
+                .split('\u{1f}')
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+                .collect(),
+        };
+        if layouts.insert(name.clone(), metadata).is_some() {
+            return Err(MachineProblem::InvalidArtifact(
+                "duplicate layout metadata".into(),
+            ));
+        }
+        if simple_name != "FILLER" {
+            simple.entry(simple_name).or_default().push(name);
+        }
+    }
+    Ok((layouts, simple))
+}
+
+fn text_attribute<'a>(operation: &'a Operation, name: &str) -> Result<&'a str, MachineProblem> {
     operation
         .attributes
-        .get(&format!("arg_{index:03}"))
-        .and_then(|value| match value {
-            Attribute::Text(text) => Some(text.as_str()),
+        .get(name)
+        .and_then(|attribute| match attribute {
+            Attribute::Text(value) => Some(value.as_str()),
             _ => None,
         })
+        .ok_or(MachineProblem::InvalidOperation)
+}
+
+fn optional_text_attribute<'a>(operation: &'a Operation, name: &str) -> Option<&'a str> {
+    operation
+        .attributes
+        .get(name)
+        .and_then(|attribute| match attribute {
+            Attribute::Text(value) => Some(value.as_str()),
+            _ => None,
+        })
+}
+
+fn integer_attribute(operation: &Operation, name: &str) -> Result<i64, MachineProblem> {
+    operation
+        .attributes
+        .get(name)
+        .and_then(|attribute| match attribute {
+            Attribute::Integer(value) => Some(*value),
+            _ => None,
+        })
+        .ok_or(MachineProblem::InvalidOperation)
+}
+
+fn optional_integer_attribute(operation: &Operation, name: &str) -> Option<i64> {
+    operation
+        .attributes
+        .get(name)
+        .and_then(|attribute| match attribute {
+            Attribute::Integer(value) => Some(*value),
+            _ => None,
+        })
+}
+
+fn usize_attribute(operation: &Operation, name: &str) -> Result<usize, MachineProblem> {
+    usize::try_from(integer_attribute(operation, name)?)
+        .map_err(|_| MachineProblem::InvalidOperation)
 }
 fn bytes_attribute<'a>(operation: &'a Operation, name: &str) -> Result<&'a [u8], MachineProblem> {
     operation
@@ -1274,6 +2470,47 @@ fn normalize(value: &str) -> String {
         .trim_matches(['\'', '"', '.', ','])
         .to_ascii_uppercase()
 }
+
+fn control_tokens(text: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut quote = None;
+    for character in text.chars() {
+        if matches!(character, '\'' | '"') {
+            current.push(character);
+            if quote == Some(character) {
+                quote = None;
+                tokens.push(std::mem::take(&mut current));
+            } else if quote.is_none() {
+                if current.len() > 1 {
+                    let quote = current.pop().expect("just pushed quote");
+                    tokens.push(std::mem::take(&mut current));
+                    current.push(quote);
+                }
+                quote = Some(character);
+            }
+        } else if quote.is_some() {
+            current.push(character);
+        } else if character.is_whitespace() || matches!(character, ',' | '(' | ')' | '=') {
+            if !current.is_empty() {
+                tokens.push(std::mem::take(&mut current).to_ascii_uppercase());
+            }
+            if matches!(character, '(' | ')' | '=') {
+                tokens.push(character.to_string());
+            }
+        } else {
+            current.push(character);
+        }
+    }
+    if !current.is_empty() {
+        tokens.push(if quote.is_some() {
+            current
+        } else {
+            current.to_ascii_uppercase()
+        });
+    }
+    tokens
+}
 fn compare(left: i128, operator: &str, right: i128) -> bool {
     match operator {
         "=" => left == right,
@@ -1284,6 +2521,572 @@ fn compare(left: i128, operator: &str, right: i128) -> bool {
         "<>" => left != right,
         _ => false,
     }
+}
+
+fn matching_close(tokens: &[String], open: usize) -> Option<usize> {
+    let mut depth = 0usize;
+    for (index, token) in tokens.iter().enumerate().skip(open) {
+        match token.as_str() {
+            "(" => depth = depth.checked_add(1)?,
+            ")" => {
+                depth = depth.checked_sub(1)?;
+                if depth == 0 {
+                    return Some(index);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn value_bytes(value: CobolValue) -> Result<Vec<u8>, MachineProblem> {
+    match value {
+        CobolValue::Bytes(bytes) => Ok(bytes),
+        CobolValue::Decimal(value) => Ok(decimal_string(value).into_bytes()),
+    }
+}
+
+fn value_decimal(value: CobolValue) -> Result<Decimal, MachineProblem> {
+    match value {
+        CobolValue::Decimal(value) => Ok(value),
+        CobolValue::Bytes(bytes) => {
+            decimal_text(&String::from_utf8_lossy(&bytes)).ok_or(MachineProblem::DataException)
+        }
+    }
+}
+
+fn strip_condition_parentheses(mut tokens: &[String]) -> &[String] {
+    while tokens.first().is_some_and(|token| token == "(")
+        && matching_close(tokens, 0) == Some(tokens.len().saturating_sub(1))
+    {
+        tokens = &tokens[1..tokens.len() - 1];
+    }
+    tokens
+}
+
+fn top_level_position(tokens: &[String], needle: &str) -> Option<usize> {
+    let mut depth = 0usize;
+    for (index, token) in tokens.iter().enumerate() {
+        match token.as_str() {
+            "(" => depth = depth.saturating_add(1),
+            ")" => depth = depth.saturating_sub(1),
+            _ if depth == 0 && token == needle => return Some(index),
+            _ => {}
+        }
+    }
+    None
+}
+
+fn padded_bytes(mut left: Vec<u8>, mut right: Vec<u8>) -> (Vec<u8>, Vec<u8>) {
+    let length = left.len().max(right.len());
+    left.resize(length, b' ');
+    right.resize(length, b' ');
+    (left, right)
+}
+
+const fn is_numeric(category: LayoutCategory) -> bool {
+    matches!(
+        category,
+        LayoutCategory::NumericDisplay
+            | LayoutCategory::NumericEdited
+            | LayoutCategory::PackedDecimal
+            | LayoutCategory::Binary
+    )
+}
+
+fn decimal_text(text: &str) -> Option<Decimal> {
+    let trimmed = text.trim().trim_matches(['\'', '"']);
+    if trimmed.is_empty() {
+        return None;
+    }
+    let negative = trimmed.starts_with('-') || (trimmed.starts_with('(') && trimmed.ends_with(')'));
+    let mut coefficient = 0i128;
+    let mut scale = 0u32;
+    let mut fractional = false;
+    let mut digits = 0usize;
+    for byte in trimmed.bytes() {
+        if byte.is_ascii_digit() {
+            coefficient = coefficient
+                .checked_mul(10)?
+                .checked_add(i128::from(byte - b'0'))?;
+            digits += 1;
+            if fractional {
+                scale = scale.checked_add(1)?;
+            }
+        } else if byte == b'.' && !fractional {
+            fractional = true;
+        } else if !matches!(byte, b'+' | b'-' | b',' | b'$' | b' ' | b'(' | b')') {
+            return None;
+        }
+    }
+    if digits == 0 {
+        return None;
+    }
+    Some(Decimal {
+        coefficient: if negative { -coefficient } else { coefficient },
+        scale,
+    })
+}
+
+fn decimal_string(value: Decimal) -> String {
+    let negative = value.coefficient < 0;
+    let mut digits = value.coefficient.unsigned_abs().to_string();
+    if value.scale > 0 {
+        let scale = value.scale as usize;
+        if digits.len() <= scale {
+            digits = format!("{}{}", "0".repeat(scale + 1 - digits.len()), digits);
+        }
+        digits.insert(digits.len() - scale, '.');
+    }
+    if negative {
+        digits.insert(0, '-');
+    }
+    digits
+}
+
+fn decimal_aligned(left: Decimal, right: Decimal) -> Result<(Decimal, Decimal), MachineProblem> {
+    let scale = left.scale.max(right.scale);
+    Ok((
+        decimal_rescale(left, scale)?,
+        decimal_rescale(right, scale)?,
+    ))
+}
+
+fn decimal_rescale(value: Decimal, scale: u32) -> Result<Decimal, MachineProblem> {
+    if value.scale == scale {
+        return Ok(value);
+    }
+    if value.scale < scale {
+        let factor = ten_power(scale - value.scale)?;
+        Ok(Decimal {
+            coefficient: value
+                .coefficient
+                .checked_mul(factor)
+                .ok_or(MachineProblem::SizeError)?,
+            scale,
+        })
+    } else {
+        let factor = ten_power(value.scale - scale)?;
+        Ok(Decimal {
+            coefficient: value.coefficient / factor,
+            scale,
+        })
+    }
+}
+
+fn decimal_rescale_rounded(value: Decimal, scale: u32) -> Result<Decimal, MachineProblem> {
+    if value.scale <= scale {
+        return decimal_rescale(value, scale);
+    }
+    let factor = ten_power(value.scale - scale)?;
+    let quotient = value.coefficient / factor;
+    let remainder = value.coefficient % factor;
+    let increment = if remainder.unsigned_abs().saturating_mul(2) >= factor as u128 {
+        value.coefficient.signum()
+    } else {
+        0
+    };
+    Ok(Decimal {
+        coefficient: quotient
+            .checked_add(increment)
+            .ok_or(MachineProblem::SizeError)?,
+        scale,
+    })
+}
+
+fn decimal_add(left: Decimal, right: Decimal) -> Result<Decimal, MachineProblem> {
+    let (left, right) = decimal_aligned(left, right)?;
+    Ok(Decimal {
+        coefficient: left
+            .coefficient
+            .checked_add(right.coefficient)
+            .ok_or(MachineProblem::SizeError)?,
+        scale: left.scale,
+    })
+}
+
+fn decimal_subtract(left: Decimal, right: Decimal) -> Result<Decimal, MachineProblem> {
+    let (left, right) = decimal_aligned(left, right)?;
+    Ok(Decimal {
+        coefficient: left
+            .coefficient
+            .checked_sub(right.coefficient)
+            .ok_or(MachineProblem::SizeError)?,
+        scale: left.scale,
+    })
+}
+
+fn decimal_multiply(left: Decimal, right: Decimal) -> Result<Decimal, MachineProblem> {
+    Ok(Decimal {
+        coefficient: left
+            .coefficient
+            .checked_mul(right.coefficient)
+            .ok_or(MachineProblem::SizeError)?,
+        scale: left
+            .scale
+            .checked_add(right.scale)
+            .ok_or(MachineProblem::SizeError)?,
+    })
+}
+
+fn decimal_divide(
+    dividend: Decimal,
+    divisor: Decimal,
+    result_scale: u32,
+) -> Result<Decimal, MachineProblem> {
+    if divisor.coefficient == 0 {
+        return Err(MachineProblem::SizeError);
+    }
+    let exponent = result_scale
+        .checked_add(divisor.scale)
+        .and_then(|value| value.checked_sub(dividend.scale))
+        .ok_or(MachineProblem::SizeError)?;
+    let numerator = dividend
+        .coefficient
+        .checked_mul(ten_power(exponent)?)
+        .ok_or(MachineProblem::SizeError)?;
+    Ok(Decimal {
+        coefficient: numerator / divisor.coefficient,
+        scale: result_scale,
+    })
+}
+
+fn ten_power(exponent: u32) -> Result<i128, MachineProblem> {
+    10i128
+        .checked_pow(exponent)
+        .ok_or(MachineProblem::SizeError)
+}
+
+fn decode_decimal(layout: &LayoutMetadata, bytes: &[u8]) -> Result<Decimal, MachineProblem> {
+    let coefficient = match layout.category {
+        LayoutCategory::NumericDisplay => decode_display(bytes, layout.sign_separate)?,
+        LayoutCategory::PackedDecimal => decode_packed(bytes)?,
+        LayoutCategory::Binary => decode_binary_integer(bytes)?,
+        LayoutCategory::NumericEdited => {
+            decimal_text(&String::from_utf8_lossy(bytes))
+                .ok_or(MachineProblem::DataException)?
+                .coefficient
+        }
+        _ => return Err(MachineProblem::DataException),
+    };
+    Ok(Decimal {
+        coefficient,
+        scale: layout.scale,
+    })
+}
+
+fn decode_display(bytes: &[u8], separate: bool) -> Result<i128, MachineProblem> {
+    let mut negative = false;
+    let mut digits = Vec::new();
+    for (index, byte) in bytes.iter().copied().enumerate() {
+        if separate && matches!(byte, b'+' | b'-') {
+            negative = byte == b'-';
+            continue;
+        }
+        let digit = if byte.is_ascii_digit() {
+            byte - b'0'
+        } else if let Some(position) = b"}JKLMNOPQR".iter().position(|value| *value == byte) {
+            negative = true;
+            position as u8
+        } else if let Some(position) = b"{ABCDEFGHI".iter().position(|value| *value == byte) {
+            position as u8
+        } else if byte == b' ' && index == 0 {
+            0
+        } else {
+            return Err(MachineProblem::DataException);
+        };
+        digits.push(digit);
+    }
+    let mut value = 0i128;
+    for digit in digits {
+        value = value
+            .checked_mul(10)
+            .and_then(|value| value.checked_add(i128::from(digit)))
+            .ok_or(MachineProblem::SizeError)?;
+    }
+    Ok(if negative { -value } else { value })
+}
+
+fn decode_packed(bytes: &[u8]) -> Result<i128, MachineProblem> {
+    if bytes.is_empty() {
+        return Err(MachineProblem::DataException);
+    }
+    let mut value = 0i128;
+    for (index, byte) in bytes.iter().copied().enumerate() {
+        let high = byte >> 4;
+        let low = byte & 0x0f;
+        if high > 9 {
+            return Err(MachineProblem::DataException);
+        }
+        value = value
+            .checked_mul(10)
+            .and_then(|value| value.checked_add(i128::from(high)))
+            .ok_or(MachineProblem::SizeError)?;
+        if index + 1 < bytes.len() {
+            if low > 9 {
+                return Err(MachineProblem::DataException);
+            }
+            value = value
+                .checked_mul(10)
+                .and_then(|value| value.checked_add(i128::from(low)))
+                .ok_or(MachineProblem::SizeError)?;
+        } else if !matches!(low, 0x0b..=0x0f) {
+            return Err(MachineProblem::DataException);
+        } else if matches!(low, 0x0b | 0x0d) {
+            value = -value;
+        }
+    }
+    Ok(value)
+}
+
+fn decode_binary_integer(bytes: &[u8]) -> Result<i128, MachineProblem> {
+    if bytes.is_empty() || bytes.len() > 16 {
+        return Err(MachineProblem::DataException);
+    }
+    let fill = if bytes[0] & 0x80 == 0 { 0 } else { 0xff };
+    let mut value = [fill; 16];
+    value[16 - bytes.len()..].copy_from_slice(bytes);
+    Ok(i128::from_be_bytes(value))
+}
+
+fn encode_decimal(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, MachineProblem> {
+    let digits = value.coefficient.unsigned_abs().to_string();
+    if layout.digits > 0 && digits.len() > layout.digits {
+        return Err(MachineProblem::SizeError);
+    }
+    match layout.category {
+        LayoutCategory::NumericDisplay => {
+            let digit_length = layout.length - usize::from(layout.sign_separate);
+            let mut output = vec![b'0'; digit_length];
+            let copy = digits.len().min(output.len());
+            let start = output.len() - copy;
+            output[start..].copy_from_slice(&digits.as_bytes()[digits.len() - copy..]);
+            if layout.signed && !layout.sign_separate && value.coefficient < 0 {
+                let last = output.last_mut().ok_or(MachineProblem::SizeError)?;
+                *last = b"}JKLMNOPQR"[usize::from(*last - b'0')];
+            }
+            if layout.sign_separate {
+                output.push(if value.coefficient < 0 { b'-' } else { b'+' });
+            }
+            Ok(output)
+        }
+        LayoutCategory::PackedDecimal => {
+            let digit_count = layout.length.saturating_mul(2).saturating_sub(1);
+            let mut nibbles = vec![0u8; digit_count];
+            let copy = digits.len().min(nibbles.len());
+            let start = nibbles.len() - copy;
+            for (slot, digit) in nibbles[start..]
+                .iter_mut()
+                .zip(digits.bytes().skip(digits.len() - copy))
+            {
+                *slot = digit - b'0';
+            }
+            nibbles.push(if value.coefficient < 0 { 0x0d } else { 0x0c });
+            Ok(nibbles
+                .chunks(2)
+                .map(|pair| (pair[0] << 4) | pair[1])
+                .collect())
+        }
+        LayoutCategory::Binary => {
+            let bytes = value.coefficient.to_be_bytes();
+            let output = bytes[bytes.len() - layout.length..].to_vec();
+            if decode_binary_integer(&output)? != value.coefficient {
+                return Err(MachineProblem::SizeError);
+            }
+            Ok(output)
+        }
+        LayoutCategory::NumericEdited => encode_edited(layout, value),
+        _ => Err(MachineProblem::DataException),
+    }
+}
+
+fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, MachineProblem> {
+    let mut digits = value.coefficient.unsigned_abs().to_string();
+    if digits.len() < layout.digits {
+        digits = format!("{}{}", "0".repeat(layout.digits - digits.len()), digits);
+    }
+    let mut digit_index = 0usize;
+    let mut output = Vec::with_capacity(layout.length);
+    for byte in layout.picture.bytes() {
+        match byte.to_ascii_uppercase() {
+            b'9' => {
+                output.push(*digits.as_bytes().get(digit_index).unwrap_or(&b'0'));
+                digit_index += 1;
+            }
+            b'Z' => {
+                let digit = *digits.as_bytes().get(digit_index).unwrap_or(&b'0');
+                output.push(if digit == b'0' && digit_index + 1 < layout.digits {
+                    b' '
+                } else {
+                    digit
+                });
+                digit_index += 1;
+            }
+            b'+' => output.push(if value.coefficient < 0 { b'-' } else { b'+' }),
+            b'-' => output.push(if value.coefficient < 0 { b'-' } else { b' ' }),
+            b'V' | b'S' => {}
+            other => output.push(other),
+        }
+    }
+    if output.len() != layout.length {
+        return Err(MachineProblem::UnsupportedForm);
+    }
+    Ok(output)
+}
+
+fn condition_matches(actual: &[u8], values: &[String]) -> Result<bool, MachineProblem> {
+    let actual = String::from_utf8_lossy(actual).trim().to_string();
+    let mut index = 0usize;
+    while index < values.len() {
+        let start = values[index].trim_matches(['\'', '"']).to_string();
+        if values
+            .get(index + 1)
+            .is_some_and(|value| value == "THRU" || value == "THROUGH")
+        {
+            let end = values
+                .get(index + 2)
+                .ok_or(MachineProblem::InvalidOperation)?
+                .trim_matches(['\'', '"']);
+            if actual.as_str() >= start.as_str() && actual.as_str() <= end {
+                return Ok(true);
+            }
+            index += 3;
+        } else {
+            if actual == start {
+                return Ok(true);
+            }
+            index += 1;
+        }
+    }
+    Ok(false)
+}
+
+fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    (!needle.is_empty())
+        .then(|| {
+            haystack
+                .windows(needle.len())
+                .position(|window| window == needle)
+        })
+        .flatten()
+}
+
+fn split_bytes<'a>(source: &'a [u8], delimiter: &[u8]) -> Vec<&'a [u8]> {
+    let mut fields = Vec::new();
+    let mut rest = source;
+    while let Some(position) = find_bytes(rest, delimiter) {
+        fields.push(&rest[..position]);
+        rest = &rest[position + delimiter.len()..];
+    }
+    fields.push(rest);
+    fields
+}
+
+fn replace_bytes(source: &[u8], from: &[u8], to: &[u8]) -> Result<Vec<u8>, MachineProblem> {
+    if from.is_empty() || from.len() != to.len() {
+        return Err(MachineProblem::UnsupportedForm);
+    }
+    let mut result = source.to_vec();
+    let mut offset = 0usize;
+    while let Some(position) = find_bytes(&result[offset..], from) {
+        let start = offset + position;
+        result[start..start + from.len()].copy_from_slice(to);
+        offset = start + from.len();
+    }
+    Ok(result)
+}
+
+fn count_bytes(source: &[u8], needle: &[u8]) -> Result<usize, MachineProblem> {
+    if needle.is_empty() {
+        return Err(MachineProblem::InvalidOperation);
+    }
+    let mut count = 0usize;
+    let mut offset = 0usize;
+    while let Some(position) = find_bytes(&source[offset..], needle) {
+        count = count
+            .checked_add(1)
+            .ok_or(MachineProblem::ResourceExhausted)?;
+        offset = offset
+            .checked_add(position + needle.len())
+            .ok_or(MachineProblem::ResourceExhausted)?;
+    }
+    Ok(count)
+}
+
+fn split_yyyymmdd(value: i128) -> Result<(i32, u32, u32), MachineProblem> {
+    let value = i64::try_from(value).map_err(|_| MachineProblem::DataException)?;
+    let year = i32::try_from(value / 10_000).map_err(|_| MachineProblem::DataException)?;
+    let month = u32::try_from((value / 100) % 100).map_err(|_| MachineProblem::DataException)?;
+    let day = u32::try_from(value % 100).map_err(|_| MachineProblem::DataException)?;
+    if !valid_date(year, month, day) {
+        return Err(MachineProblem::DataException);
+    }
+    Ok((year, month, day))
+}
+
+fn cobol_integer_of_date(year: i32, month: u32, day: u32) -> Result<i64, MachineProblem> {
+    if !valid_date(year, month, day) || !(1601..=9999).contains(&year) {
+        return Err(MachineProblem::DataException);
+    }
+    let base = days_from_civil(1600, 12, 31);
+    days_from_civil(year, month, day)
+        .checked_sub(base)
+        .ok_or(MachineProblem::DataException)
+}
+
+fn cobol_date_of_integer(value: i64) -> Result<(i32, u32, u32), MachineProblem> {
+    if value <= 0 {
+        return Err(MachineProblem::DataException);
+    }
+    let base = days_from_civil(1600, 12, 31);
+    let days = base
+        .checked_add(value)
+        .ok_or(MachineProblem::DataException)?;
+    let date = civil_from_days(days);
+    if date.0 > 9999 {
+        return Err(MachineProblem::DataException);
+    }
+    Ok(date)
+}
+
+fn valid_date(year: i32, month: u32, day: u32) -> bool {
+    if year <= 0 || !(1..=12).contains(&month) || day == 0 {
+        return false;
+    }
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let length = match month {
+        2 if leap => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    };
+    day <= length
+}
+
+fn days_from_civil(year: i32, month: u32, day: u32) -> i64 {
+    let year = i64::from(year) - i64::from(month <= 2);
+    let era = if year >= 0 { year } else { year - 399 } / 400;
+    let year_of_era = year - era * 400;
+    let month = i64::from(month);
+    let day_of_year = (153 * (month + if month > 2 { -3 } else { 9 }) + 2) / 5 + i64::from(day) - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    era * 146_097 + day_of_era - 719_468
+}
+
+fn civil_from_days(days: i64) -> (i32, u32, u32) {
+    let days = days + 719_468;
+    let era = if days >= 0 { days } else { days - 146_096 } / 146_097;
+    let day_of_era = days - era * 146_097;
+    let year_of_era =
+        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let mut year = year_of_era + era * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_prime = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * month_prime + 2) / 5 + 1;
+    let month = month_prime + if month_prime < 10 { 3 } else { -9 };
+    year += i64::from(month <= 2);
+    (year as i32, month as u32, day as u32)
 }
 fn empty_payload() -> Result<BoundedPayload, MachineProblem> {
     BoundedPayload::new(
@@ -1317,6 +3120,8 @@ pub enum MachineProblem {
     UnknownLabel,
     DataException,
     SizeError,
+    SubscriptError,
+    ReferenceModificationError,
     ResourceExhausted,
     UnexpectedResume,
     UnexpectedHostResult,

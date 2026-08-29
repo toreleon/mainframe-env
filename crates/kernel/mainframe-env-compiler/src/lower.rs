@@ -1,4 +1,4 @@
-use crate::{CobolHir, StatementKind};
+use crate::{CobolHir, ControlEdgeKind, ControlRole, ControlScope, DataCategory, StatementKind};
 use mainframe_env_ir::{
     Attribute, Effect, IrLimits, LegalityProfile, Module, ModuleBuilder, OperationCatalog,
     OperationIdentity, OperationSchema, StorageReference,
@@ -8,21 +8,39 @@ use std::collections::{BTreeMap, BTreeSet};
 pub const CORE_NAMESPACE: &str = "mainframe.core.cobol";
 
 pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, LowerProblem> {
-    if !hir.unsupported().is_empty() {
+    let mut unsupported = hir.unsupported();
+    let structured = hir.control_nodes.iter().any(|start| {
+        start.role == ControlRole::BlockStart
+            && hir.control_nodes.iter().any(|end| {
+                end.role == ControlRole::BlockEnd
+                    && end.parent == Some(start.id)
+                    && end.line != start.line
+            })
+    });
+    if structured {
+        unsupported.remove(&StatementKind::NextSentence);
+    }
+    if !unsupported.is_empty() {
         return Err(LowerProblem::UnsupportedConstruct);
     }
     let mut builder = ModuleBuilder::new(limits);
     let mut storage = BTreeMap::new();
+    let storage_bytes = hir
+        .layouts
+        .iter()
+        .map(|layout| layout.offset.saturating_add(layout.length))
+        .max()
+        .unwrap_or(0);
+    let program_storage = (storage_bytes > 0)
+        .then(|| builder.add_storage("__program_storage", storage_bytes as u64, None))
+        .transpose()
+        .map_err(|_| LowerProblem::InvalidLayout)?;
     for layout in hir.layouts.iter().filter(|layout| layout.length > 0) {
-        let alias = layout
-            .alias_of
-            .as_ref()
-            .and_then(|name| storage.get(name))
-            .map(|id| StorageReference {
-                storage: *id,
-                offset: 0,
-                length: layout.length as u64,
-            });
+        let alias = program_storage.map(|id| StorageReference {
+            storage: id,
+            offset: layout.offset as u64,
+            length: layout.length as u64,
+        });
         let id = builder
             .add_storage(
                 layout.qualified_name.to_ascii_lowercase(),
@@ -38,10 +56,64 @@ pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, 
     let block = builder
         .add_block(region)
         .map_err(|_| LowerProblem::LimitExceeded)?;
+    for layout in &hir.layouts {
+        let attributes = BTreeMap::from([
+            (
+                "name".into(),
+                Attribute::Text(layout.qualified_name.clone()),
+            ),
+            ("simple_name".into(), Attribute::Text(layout.name.clone())),
+            (
+                "category".into(),
+                Attribute::Text(category_slug(layout.category).into()),
+            ),
+            (
+                "picture".into(),
+                Attribute::Text(layout.picture.clone().unwrap_or_default()),
+            ),
+            ("digits".into(), Attribute::Integer(layout.digits as i64)),
+            ("scale".into(), Attribute::Integer(layout.scale as i64)),
+            (
+                "signed".into(),
+                Attribute::Integer(i64::from(layout.signed)),
+            ),
+            (
+                "sign_separate".into(),
+                Attribute::Integer(i64::from(layout.sign_separate)),
+            ),
+            ("offset".into(), Attribute::Integer(layout.offset as i64)),
+            ("length".into(), Attribute::Integer(layout.length as i64)),
+            (
+                "element_length".into(),
+                Attribute::Integer(layout.element_length as i64),
+            ),
+            ("occurs".into(), Attribute::Integer(layout.occurs as i64)),
+            (
+                "parent".into(),
+                Attribute::Text(layout.parent.clone().unwrap_or_default()),
+            ),
+            (
+                "condition_values".into(),
+                Attribute::Text(layout.condition_values.join("\u{1f}")),
+            ),
+        ]);
+        builder
+            .add_operation(
+                block,
+                core_identity("define")?,
+                Vec::new(),
+                0,
+                attributes,
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .map_err(|_| LowerProblem::LimitExceeded)?;
+    }
     for layout in hir
         .layouts
         .iter()
-        .filter(|layout| layout.length > 0 && layout.alias_of.is_none())
+        .filter(|layout| layout.length > 0 && layout.parent.is_none() && layout.alias_of.is_none())
     {
         let id = *storage
             .get(&layout.qualified_name)
@@ -72,61 +144,184 @@ pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, 
             )
             .map_err(|_| LowerProblem::LimitExceeded)?;
     }
-    for statement in &hir.statements {
-        let name = match statement.kind {
-            StatementKind::ProgramEnd => "halt",
-            other => other.slug(),
-        };
-        let mut attributes =
-            BTreeMap::from([("line".into(), Attribute::Integer(statement.line as i64))]);
-        for (index, argument) in statement.arguments.iter().enumerate() {
-            attributes.insert(format!("arg_{index:03}"), Attribute::Text(argument.clone()));
-        }
-        let mut references = Vec::new();
-        let mut seen = BTreeSet::new();
-        for argument in &statement.arguments {
-            let normalized = argument.trim_matches(['\'', '"']).to_ascii_uppercase();
-            if seen.insert(normalized.clone())
-                && let Some(layout) = hir
-                    .layouts
-                    .iter()
-                    .find(|layout| layout.name == normalized && layout.length > 0)
-            {
-                let id = *storage
-                    .get(&layout.qualified_name)
-                    .ok_or(LowerProblem::InvalidLayout)?;
-                references.push(StorageReference {
-                    storage: id,
-                    offset: 0,
-                    length: layout.length as u64,
-                });
-            }
-        }
-        builder
-            .add_operation(
+    if structured {
+        lower_structured(hir, &mut builder, block, &storage)?;
+    } else {
+        for statement in &hir.statements {
+            lower_statement(
+                statement,
+                hir,
+                &mut builder,
                 block,
-                core_identity(name)?,
-                Vec::new(),
-                0,
-                attributes,
-                crate::hir::effects(statement.kind),
-                references,
-                None,
-            )
-            .map_err(|_| LowerProblem::LimitExceeded)?;
+                &storage,
+                BTreeMap::new(),
+            )?;
+        }
     }
     builder.finish().map_err(|_| LowerProblem::LimitExceeded)
 }
 
+fn lower_structured(
+    hir: &CobolHir,
+    builder: &mut ModuleBuilder,
+    block: mainframe_env_ir::BlockId,
+    storage: &BTreeMap<String, mainframe_env_ir::StorageId>,
+) -> Result<(), LowerProblem> {
+    for node in &hir.control_nodes {
+        let mut control = BTreeMap::from([
+            ("control_node".into(), Attribute::Integer(node.id as i64)),
+            (
+                "control_role".into(),
+                Attribute::Text(control_role_slug(node.role).into()),
+            ),
+            (
+                "control_scope".into(),
+                Attribute::Text(node.scope.map(control_scope_slug).unwrap_or("").into()),
+            ),
+            (
+                "control_parent".into(),
+                Attribute::Integer(node.parent.map_or(-1, |parent| parent as i64)),
+            ),
+            ("control_text".into(), Attribute::Text(node.text.clone())),
+        ]);
+        for edge in hir.control_edges.iter().filter(|edge| edge.from == node.id) {
+            control
+                .entry(edge_attribute(edge.kind).into())
+                .or_insert(Attribute::Integer(edge.to as i64));
+        }
+        if node.role == ControlRole::Branch {
+            let false_target = hir
+                .control_nodes
+                .iter()
+                .skip(node.id + 1)
+                .find(|candidate| {
+                    candidate.parent == node.parent
+                        && matches!(candidate.role, ControlRole::Branch | ControlRole::BlockEnd)
+                })
+                .map(|candidate| candidate.id)
+                .ok_or(LowerProblem::InvalidOperation)?;
+            control.insert(
+                "edge_branch_false".into(),
+                Attribute::Integer(false_target as i64),
+            );
+        }
+        if let Some(statement) = node.statement.and_then(|index| hir.statements.get(index)) {
+            lower_statement(statement, hir, builder, block, storage, control)?;
+        } else {
+            builder
+                .add_operation(
+                    block,
+                    core_identity("control")?,
+                    Vec::new(),
+                    0,
+                    control,
+                    vec![Effect::ProgramControl, Effect::Condition],
+                    Vec::new(),
+                    None,
+                )
+                .map_err(|_| LowerProblem::LimitExceeded)?;
+        }
+    }
+    builder
+        .add_operation(
+            block,
+            core_identity("halt")?,
+            Vec::new(),
+            0,
+            BTreeMap::new(),
+            Vec::new(),
+            Vec::new(),
+            None,
+        )
+        .map_err(|_| LowerProblem::LimitExceeded)?;
+    Ok(())
+}
+
+fn lower_statement(
+    statement: &crate::HirStatement,
+    hir: &CobolHir,
+    builder: &mut ModuleBuilder,
+    block: mainframe_env_ir::BlockId,
+    storage: &BTreeMap<String, mainframe_env_ir::StorageId>,
+    mut attributes: BTreeMap<String, Attribute>,
+) -> Result<(), LowerProblem> {
+    let name = match statement.kind {
+        StatementKind::ProgramEnd => "halt",
+        other => other.slug(),
+    };
+    attributes.insert("line".into(), Attribute::Integer(statement.line as i64));
+    attributes.insert(
+        "arguments".into(),
+        Attribute::Bytes(encode_arguments(&statement.arguments)),
+    );
+    let mut references = Vec::new();
+    let mut seen = BTreeSet::new();
+    for argument in &statement.arguments {
+        let normalized = argument.trim_matches(['\'', '"']).to_ascii_uppercase();
+        if seen.insert(normalized.clone())
+            && let Some(layout) = hir
+                .layouts
+                .iter()
+                .find(|layout| layout.name == normalized && layout.length > 0)
+        {
+            let id = *storage
+                .get(&layout.qualified_name)
+                .ok_or(LowerProblem::InvalidLayout)?;
+            references.push(StorageReference {
+                storage: id,
+                offset: 0,
+                length: layout.length as u64,
+            });
+        }
+    }
+    builder
+        .add_operation(
+            block,
+            core_identity(name)?,
+            Vec::new(),
+            0,
+            attributes,
+            crate::hir::effects(statement.kind),
+            references,
+            None,
+        )
+        .map_err(|_| LowerProblem::LimitExceeded)?;
+    Ok(())
+}
+
+fn encode_arguments(arguments: &[String]) -> Vec<u8> {
+    let mut encoded = Vec::new();
+    for argument in arguments {
+        encoded.extend_from_slice(&(argument.len() as u64).to_be_bytes());
+        encoded.extend_from_slice(argument.as_bytes());
+    }
+    encoded
+}
+
 pub fn core_mir_catalog() -> OperationCatalog {
     let mut catalog = OperationCatalog::default();
+    catalog
+        .register(OperationSchema::pure(
+            core_identity("define").expect("static identity"),
+            0,
+            0,
+        ))
+        .expect("unique define");
+    let mut control =
+        OperationSchema::pure(core_identity("control").expect("static identity"), 0, 0);
+    control.allowed_effects = BTreeSet::from([Effect::ProgramControl, Effect::Condition]);
+    catalog.register(control).expect("unique control");
     let mut init = OperationSchema::pure(core_identity("init").expect("static identity"), 0, 0);
     init.allowed_effects = BTreeSet::from([Effect::MemoryWrite]);
     catalog.register(init).expect("unique init");
     for kind in StatementKind::frozen()
         .into_iter()
         .filter(|kind| kind.supported())
-        .chain([StatementKind::Label, StatementKind::ProgramEnd])
+        .chain([
+            StatementKind::NextSentence,
+            StatementKind::Label,
+            StatementKind::ProgramEnd,
+        ])
     {
         let name = if kind == StatementKind::ProgramEnd {
             "halt"
@@ -140,6 +335,56 @@ pub fn core_mir_catalog() -> OperationCatalog {
         catalog.register(schema).expect("unique core operation");
     }
     catalog
+}
+
+const fn control_role_slug(role: ControlRole) -> &'static str {
+    match role {
+        ControlRole::Statement => "statement",
+        ControlRole::BlockStart => "block_start",
+        ControlRole::Branch => "branch",
+        ControlRole::BlockEnd => "block_end",
+        ControlRole::Label => "label",
+        ControlRole::ExternalTarget => "external_target",
+        ControlRole::Recovered => "recovered",
+        ControlRole::Transfer => "transfer",
+        ControlRole::Terminator => "terminator",
+    }
+}
+
+const fn control_scope_slug(scope: ControlScope) -> &'static str {
+    match scope {
+        ControlScope::If => "if",
+        ControlScope::Evaluate => "evaluate",
+        ControlScope::Search => "search",
+        ControlScope::Perform => "perform",
+    }
+}
+
+const fn edge_attribute(kind: ControlEdgeKind) -> &'static str {
+    match kind {
+        ControlEdgeKind::Fallthrough => "edge_fallthrough",
+        ControlEdgeKind::Branch => "edge_branch",
+        ControlEdgeKind::True => "edge_true",
+        ControlEdgeKind::False => "edge_false",
+        ControlEdgeKind::Loop => "edge_loop",
+        ControlEdgeKind::Call => "edge_call",
+        ControlEdgeKind::Transfer => "edge_transfer",
+        ControlEdgeKind::Return => "edge_return",
+    }
+}
+
+const fn category_slug(category: DataCategory) -> &'static str {
+    match category {
+        DataCategory::Alphanumeric => "alphanumeric",
+        DataCategory::NumericDisplay => "numeric_display",
+        DataCategory::NumericEdited => "numeric_edited",
+        DataCategory::PackedDecimal => "packed_decimal",
+        DataCategory::Binary => "binary",
+        DataCategory::Pointer => "pointer",
+        DataCategory::Group => "group",
+        DataCategory::Condition => "condition",
+        DataCategory::Rename => "rename",
+    }
 }
 
 pub fn core_mir_profile() -> LegalityProfile {
