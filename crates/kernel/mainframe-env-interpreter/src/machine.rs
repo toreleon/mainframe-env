@@ -3,13 +3,13 @@ use mainframe_env_diagnostics::{
     DiagnosticCode, DiagnosticLimits, ExecutionProblem, FailureCategory, Phase,
 };
 use mainframe_env_execution_api::{
-    BoundedPayload, Completion, IdempotencyKey, Invocation, InvocationLimits, Machine,
-    MachineDrive, MachineResume, Quantum,
+    Abend, BoundedPayload, Completion, Condition, IdempotencyKey, Invocation, InvocationLimits,
+    Machine, MachineDrive, MachineResume, Quantum, Selector, Suspension, Transfer,
 };
 use mainframe_env_host_api::{
-    CicsConditionPolicy, CicsOperation, CicsRequest, DatasetName, DatasetRequest, EffectRequest,
-    EffectResult, HostLimits, HostProblem, HostRequest, HostResult, Mutation, ProgramName,
-    ProgramRequest, TerminalRequest,
+    CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest, DatasetName, DatasetRequest,
+    EffectRequest, EffectResult, HostLimits, HostProblem, HostRequest, HostResult, Mutation,
+    ProgramName, ProgramRequest, TerminalRequest,
 };
 use mainframe_env_ir::{
     Attribute, CodecLimits, Module, Operation, OperationIdentity, StorageId, decode_binary,
@@ -30,6 +30,7 @@ struct StorageView {
 enum PendingKind {
     Accept { target: String },
     DatasetRead { target: Option<String> },
+    Cics,
     Ignore,
 }
 
@@ -47,6 +48,7 @@ pub struct MachineSnapshot {
     pub output: Vec<u8>,
     pub base_storage: Vec<Vec<u8>>,
     pub perform_stack: Vec<usize>,
+    pub altered_targets: BTreeMap<String, String>,
 }
 
 pub struct ReferenceMachine {
@@ -62,6 +64,7 @@ pub struct ReferenceMachine {
     effect_sequence: u64,
     pending: Option<Pending>,
     perform_stack: Vec<usize>,
+    deferred_drive: Option<MachineDrive<EffectRequest>>,
 }
 
 impl ReferenceMachine {
@@ -103,6 +106,7 @@ impl ReferenceMachine {
             effect_sequence: 0,
             pending: None,
             perform_stack: Vec::new(),
+            deferred_drive: None,
         })
     }
 
@@ -115,6 +119,7 @@ impl ReferenceMachine {
             output: self.output.clone(),
             base_storage: self.bases.clone(),
             perform_stack: self.perform_stack.clone(),
+            altered_targets: self.altered.clone(),
         }
     }
 
@@ -131,8 +136,23 @@ impl ReferenceMachine {
         self.output = snapshot.output;
         self.bases = snapshot.base_storage;
         self.perform_stack = snapshot.perform_stack;
+        self.altered = snapshot.altered_targets;
         self.pending = None;
+        self.deferred_drive = None;
         Ok(())
+    }
+
+    pub fn restore_checkpoint(&mut self, payload: &BoundedPayload) -> Result<(), MachineProblem> {
+        if payload.schema() != "mainframe-env.reference-machine-checkpoint@1" {
+            return Err(MachineProblem::IncompatibleSnapshot);
+        }
+        let snapshot = decode_snapshot(
+            payload.bytes(),
+            self.invocation.limits.max_storage_bytes as usize,
+            self.invocation.limits.max_output_bytes as usize,
+            self.invocation.limits.max_frames as usize,
+        )?;
+        self.restore(snapshot)
     }
 
     #[must_use]
@@ -168,6 +188,45 @@ impl ReferenceMachine {
                 if let Some(record) = records.first() {
                     self.write(&target, record)?;
                 }
+            }
+            (PendingKind::Cics, HostResult::Cics(response)) => {
+                self.deferred_drive = match response.disposition {
+                    CicsDisposition::Complete => {
+                        (response.response != 0).then_some(MachineDrive::Condition(Condition {
+                            name: response.condition,
+                            response: response.response,
+                            response2: response.response2,
+                            handled: false,
+                        }))
+                    }
+                    CicsDisposition::Suspended => Some(MachineDrive::Suspended(Suspension {
+                        kind: "cics-terminal".into(),
+                        resume_token: format!(
+                            "{}:{}",
+                            self.invocation.run_unit_id, self.effect_sequence
+                        ),
+                        state_bytes: response.payload.bytes().len() as u64,
+                    })),
+                    CicsDisposition::Transfer => {
+                        let target = response
+                            .target
+                            .ok_or(MachineProblem::UnexpectedHostResult)?;
+                        Some(MachineDrive::Transfer(Transfer {
+                            selector: Selector::new(target, InvocationLimits::default())
+                                .map_err(|_| MachineProblem::UnexpectedHostResult)?,
+                            payload: response.payload,
+                            replace_frame: true,
+                        }))
+                    }
+                    CicsDisposition::Returned => Some(MachineDrive::Completed(self.complete()?)),
+                    CicsDisposition::Abended => Some(MachineDrive::Abend(Abend {
+                        code: response.condition,
+                        reason: Some(format!(
+                            "EIBRESP={} EIBRESP2={}",
+                            response.response, response.response2
+                        )),
+                    })),
+                };
             }
             (PendingKind::DatasetRead { .. } | PendingKind::Ignore, _) => {}
             _ => return Err(MachineProblem::UnexpectedHostResult),
@@ -380,7 +439,7 @@ impl ReferenceMachine {
                 condition_policy,
                 mutation,
             }),
-            PendingKind::Ignore,
+            PendingKind::Cics,
         )
     }
     fn effect(&mut self, request: HostRequest, kind: PendingKind) -> Result<Step, MachineProblem> {
@@ -774,6 +833,9 @@ impl Machine for ReferenceMachine {
                 }
                 _ => return Err(MachineProblem::UnexpectedResume),
             }
+            if let Some(drive) = self.deferred_drive.take() {
+                return Ok(drive);
+            }
             let mut steps = 0;
             while steps < quantum.max_steps {
                 if self.pc >= self.operations.len() {
@@ -797,6 +859,194 @@ impl Machine for ReferenceMachine {
             Ok(drive) => drive,
             Err(problem) => MachineDrive::Failed(problem.execution_problem()),
         }
+    }
+
+    fn checkpoint(&self) -> Option<BoundedPayload> {
+        if self.pending.is_some() {
+            return None;
+        }
+        let bytes = encode_snapshot(&self.snapshot())?;
+        BoundedPayload::new(
+            "mainframe-env.reference-machine-checkpoint@1",
+            bytes,
+            InvocationLimits {
+                max_payload_bytes: usize::try_from(
+                    self.invocation
+                        .limits
+                        .max_storage_bytes
+                        .saturating_add(self.invocation.limits.max_output_bytes)
+                        .saturating_add(1024 * 1024),
+                )
+                .ok()?,
+                ..InvocationLimits::default()
+            },
+        )
+        .ok()
+    }
+
+    fn effect_sequence(&self) -> u64 {
+        self.effect_sequence
+    }
+}
+
+fn encode_snapshot(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
+    let mut bytes = b"MECP0001".to_vec();
+    bytes.extend_from_slice(&snapshot.schema_version.to_be_bytes());
+    bytes.extend_from_slice(&u64::try_from(snapshot.program_counter).ok()?.to_be_bytes());
+    bytes.extend_from_slice(&snapshot.effect_sequence.to_be_bytes());
+    push_bytes(&mut bytes, &snapshot.output)?;
+    bytes.extend_from_slice(
+        &u32::try_from(snapshot.base_storage.len())
+            .ok()?
+            .to_be_bytes(),
+    );
+    for storage in &snapshot.base_storage {
+        push_bytes(&mut bytes, storage)?;
+    }
+    bytes.extend_from_slice(
+        &u32::try_from(snapshot.perform_stack.len())
+            .ok()?
+            .to_be_bytes(),
+    );
+    for target in &snapshot.perform_stack {
+        bytes.extend_from_slice(&u64::try_from(*target).ok()?.to_be_bytes());
+    }
+    bytes.extend_from_slice(
+        &u32::try_from(snapshot.altered_targets.len())
+            .ok()?
+            .to_be_bytes(),
+    );
+    for (from, to) in &snapshot.altered_targets {
+        push_bytes(&mut bytes, from.as_bytes())?;
+        push_bytes(&mut bytes, to.as_bytes())?;
+    }
+    Some(bytes)
+}
+
+fn push_bytes(output: &mut Vec<u8>, value: &[u8]) -> Option<()> {
+    output.extend_from_slice(&u64::try_from(value.len()).ok()?.to_be_bytes());
+    output.extend_from_slice(value);
+    Some(())
+}
+
+fn decode_snapshot(
+    bytes: &[u8],
+    max_storage: usize,
+    max_output: usize,
+    max_frames: usize,
+) -> Result<MachineSnapshot, MachineProblem> {
+    let mut input = SnapshotInput::new(bytes);
+    if input.take(8)? != b"MECP0001" {
+        return Err(MachineProblem::IncompatibleSnapshot);
+    }
+    let schema_version = input.u32()?;
+    let program_counter =
+        usize::try_from(input.u64()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+    let effect_sequence = input.u64()?;
+    let output = input.bytes(max_output)?;
+    let base_count =
+        usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+    if base_count > max_frames.saturating_mul(1024) {
+        return Err(MachineProblem::IncompatibleSnapshot);
+    }
+    let mut remaining_storage = max_storage;
+    let mut base_storage = Vec::with_capacity(base_count);
+    for _ in 0..base_count {
+        let storage = input.bytes(remaining_storage)?;
+        remaining_storage = remaining_storage
+            .checked_sub(storage.len())
+            .ok_or(MachineProblem::IncompatibleSnapshot)?;
+        base_storage.push(storage);
+    }
+    let stack_count =
+        usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+    if stack_count > max_frames {
+        return Err(MachineProblem::IncompatibleSnapshot);
+    }
+    let mut perform_stack = Vec::with_capacity(stack_count);
+    for _ in 0..stack_count {
+        perform_stack
+            .push(usize::try_from(input.u64()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?);
+    }
+    let altered_count =
+        usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+    if altered_count > max_frames.saturating_mul(4) {
+        return Err(MachineProblem::IncompatibleSnapshot);
+    }
+    let mut altered_targets = BTreeMap::new();
+    for _ in 0..altered_count {
+        let from = String::from_utf8(input.bytes(4096)?)
+            .map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+        let to = String::from_utf8(input.bytes(4096)?)
+            .map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+        if altered_targets.insert(from, to).is_some() {
+            return Err(MachineProblem::IncompatibleSnapshot);
+        }
+    }
+    if !input.finished() {
+        return Err(MachineProblem::IncompatibleSnapshot);
+    }
+    Ok(MachineSnapshot {
+        schema_version,
+        program_counter,
+        effect_sequence,
+        output,
+        base_storage,
+        perform_stack,
+        altered_targets,
+    })
+}
+
+struct SnapshotInput<'a> {
+    bytes: &'a [u8],
+    offset: usize,
+}
+
+impl<'a> SnapshotInput<'a> {
+    const fn new(bytes: &'a [u8]) -> Self {
+        Self { bytes, offset: 0 }
+    }
+
+    fn take(&mut self, length: usize) -> Result<&'a [u8], MachineProblem> {
+        let end = self
+            .offset
+            .checked_add(length)
+            .ok_or(MachineProblem::IncompatibleSnapshot)?;
+        let value = self
+            .bytes
+            .get(self.offset..end)
+            .ok_or(MachineProblem::IncompatibleSnapshot)?;
+        self.offset = end;
+        Ok(value)
+    }
+
+    fn u32(&mut self) -> Result<u32, MachineProblem> {
+        Ok(u32::from_be_bytes(
+            self.take(4)?
+                .try_into()
+                .map_err(|_| MachineProblem::IncompatibleSnapshot)?,
+        ))
+    }
+
+    fn u64(&mut self) -> Result<u64, MachineProblem> {
+        Ok(u64::from_be_bytes(
+            self.take(8)?
+                .try_into()
+                .map_err(|_| MachineProblem::IncompatibleSnapshot)?,
+        ))
+    }
+
+    fn bytes(&mut self, max: usize) -> Result<Vec<u8>, MachineProblem> {
+        let length =
+            usize::try_from(self.u64()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+        if length > max {
+            return Err(MachineProblem::IncompatibleSnapshot);
+        }
+        Ok(self.take(length)?.to_vec())
+    }
+
+    fn finished(&self) -> bool {
+        self.offset == self.bytes.len()
     }
 }
 
@@ -1197,6 +1447,33 @@ mod tests {
             m.drive(MachineResume::Start, Quantum::new(100, 1024).unwrap()),
             MachineDrive::Failed(_)
         ));
+    }
+    #[test]
+    fn checkpoint_roundtrip_restores_exact_machine_state_and_rejects_corruption() {
+        let invocation = invocation();
+        let mut first =
+            ReferenceMachine::from_binary(&binary(), invocation.clone(), CodecLimits::default())
+                .unwrap();
+        assert_eq!(
+            first.drive(MachineResume::Start, Quantum::new(1, 1024).unwrap()),
+            MachineDrive::Continue
+        );
+        let checkpoint = first.checkpoint().unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(&binary(), invocation, CodecLimits::default()).unwrap();
+        restored.restore_checkpoint(&checkpoint).unwrap();
+        let first_done = first.drive(MachineResume::Start, Quantum::new(100, 1024).unwrap());
+        let restored_done = restored.drive(MachineResume::Start, Quantum::new(100, 1024).unwrap());
+        assert_eq!(first_done, restored_done);
+
+        let mut damaged = checkpoint.bytes().to_vec();
+        damaged.push(0);
+        let damaged =
+            BoundedPayload::new(checkpoint.schema(), damaged, InvocationLimits::default()).unwrap();
+        assert_eq!(
+            restored.restore_checkpoint(&damaged),
+            Err(MachineProblem::IncompatibleSnapshot)
+        );
     }
     #[test]
     fn cics_tokens_lower_to_named_typed_arguments() {

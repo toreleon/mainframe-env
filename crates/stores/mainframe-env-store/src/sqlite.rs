@@ -1,5 +1,7 @@
 use crate::runtime::{AdapterRuntime, block_on};
-use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
+use mainframe_env_store_api::{
+    ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
+};
 use sqlx::Row;
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use std::future::Future;
@@ -263,6 +265,82 @@ impl ProviderStateStore for SqliteStateStore {
                     .rows_affected();
             if inserted != 1 || deleted != 1 {
                 return Err(StoreError::Conflict);
+            }
+            transaction
+                .commit()
+                .await
+                .map_err(|error| StoreError::Infrastructure(error.to_string()))
+        })?
+    }
+
+    fn put_provider_states_atomic(
+        &self,
+        writes: Vec<ProviderStateWrite>,
+    ) -> Result<(), StoreError> {
+        if writes.is_empty()
+            || writes
+                .iter()
+                .any(|write| write.record.payload.len() > self.max_payload_bytes)
+        {
+            return Err(StoreError::PayloadTooLarge);
+        }
+        block_on(&self.runtime, async {
+            let mut transaction = self
+                .pool
+                .begin()
+                .await
+                .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
+            let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM provider_state")
+                .fetch_one(&mut *transaction)
+                .await
+                .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
+            let creates = writes
+                .iter()
+                .filter(|write| write.expected_version.is_none())
+                .count();
+            if usize::try_from(count)
+                .map_err(|_| StoreError::CapacityExceeded)?
+                .checked_add(creates)
+                .is_none_or(|total| total > self.max_rows)
+            {
+                return Err(StoreError::CapacityExceeded);
+            }
+            for write in writes {
+                let record = write.record;
+                let affected = if let Some(expected) = write.expected_version {
+                    if record.version != expected.checked_add(1).ok_or(StoreError::Conflict)? {
+                        return Err(StoreError::Conflict);
+                    }
+                    sqlx::query(
+                        "UPDATE provider_state SET version=?,payload=? WHERE namespace=? AND key=? AND version=?",
+                    )
+                    .bind(i64::try_from(record.version).map_err(|_| StoreError::Conflict)?)
+                    .bind(record.payload)
+                    .bind(record.namespace)
+                    .bind(record.key)
+                    .bind(i64::try_from(expected).map_err(|_| StoreError::Conflict)?)
+                    .execute(&mut *transaction)
+                    .await
+                    .map_err(|error| StoreError::Infrastructure(error.to_string()))?
+                    .rows_affected()
+                } else {
+                    if record.version != 1 {
+                        return Err(StoreError::Conflict);
+                    }
+                    sqlx::query(
+                        "INSERT OR IGNORE INTO provider_state(namespace,key,version,payload) VALUES(?,?,1,?)",
+                    )
+                    .bind(record.namespace)
+                    .bind(record.key)
+                    .bind(record.payload)
+                    .execute(&mut *transaction)
+                    .await
+                    .map_err(|error| StoreError::Infrastructure(error.to_string()))?
+                    .rows_affected()
+                };
+                if affected != 1 {
+                    return Err(StoreError::Conflict);
+                }
             }
             transaction
                 .commit()

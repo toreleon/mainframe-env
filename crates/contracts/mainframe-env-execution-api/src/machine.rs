@@ -131,6 +131,14 @@ pub trait Machine {
         resume: MachineResume<Self::EffectResult>,
         quantum: Quantum,
     ) -> MachineDrive<Self::Effect>;
+
+    fn checkpoint(&self) -> Option<BoundedPayload> {
+        None
+    }
+
+    fn effect_sequence(&self) -> u64 {
+        0
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -139,6 +147,7 @@ pub enum LifecycleEventKind {
     Queued,
     Claimed,
     Started,
+    Completing,
     EffectIntent { sequence: u64 },
     EffectResult { sequence: u64 },
     Suspended,

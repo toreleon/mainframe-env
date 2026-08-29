@@ -3,7 +3,7 @@ use mainframe_env_server::{
     ConfigOverrides, ProductServer, ServerConfig, StoreProfile, default_program_router,
 };
 use mainframe_env_store::{MemoryStore, PostgresStateStore, SqliteStateStore};
-use mainframe_env_store_api::ProviderStateStore;
+use mainframe_env_store_api::PlatformStore;
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -29,7 +29,7 @@ async fn run() -> Result<(), String> {
     let config =
         ServerConfig::from_sources(Some(&config_path), &environment, ConfigOverrides::default())
             .map_err(|problem| problem.to_string())?;
-    let store: Arc<dyn ProviderStateStore> = match config.store_profile {
+    let store: Arc<dyn PlatformStore> = match config.store_profile {
         StoreProfile::Memory => Arc::new(MemoryStore::new(Default::default())),
         StoreProfile::Sqlite => Arc::new(
             SqliteStateStore::open(&config.sqlite_url, 64 * 1024 * 1024, 262_144)

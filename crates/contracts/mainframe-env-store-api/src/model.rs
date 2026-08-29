@@ -1,6 +1,7 @@
 use mainframe_env_execution_api::{
     ArtifactRef, ExecutionId, IdempotencyKey, LifecycleEvent, PrincipalId, RunUnitId, Selector,
 };
+use std::collections::BTreeMap;
 use std::fmt;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -65,6 +66,7 @@ pub enum WorkState {
     Queued,
     Claimed,
     Completed,
+    Cancelled,
     DeadLetter,
 }
 
@@ -72,11 +74,21 @@ pub enum WorkState {
 pub struct WorkRecord {
     pub work_id: String,
     pub execution_id: ExecutionId,
+    pub required_selector: Selector,
+    pub required_generation: String,
+    pub artifact: ArtifactRef,
     pub state: WorkState,
     pub attempt: u32,
+    pub max_attempts: u32,
     pub available_tick: u64,
+    pub deadline_tick: u64,
+    pub cancellation_requested: bool,
+    pub worker_id: Option<String>,
     pub lease_id: Option<String>,
     pub lease_expiry_tick: Option<u64>,
+    pub heartbeat_tick: Option<u64>,
+    pub checkpoint_id: Option<String>,
+    pub effect_sequence: u64,
     pub payload: Vec<u8>,
 }
 
@@ -84,11 +96,32 @@ pub struct WorkRecord {
 pub struct CheckpointRecord {
     pub execution_id: ExecutionId,
     pub run_unit_id: RunUnitId,
+    pub session_id: Option<String>,
     pub schema_version: u32,
+    pub machine_schema_version: u32,
     pub artifact: ArtifactRef,
+    pub provider_generation: String,
+    pub required_host_interfaces: BTreeMap<String, String>,
     pub effect_sequence: u64,
+    pub transaction: Option<String>,
+    pub principal: PrincipalId,
+    pub security_classification: String,
+    pub encryption_key_reference: Option<String>,
+    pub payload_size: u64,
     pub payload_digest: [u8; 32],
     pub payload: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OutboxRecord {
+    pub notification_id: String,
+    pub execution_id: ExecutionId,
+    pub sequence: u64,
+    pub topic: String,
+    pub payload: Vec<u8>,
+    pub attempt: u32,
+    pub delivered: bool,
+    pub version: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -142,6 +175,12 @@ pub struct ProviderStateRecord {
     pub key: String,
     pub version: u64,
     pub payload: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProviderStateWrite {
+    pub record: ProviderStateRecord,
+    pub expected_version: Option<u64>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

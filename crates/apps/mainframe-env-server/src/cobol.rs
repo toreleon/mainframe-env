@@ -19,7 +19,9 @@ use mainframe_env_ir::CodecLimits;
 use mainframe_env_source::{
     LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
 };
+use mainframe_env_store_api::PlatformStore;
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 
 pub struct DefaultProgramRouter {
@@ -28,10 +30,18 @@ pub struct DefaultProgramRouter {
 }
 
 impl DefaultProgramRouter {
-    pub(crate) fn bind_host(&self, host: Arc<ScopedHostService>) -> Result<(), HostProblem> {
+    pub(crate) fn bind_runtime(
+        &self,
+        host: Arc<ScopedHostService>,
+        store: Arc<dyn PlatformStore>,
+    ) -> Result<(), HostProblem> {
         self.cobol
             .host
             .set(host)
+            .map_err(|_| HostProblem::IdempotencyConflict)?;
+        self.cobol
+            .store
+            .set(store)
             .map_err(|_| HostProblem::IdempotencyConflict)
     }
 }
@@ -59,12 +69,16 @@ pub fn default_program_router() -> Arc<DefaultProgramRouter> {
 
 struct CobolProgram {
     host: OnceLock<Arc<ScopedHostService>>,
+    store: OnceLock<Arc<dyn PlatformStore>>,
+    sequence: AtomicU64,
 }
 
 impl CobolProgram {
     const fn new() -> Self {
         Self {
             host: OnceLock::new(),
+            store: OnceLock::new(),
+            sequence: AtomicU64::new(1),
         }
     }
 }
@@ -109,6 +123,7 @@ impl Program for CobolProgram {
             return Err(HostProblem::Malformed);
         };
         let limits = InvocationLimits::default();
+        let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
         let grants = [
             "host.audit",
             "host.cics.execute",
@@ -123,11 +138,11 @@ impl Program for CobolProgram {
         })
         .collect::<Result<BTreeSet<_>, _>>()?;
         let invocation = Invocation::new(
-            RequestId::new("batch-cobol-request", limits)
+            RequestId::new(format!("batch-cobol-request-{sequence}"), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
-            ExecutionId::new("batch-cobol-execution", limits)
+            ExecutionId::new(format!("batch-cobol-execution-{sequence}"), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
-            RunUnitId::new("batch-cobol-run", limits)
+            RunUnitId::new(format!("batch-cobol-run-{sequence}"), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
             None,
             Selector::new("program:COBOL", limits).map_err(|_| HostProblem::Malformed)?,
@@ -143,9 +158,9 @@ impl Program for CobolProgram {
             ServiceClass::Batch,
             0,
             1000,
-            TraceId::new("batch-cobol-trace", limits)
+            TraceId::new(format!("batch-cobol-trace-{sequence}"), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
-            IdempotencyKey::new("batch-cobol-effect", limits)
+            IdempotencyKey::new(format!("batch-cobol-effect-{sequence}"), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
             1,
             ResourceLimits::default(),
@@ -159,10 +174,17 @@ impl Program for CobolProgram {
             CodecLimits::default(),
         )
         .map_err(|_| HostProblem::ProviderFailure)?;
-        let coordinator = self.host.get().map_or_else(
-            || ExecutionCoordinator::local(CoordinatorLimits::default()),
-            |host| ExecutionCoordinator::with_host(Arc::clone(host), CoordinatorLimits::default()),
-        );
+        let coordinator = match (self.host.get(), self.store.get()) {
+            (Some(host), Some(store)) => ExecutionCoordinator::durable(
+                Arc::clone(host),
+                Arc::clone(store),
+                CoordinatorLimits::default(),
+            ),
+            (Some(host), None) => {
+                ExecutionCoordinator::with_host(Arc::clone(host), CoordinatorLimits::default())
+            }
+            (None, _) => ExecutionCoordinator::local(CoordinatorLimits::default()),
+        };
         match coordinator.execute(&mut machine, &invocation, ExecutionControl::default()) {
             ExecutionOutcome::Completed(completion) => Ok(ProgramOutput {
                 return_code: completion.return_code,
@@ -200,6 +222,9 @@ impl Program for CobolProgram {
 mod tests {
     use super::*;
     use mainframe_env_batch::DdPlan;
+    use mainframe_env_host_api::{HostLimits, RegistrySnapshot};
+    use mainframe_env_store::MemoryStore;
+    use mainframe_env_store_api::{ExecutionState, PlatformStore};
 
     #[test]
     fn default_cobol_program_compiles_and_runs_reference_machine() {
@@ -221,5 +246,41 @@ mod tests {
             .unwrap();
         assert_eq!(output.return_code, 0);
         assert_eq!(output.records, vec![b"BATCH COBOL".to_vec()]);
+    }
+
+    #[test]
+    fn composed_cobol_execution_commits_projection_events_and_outbox() {
+        let store: Arc<dyn PlatformStore> = Arc::new(MemoryStore::new(Default::default()));
+        let host = Arc::new(ScopedHostService::new(
+            Arc::new(RegistrySnapshot::new(1, Vec::new(), InvocationLimits::default()).unwrap()),
+            HostLimits::default(),
+        ));
+        let program = CobolProgram::new();
+        assert!(program.host.set(host).is_ok());
+        assert!(program.store.set(store.clone()).is_ok());
+        let output = program
+            .execute(&ProgramInput {
+                parameter: None,
+                dds: vec![DdPlan {
+                    name: "SYSIN".into(),
+                    dataset: None,
+                    temporary: false,
+                    sysout: None,
+                    disposition: Vec::new(),
+                    inline_data: b"IDENTIFICATION DIVISION.\nPROGRAM-ID. DURABLE.\nPROCEDURE DIVISION.\nDISPLAY 'DURABLE'.\nSTOP RUN.\n".to_vec(),
+                    concatenation: false,
+                    source_line: 1,
+                }],
+            })
+            .unwrap();
+        assert_eq!(output.records, vec![b"DURABLE".to_vec()]);
+        let execution =
+            ExecutionId::new("batch-cobol-execution-1", InvocationLimits::default()).unwrap();
+        assert_eq!(
+            store.get_execution(&execution).unwrap().unwrap().state,
+            ExecutionState::Completed
+        );
+        assert_eq!(store.events(&execution, 1, 16).unwrap().len(), 5);
+        assert_eq!(store.pending_notifications(16).unwrap().len(), 5);
     }
 }

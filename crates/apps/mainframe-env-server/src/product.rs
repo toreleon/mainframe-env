@@ -15,7 +15,9 @@ use mainframe_env_host_api::{
 };
 use mainframe_env_racf::{MemorySecretResolver, RacfService, racf_providers};
 use mainframe_env_store::{LocalArtifactStore, MemoryStore};
-use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
+use mainframe_env_store_api::{
+    PlatformStore, ProviderStateRecord, ProviderStateStore, StoreError, WorkRecord, WorkState,
+};
 use mainframe_env_zosmf::{
     Authentication, GatewayProblem, GatewayRequest, GatewayResponse, ZosmfBackend, ZosmfLimits,
 };
@@ -34,6 +36,8 @@ pub struct ProductMetrics {
     pub active: usize,
     pub sessions: usize,
     pub console_messages: usize,
+    pub outbox_pending: usize,
+    pub outbox_delivered: u64,
 }
 
 struct AuthSession {
@@ -49,7 +53,7 @@ struct ConsoleMessage {
 
 pub struct ProductServer {
     config: ServerConfig,
-    store: Arc<dyn ProviderStateStore>,
+    store: Arc<dyn PlatformStore>,
     secrets: Arc<MemorySecretResolver>,
     racf: Arc<RacfService>,
     dataset: Arc<DatasetService>,
@@ -64,23 +68,25 @@ pub struct ProductServer {
     requests: AtomicU64,
     failures: AtomicU64,
     active: AtomicUsize,
+    outbox_delivered: AtomicU64,
 }
 
 impl ProductServer {
     pub fn open(
         config: ServerConfig,
-        store: Arc<dyn ProviderStateStore>,
+        store: Arc<dyn PlatformStore>,
         secrets: Arc<MemorySecretResolver>,
         program: Arc<DefaultProgramRouter>,
     ) -> Result<Arc<Self>, HostProblem> {
         config.validate()?;
         let artifacts = LocalArtifactStore::open(&config.artifact_root, 64 * 1024 * 1024)
             .map_err(store_error)?;
-        let racf = RacfService::open(store.clone(), secrets.clone(), Default::default())?;
-        let dataset = DatasetService::open(store.clone(), Default::default())?;
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let racf = RacfService::open(provider_store.clone(), secrets.clone(), Default::default())?;
+        let dataset = DatasetService::open(provider_store.clone(), Default::default())?;
         let inner_program: Arc<dyn HostProvider> = program.clone();
         let inner = scoped_host(&racf, &dataset, inner_program, false, None)?;
-        let cics = CicsService::open(inner, store.clone(), Default::default())?;
+        let cics = CicsService::open(inner, provider_store.clone(), Default::default())?;
         let program_provider: Arc<dyn HostProvider> = program.clone();
         let host = scoped_host(
             &racf,
@@ -89,10 +95,10 @@ impl ProductServer {
             true,
             Some(cics_provider(cics.clone(), InvocationLimits::default())),
         )?;
-        program.bind_host(host.clone())?;
+        program.bind_runtime(host.clone(), store.clone())?;
         let batch = BatchService::open(
             host.clone(),
-            store.clone(),
+            provider_store,
             Default::default(),
             Default::default(),
         )?;
@@ -130,7 +136,7 @@ impl ProductServer {
                 text: text.to_vec(),
             });
         }
-        Ok(Arc::new(Self {
+        let product = Arc::new(Self {
             config,
             store,
             secrets,
@@ -147,11 +153,14 @@ impl ProductServer {
             requests: AtomicU64::new(0),
             failures: AtomicU64::new(0),
             active: AtomicUsize::new(0),
-        }))
+            outbox_delivered: AtomicU64::new(0),
+        });
+        product.recover_local_wakeups()?;
+        Ok(product)
     }
 
     pub fn memory(config: ServerConfig) -> Result<Arc<Self>, HostProblem> {
-        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let store: Arc<dyn PlatformStore> = Arc::new(MemoryStore::new(Default::default()));
         let secrets = Arc::new(MemorySecretResolver::default());
         let program = default_program_router();
         Self::open(config, store, secrets, program)
@@ -210,6 +219,11 @@ impl ProductServer {
             active: self.active.load(Ordering::Relaxed),
             sessions: self.sessions.lock().map_or(0, |sessions| sessions.len()),
             console_messages: self.console.lock().map_or(0, |messages| messages.len()),
+            outbox_pending: self
+                .store
+                .pending_notifications(4096)
+                .map_or(0, |rows| rows.len()),
+            outbox_delivered: self.outbox_delivered.load(Ordering::Relaxed),
         }
     }
 
@@ -255,10 +269,27 @@ impl ProductServer {
         self.active.fetch_add(1, Ordering::SeqCst);
         let _guard = ActiveGuard(&self.active);
         let result = self.handle_inner(authentication, request);
+        if self.recover_local_wakeups().is_err() && result.is_ok() {
+            return Err(gateway_problem(HostProblem::InfrastructureFailure));
+        }
         if result.is_err() {
             self.failures.fetch_add(1, Ordering::Relaxed);
         }
         result
+    }
+
+    fn recover_local_wakeups(&self) -> Result<(), HostProblem> {
+        for notification in self
+            .store
+            .pending_notifications(4096)
+            .map_err(store_error)?
+        {
+            self.store
+                .mark_notification_delivered(&notification.notification_id, notification.version)
+                .map_err(store_error)?;
+            self.outbox_delivered.fetch_add(1, Ordering::Relaxed);
+        }
+        Ok(())
     }
 
     fn handle_inner(
@@ -527,11 +558,65 @@ impl ProductServer {
                         false,
                     )
                     .map_err(gateway_problem)?;
-                let completed = self
-                    .batch
-                    .run_next(&invocation, false)
+                let work_id = format!("jes:{}", snapshot.id);
+                self.store
+                    .enqueue(WorkRecord {
+                        work_id: work_id.clone(),
+                        execution_id: invocation.execution_id.clone(),
+                        required_selector: invocation.selector.clone(),
+                        required_generation: "mainframe-env-batch@1".into(),
+                        artifact: invocation.artifact.clone(),
+                        state: WorkState::Queued,
+                        attempt: 0,
+                        max_attempts: 3,
+                        available_tick: 1,
+                        deadline_tick: invocation.deadline_tick,
+                        cancellation_requested: false,
+                        worker_id: None,
+                        lease_id: None,
+                        lease_expiry_tick: None,
+                        heartbeat_tick: None,
+                        checkpoint_id: None,
+                        effect_sequence: 0,
+                        payload: snapshot.id.as_bytes().to_vec(),
+                    })
+                    .map_err(store_error)
+                    .map_err(gateway_problem)?;
+                let claimed = self
+                    .store
+                    .claim("jes-worker-0", 1, 10)
+                    .map_err(store_error)
                     .map_err(gateway_problem)?
-                    .unwrap_or(snapshot);
+                    .ok_or_else(|| gateway_problem(HostProblem::InfrastructureFailure))?;
+                if claimed.work_id != work_id {
+                    let lease = claimed
+                        .lease_id
+                        .as_deref()
+                        .ok_or_else(|| gateway_problem(HostProblem::InfrastructureFailure))?;
+                    let _ = self.store.release(&claimed.work_id, lease, 2);
+                    return Err(gateway_problem(HostProblem::InfrastructureFailure));
+                }
+                let lease = claimed
+                    .lease_id
+                    .clone()
+                    .ok_or_else(|| gateway_problem(HostProblem::InfrastructureFailure))?;
+                self.store
+                    .heartbeat(&work_id, &lease, 2, 10)
+                    .map_err(store_error)
+                    .map_err(gateway_problem)?;
+                let completed = match self.batch.run_next(&invocation, false) {
+                    Ok(result) => {
+                        self.store
+                            .complete(&work_id, &lease)
+                            .map_err(store_error)
+                            .map_err(gateway_problem)?;
+                        result.unwrap_or(snapshot)
+                    }
+                    Err(problem) => {
+                        let _ = self.store.dead_letter(&work_id, &lease);
+                        return Err(gateway_problem(problem));
+                    }
+                };
                 Ok(GatewayResponse::json(
                     StatusCode::CREATED,
                     job_json(completed),
@@ -545,6 +630,10 @@ impl ProductServer {
             GatewayRequest::JobCancel { jobname, jobid } => {
                 let job = self.batch.get(&jobid).map_err(gateway_problem)?;
                 verify_job(&principal, &jobname, &job)?;
+                match self.store.request_cancellation(&format!("jes:{jobid}")) {
+                    Ok(_) | Err(StoreError::NotFound) => {}
+                    Err(error) => return Err(gateway_problem(store_error(error))),
+                }
                 self.batch.cancel(&jobid).map_err(gateway_problem)?;
                 Ok(GatewayResponse::empty(StatusCode::NO_CONTENT))
             }
@@ -1438,7 +1527,7 @@ mod tests {
         config.store_profile = crate::StoreProfile::Sqlite;
         config.sqlite_url = url.clone();
         {
-            let store: Arc<dyn ProviderStateStore> =
+            let store: Arc<dyn PlatformStore> =
                 Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 262144).unwrap());
             let server = ProductServer::open(
                 config.clone(),
@@ -1474,7 +1563,7 @@ mod tests {
                 .unwrap();
         }
         {
-            let store: Arc<dyn ProviderStateStore> =
+            let store: Arc<dyn PlatformStore> =
                 Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 262144).unwrap());
             let server = ProductServer::open(
                 config,

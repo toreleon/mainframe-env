@@ -7,8 +7,9 @@ use mainframe_env_execution_api::{
 use mainframe_env_store_api::{
     ArtifactRecord, ArtifactStore, CheckpointRecord, CheckpointStore, EffectRecord, EffectState,
     EventStore, ExecutionRecord, ExecutionState, ExecutionStore, GenerationRecord, GenerationStore,
-    IdempotencyStore, ProviderStateRecord, ProviderStateStore, SessionRecord, SessionStore,
-    StoreError, WorkRecord, WorkState, WorkStore,
+    IdempotencyStore, JournalStore, OutboxRecord, OutboxStore, ProviderStateRecord,
+    ProviderStateStore, ProviderStateWrite, SessionRecord, SessionStore, StoreError, WorkRecord,
+    WorkState, WorkStore,
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -130,7 +131,13 @@ macro_rules! durable_implementations {
 
         impl WorkStore for $store {
             fn enqueue(&self, work: WorkRecord) -> Result<(), StoreError> {
-                if work.work_id.is_empty() || work.state != WorkState::Queued || work.attempt != 0 {
+                if work.work_id.is_empty()
+                    || work.state != WorkState::Queued
+                    || work.attempt != 0
+                    || work.max_attempts == 0
+                    || work.deadline_tick == 0
+                    || work.required_generation.is_empty()
+                {
                     return Err(StoreError::InvalidTransition);
                 }
                 self.put_provider_state(
@@ -156,9 +163,19 @@ macro_rules! durable_implementations {
                             .lease_expiry_tick
                             .is_some_and(|expiry| expiry <= now_tick)
                     {
-                        work.state = WorkState::Queued;
+                        work.state = if work.cancellation_requested {
+                            WorkState::Cancelled
+                        } else if work.attempt >= work.max_attempts
+                            || work.deadline_tick <= now_tick
+                        {
+                            WorkState::DeadLetter
+                        } else {
+                            WorkState::Queued
+                        };
+                        work.worker_id = None;
                         work.lease_id = None;
                         work.lease_expiry_tick = None;
+                        work.heartbeat_tick = None;
                         self.put_provider_state(
                             state_record(
                                 "durable-work",
@@ -173,12 +190,14 @@ macro_rules! durable_implementations {
                     if work.state == WorkState::Queued && work.available_tick <= now_tick {
                         work.attempt = work.attempt.checked_add(1).ok_or(StoreError::Conflict)?;
                         work.state = WorkState::Claimed;
+                        work.worker_id = Some(worker.into());
                         work.lease_id = Some(format!("{worker}:{}", work.attempt));
                         work.lease_expiry_tick = Some(
                             now_tick
                                 .checked_add(lease_ticks)
                                 .ok_or(StoreError::Conflict)?,
                         );
+                        work.heartbeat_tick = Some(now_tick);
                         match self.put_provider_state(
                             state_record(
                                 "durable-work",
@@ -197,16 +216,127 @@ macro_rules! durable_implementations {
                 Ok(None)
             }
 
+            fn heartbeat(
+                &self,
+                work_id: &str,
+                lease_id: &str,
+                now_tick: u64,
+                lease_ticks: u64,
+            ) -> Result<WorkRecord, StoreError> {
+                if lease_ticks == 0 {
+                    return Err(StoreError::LeaseConflict);
+                }
+                let row = self
+                    .get_provider_state("durable-work", work_id)?
+                    .ok_or(StoreError::NotFound)?;
+                let mut work = decode_work(&row.payload)?;
+                if work.state != WorkState::Claimed
+                    || work.lease_id.as_deref() != Some(lease_id)
+                    || work
+                        .lease_expiry_tick
+                        .is_none_or(|expiry| expiry <= now_tick)
+                {
+                    return Err(StoreError::LeaseConflict);
+                }
+                work.heartbeat_tick = Some(now_tick);
+                work.lease_expiry_tick = Some(
+                    now_tick
+                        .checked_add(lease_ticks)
+                        .ok_or(StoreError::LeaseConflict)?,
+                );
+                self.put_provider_state(
+                    state_record(
+                        "durable-work",
+                        work_id,
+                        row.version + 1,
+                        encode_work(&work)?,
+                    ),
+                    Some(row.version),
+                )?;
+                Ok(work)
+            }
+
+            fn release(
+                &self,
+                work_id: &str,
+                lease_id: &str,
+                available_tick: u64,
+            ) -> Result<WorkRecord, StoreError> {
+                let row = self
+                    .get_provider_state("durable-work", work_id)?
+                    .ok_or(StoreError::NotFound)?;
+                let mut work = decode_work(&row.payload)?;
+                valid_lease(&work, lease_id)?;
+                work.state = if work.cancellation_requested {
+                    WorkState::Cancelled
+                } else if work.attempt >= work.max_attempts {
+                    WorkState::DeadLetter
+                } else {
+                    WorkState::Queued
+                };
+                work.available_tick = available_tick;
+                clear_lease(&mut work);
+                self.put_provider_state(
+                    state_record(
+                        "durable-work",
+                        work_id,
+                        row.version + 1,
+                        encode_work(&work)?,
+                    ),
+                    Some(row.version),
+                )?;
+                Ok(work)
+            }
+
+            fn request_cancellation(&self, work_id: &str) -> Result<WorkRecord, StoreError> {
+                let row = self
+                    .get_provider_state("durable-work", work_id)?
+                    .ok_or(StoreError::NotFound)?;
+                let mut work = decode_work(&row.payload)?;
+                work.cancellation_requested = true;
+                if work.state == WorkState::Queued {
+                    work.state = WorkState::Cancelled;
+                }
+                self.put_provider_state(
+                    state_record(
+                        "durable-work",
+                        work_id,
+                        row.version + 1,
+                        encode_work(&work)?,
+                    ),
+                    Some(row.version),
+                )?;
+                Ok(work)
+            }
+
+            fn dead_letter(&self, work_id: &str, lease_id: &str) -> Result<WorkRecord, StoreError> {
+                let row = self
+                    .get_provider_state("durable-work", work_id)?
+                    .ok_or(StoreError::NotFound)?;
+                let mut work = decode_work(&row.payload)?;
+                valid_lease(&work, lease_id)?;
+                work.state = WorkState::DeadLetter;
+                clear_lease(&mut work);
+                self.put_provider_state(
+                    state_record(
+                        "durable-work",
+                        work_id,
+                        row.version + 1,
+                        encode_work(&work)?,
+                    ),
+                    Some(row.version),
+                )?;
+                Ok(work)
+            }
+
             fn complete(&self, work_id: &str, lease_id: &str) -> Result<(), StoreError> {
                 let row = self
                     .get_provider_state("durable-work", work_id)?
                     .ok_or(StoreError::NotFound)?;
                 let mut work = decode_work(&row.payload)?;
-                if work.state != WorkState::Claimed || work.lease_id.as_deref() != Some(lease_id) {
-                    return Err(StoreError::LeaseConflict);
-                }
+                valid_lease(&work, lease_id)?;
                 work.state = WorkState::Completed;
-                work.lease_expiry_tick = None;
+                clear_lease(&mut work);
                 self.put_provider_state(
                     state_record(
                         "durable-work",
@@ -222,7 +352,11 @@ macro_rules! durable_implementations {
         impl CheckpointStore for $store {
             fn put_checkpoint(&self, record: CheckpointRecord) -> Result<(), StoreError> {
                 if record.schema_version != 1
+                    || record.machine_schema_version == 0
+                    || record.provider_generation.is_empty()
+                    || record.security_classification.is_empty()
                     || record.payload.is_empty()
+                    || record.payload_size != record.payload.len() as u64
                     || Sha256::digest(&record.payload).as_slice() != record.payload_digest
                 {
                     return Err(StoreError::IncompatibleVersion);
@@ -401,6 +535,309 @@ macro_rules! durable_implementations {
                 self.get_provider_state("durable-effect", key.as_str())?
                     .map(|row| decode_effect(key, &row.payload))
                     .transpose()
+            }
+
+            fn unknown_effects(&self, max: usize) -> Result<Vec<EffectRecord>, StoreError> {
+                if max == 0 || max > 65536 {
+                    return Err(StoreError::CapacityExceeded);
+                }
+                let rows = self.list_provider_state("durable-effect", 65536)?;
+                let mut records = Vec::new();
+                for row in rows {
+                    let key = IdempotencyKey::new(&row.key, InvocationLimits::default())
+                        .map_err(|_| StoreError::IncompatibleVersion)?;
+                    let record = decode_effect(&key, &row.payload)?;
+                    if record.state == EffectState::UnknownOutcome {
+                        records.push(record);
+                        if records.len() == max {
+                            break;
+                        }
+                    }
+                }
+                Ok(records)
+            }
+
+            fn reconcile_unknown(
+                &self,
+                key: &IdempotencyKey,
+                final_state: EffectState,
+                result_digest: [u8; 32],
+            ) -> Result<EffectRecord, StoreError> {
+                if !matches!(final_state, EffectState::Completed | EffectState::Failed) {
+                    return Err(StoreError::InvalidTransition);
+                }
+                let row = self
+                    .get_provider_state("durable-effect", key.as_str())?
+                    .ok_or(StoreError::NotFound)?;
+                if row.version != 2 {
+                    return Err(StoreError::Conflict);
+                }
+                let mut record = decode_effect(key, &row.payload)?;
+                if record.state != EffectState::UnknownOutcome {
+                    return Err(StoreError::InvalidTransition);
+                }
+                record.state = final_state;
+                record.result_digest = Some(result_digest);
+                self.put_provider_state(
+                    state_record("durable-effect", key.as_str(), 3, encode_effect(&record)?),
+                    Some(2),
+                )?;
+                Ok(record)
+            }
+        }
+
+        impl OutboxStore for $store {
+            fn append_notification(&self, record: OutboxRecord) -> Result<(), StoreError> {
+                if record.notification_id.is_empty()
+                    || record.topic.is_empty()
+                    || record.sequence == 0
+                    || record.attempt != 0
+                    || record.delivered
+                    || record.version != 1
+                {
+                    return Err(StoreError::InvalidTransition);
+                }
+                if let Some(existing) = self
+                    .get_provider_state("durable-outbox", &record.notification_id)?
+                    .map(|row| decode_outbox(&row.payload, row.version))
+                    .transpose()?
+                {
+                    return if existing == record {
+                        Ok(())
+                    } else {
+                        Err(StoreError::Conflict)
+                    };
+                }
+                self.put_provider_state(
+                    state_record(
+                        "durable-outbox",
+                        &record.notification_id,
+                        1,
+                        encode_outbox(&record)?,
+                    ),
+                    None,
+                )
+            }
+
+            fn pending_notifications(&self, max: usize) -> Result<Vec<OutboxRecord>, StoreError> {
+                if max == 0 || max > 65536 {
+                    return Err(StoreError::CapacityExceeded);
+                }
+                let records = self
+                    .list_provider_state("durable-outbox", 65536)?
+                    .into_iter()
+                    .map(|row| decode_outbox(&row.payload, row.version))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(records
+                    .into_iter()
+                    .filter(|record| !record.delivered)
+                    .take(max)
+                    .collect())
+            }
+
+            fn mark_notification_delivered(
+                &self,
+                notification_id: &str,
+                expected_version: u64,
+            ) -> Result<OutboxRecord, StoreError> {
+                let row = self
+                    .get_provider_state("durable-outbox", notification_id)?
+                    .ok_or(StoreError::NotFound)?;
+                if row.version != expected_version {
+                    return Err(StoreError::Conflict);
+                }
+                let mut record = decode_outbox(&row.payload, row.version)?;
+                if record.delivered {
+                    return Err(StoreError::Conflict);
+                }
+                record.delivered = true;
+                record.attempt = record.attempt.checked_add(1).ok_or(StoreError::Conflict)?;
+                record.version = record.version.checked_add(1).ok_or(StoreError::Conflict)?;
+                self.put_provider_state(
+                    state_record(
+                        "durable-outbox",
+                        notification_id,
+                        record.version,
+                        encode_outbox(&record)?,
+                    ),
+                    Some(expected_version),
+                )?;
+                Ok(record)
+            }
+        }
+
+        impl JournalStore for $store {
+            fn admit_execution(
+                &self,
+                execution: ExecutionRecord,
+                event: LifecycleEvent,
+                notification: OutboxRecord,
+            ) -> Result<(), StoreError> {
+                if execution.version != 1
+                    || execution.attempt == 0
+                    || execution.state != ExecutionState::Admitted
+                    || execution.execution_id != event.execution_id
+                    || !event.validate()
+                    || event.execution_id != notification.execution_id
+                    || event.sequence != notification.sequence
+                    || notification.version != 1
+                    || notification.delivered
+                {
+                    return Err(StoreError::InvalidSequence);
+                }
+                let namespace = format!("durable-event:{}", event.execution_id);
+                if event.sequence != 1 {
+                    return Err(StoreError::InvalidSequence);
+                }
+                self.put_provider_states_atomic(vec![
+                    ProviderStateWrite {
+                        record: state_record(
+                            "durable-execution",
+                            execution.execution_id.as_str(),
+                            1,
+                            encode_execution(&execution)?,
+                        ),
+                        expected_version: None,
+                    },
+                    ProviderStateWrite {
+                        record: state_record(
+                            &namespace,
+                            &format!("{:020}", event.sequence),
+                            1,
+                            encode_event(&event)?,
+                        ),
+                        expected_version: None,
+                    },
+                    ProviderStateWrite {
+                        record: state_record(
+                            "durable-outbox",
+                            &notification.notification_id,
+                            1,
+                            encode_outbox(&notification)?,
+                        ),
+                        expected_version: None,
+                    },
+                ])
+            }
+
+            fn commit_execution_step(
+                &self,
+                execution_id: &ExecutionId,
+                expected_version: u64,
+                next_state: Option<ExecutionState>,
+                event: LifecycleEvent,
+                effect: Option<EffectRecord>,
+                checkpoint: Option<CheckpointRecord>,
+                notification: OutboxRecord,
+            ) -> Result<ExecutionRecord, StoreError> {
+                if &event.execution_id != execution_id
+                    || event.execution_id != notification.execution_id
+                    || event.sequence != notification.sequence
+                    || notification.version != 1
+                    || notification.delivered
+                {
+                    return Err(StoreError::InvalidSequence);
+                }
+                let mut execution = self
+                    .get_execution(execution_id)?
+                    .ok_or(StoreError::NotFound)?;
+                if execution.version != expected_version {
+                    return Err(StoreError::Conflict);
+                }
+                if let Some(next) = next_state {
+                    if !execution.state.can_transition_to(next) {
+                        return Err(StoreError::InvalidTransition);
+                    }
+                    execution.state = next;
+                }
+                execution.version = execution
+                    .version
+                    .checked_add(1)
+                    .ok_or(StoreError::Conflict)?;
+                let namespace = format!("durable-event:{}", event.execution_id);
+                let events = self.list_provider_state(&namespace, 65536)?;
+                let next_sequence = events.last().map_or(Ok(1), |row| {
+                    row.key
+                        .parse::<u64>()
+                        .map_err(|_| StoreError::IncompatibleVersion)
+                        .and_then(|sequence| {
+                            sequence.checked_add(1).ok_or(StoreError::InvalidSequence)
+                        })
+                })?;
+                if event.sequence != next_sequence {
+                    return Err(StoreError::InvalidSequence);
+                }
+                let mut writes = vec![
+                    ProviderStateWrite {
+                        record: state_record(
+                            "durable-execution",
+                            execution_id.as_str(),
+                            execution.version,
+                            encode_execution(&execution)?,
+                        ),
+                        expected_version: Some(expected_version),
+                    },
+                    ProviderStateWrite {
+                        record: state_record(
+                            &namespace,
+                            &format!("{:020}", event.sequence),
+                            1,
+                            encode_event(&event)?,
+                        ),
+                        expected_version: None,
+                    },
+                    ProviderStateWrite {
+                        record: state_record(
+                            "durable-outbox",
+                            &notification.notification_id,
+                            1,
+                            encode_outbox(&notification)?,
+                        ),
+                        expected_version: None,
+                    },
+                ];
+                if let Some(effect) = effect {
+                    if effect.execution_id != *execution_id {
+                        return Err(StoreError::Conflict);
+                    }
+                    let (version, expected) = match effect.state {
+                        EffectState::Intent => (1, None),
+                        EffectState::Completed
+                        | EffectState::Failed
+                        | EffectState::UnknownOutcome => (2, Some(1)),
+                    };
+                    writes.push(ProviderStateWrite {
+                        record: state_record(
+                            "durable-effect",
+                            effect.key.as_str(),
+                            version,
+                            encode_effect(&effect)?,
+                        ),
+                        expected_version: expected,
+                    });
+                }
+                if let Some(checkpoint) = checkpoint {
+                    if checkpoint.execution_id != *execution_id
+                        || checkpoint.payload_size != checkpoint.payload.len() as u64
+                    {
+                        return Err(StoreError::IncompatibleVersion);
+                    }
+                    let existing =
+                        self.get_provider_state("durable-checkpoint", execution_id.as_str())?;
+                    let (version, expected) =
+                        existing.map_or((1, None), |row| (row.version + 1, Some(row.version)));
+                    writes.push(ProviderStateWrite {
+                        record: state_record(
+                            "durable-checkpoint",
+                            execution_id.as_str(),
+                            version,
+                            encode_checkpoint(&checkpoint)?,
+                        ),
+                        expected_version: expected,
+                    });
+                }
+                self.put_provider_states_atomic(writes)?;
+                Ok(execution)
             }
         }
     };
@@ -594,6 +1031,7 @@ fn event_kind_back(value: &str) -> Result<LifecycleEventKind, StoreError> {
         "queued" => LifecycleEventKind::Queued,
         "claimed" => LifecycleEventKind::Claimed,
         "started" => LifecycleEventKind::Started,
+        "completing" => LifecycleEventKind::Completing,
         "suspended" => LifecycleEventKind::Suspended,
         "resumed" => LifecycleEventKind::Resumed,
         "cancellationrequested" | "cancellation-requested" => {
@@ -610,21 +1048,44 @@ fn event_kind_back(value: &str) -> Result<LifecycleEventKind, StoreError> {
 
 fn encode_work(work: &WorkRecord) -> Result<Vec<u8>, StoreError> {
     encode(
-        json!({"schema":1,"id":work.work_id,"execution":work.execution_id.as_str(),"state":work_state(work.state),"attempt":work.attempt,"available":work.available_tick,"lease":work.lease_id,"expiry":work.lease_expiry_tick,"payload":binary(&work.payload)}),
+        json!({"schema":1,"id":work.work_id,"execution":work.execution_id.as_str(),
+        "selector":work.required_selector.as_str(),"generation":work.required_generation,
+        "artifact":work.artifact.as_str(),"state":work_state(work.state),"attempt":work.attempt,
+        "max_attempts":work.max_attempts,"available":work.available_tick,"deadline":work.deadline_tick,
+        "cancel":work.cancellation_requested,"worker":work.worker_id,"lease":work.lease_id,
+        "expiry":work.lease_expiry_tick,"heartbeat":work.heartbeat_tick,
+        "checkpoint":work.checkpoint_id,"effect":work.effect_sequence,"payload":binary(&work.payload)}),
     )
 }
 fn decode_work(bytes: &[u8]) -> Result<WorkRecord, StoreError> {
     let value = decode(bytes)?;
+    let limits = InvocationLimits::default();
     Ok(WorkRecord {
         work_id: string(&value, "id")?.into(),
-        execution_id: ExecutionId::new(string(&value, "execution")?, InvocationLimits::default())
+        execution_id: ExecutionId::new(string(&value, "execution")?, limits)
+            .map_err(|_| StoreError::IncompatibleVersion)?,
+        required_selector: Selector::new(string(&value, "selector")?, limits)
+            .map_err(|_| StoreError::IncompatibleVersion)?,
+        required_generation: string(&value, "generation")?.into(),
+        artifact: ArtifactRef::new(string(&value, "artifact")?, limits)
             .map_err(|_| StoreError::IncompatibleVersion)?,
         state: work_state_back(string(&value, "state")?)?,
         attempt: u32::try_from(number(&value, "attempt")?)
             .map_err(|_| StoreError::IncompatibleVersion)?,
+        max_attempts: u32::try_from(number(&value, "max_attempts")?)
+            .map_err(|_| StoreError::IncompatibleVersion)?,
         available_tick: number(&value, "available")?,
+        deadline_tick: number(&value, "deadline")?,
+        cancellation_requested: value
+            .get("cancel")
+            .and_then(Value::as_bool)
+            .ok_or(StoreError::IncompatibleVersion)?,
+        worker_id: optional_string(&value, "worker")?,
         lease_id: optional_string(&value, "lease")?,
         lease_expiry_tick: value.get("expiry").and_then(Value::as_u64),
+        heartbeat_tick: value.get("heartbeat").and_then(Value::as_u64),
+        checkpoint_id: optional_string(&value, "checkpoint")?,
+        effect_sequence: number(&value, "effect")?,
         payload: binary_back(string(&value, "payload")?)?,
     })
 }
@@ -633,6 +1094,7 @@ fn work_state(value: WorkState) -> &'static str {
         WorkState::Queued => "queued",
         WorkState::Claimed => "claimed",
         WorkState::Completed => "completed",
+        WorkState::Cancelled => "cancelled",
         WorkState::DeadLetter => "dead-letter",
     }
 }
@@ -641,6 +1103,7 @@ fn work_state_back(value: &str) -> Result<WorkState, StoreError> {
         "queued" => WorkState::Queued,
         "claimed" => WorkState::Claimed,
         "completed" => WorkState::Completed,
+        "cancelled" => WorkState::Cancelled,
         "dead-letter" => WorkState::DeadLetter,
         _ => return Err(StoreError::IncompatibleVersion),
     })
@@ -648,26 +1111,58 @@ fn work_state_back(value: &str) -> Result<WorkState, StoreError> {
 
 fn encode_checkpoint(record: &CheckpointRecord) -> Result<Vec<u8>, StoreError> {
     encode(
-        json!({"schema":record.schema_version,"execution":record.execution_id.as_str(),"run":record.run_unit_id.as_str(),"artifact":record.artifact.as_str(),"effect":record.effect_sequence,"digest":hex(&record.payload_digest),"payload":binary(&record.payload)}),
+        json!({"schema":record.schema_version,"machine_schema":record.machine_schema_version,
+        "execution":record.execution_id.as_str(),"run":record.run_unit_id.as_str(),
+        "session":record.session_id,"artifact":record.artifact.as_str(),
+        "generation":record.provider_generation,"interfaces":record.required_host_interfaces,
+        "effect":record.effect_sequence,"transaction":record.transaction,
+        "principal":record.principal.as_str(),"classification":record.security_classification,
+        "encryption_key":record.encryption_key_reference,"size":record.payload_size,
+        "digest":hex(&record.payload_digest),"payload":binary(&record.payload)}),
     )
 }
 fn decode_checkpoint(bytes: &[u8]) -> Result<CheckpointRecord, StoreError> {
     let value = decode(bytes)?;
     let limits = InvocationLimits::default();
+    let required_host_interfaces = value
+        .get("interfaces")
+        .and_then(Value::as_object)
+        .ok_or(StoreError::IncompatibleVersion)?
+        .iter()
+        .map(|(name, version)| {
+            version
+                .as_str()
+                .map(|version| (name.clone(), version.to_string()))
+                .ok_or(StoreError::IncompatibleVersion)
+        })
+        .collect::<Result<_, _>>()?;
     let record = CheckpointRecord {
         execution_id: ExecutionId::new(string(&value, "execution")?, limits)
             .map_err(|_| StoreError::IncompatibleVersion)?,
         run_unit_id: RunUnitId::new(string(&value, "run")?, limits)
             .map_err(|_| StoreError::IncompatibleVersion)?,
+        session_id: optional_string(&value, "session")?,
         schema_version: u32::try_from(number(&value, "schema")?)
+            .map_err(|_| StoreError::IncompatibleVersion)?,
+        machine_schema_version: u32::try_from(number(&value, "machine_schema")?)
             .map_err(|_| StoreError::IncompatibleVersion)?,
         artifact: ArtifactRef::new(string(&value, "artifact")?, limits)
             .map_err(|_| StoreError::IncompatibleVersion)?,
+        provider_generation: string(&value, "generation")?.into(),
+        required_host_interfaces,
         effect_sequence: number(&value, "effect")?,
+        transaction: optional_string(&value, "transaction")?,
+        principal: PrincipalId::new(string(&value, "principal")?, limits)
+            .map_err(|_| StoreError::IncompatibleVersion)?,
+        security_classification: string(&value, "classification")?.into(),
+        encryption_key_reference: optional_string(&value, "encryption_key")?,
+        payload_size: number(&value, "size")?,
         payload_digest: digest_back(string(&value, "digest")?)?,
         payload: binary_back(string(&value, "payload")?)?,
     };
-    if Sha256::digest(&record.payload).as_slice() != record.payload_digest {
+    if record.payload_size != record.payload.len() as u64
+        || Sha256::digest(&record.payload).as_slice() != record.payload_digest
+    {
         return Err(StoreError::IncompatibleVersion);
     }
     Ok(record)
@@ -778,6 +1273,47 @@ fn effect_state_back(value: &str) -> Result<EffectState, StoreError> {
     })
 }
 
+fn encode_outbox(record: &OutboxRecord) -> Result<Vec<u8>, StoreError> {
+    encode(json!({"schema":1,"id":record.notification_id,
+        "execution":record.execution_id.as_str(),"sequence":record.sequence,
+        "topic":record.topic,"payload":binary(&record.payload),"attempt":record.attempt,
+        "delivered":record.delivered}))
+}
+
+fn decode_outbox(bytes: &[u8], version: u64) -> Result<OutboxRecord, StoreError> {
+    let value = decode(bytes)?;
+    Ok(OutboxRecord {
+        notification_id: string(&value, "id")?.into(),
+        execution_id: ExecutionId::new(string(&value, "execution")?, InvocationLimits::default())
+            .map_err(|_| StoreError::IncompatibleVersion)?,
+        sequence: number(&value, "sequence")?,
+        topic: string(&value, "topic")?.into(),
+        payload: binary_back(string(&value, "payload")?)?,
+        attempt: u32::try_from(number(&value, "attempt")?)
+            .map_err(|_| StoreError::IncompatibleVersion)?,
+        delivered: value
+            .get("delivered")
+            .and_then(Value::as_bool)
+            .ok_or(StoreError::IncompatibleVersion)?,
+        version,
+    })
+}
+
+fn valid_lease(work: &WorkRecord, lease_id: &str) -> Result<(), StoreError> {
+    if work.state == WorkState::Claimed && work.lease_id.as_deref() == Some(lease_id) {
+        Ok(())
+    } else {
+        Err(StoreError::LeaseConflict)
+    }
+}
+
+fn clear_lease(work: &mut WorkRecord) {
+    work.worker_id = None;
+    work.lease_id = None;
+    work.lease_expiry_tick = None;
+    work.heartbeat_tick = None;
+}
+
 fn already_exists(error: StoreError) -> StoreError {
     if error == StoreError::Conflict {
         StoreError::AlreadyExists
@@ -789,7 +1325,9 @@ fn already_exists(error: StoreError) -> StoreError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mainframe_env_store_api::{ArtifactStore, ExecutionStore, WorkStore};
+    use mainframe_env_store_api::{
+        ArtifactStore, EventStore, ExecutionStore, JournalStore, OutboxStore, WorkStore,
+    };
 
     #[test]
     fn sqlite_durable_traits_survive_reopen_and_enforce_integrity() {
@@ -803,6 +1341,7 @@ mod tests {
         let url = format!("sqlite://{}?mode=rwc", path.display());
         let limits = InvocationLimits::default();
         let execution = ExecutionId::new("exec", limits).unwrap();
+        let journal_execution = ExecutionId::new("journal-exec", limits).unwrap();
         {
             let store = SqliteStateStore::open(&url, 8 * 1024 * 1024, 262144).unwrap();
             store
@@ -823,11 +1362,21 @@ mod tests {
                 .enqueue(WorkRecord {
                     work_id: "work".into(),
                     execution_id: execution.clone(),
+                    required_selector: Selector::new("program:HELLO", limits).unwrap(),
+                    required_generation: "mainframe-env-reference@1".into(),
+                    artifact: ArtifactRef::new("artifact", limits).unwrap(),
                     state: WorkState::Queued,
                     attempt: 0,
+                    max_attempts: 3,
                     available_tick: 0,
+                    deadline_tick: 100,
+                    cancellation_requested: false,
+                    worker_id: None,
                     lease_id: None,
                     lease_expiry_tick: None,
+                    heartbeat_tick: None,
+                    checkpoint_id: None,
+                    effect_sequence: 0,
                     payload: vec![1],
                 })
                 .unwrap();
@@ -841,6 +1390,41 @@ mod tests {
                     payload,
                 })
                 .unwrap();
+            let event = LifecycleEvent {
+                execution_id: journal_execution.clone(),
+                run_unit_id: RunUnitId::new("journal-run", limits).unwrap(),
+                sequence: 1,
+                attempt: 1,
+                tick: 1,
+                kind: LifecycleEventKind::Admitted,
+            };
+            store
+                .admit_execution(
+                    ExecutionRecord {
+                        execution_id: journal_execution.clone(),
+                        run_unit_id: event.run_unit_id.clone(),
+                        selector: Selector::new("program:JOURNAL", limits).unwrap(),
+                        artifact: ArtifactRef::new("journal-artifact", limits).unwrap(),
+                        principal: PrincipalId::new("IBMUSER", limits).unwrap(),
+                        state: ExecutionState::Admitted,
+                        attempt: 1,
+                        version: 1,
+                        owner_lease: None,
+                        lease_expiry_tick: None,
+                    },
+                    event,
+                    OutboxRecord {
+                        notification_id: "journal-exec:1".into(),
+                        execution_id: journal_execution.clone(),
+                        sequence: 1,
+                        topic: "execution.lifecycle".into(),
+                        payload: b"admitted".to_vec(),
+                        attempt: 0,
+                        delivered: false,
+                        version: 1,
+                    },
+                )
+                .unwrap();
         }
         {
             let store = SqliteStateStore::open(&url, 8 * 1024 * 1024, 262144).unwrap();
@@ -850,6 +1434,22 @@ mod tests {
             );
             let claimed = store.claim("worker", 1, 10).unwrap().unwrap();
             assert_eq!(claimed.attempt, 1);
+            assert_eq!(
+                store
+                    .get_execution(&journal_execution)
+                    .unwrap()
+                    .unwrap()
+                    .state,
+                ExecutionState::Admitted
+            );
+            assert_eq!(store.events(&journal_execution, 1, 8).unwrap().len(), 1);
+            assert!(
+                store
+                    .pending_notifications(8)
+                    .unwrap()
+                    .iter()
+                    .any(|record| record.notification_id == "journal-exec:1")
+            );
         }
         let _ = std::fs::remove_file(path);
         let _ = std::fs::remove_dir(directory);

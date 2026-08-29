@@ -264,6 +264,7 @@ fn allowed_internal_dependency(package: &str, dependency: &str) -> bool {
             "mainframe-env-ir",
             "mainframe-env-execution-api",
             "mainframe-env-host-api",
+            "mainframe-env-store-api",
         ],
         _ => return true,
     };

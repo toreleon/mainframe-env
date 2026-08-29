@@ -16,6 +16,7 @@
     ["mainframe-env-interpreter","mainframe-env-ir"],
     ["mainframe-env-interpreter","mainframe-env-execution-api"],
     ["mainframe-env-interpreter","mainframe-env-host-api"],
+    ["mainframe-env-interpreter","mainframe-env-store-api"],
     ["mainframe-env-dataset","mainframe-env-host-api"],
     ["mainframe-env-dataset","mainframe-env-store-api"],
     ["mainframe-env-racf","mainframe-env-host-api"],

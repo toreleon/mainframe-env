@@ -1,6 +1,7 @@
 use crate::{
     ArtifactRecord, CheckpointRecord, EffectRecord, ExecutionRecord, ExecutionState,
-    GenerationRecord, ProviderStateRecord, SessionRecord, StoreError, WorkRecord,
+    GenerationRecord, OutboxRecord, ProviderStateRecord, ProviderStateWrite, SessionRecord,
+    StoreError, WorkRecord,
 };
 use mainframe_env_execution_api::{ArtifactRef, ExecutionId, IdempotencyKey, LifecycleEvent};
 
@@ -33,7 +34,51 @@ pub trait WorkStore: Send + Sync {
         now_tick: u64,
         lease_ticks: u64,
     ) -> Result<Option<WorkRecord>, StoreError>;
+    fn heartbeat(
+        &self,
+        work_id: &str,
+        lease_id: &str,
+        now_tick: u64,
+        lease_ticks: u64,
+    ) -> Result<WorkRecord, StoreError>;
+    fn release(
+        &self,
+        work_id: &str,
+        lease_id: &str,
+        available_tick: u64,
+    ) -> Result<WorkRecord, StoreError>;
+    fn request_cancellation(&self, work_id: &str) -> Result<WorkRecord, StoreError>;
+    fn dead_letter(&self, work_id: &str, lease_id: &str) -> Result<WorkRecord, StoreError>;
     fn complete(&self, work_id: &str, lease_id: &str) -> Result<(), StoreError>;
+}
+
+pub trait OutboxStore: Send + Sync {
+    fn append_notification(&self, record: OutboxRecord) -> Result<(), StoreError>;
+    fn pending_notifications(&self, max: usize) -> Result<Vec<OutboxRecord>, StoreError>;
+    fn mark_notification_delivered(
+        &self,
+        notification_id: &str,
+        expected_version: u64,
+    ) -> Result<OutboxRecord, StoreError>;
+}
+
+pub trait JournalStore: Send + Sync {
+    fn admit_execution(
+        &self,
+        execution: ExecutionRecord,
+        event: LifecycleEvent,
+        notification: OutboxRecord,
+    ) -> Result<(), StoreError>;
+    fn commit_execution_step(
+        &self,
+        execution_id: &ExecutionId,
+        expected_version: u64,
+        next_state: Option<ExecutionState>,
+        event: LifecycleEvent,
+        effect: Option<EffectRecord>,
+        checkpoint: Option<CheckpointRecord>,
+        notification: OutboxRecord,
+    ) -> Result<ExecutionRecord, StoreError>;
 }
 
 pub trait CheckpointStore: Send + Sync {
@@ -64,6 +109,13 @@ pub trait IdempotencyStore: Send + Sync {
     fn record_intent(&self, record: EffectRecord) -> Result<(), StoreError>;
     fn record_result(&self, key: &IdempotencyKey, record: EffectRecord) -> Result<(), StoreError>;
     fn effect(&self, key: &IdempotencyKey) -> Result<Option<EffectRecord>, StoreError>;
+    fn unknown_effects(&self, max: usize) -> Result<Vec<EffectRecord>, StoreError>;
+    fn reconcile_unknown(
+        &self,
+        key: &IdempotencyKey,
+        final_state: crate::EffectState,
+        result_digest: [u8; 32],
+    ) -> Result<EffectRecord, StoreError>;
 }
 
 pub trait ProviderStateStore: Send + Sync {
@@ -94,4 +146,40 @@ pub trait ProviderStateStore: Send + Sync {
         old_key: &str,
         expected_version: u64,
     ) -> Result<(), StoreError>;
+    fn put_provider_states_atomic(&self, writes: Vec<ProviderStateWrite>)
+    -> Result<(), StoreError>;
+}
+
+pub trait PlatformStore:
+    ExecutionStore
+    + EventStore
+    + WorkStore
+    + CheckpointStore
+    + SessionStore
+    + ArtifactStore
+    + GenerationStore
+    + IdempotencyStore
+    + OutboxStore
+    + JournalStore
+    + ProviderStateStore
+    + Send
+    + Sync
+{
+}
+
+impl<T> PlatformStore for T where
+    T: ExecutionStore
+        + EventStore
+        + WorkStore
+        + CheckpointStore
+        + SessionStore
+        + ArtifactStore
+        + GenerationStore
+        + IdempotencyStore
+        + OutboxStore
+        + JournalStore
+        + ProviderStateStore
+        + Send
+        + Sync
+{
 }

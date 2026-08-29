@@ -1081,6 +1081,8 @@ dependencies = [
  "mainframe-env-execution-api",
  "mainframe-env-host-api",
  "mainframe-env-ir",
+ "mainframe-env-store-api",
+ "sha2 0.10.9",
 ]
 
 [[package]]

@@ -2,8 +2,9 @@ use mainframe_env_execution_api::{ArtifactRef, ExecutionId, IdempotencyKey, Life
 use mainframe_env_store_api::{
     ArtifactRecord, ArtifactStore, CheckpointRecord, CheckpointStore, EffectRecord, EffectState,
     EventStore, ExecutionRecord, ExecutionState, ExecutionStore, GenerationRecord, GenerationStore,
-    IdempotencyStore, ProviderStateRecord, ProviderStateStore, SessionRecord, SessionStore,
-    StoreError, WorkRecord, WorkState, WorkStore,
+    IdempotencyStore, JournalStore, OutboxRecord, OutboxStore, ProviderStateRecord,
+    ProviderStateStore, ProviderStateWrite, SessionRecord, SessionStore, StoreError, WorkRecord,
+    WorkState, WorkStore,
 };
 use std::collections::BTreeMap;
 use std::sync::{Mutex, MutexGuard};
@@ -19,6 +20,7 @@ pub struct StoreLimits {
     pub max_artifacts: usize,
     pub max_generations: usize,
     pub max_effects: usize,
+    pub max_outbox: usize,
     pub max_provider_state: usize,
     pub max_blob_bytes: usize,
     pub max_total_blob_bytes: usize,
@@ -36,6 +38,7 @@ impl Default for StoreLimits {
             max_artifacts: 4096,
             max_generations: 256,
             max_effects: 262_144,
+            max_outbox: 262_144,
             max_provider_state: 262_144,
             max_blob_bytes: 64 * 1024 * 1024,
             max_total_blob_bytes: 512 * 1024 * 1024,
@@ -43,7 +46,7 @@ impl Default for StoreLimits {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct State {
     executions: BTreeMap<ExecutionId, ExecutionRecord>,
     events: BTreeMap<ExecutionId, Vec<LifecycleEvent>>,
@@ -53,6 +56,7 @@ struct State {
     artifacts: BTreeMap<ArtifactRef, ArtifactRecord>,
     generations: BTreeMap<String, GenerationRecord>,
     effects: BTreeMap<IdempotencyKey, EffectRecord>,
+    outbox: BTreeMap<String, OutboxRecord>,
     provider_state: BTreeMap<(String, String), ProviderStateRecord>,
     blob_bytes: usize,
 }
@@ -93,6 +97,85 @@ impl MemoryStore {
             return Err(StoreError::CapacityExceeded);
         }
         state.blob_bytes = total;
+        Ok(())
+    }
+
+    fn put_provider_state_locked(
+        state: &mut State,
+        record: ProviderStateRecord,
+        expected_version: Option<u64>,
+        limits: StoreLimits,
+    ) -> Result<(), StoreError> {
+        if record.namespace.is_empty() || record.key.is_empty() || record.version == 0 {
+            return Err(StoreError::IncompatibleVersion);
+        }
+        let key = (record.namespace.clone(), record.key.clone());
+        let current = state.provider_state.get(&key);
+        match (current, expected_version) {
+            (None, None) if record.version == 1 => {}
+            (Some(current), Some(expected))
+                if current.version == expected && record.version == expected + 1 => {}
+            _ => return Err(StoreError::Conflict),
+        }
+        let old = current.map_or(0, |item| item.payload.len());
+        if old == 0 && state.provider_state.len() >= limits.max_provider_state {
+            return Err(StoreError::CapacityExceeded);
+        }
+        Self::reserve_blob(state, old, record.payload.len(), limits)?;
+        state.provider_state.insert(key, record);
+        Ok(())
+    }
+
+    fn append_event_locked(
+        state: &mut State,
+        event: LifecycleEvent,
+        limits: StoreLimits,
+    ) -> Result<(), StoreError> {
+        if !event.validate() {
+            return Err(StoreError::InvalidSequence);
+        }
+        let total: usize = state.events.values().map(Vec::len).sum();
+        if total >= limits.max_events {
+            return Err(StoreError::CapacityExceeded);
+        }
+        let events = state.events.entry(event.execution_id.clone()).or_default();
+        if events.len() >= limits.max_events_per_execution {
+            return Err(StoreError::CapacityExceeded);
+        }
+        let expected = events.last().map_or(1, |last| last.sequence + 1);
+        if event.sequence != expected {
+            return Err(StoreError::InvalidSequence);
+        }
+        events.push(event);
+        Ok(())
+    }
+
+    fn append_outbox_locked(
+        state: &mut State,
+        record: OutboxRecord,
+        limits: StoreLimits,
+    ) -> Result<(), StoreError> {
+        if record.notification_id.is_empty()
+            || record.topic.is_empty()
+            || record.sequence == 0
+            || record.attempt != 0
+            || record.delivered
+            || record.version != 1
+        {
+            return Err(StoreError::InvalidTransition);
+        }
+        if let Some(existing) = state.outbox.get(&record.notification_id) {
+            return if existing == &record {
+                Ok(())
+            } else {
+                Err(StoreError::Conflict)
+            };
+        }
+        if state.outbox.len() >= limits.max_outbox {
+            return Err(StoreError::CapacityExceeded);
+        }
+        Self::reserve_blob(state, 0, record.payload.len(), limits)?;
+        state.outbox.insert(record.notification_id.clone(), record);
         Ok(())
     }
 }
@@ -139,24 +222,8 @@ impl ExecutionStore for MemoryStore {
 
 impl EventStore for MemoryStore {
     fn append_event(&self, event: LifecycleEvent) -> Result<(), StoreError> {
-        if !event.validate() {
-            return Err(StoreError::InvalidSequence);
-        }
         let mut state = self.lock()?;
-        let total: usize = state.events.values().map(Vec::len).sum();
-        if total >= self.limits.max_events {
-            return Err(StoreError::CapacityExceeded);
-        }
-        let events = state.events.entry(event.execution_id.clone()).or_default();
-        if events.len() >= self.limits.max_events_per_execution {
-            return Err(StoreError::CapacityExceeded);
-        }
-        let expected = events.last().map_or(1, |last| last.sequence + 1);
-        if event.sequence != expected {
-            return Err(StoreError::InvalidSequence);
-        }
-        events.push(event);
-        Ok(())
+        Self::append_event_locked(&mut state, event, self.limits)
     }
 
     fn events(
@@ -185,6 +252,9 @@ impl WorkStore for MemoryStore {
     fn enqueue(&self, work: WorkRecord) -> Result<(), StoreError> {
         if work.work_id.is_empty()
             || work.attempt != 0
+            || work.max_attempts == 0
+            || work.deadline_tick == 0
+            || work.required_generation.is_empty()
             || work.state != WorkState::Queued
             || work.payload.len() > self.limits.max_blob_bytes
         {
@@ -218,9 +288,14 @@ impl WorkStore for MemoryStore {
                     .lease_expiry_tick
                     .is_some_and(|expiry| expiry <= now_tick)
             {
-                work.state = WorkState::Queued;
-                work.lease_id = None;
-                work.lease_expiry_tick = None;
+                work.state = if work.cancellation_requested {
+                    WorkState::Cancelled
+                } else if work.attempt >= work.max_attempts || work.deadline_tick <= now_tick {
+                    WorkState::DeadLetter
+                } else {
+                    WorkState::Queued
+                };
+                clear_lease(work);
             }
         }
         let Some(work) = state
@@ -232,30 +307,120 @@ impl WorkStore for MemoryStore {
         };
         work.attempt = work.attempt.checked_add(1).ok_or(StoreError::Conflict)?;
         work.state = WorkState::Claimed;
+        work.worker_id = Some(worker.into());
         work.lease_id = Some(format!("{worker}:{}", work.attempt));
         work.lease_expiry_tick = Some(
             now_tick
                 .checked_add(lease_ticks)
                 .ok_or(StoreError::Conflict)?,
         );
+        work.heartbeat_tick = Some(now_tick);
         Ok(Some(work.clone()))
+    }
+
+    fn heartbeat(
+        &self,
+        work_id: &str,
+        lease_id: &str,
+        now_tick: u64,
+        lease_ticks: u64,
+    ) -> Result<WorkRecord, StoreError> {
+        if lease_ticks == 0 {
+            return Err(StoreError::LeaseConflict);
+        }
+        let mut state = self.lock()?;
+        let work = state.work.get_mut(work_id).ok_or(StoreError::NotFound)?;
+        if work.state != WorkState::Claimed
+            || work.lease_id.as_deref() != Some(lease_id)
+            || work
+                .lease_expiry_tick
+                .is_none_or(|expiry| expiry <= now_tick)
+        {
+            return Err(StoreError::LeaseConflict);
+        }
+        work.heartbeat_tick = Some(now_tick);
+        work.lease_expiry_tick = Some(
+            now_tick
+                .checked_add(lease_ticks)
+                .ok_or(StoreError::LeaseConflict)?,
+        );
+        Ok(work.clone())
+    }
+
+    fn release(
+        &self,
+        work_id: &str,
+        lease_id: &str,
+        available_tick: u64,
+    ) -> Result<WorkRecord, StoreError> {
+        let mut state = self.lock()?;
+        let work = state.work.get_mut(work_id).ok_or(StoreError::NotFound)?;
+        valid_lease(work, lease_id)?;
+        work.state = if work.cancellation_requested {
+            WorkState::Cancelled
+        } else if work.attempt >= work.max_attempts {
+            WorkState::DeadLetter
+        } else {
+            WorkState::Queued
+        };
+        work.available_tick = available_tick;
+        clear_lease(work);
+        Ok(work.clone())
+    }
+
+    fn request_cancellation(&self, work_id: &str) -> Result<WorkRecord, StoreError> {
+        let mut state = self.lock()?;
+        let work = state.work.get_mut(work_id).ok_or(StoreError::NotFound)?;
+        work.cancellation_requested = true;
+        if work.state == WorkState::Queued {
+            work.state = WorkState::Cancelled;
+        }
+        Ok(work.clone())
+    }
+
+    fn dead_letter(&self, work_id: &str, lease_id: &str) -> Result<WorkRecord, StoreError> {
+        let mut state = self.lock()?;
+        let work = state.work.get_mut(work_id).ok_or(StoreError::NotFound)?;
+        valid_lease(work, lease_id)?;
+        work.state = WorkState::DeadLetter;
+        clear_lease(work);
+        Ok(work.clone())
     }
 
     fn complete(&self, work_id: &str, lease_id: &str) -> Result<(), StoreError> {
         let mut state = self.lock()?;
         let work = state.work.get_mut(work_id).ok_or(StoreError::NotFound)?;
-        if work.state != WorkState::Claimed || work.lease_id.as_deref() != Some(lease_id) {
-            return Err(StoreError::LeaseConflict);
-        }
+        valid_lease(work, lease_id)?;
         work.state = WorkState::Completed;
-        work.lease_expiry_tick = None;
+        clear_lease(work);
         Ok(())
     }
 }
 
+fn valid_lease(work: &WorkRecord, lease_id: &str) -> Result<(), StoreError> {
+    if work.state == WorkState::Claimed && work.lease_id.as_deref() == Some(lease_id) {
+        Ok(())
+    } else {
+        Err(StoreError::LeaseConflict)
+    }
+}
+
+fn clear_lease(work: &mut WorkRecord) {
+    work.worker_id = None;
+    work.lease_id = None;
+    work.lease_expiry_tick = None;
+    work.heartbeat_tick = None;
+}
+
 impl CheckpointStore for MemoryStore {
     fn put_checkpoint(&self, record: CheckpointRecord) -> Result<(), StoreError> {
-        if record.schema_version == 0 || record.payload.is_empty() {
+        if record.schema_version == 0
+            || record.machine_schema_version == 0
+            || record.provider_generation.is_empty()
+            || record.security_classification.is_empty()
+            || record.payload.is_empty()
+            || record.payload_size != record.payload.len() as u64
+        {
             return Err(StoreError::IncompatibleVersion);
         }
         let mut state = self.lock()?;
@@ -399,6 +564,200 @@ impl IdempotencyStore for MemoryStore {
     fn effect(&self, key: &IdempotencyKey) -> Result<Option<EffectRecord>, StoreError> {
         Ok(self.lock()?.effects.get(key).cloned())
     }
+
+    fn unknown_effects(&self, max: usize) -> Result<Vec<EffectRecord>, StoreError> {
+        if max == 0 || max > self.limits.max_effects {
+            return Err(StoreError::CapacityExceeded);
+        }
+        Ok(self
+            .lock()?
+            .effects
+            .values()
+            .filter(|record| record.state == EffectState::UnknownOutcome)
+            .take(max)
+            .cloned()
+            .collect())
+    }
+
+    fn reconcile_unknown(
+        &self,
+        key: &IdempotencyKey,
+        final_state: EffectState,
+        result_digest: [u8; 32],
+    ) -> Result<EffectRecord, StoreError> {
+        if !matches!(final_state, EffectState::Completed | EffectState::Failed) {
+            return Err(StoreError::InvalidTransition);
+        }
+        let mut state = self.lock()?;
+        let record = state.effects.get_mut(key).ok_or(StoreError::NotFound)?;
+        if record.state != EffectState::UnknownOutcome {
+            return Err(StoreError::InvalidTransition);
+        }
+        record.state = final_state;
+        record.result_digest = Some(result_digest);
+        Ok(record.clone())
+    }
+}
+
+impl OutboxStore for MemoryStore {
+    fn append_notification(&self, record: OutboxRecord) -> Result<(), StoreError> {
+        let mut state = self.lock()?;
+        Self::append_outbox_locked(&mut state, record, self.limits)
+    }
+
+    fn pending_notifications(&self, max: usize) -> Result<Vec<OutboxRecord>, StoreError> {
+        if max == 0 || max > self.limits.max_outbox {
+            return Err(StoreError::CapacityExceeded);
+        }
+        Ok(self
+            .lock()?
+            .outbox
+            .values()
+            .filter(|record| !record.delivered)
+            .take(max)
+            .cloned()
+            .collect())
+    }
+
+    fn mark_notification_delivered(
+        &self,
+        notification_id: &str,
+        expected_version: u64,
+    ) -> Result<OutboxRecord, StoreError> {
+        let mut state = self.lock()?;
+        let record = state
+            .outbox
+            .get_mut(notification_id)
+            .ok_or(StoreError::NotFound)?;
+        if record.version != expected_version || record.delivered {
+            return Err(StoreError::Conflict);
+        }
+        record.delivered = true;
+        record.attempt = record.attempt.checked_add(1).ok_or(StoreError::Conflict)?;
+        record.version = record.version.checked_add(1).ok_or(StoreError::Conflict)?;
+        Ok(record.clone())
+    }
+}
+
+impl JournalStore for MemoryStore {
+    fn admit_execution(
+        &self,
+        execution: ExecutionRecord,
+        event: LifecycleEvent,
+        notification: OutboxRecord,
+    ) -> Result<(), StoreError> {
+        if execution.version != 1
+            || execution.attempt == 0
+            || execution.state != ExecutionState::Admitted
+            || execution.execution_id != event.execution_id
+            || event.execution_id != notification.execution_id
+            || event.sequence != notification.sequence
+        {
+            return Err(StoreError::InvalidSequence);
+        }
+        let mut state = self.lock()?;
+        let mut staged = state.clone();
+        if staged.executions.contains_key(&execution.execution_id) {
+            return Err(StoreError::AlreadyExists);
+        }
+        if staged.executions.len() >= self.limits.max_executions {
+            return Err(StoreError::CapacityExceeded);
+        }
+        staged
+            .executions
+            .insert(execution.execution_id.clone(), execution);
+        Self::append_event_locked(&mut staged, event, self.limits)?;
+        Self::append_outbox_locked(&mut staged, notification, self.limits)?;
+        *state = staged;
+        Ok(())
+    }
+
+    fn commit_execution_step(
+        &self,
+        execution_id: &ExecutionId,
+        expected_version: u64,
+        next_state: Option<ExecutionState>,
+        event: LifecycleEvent,
+        effect: Option<EffectRecord>,
+        checkpoint: Option<CheckpointRecord>,
+        notification: OutboxRecord,
+    ) -> Result<ExecutionRecord, StoreError> {
+        if &event.execution_id != execution_id
+            || event.execution_id != notification.execution_id
+            || event.sequence != notification.sequence
+        {
+            return Err(StoreError::InvalidSequence);
+        }
+        let mut state = self.lock()?;
+        let mut staged = state.clone();
+        let current = staged
+            .executions
+            .get(execution_id)
+            .cloned()
+            .ok_or(StoreError::NotFound)?;
+        if current.version != expected_version
+            || next_state.is_some_and(|next| !current.state.can_transition_to(next))
+        {
+            return Err(StoreError::InvalidTransition);
+        }
+        let mut updated = current;
+        if let Some(next) = next_state {
+            updated.state = next;
+        }
+        updated.version = updated.version.checked_add(1).ok_or(StoreError::Conflict)?;
+        staged
+            .executions
+            .insert(execution_id.clone(), updated.clone());
+        if let Some(effect) = effect {
+            match effect.state {
+                EffectState::Intent => {
+                    if staged.effects.contains_key(&effect.key) {
+                        return Err(StoreError::Conflict);
+                    }
+                    if staged.effects.len() >= self.limits.max_effects {
+                        return Err(StoreError::CapacityExceeded);
+                    }
+                    staged.effects.insert(effect.key.clone(), effect);
+                }
+                EffectState::Completed | EffectState::Failed | EffectState::UnknownOutcome => {
+                    let intent = staged
+                        .effects
+                        .get(&effect.key)
+                        .ok_or(StoreError::NotFound)?;
+                    if intent.execution_id != effect.execution_id
+                        || intent.run_unit_id != effect.run_unit_id
+                        || intent.sequence != effect.sequence
+                        || intent.request_digest != effect.request_digest
+                        || intent.state != EffectState::Intent
+                    {
+                        return Err(StoreError::Conflict);
+                    }
+                    staged.effects.insert(effect.key.clone(), effect);
+                }
+            }
+        }
+        if let Some(checkpoint) = checkpoint {
+            if checkpoint.execution_id != *execution_id
+                || checkpoint.payload_size != checkpoint.payload.len() as u64
+                || checkpoint.payload.is_empty()
+            {
+                return Err(StoreError::IncompatibleVersion);
+            }
+            let old = staged
+                .checkpoints
+                .get(execution_id)
+                .map_or(0, |record| record.payload.len());
+            if old == 0 && staged.checkpoints.len() >= self.limits.max_checkpoints {
+                return Err(StoreError::CapacityExceeded);
+            }
+            Self::reserve_blob(&mut staged, old, checkpoint.payload.len(), self.limits)?;
+            staged.checkpoints.insert(execution_id.clone(), checkpoint);
+        }
+        Self::append_event_locked(&mut staged, event, self.limits)?;
+        Self::append_outbox_locked(&mut staged, notification, self.limits)?;
+        *state = staged;
+        Ok(updated)
+    }
 }
 
 impl ProviderStateStore for MemoryStore {
@@ -437,25 +796,8 @@ impl ProviderStateStore for MemoryStore {
         record: ProviderStateRecord,
         expected_version: Option<u64>,
     ) -> Result<(), StoreError> {
-        if record.namespace.is_empty() || record.key.is_empty() || record.version == 0 {
-            return Err(StoreError::IncompatibleVersion);
-        }
         let mut state = self.lock()?;
-        let key = (record.namespace.clone(), record.key.clone());
-        let current = state.provider_state.get(&key);
-        match (current, expected_version) {
-            (None, None) if record.version == 1 => {}
-            (Some(current), Some(expected))
-                if current.version == expected && record.version == expected + 1 => {}
-            _ => return Err(StoreError::Conflict),
-        }
-        let old = current.map_or(0, |item| item.payload.len());
-        if old == 0 && state.provider_state.len() >= self.limits.max_provider_state {
-            return Err(StoreError::CapacityExceeded);
-        }
-        Self::reserve_blob(&mut state, old, record.payload.len(), self.limits)?;
-        state.provider_state.insert(key, record);
-        Ok(())
+        Self::put_provider_state_locked(&mut state, record, expected_version, self.limits)
     }
 
     fn delete_provider_state(
@@ -509,6 +851,27 @@ impl ProviderStateStore for MemoryStore {
         Self::reserve_blob(&mut state, old_bytes, record.payload.len(), self.limits)?;
         state.provider_state.remove(&old_map_key);
         state.provider_state.insert(new_map_key, record);
+        Ok(())
+    }
+
+    fn put_provider_states_atomic(
+        &self,
+        writes: Vec<ProviderStateWrite>,
+    ) -> Result<(), StoreError> {
+        if writes.is_empty() {
+            return Err(StoreError::InvalidTransition);
+        }
+        let mut state = self.lock()?;
+        let mut staged = state.clone();
+        for write in writes {
+            Self::put_provider_state_locked(
+                &mut staged,
+                write.record,
+                write.expected_version,
+                self.limits,
+            )?;
+        }
+        *state = staged;
         Ok(())
     }
 }
@@ -602,17 +965,100 @@ mod tests {
             .enqueue(WorkRecord {
                 work_id: "work-1".into(),
                 execution_id: ids.execution,
+                required_selector: ids.selector,
+                required_generation: "test@1".into(),
+                artifact: ids.artifact,
                 state: WorkState::Queued,
                 attempt: 0,
+                max_attempts: 3,
                 available_tick: 1,
+                deadline_tick: 100,
+                cancellation_requested: false,
+                worker_id: None,
                 lease_id: None,
                 lease_expiry_tick: None,
+                heartbeat_tick: None,
+                checkpoint_id: None,
+                effect_sequence: 0,
                 payload: vec![1],
             })
             .unwrap();
         let first = store.claim("worker", 1, 1).unwrap().unwrap();
         let second = store.claim("worker", 2, 1).unwrap().unwrap();
         assert_eq!((first.attempt, second.attempt), (1, 2));
+    }
+
+    #[test]
+    fn heartbeat_and_attempt_policy_control_terminal_work_state() {
+        let store = MemoryStore::new(StoreLimits::default());
+        let ids = ids();
+        store
+            .enqueue(WorkRecord {
+                work_id: "bounded-work".into(),
+                execution_id: ids.execution,
+                required_selector: ids.selector,
+                required_generation: "test@1".into(),
+                artifact: ids.artifact,
+                state: WorkState::Queued,
+                attempt: 0,
+                max_attempts: 1,
+                available_tick: 1,
+                deadline_tick: 100,
+                cancellation_requested: false,
+                worker_id: None,
+                lease_id: None,
+                lease_expiry_tick: None,
+                heartbeat_tick: None,
+                checkpoint_id: None,
+                effect_sequence: 0,
+                payload: vec![1],
+            })
+            .unwrap();
+        let claimed = store.claim("worker", 1, 2).unwrap().unwrap();
+        let lease = claimed.lease_id.unwrap();
+        let heartbeat = store.heartbeat("bounded-work", &lease, 2, 10).unwrap();
+        assert_eq!(heartbeat.heartbeat_tick, Some(2));
+        assert!(store.claim("other", 3, 1).unwrap().is_none());
+        assert_eq!(
+            store.release("bounded-work", &lease, 4).unwrap().state,
+            WorkState::DeadLetter
+        );
+    }
+
+    #[test]
+    fn journal_admission_rolls_back_when_outbox_is_saturated() {
+        let store = MemoryStore::new(StoreLimits {
+            max_outbox: 0,
+            ..StoreLimits::default()
+        });
+        let ids = ids();
+        let event = LifecycleEvent {
+            execution_id: ids.execution.clone(),
+            run_unit_id: ids.run.clone(),
+            sequence: 1,
+            attempt: 1,
+            tick: 1,
+            kind: LifecycleEventKind::Admitted,
+        };
+        assert_eq!(
+            store.admit_execution(
+                execution(&ids),
+                event,
+                OutboxRecord {
+                    notification_id: "event-1".into(),
+                    execution_id: ids.execution.clone(),
+                    sequence: 1,
+                    topic: "execution.lifecycle".into(),
+                    payload: vec![1],
+                    attempt: 0,
+                    delivered: false,
+                    version: 1,
+                }
+            ),
+            Err(StoreError::CapacityExceeded)
+        );
+        assert_eq!(store.get_execution(&ids.execution).unwrap(), None);
+        assert!(store.events(&ids.execution, 1, 8).unwrap().is_empty());
     }
 
     #[test]
@@ -661,6 +1107,12 @@ mod tests {
         };
         store.record_result(&ids.idem, unknown.clone()).unwrap();
         assert_eq!(store.effect(&ids.idem).unwrap(), Some(unknown));
+        assert_eq!(store.unknown_effects(8).unwrap().len(), 1);
+        let reconciled = store
+            .reconcile_unknown(&ids.idem, EffectState::Completed, [9; 32])
+            .unwrap();
+        assert_eq!(reconciled.state, EffectState::Completed);
+        assert!(store.unknown_effects(8).unwrap().is_empty());
     }
 
     #[test]
