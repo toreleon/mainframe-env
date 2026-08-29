@@ -1,17 +1,17 @@
 # CardDemo-full 0.1.1 Program Status
 
 Current phase: **CD.D — VSAM and application data**
-Current issue: **CD-015 — dataset organizations and catalog lifecycle PASS**
-Next issue: **CD-016 — exact CardDemo seeds and resource aliases**
+Current issue: **CD-016 — exact CardDemo seeds and resource aliases PASS**
+Next issue: **CD-017 — least-privilege identities and resource profiles**
 Current product: **0.1.0-alpha.0**
 Target product: **0.1.1**
 CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Source identity
 
-- mainframe-env base commit: `5cba6ebf2e53bc3aa1dca49c5288d329c506d8a3`
+- mainframe-env base commit: `5ae89724b45d5779004ecddb795a3193b35dd507`
 - current deterministic dirty-tree identity:
-  `sha256:284ef5dbc1f474820e7622ecdb2e983c487d86a3df15080d06373f79d392b9e0`
+  `sha256:80d984a91ac71f2a3a8f8af9fb17018cd827b2cc9f1e724db733397741ab732e`
 - dirty-tree algorithm: SHA-256 of the sorted `sha256sum` records for every
   repository file except `.git/`, `target/`, and the two persistent CardDemo
   status ledgers (which carry the identity).
@@ -297,7 +297,8 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 - State: **PASS**
 - Required commit subject: `Add CardDemo dataset catalog forms`
-- Completion commit identity: recorded when CD-016 starts from this issue commit.
+- Completion commit identity:
+  `5ae89724b45d5779004ecddb795a3193b35dd507`.
 - Evidence: `conformance/0.1.1/evidence/issues/CD-015.json`
 - Evidence digest:
   `sha256:4997afd59b8772e210ffd62895de364bc5a1a2efc19012cc6bdfe1948c0a71f7`
@@ -309,6 +310,24 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   variable-blocked, and line-sequential LRECL enforcement pass. The catalog
   shape digest is
   `sha256:4152cd10be2c75b11054c97c8b61e1532e4d9c6a4bba9059dd2bd26a66958452`.
+
+### CD-016 — exact seed objects and CICS FILE aliases
+
+- State: **PASS**
+- Required commit subject: `Install CardDemo datasets and seed records`
+- Completion commit identity: recorded when CD-017 starts from this issue commit.
+- Evidence: `conformance/0.1.1/evidence/issues/CD-016.json`
+- Evidence digest:
+  `sha256:3b0615948b4eaa65c656850c4a3b57aa180daf6e1e29737ba06ebf6c57a53021`
+- Thirteen exact EBCDIC objects retain per-source digests and 1,187 fixed-record
+  boundaries over 427,700 bytes. Identical duplicate input coalesces to 12
+  datasets and 1,137 installed records only after byte/metadata validation.
+- All 13 runtime key ranges, three AIX paths, and eight CSD FILE aliases pass.
+  Atomic install/reinstall/upgrade/rollback and corruption/capacity/restart
+  controls pass. Install identity is
+  `sha256:969023dba27abda4277616de8d89100ac793d78922d036f327f0501203f86fff`;
+  seed shape is
+  `sha256:c4c87550be6d017c3bac1076b3b6cba4c757db03a66bb70becda3d2f4ff21b77`.
 
 ## Commands and exit codes
 
@@ -414,6 +433,16 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 - `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-cics-runtime --check` —
   **1**; expected missing-environment failure.
 - Ordinary conformance, JSON, formatting, redaction, and diff checks — **0**.
+- Pre-evidence `carddemo-seeds` derived gate — **1**; no CD-016 issue receipt
+  existed yet.
+- Dataset, CICS, conformance, and xtask tests — **0**; 63 tests passed.
+- Workspace all-target check and affected-package Clippy with `-D warnings` —
+  **0**.
+- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-seeds --check`
+  — **0**; exact 13-object/eight-alias receipt passed.
+- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-seeds --check` — **1**;
+  expected missing-environment failure.
+- Ordinary conformance, JSON, formatting, redaction, and diff checks — **0**.
 - Focused pre-repair ESDS append regression — **1**; ESDS/RRDS organizations
   were not represented.
 - Affected application, dataset, host API, interpreter, conformance, server,
@@ -439,7 +468,7 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Implementation status
 
-- Issues passed: **15 / 27**
+- Issues passed: **16 / 27**
 - Journeys passed: **0 / 20**
 - Installed CardDemo resources: **0**
 - Executed CardDemo application journeys: **0**
@@ -453,10 +482,10 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 2. The repository is still `0.1.0-alpha.0`. A 0.1.1 release cannot be cut until
    0.1.0 is finalized or an explicit version-line correction is accepted.
 
-Neither decision blocks CD-016. No CD-015 blocker remains.
+Neither decision blocks CD-017. No CD-016 blocker remains.
 
 ## Next smallest executable step
 
-Import all 13 base EBCDIC seeds with exact record/key/AIX validation, resolve
-CICS FILE aliases, and cover reinstall, upgrade, rollback, corruption, and
-capacity behavior.
+Install distinct application sign-on and transport identities, least-privilege
+transaction/program/dataset/queue/database/JES/operator profiles, and redacted
+authorization audit evidence.

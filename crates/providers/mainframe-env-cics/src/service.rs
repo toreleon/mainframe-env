@@ -9,7 +9,9 @@ use mainframe_env_host_api::{
     MemberName, Mutation, ProgramName, ProgramRequest, ResourceName, ScopedHostService,
     SecurityDecision, SecurityRequest, SessionId,
 };
-use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
+use mainframe_env_store_api::{
+    ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
+};
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
@@ -18,6 +20,7 @@ pub struct CicsLimits {
     pub max_sessions: usize,
     pub max_runs: usize,
     pub max_maps: usize,
+    pub max_file_aliases: usize,
     pub max_fields: usize,
     pub max_screen_bytes: usize,
     pub max_queue_records: usize,
@@ -30,6 +33,7 @@ impl Default for CicsLimits {
             max_sessions: 4096,
             max_runs: 4096,
             max_maps: 1024,
+            max_file_aliases: 1024,
             max_fields: 512,
             max_screen_bytes: 4 * 1024 * 1024,
             max_queue_records: 65536,
@@ -111,6 +115,7 @@ struct State {
     sessions: BTreeMap<String, Session>,
     runs: BTreeMap<RunUnitId, Run>,
     maps: BTreeMap<(String, String), BmsMapDefinition>,
+    file_aliases: BTreeMap<String, DatasetName>,
     continuations: BTreeMap<String, DurableContinuation>,
     transient: BTreeMap<String, TransientQueue>,
     transient_bytes: usize,
@@ -146,6 +151,17 @@ impl CicsService {
                 decode_continuation(&row.payload, row.version, limits)?,
             );
         }
+        let mut file_aliases = BTreeMap::new();
+        for row in store
+            .list_provider_state("cics-file-alias", limits.max_file_aliases)
+            .map_err(store_error)?
+        {
+            let target =
+                String::from_utf8(row.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
+            let dataset =
+                DatasetName::new(target, 128).map_err(|_| HostProblem::InfrastructureFailure)?;
+            file_aliases.insert(row.key, dataset);
+        }
         let mut transient = BTreeMap::new();
         let mut transient_bytes = 0usize;
         for row in store
@@ -174,6 +190,7 @@ impl CicsService {
                 sessions,
                 runs: BTreeMap::new(),
                 maps: BTreeMap::new(),
+                file_aliases,
                 continuations,
                 transient,
                 transient_bytes,
@@ -383,6 +400,63 @@ impl CicsService {
         );
         if state.maps.insert(key, definition).is_some() {
             return Err(HostProblem::IdempotencyConflict);
+        }
+        Ok(())
+    }
+
+    pub fn register_file_aliases(
+        &self,
+        aliases: &BTreeMap<String, DatasetName>,
+    ) -> Result<(), HostProblem> {
+        let mut state = self.lock()?;
+        let new_aliases = aliases
+            .keys()
+            .filter(|name| !state.file_aliases.contains_key(*name))
+            .count();
+        if state
+            .file_aliases
+            .len()
+            .checked_add(new_aliases)
+            .is_none_or(|total| total > self.limits.max_file_aliases)
+        {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let mut writes = Vec::new();
+        for (name, dataset) in aliases {
+            let name = name.trim().to_ascii_uppercase();
+            if name.is_empty()
+                || name.len() > 16
+                || !name
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+            {
+                return Err(HostProblem::Malformed);
+            }
+            if let Some(existing) = state.file_aliases.get(&name) {
+                if existing != dataset {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+                continue;
+            }
+            writes.push(ProviderStateWrite {
+                record: ProviderStateRecord {
+                    namespace: "cics-file-alias".into(),
+                    key: name,
+                    version: 1,
+                    payload: dataset.as_str().as_bytes().to_vec(),
+                },
+                expected_version: None,
+            });
+        }
+        if !writes.is_empty() {
+            self.store
+                .put_provider_states_atomic(writes)
+                .map_err(store_error)?;
+        }
+        for (name, dataset) in aliases {
+            state
+                .file_aliases
+                .insert(name.trim().to_ascii_uppercase(), dataset.clone());
         }
         Ok(())
     }
@@ -945,10 +1019,16 @@ impl CicsService {
     }
 
     fn file(&self, run: &mut Run, request: &CicsRequest) -> Result<CicsResponse, HostProblem> {
-        let name = argument_text(request, "DATASET")
+        let logical_name = argument_text(request, "DATASET")
             .or_else(|_| argument_text(request, "FILE"))?
             .trim()
             .to_ascii_uppercase();
+        let name = self
+            .lock()?
+            .file_aliases
+            .get(&logical_name)
+            .map(|dataset| dataset.as_str().to_string())
+            .unwrap_or(logical_name);
         let dataset = DatasetName::new(name, 128).map_err(|_| HostProblem::Malformed)?;
         let dataset_key = dataset.as_str().to_string();
         self.authorize(
@@ -2870,10 +2950,16 @@ mod tests {
             CicsService::open(traced_authorities(trace.clone()), store, Default::default())
                 .unwrap();
         let (invocation, _) = registered(&service);
+        service
+            .register_file_aliases(&BTreeMap::from([(
+                "CARDDAT".into(),
+                DatasetName::new("CARDDEMO.CARDDAT", 128).unwrap(),
+            )]))
+            .unwrap();
         let start = request(
             CicsOperation::StartBrowse,
             BTreeMap::from([
-                ("DATASET".into(), argument(b"CARDDEMO.CARDDAT")),
+                ("DATASET".into(), argument(b"CARDDAT")),
                 ("RIDFLD".into(), argument(b"AA")),
             ]),
             1,
@@ -2883,7 +2969,7 @@ mod tests {
             .unwrap();
         let next = request(
             CicsOperation::ReadNext,
-            BTreeMap::from([("DATASET".into(), argument(b"CARDDEMO.CARDDAT"))]),
+            BTreeMap::from([("DATASET".into(), argument(b"CARDDAT"))]),
             2,
         );
         let browsed = service
@@ -2894,7 +2980,7 @@ mod tests {
         let rewrite = request(
             CicsOperation::Rewrite,
             BTreeMap::from([
-                ("DATASET".into(), argument(b"CARDDEMO.CARDDAT")),
+                ("DATASET".into(), argument(b"CARDDAT")),
                 ("FROM".into(), argument(b"AA22")),
             ]),
             3,
@@ -2907,7 +2993,7 @@ mod tests {
             .unwrap();
         let delete = request(
             CicsOperation::Delete,
-            BTreeMap::from([("DATASET".into(), argument(b"CARDDEMO.CARDDAT"))]),
+            BTreeMap::from([("DATASET".into(), argument(b"CARDDAT"))]),
             4,
         );
         service
@@ -2915,7 +3001,7 @@ mod tests {
             .unwrap();
         let end = request(
             CicsOperation::EndBrowse,
-            BTreeMap::from([("DATASET".into(), argument(b"CARDDEMO.CARDDAT"))]),
+            BTreeMap::from([("DATASET".into(), argument(b"CARDDAT"))]),
             5,
         );
         service
@@ -2923,6 +3009,11 @@ mod tests {
             .unwrap();
 
         let requests = trace.requests.lock().unwrap();
+        assert!(matches!(
+            &requests[0],
+            DatasetRequest::StartBrowse { dataset, .. }
+                if dataset.as_str() == "CARDDEMO.CARDDAT"
+        ));
         assert!(matches!(
             &requests[1],
             DatasetRequest::ReadNext { cursor, .. } if cursor == "CURSOR-1"

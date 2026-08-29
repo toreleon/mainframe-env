@@ -21,6 +21,27 @@ pub struct DatasetLimits {
     pub max_cursors: usize,
     pub max_idempotency: usize,
 }
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DatasetSeedObject {
+    pub source_id: String,
+    pub dataset: DatasetName,
+    pub attributes: mainframe_env_host_api::DatasetAttributes,
+    pub record_length: u32,
+    pub sha256: String,
+    pub bytes: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SeedInstallReceipt {
+    pub package: String,
+    pub generation: String,
+    pub seed_objects: usize,
+    pub datasets: usize,
+    pub records: usize,
+    pub bytes: usize,
+    pub identity: String,
+    pub replayed: bool,
+}
 impl Default for DatasetLimits {
     fn default() -> Self {
         Self {
@@ -64,10 +85,26 @@ struct GenerationGroup {
     retired: Vec<String>,
     version: u64,
 }
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct SeedGeneration {
+    package: String,
+    generation: String,
+    objects: Vec<DatasetSeedObject>,
+    entries: BTreeMap<String, Entry>,
+    identity: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct SeedSelection {
+    generation: String,
+    version: u64,
+}
 struct State {
     entries: BTreeMap<String, Entry>,
     alternate_indexes: BTreeMap<String, AlternateIndex>,
     generation_groups: BTreeMap<String, GenerationGroup>,
+    seed_generations: BTreeMap<(String, String), SeedGeneration>,
+    seed_selections: BTreeMap<String, SeedSelection>,
     cursors: BTreeMap<String, Cursor>,
     next_cursor: u64,
     replay: BTreeMap<String, Replay>,
@@ -157,6 +194,36 @@ impl DatasetService {
         {
             return Err(HostProblem::ResourceExhausted);
         }
+        let mut seed_generations = BTreeMap::new();
+        for row in store
+            .list_provider_state("dataset-seed-generation", limits.max_idempotency)
+            .map_err(store_error)?
+        {
+            let generation = decode_seed_generation(&row.payload, limits)?;
+            if row.key != seed_generation_key(&generation.package, &generation.generation) {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            if seed_generations
+                .insert(
+                    (generation.package.clone(), generation.generation.clone()),
+                    generation,
+                )
+                .is_some()
+            {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+        }
+        let mut seed_selections = BTreeMap::new();
+        for row in store
+            .list_provider_state("dataset-seed-selection", limits.max_datasets)
+            .map_err(store_error)?
+        {
+            let selection = decode_seed_selection(&row.payload, row.version)?;
+            if !seed_generations.contains_key(&(row.key.clone(), selection.generation.clone())) {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            seed_selections.insert(row.key, selection);
+        }
         Ok(Arc::new(Self {
             store,
             limits,
@@ -164,12 +231,214 @@ impl DatasetService {
                 entries,
                 alternate_indexes,
                 generation_groups,
+                seed_generations,
+                seed_selections,
                 cursors: BTreeMap::new(),
                 next_cursor: 1,
                 replay,
             }),
         }))
     }
+
+    pub fn install_seed_generation(
+        &self,
+        package: &str,
+        generation: &str,
+        objects: Vec<DatasetSeedObject>,
+    ) -> Result<SeedInstallReceipt, HostProblem> {
+        let planned = build_seed_generation(package, generation, objects, self.limits)?;
+        self.select_seed_generation(planned, true)
+    }
+
+    pub fn rollback_seed_generation(
+        &self,
+        package: &str,
+        generation: &str,
+    ) -> Result<SeedInstallReceipt, HostProblem> {
+        validate_seed_label(package)?;
+        validate_seed_label(generation)?;
+        let planned = self
+            .state
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .seed_generations
+            .get(&(package.to_ascii_uppercase(), generation.to_string()))
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
+        self.select_seed_generation(planned, false)
+    }
+
+    pub fn selected_seed_generation(&self, package: &str) -> Result<Option<String>, HostProblem> {
+        validate_seed_label(package)?;
+        Ok(self
+            .state
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .seed_selections
+            .get(&package.to_ascii_uppercase())
+            .map(|selection| selection.generation.clone()))
+    }
+
+    fn select_seed_generation(
+        &self,
+        planned: SeedGeneration,
+        retain_new: bool,
+    ) -> Result<SeedInstallReceipt, HostProblem> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let package = planned.package.clone();
+        let generation = planned.generation.clone();
+        let key = (package.clone(), generation.clone());
+        if let Some(existing) = state.seed_generations.get(&key)
+            && existing != &planned
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        let current_selection = state.seed_selections.get(&package).cloned();
+        if current_selection
+            .as_ref()
+            .is_some_and(|selection| selection.generation == generation)
+        {
+            return Ok(seed_receipt(&planned, true));
+        }
+        let previous_entries = current_selection
+            .as_ref()
+            .and_then(|selection| {
+                state
+                    .seed_generations
+                    .get(&(package.clone(), selection.generation.clone()))
+            })
+            .map(|generation| generation.entries.keys().cloned().collect::<Vec<_>>())
+            .unwrap_or_default();
+        let next_entries = planned.entries.keys().cloned().collect::<Vec<_>>();
+        if !previous_entries.is_empty() && previous_entries != next_entries {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        let mut installed = BTreeMap::new();
+        let mut writes = Vec::new();
+        for (name, snapshot) in &planned.entries {
+            let current = state.entries.get(name);
+            if current_selection.is_none()
+                && current.is_some_and(|entry| {
+                    entry.attributes != snapshot.attributes
+                        || !entry.records.is_empty()
+                        || !entry.members.is_empty()
+                        || !entry.relative_records.is_empty()
+                })
+            {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            let mut entry = snapshot.clone();
+            entry.version = current.map_or(1, |entry| entry.version.saturating_add(1));
+            validate_entry_shape(&entry, self.limits)?;
+            writes.push(ProviderStateWrite {
+                record: ProviderStateRecord {
+                    namespace: "dataset".into(),
+                    key: name.clone(),
+                    version: entry.version,
+                    payload: encode(&entry).map_err(|_| HostProblem::InfrastructureFailure)?,
+                },
+                expected_version: current.map(|entry| entry.version),
+            });
+            installed.insert(name.clone(), entry);
+        }
+        if state
+            .entries
+            .len()
+            .checked_add(
+                installed
+                    .keys()
+                    .filter(|name| !state.entries.contains_key(*name))
+                    .count(),
+            )
+            .and_then(|total| total.checked_add(state.alternate_indexes.len()))
+            .and_then(|total| total.checked_add(state.generation_groups.len()))
+            .is_none_or(|total| total > self.limits.max_datasets)
+        {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let mut updated_indexes = Vec::new();
+        for (name, index) in &state.alternate_indexes {
+            let Some(entry) = installed.get(&index.base) else {
+                continue;
+            };
+            validate_alternate_index(entry, index)?;
+            let mut updated = index.clone();
+            updated.version = updated
+                .version
+                .checked_add(1)
+                .ok_or(HostProblem::ResourceExhausted)?;
+            writes.push(ProviderStateWrite {
+                record: ProviderStateRecord {
+                    namespace: "dataset-aix".into(),
+                    key: name.clone(),
+                    version: updated.version,
+                    payload: encode_alternate_index(&updated)?,
+                },
+                expected_version: Some(index.version),
+            });
+            updated_indexes.push((name.clone(), updated));
+        }
+        if retain_new && !state.seed_generations.contains_key(&key) {
+            writes.push(ProviderStateWrite {
+                record: ProviderStateRecord {
+                    namespace: "dataset-seed-generation".into(),
+                    key: seed_generation_key(&package, &generation),
+                    version: 1,
+                    payload: encode_seed_generation(&planned)?,
+                },
+                expected_version: None,
+            });
+        }
+        let next_selection = SeedSelection {
+            generation: generation.clone(),
+            version: current_selection
+                .as_ref()
+                .map_or(1, |selection| selection.version.saturating_add(1)),
+        };
+        writes.push(ProviderStateWrite {
+            record: ProviderStateRecord {
+                namespace: "dataset-seed-selection".into(),
+                key: package.clone(),
+                version: next_selection.version,
+                payload: encode_seed_selection(&next_selection)?,
+            },
+            expected_version: current_selection
+                .as_ref()
+                .map(|selection| selection.version),
+        });
+        if let Err(error) = self.store.put_provider_states_atomic(writes) {
+            if matches!(
+                error,
+                StoreError::CapacityExceeded | StoreError::PayloadTooLarge
+            ) {
+                return Err(HostProblem::ResourceExhausted);
+            }
+            if error == StoreError::Conflict {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            let selected = self
+                .store
+                .get_provider_state("dataset-seed-selection", &package)
+                .map_err(store_error)?
+                .ok_or(HostProblem::UnknownOutcome)?;
+            if decode_seed_selection(&selected.payload, selected.version)? != next_selection {
+                return Err(HostProblem::UnknownOutcome);
+            }
+        }
+        state.entries.extend(installed);
+        for (name, index) in updated_indexes {
+            state.alternate_indexes.insert(name, index);
+        }
+        if retain_new {
+            state.seed_generations.insert(key, planned.clone());
+        }
+        state.seed_selections.insert(package, next_selection);
+        Ok(seed_receipt(&planned, false))
+    }
+
     pub fn invoke(&self, request: DatasetRequest) -> Result<DatasetResult, HostProblem> {
         let mutation = mutation(&request);
         let mut state = self
@@ -1733,6 +2002,275 @@ fn generation_number(name: &str) -> Option<u32> {
         .flatten()
 }
 
+fn validate_seed_label(value: &str) -> Result<(), HostProblem> {
+    if value.is_empty()
+        || value.len() > 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'_'))
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_seed_source(value: &str) -> Result<(), HostProblem> {
+    if value.is_empty()
+        || value.len() > 256
+        || value.starts_with('/')
+        || value
+            .split('/')
+            .any(|component| component.is_empty() || component == "..")
+        || !value.bytes().all(|byte| byte.is_ascii_graphic())
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
+}
+
+fn build_seed_generation(
+    package: &str,
+    generation: &str,
+    mut objects: Vec<DatasetSeedObject>,
+    limits: DatasetLimits,
+) -> Result<SeedGeneration, HostProblem> {
+    validate_seed_label(package)?;
+    validate_seed_label(generation)?;
+    if objects.is_empty() || objects.len() > limits.max_datasets {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    objects.sort_by(|left, right| left.source_id.cmp(&right.source_id));
+    let mut sources = BTreeMap::new();
+    let mut entries = BTreeMap::new();
+    let mut total = 0usize;
+    let mut digest = Sha256::new();
+    for object in &objects {
+        validate_seed_source(&object.source_id)?;
+        if sources.insert(object.source_id.clone(), ()).is_some()
+            || object.record_length == 0
+            || object.record_length != object.attributes.logical_record_length
+            || !matches!(
+                object.attributes.record_format,
+                mainframe_env_host_api::RecordFormat::Fixed
+                    | mainframe_env_host_api::RecordFormat::FixedBlocked
+            )
+            || object.bytes.is_empty()
+            || object.bytes.len() % object.record_length as usize != 0
+        {
+            return Err(HostProblem::Malformed);
+        }
+        object
+            .attributes
+            .validate(mainframe_env_host_api::HostLimits {
+                max_record_bytes: limits.max_record_bytes,
+                ..Default::default()
+            })?;
+        let actual = format!("sha256:{:x}", Sha256::digest(&object.bytes));
+        if object.sha256 != actual {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        total = total
+            .checked_add(object.bytes.len())
+            .ok_or(HostProblem::ResourceExhausted)?;
+        if total > limits.max_total_bytes {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let records = object
+            .bytes
+            .chunks_exact(object.record_length as usize)
+            .map(<[u8]>::to_vec)
+            .collect::<Vec<_>>();
+        let mut entry = Entry {
+            attributes: object.attributes.clone(),
+            version: 1,
+            records,
+            members: BTreeMap::new(),
+            relative_records: BTreeMap::new(),
+        };
+        validate_entry_shape(&entry, limits)?;
+        if entry.attributes.organization
+            == mainframe_env_host_api::DatasetOrganization::KeySequenced
+        {
+            validate_keyed_entry(&mut entry)?;
+        }
+        match entries.get(object.dataset.as_str()) {
+            Some(existing) if existing != &entry => {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            Some(_) => {}
+            None => {
+                entries.insert(object.dataset.as_str().into(), entry);
+            }
+        }
+        digest.update((object.source_id.len() as u64).to_be_bytes());
+        digest.update(object.source_id.as_bytes());
+        digest.update((object.dataset.as_str().len() as u64).to_be_bytes());
+        digest.update(object.dataset.as_str().as_bytes());
+        digest.update((object.bytes.len() as u64).to_be_bytes());
+        digest.update(&object.bytes);
+    }
+    Ok(SeedGeneration {
+        package: package.to_ascii_uppercase(),
+        generation: generation.to_string(),
+        objects,
+        entries,
+        identity: format!("sha256:{:x}", digest.finalize()),
+    })
+}
+
+fn seed_receipt(generation: &SeedGeneration, replayed: bool) -> SeedInstallReceipt {
+    SeedInstallReceipt {
+        package: generation.package.clone(),
+        generation: generation.generation.clone(),
+        seed_objects: generation.objects.len(),
+        datasets: generation.entries.len(),
+        records: generation
+            .entries
+            .values()
+            .map(|entry| entry.records.len())
+            .sum(),
+        bytes: generation
+            .objects
+            .iter()
+            .map(|object| object.bytes.len())
+            .sum(),
+        identity: generation.identity.clone(),
+        replayed,
+    }
+}
+
+fn seed_generation_key(package: &str, generation: &str) -> String {
+    format!("{}@{generation}", package.to_ascii_uppercase())
+}
+
+fn encode_seed_generation(generation: &SeedGeneration) -> Result<Vec<u8>, HostProblem> {
+    let mut payload = b"MESEED1".to_vec();
+    dataset_field(&mut payload, generation.package.as_bytes())?;
+    dataset_field(&mut payload, generation.generation.as_bytes())?;
+    dataset_field(&mut payload, generation.identity.as_bytes())?;
+    payload.extend_from_slice(
+        &u32::try_from(generation.objects.len())
+            .map_err(|_| HostProblem::ResourceExhausted)?
+            .to_be_bytes(),
+    );
+    for object in &generation.objects {
+        dataset_field(&mut payload, object.source_id.as_bytes())?;
+        dataset_field(&mut payload, object.dataset.as_str().as_bytes())?;
+        dataset_field(&mut payload, object.sha256.as_bytes())?;
+        let entry = Entry {
+            attributes: object.attributes.clone(),
+            version: 1,
+            records: object
+                .bytes
+                .chunks_exact(object.record_length as usize)
+                .map(<[u8]>::to_vec)
+                .collect(),
+            members: BTreeMap::new(),
+            relative_records: BTreeMap::new(),
+        };
+        dataset_field(
+            &mut payload,
+            &encode(&entry).map_err(|_| HostProblem::InfrastructureFailure)?,
+        )?;
+    }
+    Ok(payload)
+}
+
+fn decode_seed_generation(
+    payload: &[u8],
+    limits: DatasetLimits,
+) -> Result<SeedGeneration, HostProblem> {
+    if payload.get(..7) != Some(b"MESEED1") {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let mut at = 7usize;
+    let package = String::from_utf8(dataset_take_field(payload, &mut at, 64)?)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    let generation = String::from_utf8(dataset_take_field(payload, &mut at, 64)?)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    let identity = String::from_utf8(dataset_take_field(payload, &mut at, 80)?)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    let count = usize::try_from(u32::from_be_bytes(
+        payload
+            .get(at..at.saturating_add(4))
+            .ok_or(HostProblem::InfrastructureFailure)?
+            .try_into()
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+    ))
+    .map_err(|_| HostProblem::InfrastructureFailure)?;
+    at += 4;
+    if count == 0 || count > limits.max_datasets {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let mut objects = Vec::with_capacity(count);
+    for _ in 0..count {
+        let source_id = String::from_utf8(dataset_take_field(payload, &mut at, 256)?)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let dataset = DatasetName::new(
+            String::from_utf8(dataset_take_field(payload, &mut at, 128)?)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            128,
+        )
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let sha256 = String::from_utf8(dataset_take_field(payload, &mut at, 80)?)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let encoded = dataset_take_field(payload, &mut at, limits.max_total_bytes)?;
+        let entry = decode(
+            &encoded,
+            limits.max_records,
+            limits.max_record_bytes,
+            limits.max_members,
+        )
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+        if !entry.members.is_empty() || !entry.relative_records.is_empty() {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let bytes = entry.records.concat();
+        objects.push(DatasetSeedObject {
+            source_id,
+            dataset,
+            attributes: entry.attributes.clone(),
+            record_length: entry.attributes.logical_record_length,
+            sha256,
+            bytes,
+        });
+    }
+    if at != payload.len() {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let decoded = build_seed_generation(&package, &generation, objects, limits)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    if decoded.identity != identity {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(decoded)
+}
+
+fn encode_seed_selection(selection: &SeedSelection) -> Result<Vec<u8>, HostProblem> {
+    let mut payload = b"MESEL1".to_vec();
+    dataset_field(&mut payload, selection.generation.as_bytes())?;
+    Ok(payload)
+}
+
+fn decode_seed_selection(payload: &[u8], version: u64) -> Result<SeedSelection, HostProblem> {
+    if payload.get(..6) != Some(b"MESEL1") || version == 0 {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let mut at = 6usize;
+    let generation = String::from_utf8(dataset_take_field(payload, &mut at, 64)?)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    if at != payload.len() {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    validate_seed_label(&generation).map_err(|_| HostProblem::InfrastructureFailure)?;
+    Ok(SeedSelection {
+        generation,
+        version,
+    })
+}
+
 fn dataset_field(payload: &mut Vec<u8>, value: &[u8]) -> Result<(), HostProblem> {
     payload.extend_from_slice(
         &u32::try_from(value.len())
@@ -2063,7 +2601,7 @@ mod tests {
     use mainframe_env_host_api::{
         DatasetAttributes, DatasetOrganization, HostLimits, Mutation, RecordFormat,
     };
-    use mainframe_env_store::{MemoryStore, SqliteStateStore};
+    use mainframe_env_store::{MemoryStore, SqliteStateStore, StoreLimits};
     fn mutation(n: u64) -> Mutation {
         Mutation {
             sequence: n,
@@ -2083,6 +2621,16 @@ mod tests {
             key_offset: (org == DatasetOrganization::KeySequenced).then_some(0),
             key_length: (org == DatasetOrganization::KeySequenced).then_some(2),
             ccsid: Some(37),
+        }
+    }
+    fn seed_object(source: &str, dataset: &str, bytes: &[u8]) -> DatasetSeedObject {
+        DatasetSeedObject {
+            source_id: source.into(),
+            dataset: DatasetName::new(dataset, 128).unwrap(),
+            attributes: attrs(DatasetOrganization::Sequential),
+            record_length: 4,
+            sha256: format!("sha256:{:x}", Sha256::digest(bytes)),
+            bytes: bytes.to_vec(),
         }
     }
     #[test]
@@ -2382,6 +2930,129 @@ mod tests {
                 absolute_generation: 3,
                 ..
             })
+        ));
+    }
+
+    #[test]
+    fn carddemo_seed_install_reinstall_upgrade_rollback_and_failures_are_atomic() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let first = vec![
+            seed_object("seed/account", "CARDDEMO.ACCOUNT", b"AA11BB22"),
+            seed_object("seed/user", "CARDDEMO.USER", b"UU11"),
+        ];
+        let installed = service
+            .install_seed_generation("CARDDEMO", "g1", first.clone())
+            .unwrap();
+        assert_eq!(
+            (
+                installed.seed_objects,
+                installed.datasets,
+                installed.records
+            ),
+            (2, 2, 3)
+        );
+        assert!(!installed.replayed);
+        assert!(
+            service
+                .install_seed_generation("CARDDEMO", "g1", first)
+                .unwrap()
+                .replayed
+        );
+        let second = vec![
+            seed_object("seed/account", "CARDDEMO.ACCOUNT", b"ZZ11YY22"),
+            seed_object("seed/user", "CARDDEMO.USER", b"VV11"),
+        ];
+        service
+            .install_seed_generation("CARDDEMO", "g2", second)
+            .unwrap();
+        assert_eq!(
+            service
+                .selected_seed_generation("carddemo")
+                .unwrap()
+                .as_deref(),
+            Some("g2")
+        );
+        assert!(matches!(
+            service.invoke(DatasetRequest::Read {
+                dataset: DatasetName::new("CARDDEMO.ACCOUNT", 128).unwrap(),
+                member: None,
+                key: None,
+                max_records: 10,
+            }),
+            Ok(DatasetResult::Records { records, .. })
+                if records == [b"ZZ11".to_vec(), b"YY22".to_vec()]
+        ));
+        service.rollback_seed_generation("CARDDEMO", "g1").unwrap();
+        assert!(matches!(
+            service.invoke(DatasetRequest::Read {
+                dataset: DatasetName::new("CARDDEMO.ACCOUNT", 128).unwrap(),
+                member: None,
+                key: None,
+                max_records: 10,
+            }),
+            Ok(DatasetResult::Records { records, .. })
+                if records == [b"AA11".to_vec(), b"BB22".to_vec()]
+        ));
+        let restarted = DatasetService::open(store, DatasetLimits::default()).unwrap();
+        assert_eq!(
+            restarted
+                .selected_seed_generation("CARDDEMO")
+                .unwrap()
+                .as_deref(),
+            Some("g1")
+        );
+
+        let mut corrupt = seed_object("seed/bad", "CARDDEMO.BAD", b"BAD!");
+        corrupt.sha256 = format!("sha256:{:064x}", 0);
+        assert_eq!(
+            restarted.install_seed_generation("BAD", "g1", vec![corrupt]),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        let limits = DatasetLimits {
+            max_total_bytes: 4,
+            ..DatasetLimits::default()
+        };
+        let bounded =
+            DatasetService::open(Arc::new(MemoryStore::new(Default::default())), limits).unwrap();
+        assert_eq!(
+            bounded.install_seed_generation(
+                "SMALL",
+                "g1",
+                vec![seed_object("seed/large", "SMALL.DATA", b"AA11BB22")],
+            ),
+            Err(HostProblem::ResourceExhausted)
+        );
+        let tiny_store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(StoreLimits {
+            max_blob_bytes: 64,
+            ..StoreLimits::default()
+        }));
+        let tiny = DatasetService::open(tiny_store, DatasetLimits::default()).unwrap();
+        assert_eq!(
+            tiny.install_seed_generation(
+                "TINY",
+                "g1",
+                vec![seed_object("seed/tiny", "TINY.DATA", b"AA11")],
+            ),
+            Err(HostProblem::ResourceExhausted)
+        );
+
+        let corrupt_store: Arc<dyn ProviderStateStore> =
+            Arc::new(MemoryStore::new(Default::default()));
+        corrupt_store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "dataset-seed-generation".into(),
+                    key: "BAD@g1".into(),
+                    version: 1,
+                    payload: b"corrupt".to_vec(),
+                },
+                None,
+            )
+            .unwrap();
+        assert!(matches!(
+            DatasetService::open(corrupt_store, DatasetLimits::default()),
+            Err(HostProblem::InfrastructureFailure)
         ));
     }
 

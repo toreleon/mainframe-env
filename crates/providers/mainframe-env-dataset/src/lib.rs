@@ -5,4 +5,6 @@
 mod codec;
 mod service;
 
-pub use service::{DatasetLimits, DatasetService, dataset_providers};
+pub use service::{
+    DatasetLimits, DatasetSeedObject, DatasetService, SeedInstallReceipt, dataset_providers,
+};

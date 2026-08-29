@@ -166,6 +166,11 @@ policy. A record mutation and every affected index generation commit in one
 provider-state transaction. Filesystem paths remain provider-private. Callers
 use typed dataset host requests and DD bindings.
 
+Seed installation consumes explicit bounded objects with declared fixed-record
+lengths and SHA-256 identities. Dataset bytes, affected alternate indexes,
+retained generation metadata, and the selected seed generation commit together;
+compatible upgrade and rollback never consult the original local source path.
+
 ### `mainframe-env-cics`
 
 Owns typed CICS provider behavior required by the 0.1 operation inventory,
@@ -173,6 +178,8 @@ including terminal/session, file, program control, conditions, transactions,
 and EIB outcomes. The provider persists pseudo-conversational continuations,
 transient-data records, and idempotent syncpoint intent/result decisions;
 unresolved decisions remain unknown outcomes until explicit reconciliation.
+Installed CICS FILE names resolve through a durable bounded alias catalog to
+typed dataset or alternate-index names.
 Protocol/UI implementations are not dependencies.
 
 ### `mainframe-env-racf`

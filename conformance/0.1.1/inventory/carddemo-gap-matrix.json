@@ -189,9 +189,11 @@
       "priority": "P0",
       "domain": "application-data",
       "title": "Import exact CardDemo seeds and resource aliases",
-      "state": "open",
+      "state": "passed",
       "depends_on": ["CD-009", "CD-014", "CD-015"],
       "commit_subject": "Install CardDemo datasets and seed records",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-016.json",
+      "evidence_digest": "sha256:3b0615948b4eaa65c656850c4a3b57aa180daf6e1e29737ba06ebf6c57a53021",
       "acceptance": ["13 base EBCDIC seeds import with exact record boundaries and digests", "runtime-oracle key offsets and lengths are checked", "CICS FILE names resolve to datasets and AIX paths", "reinstall, upgrade, rollback, corrupt input, and capacity cases are covered"]
     },
     {

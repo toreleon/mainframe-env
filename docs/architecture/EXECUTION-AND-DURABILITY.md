@@ -101,6 +101,11 @@ upgradable alternate-index generation, and the idempotency result as one atomic
 provider-state write. A restart that observes only the preceding intent can
 safely retry; a final result replays without applying the record twice.
 
+Application seed generations retain verified source-object identities and a
+provider-neutral dataset snapshot. Install, compatible upgrade, and rollback
+atomically select one retained generation together with all dataset/index
+state; corrupt or capacity-exceeding input cannot become selected.
+
 ## Scheduling
 
 The single-node scheduler provides bounded lanes:

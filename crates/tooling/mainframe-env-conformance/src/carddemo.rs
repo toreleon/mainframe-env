@@ -10,12 +10,19 @@ use mainframe_env_compiler::{
     CobolCompiler, ControlEdgeKind, ControlRole, DataCategory, StatementKind, StorageSection,
     compatibility_copybooks, owned_compatibility_library,
 };
-use mainframe_env_execution_api::{Machine, MachineDrive, MachineResume, Quantum};
-use mainframe_env_host_api::{CicsOperation, DatasetAttributes, DatasetOrganization, RecordFormat};
+use mainframe_env_dataset::{DatasetLimits, DatasetSeedObject, DatasetService};
+use mainframe_env_execution_api::{
+    IdempotencyKey, InvocationLimits, Machine, MachineDrive, MachineResume, Quantum,
+};
+use mainframe_env_host_api::{
+    CicsOperation, DatasetAttributes, DatasetName, DatasetOrganization, DatasetRequest, Mutation,
+    RecordFormat,
+};
 use mainframe_env_source::{
     LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLibrary,
     SourceLimits,
 };
+use mainframe_env_store::MemoryStore;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -24,6 +31,7 @@ use std::fmt;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+use std::sync::Arc;
 
 const CORPUS_ENV: &str = "CARDEMO_CORPUS_DIR";
 
@@ -374,6 +382,28 @@ pub struct CardDemoDatasetCatalogReceipt {
     pub record_formats: Vec<String>,
     pub provider_regression_cases: usize,
     pub catalog_shape_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoSeedReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub seed_objects: usize,
+    pub installed_datasets: usize,
+    pub seed_records: usize,
+    pub installed_records: usize,
+    pub seed_bytes: usize,
+    pub seed_sha256: BTreeMap<String, String>,
+    pub runtime_key_ranges_checked: usize,
+    pub alternate_indexes_installed: usize,
+    pub cics_file_aliases: BTreeMap<String, String>,
+    pub reinstall_passed: bool,
+    pub upgrade_passed: bool,
+    pub rollback_passed: bool,
+    pub negative_controls: usize,
+    pub install_identity: String,
+    pub seed_shape_sha256: String,
 }
 
 pub fn verify_carddemo_corpus_from_env(
@@ -2613,6 +2643,308 @@ pub fn verify_carddemo_dataset_catalog_from_env(
         record_formats: record_formats.into_iter().collect(),
         provider_regression_cases: 4,
         catalog_shape_sha256: format!("{:x}", digest.finalize()),
+    })
+}
+
+pub fn verify_carddemo_seeds_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoSeedReceipt, CorpusProblem> {
+    let catalog = verify_carddemo_dataset_catalog_from_env(inventory_path)?;
+    let vsam = verify_carddemo_vsam_from_env(inventory_path)?;
+    let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required",
+        )
+    })?;
+    let corpus_dir = Path::new(&corpus_dir);
+    let mappings = [
+        (
+            "AWS.M2.CARDDEMO.ACCDATA.PS",
+            "AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS",
+            300,
+            Some((0, 11)),
+        ),
+        (
+            "AWS.M2.CARDDEMO.ACCTDATA.PS",
+            "AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS",
+            300,
+            Some((0, 11)),
+        ),
+        (
+            "AWS.M2.CARDDEMO.CARDDATA.PS",
+            "AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS",
+            150,
+            Some((0, 16)),
+        ),
+        (
+            "AWS.M2.CARDDEMO.CARDXREF.PS",
+            "AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS",
+            50,
+            Some((0, 16)),
+        ),
+        (
+            "AWS.M2.CARDDEMO.CUSTDATA.PS",
+            "AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS",
+            500,
+            Some((0, 9)),
+        ),
+        (
+            "AWS.M2.CARDDEMO.DALYTRAN.PS",
+            "AWS.M2.CARDDEMO.DALYTRAN.PS",
+            350,
+            None,
+        ),
+        (
+            "AWS.M2.CARDDEMO.DALYTRAN.PS.INIT",
+            "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
+            350,
+            Some((0, 16)),
+        ),
+        (
+            "AWS.M2.CARDDEMO.DISCGRP.PS",
+            "AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS",
+            50,
+            Some((0, 16)),
+        ),
+        (
+            "AWS.M2.CARDDEMO.EXPORT.DATA.PS",
+            "AWS.M2.CARDDEMO.EXPORT.DATA",
+            500,
+            Some((28, 4)),
+        ),
+        (
+            "AWS.M2.CARDDEMO.TCATBALF.PS",
+            "AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS",
+            50,
+            Some((0, 17)),
+        ),
+        (
+            "AWS.M2.CARDDEMO.TRANCATG.PS",
+            "AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS",
+            60,
+            Some((0, 6)),
+        ),
+        (
+            "AWS.M2.CARDDEMO.TRANTYPE.PS",
+            "AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS",
+            60,
+            Some((0, 2)),
+        ),
+        (
+            "AWS.M2.CARDDEMO.USRSEC.PS",
+            "AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS",
+            80,
+            Some((0, 8)),
+        ),
+    ];
+    let mut objects = Vec::new();
+    let mut seed_sha256 = BTreeMap::new();
+    let mut seed_records = 0usize;
+    let mut seed_bytes = 0usize;
+    let mut shape = Sha256::new();
+    for (source, target, record_length, key) in mappings {
+        let relative = format!("app/data/EBCDIC/{source}");
+        let bytes = read_corpus_file(corpus_dir, &corpus_dir.join(&relative))?;
+        if bytes.is_empty() || bytes.len() % record_length as usize != 0 {
+            return Err(CorpusProblem::new(
+                "carddemo.seed.record_boundary_invalid",
+                format!("{relative} is not an exact fixed-record stream"),
+            ));
+        }
+        let sha256 = format!("sha256:{:x}", Sha256::digest(&bytes));
+        seed_records += bytes.len() / record_length as usize;
+        seed_bytes += bytes.len();
+        seed_sha256.insert(relative.clone(), sha256.clone());
+        digest_field(&mut shape, relative.as_bytes());
+        digest_field(&mut shape, target.as_bytes());
+        digest_field(&mut shape, &bytes);
+        objects.push(DatasetSeedObject {
+            source_id: relative,
+            dataset: DatasetName::new(target, 128).map_err(|_| {
+                CorpusProblem::new("carddemo.seed.target_invalid", "seed target is invalid")
+            })?,
+            attributes: DatasetAttributes {
+                organization: if key.is_some() {
+                    DatasetOrganization::KeySequenced
+                } else {
+                    DatasetOrganization::Sequential
+                },
+                record_format: RecordFormat::Fixed,
+                logical_record_length: record_length,
+                key_offset: key.map(|value| value.0),
+                key_length: key.map(|value| value.1),
+                ccsid: Some(37),
+            },
+            record_length,
+            sha256,
+            bytes,
+        });
+    }
+    let store = Arc::new(MemoryStore::new(Default::default()));
+    let service = DatasetService::open(store, DatasetLimits::default()).map_err(|problem| {
+        CorpusProblem::new("carddemo.seed.install_failed", problem.to_string())
+    })?;
+    let installed = service
+        .install_seed_generation("CARDDEMO", "g1", objects.clone())
+        .map_err(|problem| {
+            CorpusProblem::new("carddemo.seed.install_failed", problem.to_string())
+        })?;
+    let reinstall_passed = service
+        .install_seed_generation("CARDDEMO", "g1", objects.clone())
+        .map(|receipt| receipt.replayed)
+        .unwrap_or(false);
+    let mutation = |sequence| Mutation {
+        sequence,
+        idempotency_key: IdempotencyKey::new(
+            format!("carddemo-seed-{sequence}"),
+            InvocationLimits::default(),
+        )
+        .expect("static seed key"),
+        transaction: Some("carddemo-seed".into()),
+    };
+    for (sequence, (index, base, offset, length)) in [
+        (
+            "AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.PATH",
+            "AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS",
+            16,
+            11,
+        ),
+        (
+            "AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH",
+            "AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS",
+            25,
+            11,
+        ),
+        (
+            "AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH",
+            "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
+            304,
+            26,
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        service
+            .invoke(DatasetRequest::DefineAlternateIndex {
+                base: DatasetName::new(base, 128).expect("static base"),
+                index: DatasetName::new(index, 128).expect("static index"),
+                key_offset: offset,
+                key_length: length,
+                allow_duplicates: true,
+                mutation: mutation(sequence as u64 + 1),
+            })
+            .map_err(|problem| {
+                CorpusProblem::new("carddemo.seed.aix_failed", problem.to_string())
+            })?;
+    }
+    let resources = parse_csd(
+        &String::from_utf8(read_corpus_file(
+            corpus_dir,
+            &corpus_dir.join("app/csd/CARDDEMO.CSD"),
+        )?)
+        .map_err(|_| CorpusProblem::new("carddemo.seed.csd_invalid", "base CSD is not UTF-8"))?,
+    )
+    .map_err(package_problem)?;
+    let mut cics_file_aliases = BTreeMap::new();
+    for resource in resources.iter().filter(|resource| resource.kind == "FILE") {
+        let target = resource.properties.get("DSNAME").ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.seed.csd_invalid",
+                format!("{} DSNAME is missing", resource.name),
+            )
+        })?;
+        if !vsam.key_offsets_and_lengths.contains_key(target) {
+            return Err(CorpusProblem::new(
+                "carddemo.seed.alias_target_missing",
+                format!("{} target is not a runtime keyed path", resource.name),
+            ));
+        }
+        cics_file_aliases.insert(resource.name.clone(), target.clone());
+        digest_field(&mut shape, resource.name.as_bytes());
+        digest_field(&mut shape, target.as_bytes());
+    }
+    let mut upgrade_objects = objects.clone();
+    let upgrade = upgrade_objects
+        .iter_mut()
+        .find(|object| object.dataset.as_str() == "AWS.M2.CARDDEMO.DALYTRAN.PS")
+        .ok_or_else(|| {
+            CorpusProblem::new("carddemo.seed.upgrade_failed", "upgrade seed is missing")
+        })?;
+    let last = upgrade.bytes.last_mut().ok_or_else(|| {
+        CorpusProblem::new("carddemo.seed.upgrade_failed", "upgrade seed is empty")
+    })?;
+    *last ^= 1;
+    upgrade.sha256 = format!("sha256:{:x}", Sha256::digest(&upgrade.bytes));
+    let upgrade_passed = service
+        .install_seed_generation("CARDDEMO", "g2", upgrade_objects)
+        .is_ok()
+        && service
+            .selected_seed_generation("CARDDEMO")
+            .ok()
+            .flatten()
+            .as_deref()
+            == Some("g2");
+    let rollback_passed = service.rollback_seed_generation("CARDDEMO", "g1").is_ok()
+        && service
+            .selected_seed_generation("CARDDEMO")
+            .ok()
+            .flatten()
+            .as_deref()
+            == Some("g1");
+    let mut corrupt = objects.clone();
+    corrupt[0].sha256 = format!("sha256:{:064x}", 0);
+    let corrupt_rejected = service
+        .install_seed_generation("CORRUPT", "g1", corrupt)
+        .is_err();
+    let bounded = DatasetService::open(
+        Arc::new(MemoryStore::new(Default::default())),
+        DatasetLimits {
+            max_total_bytes: seed_bytes.saturating_sub(1),
+            ..DatasetLimits::default()
+        },
+    )
+    .map_err(|problem| CorpusProblem::new("carddemo.seed.capacity_failed", problem.to_string()))?;
+    let capacity_rejected = bounded
+        .install_seed_generation("BOUNDED", "g1", objects)
+        .is_err();
+    if installed.seed_objects != 13
+        || installed.datasets != 12
+        || installed.records != 1_137
+        || seed_records != 1_187
+        || seed_bytes != 427_700
+        || cics_file_aliases.len() != 8
+        || !reinstall_passed
+        || !upgrade_passed
+        || !rollback_passed
+        || !corrupt_rejected
+        || !capacity_rejected
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.seed.surface_drift",
+            "seed install or alias surface differs from the pinned contract",
+        ));
+    }
+    Ok(CardDemoSeedReceipt {
+        schema_version: "mainframe-env.carddemo-seed-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit: catalog.corpus_commit,
+        seed_objects: installed.seed_objects,
+        installed_datasets: installed.datasets,
+        seed_records,
+        installed_records: installed.records,
+        seed_bytes,
+        seed_sha256,
+        runtime_key_ranges_checked: vsam.key_offsets_and_lengths.len(),
+        alternate_indexes_installed: 3,
+        cics_file_aliases,
+        reinstall_passed,
+        upgrade_passed,
+        rollback_passed,
+        negative_controls: 2,
+        install_identity: installed.identity,
+        seed_shape_sha256: format!("{:x}", shape.finalize()),
     })
 }
 
