@@ -5,11 +5,12 @@ use mainframe_env_compiler_api::{
     CompilerService,
 };
 use mainframe_env_execution_api::{
-    ArtifactRef, ExecutionId, IdempotencyKey, Invocation, InvocationLimits, Machine, MachineDrive,
-    MachineResume, Principal, PrincipalId, Quantum, RequestId, ResourceLimits, RunUnitId, Selector,
-    ServiceClass, TraceId,
+    ArtifactRef, ExecutionId, ExecutionOutcome, IdempotencyKey, Invocation, InvocationLimits,
+    Principal, PrincipalId, RequestId, ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
 };
-use mainframe_env_interpreter::ReferenceMachine;
+use mainframe_env_interpreter::{
+    CoordinatorLimits, ExecutionControl, ExecutionCoordinator, ReferenceMachine,
+};
 use mainframe_env_ir::CodecLimits;
 use mainframe_env_source::{
     LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
@@ -116,30 +117,24 @@ fn run(cli: Cli) -> Result<(), String> {
             )?;
             let mut machine = ReferenceMachine::from_binary(
                 artifact.payload(),
-                invocation,
+                invocation.clone(),
                 CodecLimits::default(),
             )
             .map_err(|problem| format!("{problem:?}"))?;
-            let mut resume = MachineResume::Start;
-            loop {
-                match machine.drive(
-                    resume,
-                    Quantum::new(10_000, 16 * 1024 * 1024).expect("non-zero quantum"),
-                ) {
-                    MachineDrive::Continue => resume = MachineResume::Start,
-                    MachineDrive::Completed(completion) => {
-                        print!("{}", String::from_utf8_lossy(completion.output.bytes()));
-                        return Ok(());
-                    }
-                    MachineDrive::HostCall(effect) => {
-                        return Err(format!(
-                            "local CLI has no provider for {:?}",
-                            effect.request.required_capability(limits)
-                        ));
-                    }
-                    MachineDrive::Failed(problem) => return Err(problem.public_message),
-                    other => return Err(format!("execution stopped with {other:?}")),
+            match ExecutionCoordinator::local(CoordinatorLimits::default()).execute(
+                &mut machine,
+                &invocation,
+                ExecutionControl::default(),
+            ) {
+                ExecutionOutcome::Completed(completion) => {
+                    print!("{}", String::from_utf8_lossy(completion.output.bytes()));
+                    Ok(())
                 }
+                ExecutionOutcome::Rejected(problem)
+                | ExecutionOutcome::ResourceExhausted(problem)
+                | ExecutionOutcome::ProviderFailure(problem)
+                | ExecutionOutcome::InfrastructureFailure(problem) => Err(problem.public_message),
+                other => Err(format!("execution stopped with {other:?}")),
             }
         }
     }

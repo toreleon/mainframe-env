@@ -2,9 +2,11 @@
 
 #![forbid(unsafe_code)]
 
+mod coordinator;
 mod machine;
 mod value;
 
+pub use coordinator::{CoordinatorLimits, ExecutionControl, ExecutionCoordinator};
 pub use machine::{MachineProblem, MachineSnapshot, ReferenceMachine, supported_operations};
 pub use value::{FixedValue, ValueProblem};
 

@@ -1,4 +1,4 @@
-use crate::{ServerConfig, default_program_router};
+use crate::{DefaultProgramRouter, ServerConfig, default_program_router};
 use axum::http::StatusCode;
 use mainframe_env_batch::{BatchService, JclBundle};
 use mainframe_env_cics::{CicsService, cics_provider};
@@ -71,22 +71,25 @@ impl ProductServer {
         config: ServerConfig,
         store: Arc<dyn ProviderStateStore>,
         secrets: Arc<MemorySecretResolver>,
-        program: Arc<dyn HostProvider>,
+        program: Arc<DefaultProgramRouter>,
     ) -> Result<Arc<Self>, HostProblem> {
         config.validate()?;
         let artifacts = LocalArtifactStore::open(&config.artifact_root, 64 * 1024 * 1024)
             .map_err(store_error)?;
         let racf = RacfService::open(store.clone(), secrets.clone(), Default::default())?;
         let dataset = DatasetService::open(store.clone(), Default::default())?;
-        let inner = scoped_host(&racf, &dataset, Arc::clone(&program), false, None)?;
+        let inner_program: Arc<dyn HostProvider> = program.clone();
+        let inner = scoped_host(&racf, &dataset, inner_program, false, None)?;
         let cics = CicsService::open(inner, store.clone(), Default::default())?;
+        let program_provider: Arc<dyn HostProvider> = program.clone();
         let host = scoped_host(
             &racf,
             &dataset,
-            program,
+            program_provider,
             true,
             Some(cics_provider(cics.clone(), InvocationLimits::default())),
         )?;
+        program.bind_host(host.clone())?;
         let batch = BatchService::open(
             host.clone(),
             store.clone(),
@@ -1278,7 +1281,6 @@ mod tests {
     use axum::body::{Body, to_bytes};
     use axum::http::{Method, Request};
     use base64::Engine;
-    use mainframe_env_batch::ProgramRouter;
     use mainframe_env_store::SqliteStateStore;
     use tower::ServiceExt;
 
@@ -1442,7 +1444,7 @@ mod tests {
                 config.clone(),
                 store,
                 Arc::new(MemorySecretResolver::default()),
-                ProgramRouter::with_builtins(InvocationLimits::default()),
+                default_program_router(),
             )
             .unwrap();
             server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
@@ -1478,7 +1480,7 @@ mod tests {
                 config,
                 store,
                 Arc::new(MemorySecretResolver::default()),
-                ProgramRouter::with_builtins(InvocationLimits::default()),
+                default_program_router(),
             )
             .unwrap();
             let response = server

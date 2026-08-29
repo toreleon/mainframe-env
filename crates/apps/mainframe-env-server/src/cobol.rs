@@ -5,28 +5,69 @@ use mainframe_env_compiler_api::{
     CompilerService,
 };
 use mainframe_env_execution_api::{
-    ArtifactRef, ExecutionId, IdempotencyKey, Invocation, InvocationLimits, Machine, MachineDrive,
-    MachineResume, Principal, PrincipalId, Quantum, RequestId, ResourceLimits, RunUnitId, Selector,
+    ArtifactRef, CapabilityId, ExecutionId, ExecutionOutcome, IdempotencyKey, Invocation,
+    InvocationLimits, Principal, PrincipalId, RequestId, ResourceLimits, RunUnitId, Selector,
     ServiceClass, TraceId,
 };
-use mainframe_env_host_api::{HostProblem, HostProvider};
-use mainframe_env_interpreter::ReferenceMachine;
+use mainframe_env_host_api::{
+    CapabilityDescriptor, EffectRequest, EffectResult, HostProblem, HostProvider, ScopedHostService,
+};
+use mainframe_env_interpreter::{
+    CoordinatorLimits, ExecutionControl, ExecutionCoordinator, ReferenceMachine,
+};
 use mainframe_env_ir::CodecLimits;
 use mainframe_env_source::{
     LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
 };
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
-pub fn default_program_router() -> Arc<dyn HostProvider> {
-    ProgramRouter::with_builtins_and(
-        BTreeMap::from([("COBOL".into(), Arc::new(CobolProgram) as Arc<dyn Program>)]),
-        InvocationLimits::default(),
-    )
-    .expect("owned program catalog is valid")
+pub struct DefaultProgramRouter {
+    router: Arc<ProgramRouter>,
+    cobol: Arc<CobolProgram>,
 }
 
-struct CobolProgram;
+impl DefaultProgramRouter {
+    pub(crate) fn bind_host(&self, host: Arc<ScopedHostService>) -> Result<(), HostProblem> {
+        self.cobol
+            .host
+            .set(host)
+            .map_err(|_| HostProblem::IdempotencyConflict)
+    }
+}
+
+impl HostProvider for DefaultProgramRouter {
+    fn descriptor(&self) -> &CapabilityDescriptor {
+        self.router.descriptor()
+    }
+
+    fn invoke(&self, effect: EffectRequest) -> EffectResult {
+        self.router.invoke(effect)
+    }
+}
+
+#[must_use]
+pub fn default_program_router() -> Arc<DefaultProgramRouter> {
+    let cobol = Arc::new(CobolProgram::new());
+    let router = ProgramRouter::with_builtins_and(
+        BTreeMap::from([("COBOL".into(), cobol.clone() as Arc<dyn Program>)]),
+        InvocationLimits::default(),
+    )
+    .expect("owned program catalog is valid");
+    Arc::new(DefaultProgramRouter { router, cobol })
+}
+
+struct CobolProgram {
+    host: OnceLock<Arc<ScopedHostService>>,
+}
+
+impl CobolProgram {
+    const fn new() -> Self {
+        Self {
+            host: OnceLock::new(),
+        }
+    }
+}
 
 impl Program for CobolProgram {
     fn execute(&self, input: &ProgramInput) -> Result<ProgramOutput, HostProblem> {
@@ -68,6 +109,19 @@ impl Program for CobolProgram {
             return Err(HostProblem::Malformed);
         };
         let limits = InvocationLimits::default();
+        let grants = [
+            "host.audit",
+            "host.cics.execute",
+            "host.dataset.read",
+            "host.dataset.write",
+            "host.program.invoke",
+            "host.terminal",
+        ]
+        .into_iter()
+        .map(|grant| {
+            CapabilityId::new(grant, limits).map_err(|_| HostProblem::InfrastructureFailure)
+        })
+        .collect::<Result<BTreeSet<_>, _>>()?;
         let invocation = Invocation::new(
             RequestId::new("batch-cobol-request", limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
@@ -82,7 +136,7 @@ impl Program for CobolProgram {
             Principal::new(
                 PrincipalId::new("BATCH", limits)
                     .map_err(|_| HostProblem::InfrastructureFailure)?,
-                BTreeSet::new(),
+                grants,
                 limits,
             )
             .map_err(|_| HostProblem::InfrastructureFailure)?,
@@ -99,47 +153,45 @@ impl Program for CobolProgram {
             limits,
         )
         .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let mut machine =
-            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
-                .map_err(|_| HostProblem::ProviderFailure)?;
-        let mut resume = MachineResume::Start;
-        loop {
-            match machine.drive(
-                resume,
-                Quantum::new(10_000, 16 * 1024 * 1024).expect("non-zero quantum"),
-            ) {
-                MachineDrive::Continue => resume = MachineResume::Start,
-                MachineDrive::Completed(completion) => {
-                    return Ok(ProgramOutput {
-                        return_code: completion.return_code,
-                        records: completion
-                            .output
-                            .bytes()
-                            .split(|byte| *byte == b'\n')
-                            .filter(|record| !record.is_empty())
-                            .map(<[u8]>::to_vec)
-                            .collect(),
-                    });
-                }
-                MachineDrive::HostCall(_) => return Err(HostProblem::ProviderFailure),
-                MachineDrive::Condition(condition) => {
-                    return Ok(ProgramOutput {
-                        return_code: condition.response,
-                        records: vec![condition.name.into_bytes()],
-                    });
-                }
-                MachineDrive::Abend(_) => {
-                    return Err(HostProblem::Condition {
-                        name: "ABEND".into(),
-                        response: -1,
-                        response2: 0,
-                    });
-                }
-                MachineDrive::Failed(_) => return Err(HostProblem::ProviderFailure),
-                MachineDrive::Suspended(_)
-                | MachineDrive::Invoke(_)
-                | MachineDrive::Transfer(_) => return Err(HostProblem::Unsupported),
-            }
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .map_err(|_| HostProblem::ProviderFailure)?;
+        let coordinator = self.host.get().map_or_else(
+            || ExecutionCoordinator::local(CoordinatorLimits::default()),
+            |host| ExecutionCoordinator::with_host(Arc::clone(host), CoordinatorLimits::default()),
+        );
+        match coordinator.execute(&mut machine, &invocation, ExecutionControl::default()) {
+            ExecutionOutcome::Completed(completion) => Ok(ProgramOutput {
+                return_code: completion.return_code,
+                records: completion
+                    .output
+                    .bytes()
+                    .split(|byte| *byte == b'\n')
+                    .filter(|record| !record.is_empty())
+                    .map(<[u8]>::to_vec)
+                    .collect(),
+            }),
+            ExecutionOutcome::Condition(condition) => Ok(ProgramOutput {
+                return_code: condition.response,
+                records: vec![condition.name.into_bytes()],
+            }),
+            ExecutionOutcome::Abend(_) => Err(HostProblem::Condition {
+                name: "ABEND".into(),
+                response: -1,
+                response2: 0,
+            }),
+            ExecutionOutcome::Cancelled => Err(HostProblem::Cancelled),
+            ExecutionOutcome::TimedOut => Err(HostProblem::TimedOut),
+            ExecutionOutcome::ResourceExhausted(_) => Err(HostProblem::ResourceExhausted),
+            ExecutionOutcome::ProviderFailure(_) => Err(HostProblem::ProviderFailure),
+            ExecutionOutcome::InfrastructureFailure(_) => Err(HostProblem::InfrastructureFailure),
+            ExecutionOutcome::Rejected(_)
+            | ExecutionOutcome::Suspended(_)
+            | ExecutionOutcome::Invoke(_)
+            | ExecutionOutcome::Transfer(_) => Err(HostProblem::Unsupported),
         }
     }
 }
@@ -151,7 +203,7 @@ mod tests {
 
     #[test]
     fn default_cobol_program_compiles_and_runs_reference_machine() {
-        let program = CobolProgram;
+        let program = CobolProgram::new();
         let output = program
             .execute(&ProgramInput {
                 parameter: None,
