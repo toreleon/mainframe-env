@@ -100,6 +100,21 @@ impl HostProvider for ProgramRouter {
     fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
         let sequence = effect.sequence;
         let outcome = (|| {
+            if let HostRequest::Program(ProgramRequest::Inquire { program }) = &effect.request {
+                if !self
+                    .programs
+                    .contains_key(&program.as_str().to_ascii_uppercase())
+                {
+                    return Err(HostProblem::NotFound);
+                }
+                return BoundedPayload::new(
+                    "mainframe-env.program.inquire@1",
+                    Vec::new(),
+                    InvocationLimits::default(),
+                )
+                .map(HostResult::Program)
+                .map_err(|_| HostProblem::ResourceExhausted);
+            }
             let (program, payload) = match effect.request {
                 HostRequest::Program(ProgramRequest::Call { program, payload })
                 | HostRequest::Program(ProgramRequest::Link { program, payload })

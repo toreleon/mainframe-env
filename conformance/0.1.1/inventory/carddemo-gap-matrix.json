@@ -153,9 +153,11 @@
       "priority": "P0",
       "domain": "cics-runtime",
       "title": "Complete reached CICS operations and unit-of-work semantics",
-      "state": "open",
+      "state": "passed",
       "depends_on": ["CD-011", "CD-012"],
       "commit_subject": "Complete CardDemo CICS operations",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-013.json",
+      "evidence_digest": "sha256:a1229fa5539697f08853c9bf4e73a6048af21ddb272d439cc56fa52ec3c7a61d",
       "acceptance": ["ASKTIME, FORMATTIME, INQUIRE, SYNCPOINT and ROLLBACK execute", "RETURN TRANSID and pseudo-conversational resume preserve COMMAREA", "LINK, RETRIEVE, terminal SEND variants, TD queue, conditions, ABEND, and NOHANDLE work for all reached subforms", "commit, rollback, unknown outcome, retry, and restart are observable"]
     },
     {

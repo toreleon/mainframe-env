@@ -103,6 +103,7 @@ enum PendingKind {
     },
     Cics {
         into: Option<String>,
+        outputs: BTreeMap<String, String>,
         response: Option<String>,
         response2: Option<String>,
         no_handle: bool,
@@ -135,6 +136,7 @@ pub struct ReferenceMachine {
     bases: Vec<Vec<u8>>,
     views: BTreeMap<String, StorageView>,
     views_by_id: BTreeMap<StorageId, StorageView>,
+    entry_initials: BTreeMap<StorageId, Vec<u8>>,
     layouts: BTreeMap<String, LayoutMetadata>,
     simple_layouts: BTreeMap<String, Vec<String>>,
     files: BTreeMap<String, FileMetadata>,
@@ -161,6 +163,18 @@ impl ReferenceMachine {
             .map_err(|problem| MachineProblem::InvalidArtifact(problem.to_string()))?;
         validate_module(&module)?;
         let (bases, views, views_by_id) = storage(&module, invocation.limits.max_storage_bytes)?;
+        let mut entry_initials = BTreeMap::new();
+        if let Some(commarea) = invocation.bindings.get("cics.commarea")
+            && let Some(storage) = module
+                .storage()
+                .iter()
+                .find(|storage| storage.name.eq_ignore_ascii_case("DFHCOMMAREA"))
+        {
+            let mut value = vec![b' '; storage.size as usize];
+            let copied = value.len().min(commarea.bytes().len());
+            value[..copied].copy_from_slice(&commarea.bytes()[..copied]);
+            entry_initials.insert(storage.id, value);
+        }
         let operations: Vec<_> = module
             .regions()
             .iter()
@@ -204,6 +218,7 @@ impl ReferenceMachine {
             bases,
             views,
             views_by_id,
+            entry_initials,
             layouts,
             simple_layouts,
             files,
@@ -341,6 +356,7 @@ impl ReferenceMachine {
             (
                 PendingKind::Cics {
                     into,
+                    outputs,
                     response: response_target,
                     response2: response2_target,
                     no_handle,
@@ -349,21 +365,21 @@ impl ReferenceMachine {
             ) => {
                 let responded = response_target.is_some() || no_handle;
                 if let Some(target) = response_target {
-                    self.write_decimal(
+                    self.write_cics_value(
                         &target,
-                        Decimal {
+                        &CobolValue::Decimal(Decimal {
                             coefficient: i128::from(response.response),
                             scale: 0,
-                        },
+                        }),
                     )?;
                 }
                 if let Some(target) = response2_target {
-                    self.write_decimal(
+                    self.write_cics_value(
                         &target,
-                        Decimal {
+                        &CobolValue::Decimal(Decimal {
                             coefficient: i128::from(response.response2),
                             scale: 0,
-                        },
+                        }),
                     )?;
                 }
                 if let Some(target) = into
@@ -372,7 +388,29 @@ impl ReferenceMachine {
                         "mainframe-env.cics.into@1" | "mainframe-env.cics.payload@1"
                     )
                 {
-                    self.write(&target, response.payload.bytes())?;
+                    self.write_cics_value(
+                        &target,
+                        &CobolValue::Bytes(response.payload.bytes().to_vec()),
+                    )?;
+                }
+                for (name, value) in &response.outputs {
+                    let Some(target) = outputs.get(name) else {
+                        continue;
+                    };
+                    if value.schema() == "mainframe-env.cics.decimal@1" {
+                        let coefficient = String::from_utf8_lossy(value.bytes())
+                            .parse::<i128>()
+                            .map_err(|_| MachineProblem::UnexpectedHostResult)?;
+                        self.write_cics_value(
+                            target,
+                            &CobolValue::Decimal(Decimal {
+                                coefficient,
+                                scale: 0,
+                            }),
+                        )?;
+                    } else {
+                        self.write_cics_value(target, &CobolValue::Bytes(value.bytes().to_vec()))?;
+                    }
                 }
                 self.write_cics_context(&response)?;
                 self.deferred_drive = match response.disposition {
@@ -402,6 +440,17 @@ impl ReferenceMachine {
                             payload: response.payload,
                             replace_frame: true,
                         }))
+                    }
+                    CicsDisposition::Handler => {
+                        let target = response
+                            .target
+                            .ok_or(MachineProblem::UnexpectedHostResult)?;
+                        self.pc = self
+                            .labels
+                            .get(&normalize(&target))
+                            .copied()
+                            .ok_or(MachineProblem::UnexpectedHostResult)?;
+                        None
                     }
                     CicsDisposition::Returned => Some(MachineDrive::Completed(self.complete()?)),
                     CicsDisposition::Abended => Some(MachineDrive::Abend(Abend {
@@ -435,12 +484,16 @@ impl ReferenceMachine {
         match name {
             "define" | "file" => {}
             "init" => {
-                let bytes = bytes_attribute(operation, "initial")?;
                 let reference = operation
                     .storage
                     .first()
                     .ok_or(MachineProblem::InvalidOperation)?;
-                self.write_storage(reference.storage, bytes)?;
+                let bytes = self
+                    .entry_initials
+                    .get(&reference.storage)
+                    .cloned()
+                    .unwrap_or(bytes_attribute(operation, "initial")?.to_vec());
+                self.write_storage(reference.storage, &bytes)?;
             }
             "display" => {
                 let mut line = Vec::new();
@@ -829,23 +882,47 @@ impl ReferenceMachine {
     fn cics_effect(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
         let operation = CicsOperation::from_tokens(args).ok_or(MachineProblem::UnsupportedForm)?;
         let mut arguments = cics_arguments(args)?;
-        let destination = |key: &str| {
-            arguments
-                .get(key)
-                .map(|value| String::from_utf8_lossy(value.bytes()).into_owned())
+        let into = cics_destination(&arguments, "INTO");
+        let output_names: &[&str] = match operation {
+            CicsOperation::Asktime => &["ABSTIME"],
+            CicsOperation::Assign => &["APPLID", "SYSID", "TRANSID", "PRINCIPAL"],
+            CicsOperation::FormatTime => &[
+                "YYYYMMDD",
+                "YYMMDD",
+                "MMDDYY",
+                "MMDDYYYY",
+                "YYDDD",
+                "TIME",
+                "MILLISECONDS",
+            ],
+            CicsOperation::Link => &["COMMAREA"],
+            _ => &[],
         };
-        let into = destination("INTO");
-        let response_target = destination("RESP");
-        let response2_target = destination("RESP2");
+        let outputs = output_names
+            .iter()
+            .filter_map(|name| {
+                cics_destination(&arguments, name).map(|target| ((*name).into(), target))
+            })
+            .collect::<BTreeMap<_, _>>();
+        let response_target = cics_destination(&arguments, "RESP");
+        let response2_target = cics_destination(&arguments, "RESP2");
+        let absolute_time = cics_destination(&arguments, "ABSTIME");
         for key in [
-            "FROM", "COMMAREA", "RIDFLD", "LENGTH", "QUEUE", "MAP", "MAPSET", "TRANSID",
+            "FROM", "COMMAREA", "RIDFLD", "LENGTH", "QUEUE", "MAP", "MAPSET", "TRANSID", "PROGRAM",
         ] {
+            if outputs.contains_key(key) {
+                continue;
+            }
             let Some(argument) = arguments.get(key) else {
                 continue;
             };
             let token = String::from_utf8_lossy(argument.bytes()).into_owned();
-            if self.layout(&token).is_some() {
-                let value = self.resolve(&token)?;
+            let reference_tokens = token
+                .split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            if let Ok(reference) = self.reference(&reference_tokens) {
+                let value = self.read_reference(&reference)?;
                 arguments.insert(
                     key.into(),
                     BoundedPayload::new(
@@ -856,6 +933,32 @@ impl ReferenceMachine {
                     .map_err(|_| MachineProblem::ResourceExhausted)?,
                 );
             }
+        }
+        if operation == CicsOperation::FormatTime
+            && let Some(target) = absolute_time
+        {
+            let tokens = target
+                .split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            let reference = self.reference(&tokens)?;
+            let bytes = self.read_reference(&reference)?;
+            if !is_numeric(reference.layout.category) {
+                return Err(MachineProblem::DataException);
+            }
+            let value = decode_decimal(&reference.layout, &bytes)?;
+            if value.scale != 0 {
+                return Err(MachineProblem::DataException);
+            }
+            arguments.insert(
+                "ABSTIME".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.decimal@1",
+                    value.coefficient.to_string().into_bytes(),
+                    InvocationLimits::default(),
+                )
+                .map_err(|_| MachineProblem::ResourceExhausted)?,
+            );
         }
         let condition_policy = if args.iter().any(|arg| arg.eq_ignore_ascii_case("NOHANDLE")) {
             CicsConditionPolicy::NoHandle
@@ -891,6 +994,7 @@ impl ReferenceMachine {
             }),
             PendingKind::Cics {
                 into,
+                outputs,
                 response: response_target,
                 response2: response2_target,
                 no_handle: args.iter().any(|argument| argument == "NOHANDLE"),
@@ -1964,6 +2068,14 @@ impl ReferenceMachine {
             Ok(token.as_bytes().to_vec())
         }
     }
+
+    fn write_cics_value(&mut self, target: &str, value: &CobolValue) -> Result<(), MachineProblem> {
+        let tokens = target
+            .split_whitespace()
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        self.write_reference_value(&tokens, value)
+    }
     fn read(&self, name: &str) -> Result<Vec<u8>, MachineProblem> {
         let resolved = self
             .layout(name)
@@ -2403,11 +2515,7 @@ fn cics_arguments(tokens: &[String]) -> Result<BTreeMap<String, BoundedPayload>,
             break;
         }
         if tokens.get(index + 1).is_some_and(|token| token == "(") {
-            let end = tokens[index + 2..]
-                .iter()
-                .position(|token| token == ")")
-                .map(|offset| index + 2 + offset)
-                .ok_or(MachineProblem::InvalidOperation)?;
+            let end = matching_close(tokens, index + 1).ok_or(MachineProblem::InvalidOperation)?;
             let value = tokens[index + 2..end]
                 .join(" ")
                 .trim_matches(['\'', '"'])
@@ -2436,6 +2544,12 @@ fn cics_arguments(tokens: &[String]) -> Result<BTreeMap<String, BoundedPayload>,
         }
     }
     Ok(arguments)
+}
+
+fn cics_destination(arguments: &BTreeMap<String, BoundedPayload>, key: &str) -> Option<String> {
+    arguments
+        .get(key)
+        .map(|value| String::from_utf8_lossy(value.bytes()).into_owned())
 }
 
 type StorageState = (

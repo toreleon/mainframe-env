@@ -22,12 +22,14 @@ use std::collections::{BTreeMap, BTreeSet};
 mod carddemo;
 
 pub use carddemo::{
-    CardDemoCicsReceipt, CardDemoClosureReceipt, CardDemoControlReceipt, CardDemoCoreReceipt,
-    CardDemoCorpusReceipt, CardDemoFileCallReceipt, CardDemoHostReceipt, CardDemoLayoutReceipt,
-    CardDemoPackageReceipt, CardDemoProgramReceipt, CardDemoResourceReceipt, CardDemoSourceReceipt,
-    CorpusProblem, verify_carddemo_application_package_from_env, verify_carddemo_cics_abi_from_env,
-    verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
-    verify_carddemo_corpus, verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
+    CardDemoCicsReceipt, CardDemoCicsRuntimeReceipt, CardDemoClosureReceipt,
+    CardDemoControlReceipt, CardDemoCoreReceipt, CardDemoCorpusReceipt, CardDemoFileCallReceipt,
+    CardDemoHostReceipt, CardDemoLayoutReceipt, CardDemoPackageReceipt, CardDemoProgramReceipt,
+    CardDemoResourceReceipt, CardDemoSourceReceipt, CorpusProblem,
+    verify_carddemo_application_package_from_env, verify_carddemo_cics_abi_from_env,
+    verify_carddemo_cics_runtime_from_env, verify_carddemo_control_flow_from_env,
+    verify_carddemo_core_semantics_from_env, verify_carddemo_corpus,
+    verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
     verify_carddemo_file_call_semantics_from_env, verify_carddemo_host_operands_from_env,
     verify_carddemo_program_routing_from_env, verify_carddemo_resources_from_env,
     verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
@@ -492,6 +494,30 @@ mod tests {
     }
 
     #[test]
+    fn cics_nested_subscript_operand_reads_selected_element() {
+        use mainframe_env_host_api::{CicsOperation, HostRequest};
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSINDEX. DATA DIVISION. WORKING-STORAGE SECTION. 01 IDX PIC 9 VALUE 2. 01 NAMES. 05 PGM-NAME PIC X(4) OCCURS 2. PROCEDURE DIVISION. MOVE 'P001' TO PGM-NAME(1). MOVE 'P002' TO PGM-NAME(2). EXEC CICS INQUIRE PROGRAM(PGM-NAME(IDX)) NOHANDLE END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("CICS INQUIRE did not call host");
+        };
+        let HostRequest::Cics(request) = effect.request else {
+            panic!("unexpected host request");
+        };
+        assert_eq!(request.operation, CicsOperation::Inquire);
+        assert_eq!(request.arguments["PROGRAM"].bytes(), b"P002");
+    }
+
+    #[test]
     fn sql_host_variables_use_typed_embedded_envelope() {
         use mainframe_env_host_api::{EffectResult, HostRequest, HostResult, ProgramRequest};
 
@@ -636,6 +662,8 @@ mod tests {
             target: None,
             next_transaction: None,
             payload,
+            outputs: BTreeMap::new(),
+            unit_of_work: None,
         };
         let result = machine.drive(
             MachineResume::HostResult(EffectResult {
@@ -649,6 +677,123 @@ mod tests {
                 result,
                 MachineDrive::Completed(ref done)
                     if done.output.bytes() == b"ABC\n13\n02\n03\nT001\n"
+            ),
+            "{result:?}"
+        );
+    }
+
+    #[test]
+    fn cics_decimal_outputs_update_exact_cobol_destinations() {
+        use mainframe_env_host_api::{CicsDisposition, CicsResponse, EffectResult, HostResult};
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTIME. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-X PIC S9(15) COMP-3 VALUE 0. 01 ABS-DISPLAY PIC 9(15). PROCEDURE DIVISION. EXEC CICS ASKTIME ABSTIME(ABS-X) END-EXEC. MOVE ABS-X TO ABS-DISPLAY. DISPLAY ABS-DISPLAY. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("ASKTIME did not call host");
+        };
+        let response = CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                Vec::new(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            outputs: BTreeMap::from([(
+                "ABSTIME".into(),
+                mainframe_env_execution_api::BoundedPayload::new(
+                    "mainframe-env.cics.decimal@1",
+                    b"3997082096789".to_vec(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            )]),
+            unit_of_work: None,
+        };
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: effect.sequence,
+                    outcome: Ok(HostResult::Cics(response)),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(done) if done.output.bytes() == b"003997082096789\n"
+        ));
+    }
+
+    #[test]
+    fn cics_local_handler_and_entry_commarea_preserve_control_and_bytes() {
+        use mainframe_env_host_api::{CicsDisposition, CicsResponse, EffectResult, HostResult};
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSHANDLER. DATA DIVISION. LINKAGE SECTION. 01 DFHCOMMAREA PIC X(4). PROCEDURE DIVISION USING DFHCOMMAREA. EXEC CICS INQUIRE PROGRAM('MISSING') END-EXEC. DISPLAY 'BAD'. GO TO DONE. HANDLER. DISPLAY DFHCOMMAREA. DONE. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut invocation = invocation(&artifact, 1024);
+        invocation.bindings.insert(
+            "cics.commarea".into(),
+            mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.commarea@1",
+                b"KEEP".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        let mut machine =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("INQUIRE did not call host");
+        };
+        let response = CicsResponse {
+            disposition: CicsDisposition::Handler,
+            condition: "PGMIDERR".into(),
+            response: 27,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0,
+            target: Some("HANDLER".into()),
+            next_transaction: None,
+            payload: mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                Vec::new(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            outputs: BTreeMap::new(),
+            unit_of_work: None,
+        };
+        let result = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: effect.sequence,
+                outcome: Ok(HostResult::Cics(response)),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        );
+        assert!(
+            matches!(
+                result,
+                MachineDrive::Completed(ref done) if done.output.bytes() == b"KEEP\n"
             ),
             "{result:?}"
         );

@@ -1,17 +1,17 @@
 # CardDemo-full 0.1.1 Program Status
 
-Current phase: **CD.A — corpus and application packaging**
-Current issue: **CD-012 — CICS screens and conditions PASS**
-Next issue: **CD-013 — base VSAM seed data**
+Current phase: **CD.C — base CICS and terminal runtime**
+Current issue: **CD-013 — reached CICS operations and unit-of-work semantics PASS**
+Next issue: **CD-014 — keyed VSAM and alternate-index semantics**
 Current product: **0.1.0-alpha.0**
 Target product: **0.1.1**
 CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Source identity
 
-- mainframe-env base commit: `9a972d9831a35600b5b19ad947cd2413fdf7c943`
+- mainframe-env base commit: `742982c052298c4855d5867aab505c216e896331`
 - current deterministic dirty-tree identity:
-  `sha256:c02dc1041d34ca9ebbe6f2c1e104dd92f143c5889396b67948f60f7b974d3855`
+  `sha256:b7949fd33c288ae049872a0df3b3a821c557a12a1882adb17850cf12eb6643b3`
 - dirty-tree algorithm: SHA-256 of the sorted `sha256sum` records for every
   repository file except `.git/`, `target/`, and the two persistent CardDemo
   status ledgers (which carry the identity).
@@ -247,7 +247,8 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 - State: **PASS**
 - Required commit subject: `Apply CICS results to COBOL storage`
-- Completion commit identity: recorded when CD-013 starts from this issue commit.
+- Completion commit identity:
+  `742982c052298c4855d5867aab505c216e896331`.
 - Evidence: `conformance/0.1.1/evidence/issues/CD-012.json`
 - Evidence digest:
   `sha256:0af81d9136fc6feec43de8e38a0c92ccf892631f611cfb4a2d80ac9ed07002fd`
@@ -255,6 +256,23 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   payloads, RESP/RESP2/NOHANDLE/HANDLE, and EIB storage updates pass. The CICS
   shape digest is
   `sha256:4c4aec5224c606f59388e517cb7553f0890830589ee29871a2a55ae015af5dc7`.
+
+### CD-013 — reached CICS runtime and unit of work
+
+- State: **PASS**
+- Required commit subject: `Complete CardDemo CICS operations`
+- Completion commit identity: recorded when CD-014 starts from this issue commit.
+- Evidence: `conformance/0.1.1/evidence/issues/CD-013.json`
+- Evidence digest:
+  `sha256:a1229fa5539697f08853c9bf4e73a6048af21ddb272d439cc56fa52ec3c7a61d`
+- All 240 reached statements map to 24 executable variants. ASKTIME,
+  FORMATTIME, INQUIRE, LINK, RETRIEVE, ASSIGN, terminal variants, TD queues,
+  local conditions, ABEND, and NOHANDLE apply exact typed results.
+- Twenty-four RETURN TRANSID/COMMAREA paths, queue records, and syncpoint
+  intent/results survive restart. Commit and both reached rollback forms replay
+  idempotently; unresolved intent remains an explicit unknown outcome until
+  reconciliation. The residual runtime shape digest is
+  `sha256:a18d2cdae251d027a032866cabf4380511a84b056a410b1cdd3be0877ea14c9f`.
 
 ## Commands and exit codes
 
@@ -349,10 +367,21 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 - `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-host --check` — **1**;
   expected missing-environment failure.
 - Ordinary conformance and cumulative CD-001–CD-008 gates — **0**.
+- Focused pre-repair `carddemo_residual_cics_forms_are_executable` — **1**;
+  ASKTIME was still explicitly unsupported.
+- Affected host API, interpreter, CICS, batch, server, conformance, and xtask
+  tests — **0**; 91 tests passed.
+- Workspace all-target check and affected-package Clippy with `-D warnings` —
+  **0**.
+- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-cics-runtime --check`
+  — **0**; exact 240-statement, 24-variant runtime receipt passed.
+- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-cics-runtime --check` —
+  **1**; expected missing-environment failure.
+- Ordinary conformance, JSON, formatting, redaction, and diff checks — **0**.
 
 ## Implementation status
 
-- Issues passed: **12 / 27**
+- Issues passed: **13 / 27**
 - Journeys passed: **0 / 20**
 - Installed CardDemo resources: **0**
 - Executed CardDemo application journeys: **0**
@@ -366,9 +395,9 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 2. The repository is still `0.1.0-alpha.0`. A 0.1.1 release cannot be cut until
    0.1.0 is finalized or an explicit version-line correction is accepted.
 
-Neither decision blocks CD-013. No CD-012 blocker remains.
+Neither decision blocks CD-014. No CD-013 blocker remains.
 
 ## Next smallest executable step
 
-Import the exact base EBCDIC seeds with record/key/AIX validation and
-transactional reinstall, upgrade, rollback, corrupt-input, and capacity tests.
+Implement keyed KSDS record insert/read/rewrite/delete, stable browse order,
+alternate-index duplicate policy, and atomic base/index CICS conditions.

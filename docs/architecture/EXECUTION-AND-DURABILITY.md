@@ -89,6 +89,13 @@ For a mutating effect:
 Infrastructure retry never assumes that an external mutation did not occur.
 Unknown outcomes remain explicit and require service-specific reconciliation.
 
+CICS syncpoint uses this same rule. A durable commit or rollback intent is
+written before its final decision. Replay returns the recorded final decision;
+an intent without a final result remains `UnknownOutcome` across restart until
+the CICS authority reconciles it. Pseudo-conversational COMMAREA continuations
+and transient-data queue records use provider-state compare-and-swap identities
+rather than worker memory.
+
 ## Scheduling
 
 The single-node scheduler provides bounded lanes:

@@ -159,7 +159,10 @@ host requests and DD bindings.
 
 Owns typed CICS provider behavior required by the 0.1 operation inventory,
 including terminal/session, file, program control, conditions, transactions,
-and EIB outcomes. Protocol/UI implementations are not dependencies.
+and EIB outcomes. The provider persists pseudo-conversational continuations,
+transient-data records, and idempotent syncpoint intent/result decisions;
+unresolved decisions remain unknown outcomes until explicit reconciliation.
+Protocol/UI implementations are not dependencies.
 
 ### `mainframe-env-racf`
 

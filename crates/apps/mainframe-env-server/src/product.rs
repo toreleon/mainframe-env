@@ -9,10 +9,10 @@ use mainframe_env_execution_api::{
     Principal, PrincipalId, RequestId, ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
 };
 use mainframe_env_host_api::{
-    AccessIntent, DatasetAttributes, DatasetName, DatasetOrganization, DatasetRequest,
-    DatasetResult, EffectRequest, HostLimits, HostProblem, HostProvider, HostRequest, HostResult,
-    MemberName, Mutation, RecordFormat, RegistrySnapshot, ResourceName, ScopedHostService,
-    SecretRef, SecurityDecision,
+    AccessIntent, CapabilityDescriptor, ClockRequest, DatasetAttributes, DatasetName,
+    DatasetOrganization, DatasetRequest, DatasetResult, EffectRequest, EffectResult, HostLimits,
+    HostProblem, HostProvider, HostRequest, HostResult, MemberName, Mutation, RecordFormat,
+    RegistrySnapshot, ResourceName, ScopedHostService, SecretRef, SecurityDecision,
 };
 use mainframe_env_racf::{MemorySecretResolver, RacfService, racf_providers};
 use mainframe_env_store::{LocalArtifactStore, MemoryStore};
@@ -27,7 +27,7 @@ use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio_rustls::TlsAcceptor;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1244,6 +1244,7 @@ fn scoped_host(
     let limits = InvocationLimits::default();
     let mut providers = dataset_providers(dataset.clone(), limits);
     providers.extend(racf_providers(racf.clone(), limits));
+    providers.push(Arc::new(SystemClockProvider::new(limits)) as Arc<dyn HostProvider>);
     providers.push(program);
     if include_cics {
         providers.push(cics.ok_or(HostProblem::InfrastructureFailure)?);
@@ -1255,6 +1256,85 @@ fn scoped_host(
         ),
         HostLimits::default(),
     )))
+}
+
+struct SystemClockProvider {
+    descriptor: CapabilityDescriptor,
+}
+
+impl SystemClockProvider {
+    fn new(limits: InvocationLimits) -> Self {
+        Self {
+            descriptor: CapabilityDescriptor {
+                capability: CapabilityId::new("host.clock", limits)
+                    .expect("static clock capability"),
+                provider_id: "mainframe-env-system-clock".into(),
+                generation: "1".into(),
+                request_schema: "mainframe-env.clock.request@1".into(),
+                result_schema: "mainframe-env.clock.response@1".into(),
+                max_request_bytes: 64,
+                max_result_bytes: 64,
+                ready: true,
+            },
+        }
+    }
+}
+
+impl HostProvider for SystemClockProvider {
+    fn descriptor(&self) -> &CapabilityDescriptor {
+        &self.descriptor
+    }
+
+    fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
+        let outcome = match effect.request {
+            HostRequest::Clock(request) => system_clock_value(request).map(HostResult::Clock),
+            _ => Err(HostProblem::Malformed),
+        };
+        EffectResult {
+            sequence: effect.sequence,
+            outcome,
+        }
+    }
+}
+
+fn system_clock_value(request: ClockRequest) -> Result<String, HostProblem> {
+    let duration = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    let seconds = i64::try_from(duration.as_secs()).map_err(|_| HostProblem::ResourceExhausted)?;
+    let days = seconds / 86_400;
+    let rest = seconds % 86_400;
+    let (year, month, day) = civil_from_unix_days(days);
+    let hour = rest / 3_600;
+    let minute = (rest / 60) % 60;
+    let second = rest % 60;
+    let milliseconds = duration.subsec_millis();
+    Ok(match request {
+        ClockRequest::UtcTimestamp => {
+            format!("{year:04}{month:02}{day:02}{hour:02}{minute:02}{second:02}{milliseconds:03}")
+        }
+        ClockRequest::Date => format!("{year:04}{month:02}{day:02}"),
+        ClockRequest::Time => format!("{hour:02}{minute:02}{second:02}{milliseconds:03}"),
+    })
+}
+
+fn civil_from_unix_days(days: i64) -> (i64, i64, i64) {
+    let shifted = days + 719_468;
+    let era = if shifted >= 0 {
+        shifted
+    } else {
+        shifted - 146_096
+    } / 146_097;
+    let day_of_era = shifted - era * 146_097;
+    let year_of_era =
+        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let mut year = year_of_era + era * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_prime = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * month_prime + 2) / 5 + 1;
+    let month = month_prime + if month_prime < 10 { 3 } else { -9 };
+    year += i64::from(month <= 2);
+    (year, month, day)
 }
 
 fn dataset_name(value: &str) -> Result<DatasetName, GatewayProblem> {
@@ -1393,6 +1473,9 @@ fn job_capabilities(jcl: &[u8]) -> Vec<&'static str> {
     if source.contains("EXEC CICS") {
         capabilities.push("host.cics.execute");
     }
+    if source.contains("ASKTIME") || source.contains("FORMATTIME") {
+        capabilities.push("host.clock");
+    }
     if source.contains("ACCEPT ") {
         capabilities.push("host.terminal");
     }
@@ -1480,6 +1563,21 @@ mod tests {
     use base64::Engine;
     use mainframe_env_store::SqliteStateStore;
     use tower::ServiceExt;
+
+    #[test]
+    fn system_clock_provider_emits_bounded_utc_shapes() {
+        assert_eq!(civil_from_unix_days(0), (1970, 1, 1));
+        assert_eq!(civil_from_unix_days(20_695), (2026, 8, 30));
+        let timestamp = system_clock_value(ClockRequest::UtcTimestamp).unwrap();
+        let date = system_clock_value(ClockRequest::Date).unwrap();
+        let time = system_clock_value(ClockRequest::Time).unwrap();
+        assert_eq!(timestamp.len(), 17);
+        assert_eq!(date.len(), 8);
+        assert_eq!(time.len(), 9);
+        assert!(timestamp.bytes().all(|byte| byte.is_ascii_digit()));
+        assert!(date.bytes().all(|byte| byte.is_ascii_digit()));
+        assert!(time.bytes().all(|byte| byte.is_ascii_digit()));
+    }
 
     fn config() -> ServerConfig {
         ServerConfig {

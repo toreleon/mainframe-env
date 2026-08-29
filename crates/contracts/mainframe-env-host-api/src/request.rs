@@ -221,6 +221,9 @@ pub enum DatasetResult {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ProgramRequest {
+    Inquire {
+        program: ProgramName,
+    },
     Call {
         program: ProgramName,
         payload: BoundedPayload,
@@ -380,10 +383,12 @@ pub enum CicsOperation {
     HandleAbend,
     HandleCondition,
     Inquire,
+    Link,
     Read,
     ReadNext,
     ReadPrev,
     ReceiveMap,
+    Retrieve,
     Return,
     Rewrite,
     SendText,
@@ -404,6 +409,10 @@ impl CicsOperation {
                 | Self::Rewrite
                 | Self::Write
                 | Self::WriteTransientData
+                | Self::Link
+                | Self::ReceiveMap
+                | Self::SendMap
+                | Self::SendText
                 | Self::Xctl
                 | Self::Return
                 | Self::Abend
@@ -429,10 +438,12 @@ impl CicsOperation {
             ("HANDLE", Some("ABEND")) => Self::HandleAbend,
             ("HANDLE", _) => Self::HandleCondition,
             ("INQUIRE", _) => Self::Inquire,
+            ("LINK", _) => Self::Link,
             ("READ", _) => Self::Read,
             ("READNEXT", _) => Self::ReadNext,
             ("READPREV", _) => Self::ReadPrev,
             ("RECEIVE", Some("MAP")) => Self::ReceiveMap,
+            ("RETRIEVE", _) => Self::Retrieve,
             ("RETURN", _) => Self::Return,
             ("REWRITE", _) => Self::Rewrite,
             ("SEND", Some("MAP")) => Self::SendMap,
@@ -448,10 +459,7 @@ impl CicsOperation {
 
     #[must_use]
     pub const fn supported(self) -> bool {
-        !matches!(
-            self,
-            Self::Asktime | Self::FormatTime | Self::Inquire | Self::Syncpoint
-        )
+        true
     }
 }
 
@@ -478,8 +486,15 @@ pub enum CicsDisposition {
     Complete,
     Suspended,
     Transfer,
+    Handler,
     Returned,
     Abended,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CicsUnitOfWorkOutcome {
+    Committed,
+    RolledBack,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -495,6 +510,8 @@ pub struct CicsResponse {
     pub target: Option<String>,
     pub next_transaction: Option<String>,
     pub payload: BoundedPayload,
+    pub outputs: BTreeMap<String, BoundedPayload>,
+    pub unit_of_work: Option<CicsUnitOfWorkOutcome>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -550,8 +567,14 @@ impl HostRequest {
                 SpoolRequest::Append { .. }
                     | SpoolRequest::Seal { .. }
                     | SpoolRequest::Purge { .. }
-            ) | Self::Program(_)
-                | Self::State(StateRequest::Put { .. } | StateRequest::Delete { .. })
+            ) | Self::Program(
+                ProgramRequest::Call { .. }
+                    | ProgramRequest::Link { .. }
+                    | ProgramRequest::Xctl { .. }
+                    | ProgramRequest::Return { .. }
+                    | ProgramRequest::Cancel { .. }
+                    | ProgramRequest::Abend { .. }
+            ) | Self::State(StateRequest::Put { .. } | StateRequest::Delete { .. })
         ) || matches!(self, Self::Cics(CicsRequest { operation, .. }) if operation.is_mutating())
     }
 
@@ -675,7 +698,19 @@ impl HostResult {
                         .next_transaction
                         .as_ref()
                         .is_some_and(|value| value.len() > limits.max_name_bytes)
-                    || response.payload.bytes().len() > limits.max_state_bytes =>
+                    || response.payload.bytes().len() > limits.max_state_bytes
+                    || response.outputs.len() > limits.max_fields
+                    || response
+                        .outputs
+                        .values()
+                        .any(|value| value.bytes().len() > limits.max_state_bytes)
+                    || response
+                        .outputs
+                        .values()
+                        .try_fold(0usize, |total, value| {
+                            total.checked_add(value.bytes().len())
+                        })
+                        .is_none_or(|total| total > limits.max_state_bytes) =>
             {
                 Err(HostProblem::ResourceExhausted)
             }
@@ -907,10 +942,12 @@ mod tests {
             CicsOperation::HandleAbend,
             CicsOperation::HandleCondition,
             CicsOperation::Inquire,
+            CicsOperation::Link,
             CicsOperation::Read,
             CicsOperation::ReadNext,
             CicsOperation::ReadPrev,
             CicsOperation::ReceiveMap,
+            CicsOperation::Retrieve,
             CicsOperation::Return,
             CicsOperation::Rewrite,
             CicsOperation::SendText,
@@ -921,6 +958,6 @@ mod tests {
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-        assert_eq!(forms.len(), 22);
+        assert_eq!(forms.len(), 24);
     }
 }

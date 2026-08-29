@@ -10,6 +10,7 @@ use mainframe_env_compiler::{
     compatibility_copybooks, owned_compatibility_library,
 };
 use mainframe_env_execution_api::{Machine, MachineDrive, MachineResume, Quantum};
+use mainframe_env_host_api::CicsOperation;
 use mainframe_env_source::{
     LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLibrary,
     SourceLimits,
@@ -317,6 +318,23 @@ pub struct CardDemoCicsReceipt {
     pub eib_fields: Vec<String>,
     pub provider_tests: usize,
     pub cics_shape_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoCicsRuntimeReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub reached_operations: usize,
+    pub executable_variants: usize,
+    pub residual_counts: BTreeMap<String, usize>,
+    pub syncpoint_rollbacks: usize,
+    pub return_transid: usize,
+    pub return_commarea: usize,
+    pub send_variants: BTreeMap<String, usize>,
+    pub format_destinations: Vec<String>,
+    pub runtime_regression_cases: usize,
+    pub cics_runtime_sha256: String,
 }
 
 pub fn verify_carddemo_corpus_from_env(
@@ -1841,6 +1859,169 @@ pub fn verify_carddemo_cics_abi_from_env(
             .collect(),
         provider_tests: 8,
         cics_shape_sha256: format!("{:x}", digest.finalize()),
+    })
+}
+
+pub fn verify_carddemo_cics_runtime_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoCicsRuntimeReceipt, CorpusProblem> {
+    let cics = verify_carddemo_cics_abi_from_env(inventory_path)?;
+    let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required",
+        )
+    })?;
+    let bundles = explicit_carddemo_bundles(Path::new(&corpus_dir))?;
+    let compiler = CobolCompiler::default();
+    let residual = [
+        "ABEND",
+        "ASKTIME",
+        "ASSIGN",
+        "FORMATTIME",
+        "HANDLE",
+        "INQUIRE",
+        "LINK",
+        "RETRIEVE",
+        "RETURN",
+        "SEND",
+        "SYNCPOINT",
+        "WRITEQ",
+    ];
+    let mut reached_operations = 0usize;
+    let mut executable = BTreeSet::new();
+    let mut residual_counts = BTreeMap::new();
+    let mut syncpoint_rollbacks = 0usize;
+    let mut return_transid = 0usize;
+    let mut return_commarea = 0usize;
+    let mut send_variants = BTreeMap::new();
+    let mut format_destinations = BTreeSet::new();
+    let mut digest = Sha256::new();
+    for (primary, bundle) in bundles {
+        let hir = compiler.analyze(&bundle).hir.ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.cics-runtime.hir_failed",
+                format!("{primary} missing HIR"),
+            )
+        })?;
+        for statement in hir
+            .statements
+            .iter()
+            .filter(|statement| statement.kind == StatementKind::ExecCics)
+        {
+            reached_operations += 1;
+            let operation = CicsOperation::from_tokens(&statement.arguments).ok_or_else(|| {
+                CorpusProblem::new(
+                    "carddemo.cics-runtime.untyped",
+                    format!("{primary} has an untyped reached CICS form"),
+                )
+            })?;
+            if !operation.supported() {
+                return Err(CorpusProblem::new(
+                    "carddemo.cics-runtime.unsupported",
+                    format!("{primary} has an unsupported reached CICS form"),
+                ));
+            }
+            executable.insert(format!("{operation:?}"));
+            let opcode = statement
+                .arguments
+                .iter()
+                .find(|argument| !matches!(argument.as_str(), "CICS" | "END-EXEC"))
+                .map(String::as_str)
+                .unwrap_or("");
+            if residual.contains(&opcode) {
+                *residual_counts.entry(opcode.to_string()).or_insert(0) += 1;
+                digest_field(&mut digest, primary.as_bytes());
+                digest_field(
+                    &mut digest,
+                    format!("{operation:?}:{:?}", statement.arguments).as_bytes(),
+                );
+            }
+            if opcode == "SYNCPOINT"
+                && statement
+                    .arguments
+                    .iter()
+                    .any(|argument| argument == "ROLLBACK")
+            {
+                syncpoint_rollbacks += 1;
+            }
+            if opcode == "RETURN" {
+                return_transid += usize::from(
+                    statement
+                        .arguments
+                        .iter()
+                        .any(|argument| argument == "TRANSID"),
+                );
+                return_commarea += usize::from(
+                    statement
+                        .arguments
+                        .iter()
+                        .any(|argument| argument == "COMMAREA"),
+                );
+            }
+            if opcode == "SEND" {
+                let variant = if statement.arguments.iter().any(|argument| argument == "MAP") {
+                    "MAP"
+                } else if statement
+                    .arguments
+                    .iter()
+                    .any(|argument| argument == "TEXT")
+                {
+                    "TEXT"
+                } else {
+                    "FROM"
+                };
+                *send_variants.entry(variant.into()).or_insert(0) += 1;
+            }
+            if opcode == "FORMATTIME" {
+                for destination in [
+                    "YYYYMMDD",
+                    "YYMMDD",
+                    "MMDDYY",
+                    "MMDDYYYY",
+                    "YYDDD",
+                    "TIME",
+                    "MILLISECONDS",
+                ] {
+                    if statement
+                        .arguments
+                        .iter()
+                        .any(|argument| argument == destination)
+                    {
+                        format_destinations.insert(destination.to_string());
+                    }
+                }
+            }
+        }
+    }
+    if reached_operations != 240
+        || executable.len() != 24
+        || syncpoint_rollbacks != 2
+        || return_transid == 0
+        || return_commarea == 0
+        || !["MAP", "TEXT", "FROM"]
+            .iter()
+            .all(|variant| send_variants.contains_key(*variant))
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.cics-runtime.surface_drift",
+            "reached CICS runtime surface differs from the pinned contract",
+        ));
+    }
+    Ok(CardDemoCicsRuntimeReceipt {
+        schema_version: "mainframe-env.carddemo-cics-runtime-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit: cics.corpus_commit,
+        reached_operations,
+        executable_variants: executable.len(),
+        residual_counts,
+        syncpoint_rollbacks,
+        return_transid,
+        return_commarea,
+        send_variants,
+        format_destinations: format_destinations.into_iter().collect(),
+        runtime_regression_cases: 8,
+        cics_runtime_sha256: format!("{:x}", digest.finalize()),
     })
 }
 

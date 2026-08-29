@@ -4,13 +4,13 @@ use mainframe_env_execution_api::{
 };
 use mainframe_env_host_api::{
     AccessIntent, CapabilityDescriptor, CicsConditionPolicy, CicsDisposition, CicsOperation,
-    CicsRequest, CicsResponse, DatasetName, DatasetRequest, DatasetResult, EffectRequest,
-    EffectResult, HostProblem, HostProvider, HostRequest, HostResult, MemberName, Mutation,
-    ProgramName, ProgramRequest, ResourceName, ScopedHostService, SecurityDecision,
-    SecurityRequest, SessionId,
+    CicsRequest, CicsResponse, CicsUnitOfWorkOutcome, ClockRequest, DatasetName, DatasetRequest,
+    DatasetResult, EffectRequest, EffectResult, HostProblem, HostProvider, HostRequest, HostResult,
+    MemberName, Mutation, ProgramName, ProgramRequest, ResourceName, ScopedHostService,
+    SecurityDecision, SecurityRequest, SessionId,
 };
 use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -81,13 +81,36 @@ struct Run {
     host_sequence: u64,
     handlers: BTreeMap<String, String>,
     abend_handler: Option<String>,
+    retrieve: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CicsContinuation {
+    pub transaction: String,
+    pub commarea: Vec<u8>,
+}
+
+#[derive(Clone, Debug)]
+struct DurableContinuation {
+    transaction: String,
+    commarea: Vec<u8>,
+    claimed_by: Option<String>,
+    effect_key: String,
+    version: u64,
+}
+
+#[derive(Clone, Debug)]
+struct TransientQueue {
+    records: Vec<(String, Vec<u8>)>,
+    version: u64,
 }
 
 struct State {
     sessions: BTreeMap<String, Session>,
     runs: BTreeMap<RunUnitId, Run>,
     maps: BTreeMap<(String, String), BmsMapDefinition>,
-    transient: BTreeMap<String, VecDeque<Vec<u8>>>,
+    continuations: BTreeMap<String, DurableContinuation>,
+    transient: BTreeMap<String, TransientQueue>,
     transient_bytes: usize,
 }
 
@@ -111,6 +134,36 @@ impl CicsService {
         {
             sessions.insert(row.key, decode_session(&row.payload, row.version, limits)?);
         }
+        let mut continuations = BTreeMap::new();
+        for row in store
+            .list_provider_state("cics-continuation", limits.max_sessions)
+            .map_err(store_error)?
+        {
+            continuations.insert(
+                row.key,
+                decode_continuation(&row.payload, row.version, limits)?,
+            );
+        }
+        let mut transient = BTreeMap::new();
+        let mut transient_bytes = 0usize;
+        for row in store
+            .list_provider_state("cics-tdq", limits.max_queue_records)
+            .map_err(store_error)?
+        {
+            let queue = decode_transient(&row.payload, row.version, limits)?;
+            transient_bytes = transient_bytes
+                .checked_add(
+                    queue
+                        .records
+                        .iter()
+                        .map(|(_, value)| value.len())
+                        .sum::<usize>(),
+                )
+                .ok_or(HostProblem::ResourceExhausted)?;
+            if transient.insert(row.key, queue).is_some() {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+        }
         Ok(Arc::new(Self {
             host,
             store,
@@ -119,8 +172,9 @@ impl CicsService {
                 sessions,
                 runs: BTreeMap::new(),
                 maps: BTreeMap::new(),
-                transient: BTreeMap::new(),
-                transient_bytes: 0,
+                continuations,
+                transient,
+                transient_bytes,
             }),
         }))
     }
@@ -189,6 +243,11 @@ impl CicsService {
         if state.runs.contains_key(&invocation.run_unit_id) {
             return Err(HostProblem::IdempotencyConflict);
         }
+        let retrieve = invocation
+            .bindings
+            .get("cics.retrieve")
+            .map(|value| value.bytes().to_vec())
+            .unwrap_or_default();
         state.runs.insert(
             invocation.run_unit_id.clone(),
             Run {
@@ -200,9 +259,81 @@ impl CicsService {
                 host_sequence: 0,
                 handlers: BTreeMap::new(),
                 abend_handler: None,
+                retrieve,
             },
         );
         Ok(())
+    }
+
+    pub fn claim_continuation(
+        &self,
+        invocation: Invocation,
+        session: &SessionId,
+        applid: &str,
+        sysid: &str,
+    ) -> Result<CicsContinuation, HostProblem> {
+        let values = [applid, sysid];
+        if values.iter().any(|value| {
+            value.is_empty()
+                || value.len() > 16
+                || !value
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        }) {
+            return Err(HostProblem::Malformed);
+        }
+        let mut state = self.lock()?;
+        if !state.sessions.contains_key(session.as_str()) {
+            return Err(HostProblem::NotFound);
+        }
+        if state.runs.len() >= self.limits.max_runs {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        if state.runs.contains_key(&invocation.run_unit_id) {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        let current = state
+            .continuations
+            .get(session.as_str())
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
+        let run_id = invocation.run_unit_id.as_str();
+        let next = match current.claimed_by.as_deref() {
+            None => {
+                let mut next = current.clone();
+                next.version = next
+                    .version
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?;
+                next.claimed_by = Some(run_id.into());
+                self.persist_continuation(session.as_str(), &next, Some(current.version))?;
+                state
+                    .continuations
+                    .insert(session.as_str().into(), next.clone());
+                next
+            }
+            Some(claimed) if claimed == run_id => current,
+            Some(_) => return Err(HostProblem::IdempotencyConflict),
+        };
+        let continuation = CicsContinuation {
+            transaction: next.transaction.clone(),
+            commarea: next.commarea.clone(),
+        };
+        state.runs.insert(
+            invocation.run_unit_id.clone(),
+            Run {
+                invocation,
+                session: session.as_str().into(),
+                transaction: next.transaction,
+                applid: applid.to_ascii_uppercase(),
+                sysid: sysid.to_ascii_uppercase(),
+                host_sequence: 0,
+                handlers: BTreeMap::new(),
+                abend_handler: None,
+                retrieve: Vec::new(),
+            },
+        );
+        Ok(continuation)
     }
 
     fn ensure_run(&self, invocation: &Invocation) -> Result<(), HostProblem> {
@@ -212,11 +343,13 @@ impl CicsService {
                 return Ok(());
             }
         }
-        let session = SessionId::new(
-            format!("session-{}", invocation.run_unit_id),
-            InvocationLimits::default().max_binding_bytes,
-        )
-        .map_err(|_| HostProblem::ResourceExhausted)?;
+        let session_name = invocation
+            .bindings
+            .get("cics.session")
+            .map(|value| String::from_utf8_lossy(value.bytes()).into_owned())
+            .unwrap_or_else(|| format!("session-{}", invocation.run_unit_id));
+        let session = SessionId::new(session_name, InvocationLimits::default().max_binding_bytes)
+            .map_err(|_| HostProblem::ResourceExhausted)?;
         match self.create_session(&session, 24, 80) {
             Ok(()) | Err(HostProblem::IdempotencyConflict) => {}
             Err(problem) => return Err(problem),
@@ -281,6 +414,21 @@ impl CicsService {
         Ok(())
     }
 
+    pub fn transient_records(&self, queue: &str) -> Result<Vec<Vec<u8>>, HostProblem> {
+        let state = self.lock()?;
+        Ok(state
+            .transient
+            .get(&queue.to_ascii_uppercase())
+            .map(|queue| {
+                queue
+                    .records
+                    .iter()
+                    .map(|(_, value)| value.clone())
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+
     pub fn invoke(
         &self,
         effect: &EffectRequest,
@@ -289,22 +437,17 @@ impl CicsService {
         if !request.operation.supported() {
             return Err(HostProblem::Unsupported);
         }
-        let mut state = self.lock()?;
-        let mut run = state
+        let mut run = self
+            .lock()?
             .runs
             .remove(&effect.run_unit)
             .ok_or(HostProblem::Unauthorized)?;
-        let result = self.invoke_run(&mut state, &mut run, request);
-        state.runs.insert(effect.run_unit.clone(), run);
+        let result = self.invoke_run(&mut run, request);
+        self.lock()?.runs.insert(effect.run_unit.clone(), run);
         result
     }
 
-    fn invoke_run(
-        &self,
-        state: &mut State,
-        run: &mut Run,
-        request: CicsRequest,
-    ) -> Result<CicsResponse, HostProblem> {
+    fn invoke_run(&self, run: &mut Run, request: CicsRequest) -> Result<CicsResponse, HostProblem> {
         if let Some(mutation) = &request.mutation
             && mutation.transaction.as_deref() != Some(run.transaction.as_str())
         {
@@ -318,9 +461,18 @@ impl CicsService {
         )?;
         match request.operation {
             CicsOperation::HandleCondition => {
-                let condition = argument_text(&request, "CONDITION")?;
-                let program = argument_text(&request, "PROGRAM")?;
-                run.handlers.insert(condition, program);
+                let (condition, label) = request
+                    .arguments
+                    .iter()
+                    .find(|(name, _)| !name.starts_with("OPTION."))
+                    .map(|(name, value)| {
+                        (
+                            name.to_ascii_uppercase(),
+                            String::from_utf8_lossy(value.bytes()).into_owned(),
+                        )
+                    })
+                    .ok_or(HostProblem::Malformed)?;
+                run.handlers.insert(condition, label);
                 self.response(
                     run,
                     CicsDisposition::Complete,
@@ -333,7 +485,11 @@ impl CicsService {
                 )
             }
             CicsOperation::HandleAbend => {
-                run.abend_handler = Some(argument_text(&request, "PROGRAM")?);
+                if request.arguments.contains_key("OPTION.CANCEL") {
+                    run.abend_handler = None;
+                } else {
+                    run.abend_handler = Some(argument_text(&request, "LABEL")?);
+                }
                 self.response(
                     run,
                     CicsDisposition::Complete,
@@ -346,15 +502,7 @@ impl CicsService {
                 )
             }
             CicsOperation::Assign => {
-                let payload = format!(
-                    "APPLID={}\nSYSID={}\nTRANSID={}\nPRINCIPAL={}\n",
-                    run.applid,
-                    run.sysid,
-                    run.transaction,
-                    run.invocation.principal.id()
-                )
-                .into_bytes();
-                self.response(
+                let mut response = self.response(
                     run,
                     CicsDisposition::Complete,
                     "NORMAL",
@@ -362,11 +510,40 @@ impl CicsService {
                     0,
                     None,
                     None,
-                    payload,
-                )
+                    Vec::new(),
+                )?;
+                for (name, value) in [
+                    ("APPLID", run.applid.as_bytes()),
+                    ("SYSID", run.sysid.as_bytes()),
+                    ("TRANSID", run.transaction.as_bytes()),
+                    (
+                        "PRINCIPAL",
+                        run.invocation.principal.id().as_str().as_bytes(),
+                    ),
+                ] {
+                    if request.arguments.contains_key(name) {
+                        response
+                            .outputs
+                            .insert(name.into(), bounded(value.to_vec())?);
+                    }
+                }
+                Ok(response)
             }
-            CicsOperation::SendMap | CicsOperation::SendText => self.send(state, run, &request),
-            CicsOperation::ReceiveMap => self.receive(state, run),
+            CicsOperation::Asktime => self.asktime(run),
+            CicsOperation::FormatTime => self.format_time(run, &request),
+            CicsOperation::Inquire => self.inquire(run, &request),
+            CicsOperation::SendMap | CicsOperation::SendText => self.send(run, &request),
+            CicsOperation::ReceiveMap => self.receive(run),
+            CicsOperation::Retrieve => self.response(
+                run,
+                CicsDisposition::Complete,
+                "NORMAL",
+                0,
+                0,
+                None,
+                None,
+                run.retrieve.clone(),
+            ),
             CicsOperation::Read
             | CicsOperation::Write
             | CicsOperation::Rewrite
@@ -374,21 +551,16 @@ impl CicsService {
             | CicsOperation::StartBrowse
             | CicsOperation::ReadNext
             | CicsOperation::ReadPrev
-            | CicsOperation::EndBrowse => self.file(state, run, &request),
-            CicsOperation::Xctl => self.transfer(run, &request),
-            CicsOperation::Return => self.response(
-                run,
-                CicsDisposition::Returned,
-                "NORMAL",
-                0,
-                0,
-                None,
-                argument_optional(&request, "TRANSID"),
-                argument_bytes(&request, "COMMAREA").unwrap_or_default(),
-            ),
+            | CicsOperation::EndBrowse => self.file(run, &request),
+            CicsOperation::Link | CicsOperation::Xctl => self.transfer(run, &request),
+            CicsOperation::Return => self.return_transaction(run, &request),
             CicsOperation::Abend => self.response(
                 run,
-                CicsDisposition::Abended,
+                if run.abend_handler.is_some() {
+                    CicsDisposition::Handler
+                } else {
+                    CicsDisposition::Abended
+                },
                 "ERROR",
                 27,
                 0,
@@ -396,21 +568,14 @@ impl CicsService {
                 None,
                 argument_bytes(&request, "ABCODE").unwrap_or_default(),
             ),
-            CicsOperation::WriteTransientData => self.write_transient(state, run, &request),
-            CicsOperation::Asktime
-            | CicsOperation::FormatTime
-            | CicsOperation::Inquire
-            | CicsOperation::Syncpoint => Err(HostProblem::Unsupported),
+            CicsOperation::WriteTransientData => self.write_transient(run, &request),
+            CicsOperation::Syncpoint => self.syncpoint(run, &request),
         }
         .or_else(|problem| self.condition(run, &request.condition_policy, problem))
     }
 
-    fn send(
-        &self,
-        state: &mut State,
-        run: &Run,
-        request: &CicsRequest,
-    ) -> Result<CicsResponse, HostProblem> {
+    fn send(&self, run: &Run, request: &CicsRequest) -> Result<CicsResponse, HostProblem> {
+        let mut state = self.lock()?;
         let mut payload = argument_bytes(request, "FROM")
             .or_else(|| argument_bytes(request, "DATA"))
             .unwrap_or_default();
@@ -453,7 +618,8 @@ impl CicsService {
         )
     }
 
-    fn receive(&self, state: &mut State, run: &Run) -> Result<CicsResponse, HostProblem> {
+    fn receive(&self, run: &Run) -> Result<CicsResponse, HostProblem> {
+        let mut state = self.lock()?;
         let current = state
             .sessions
             .get(&run.session)
@@ -474,12 +640,305 @@ impl CicsService {
         Ok(response)
     }
 
-    fn file(
+    fn asktime(&self, run: &mut Run) -> Result<CicsResponse, HostProblem> {
+        let timestamp = match self.nested(run, HostRequest::Clock(ClockRequest::UtcTimestamp))? {
+            HostResult::Clock(value) => value,
+            _ => return Err(HostProblem::ProviderFailure),
+        };
+        let instant = parse_clock_timestamp(&timestamp)?;
+        let absolute = absolute_milliseconds(instant)?;
+        let mut response = self.response(
+            run,
+            CicsDisposition::Complete,
+            "NORMAL",
+            0,
+            0,
+            None,
+            None,
+            Vec::new(),
+        )?;
+        response
+            .outputs
+            .insert("ABSTIME".into(), decimal_payload(absolute)?);
+        Ok(response)
+    }
+
+    fn format_time(&self, run: &Run, request: &CicsRequest) -> Result<CicsResponse, HostProblem> {
+        let absolute = argument_text(request, "ABSTIME")?
+            .trim()
+            .parse::<i64>()
+            .map_err(|_| HostProblem::Malformed)?;
+        let instant = instant_from_absolute(absolute)?;
+        let date_separator = separator(request, "DATESEP", b'/')?;
+        let time_separator = separator(request, "TIMESEP", b':')?;
+        let mut response = self.response(
+            run,
+            CicsDisposition::Complete,
+            "NORMAL",
+            0,
+            0,
+            None,
+            None,
+            Vec::new(),
+        )?;
+        for key in ["YYYYMMDD", "YYMMDD", "MMDDYY", "MMDDYYYY", "YYDDD"] {
+            if request.arguments.contains_key(key) {
+                let value = format_date(instant, key, date_separator)?;
+                response.outputs.insert(key.into(), bounded(value)?);
+            }
+        }
+        if request.arguments.contains_key("TIME") {
+            response.outputs.insert(
+                "TIME".into(),
+                bounded(format_time_value(instant, time_separator))?,
+            );
+        }
+        if request.arguments.contains_key("MILLISECONDS") {
+            response.outputs.insert(
+                "MILLISECONDS".into(),
+                bounded(format!("{:03}", instant.millisecond).into_bytes())?,
+            );
+        }
+        Ok(response)
+    }
+
+    fn inquire(&self, run: &mut Run, request: &CicsRequest) -> Result<CicsResponse, HostProblem> {
+        let target = argument_text(request, "PROGRAM")?
+            .trim()
+            .to_ascii_uppercase();
+        self.authorize(
+            run,
+            "FACILITY",
+            &format!("CICS.PROGRAM.{target}"),
+            AccessIntent::Execute,
+        )?;
+        let program = ProgramName::new(target, 128).map_err(|_| HostProblem::Malformed)?;
+        let result = self.nested(
+            run,
+            HostRequest::Program(ProgramRequest::Inquire { program }),
+        );
+        match result {
+            Err(HostProblem::NotFound) => Err(HostProblem::Condition {
+                name: "PGMIDERR".into(),
+                response: 27,
+                response2: 0,
+            }),
+            Err(problem) => Err(problem),
+            Ok(HostResult::Program(_)) => self.response(
+                run,
+                CicsDisposition::Complete,
+                "NORMAL",
+                0,
+                0,
+                None,
+                None,
+                Vec::new(),
+            ),
+            Ok(_) => Err(HostProblem::ProviderFailure),
+        }
+    }
+
+    fn return_transaction(
         &self,
-        _state: &mut State,
-        run: &mut Run,
+        run: &Run,
         request: &CicsRequest,
     ) -> Result<CicsResponse, HostProblem> {
+        let mut state = self.lock()?;
+        let next_transaction = argument_optional(request, "TRANSID")
+            .map(|value| value.trim().to_ascii_uppercase())
+            .filter(|value| !value.is_empty());
+        let commarea = argument_bytes(request, "COMMAREA").unwrap_or_default();
+        if commarea.len() > self.limits.max_screen_bytes {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        if let Some(transaction) = &next_transaction {
+            if transaction.len() > 16
+                || !transaction
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+            {
+                return Err(HostProblem::Malformed);
+            }
+            let effect_key = request
+                .mutation
+                .as_ref()
+                .ok_or(HostProblem::MissingIdempotency)?
+                .idempotency_key
+                .as_str()
+                .to_string();
+            let current = state.continuations.get(&run.session).cloned();
+            if let Some(current) = &current
+                && current.effect_key == effect_key
+            {
+                if current.transaction != *transaction || current.commarea != commarea {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+            } else {
+                let version = current.as_ref().map_or(Ok(1), |value| {
+                    value
+                        .version
+                        .checked_add(1)
+                        .ok_or(HostProblem::ResourceExhausted)
+                })?;
+                let next = DurableContinuation {
+                    transaction: transaction.clone(),
+                    commarea: commarea.clone(),
+                    claimed_by: None,
+                    effect_key,
+                    version,
+                };
+                self.persist_continuation(
+                    &run.session,
+                    &next,
+                    current.as_ref().map(|value| value.version),
+                )
+                .map_err(mutation_problem)?;
+                state.continuations.insert(run.session.clone(), next);
+            }
+        } else if let Some(current) = state.continuations.get(&run.session).cloned()
+            && current.claimed_by.as_deref() == Some(run.invocation.run_unit_id.as_str())
+        {
+            self.store
+                .delete_provider_state("cics-continuation", &run.session, current.version)
+                .map_err(store_error)
+                .map_err(mutation_problem)?;
+            state.continuations.remove(&run.session);
+        }
+        self.response(
+            run,
+            CicsDisposition::Returned,
+            "NORMAL",
+            0,
+            0,
+            None,
+            next_transaction,
+            commarea,
+        )
+    }
+
+    fn syncpoint(&self, run: &Run, request: &CicsRequest) -> Result<CicsResponse, HostProblem> {
+        let mutation = request
+            .mutation
+            .as_ref()
+            .ok_or(HostProblem::MissingIdempotency)?;
+        let outcome = if request.arguments.contains_key("OPTION.ROLLBACK") {
+            CicsUnitOfWorkOutcome::RolledBack
+        } else {
+            CicsUnitOfWorkOutcome::Committed
+        };
+        let key = mutation.idempotency_key.as_str();
+        if let Some(record) = self
+            .store
+            .get_provider_state("cics-uow", key)
+            .map_err(store_error)?
+        {
+            let existing = decode_uow(&record.payload)?;
+            if existing.transaction != run.transaction {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            match (existing.finalized, existing.outcome) {
+                (false, existing) if existing == outcome => {
+                    return Err(HostProblem::UnknownOutcome);
+                }
+                (true, existing) if existing == outcome => {
+                    return self.uow_response(run, outcome);
+                }
+                _ => return Err(HostProblem::IdempotencyConflict),
+            }
+        }
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "cics-uow".into(),
+                    key: key.into(),
+                    version: 1,
+                    payload: encode_uow(&UowRecord {
+                        finalized: false,
+                        outcome,
+                        transaction: run.transaction.clone(),
+                    })?,
+                },
+                None,
+            )
+            .map_err(store_error)?;
+        if self
+            .store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "cics-uow".into(),
+                    key: key.into(),
+                    version: 2,
+                    payload: encode_uow(&UowRecord {
+                        finalized: true,
+                        outcome,
+                        transaction: run.transaction.clone(),
+                    })?,
+                },
+                Some(1),
+            )
+            .is_err()
+        {
+            return Err(HostProblem::UnknownOutcome);
+        }
+        self.uow_response(run, outcome)
+    }
+
+    fn uow_response(
+        &self,
+        run: &Run,
+        outcome: CicsUnitOfWorkOutcome,
+    ) -> Result<CicsResponse, HostProblem> {
+        let mut response = self.response(
+            run,
+            CicsDisposition::Complete,
+            "NORMAL",
+            0,
+            0,
+            None,
+            None,
+            Vec::new(),
+        )?;
+        response.unit_of_work = Some(outcome);
+        Ok(response)
+    }
+
+    pub fn reconcile_unit_of_work(
+        &self,
+        key: &IdempotencyKey,
+        outcome: CicsUnitOfWorkOutcome,
+    ) -> Result<(), HostProblem> {
+        let record = self
+            .store
+            .get_provider_state("cics-uow", key.as_str())
+            .map_err(store_error)?
+            .ok_or(HostProblem::NotFound)?;
+        let existing = decode_uow(&record.payload)?;
+        match (existing.finalized, existing.outcome) {
+            (true, existing_outcome) if existing_outcome == outcome => Ok(()),
+            (false, existing_outcome) if existing_outcome == outcome => self
+                .store
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: "cics-uow".into(),
+                        key: key.as_str().into(),
+                        version: record
+                            .version
+                            .checked_add(1)
+                            .ok_or(HostProblem::ResourceExhausted)?,
+                        payload: encode_uow(&UowRecord {
+                            finalized: true,
+                            outcome,
+                            transaction: existing.transaction,
+                        })?,
+                    },
+                    Some(record.version),
+                )
+                .map_err(store_error),
+            _ => Err(HostProblem::IdempotencyConflict),
+        }
+    }
+
+    fn file(&self, run: &mut Run, request: &CicsRequest) -> Result<CicsResponse, HostProblem> {
         let name = argument_text(request, "DATASET").or_else(|_| argument_text(request, "FILE"))?;
         let dataset = DatasetName::new(name, 128).map_err(|_| HostProblem::Malformed)?;
         self.authorize(
@@ -573,7 +1032,9 @@ impl CicsService {
     }
 
     fn transfer(&self, run: &mut Run, request: &CicsRequest) -> Result<CicsResponse, HostProblem> {
-        let target = argument_text(request, "PROGRAM")?;
+        let target = argument_text(request, "PROGRAM")?
+            .trim()
+            .to_ascii_uppercase();
         self.authorize(
             run,
             "FACILITY",
@@ -582,36 +1043,86 @@ impl CicsService {
         )?;
         let program = ProgramName::new(target.clone(), 128).map_err(|_| HostProblem::Malformed)?;
         let payload = bounded(argument_bytes(request, "COMMAREA").unwrap_or_default())?;
-        let result = self.nested(
-            run,
-            HostRequest::Program(ProgramRequest::Xctl { program, payload }),
-        )?;
+        let host_request = if request.operation == CicsOperation::Link {
+            HostRequest::Program(ProgramRequest::Link { program, payload })
+        } else {
+            HostRequest::Program(ProgramRequest::Xctl { program, payload })
+        };
+        let result = self.nested(run, host_request)?;
         let payload = match result {
             HostResult::Program(payload) => payload.bytes().to_vec(),
             _ => return Err(HostProblem::ProviderFailure),
         };
-        self.response(
+        let mut response = self.response(
             run,
-            CicsDisposition::Transfer,
+            if request.operation == CicsOperation::Link {
+                CicsDisposition::Complete
+            } else {
+                CicsDisposition::Transfer
+            },
             "NORMAL",
             0,
             0,
             Some(target),
             None,
-            payload,
-        )
+            payload.clone(),
+        )?;
+        if request.operation == CicsOperation::Link {
+            response
+                .outputs
+                .insert("COMMAREA".into(), bounded(payload)?);
+        }
+        Ok(response)
     }
 
     fn write_transient(
         &self,
-        state: &mut State,
         run: &Run,
         request: &CicsRequest,
     ) -> Result<CicsResponse, HostProblem> {
-        let queue =
-            argument_text(request, "QUEUE").or_else(|_| argument_text(request, "TDQUEUE"))?;
+        let mut state = self.lock()?;
+        let queue = argument_text(request, "QUEUE")
+            .or_else(|_| argument_text(request, "TDQUEUE"))?
+            .trim()
+            .to_ascii_uppercase();
+        if queue.is_empty()
+            || queue.len() > 16
+            || !queue
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        {
+            return Err(HostProblem::Malformed);
+        }
         let value = argument_bytes(request, "FROM").unwrap_or_default();
-        if state.transient.values().map(VecDeque::len).sum::<usize>()
+        let mutation = request
+            .mutation
+            .as_ref()
+            .ok_or(HostProblem::MissingIdempotency)?;
+        let effect_key = mutation.idempotency_key.as_str();
+        let current = state.transient.get(&queue).cloned();
+        if let Some((_, existing_value)) = current
+            .as_ref()
+            .and_then(|queue| queue.records.iter().find(|(key, _)| key == effect_key))
+        {
+            if existing_value != &value {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            return self.response(
+                run,
+                CicsDisposition::Complete,
+                "NORMAL",
+                0,
+                0,
+                None,
+                None,
+                Vec::new(),
+            );
+        }
+        if state
+            .transient
+            .values()
+            .map(|queue| queue.records.len())
+            .sum::<usize>()
             >= self.limits.max_queue_records
             || state
                 .transient_bytes
@@ -620,8 +1131,30 @@ impl CicsService {
         {
             return Err(HostProblem::ResourceExhausted);
         }
-        state.transient.entry(queue).or_default().push_back(value);
-        state.transient_bytes += argument_bytes(request, "FROM").map_or(0, |value| value.len());
+        let mut next = current.unwrap_or(TransientQueue {
+            records: Vec::new(),
+            version: 0,
+        });
+        let expected = (next.version != 0).then_some(next.version);
+        next.version = next
+            .version
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        next.records.push((effect_key.into(), value.clone()));
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "cics-tdq".into(),
+                    key: queue.clone(),
+                    version: next.version,
+                    payload: encode_transient(&next)?,
+                },
+                expected,
+            )
+            .map_err(store_error)
+            .map_err(mutation_problem)?;
+        state.transient.insert(queue, next);
+        state.transient_bytes += value.len();
         self.response(
             run,
             CicsDisposition::Complete,
@@ -692,6 +1225,16 @@ impl CicsService {
         policy: &CicsConditionPolicy,
         problem: HostProblem,
     ) -> Result<CicsResponse, HostProblem> {
+        if matches!(
+            problem,
+            HostProblem::UnknownOutcome
+                | HostProblem::InfrastructureFailure
+                | HostProblem::ProviderFailure
+                | HostProblem::TimedOut
+                | HostProblem::Cancelled
+        ) {
+            return Err(problem);
+        }
         let (name, response, response2) = condition_for(&problem);
         match policy {
             CicsConditionPolicy::NoHandle | CicsConditionPolicy::Respond { .. } => self.response(
@@ -708,7 +1251,7 @@ impl CicsService {
                 if let Some(target) = run.handlers.get(name) {
                     self.response(
                         run,
-                        CicsDisposition::Transfer,
+                        CicsDisposition::Handler,
                         name,
                         response,
                         response2,
@@ -747,6 +1290,8 @@ impl CicsService {
             target,
             next_transaction,
             payload: bounded(payload)?,
+            outputs: BTreeMap::new(),
+            unit_of_work: None,
         })
     }
 
@@ -769,6 +1314,25 @@ impl CicsService {
                     key: key.into(),
                     version: session.version,
                     payload: encode_session(session)?,
+                },
+                expected,
+            )
+            .map_err(store_error)
+    }
+
+    fn persist_continuation(
+        &self,
+        key: &str,
+        continuation: &DurableContinuation,
+        expected: Option<u64>,
+    ) -> Result<(), HostProblem> {
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "cics-continuation".into(),
+                    key: key.into(),
+                    version: continuation.version,
+                    payload: encode_continuation(continuation)?,
                 },
                 expected,
             )
@@ -924,6 +1488,348 @@ fn condition_name(name: &str) -> &'static str {
         "ENDFILE" => "ENDFILE",
         "PGMIDERR" => "PGMIDERR",
         _ => "ERROR",
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct UowRecord {
+    finalized: bool,
+    outcome: CicsUnitOfWorkOutcome,
+    transaction: String,
+}
+
+fn encode_uow(record: &UowRecord) -> Result<Vec<u8>, HostProblem> {
+    let state = match (record.finalized, record.outcome) {
+        (false, CicsUnitOfWorkOutcome::Committed) => b'C',
+        (false, CicsUnitOfWorkOutcome::RolledBack) => b'R',
+        (true, CicsUnitOfWorkOutcome::Committed) => b'c',
+        (true, CicsUnitOfWorkOutcome::RolledBack) => b'r',
+    };
+    let mut value = b"MECU1".to_vec();
+    value.push(state);
+    field(&mut value, record.transaction.as_bytes())?;
+    Ok(value)
+}
+
+fn decode_uow(payload: &[u8]) -> Result<UowRecord, HostProblem> {
+    let mut reader = Reader {
+        bytes: payload,
+        at: 0,
+    };
+    if reader.take(5)? != b"MECU1" {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let (finalized, outcome) = match reader.take(1)?[0] {
+        b'C' => (false, CicsUnitOfWorkOutcome::Committed),
+        b'R' => (false, CicsUnitOfWorkOutcome::RolledBack),
+        b'c' => (true, CicsUnitOfWorkOutcome::Committed),
+        b'r' => (true, CicsUnitOfWorkOutcome::RolledBack),
+        _ => return Err(HostProblem::InfrastructureFailure),
+    };
+    let transaction =
+        String::from_utf8(reader.field(16)?).map_err(|_| HostProblem::InfrastructureFailure)?;
+    if reader.at != payload.len() || transaction.is_empty() {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(UowRecord {
+        finalized,
+        outcome,
+        transaction,
+    })
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct ClockInstant {
+    year: i64,
+    month: u32,
+    day: u32,
+    hour: u32,
+    minute: u32,
+    second: u32,
+    millisecond: u32,
+}
+
+fn parse_clock_timestamp(value: &str) -> Result<ClockInstant, HostProblem> {
+    if value.len() != 17 || !value.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(HostProblem::ProviderFailure);
+    }
+    let number = |range: std::ops::Range<usize>| {
+        value[range]
+            .parse::<u32>()
+            .map_err(|_| HostProblem::ProviderFailure)
+    };
+    let instant = ClockInstant {
+        year: i64::from(number(0..4)?),
+        month: number(4..6)?,
+        day: number(6..8)?,
+        hour: number(8..10)?,
+        minute: number(10..12)?,
+        second: number(12..14)?,
+        millisecond: number(14..17)?,
+    };
+    validate_instant(instant)?;
+    Ok(instant)
+}
+
+fn validate_instant(instant: ClockInstant) -> Result<(), HostProblem> {
+    let days = days_from_civil(instant.year, instant.month, instant.day)
+        .ok_or(HostProblem::ProviderFailure)?;
+    let (year, month, day) = civil_from_days(days);
+    if (year, month, day) != (instant.year, instant.month, instant.day)
+        || instant.hour > 23
+        || instant.minute > 59
+        || instant.second > 59
+        || instant.millisecond > 999
+    {
+        Err(HostProblem::ProviderFailure)
+    } else {
+        Ok(())
+    }
+}
+
+fn absolute_milliseconds(instant: ClockInstant) -> Result<i64, HostProblem> {
+    let epoch = days_from_civil(1900, 1, 1).ok_or(HostProblem::ProviderFailure)?;
+    let days = days_from_civil(instant.year, instant.month, instant.day)
+        .ok_or(HostProblem::ProviderFailure)?
+        .checked_sub(epoch)
+        .ok_or(HostProblem::ResourceExhausted)?;
+    days.checked_mul(86_400_000)
+        .and_then(|value| value.checked_add(i64::from(instant.hour) * 3_600_000))
+        .and_then(|value| value.checked_add(i64::from(instant.minute) * 60_000))
+        .and_then(|value| value.checked_add(i64::from(instant.second) * 1_000))
+        .and_then(|value| value.checked_add(i64::from(instant.millisecond)))
+        .ok_or(HostProblem::ResourceExhausted)
+}
+
+fn instant_from_absolute(value: i64) -> Result<ClockInstant, HostProblem> {
+    if value < 0 {
+        return Err(HostProblem::Malformed);
+    }
+    let epoch = days_from_civil(1900, 1, 1).ok_or(HostProblem::ProviderFailure)?;
+    let days = value / 86_400_000;
+    let rest = value % 86_400_000;
+    let (year, month, day) = civil_from_days(
+        epoch
+            .checked_add(days)
+            .ok_or(HostProblem::ResourceExhausted)?,
+    );
+    Ok(ClockInstant {
+        year,
+        month,
+        day,
+        hour: u32::try_from(rest / 3_600_000).map_err(|_| HostProblem::Malformed)?,
+        minute: u32::try_from((rest / 60_000) % 60).map_err(|_| HostProblem::Malformed)?,
+        second: u32::try_from((rest / 1_000) % 60).map_err(|_| HostProblem::Malformed)?,
+        millisecond: u32::try_from(rest % 1_000).map_err(|_| HostProblem::Malformed)?,
+    })
+}
+
+fn days_from_civil(year: i64, month: u32, day: u32) -> Option<i64> {
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+        return None;
+    }
+    let adjusted_year = year - i64::from(month <= 2);
+    let era = if adjusted_year >= 0 {
+        adjusted_year
+    } else {
+        adjusted_year - 399
+    } / 400;
+    let year_of_era = adjusted_year - era * 400;
+    let adjusted_month = i64::from(month) + if month > 2 { -3 } else { 9 };
+    let day_of_year = (153 * adjusted_month + 2) / 5 + i64::from(day) - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    Some(era * 146_097 + day_of_era - 719_468)
+}
+
+fn civil_from_days(days: i64) -> (i64, u32, u32) {
+    let shifted = days + 719_468;
+    let era = if shifted >= 0 {
+        shifted
+    } else {
+        shifted - 146_096
+    } / 146_097;
+    let day_of_era = shifted - era * 146_097;
+    let year_of_era =
+        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let mut year = year_of_era + era * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_prime = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * month_prime + 2) / 5 + 1;
+    let month = month_prime + if month_prime < 10 { 3 } else { -9 };
+    year += i64::from(month <= 2);
+    (year, month as u32, day as u32)
+}
+
+fn separator(request: &CicsRequest, name: &str, default: u8) -> Result<Option<u8>, HostProblem> {
+    if let Some(value) = request.arguments.get(name) {
+        if value.bytes().len() != 1 {
+            return Err(HostProblem::Malformed);
+        }
+        Ok(value.bytes().first().copied())
+    } else if request.arguments.contains_key(&format!("OPTION.{name}")) {
+        Ok(Some(default))
+    } else {
+        Ok(None)
+    }
+}
+
+fn format_date(
+    instant: ClockInstant,
+    format: &str,
+    separator: Option<u8>,
+) -> Result<Vec<u8>, HostProblem> {
+    let year = u32::try_from(instant.year).map_err(|_| HostProblem::Malformed)?;
+    let parts = match format {
+        "YYYYMMDD" => vec![
+            format!("{year:04}"),
+            format!("{:02}", instant.month),
+            format!("{:02}", instant.day),
+        ],
+        "YYMMDD" => vec![
+            format!("{:02}", year % 100),
+            format!("{:02}", instant.month),
+            format!("{:02}", instant.day),
+        ],
+        "MMDDYY" => vec![
+            format!("{:02}", instant.month),
+            format!("{:02}", instant.day),
+            format!("{:02}", year % 100),
+        ],
+        "MMDDYYYY" => vec![
+            format!("{:02}", instant.month),
+            format!("{:02}", instant.day),
+            format!("{year:04}"),
+        ],
+        "YYDDD" => {
+            let jan1 = days_from_civil(instant.year, 1, 1).ok_or(HostProblem::Malformed)?;
+            let current = days_from_civil(instant.year, instant.month, instant.day)
+                .ok_or(HostProblem::Malformed)?;
+            return Ok(format!("{:02}{:03}", year % 100, current - jan1 + 1).into_bytes());
+        }
+        _ => return Err(HostProblem::Malformed),
+    };
+    let joiner = separator.map_or_else(String::new, |value| char::from(value).to_string());
+    Ok(parts.join(&joiner).into_bytes())
+}
+
+fn format_time_value(instant: ClockInstant, separator: Option<u8>) -> Vec<u8> {
+    let parts = [
+        format!("{:02}", instant.hour),
+        format!("{:02}", instant.minute),
+        format!("{:02}", instant.second),
+    ];
+    let joiner = separator.map_or_else(String::new, |value| char::from(value).to_string());
+    parts.join(&joiner).into_bytes()
+}
+
+fn decimal_payload(value: i64) -> Result<BoundedPayload, HostProblem> {
+    BoundedPayload::new(
+        "mainframe-env.cics.decimal@1",
+        value.to_string().into_bytes(),
+        InvocationLimits::default(),
+    )
+    .map_err(|_| HostProblem::ResourceExhausted)
+}
+
+fn encode_continuation(continuation: &DurableContinuation) -> Result<Vec<u8>, HostProblem> {
+    let mut out = b"MECC1".to_vec();
+    field(&mut out, continuation.transaction.as_bytes())?;
+    field(&mut out, &continuation.commarea)?;
+    field(
+        &mut out,
+        continuation.claimed_by.as_deref().unwrap_or("").as_bytes(),
+    )?;
+    field(&mut out, continuation.effect_key.as_bytes())?;
+    Ok(out)
+}
+
+fn decode_continuation(
+    bytes: &[u8],
+    version: u64,
+    limits: CicsLimits,
+) -> Result<DurableContinuation, HostProblem> {
+    let mut reader = Reader { bytes, at: 0 };
+    if reader.take(5)? != b"MECC1" {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let transaction =
+        String::from_utf8(reader.field(16)?).map_err(|_| HostProblem::InfrastructureFailure)?;
+    let commarea = reader.field(limits.max_screen_bytes)?;
+    let claimed =
+        String::from_utf8(reader.field(128)?).map_err(|_| HostProblem::InfrastructureFailure)?;
+    let effect_key =
+        String::from_utf8(reader.field(256)?).map_err(|_| HostProblem::InfrastructureFailure)?;
+    if reader.at != bytes.len() || transaction.is_empty() || effect_key.is_empty() {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(DurableContinuation {
+        transaction,
+        commarea,
+        claimed_by: (!claimed.is_empty()).then_some(claimed),
+        effect_key,
+        version,
+    })
+}
+
+fn encode_transient(queue: &TransientQueue) -> Result<Vec<u8>, HostProblem> {
+    let mut out = b"MECT2".to_vec();
+    out.extend_from_slice(
+        &u32::try_from(queue.records.len())
+            .map_err(|_| HostProblem::ResourceExhausted)?
+            .to_be_bytes(),
+    );
+    for (key, value) in &queue.records {
+        field(&mut out, key.as_bytes())?;
+        field(&mut out, value)?;
+    }
+    Ok(out)
+}
+
+fn decode_transient(
+    bytes: &[u8],
+    version: u64,
+    limits: CicsLimits,
+) -> Result<TransientQueue, HostProblem> {
+    let mut reader = Reader { bytes, at: 0 };
+    if reader.take(5)? != b"MECT2" {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let count = usize::try_from(u32::from_be_bytes(
+        reader
+            .take(4)?
+            .try_into()
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+    ))
+    .map_err(|_| HostProblem::InfrastructureFailure)?;
+    if count > limits.max_queue_records {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let mut records = Vec::with_capacity(count);
+    let mut total = 0usize;
+    for _ in 0..count {
+        let key = String::from_utf8(reader.field(256)?)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let value = reader.field(limits.max_queue_bytes)?;
+        total = total
+            .checked_add(value.len())
+            .ok_or(HostProblem::ResourceExhausted)?;
+        if key.is_empty() || total > limits.max_queue_bytes {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        records.push((key, value));
+    }
+    if reader.at != bytes.len() || records.is_empty() || version == 0 {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(TransientQueue { records, version })
+}
+
+fn mutation_problem(problem: HostProblem) -> HostProblem {
+    match problem {
+        HostProblem::InfrastructureFailure | HostProblem::ProviderFailure => {
+            HostProblem::UnknownOutcome
+        }
+        other => other,
     }
 }
 
@@ -1089,8 +1995,19 @@ mod tests {
                 HostRequest::Dataset(_) => {
                     Ok(HostResult::Dataset(DatasetResult::Mutated { version: 2 }))
                 }
+                HostRequest::Program(ProgramRequest::Inquire { program })
+                    if program.as_str() == "MISSING" =>
+                {
+                    Err(HostProblem::NotFound)
+                }
+                HostRequest::Program(ProgramRequest::Inquire { .. }) => {
+                    Ok(HostResult::Program(bounded(Vec::new()).unwrap()))
+                }
                 HostRequest::Program(_) => {
                     Ok(HostResult::Program(bounded(b"CHILD".to_vec()).unwrap()))
+                }
+                HostRequest::Clock(ClockRequest::UtcTimestamp) => {
+                    Ok(HostResult::Clock("20260830123456789".into()))
                 }
                 _ => Err(HostProblem::Unsupported),
             };
@@ -1121,6 +2038,7 @@ mod tests {
             "host.dataset.read",
             "host.dataset.write",
             "host.program.invoke",
+            "host.clock",
         ]
         .into_iter()
         .map(|capability| {
@@ -1136,6 +2054,10 @@ mod tests {
     }
 
     fn invocation() -> Invocation {
+        invocation_for("run", BTreeMap::new())
+    }
+
+    fn invocation_for(run: &str, bindings: BTreeMap<String, BoundedPayload>) -> Invocation {
         let limits = InvocationLimits::default();
         let grants = [
             "host.security.authorize",
@@ -1143,14 +2065,15 @@ mod tests {
             "host.dataset.write",
             "host.program.invoke",
             "host.cics.execute",
+            "host.clock",
         ]
         .into_iter()
         .map(|name| CapabilityId::new(name, limits).unwrap())
         .collect::<BTreeSet<_>>();
         Invocation::new(
-            RequestId::new("request", limits).unwrap(),
-            ExecutionId::new("execution", limits).unwrap(),
-            RunUnitId::new("run", limits).unwrap(),
+            RequestId::new(format!("request-{run}"), limits).unwrap(),
+            ExecutionId::new(format!("execution-{run}"), limits).unwrap(),
+            RunUnitId::new(run, limits).unwrap(),
             None,
             Selector::new("cics:MENU", limits).unwrap(),
             ArtifactRef::new("artifact", limits).unwrap(),
@@ -1162,7 +2085,7 @@ mod tests {
             IdempotencyKey::new("invocation", limits).unwrap(),
             1,
             ResourceLimits::default(),
-            BTreeMap::new(),
+            bindings,
             limits,
         )
         .unwrap()
@@ -1237,10 +2160,12 @@ mod tests {
             ("HANDLE ABEND", CicsOperation::HandleAbend),
             ("HANDLE CONDITION", CicsOperation::HandleCondition),
             ("INQUIRE", CicsOperation::Inquire),
+            ("LINK", CicsOperation::Link),
             ("READ", CicsOperation::Read),
             ("READNEXT", CicsOperation::ReadNext),
             ("READPREV", CicsOperation::ReadPrev),
             ("RECEIVE MAP", CicsOperation::ReceiveMap),
+            ("RETRIEVE", CicsOperation::Retrieve),
             ("RETURN", CicsOperation::Return),
             ("REWRITE", CicsOperation::Rewrite),
             ("SEND TEXT", CicsOperation::SendText),
@@ -1258,6 +2183,408 @@ mod tests {
                 .collect::<Vec<_>>();
             assert_eq!(CicsOperation::from_tokens(&tokens), Some(expected));
         }
+    }
+
+    #[test]
+    fn carddemo_residual_cics_forms_are_executable() {
+        for source in [
+            "ASKTIME",
+            "FORMATTIME",
+            "INQUIRE PROGRAM(COCRDLIC)",
+            "LINK PROGRAM(COPAUS2C)",
+            "RETRIEVE INTO(MQTM)",
+            "SYNCPOINT",
+            "SYNCPOINT ROLLBACK",
+        ] {
+            let tokens = format!("EXEC CICS {source} END-EXEC")
+                .split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            let operation = CicsOperation::from_tokens(&tokens)
+                .unwrap_or_else(|| panic!("CardDemo CICS form is untyped: {source}"));
+            assert!(
+                operation.supported(),
+                "CardDemo CICS form is unsupported: {source}"
+            );
+        }
+    }
+
+    #[test]
+    fn carddemo_time_inquire_link_retrieve_and_assign_subforms_execute() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+
+        let asktime = request(CicsOperation::Asktime, BTreeMap::new(), 1);
+        let asked = service
+            .invoke(
+                &effect(&invocation.run_unit_id, asktime.clone(), 1),
+                asktime,
+            )
+            .unwrap();
+        let absolute =
+            String::from_utf8(asked.outputs.get("ABSTIME").unwrap().bytes().to_vec()).unwrap();
+        assert_eq!(
+            absolute.parse::<i64>().unwrap(),
+            absolute_milliseconds(ClockInstant {
+                year: 2026,
+                month: 8,
+                day: 30,
+                hour: 12,
+                minute: 34,
+                second: 56,
+                millisecond: 789,
+            })
+            .unwrap()
+        );
+
+        let format = request(
+            CicsOperation::FormatTime,
+            BTreeMap::from([
+                ("ABSTIME".into(), argument(absolute.as_bytes())),
+                ("YYYYMMDD".into(), argument(b"DATE-OUT")),
+                ("TIME".into(), argument(b"TIME-OUT")),
+                ("MILLISECONDS".into(), argument(b"MS-OUT")),
+                ("DATESEP".into(), argument(b"-")),
+                ("TIMESEP".into(), argument(b":")),
+            ]),
+            2,
+        );
+        let formatted = service
+            .invoke(&effect(&invocation.run_unit_id, format.clone(), 2), format)
+            .unwrap();
+        assert_eq!(formatted.outputs["YYYYMMDD"].bytes(), b"2026-08-30");
+        assert_eq!(formatted.outputs["TIME"].bytes(), b"12:34:56");
+        assert_eq!(formatted.outputs["MILLISECONDS"].bytes(), b"789");
+
+        let assign = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("APPLID".into(), argument(b"APP-OUT")),
+                ("SYSID".into(), argument(b"SYS-OUT")),
+            ]),
+            3,
+        );
+        let assigned = service
+            .invoke(&effect(&invocation.run_unit_id, assign.clone(), 3), assign)
+            .unwrap();
+        assert_eq!(assigned.outputs["APPLID"].bytes(), b"MEAPPL");
+        assert_eq!(assigned.outputs["SYSID"].bytes(), b"MESYS");
+
+        let inquire = request(
+            CicsOperation::Inquire,
+            BTreeMap::from([("PROGRAM".into(), argument(b"COCRDLIC"))]),
+            4,
+        );
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, inquire.clone(), 4),
+                    inquire,
+                )
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+        let link = request(
+            CicsOperation::Link,
+            BTreeMap::from([
+                ("PROGRAM".into(), argument(b"COPAUS2C")),
+                ("COMMAREA".into(), argument(b"PENDING")),
+            ]),
+            5,
+        );
+        let linked = service
+            .invoke(&effect(&invocation.run_unit_id, link.clone(), 5), link)
+            .unwrap();
+        assert_eq!(linked.disposition, CicsDisposition::Complete);
+        assert_eq!(linked.outputs["COMMAREA"].bytes(), b"CHILD");
+
+        let retrieve_invocation = invocation_for(
+            "retrieve-run",
+            BTreeMap::from([("cics.retrieve".into(), argument(b"MQ-TRIGGER"))]),
+        );
+        let retrieve_session = SessionId::new("retrieve-session", 64).unwrap();
+        service.create_session(&retrieve_session, 24, 80).unwrap();
+        service
+            .register_run(
+                retrieve_invocation.clone(),
+                &retrieve_session,
+                "MENU",
+                "MEAPPL",
+                "MESYS",
+            )
+            .unwrap();
+        let retrieve = request(CicsOperation::Retrieve, BTreeMap::new(), 1);
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&retrieve_invocation.run_unit_id, retrieve.clone(), 1),
+                    retrieve,
+                )
+                .unwrap()
+                .payload
+                .bytes(),
+            b"MQ-TRIGGER"
+        );
+    }
+
+    #[test]
+    fn pseudo_conversation_tdq_and_syncpoint_survive_restart_and_replay() {
+        let memory = Arc::new(MemoryStore::new(Default::default()));
+        let store: Arc<dyn ProviderStateStore> = memory.clone();
+        let initial = service(store.clone());
+        let (invocation, session) = registered(&initial);
+
+        let returned = request(
+            CicsOperation::Return,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"NEXT")),
+                ("COMMAREA".into(), argument(b"STATE-1")),
+            ]),
+            1,
+        );
+        let response = initial
+            .invoke(
+                &effect(&invocation.run_unit_id, returned.clone(), 1),
+                returned,
+            )
+            .unwrap();
+        assert_eq!(response.next_transaction.as_deref(), Some("NEXT"));
+
+        let writeq = request(
+            CicsOperation::WriteTransientData,
+            BTreeMap::from([
+                ("QUEUE".into(), argument(b"JOBS")),
+                ("FROM".into(), argument(b"//REPORT JOB")),
+            ]),
+            2,
+        );
+        initial
+            .invoke(
+                &effect(&invocation.run_unit_id, writeq.clone(), 2),
+                writeq.clone(),
+            )
+            .unwrap();
+        initial
+            .invoke(&effect(&invocation.run_unit_id, writeq.clone(), 2), writeq)
+            .unwrap();
+        let second_invocation = invocation_for("aaa-run", BTreeMap::new());
+        let second_session = SessionId::new("second-session", 64).unwrap();
+        initial.create_session(&second_session, 24, 80).unwrap();
+        initial
+            .register_run(
+                second_invocation.clone(),
+                &second_session,
+                "MENU",
+                "MEAPPL",
+                "MESYS",
+            )
+            .unwrap();
+        let second_write = request(
+            CicsOperation::WriteTransientData,
+            BTreeMap::from([
+                ("QUEUE".into(), argument(b"JOBS")),
+                ("FROM".into(), argument(b"//SECOND JOB")),
+            ]),
+            1,
+        );
+        initial
+            .invoke(
+                &effect(&second_invocation.run_unit_id, second_write.clone(), 1),
+                second_write,
+            )
+            .unwrap();
+        assert_eq!(
+            initial.transient_records("JOBS").unwrap(),
+            [b"//REPORT JOB".to_vec(), b"//SECOND JOB".to_vec()]
+        );
+
+        let commit = request(CicsOperation::Syncpoint, BTreeMap::new(), 3);
+        let committed = initial
+            .invoke(
+                &effect(&invocation.run_unit_id, commit.clone(), 3),
+                commit.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            committed.unit_of_work,
+            Some(CicsUnitOfWorkOutcome::Committed)
+        );
+        assert_eq!(
+            initial
+                .invoke(&effect(&invocation.run_unit_id, commit.clone(), 3), commit,)
+                .unwrap()
+                .unit_of_work,
+            Some(CicsUnitOfWorkOutcome::Committed)
+        );
+        let rollback = request(
+            CicsOperation::Syncpoint,
+            BTreeMap::from([("OPTION.ROLLBACK".into(), argument(b""))]),
+            4,
+        );
+        assert_eq!(
+            initial
+                .invoke(
+                    &effect(&invocation.run_unit_id, rollback.clone(), 4),
+                    rollback,
+                )
+                .unwrap()
+                .unit_of_work,
+            Some(CicsUnitOfWorkOutcome::RolledBack)
+        );
+
+        let restarted = service(store.clone());
+        assert_eq!(
+            restarted.transient_records("JOBS").unwrap(),
+            [b"//REPORT JOB".to_vec(), b"//SECOND JOB".to_vec()]
+        );
+        let resumed_invocation = invocation_for("resumed-run", BTreeMap::new());
+        let continuation = restarted
+            .claim_continuation(resumed_invocation, &session, "MEAPPL", "MESYS")
+            .unwrap();
+        assert_eq!(continuation.transaction, "NEXT");
+        assert_eq!(continuation.commarea, b"STATE-1");
+
+        let unknown_key = IdempotencyKey::new("outer-5", InvocationLimits::default()).unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "cics-uow".into(),
+                    key: unknown_key.as_str().into(),
+                    version: 1,
+                    payload: encode_uow(&UowRecord {
+                        finalized: false,
+                        outcome: CicsUnitOfWorkOutcome::Committed,
+                        transaction: "MENU".into(),
+                    })
+                    .unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        let unknown_invocation = invocation_for("unknown-run", BTreeMap::new());
+        let unknown_session = SessionId::new("unknown-session", 64).unwrap();
+        restarted.create_session(&unknown_session, 24, 80).unwrap();
+        restarted
+            .register_run(
+                unknown_invocation.clone(),
+                &unknown_session,
+                "MENU",
+                "MEAPPL",
+                "MESYS",
+            )
+            .unwrap();
+        let unknown = request(CicsOperation::Syncpoint, BTreeMap::new(), 5);
+        assert_eq!(
+            restarted.invoke(
+                &effect(&unknown_invocation.run_unit_id, unknown.clone(), 5),
+                unknown.clone(),
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        restarted
+            .reconcile_unit_of_work(&unknown_key, CicsUnitOfWorkOutcome::Committed)
+            .unwrap();
+        assert_eq!(
+            restarted
+                .invoke(
+                    &effect(&unknown_invocation.run_unit_id, unknown.clone(), 5),
+                    unknown,
+                )
+                .unwrap()
+                .unit_of_work,
+            Some(CicsUnitOfWorkOutcome::Committed)
+        );
+    }
+
+    #[test]
+    fn carddemo_condition_abend_and_nohandle_routes_are_distinct() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+        let handle = request(
+            CicsOperation::HandleCondition,
+            BTreeMap::from([("PGMIDERR".into(), argument(b"PGMIDERR-ERR-PARA"))]),
+            1,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, handle.clone(), 1), handle)
+            .unwrap();
+        let missing = request(
+            CicsOperation::Inquire,
+            BTreeMap::from([("PROGRAM".into(), argument(b"MISSING"))]),
+            2,
+        );
+        let handled = service
+            .invoke(
+                &effect(&invocation.run_unit_id, missing.clone(), 2),
+                missing,
+            )
+            .unwrap();
+        assert_eq!(handled.disposition, CicsDisposition::Handler);
+        assert_eq!(handled.condition, "PGMIDERR");
+        assert_eq!(handled.target.as_deref(), Some("PGMIDERR-ERR-PARA"));
+
+        let mut nohandle = request(
+            CicsOperation::Inquire,
+            BTreeMap::from([("PROGRAM".into(), argument(b"MISSING"))]),
+            3,
+        );
+        nohandle.condition_policy = CicsConditionPolicy::NoHandle;
+        let condition = service
+            .invoke(
+                &effect(&invocation.run_unit_id, nohandle.clone(), 3),
+                nohandle,
+            )
+            .unwrap();
+        assert_eq!(condition.disposition, CicsDisposition::Complete);
+        assert_eq!(
+            (condition.condition.as_str(), condition.response),
+            ("PGMIDERR", 27)
+        );
+
+        let handle_abend = request(
+            CicsOperation::HandleAbend,
+            BTreeMap::from([("LABEL".into(), argument(b"ABEND-ROUTINE"))]),
+            4,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, handle_abend.clone(), 4),
+                handle_abend,
+            )
+            .unwrap();
+        let abend = request(
+            CicsOperation::Abend,
+            BTreeMap::from([("ABCODE".into(), argument(b"9999"))]),
+            5,
+        );
+        assert_eq!(
+            service
+                .invoke(&effect(&invocation.run_unit_id, abend.clone(), 5), abend)
+                .unwrap()
+                .disposition,
+            CicsDisposition::Handler
+        );
+        let cancel = request(
+            CicsOperation::HandleAbend,
+            BTreeMap::from([("OPTION.CANCEL".into(), argument(b""))]),
+            6,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, cancel.clone(), 6), cancel)
+            .unwrap();
+        let abend = request(
+            CicsOperation::Abend,
+            BTreeMap::from([("ABCODE".into(), argument(b"9999"))]),
+            7,
+        );
+        assert_eq!(
+            service
+                .invoke(&effect(&invocation.run_unit_id, abend.clone(), 7), abend)
+                .unwrap()
+                .disposition,
+            CicsDisposition::Abended
+        );
     }
 
     #[test]
@@ -1362,7 +2689,7 @@ mod tests {
     }
 
     #[test]
-    fn outer_registry_selects_cics_provider_and_unsupported_is_explicit() {
+    fn outer_registry_selects_cics_provider_for_clocked_operations() {
         let service = service(Arc::new(MemoryStore::new(Default::default())));
         let (invocation, _) = registered(&service);
         let outer = ScopedHostService::new(
@@ -1384,19 +2711,20 @@ mod tests {
             effect(&invocation.run_unit_id, assign, 1),
         );
         assert!(matches!(selected.effect.outcome, Ok(HostResult::Cics(_))));
-        let unsupported = request(CicsOperation::Asktime, BTreeMap::new(), 2);
-        assert_eq!(
+        let asktime = request(CicsOperation::Asktime, BTreeMap::new(), 2);
+        assert!(matches!(
             outer
                 .invoke(
                     &invocation,
                     1,
                     false,
-                    effect(&invocation.run_unit_id, unsupported, 2),
+                    effect(&invocation.run_unit_id, asktime, 2),
                 )
                 .effect
                 .outcome,
-            Err(HostProblem::Unsupported)
-        );
+            Ok(HostResult::Cics(CicsResponse { outputs, .. }))
+                if outputs.contains_key("ABSTIME")
+        ));
     }
 
     #[test]

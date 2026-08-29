@@ -1,0 +1,22 @@
+{
+  "schema_version":"mainframe-env.carddemo-issue-evidence@1","issue":"CD-013","title":"Complete reached CICS operations and unit-of-work semantics","derived":true,"status":"pass","target_product":"0.1.1","current_product":"0.1.0-alpha.0",
+  "digest_scope":"Recursively lexicographically key-sorted compact UTF-8 JSON serialization of cics_runtime_receipt, with no trailing newline, followed by SHA-256","evidence_digest":"sha256:a1229fa5539697f08853c9bf4e73a6048af21ddb272d439cc56fa52ec3c7a61d",
+  "cics_runtime_receipt":{"schema_version":"mainframe-env.carddemo-cics-runtime-receipt@1","status":"pass","corpus_commit":"59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e","reached_operations":240,"executable_variants":24,"residual_counts":{"ABEND":5,"ASKTIME":5,"ASSIGN":2,"FORMATTIME":5,"HANDLE":11,"INQUIRE":1,"LINK":1,"RETRIEVE":3,"RETURN":38,"SEND":40,"SYNCPOINT":16,"WRITEQ":2},"syncpoint_rollbacks":2,"return_transid":24,"return_commarea":24,"send_variants":{"FROM":5,"MAP":26,"TEXT":9},"format_destinations":["MILLISECONDS","MMDDYY","MMDDYYYY","TIME","YYDDD","YYMMDD","YYYYMMDD"],"runtime_regression_cases":8,"cics_runtime_sha256":"a18d2cdae251d027a032866cabf4380511a84b056a410b1cdd3be0877ea14c9f"},
+  "acceptance_observations":[
+    "All 240 reached CICS statements map to 24 executable typed variants; the former ASKTIME, FORMATTIME, INQUIRE, and SYNCPOINT unsupported boundary is removed without accepting unknown opcodes.",
+    "The scoped clock returns bounded UTC calendar values; ASKTIME produces exact CICS milliseconds since 1900 and FORMATTIME populates all seven reached date, time, separator, and millisecond destination forms.",
+    "ASSIGN, LINK, RETRIEVE, nested/subscripted operands, local condition handlers, HANDLE ABEND/CANCEL, NOHANDLE, and all 26 MAP, nine TEXT, and five plain FROM SEND forms preserve typed storage and control identities.",
+    "RETURN TRANSID persists 24 reached COMMAREA continuations with compare-and-swap claim/replay behavior; entry DFHCOMMAREA bytes and transient-data queue records survive provider restart.",
+    "SYNCPOINT commit and both reached ROLLBACK forms persist intent before result. Final replay is idempotent; an intent without a result remains UnknownOutcome across restart until explicit reconciliation. Infrastructure failure is never converted to NOHANDLE success."
+  ],
+  "commands":[
+    {"command":"cargo test -p mainframe-env-cics carddemo_residual_cics_forms_are_executable --locked","exit_code":1,"result":"focused pre-repair regression proved ASKTIME was explicitly unsupported"},
+    {"command":"cargo test -p mainframe-env-host-api -p mainframe-env-interpreter -p mainframe-env-cics -p mainframe-env-batch -p mainframe-env-conformance -p mainframe-env-server -p xtask --locked","exit_code":0,"result":"91 typed-contract, interpreter-storage, provider-restart/UOW, program-inquiry, clock-composition, conformance, and gate tests passed"},
+    {"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-cics-runtime --check","exit_code":0,"result":"exact 240-operation and 24-variant CICS runtime receipt passed"},
+    {"command":"env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-cics-runtime --check","exit_code":1,"result":"expected missing-environment control"},
+    {"command":"cargo check --workspace --all-targets --locked","exit_code":0,"result":"pass"},
+    {"command":"affected-package cargo clippy --all-targets --locked -- -D warnings","exit_code":0,"result":"pass"},
+    {"command":"env -u CARDEMO_CORPUS_DIR cargo xtask conformance --check","exit_code":0,"result":"pass"},
+    {"command":"cargo fmt --all -- --check && git diff --check","exit_code":0,"result":"pass"}
+  ],"absolute_local_paths_present":false,"native_or_legacy_fallback_present":false
+}

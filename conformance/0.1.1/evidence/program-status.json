@@ -1,14 +1,14 @@
 {
   "schema_version": "mainframe-env.carddemo-program-status@1",
-  "phase": "CD.A",
+  "phase": "CD.C",
   "phase_status": "in_progress",
   "implementation_status": "in_progress",
   "current_product": "0.1.0-alpha.0",
   "target_product": "0.1.1",
   "source_identity": {
-    "base_commit": "9a972d9831a35600b5b19ad947cd2413fdf7c943",
+    "base_commit": "742982c052298c4855d5867aab505c216e896331",
     "dirty_tree_algorithm": "sha256 of sorted sha256sum records, excluding .git, target, docs/delivery/CARDEMO-0.1.1-STATUS.md, and conformance/0.1.1/evidence/program-status.json",
-    "dirty_tree_digest": "sha256:c02dc1041d34ca9ebbe6f2c1e104dd92f143c5889396b67948f60f7b974d3855"
+    "dirty_tree_digest": "sha256:b7949fd33c288ae049872a0df3b3a821c557a12a1882adb17850cf12eb6643b3"
   },
   "corpus": {
     "environment_key": "CARDEMO_CORPUS_DIR",
@@ -21,8 +21,8 @@
     "license": "Apache-2.0",
     "license_sha256": "09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b"
   },
-  "current_issue": "CD-012",
-  "issues": {"total":27,"completed":12,"in_progress":0,"open":15},
+  "current_issue": "CD-013",
+  "issues": {"total":27,"completed":13,"in_progress":0,"open":14},
   "journeys": {"total":20,"passed":0,"failed_or_not_run":20},
   "completed_issues": [
     {
@@ -117,8 +117,16 @@
       "id": "CD-012",
       "state": "pass",
       "commit_subject": "Apply CICS results to COBOL storage",
+      "commit_identity": "742982c052298c4855d5867aab505c216e896331",
       "evidence": "conformance/0.1.1/evidence/issues/CD-012.json",
       "evidence_digest": "sha256:0af81d9136fc6feec43de8e38a0c92ccf892631f611cfb4a2d80ac9ed07002fd"
+    },
+    {
+      "id": "CD-013",
+      "state": "pass",
+      "commit_subject": "Complete CardDemo CICS operations",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-013.json",
+      "evidence_digest": "sha256:a1229fa5539697f08853c9bf4e73a6048af21ddb272d439cc56fa52ec3c7a61d"
     }
   ],
   "commands": [
@@ -175,6 +183,12 @@
     ,{"command":"cargo check --workspace --all-targets --locked","exit_code":0,"result":"pass"}
     ,{"command":"affected-package cargo clippy --all-targets --locked -- -D warnings","exit_code":0,"result":"pass"}
     ,{"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-package --check","exit_code":0,"result":"six content-addressed cohorts; staged/ready/idempotent states; five negative controls passed"}
+    ,{"command":"cargo test -p mainframe-env-cics carddemo_residual_cics_forms_are_executable --locked","exit_code":1,"result":"focused pre-repair regression proved ASKTIME was explicitly unsupported"}
+    ,{"command":"affected host API/interpreter/CICS/batch/server/conformance/xtask tests","exit_code":0,"result":"91 tests passed"}
+    ,{"command":"cargo check --workspace --all-targets --locked","exit_code":0,"result":"pass"}
+    ,{"command":"affected-package cargo clippy --all-targets --locked -- -D warnings","exit_code":0,"result":"pass"}
+    ,{"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-cics-runtime --check","exit_code":0,"result":"240 reached statements and 24 executable variants passed"}
+    ,{"command":"env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-cics-runtime --check","exit_code":1,"result":"expected carddemo.corpus.environment_missing control"}
   ],
   "decisions": [
     "0.1.1 uses additive CardDemo profiles and preserves core-server compatibility.",
@@ -187,6 +201,6 @@
     "Resolve 0.1.0-alpha.0 release ordering before cutting 0.1.1."
   ],
   "blockers": [],
-  "next_issue": "CD-013",
-  "next_step": "Implement CD-013 exact base EBCDIC seed import, key/AIX validation, transactional reinstall/upgrade/rollback, and corruption/capacity controls."
+  "next_issue": "CD-014",
+  "next_step": "Implement CD-014 keyed KSDS record mutation, stable browse order, alternate-index duplicate policy, and atomic base/index conditions."
 }
