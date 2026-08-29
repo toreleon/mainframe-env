@@ -1,15 +1,17 @@
 {
   "schema_version": "mainframe-env.program-status@1",
-  "current_phase": "ME.V0",
-  "current_work_item": "ME.V0 gate passed; create the required completion commit",
-  "source_identity": "unborn-main:canonical-content-sha256:473cc54f555d5d32085a56333fcf2c2ab725f5fd10b346150822f9cc0f8f2aad",
+  "current_phase": "ME.V1",
+  "current_work_item": "ME.V1 gate passed; create the required completion commit",
+  "source_identity": "commit:811aaf1aa84077ca296d83ebca96d17c1dd3843c+canonical-content-sha256:5b8dd1ed0bf5e05cdde252ab793c4639065145e3e2edfd28efcd1028e2676e01",
   "completed_deliverables": [
     {"item":"normative mainframe-env documents read","evidence":"docs/"},
     {"item":"OpenMainframe oracle frozen clean","evidence":"conformance/0.1/inventory/oracle.json"},
     {"item":"finite scope and profile inventory","evidence":"conformance/0.1/inventory/"},
     {"item":"entry gate derived pass","evidence":"conformance/0.1/evidence/entry.json"},
     {"item":"Rust workspace and deterministic xtask","evidence":"Cargo.toml, xtask/"},
-    {"item":"ME.V0 validation gate passed","evidence":"conformance/0.1/evidence/phase-v0.json"}
+    {"item":"ME.V0 validation gate and completion commit","evidence":"conformance/0.1/evidence/phase-v0.json; commit 811aaf1aa84077ca296d83ebca96d17c1dd3843c"},
+    {"item":"ME.V1 owned foundation and contracts","evidence":"conformance/0.1/evidence/v1-contract-results.json"},
+    {"item":"ME.V1 validation gate passed","evidence":"conformance/0.1/evidence/phase-v1.json"}
   ],
   "accepted_decisions": [
     "mainframe-env identity and greenfield direction",
@@ -27,13 +29,15 @@
     ,{"command":"cargo check --workspace --all-targets --locked","exit_code":101,"result":"expected first-run failure because Cargo.lock did not yet exist"}
     ,{"command":"cargo generate-lockfile","exit_code":0,"result":"locked 30 Rust 1.95-compatible packages"}
     ,{"command":"cargo check/test/clippy/doc/fmt plus xtask versions/architecture/profiles/schemas/inventory/evidence and git diff --check","exit_code":0,"result":"ME.V0 candidate passed on Rust 1.98.0"}
+    ,{"command":"cargo fmt --all -- --check at first ME.V1 milestone attempt","exit_code":1,"result":"one registry.rs formatting diff; repaired with cargo fmt"}
+    ,{"command":"cargo fmt/check/test/clippy/doc, Rust 1.95 contract check, xtask gates, and git diff --check","exit_code":0,"result":"ME.V1 candidate passed; 42 V1 tests passed"}
   ],
   "known_gaps": [
-    "ME.V1 through ME.V7 are not implemented",
+    "ME.V2 through ME.V7 are not implemented",
     "Oracle CardDemo corpus is pinned but local corpus reproduction is pending",
     "PostgreSQL 18 runner availability is pending",
     "No compatibility or production promotion is claimed by V0"
   ],
   "stop_the_line": [],
-  "next_step": "Record the canonical ME.V0 content digest, review the staged diff, and create Complete ME.V0 workspace foundation."
+  "next_step": "Record the canonical ME.V1 content digest, review the staged diff, and create Complete ME.V1 foundation contracts."
 }

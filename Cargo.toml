@@ -1,5 +1,16 @@
 [workspace]
-members = ["xtask"]
+members = [
+    "crates/foundation/mainframe-env-source",
+    "crates/foundation/mainframe-env-diagnostics",
+    "crates/foundation/mainframe-env-encoding",
+    "crates/foundation/mainframe-env-ir",
+    "crates/contracts/mainframe-env-compiler-api",
+    "crates/contracts/mainframe-env-execution-api",
+    "crates/contracts/mainframe-env-host-api",
+    "crates/contracts/mainframe-env-store-api",
+    "crates/stores/mainframe-env-store",
+    "xtask",
+]
 resolver = "3"
 
 [workspace.package]
@@ -14,3 +25,13 @@ serde = { version = "1", default-features = false, features = ["derive", "std"] 
 serde_json = "1"
 sha2 = "0.10"
 toml = "0.8"
+proptest = "1"
+
+mainframe-env-source = { path = "crates/foundation/mainframe-env-source" }
+mainframe-env-diagnostics = { path = "crates/foundation/mainframe-env-diagnostics" }
+mainframe-env-encoding = { path = "crates/foundation/mainframe-env-encoding" }
+mainframe-env-ir = { path = "crates/foundation/mainframe-env-ir" }
+mainframe-env-compiler-api = { path = "crates/contracts/mainframe-env-compiler-api" }
+mainframe-env-execution-api = { path = "crates/contracts/mainframe-env-execution-api" }
+mainframe-env-host-api = { path = "crates/contracts/mainframe-env-host-api" }
+mainframe-env-store-api = { path = "crates/contracts/mainframe-env-store-api" }

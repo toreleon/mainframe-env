@@ -1,0 +1,10 @@
+[package]
+name = "mainframe-env-store"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+mainframe-env-execution-api.workspace = true
+mainframe-env-store-api.workspace = true

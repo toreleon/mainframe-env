@@ -1,0 +1,12 @@
+[package]
+name = "mainframe-env-compiler-api"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+mainframe-env-source.workspace = true
+mainframe-env-diagnostics.workspace = true
+mainframe-env-ir.workspace = true
+sha2.workspace = true

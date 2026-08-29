@@ -137,6 +137,34 @@ fn check_versions(root: &Path) -> TaskResult {
     require(msrv == "1.95", "workspace MSRV must be 1.95")?;
     require(pinned == "1.98.0", "pinned Rust toolchain must be 1.98.0")?;
 
+    let mut manifests = Vec::new();
+    collect_named(root, OsStr::new("Cargo.toml"), &mut manifests)?;
+    for manifest in manifests {
+        if manifest == root.join("Cargo.toml") {
+            continue;
+        }
+        let parsed: toml::Value = read(&manifest)?
+            .parse()
+            .map_err(|error| format!("{}: {error}", manifest.display()))?;
+        let crate_version = &parsed["package"]["version"];
+        let inherits = crate_version
+            .get("workspace")
+            .and_then(toml::Value::as_bool)
+            == Some(true);
+        let exact = crate_version.as_str() == Some(version.as_str());
+        require(
+            inherits || exact,
+            &format!("{} does not use the product version", manifest.display()),
+        )?;
+    }
+
+    let inventory_path = root.join("conformance/0.1/inventory/versions.json");
+    let inventory = json(&inventory_path)?;
+    require(
+        text(&inventory, "product", &inventory_path)? == version,
+        "machine version inventory differs from VERSION",
+    )?;
+
     let notes = read(&root.join("docs/releases/0.1.md"))?;
     require(
         notes.contains(&version),
@@ -191,6 +219,12 @@ fn check_dependency(package: &str, dependency: &str, excluded: &BTreeSet<String>
             &format!("deterministic package {package} depends on infrastructure {dependency}"),
         )?;
     }
+    if dependency.starts_with("mainframe-env-") && !allowed_internal_dependency(package, dependency)
+    {
+        return Err(format!(
+            "dependency direction forbids {package} -> {dependency}"
+        ));
+    }
     if package == "mainframe-env-conformance" {
         return Ok(());
     }
@@ -198,6 +232,25 @@ fn check_dependency(package: &str, dependency: &str, excluded: &BTreeSet<String>
         dependency != "mainframe-env-conformance",
         &format!("production package {package} depends on conformance"),
     )
+}
+
+fn allowed_internal_dependency(package: &str, dependency: &str) -> bool {
+    let allowed: &[&str] = match package {
+        "mainframe-env-source" | "mainframe-env-encoding" => &[],
+        "mainframe-env-diagnostics" => &["mainframe-env-source"],
+        "mainframe-env-ir" => &["mainframe-env-source", "mainframe-env-diagnostics"],
+        "mainframe-env-compiler-api" => &[
+            "mainframe-env-source",
+            "mainframe-env-diagnostics",
+            "mainframe-env-ir",
+        ],
+        "mainframe-env-execution-api" => &["mainframe-env-diagnostics"],
+        "mainframe-env-host-api" => &["mainframe-env-execution-api"],
+        "mainframe-env-store-api" => &["mainframe-env-execution-api"],
+        "mainframe-env-store" => &["mainframe-env-execution-api", "mainframe-env-store-api"],
+        _ => return true,
+    };
+    allowed.contains(&dependency)
 }
 
 fn check_profiles(root: &Path) -> TaskResult {
@@ -278,6 +331,8 @@ fn check_inventory(root: &Path) -> TaskResult {
         "excluded-components.json",
         "oracle.json",
         "known-gaps.json",
+        "operation-catalog.json",
+        "versions.json",
     ];
     for name in required {
         let path = inventory.join(name);
@@ -375,6 +430,24 @@ fn check_evidence(root: &Path) -> TaskResult {
         !array(&status, "commands", &status_path)?.is_empty(),
         "program status has no command receipts",
     )?;
+    let current = text(&status, "current_phase", &status_path)?
+        .strip_prefix("ME.V")
+        .ok_or("current phase prefix is invalid")?
+        .parse::<usize>()
+        .map_err(|error| format!("current phase number is invalid: {error}"))?;
+    for phase in 0..=current {
+        let path = evidence.join(format!("phase-v{phase}.json"));
+        let result = json(&path)?;
+        require(
+            result.get("derived") == Some(&Value::Bool(true))
+                && result.get("status") == Some(&Value::String("pass".to_string())),
+            &format!("ME.V{phase} evidence does not derive pass"),
+        )?;
+        require(
+            text(&result, "digest", &path)?.starts_with("sha256:"),
+            &format!("ME.V{phase} evidence digest is missing"),
+        )?;
+    }
     Ok(())
 }
 
@@ -501,6 +574,19 @@ mod tests {
     fn allowed_tooling_edge_is_accepted() {
         let excluded = BTreeSet::new();
         assert!(check_dependency("xtask", "serde_json", &excluded).is_ok());
+    }
+
+    #[test]
+    fn reverse_internal_dependency_is_rejected() {
+        let excluded = BTreeSet::new();
+        assert!(
+            check_dependency(
+                "mainframe-env-source",
+                "mainframe-env-compiler-api",
+                &excluded,
+            )
+            .is_err()
+        );
     }
 
     #[test]

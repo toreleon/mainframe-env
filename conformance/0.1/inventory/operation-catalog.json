@@ -1,0 +1,17 @@
+{
+  "schema_version": "mainframe-env.operation-catalog@1",
+  "source": "readable normative catalog; generated bindings are not authoritative",
+  "dialects": [
+    {"id":"mainframe.core@1","operations":[
+      {"name":"constant","operands":0,"results":1,"effects":[],"route":"reference"},
+      {"name":"copy_bytes","operands":1,"results":1,"effects":["memory-read","memory-write"],"route":"reference"},
+      {"name":"branch","operands":0,"results":0,"effects":[],"terminator":true,"route":"reference"},
+      {"name":"conditional_branch","operands":1,"results":0,"effects":[],"terminator":true,"route":"reference"},
+      {"name":"return","operands":"0..1","results":0,"effects":["program-control"],"terminator":true,"route":"reference"},
+      {"name":"condition","operands":"0..2","results":0,"effects":["condition"],"terminator":true,"route":"reference"},
+      {"name":"suspend","operands":"0..1","results":0,"effects":["suspension"],"terminator":true,"route":"reference"},
+      {"name":"host_call","operands":"0..64","results":"0..16","effects":"catalog-declared","route":"registered host import"}
+    ]},
+    {"id":"cics.typed@1","operations_source":"cics-operations.json","route":"mainframe-env-host-api typed CicsRequest"}
+  ]
+}

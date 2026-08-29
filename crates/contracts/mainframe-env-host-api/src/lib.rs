@@ -1,0 +1,24 @@
+//! Typed host-service and CICS effects with deterministic capability selection.
+
+#![forbid(unsafe_code)]
+
+mod names;
+mod registry;
+mod request;
+
+pub use names::{
+    DatasetName, HostNameProblem, JobName, MemberName, ProgramName, ResourceName, SessionId,
+};
+pub use registry::{
+    CapabilityDescriptor, HostProvider, RegistryProblem, RegistryPublisher, RegistrySnapshot,
+};
+pub use request::{
+    AccessIntent, AuditEvent, CicsConditionPolicy, CicsOperation, CicsRequest, ClockRequest,
+    DatasetAttributes, DatasetOrganization, DatasetRequest, DatasetResult, EffectRequest,
+    EffectResult, HostLimits, HostProblem, HostRequest, HostResult, Mutation, ProgramRequest,
+    RecordFormat, SecretRef, SecurityDecision, SecurityRequest, SpoolRequest, StateRequest,
+    TerminalField, TerminalRequest,
+};
+
+pub const HOST_CONTRACT: &str = "mainframe-env.host@1";
+pub const CICS_CONTRACT: &str = "mainframe-env.cics@1";

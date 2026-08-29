@@ -1,0 +1,14 @@
+[package]
+name = "mainframe-env-ir"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+mainframe-env-source.workspace = true
+mainframe-env-diagnostics.workspace = true
+sha2.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true

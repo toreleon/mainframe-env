@@ -1,0 +1,824 @@
+use crate::{DatasetName, JobName, MemberName, ProgramName, ResourceName, SessionId};
+use mainframe_env_execution_api::{
+    BoundedPayload, CapabilityId, IdempotencyKey, InvocationLimits, PrincipalId, RunUnitId,
+};
+use std::collections::BTreeMap;
+use std::fmt;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HostLimits {
+    pub max_name_bytes: usize,
+    pub max_record_bytes: usize,
+    pub max_records: usize,
+    pub max_fields: usize,
+    pub max_audit_fields: usize,
+    pub max_state_bytes: usize,
+}
+impl Default for HostLimits {
+    fn default() -> Self {
+        Self {
+            max_name_bytes: 128,
+            max_record_bytes: 1024 * 1024,
+            max_records: 4096,
+            max_fields: 512,
+            max_audit_fields: 128,
+            max_state_bytes: 4 * 1024 * 1024,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DatasetOrganization {
+    Sequential,
+    Partitioned,
+    KeySequenced,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RecordFormat {
+    Fixed,
+    FixedBlocked,
+    Variable,
+    VariableBlocked,
+    Undefined,
+    Line,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AccessIntent {
+    Read,
+    Execute,
+    Update,
+    Control,
+    Alter,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SecretRef(String);
+
+impl SecretRef {
+    pub fn new(value: impl Into<String>, limits: HostLimits) -> Result<Self, HostProblem> {
+        let value = value.into();
+        if value.is_empty()
+            || value.len() > limits.max_name_bytes
+            || value.contains(char::is_whitespace)
+        {
+            Err(HostProblem::Malformed)
+        } else {
+            Ok(Self(value))
+        }
+    }
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DatasetAttributes {
+    pub organization: DatasetOrganization,
+    pub record_format: RecordFormat,
+    pub logical_record_length: u32,
+    pub key_offset: Option<u32>,
+    pub key_length: Option<u32>,
+    pub ccsid: Option<u16>,
+}
+
+impl DatasetAttributes {
+    pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
+        if self.logical_record_length == 0
+            || self.logical_record_length as usize > limits.max_record_bytes
+            || self
+                .key_offset
+                .zip(self.key_length)
+                .is_some_and(|(offset, length)| {
+                    length == 0
+                        || offset
+                            .checked_add(length)
+                            .is_none_or(|end| end > self.logical_record_length)
+                })
+            || self.key_offset.is_some() != self.key_length.is_some()
+        {
+            Err(HostProblem::Malformed)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Mutation {
+    pub sequence: u64,
+    pub idempotency_key: IdempotencyKey,
+    pub transaction: Option<String>,
+}
+
+impl Mutation {
+    pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
+        if self.sequence == 0
+            || self
+                .transaction
+                .as_ref()
+                .is_some_and(|value| value.is_empty() || value.len() > limits.max_name_bytes)
+        {
+            Err(HostProblem::Malformed)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DatasetRequest {
+    List {
+        pattern: String,
+        start: Option<DatasetName>,
+        max_items: u32,
+    },
+    Attributes {
+        dataset: DatasetName,
+    },
+    Read {
+        dataset: DatasetName,
+        member: Option<MemberName>,
+        key: Option<Vec<u8>>,
+        max_records: u32,
+    },
+    Create {
+        dataset: DatasetName,
+        attributes: DatasetAttributes,
+        mutation: Mutation,
+    },
+    Write {
+        dataset: DatasetName,
+        member: Option<MemberName>,
+        records: Vec<Vec<u8>>,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
+    Rename {
+        from: DatasetName,
+        to: DatasetName,
+        mutation: Mutation,
+    },
+    Delete {
+        dataset: DatasetName,
+        member: Option<MemberName>,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
+    StartBrowse {
+        dataset: DatasetName,
+        key: Vec<u8>,
+    },
+    ReadNext {
+        dataset: DatasetName,
+        cursor: String,
+        reverse: bool,
+    },
+    EndBrowse {
+        dataset: DatasetName,
+        cursor: String,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DatasetResult {
+    Listed {
+        names: Vec<DatasetName>,
+        more: bool,
+    },
+    Attributes {
+        attributes: DatasetAttributes,
+        version: u64,
+    },
+    Records {
+        records: Vec<Vec<u8>>,
+        version: u64,
+    },
+    Created {
+        version: u64,
+    },
+    Mutated {
+        version: u64,
+    },
+    Browse {
+        cursor: String,
+        record: Option<Vec<u8>>,
+    },
+    Condition {
+        name: String,
+        status: String,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ProgramRequest {
+    Call {
+        program: ProgramName,
+        payload: BoundedPayload,
+    },
+    Link {
+        program: ProgramName,
+        payload: BoundedPayload,
+    },
+    Xctl {
+        program: ProgramName,
+        payload: BoundedPayload,
+    },
+    Return {
+        next_transaction: Option<String>,
+        payload: BoundedPayload,
+    },
+    Cancel {
+        program: ProgramName,
+    },
+    Abend {
+        code: String,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SpoolRequest {
+    Append {
+        job: JobName,
+        file: String,
+        records: Vec<Vec<u8>>,
+        mutation: Mutation,
+    },
+    List {
+        job: JobName,
+    },
+    Read {
+        job: JobName,
+        file: String,
+        start: u64,
+        max_records: u32,
+    },
+    Seal {
+        job: JobName,
+        file: String,
+        mutation: Mutation,
+    },
+    Purge {
+        job: JobName,
+        mutation: Mutation,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TerminalField {
+    pub name: String,
+    pub row: u16,
+    pub column: u16,
+    pub length: u16,
+    pub modified: bool,
+    pub secret: bool,
+    pub value: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TerminalRequest {
+    Open {
+        session: SessionId,
+        rows: u16,
+        columns: u16,
+    },
+    Write {
+        session: SessionId,
+        erase: bool,
+        cursor: Option<(u16, u16)>,
+        fields: Vec<TerminalField>,
+    },
+    Read {
+        session: SessionId,
+    },
+    Input {
+        session: SessionId,
+        aid: u8,
+        fields: Vec<TerminalField>,
+    },
+    Release {
+        session: SessionId,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SecurityRequest {
+    Authenticate {
+        user: PrincipalId,
+        credential_reference: SecretRef,
+    },
+    Authorize {
+        principal: PrincipalId,
+        class: String,
+        resource: ResourceName,
+        intent: AccessIntent,
+    },
+    Audit(AuditEvent),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SecurityDecision {
+    Allow,
+    Deny,
+    NotFound,
+    InvalidCredentials,
+    Revoked,
+    Locked,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AuditEvent {
+    pub action: String,
+    pub resource_hash: String,
+    pub decision: String,
+    pub fields: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ClockRequest {
+    UtcTimestamp,
+    Date,
+    Time,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum StateRequest {
+    Get {
+        key: String,
+    },
+    Put {
+        key: String,
+        value: Vec<u8>,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
+    Delete {
+        key: String,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CicsOperation {
+    Abend,
+    Asktime,
+    Assign,
+    Delete,
+    EndBrowse,
+    FormatTime,
+    HandleAbend,
+    HandleCondition,
+    Inquire,
+    Read,
+    ReadNext,
+    ReadPrev,
+    ReceiveMap,
+    Return,
+    Rewrite,
+    SendText,
+    SendMap,
+    StartBrowse,
+    Syncpoint,
+    Write,
+    WriteTransientData,
+    Xctl,
+}
+
+impl CicsOperation {
+    #[must_use]
+    pub const fn is_mutating(self) -> bool {
+        matches!(
+            self,
+            Self::Delete
+                | Self::Rewrite
+                | Self::Write
+                | Self::WriteTransientData
+                | Self::Xctl
+                | Self::Return
+                | Self::Abend
+                | Self::Syncpoint
+        )
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum CicsConditionPolicy {
+    Default,
+    NoHandle,
+    Respond {
+        response_field: String,
+        response2_field: Option<String>,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CicsRequest {
+    pub operation: CicsOperation,
+    pub arguments: BTreeMap<String, BoundedPayload>,
+    pub condition_policy: CicsConditionPolicy,
+    pub mutation: Option<Mutation>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum HostRequest {
+    Dataset(DatasetRequest),
+    Program(ProgramRequest),
+    Spool(SpoolRequest),
+    Terminal(TerminalRequest),
+    Security(SecurityRequest),
+    Clock(ClockRequest),
+    State(StateRequest),
+    Cics(CicsRequest),
+}
+
+impl HostRequest {
+    #[must_use]
+    pub fn required_capability(&self, limits: InvocationLimits) -> CapabilityId {
+        let name = match self {
+            Self::Dataset(
+                DatasetRequest::List { .. }
+                | DatasetRequest::Attributes { .. }
+                | DatasetRequest::Read { .. }
+                | DatasetRequest::ReadNext { .. }
+                | DatasetRequest::StartBrowse { .. }
+                | DatasetRequest::EndBrowse { .. },
+            ) => "host.dataset.read",
+            Self::Dataset(_) => "host.dataset.write",
+            Self::Program(_) => "host.program.invoke",
+            Self::Spool(SpoolRequest::List { .. } | SpoolRequest::Read { .. }) => "host.spool.read",
+            Self::Spool(_) => "host.spool.write",
+            Self::Terminal(_) => "host.terminal",
+            Self::Security(SecurityRequest::Audit(_)) => "host.audit",
+            Self::Security(_) => "host.security.authorize",
+            Self::Clock(_) => "host.clock",
+            Self::State(StateRequest::Get { .. }) => "host.state.read",
+            Self::State(_) => "host.state.write",
+            Self::Cics(_) => "host.cics.execute",
+        };
+        CapabilityId::new(name, limits).expect("built-in capability identities are valid")
+    }
+
+    #[must_use]
+    pub fn is_mutating(&self) -> bool {
+        matches!(
+            self,
+            Self::Dataset(
+                DatasetRequest::Create { .. }
+                    | DatasetRequest::Write { .. }
+                    | DatasetRequest::Rename { .. }
+                    | DatasetRequest::Delete { .. }
+            ) | Self::Spool(
+                SpoolRequest::Append { .. }
+                    | SpoolRequest::Seal { .. }
+                    | SpoolRequest::Purge { .. }
+            ) | Self::Program(_)
+                | Self::State(StateRequest::Put { .. } | StateRequest::Delete { .. })
+        ) || matches!(self, Self::Cics(CicsRequest { operation, .. }) if operation.is_mutating())
+    }
+
+    #[must_use]
+    pub fn mutation(&self) -> Option<&Mutation> {
+        match self {
+            Self::Dataset(
+                DatasetRequest::Create { mutation, .. }
+                | DatasetRequest::Write { mutation, .. }
+                | DatasetRequest::Rename { mutation, .. }
+                | DatasetRequest::Delete { mutation, .. },
+            )
+            | Self::Spool(
+                SpoolRequest::Append { mutation, .. }
+                | SpoolRequest::Seal { mutation, .. }
+                | SpoolRequest::Purge { mutation, .. },
+            )
+            | Self::State(
+                StateRequest::Put { mutation, .. } | StateRequest::Delete { mutation, .. },
+            ) => Some(mutation),
+            Self::Cics(request) => request.mutation.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
+        match self {
+            Self::Dataset(request) => validate_dataset(request, limits),
+            Self::Spool(SpoolRequest::Append {
+                records, mutation, ..
+            }) => {
+                validate_records(records, limits)?;
+                mutation.validate(limits)
+            }
+            Self::Spool(
+                SpoolRequest::Seal { mutation, .. } | SpoolRequest::Purge { mutation, .. },
+            ) => mutation.validate(limits),
+            Self::Terminal(
+                TerminalRequest::Write { fields, .. } | TerminalRequest::Input { fields, .. },
+            ) => validate_fields(fields, limits),
+            Self::Security(SecurityRequest::Audit(event)) => {
+                if event.fields.len() > limits.max_audit_fields {
+                    Err(HostProblem::ResourceExhausted)
+                } else {
+                    Ok(())
+                }
+            }
+            Self::State(StateRequest::Put {
+                value, mutation, ..
+            }) => {
+                if value.len() > limits.max_state_bytes {
+                    return Err(HostProblem::ResourceExhausted);
+                }
+                mutation.validate(limits)
+            }
+            Self::State(StateRequest::Delete { mutation, .. }) => mutation.validate(limits),
+            Self::Cics(request) => {
+                if request.arguments.len() > limits.max_fields {
+                    return Err(HostProblem::ResourceExhausted);
+                }
+                if self.is_mutating() {
+                    request
+                        .mutation
+                        .as_ref()
+                        .ok_or(HostProblem::MissingIdempotency)?
+                        .validate(limits)?;
+                }
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum HostResult {
+    Dataset(DatasetResult),
+    Program(BoundedPayload),
+    Spool(BoundedPayload),
+    Terminal(BoundedPayload),
+    Security(SecurityDecision),
+    Clock(String),
+    State {
+        value: Option<Vec<u8>>,
+        version: u64,
+    },
+    Cics(BoundedPayload),
+}
+
+impl HostResult {
+    pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
+        match self {
+            Self::Dataset(DatasetResult::Listed { names, .. })
+                if names.len() > limits.max_records =>
+            {
+                Err(HostProblem::ResourceExhausted)
+            }
+            Self::Dataset(DatasetResult::Records { records, .. }) => {
+                validate_records(records, limits)
+            }
+            Self::Program(payload)
+            | Self::Spool(payload)
+            | Self::Terminal(payload)
+            | Self::Cics(payload)
+                if payload.bytes().len() > limits.max_state_bytes =>
+            {
+                Err(HostProblem::ResourceExhausted)
+            }
+            Self::State {
+                value: Some(value), ..
+            } if value.len() > limits.max_state_bytes => Err(HostProblem::ResourceExhausted),
+            Self::Clock(value) if value.len() > limits.max_name_bytes => {
+                Err(HostProblem::ResourceExhausted)
+            }
+            _ => Ok(()),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EffectRequest {
+    pub run_unit: RunUnitId,
+    pub sequence: u64,
+    pub deadline_tick: u64,
+    pub idempotency_key: Option<IdempotencyKey>,
+    pub request: HostRequest,
+}
+
+impl EffectRequest {
+    pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
+        if self.sequence == 0 || self.deadline_tick == 0 {
+            return Err(HostProblem::Malformed);
+        }
+        if self.request.is_mutating() {
+            let key = self
+                .idempotency_key
+                .as_ref()
+                .ok_or(HostProblem::MissingIdempotency)?;
+            if let Some(mutation) = self.request.mutation()
+                && (&mutation.idempotency_key != key || mutation.sequence != self.sequence)
+            {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+        }
+        self.request.validate(limits)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EffectResult {
+    pub sequence: u64,
+    pub outcome: Result<HostResult, HostProblem>,
+}
+
+impl EffectResult {
+    pub fn validate(&self, expected_sequence: u64, limits: HostLimits) -> Result<(), HostProblem> {
+        if self.sequence == 0 || self.sequence != expected_sequence {
+            return Err(HostProblem::Malformed);
+        }
+        if let Ok(result) = &self.outcome {
+            result.validate(limits)?;
+        }
+        Ok(())
+    }
+}
+
+fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), HostProblem> {
+    match request {
+        DatasetRequest::List {
+            max_items, pattern, ..
+        } if *max_items == 0
+            || *max_items as usize > limits.max_records
+            || pattern.len() > limits.max_name_bytes =>
+        {
+            Err(HostProblem::ResourceExhausted)
+        }
+        DatasetRequest::Read {
+            key, max_records, ..
+        } if *max_records == 0
+            || *max_records as usize > limits.max_records
+            || key
+                .as_ref()
+                .is_some_and(|value| value.len() > limits.max_record_bytes) =>
+        {
+            Err(HostProblem::ResourceExhausted)
+        }
+        DatasetRequest::Create {
+            attributes,
+            mutation,
+            ..
+        } => {
+            attributes.validate(limits)?;
+            mutation.validate(limits)
+        }
+        DatasetRequest::Write {
+            records, mutation, ..
+        } => {
+            validate_records(records, limits)?;
+            mutation.validate(limits)
+        }
+        DatasetRequest::Rename { mutation, .. } | DatasetRequest::Delete { mutation, .. } => {
+            mutation.validate(limits)
+        }
+        DatasetRequest::StartBrowse { key, .. } if key.len() > limits.max_record_bytes => {
+            Err(HostProblem::ResourceExhausted)
+        }
+        DatasetRequest::ReadNext { cursor, .. } | DatasetRequest::EndBrowse { cursor, .. }
+            if cursor.is_empty() || cursor.len() > limits.max_name_bytes =>
+        {
+            Err(HostProblem::Malformed)
+        }
+        _ => Ok(()),
+    }
+}
+
+fn validate_records(records: &[Vec<u8>], limits: HostLimits) -> Result<(), HostProblem> {
+    if records.len() > limits.max_records
+        || records
+            .iter()
+            .any(|record| record.len() > limits.max_record_bytes)
+    {
+        Err(HostProblem::ResourceExhausted)
+    } else {
+        Ok(())
+    }
+}
+fn validate_fields(fields: &[TerminalField], limits: HostLimits) -> Result<(), HostProblem> {
+    if fields.len() > limits.max_fields
+        || fields.iter().any(|field| {
+            field.name.is_empty()
+                || field.name.len() > limits.max_name_bytes
+                || field.value.len() > limits.max_record_bytes
+                || field.value.len() > usize::from(field.length)
+        })
+    {
+        Err(HostProblem::ResourceExhausted)
+    } else {
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum HostProblem {
+    Malformed,
+    Unsupported,
+    NotFound,
+    Condition {
+        name: String,
+        response: i32,
+        response2: i32,
+    },
+    Unauthorized,
+    Cancelled,
+    TimedOut,
+    ResourceExhausted,
+    ProviderFailure,
+    InfrastructureFailure,
+    MissingIdempotency,
+    IdempotencyConflict,
+    UnknownOutcome,
+}
+impl fmt::Display for HostProblem {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "host service failed: {self:?}")
+    }
+}
+impl std::error::Error for HostProblem {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mutating_effect_requires_idempotency() {
+        let invocation = InvocationLimits::default();
+        let host = HostLimits::default();
+        let request = EffectRequest {
+            run_unit: RunUnitId::new("run-1", invocation).unwrap(),
+            sequence: 1,
+            deadline_tick: 1,
+            idempotency_key: None,
+            request: HostRequest::State(StateRequest::Delete {
+                key: "x".into(),
+                expected_version: None,
+                mutation: Mutation {
+                    sequence: 1,
+                    idempotency_key: IdempotencyKey::new("idem-1", invocation).unwrap(),
+                    transaction: None,
+                },
+            }),
+        };
+        assert_eq!(request.validate(host), Err(HostProblem::MissingIdempotency));
+    }
+
+    #[test]
+    fn records_are_bounded() {
+        let invocation = InvocationLimits::default();
+        let limits = HostLimits {
+            max_record_bytes: 1,
+            ..HostLimits::default()
+        };
+        let mutation = Mutation {
+            sequence: 1,
+            idempotency_key: IdempotencyKey::new("i", invocation).unwrap(),
+            transaction: None,
+        };
+        let request = HostRequest::Dataset(DatasetRequest::Write {
+            dataset: DatasetName::new("USER.DATA", 44).unwrap(),
+            member: None,
+            records: vec![vec![1, 2]],
+            expected_version: None,
+            mutation,
+        });
+        assert_eq!(
+            request.validate(limits),
+            Err(HostProblem::ResourceExhausted)
+        );
+    }
+
+    #[test]
+    fn all_frozen_cics_forms_are_typed() {
+        let forms = [
+            CicsOperation::Abend,
+            CicsOperation::Asktime,
+            CicsOperation::Assign,
+            CicsOperation::Delete,
+            CicsOperation::EndBrowse,
+            CicsOperation::FormatTime,
+            CicsOperation::HandleAbend,
+            CicsOperation::HandleCondition,
+            CicsOperation::Inquire,
+            CicsOperation::Read,
+            CicsOperation::ReadNext,
+            CicsOperation::ReadPrev,
+            CicsOperation::ReceiveMap,
+            CicsOperation::Return,
+            CicsOperation::Rewrite,
+            CicsOperation::SendText,
+            CicsOperation::SendMap,
+            CicsOperation::StartBrowse,
+            CicsOperation::Syncpoint,
+            CicsOperation::Write,
+            CicsOperation::WriteTransientData,
+            CicsOperation::Xctl,
+        ];
+        assert_eq!(forms.len(), 22);
+    }
+}

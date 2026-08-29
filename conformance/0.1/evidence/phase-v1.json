@@ -1,0 +1,28 @@
+{
+  "schema_version":"mainframe-env.phase-result@1",
+  "phase":"ME.V1",
+  "derived":true,
+  "status":"pass",
+  "product_version":"0.1.0-alpha.0",
+  "source_identity":"commit:811aaf1aa84077ca296d83ebca96d17c1dd3843c+canonical-content-sha256:5b8dd1ed0bf5e05cdde252ab793c4639065145e3e2edfd28efcd1028e2676e01",
+  "conditions":{
+    "foundation_contracts_complete":true,
+    "dependency_direction_clean":true,
+    "codecs_verifiers_bounds_pass":true,
+    "contracts_have_no_infrastructure_or_oracle_dependency":true,
+    "executable_state_cannot_bypass_legality":true,
+    "bounded_memory_stores_pass":true,
+    "property_and_hostile_input_tests_pass":true,
+    "msrv_pass":true
+  },
+  "evidence":[
+    "conformance/0.1/evidence/v1-contract-results.json",
+    "conformance/0.1/inventory/operation-catalog.json",
+    "conformance/0.1/inventory/versions.json",
+    "crates/foundation/",
+    "crates/contracts/",
+    "crates/stores/mainframe-env-store/"
+  ],
+  "digest_policy":"cargo xtask digest; excludes Git metadata, target output, raw evidence, program status, and phase receipt JSON files",
+  "digest":"sha256:5b8dd1ed0bf5e05cdde252ab793c4639065145e3e2edfd28efcd1028e2676e01"
+}
