@@ -1,6 +1,7 @@
 use crate::{FileId, LogicalPath, SourceId, SourceProblem};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt;
 use std::ops::Range;
 
 /// Enforced limits for one semantic source closure.
@@ -144,6 +145,94 @@ pub struct SourceBundle {
     options: BTreeMap<String, String>,
     provenance: Vec<ProvenanceEdge>,
     total_bytes: usize,
+    libraries: Vec<SourceLibrary>,
+}
+
+/// One explicitly ordered logical source library.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SourceLibrary {
+    name: String,
+    members: Vec<LogicalPath>,
+}
+
+impl SourceLibrary {
+    pub fn new(
+        name: impl Into<String>,
+        mut members: Vec<LogicalPath>,
+        limits: SourceLimits,
+    ) -> Result<Self, LibraryProblem> {
+        let name = name.into();
+        if name.is_empty()
+            || name.len() > limits.max_path_bytes
+            || !name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+        {
+            return Err(LibraryProblem::InvalidLibraryName(name));
+        }
+        if members.is_empty() || members.len() > limits.max_files {
+            return Err(LibraryProblem::InvalidMemberCount(name));
+        }
+        members.sort();
+        if members.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(LibraryProblem::DuplicateMemberPath(name));
+        }
+        let mut member_names = BTreeSet::new();
+        for member in &members {
+            let leaf = member
+                .as_str()
+                .rsplit('/')
+                .next()
+                .unwrap_or(member.as_str());
+            let stem = leaf.split('.').next().unwrap_or(leaf).to_ascii_uppercase();
+            if !member_names.insert(stem.clone()) {
+                return Err(LibraryProblem::DuplicateMemberName {
+                    member: stem,
+                    library: name,
+                });
+            }
+        }
+        Ok(Self { name, members })
+    }
+
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    #[must_use]
+    pub fn members(&self) -> &[LogicalPath] {
+        &self.members
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum LibraryProblem {
+    InvalidLibraryName(String),
+    InvalidMemberCount(String),
+    DuplicateLibraryName(String),
+    DuplicateMemberPath(String),
+    DuplicateMemberName { member: String, library: String },
+    UnknownMemberPath(LogicalPath),
+    PrimaryIsLibraryMember(LogicalPath),
+    UnassignedFile(LogicalPath),
+    MissingMember(String),
+    AmbiguousMember { member: String, library: String },
+    Source(SourceProblem),
+}
+
+impl fmt::Display for LibraryProblem {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "source library failed: {self:?}")
+    }
+}
+
+impl std::error::Error for LibraryProblem {}
+
+impl From<SourceProblem> for LibraryProblem {
+    fn from(problem: SourceProblem) -> Self {
+        Self::Source(problem)
+    }
 }
 
 impl SourceBundle {
@@ -223,6 +312,19 @@ impl SourceBundle {
             )
         });
         let id = fingerprint(primary, &files, &options, &validated_edges);
+        let default_members = files
+            .iter()
+            .filter(|file| file.id != primary)
+            .map(|file| file.path.clone())
+            .collect::<Vec<_>>();
+        let libraries = if default_members.is_empty() {
+            Vec::new()
+        } else {
+            vec![SourceLibrary {
+                name: "default".to_string(),
+                members: default_members,
+            }]
+        };
         Ok(Self {
             id,
             primary,
@@ -230,7 +332,61 @@ impl SourceBundle {
             options,
             provenance: validated_edges,
             total_bytes,
+            libraries,
         })
+    }
+
+    /// Validates an explicit, ordered library closure while retaining the
+    /// legacy `new` constructor and its identities unchanged.
+    pub fn with_libraries(
+        primary_path: &LogicalPath,
+        files: Vec<SourceFile>,
+        libraries: Vec<SourceLibrary>,
+        options: BTreeMap<String, String>,
+        provenance: Vec<ProvenanceEdgeInput>,
+        limits: SourceLimits,
+    ) -> Result<Self, LibraryProblem> {
+        if libraries.len() > limits.max_files {
+            return Err(LibraryProblem::InvalidMemberCount("closure".into()));
+        }
+        let mut bundle = Self::new(primary_path, files, options, provenance, limits)?;
+        let known = bundle
+            .files
+            .iter()
+            .map(|file| file.path.clone())
+            .collect::<BTreeSet<_>>();
+        let mut names = BTreeSet::new();
+        let mut assigned = BTreeSet::new();
+        for library in &libraries {
+            if !names.insert(library.name.clone()) {
+                return Err(LibraryProblem::DuplicateLibraryName(library.name.clone()));
+            }
+            for member in &library.members {
+                if member == primary_path {
+                    return Err(LibraryProblem::PrimaryIsLibraryMember(member.clone()));
+                }
+                if !known.contains(member) {
+                    return Err(LibraryProblem::UnknownMemberPath(member.clone()));
+                }
+                if !assigned.insert(member.clone()) {
+                    return Err(LibraryProblem::DuplicateMemberPath(library.name.clone()));
+                }
+            }
+        }
+        for file in &bundle.files {
+            if file.path != *primary_path && !assigned.contains(&file.path) {
+                return Err(LibraryProblem::UnassignedFile(file.path.clone()));
+            }
+        }
+        bundle.libraries = libraries;
+        bundle.id = fingerprint_with_libraries(
+            bundle.primary,
+            &bundle.files,
+            &bundle.options,
+            &bundle.provenance,
+            &bundle.libraries,
+        );
+        Ok(bundle)
     }
 
     #[must_use]
@@ -261,6 +417,51 @@ impl SourceBundle {
     #[must_use]
     pub const fn total_bytes(&self) -> usize {
         self.total_bytes
+    }
+
+    #[must_use]
+    pub fn libraries(&self) -> &[SourceLibrary] {
+        &self.libraries
+    }
+
+    pub fn resolve_library_member(&self, name: &str) -> Result<&SourceFile, LibraryProblem> {
+        if name.is_empty()
+            || name.len() > 128
+            || !name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+        {
+            return Err(LibraryProblem::MissingMember(name.to_string()));
+        }
+        for library in &self.libraries {
+            let matches = library
+                .members
+                .iter()
+                .filter_map(|path| self.files.iter().find(|file| file.path == *path))
+                .filter(|file| {
+                    let leaf = file
+                        .path
+                        .as_str()
+                        .rsplit('/')
+                        .next()
+                        .unwrap_or(file.path.as_str());
+                    leaf.split('.')
+                        .next()
+                        .is_some_and(|stem| stem.eq_ignore_ascii_case(name))
+                })
+                .collect::<Vec<_>>();
+            match matches.as_slice() {
+                [] => {}
+                [file] => return Ok(*file),
+                _ => {
+                    return Err(LibraryProblem::AmbiguousMember {
+                        member: name.to_string(),
+                        library: library.name.clone(),
+                    });
+                }
+            }
+        }
+        Err(LibraryProblem::MissingMember(name.to_string()))
     }
 
     #[must_use]
@@ -310,6 +511,26 @@ fn fingerprint(
         field(&mut digest, &usize_bytes(edge.origin.bytes.start));
         field(&mut digest, &usize_bytes(edge.origin.bytes.end));
         field(&mut digest, &[provenance_tag(edge.kind)]);
+    }
+    SourceId::from_bytes(digest.finalize().into())
+}
+
+fn fingerprint_with_libraries(
+    primary: FileId,
+    files: &[SourceFile],
+    options: &BTreeMap<String, String>,
+    provenance: &[ProvenanceEdge],
+    libraries: &[SourceLibrary],
+) -> SourceId {
+    let legacy = fingerprint(primary, files, options, provenance);
+    let mut digest = Sha256::new();
+    field(&mut digest, b"mainframe-env.source-libraries@1");
+    field(&mut digest, legacy.as_bytes());
+    for library in libraries {
+        field(&mut digest, library.name.as_bytes());
+        for member in &library.members {
+            field(&mut digest, member.as_str().as_bytes());
+        }
     }
     SourceId::from_bytes(digest.finalize().into())
 }
@@ -429,5 +650,95 @@ mod tests {
             LogicalPath::new("/tmp/main.cbl", limit),
             Err(SourceProblem::InvalidPath)
         );
+    }
+
+    #[test]
+    fn explicit_library_precedence_is_deterministic_and_identified() {
+        let limits = SourceLimits::default();
+        let primary = LogicalPath::new("src/main.cbl", limits.max_path_bytes).unwrap();
+        let first_path = LogicalPath::new("first/REC.cpy", limits.max_path_bytes).unwrap();
+        let second_path = LogicalPath::new("second/REC.cpy", limits.max_path_bytes).unwrap();
+        let files = vec![
+            input("src/main.cbl", b"COPY REC."),
+            input("first/REC.cpy", b"FIRST"),
+            input("second/REC.cpy", b"SECOND"),
+        ];
+        let first = SourceBundle::with_libraries(
+            &primary,
+            files.clone(),
+            vec![
+                SourceLibrary::new("first", vec![first_path.clone()], limits).unwrap(),
+                SourceLibrary::new("second", vec![second_path.clone()], limits).unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let second = SourceBundle::with_libraries(
+            &primary,
+            files,
+            vec![
+                SourceLibrary::new("second", vec![second_path], limits).unwrap(),
+                SourceLibrary::new("first", vec![first_path], limits).unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        assert_eq!(
+            first.resolve_library_member("REC").unwrap().bytes(),
+            b"FIRST"
+        );
+        assert_eq!(
+            second.resolve_library_member("REC").unwrap().bytes(),
+            b"SECOND"
+        );
+        assert_ne!(first.id(), second.id());
+    }
+
+    #[test]
+    fn missing_ambiguous_and_unassigned_members_fail_before_compilation() {
+        let limits = SourceLimits::default();
+        let primary = LogicalPath::new("main.cbl", limits.max_path_bytes).unwrap();
+        let left = LogicalPath::new("copy/REC.cpy", limits.max_path_bytes).unwrap();
+        let right = LogicalPath::new("copy/REC.CPY", limits.max_path_bytes).unwrap();
+        let ambiguous_library = SourceLibrary::new("copy", vec![left, right], limits);
+        assert!(matches!(
+            ambiguous_library,
+            Err(LibraryProblem::DuplicateMemberName { .. })
+        ));
+
+        let bundle = SourceBundle::new(
+            &primary,
+            vec![
+                input("main.cbl", b"COPY REC."),
+                input("copy/REC.cpy", b"A"),
+                input("copy/REC.CPY", b"B"),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        assert!(matches!(
+            bundle.resolve_library_member("REC"),
+            Err(LibraryProblem::AmbiguousMember { .. })
+        ));
+        assert_eq!(
+            bundle.resolve_library_member("MISSING"),
+            Err(LibraryProblem::MissingMember("MISSING".into()))
+        );
+
+        let unassigned = SourceBundle::with_libraries(
+            &primary,
+            vec![input("main.cbl", b"MAIN"), input("copy/REC.cpy", b"A")],
+            Vec::new(),
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        );
+        assert!(matches!(unassigned, Err(LibraryProblem::UnassignedFile(_))));
     }
 }

@@ -1,5 +1,7 @@
 use mainframe_env_encoding::CodePage;
-use mainframe_env_source::{LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat};
+use mainframe_env_source::{
+    LibraryProblem, LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat,
+};
 use rowan::{GreenNode, GreenNodeBuilder, Language};
 use std::fmt;
 use std::ops::Range;
@@ -402,20 +404,14 @@ fn expand_copies(
             return Err(SyntaxProblem::CopyDepthExceeded);
         }
         let dependency = bundle
-            .files()
-            .iter()
-            .find(|file| {
-                let leaf = file
-                    .path()
-                    .as_str()
-                    .rsplit('/')
-                    .next()
-                    .unwrap_or(file.path().as_str());
-                leaf.split('.')
-                    .next()
-                    .is_some_and(|stem| stem.eq_ignore_ascii_case(&name))
-            })
-            .ok_or_else(|| SyntaxProblem::CopyNotFound(name.clone()))?;
+            .resolve_library_member(&name)
+            .map_err(|problem| match problem {
+                LibraryProblem::MissingMember(_) => SyntaxProblem::CopyNotFound(name.clone()),
+                LibraryProblem::AmbiguousMember { .. } => {
+                    SyntaxProblem::AmbiguousCopy(name.clone())
+                }
+                _ => SyntaxProblem::InvalidCopy,
+            })?;
         stack.push(name.clone());
         let decoded = decode_file(dependency, limits)?;
         let normalized =
@@ -915,6 +911,7 @@ pub(crate) enum SyntaxProblem {
     InvalidEncoding,
     UnsupportedEncoding,
     CopyNotFound(String),
+    AmbiguousCopy(String),
     CircularCopy(String),
     CopyDepthExceeded,
     InvalidCopy,

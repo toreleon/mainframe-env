@@ -1,5 +1,5 @@
 use mainframe_env_batch::{Program, ProgramInput, ProgramOutput, ProgramRouter};
-use mainframe_env_compiler::CobolCompiler;
+use mainframe_env_compiler::{CobolCompiler, owned_compatibility_library};
 use mainframe_env_compiler_api::{
     CompilationMode, CompileOptions, CompileTarget, CompilerRequest, CompilerResult,
     CompilerService,
@@ -16,7 +16,8 @@ use mainframe_env_interpreter::{
 };
 use mainframe_env_ir::CodecLimits;
 use mainframe_env_source::{
-    LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
+    LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLibrary,
+    SourceLimits,
 };
 use mainframe_env_store_api::PlatformStore;
 use std::collections::BTreeMap;
@@ -88,31 +89,7 @@ impl Program for CobolProgram {
         parent: &Invocation,
         input: &ProgramInput,
     ) -> Result<ProgramOutput, HostProblem> {
-        let source = input
-            .dds
-            .iter()
-            .find(|dd| dd.name == "SYSIN")
-            .map(|dd| dd.inline_data.clone())
-            .ok_or(HostProblem::NotFound)?;
-        let source_limits = SourceLimits::default();
-        let path = LogicalPath::new("SYSIN.cbl", source_limits.max_path_bytes)
-            .map_err(|_| HostProblem::Malformed)?;
-        let file = SourceFile::input(
-            "SYSIN.cbl",
-            source,
-            SourceFormat::Free,
-            SourceEncoding::Utf8,
-            source_limits,
-        )
-        .map_err(|_| HostProblem::Malformed)?;
-        let source = SourceBundle::new(
-            &path,
-            vec![file],
-            BTreeMap::new(),
-            Vec::new(),
-            source_limits,
-        )
-        .map_err(|_| HostProblem::Malformed)?;
+        let source = source_bundle(input)?;
         let compiled = CobolCompiler::default()
             .compile(CompilerRequest {
                 source,
@@ -210,6 +187,90 @@ impl Program for CobolProgram {
     }
 }
 
+fn source_bundle(input: &ProgramInput) -> Result<SourceBundle, HostProblem> {
+    let source = input
+        .dds
+        .iter()
+        .find(|dd| dd.name == "SYSIN")
+        .map(|dd| dd.inline_data.clone())
+        .ok_or(HostProblem::NotFound)?;
+    let source_limits = SourceLimits::default();
+    let path = LogicalPath::new("SYSIN.cbl", source_limits.max_path_bytes)
+        .map_err(|_| HostProblem::Malformed)?;
+    let format = if input.parameter.as_deref().is_some_and(|parameters| {
+        parameters
+            .split(',')
+            .any(|item| item.trim().eq_ignore_ascii_case("FORMAT=FIXED"))
+    }) {
+        SourceFormat::Fixed
+    } else {
+        SourceFormat::Free
+    };
+    let primary = SourceFile::input(
+        "SYSIN.cbl",
+        source,
+        format,
+        SourceEncoding::Utf8,
+        source_limits,
+    )
+    .map_err(|_| HostProblem::Malformed)?;
+    let library_dds = input
+        .dds
+        .iter()
+        .filter(|dd| dd.name.starts_with("SYSLIB"))
+        .collect::<Vec<_>>();
+    if library_dds.is_empty() {
+        return SourceBundle::new(
+            &path,
+            vec![primary],
+            BTreeMap::new(),
+            Vec::new(),
+            source_limits,
+        )
+        .map_err(|_| HostProblem::Malformed);
+    }
+    let mut files = vec![primary];
+    let mut libraries = Vec::with_capacity(library_dds.len() + 1);
+    for (index, dd) in library_dds.into_iter().enumerate() {
+        let member = dd.dataset.as_deref().ok_or(HostProblem::Malformed)?;
+        let leaf = member
+            .rsplit(['/', '\\'])
+            .next()
+            .filter(|name| !name.is_empty())
+            .ok_or(HostProblem::Malformed)?;
+        let logical = format!("jes/{index:03}/{leaf}");
+        let member_path = LogicalPath::new(&logical, source_limits.max_path_bytes)
+            .map_err(|_| HostProblem::Malformed)?;
+        files.push(
+            SourceFile::input(
+                logical,
+                dd.inline_data.clone(),
+                format,
+                SourceEncoding::Utf8,
+                source_limits,
+            )
+            .map_err(|_| HostProblem::Malformed)?,
+        );
+        libraries.push(
+            SourceLibrary::new(format!("jes-{index:03}"), vec![member_path], source_limits)
+                .map_err(|_| HostProblem::Malformed)?,
+        );
+    }
+    let (compatibility, compatibility_library) =
+        owned_compatibility_library(source_limits).map_err(|_| HostProblem::Malformed)?;
+    files.extend(compatibility);
+    libraries.push(compatibility_library);
+    SourceBundle::with_libraries(
+        &path,
+        files,
+        libraries,
+        BTreeMap::new(),
+        Vec::new(),
+        source_limits,
+    )
+    .map_err(|_| HostProblem::Malformed)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -268,6 +329,43 @@ mod tests {
             .unwrap();
         assert_eq!(output.return_code, 0);
         assert_eq!(output.records, vec![b"BATCH COBOL".to_vec()]);
+    }
+
+    #[test]
+    fn jes_cobol_route_accepts_fixed_primary_and_ordered_copy_library() {
+        let program = CobolProgram::new();
+        let output = program
+            .execute(
+                &parent(),
+                &ProgramInput {
+                    parameter: Some("FORMAT=FIXED".into()),
+                    dds: vec![
+                        DdPlan {
+                            name: "SYSIN".into(),
+                            dataset: None,
+                            temporary: false,
+                            sysout: None,
+                            disposition: Vec::new(),
+                            inline_data: b"       IDENTIFICATION DIVISION.\n       PROGRAM-ID. BATCHLIB.\n       DATA DIVISION.\n       WORKING-STORAGE SECTION.\n       COPY MESSAGE.\n       PROCEDURE DIVISION.\n       DISPLAY MESSAGE-TEXT.\n       STOP RUN.\n".to_vec(),
+                            concatenation: false,
+                            source_line: 1,
+                        },
+                        DdPlan {
+                            name: "SYSLIB".into(),
+                            dataset: Some("MESSAGE.cpy".into()),
+                            temporary: false,
+                            sysout: None,
+                            disposition: Vec::new(),
+                            inline_data: b"       01 MESSAGE-TEXT PIC X(5) VALUE 'HELLO'.\n".to_vec(),
+                            concatenation: false,
+                            source_line: 9,
+                        },
+                    ],
+                },
+            )
+            .unwrap();
+        assert_eq!(output.return_code, 0);
+        assert_eq!(output.records, vec![b"HELLO".to_vec()]);
     }
 
     #[test]

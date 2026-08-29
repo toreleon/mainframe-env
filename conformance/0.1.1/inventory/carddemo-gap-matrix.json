@@ -33,9 +33,11 @@
       "priority": "P0",
       "domain": "source-package",
       "title": "Load complete source closures and compatibility copybooks",
-      "state": "open",
+      "state": "passed",
       "depends_on": ["CD-001", "CD-002"],
       "commit_subject": "Load complete CardDemo source closures",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-003.json",
+      "evidence_digest": "sha256:b3326477beeb8c0f393ecb4393d057f821728d460fba5754f6cf5d03da53eb14",
       "acceptance": ["CLI, installer, JES, and compiler accept multi-file fixed-format bundles", "logical library precedence is deterministic", "DFHAID, DFHBMSCA, SQLCA, and reached MQ definitions use owned compatible contracts", "missing or ambiguous libraries fail before compilation"]
     },
     {

@@ -1,8 +1,9 @@
 //! Fail-closed verification for the externally supplied CardDemo corpus.
 
-use mainframe_env_compiler::CobolCompiler;
+use mainframe_env_compiler::{CobolCompiler, compatibility_copybooks, owned_compatibility_library};
 use mainframe_env_source::{
-    LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
+    LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLibrary,
+    SourceLimits,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -117,6 +118,22 @@ pub struct CardDemoSourceReceipt {
     pub compatibility_placeholders: usize,
     pub copy_expansions: usize,
     pub deterministic_replays: usize,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoClosureReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub source_library_contract: String,
+    pub compatibility_contract: String,
+    pub programs_checked: usize,
+    pub application_copybooks: usize,
+    pub owned_compatibility_copybooks: usize,
+    pub ordered_libraries: usize,
+    pub copy_expansions: usize,
+    pub unique_source_identities: usize,
+    pub placeholder_content_present: bool,
 }
 
 pub fn verify_carddemo_corpus_from_env(
@@ -326,19 +343,19 @@ pub fn verify_carddemo_source_preprocessing_from_env(
                 ));
             }
             SourceFile::input(
-            format!("compatibility/{name}.cpy"),
-            b"      * CD-002 source-expansion placeholder; CD-003 owns compatibility content.\n"
-                .to_vec(),
-            SourceFormat::Fixed,
-            SourceEncoding::Utf8,
-            limits,
-        )
-        .map_err(|error| {
-            CorpusProblem::new(
-                "carddemo.source.bundle_invalid",
-                format!("cannot create compatibility placeholder: {error}"),
+                format!("compatibility/{name}.cpy"),
+                b"      * CD-002 source-expansion placeholder; CD-003 owns compatibility content.\n"
+                    .to_vec(),
+                SourceFormat::Fixed,
+                SourceEncoding::Utf8,
+                limits,
             )
-        })
+            .map_err(|error| {
+                CorpusProblem::new(
+                    "carddemo.source.bundle_invalid",
+                    format!("cannot create compatibility placeholder: {error}"),
+                )
+            })
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -410,6 +427,179 @@ pub fn verify_carddemo_source_preprocessing_from_env(
         compatibility_placeholders: compatibility.len(),
         copy_expansions,
         deterministic_replays: source_paths.len(),
+    })
+}
+
+pub fn verify_carddemo_source_closures_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoClosureReceipt, CorpusProblem> {
+    let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required for CardDemo gates",
+        )
+    })?;
+    let corpus_dir = Path::new(&corpus_dir);
+    let corpus = verify_carddemo_corpus(corpus_dir, inventory_path)?;
+    let contract = read_contract(inventory_path)?;
+    let source_paths = collect_paths(
+        corpus_dir,
+        &[
+            "app/cbl",
+            "app/app-authorization-ims-db2-mq/cbl",
+            "app/app-transaction-type-db2/cbl",
+            "app/app-vsam-mq/cbl",
+        ],
+        "cbl",
+    )?;
+    let copy_roots = [
+        "app/app-authorization-ims-db2-mq/cpy",
+        "app/app-authorization-ims-db2-mq/cpy-bms",
+        "app/app-transaction-type-db2/cpy",
+        "app/app-transaction-type-db2/cpy-bms",
+        "app/cpy",
+        "app/cpy-bms",
+    ];
+    let copy_paths = collect_paths(corpus_dir, &copy_roots, "cpy")?;
+    if source_paths.len() != 44 || copy_paths.len() != 62 {
+        return Err(CorpusProblem::new(
+            "carddemo.closure.corpus_count_drift",
+            "explicit source closure counts differ from the pinned inventory",
+        ));
+    }
+    let owned_names = compatibility_copybooks()
+        .iter()
+        .map(|copybook| copybook.name.to_string())
+        .collect::<BTreeSet<_>>();
+    if contract
+        .external_compatibility_copybooks
+        .iter()
+        .cloned()
+        .collect::<BTreeSet<_>>()
+        != owned_names
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.closure.compatibility_drift",
+            "owned compatibility catalog differs from the pinned reached list",
+        ));
+    }
+    let limits = SourceLimits::default();
+    let copybooks = copy_paths
+        .iter()
+        .map(|path| source_file(corpus_dir, path, limits))
+        .collect::<Result<Vec<_>, _>>()?;
+    let (compatibility, compatibility_library) =
+        owned_compatibility_library(limits).map_err(|error| {
+            CorpusProblem::new(
+                "carddemo.closure.compatibility_invalid",
+                format!("owned compatibility catalog is invalid: {error}"),
+            )
+        })?;
+    let placeholder_content_present = compatibility.iter().any(|file| {
+        String::from_utf8_lossy(file.bytes())
+            .to_ascii_lowercase()
+            .contains("placeholder")
+    });
+    if placeholder_content_present {
+        return Err(CorpusProblem::new(
+            "carddemo.closure.compatibility_invalid",
+            "owned compatibility catalog contains placeholder content",
+        ));
+    }
+    let mut libraries = Vec::with_capacity(copy_roots.len() + 1);
+    for (index, root) in copy_roots.iter().enumerate() {
+        let members = collect_paths(corpus_dir, &[*root], "cpy")?
+            .into_iter()
+            .map(|path| LogicalPath::new(path, limits.max_path_bytes))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|error| {
+                CorpusProblem::new(
+                    "carddemo.closure.library_invalid",
+                    format!("application member path is invalid: {error}"),
+                )
+            })?;
+        libraries.push(
+            SourceLibrary::new(format!("application-{index:02}"), members, limits).map_err(
+                |error| {
+                    CorpusProblem::new(
+                        "carddemo.closure.library_invalid",
+                        format!("application library is invalid: {error}"),
+                    )
+                },
+            )?,
+        );
+    }
+    libraries.push(compatibility_library);
+
+    let compiler = CobolCompiler::default();
+    let mut copy_expansions = 0usize;
+    let mut identities = BTreeSet::new();
+    for primary_path in &source_paths {
+        let primary = source_file(corpus_dir, primary_path, limits)?;
+        let mut files = Vec::with_capacity(1 + copybooks.len() + compatibility.len());
+        files.push(primary);
+        files.extend(copybooks.iter().cloned());
+        files.extend(compatibility.iter().cloned());
+        let logical = LogicalPath::new(primary_path, limits.max_path_bytes).map_err(|error| {
+            CorpusProblem::new(
+                "carddemo.closure.library_invalid",
+                format!("program path is invalid: {error}"),
+            )
+        })?;
+        let bundle = SourceBundle::with_libraries(
+            &logical,
+            files,
+            libraries.clone(),
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .map_err(|error| {
+            CorpusProblem::new(
+                "carddemo.closure.library_invalid",
+                format!("source closure is invalid: {error}"),
+            )
+        })?;
+        identities.insert(bundle.id().to_hex());
+        let analysis = compiler.analyze(&bundle);
+        let syntax = analysis.syntax.ok_or_else(|| {
+            let diagnostic = analysis
+                .diagnostics
+                .first()
+                .map_or("source closure failed", |item| item.public_message());
+            CorpusProblem::new(
+                "carddemo.closure.preprocessing_failed",
+                format!("program {primary_path} did not reach syntax: {diagnostic}"),
+            )
+        })?;
+        copy_expansions = copy_expansions
+            .checked_add(syntax.expansions().len())
+            .ok_or_else(|| {
+                CorpusProblem::new(
+                    "carddemo.closure.resource_exhausted",
+                    "copy expansion counter overflow",
+                )
+            })?;
+    }
+    if identities.len() != source_paths.len() {
+        return Err(CorpusProblem::new(
+            "carddemo.closure.identity_collision",
+            "explicit program source closures do not have unique identities",
+        ));
+    }
+    Ok(CardDemoClosureReceipt {
+        schema_version: "mainframe-env.carddemo-closure-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit: corpus.commit,
+        source_library_contract: mainframe_env_source::SOURCE_LIBRARY_CONTRACT.into(),
+        compatibility_contract: mainframe_env_compiler::COMPATIBILITY_COPYBOOK_CONTRACT.into(),
+        programs_checked: source_paths.len(),
+        application_copybooks: copybooks.len(),
+        owned_compatibility_copybooks: compatibility.len(),
+        ordered_libraries: libraries.len(),
+        copy_expansions,
+        unique_source_identities: identities.len(),
+        placeholder_content_present,
     })
 }
 

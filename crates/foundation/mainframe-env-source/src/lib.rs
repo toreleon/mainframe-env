@@ -6,10 +6,13 @@ mod bundle;
 mod identity;
 
 pub use bundle::{
-    ProvenanceEdge, ProvenanceEdgeInput, ProvenanceKind, SourceBundle, SourceEncoding, SourceFile,
-    SourceFormat, SourceLimits, SourceRange,
+    LibraryProblem, ProvenanceEdge, ProvenanceEdgeInput, ProvenanceKind, SourceBundle,
+    SourceEncoding, SourceFile, SourceFormat, SourceLibrary, SourceLimits, SourceRange,
 };
 pub use identity::{FileId, LogicalPath, SourceId, SourceProblem};
 
 /// Stable source-bundle contract identity.
 pub const SOURCE_CONTRACT: &str = "mainframe-env.source@1";
+
+/// Additive ordered-library identity used only by explicit source closures.
+pub const SOURCE_LIBRARY_CONTRACT: &str = "mainframe-env.source-libraries@1";

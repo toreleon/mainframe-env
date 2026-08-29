@@ -9,3 +9,8 @@ deterministic utilities. Public surface: the types re-exported by `lib.rs`.
 Invariants: physical paths and timestamps never enter semantic identity; every
 file, byte, option, and provenance edge is bounded. Verify with
 `cargo test -p mainframe-env-source`.
+
+Explicit multi-file closures use ordered `SourceLibrary` values. Library order
+is part of the additive source identity; missing, duplicate, ambiguous, unknown,
+or unassigned members fail before compiler publication. The legacy
+`SourceBundle::new` identity remains unchanged.

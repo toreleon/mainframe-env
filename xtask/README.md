@@ -16,3 +16,5 @@ Verify with `cargo test -p xtask`, `cargo xtask conformance`, and (when the
 pinned checkout is available) `cargo xtask carddemo-corpus --check`.
 `cargo xtask carddemo-source --check` additionally replays all pinned COBOL
 source closures through the CD-002 preprocessing surface.
+`cargo xtask carddemo-closure --check` verifies the CD-003 ordered-library and
+owned compatibility closure across every pinned program.

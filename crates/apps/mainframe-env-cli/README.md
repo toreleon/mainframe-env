@@ -6,3 +6,8 @@ Clap application types but converts to owned source/compiler/execution
 contracts before invoking product behavior.
 
 Verify with `cargo test -p mainframe-env-cli` and `mainframe-env --help`.
+
+`compile`, `inspect`, and `run` accept repeatable `--library DIRECTORY` options.
+Directories are enumerated deterministically into ordered logical libraries;
+physical paths and timestamps do not enter source identity. Supplying libraries
+also selects the final owned compatibility library.

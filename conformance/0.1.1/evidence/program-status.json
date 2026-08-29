@@ -6,9 +6,9 @@
   "current_product": "0.1.0-alpha.0",
   "target_product": "0.1.1",
   "source_identity": {
-    "base_commit": "8d2f1a6476cee17032f277d41bb026cb1d7bdaf3",
+    "base_commit": "852aa654547a6df68c876e06b6f63f42559922b0",
     "dirty_tree_algorithm": "sha256 of sorted sha256sum records, excluding .git, target, docs/delivery/CARDEMO-0.1.1-STATUS.md, and conformance/0.1.1/evidence/program-status.json",
-    "dirty_tree_digest": "sha256:60615424bc816493e7a0c95f024e68502005224936cfcc45c6308d7e92c98dd0"
+    "dirty_tree_digest": "sha256:7f0440059c84e2b880a65cb576e0a7451f7454ec32be4a0c1ba5a3dc9c29dcb3"
   },
   "corpus": {
     "environment_key": "CARDEMO_CORPUS_DIR",
@@ -21,8 +21,8 @@
     "license": "Apache-2.0",
     "license_sha256": "09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b"
   },
-  "current_issue": "CD-002",
-  "issues": {"total":27,"completed":2,"in_progress":0,"open":25},
+  "current_issue": "CD-003",
+  "issues": {"total":27,"completed":3,"in_progress":0,"open":24},
   "journeys": {"total":20,"passed":0,"failed_or_not_run":20},
   "completed_issues": [
     {
@@ -37,9 +37,17 @@
       "id": "CD-002",
       "state": "pass",
       "commit_subject": "Parse CardDemo fixed source and COPY directives",
-      "commit_identity": "self:focused-commit-containing-this-ledger",
+      "commit_identity": "852aa654547a6df68c876e06b6f63f42559922b0",
       "evidence": "conformance/0.1.1/evidence/issues/CD-002.json",
       "evidence_digest": "sha256:7adea86b25b9b625226ff3c50ecbc65d2beac8e3a4a4900cffb154dcf5b549a6"
+    },
+    {
+      "id": "CD-003",
+      "state": "pass",
+      "commit_subject": "Load complete CardDemo source closures",
+      "commit_identity": "self:focused-commit-containing-this-ledger",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-003.json",
+      "evidence_digest": "sha256:b3326477beeb8c0f393ecb4393d057f821728d460fba5754f6cf5d03da53eb14"
     }
   ],
   "commands": [
@@ -57,6 +65,13 @@
     ,{"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-source --check","exit_code":0,"result":"44 programs, 62 copybooks, 346 expansions, and 44 deterministic replays passed"}
     ,{"command":"env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-source --check","exit_code":1,"result":"expected carddemo.corpus.environment_missing control"}
     ,{"command":"cargo run -p mainframe-env-cli -- compile <redacted-corpus>/app/cbl/COSGN00C.cbl --format fixed","exit_code":1,"result":"expected CD-003 closure failure now names COCOM01Y rather than license prose"}
+    ,{"command":"cargo test -p mainframe-env-source -p mainframe-env-compiler -p mainframe-env-cli -p mainframe-env-server -p mainframe-env-conformance -p xtask --locked","exit_code":0,"result":"6 source, 18 compiler, 3 CLI, 10 server, 19 conformance, and 5 xtask tests passed"}
+    ,{"command":"cargo check --workspace --all-targets --locked","exit_code":0,"result":"pass"}
+    ,{"command":"affected-package cargo clippy --all-targets --locked -- -D warnings","exit_code":0,"result":"pass"}
+    ,{"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-closure --check","exit_code":0,"result":"44 programs, 62 application copybooks, 9 owned compatibility copybooks, 7 libraries, 346 expansions, and 44 unique identities passed"}
+    ,{"command":"env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-closure --check","exit_code":1,"result":"expected carddemo.corpus.environment_missing control"}
+    ,{"command":"full-library CLI COSGN00C compile","exit_code":1,"result":"expected next-phase semantic DuplicateName proves complete source closure"}
+    ,{"command":"cargo test -p mainframe-env-server jes_cobol_route_accepts_fixed_primary_and_ordered_copy_library --locked","exit_code":0,"result":"fixed SYSIN plus SYSLIB route executed HELLO"}
   ],
   "decisions": [
     "0.1.1 uses additive CardDemo profiles and preserves core-server compatibility.",
@@ -70,5 +85,5 @@
   ],
   "blockers": [],
   "next_issue": "CD-003",
-  "next_step": "Commit CD-002, record its hash on continuation, then implement CD-003 generic complete source closures and owned compatibility copybooks."
+  "next_step": "Commit CD-003, record its hash on continuation, then implement CD-004 hierarchical data scopes and exact reached layouts from the real duplicate-name cohort."
 }

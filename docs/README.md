@@ -26,6 +26,7 @@ rewrite. When prose conflicts, the order below defines precedence.
 - [Compatibility and cutover](delivery/COMPATIBILITY-AND-CUTOVER.md)
 - [Implementation roadmap](delivery/IMPLEMENTATION-ROADMAP.md)
 - [Versioning and release gates](delivery/VERSIONING-AND-RELEASES.md)
+- [CardDemo reached compatibility copybooks](compatibility/CARDEMO-COPYBOOKS.md)
 
 ## Document status vocabulary
 

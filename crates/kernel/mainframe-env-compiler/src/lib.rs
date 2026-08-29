@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+mod compatibility;
 mod hir;
 mod lower;
 mod semantic;
@@ -19,3 +20,7 @@ pub use syntax::{
 
 pub const COBOL_HIR_DIALECT: &str = "cobol.hir@1";
 pub const CORE_MIR_DIALECT: &str = "mainframe.core.cobol@1";
+pub use compatibility::{
+    COMPATIBILITY_COPYBOOK_CONTRACT, CompatibilityCopybook, CompatibilityProblem,
+    compatibility_copybooks, owned_compatibility_library,
+};
