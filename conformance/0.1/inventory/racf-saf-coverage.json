@@ -1,0 +1,13 @@
+{
+  "schema_version": "mainframe-env.racf-saf-coverage@1",
+  "operations": [
+    "authenticate-password", "logout-session", "user-create", "user-update", "user-revoke",
+    "group-create", "group-connect", "dataset-profile-create", "general-profile-create",
+    "permit", "SAF-VERIFY", "SAF-AUTH-dataset", "SAF-AUTH-general", "profile-list", "audit-write"
+  ],
+  "access_levels": ["none", "execute", "read", "update", "control", "alter"],
+  "generic_patterns": ["*", "**", "%"],
+  "authentication_results": ["authenticated", "invalid-credentials", "expired", "revoked", "locked", "provider-failure"],
+  "authorization_results": ["allow", "deny", "not-found", "invalid-principal", "cancelled", "timed-out", "resource-exhausted", "provider-failure", "infrastructure-failure"],
+  "default": "deny"
+}

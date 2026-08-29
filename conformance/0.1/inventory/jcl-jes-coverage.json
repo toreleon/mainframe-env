@@ -1,0 +1,28 @@
+{
+  "schema_version": "mainframe-env.jcl-jes-coverage@1",
+  "oracle_status": "current parser and execution tests pass; R0 classifies execution effects partial",
+  "jcl_statements": ["JOB", "EXEC PGM", "EXEC PROC", "DD", "PROC", "PEND", "SET", "IF", "THEN", "ELSE", "ENDIF", "INCLUDE", "OUTPUT"],
+  "jcl_behaviors": [
+    "column-72-continuation", "comments", "in-stream-data", "custom-delimiter", "DD-concatenation",
+    "cataloged-procedure", "in-stream-procedure", "symbol-substitution", "step-DD-overrides",
+    "COND", "EVEN", "ONLY", "boolean-IF", "temporary-dataset-PASS", "GDG-relative-resolution",
+    "DISP-normal-abnormal", "source-provenance"
+  ],
+  "jes_behaviors": [
+    "submit", "admit", "queue", "hold", "release", "run", "complete", "fail", "cancel", "purge",
+    "priority", "class", "JOBLOG", "JESMSGLG", "JESJCL", "SYSOUT", "SYSPRINT", "checkpoint-warm-start"
+  ],
+  "program_selectors": [
+    {"name":"IEFBR14","support":"supported","target":"mainframe-env-batch ProgramService"},
+    {"name":"IEBGENER","support":"supported","target":"mainframe-env-batch ProgramService"},
+    {"name":"IEBCOPY","support":"supported","target":"mainframe-env-batch ProgramService"},
+    {"name":"IEBCOMPR","support":"supported","target":"mainframe-env-batch ProgramService"},
+    {"name":"IEBDG","support":"supported","target":"mainframe-env-batch ProgramService"},
+    {"name":"IEBEDIT","support":"supported","target":"mainframe-env-batch ProgramService"},
+    {"name":"IEBUPDTE","support":"supported","target":"mainframe-env-batch ProgramService"},
+    {"name":"IDCAMS","support":"supported","target":"mainframe-env-dataset ProgramService"},
+    {"name":"SORT","support":"supported","target":"mainframe-env-batch ProgramService"},
+    {"name":"COBOL","support":"supported","target":"mainframe-env-interpreter ProgramService"}
+  ],
+  "excluded_utility_families": ["TSO batch interfaces", "REXX", "USS/BPXBATCH", "DB2", "IMS", "binder", "FTP", "generic-success subsystem stubs"]
+}

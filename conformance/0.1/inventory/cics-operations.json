@@ -1,0 +1,32 @@
+{
+  "schema_version": "mainframe-env.cics-operations@1",
+  "oracle_source": "OpenMainframe pinned AWS Samples CardDemo main application corpus",
+  "corpus_commit": "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e",
+  "exec_cics_blocks": 174,
+  "operations": [
+    {"id":"cics.operation.abend","name":"ABEND","count":4,"oracle":"implemented","v0_1":"typed"},
+    {"id":"cics.operation.asktime","name":"ASKTIME","count":1,"oracle":"unsupported","v0_1":"explicit_unsupported"},
+    {"id":"cics.operation.assign","name":"ASSIGN","count":2,"oracle":"implemented","v0_1":"typed"},
+    {"id":"cics.operation.delete","name":"DELETE","count":1,"oracle":"implemented","v0_1":"typed"},
+    {"id":"cics.operation.endbr","name":"ENDBR","count":6,"oracle":"implemented","v0_1":"typed"},
+    {"id":"cics.operation.formattime","name":"FORMATTIME","count":1,"oracle":"unsupported","v0_1":"explicit_unsupported"},
+    {"id":"cics.operation.handle_abend","name":"HANDLE ABEND","count":8,"oracle":"implemented","v0_1":"typed"},
+    {"id":"cics.operation.handle_condition","name":"HANDLE CONDITION","count":1,"oracle":"implemented","v0_1":"typed"},
+    {"id":"cics.operation.inquire","name":"INQUIRE","count":1,"oracle":"unsupported","v0_1":"explicit_unsupported"},
+    {"id":"cics.operation.read","name":"READ","count":20,"oracle":"implemented","v0_1":"typed"},
+    {"id":"cics.operation.readnext","name":"READNEXT","count":4,"oracle":"implemented","v0_1":"typed"},
+    {"id":"cics.operation.readprev","name":"READPREV","count":6,"oracle":"implemented","v0_1":"typed"},
+    {"id":"cics.operation.receive_map","name":"RECEIVE MAP","count":17,"oracle":"partial","v0_1":"typed_frozen_subforms"},
+    {"id":"cics.operation.return","name":"RETURN","count":27,"oracle":"implemented","v0_1":"typed"},
+    {"id":"cics.operation.rewrite","name":"REWRITE","count":5,"oracle":"implemented","v0_1":"typed"},
+    {"id":"cics.operation.send","name":"SEND TEXT","count":11,"oracle":"implemented","v0_1":"typed"},
+    {"id":"cics.operation.send_map","name":"SEND MAP","count":20,"oracle":"partial","v0_1":"typed_frozen_subforms"},
+    {"id":"cics.operation.startbr","name":"STARTBR","count":6,"oracle":"implemented","v0_1":"typed"},
+    {"id":"cics.operation.syncpoint","name":"SYNCPOINT","count":3,"oracle":"unsupported","v0_1":"explicit_unsupported"},
+    {"id":"cics.operation.write","name":"WRITE","count":3,"oracle":"implemented","v0_1":"typed"},
+    {"id":"cics.operation.writeq_td","name":"WRITEQ TD","count":1,"oracle":"implemented","v0_1":"typed"},
+    {"id":"cics.operation.xctl","name":"XCTL","count":26,"oracle":"implemented","v0_1":"typed"}
+  ],
+  "condition_contract": ["NORMAL", "ERROR", "NOTFND", "DUPREC", "INVREQ", "LENGERR", "ENDFILE", "PGMIDERR", "NOTAUTH", "resource-exhausted", "provider-failure"],
+  "bms_contract": ["mapset", "map", "field", "position", "length", "attributes", "color", "highlight", "cursor", "AID", "modified-data", "secret"]
+}

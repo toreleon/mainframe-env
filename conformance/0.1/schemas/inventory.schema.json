@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "mainframe-env.inventory@1",
+  "title": "mainframe-env versioned inventory",
+  "type": "object",
+  "required": ["schema_version"]
+}

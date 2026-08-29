@@ -1,0 +1,24 @@
+{
+  "schema_version": "mainframe-env.owner-authorization@1",
+  "accepted": true,
+  "owner": {
+    "name": "Thang Le",
+    "email": "levietthang0512@outlook.com",
+    "identity_source": "OpenMainframe repository Git configuration"
+  },
+  "authorization_source": "Explicit /goal invocation of docs/prompts/IMPLEMENT_MAINFRAME_ENV_0_1.md in the mainframe-env repository",
+  "authorized": [
+    "greenfield mainframe-env implementation",
+    "bounded 0.1 scope and mainframe-env identity",
+    "local Git initialization",
+    "mandatory local ME.V0 through ME.V7 completion commits"
+  ],
+  "not_authorized": [
+    "remote creation or push",
+    "release tag creation",
+    "package publication",
+    "production deployment",
+    "destructive mutation of the OpenMainframe oracle"
+  ],
+  "independent_review_claimed": false
+}

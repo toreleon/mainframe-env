@@ -1,0 +1,14 @@
+{
+  "schema_version": "mainframe-env.dataset-coverage@1",
+  "identities": ["dataset", "member", "DD", "catalog", "volume", "record", "key"],
+  "organizations": ["sequential", "partitioned", "KSDS-selected"],
+  "record_formats": ["F", "FB", "V", "VB", "U", "line"],
+  "operations": [
+    "catalog-list", "attributes", "read", "create", "write", "rename", "delete",
+    "member-list", "member-read", "member-write", "member-delete", "search",
+    "keyed-read", "keyed-write", "keyed-rewrite", "keyed-delete", "start-browse",
+    "read-next", "read-prev", "end-browse", "DD-bind", "DISP-commit", "DISP-rollback"
+  ],
+  "ams_subset": ["DEFINE CLUSTER", "REPRO", "DELETE", "LISTCAT"],
+  "required_failures": ["invalid-name", "not-found", "duplicate", "invalid-state", "not-authorized", "conflict", "cancelled", "timed-out", "resource-exhausted", "provider-failure"]
+}

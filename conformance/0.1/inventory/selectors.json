@@ -1,0 +1,18 @@
+{
+  "schema_version": "mainframe-env.selectors@1",
+  "selectors": [
+    {"id":"compiler:cobol","domain":"cobol","owner":"Thang Le","disposition":"reimplement","target_authority":"mainframe-env-compiler","coverage":"cobol-constructs.json"},
+    {"id":"program:cobol","domain":"cobol","owner":"Thang Le","disposition":"reimplement","target_authority":"mainframe-env-interpreter","coverage":"cobol-constructs.json"},
+    {"id":"transaction:cics","domain":"cics","owner":"Thang Le","disposition":"reimplement","target_authority":"mainframe-env-cics","coverage":"cics-operations.json"},
+    {"id":"workflow:jcl","domain":"jcl-jes","owner":"Thang Le","disposition":"reimplement","target_authority":"mainframe-env-batch","coverage":"jcl-jes-coverage.json"},
+    {"id":"jobs:jes","domain":"jcl-jes","owner":"Thang Le","disposition":"reimplement","target_authority":"mainframe-env-batch","coverage":"jcl-jes-coverage.json"},
+    {"id":"host:dataset","domain":"datasets","owner":"Thang Le","disposition":"replace","target_authority":"mainframe-env-dataset","coverage":"dataset-coverage.json"},
+    {"id":"host:security","domain":"racf-saf","owner":"Thang Le","disposition":"replace","target_authority":"mainframe-env-racf","coverage":"racf-saf-coverage.json"},
+    {"id":"http:info","domain":"zosmf","owner":"Thang Le","disposition":"reimplement","target_authority":"mainframe-env-zosmf","coverage":"zosmf-routes.json"},
+    {"id":"http:authenticate","domain":"zosmf","owner":"Thang Le","disposition":"reimplement","target_authority":"mainframe-env-zosmf","coverage":"zosmf-routes.json"},
+    {"id":"http:datasets","domain":"zosmf","owner":"Thang Le","disposition":"reimplement","target_authority":"mainframe-env-zosmf","coverage":"zosmf-routes.json"},
+    {"id":"http:jobs","domain":"zosmf","owner":"Thang Le","disposition":"reimplement","target_authority":"mainframe-env-zosmf","coverage":"zosmf-routes.json"},
+    {"id":"http:console","domain":"zosmf","owner":"Thang Le","disposition":"reimplement","target_authority":"mainframe-env-zosmf","coverage":"zosmf-routes.json"},
+    {"id":"cli:compile-execute-inspect-admin","domain":"application","owner":"Thang Le","disposition":"replace","target_authority":"mainframe-env-cli","coverage":"packages.json"}
+  ]
+}

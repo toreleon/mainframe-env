@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "mainframe-env.phase-result@1",
+  "title": "mainframe-env phase result",
+  "type": "object",
+  "required": ["schema_version", "phase", "derived", "status", "conditions", "evidence", "digest"]
+}

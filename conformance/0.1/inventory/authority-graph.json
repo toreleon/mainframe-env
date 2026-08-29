@@ -1,0 +1,15 @@
+{
+  "schema_version": "mainframe-env.authority-graph@1",
+  "authorities": [
+    {"family":"source-and-compilation","default":"mainframe-env-compiler","legacy":"oracle-only","phase":"ME.V2"},
+    {"family":"execution","default":"mainframe-env-interpreter","legacy":"oracle-only","phase":"ME.V2"},
+    {"family":"datasets","default":"mainframe-env-dataset","legacy":"oracle-only","phase":"ME.V3"},
+    {"family":"security","default":"mainframe-env-racf","legacy":"oracle-only","phase":"ME.V3"},
+    {"family":"cics-effects","default":"mainframe-env-cics","legacy":"oracle-only","phase":"ME.V4"},
+    {"family":"jcl-jes-jobs-spool","default":"mainframe-env-batch","legacy":"oracle-only","phase":"ME.V5"},
+    {"family":"configuration","default":"mainframe-env-server","legacy":"none","phase":"ME.V6"},
+    {"family":"stores-and-artifacts","default":"mainframe-env-store","legacy":"none","phase":"ME.V6"},
+    {"family":"zosmf-routes","default":"mainframe-env-zosmf","legacy":"oracle-only","phase":"ME.V6"}
+  ],
+  "automatic_fallback": false
+}

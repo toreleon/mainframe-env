@@ -1,0 +1,22 @@
+{
+  "schema_version": "mainframe-env.oracle@1",
+  "name": "OpenMainframe",
+  "repository": "https://github.com/toreleon/OpenMainframe.git",
+  "local_role": "read-only executable compatibility oracle",
+  "revision": "cee4b1df3fa5e32066b7948d528c163f8636a18e",
+  "branch": "feat/r1-execution-spine",
+  "dirty": false,
+  "rust_toolchain": "1.82-aarch64-apple-darwin",
+  "environment": {"timezone":"UTC for deterministic fixtures","locale":"C","carddemo_dir":"required only for CardDemo differential"},
+  "commands": [
+    {"command":"cargo +1.82 metadata --no-deps --format-version 1 --locked","exit_code":0,"result":"55 workspace packages"},
+    {"command":"cargo +1.82 test -p open-mainframe-cobol --test conformance --locked","exit_code":0,"result":"37 passed"},
+    {"command":"cargo +1.82 test -p open-mainframe-racf --test integration --locked","exit_code":0,"result":"8 passed"},
+    {"command":"cargo +1.82 test -p open-mainframe-zosmf --test e2e_datasets --locked","exit_code":0,"result":"9 passed"},
+    {"command":"cargo +1.82 test -p open-mainframe-zosmf --test e2e_jobs --locked","exit_code":0,"result":"9 passed"},
+    {"command":"cargo +1.82 test -p open-mainframe-cics --locked","exit_code":0,"result":"317 unit tests passed; 2 doc tests ignored"},
+    {"command":"cargo +1.82 test -p open-mainframe-jcl --locked","exit_code":0,"result":"164 unit tests passed; 1 doc test ignored"},
+    {"command":"cargo +1.82 test -p open-mainframe-jes2 --locked","exit_code":0,"result":"221 unit tests and 1 doc test passed"}
+  ],
+  "production_dependency_allowed": false
+}

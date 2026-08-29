@@ -1,0 +1,14 @@
+{
+  "schema_version": "mainframe-env.known-gaps@1",
+  "gaps": [
+    {"id":"ORACLE-EVIDENCE-REVISION","status":"open","detail":"Historical R0/R1/R2 evidence is stamped at a21f500a... while the clean executable oracle is cee4b1df...; historical results are inputs, not current parity proof.","blocks":"selector parity promotion"},
+    {"id":"ORACLE-R2-DOC-STATUS","status":"open","detail":"Some R2 decision prose still describes remediation while current r2-exit-gates reports scoped PASS.","blocks":"none; preserve both observations"},
+    {"id":"ORACLE-R2A-GOVERNANCE","status":"not_applicable","detail":"OpenMainframe R2A remains pending governance and its portfolio scope is not a mainframe-env 0.1 obligation.","blocks":"none"},
+    {"id":"COBOL-PARTIAL-SUBFORMS","status":"open","detail":"Oracle inventories partial or unsupported subforms for 16 of 43 statements; 0.1 must implement frozen supported subforms and fail unsupported forms explicitly.","blocks":"ME.V2"},
+    {"id":"CICS-PARTIAL-UNSUPPORTED","status":"open","detail":"SEND MAP and RECEIVE MAP are partial; ASKTIME, FORMATTIME, INQUIRE, and SYNCPOINT are oracle-unsupported for the pinned set.","blocks":"ME.V4"},
+    {"id":"JES-SECURITY-DEFAULT","status":"open","detail":"Oracle JES documentation says JESSPOOL hooks default permit when RACF is absent; mainframe-env must fail closed.","blocks":"ME.V5"},
+    {"id":"ZOSMF-TLS-CSRF","status":"open","detail":"Oracle TLS/CORS configuration is inactive and CSRF middleware is not installed; mainframe-env must implement transport and mutation policy truthfully.","blocks":"ME.V6"},
+    {"id":"POSTGRES-RUNNER","status":"open","detail":"PostgreSQL 18 availability and recovery runner have not yet been established on this host.","blocks":"ME.V6 production durable profile"},
+    {"id":"CARDEMO-LOCAL-CORPUS","status":"open","detail":"Pinned CardDemo identity is frozen but corpus reproduction has not yet been executed from a local CARDDEMO_DIR in mainframe-env.","blocks":"ME.V4 compatibility promotion"}
+  ]
+}

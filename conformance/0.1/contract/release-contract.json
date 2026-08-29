@@ -1,0 +1,26 @@
+{
+  "schema_version": "mainframe-env.release-contract@1",
+  "contract_version": "0.1.0",
+  "product": "mainframe-env",
+  "release_line": "0.1",
+  "development_version": "0.1.0-alpha.0",
+  "status": "accepted",
+  "objective": "Deliver one bounded, deterministic, greenfield authority for the frozen COBOL, CICS, JCL/JES, dataset, RACF/SAF, and selected z/OSMF 0.1 surface.",
+  "profiles": ["core-server", "conformance"],
+  "included_domains": [
+    "cobol",
+    "cics",
+    "jcl-jes",
+    "datasets",
+    "racf-saf",
+    "zosmf-information-authentication-datasets-jobs-console",
+    "required-compiler-execution-host-store-configuration-observability"
+  ],
+  "delivery": "at-least-once",
+  "default_authority_policy": "exactly-one",
+  "resource_policy": "all-owned-resources-bounded",
+  "compatibility_oracle": "out-of-process OpenMainframe only",
+  "phase_commits_required": ["ME.V0", "ME.V1", "ME.V2", "ME.V3", "ME.V4", "ME.V5", "ME.V6", "ME.V7"],
+  "final_gate_expression": "me_v0_pass && me_v1_pass && me_v2_pass && me_v3_pass && me_v4_pass && me_v5_pass && me_v6_pass && me_v7_pass",
+  "remote_actions_authorized": false
+}

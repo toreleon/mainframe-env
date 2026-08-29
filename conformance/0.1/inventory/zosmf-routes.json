@@ -1,0 +1,30 @@
+{
+  "schema_version": "mainframe-env.zosmf-routes@1",
+  "compatibility_family": "mainframe-env.zosmf@1",
+  "routes": [
+    {"id":"GET /zosmf/info","family":"information","auth":"none"},
+    {"id":"POST /zosmf/services/authenticate","family":"security","auth":"basic"},
+    {"id":"DELETE /zosmf/services/authenticate","family":"security","auth":"required"},
+    {"id":"GET /zosmf/restfiles/ds","family":"datasets","auth":"required"},
+    {"id":"GET /zosmf/restfiles/ds/{dsn}","family":"datasets","auth":"required"},
+    {"id":"PUT /zosmf/restfiles/ds/{dsn}","family":"datasets","auth":"required"},
+    {"id":"POST /zosmf/restfiles/ds/{dsn}","family":"datasets","auth":"required"},
+    {"id":"DELETE /zosmf/restfiles/ds/{dsn}","family":"datasets","auth":"required"},
+    {"id":"GET /zosmf/restfiles/ds/{dsn}/member","family":"datasets","auth":"required"},
+    {"id":"GET /zosmf/restfiles/ds/{dsn}/search","family":"datasets","auth":"required"},
+    {"id":"PUT /zosmf/restfiles/ams","family":"datasets","auth":"required"},
+    {"id":"GET /zosmf/restjobs/jobs","family":"jobs","auth":"required"},
+    {"id":"PUT /zosmf/restjobs/jobs","family":"jobs","auth":"required"},
+    {"id":"GET /zosmf/restjobs/jobs/{jobname}/{jobid}","family":"jobs","auth":"required"},
+    {"id":"PUT /zosmf/restjobs/jobs/{jobname}/{jobid}","family":"jobs","auth":"required"},
+    {"id":"DELETE /zosmf/restjobs/jobs/{jobname}/{jobid}","family":"jobs","auth":"required"},
+    {"id":"GET /zosmf/restjobs/jobs/{jobname}/{jobid}/files","family":"jobs","auth":"required"},
+    {"id":"GET /zosmf/restjobs/jobs/{jobname}/{jobid}/files/{id}/records","family":"jobs","auth":"required"},
+    {"id":"PUT /zosmf/restconsoles/consoles/{name}","family":"console","auth":"required"},
+    {"id":"GET /zosmf/restconsoles/consoles/{name}/solmsgs/{key}","family":"console","auth":"required"},
+    {"id":"GET /zosmf/restconsoles/consoles/{name}/detections/{key}","family":"console","auth":"required"},
+    {"id":"GET /zosmf/logs","family":"console","auth":"required"},
+    {"id":"GET /zosmf/restconsoles/v1/log","family":"console","auth":"required"}
+  ],
+  "explicitly_unadvertised": ["DB2", "DRDA", "TSO", "USS", "WLM", "topology", "variables", "workflow", "provisioning", "CMCI", "z/OSMF CICS sessions"]
+}

@@ -1,0 +1,6 @@
+/target/
+/.idea/
+/.vscode/
+.DS_Store
+*.tmp
+conformance/0.1/evidence/raw/

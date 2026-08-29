@@ -1,0 +1,38 @@
+{
+  "schema_version": "mainframe-env.dependency-graph@1",
+  "direction": "applications -> kernel/adapters -> contracts -> foundation",
+  "edges": [
+    ["mainframe-env-diagnostics","mainframe-env-source"],
+    ["mainframe-env-ir","mainframe-env-source"],
+    ["mainframe-env-ir","mainframe-env-diagnostics"],
+    ["mainframe-env-compiler-api","mainframe-env-source"],
+    ["mainframe-env-compiler-api","mainframe-env-diagnostics"],
+    ["mainframe-env-compiler-api","mainframe-env-ir"],
+    ["mainframe-env-execution-api","mainframe-env-diagnostics"],
+    ["mainframe-env-host-api","mainframe-env-execution-api"],
+    ["mainframe-env-store-api","mainframe-env-execution-api"],
+    ["mainframe-env-compiler","mainframe-env-compiler-api"],
+    ["mainframe-env-compiler","mainframe-env-encoding"],
+    ["mainframe-env-interpreter","mainframe-env-ir"],
+    ["mainframe-env-interpreter","mainframe-env-execution-api"],
+    ["mainframe-env-interpreter","mainframe-env-host-api"],
+    ["mainframe-env-dataset","mainframe-env-host-api"],
+    ["mainframe-env-racf","mainframe-env-host-api"],
+    ["mainframe-env-cics","mainframe-env-host-api"],
+    ["mainframe-env-batch","mainframe-env-execution-api"],
+    ["mainframe-env-batch","mainframe-env-host-api"],
+    ["mainframe-env-store","mainframe-env-store-api"],
+    ["mainframe-env-zosmf","mainframe-env-host-api"],
+    ["mainframe-env-server","mainframe-env-zosmf"],
+    ["mainframe-env-cli","mainframe-env-compiler"],
+    ["mainframe-env-cli","mainframe-env-interpreter"],
+    ["mainframe-env-conformance","mainframe-env-server"]
+  ],
+  "prohibited": [
+    "frontend-to-backend",
+    "core-to-infrastructure",
+    "gateway-to-provider-internals",
+    "production-to-conformance",
+    "any-openmainframe-production-dependency"
+  ]
+}

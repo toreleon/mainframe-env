@@ -1,0 +1,55 @@
+{
+  "schema_version": "mainframe-env.profiles@1",
+  "profiles": [
+    {
+      "id": "core-server",
+      "version": 1,
+      "production": true,
+      "packages": [
+        "mainframe-env-source",
+        "mainframe-env-diagnostics",
+        "mainframe-env-encoding",
+        "mainframe-env-ir",
+        "mainframe-env-compiler-api",
+        "mainframe-env-execution-api",
+        "mainframe-env-host-api",
+        "mainframe-env-store-api",
+        "mainframe-env-compiler",
+        "mainframe-env-interpreter",
+        "mainframe-env-batch",
+        "mainframe-env-dataset",
+        "mainframe-env-racf",
+        "mainframe-env-cics",
+        "mainframe-env-store",
+        "mainframe-env-zosmf",
+        "mainframe-env-server"
+      ]
+    },
+    {
+      "id": "conformance",
+      "version": 1,
+      "production": false,
+      "packages": [
+        "mainframe-env-source",
+        "mainframe-env-diagnostics",
+        "mainframe-env-encoding",
+        "mainframe-env-ir",
+        "mainframe-env-compiler-api",
+        "mainframe-env-execution-api",
+        "mainframe-env-host-api",
+        "mainframe-env-store-api",
+        "mainframe-env-compiler",
+        "mainframe-env-interpreter",
+        "mainframe-env-batch",
+        "mainframe-env-dataset",
+        "mainframe-env-racf",
+        "mainframe-env-cics",
+        "mainframe-env-store",
+        "mainframe-env-zosmf",
+        "mainframe-env-server",
+        "mainframe-env-cli",
+        "mainframe-env-conformance"
+      ]
+    }
+  ]
+}

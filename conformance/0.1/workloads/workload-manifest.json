@@ -1,0 +1,12 @@
+{
+  "schema_version": "mainframe-env.workloads@1",
+  "workloads": [
+    {"id":"cobol-hello","phase":"ME.V2","limits":{"source_bytes":65536,"steps":10000,"output_bytes":65536}},
+    {"id":"cobol-malformed-and-unsupported","phase":"ME.V2","limits":{"cases":64,"diagnostics":64}},
+    {"id":"dataset-security-restart","phase":"ME.V3","limits":{"records":256,"record_bytes":4096,"restarts":3}},
+    {"id":"cics-carddemo-login","phase":"ME.V4","limits":{"sessions":16,"effects":128,"screen_bytes":4096}},
+    {"id":"jcl-iefbr14-iebgener","phase":"ME.V5","limits":{"jobs":64,"steps_per_job":32,"spool_bytes":1048576}},
+    {"id":"zosmf-protocol","phase":"ME.V6","limits":{"requests":512,"body_bytes":1048576,"concurrency":32}},
+    {"id":"mixed-1x-2x","phase":"ME.V7","limits":{"duration_seconds":900,"offered_load":[1,2],"raw_artifact_bytes":67108864}}
+  ]
+}

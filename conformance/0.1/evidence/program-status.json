@@ -1,0 +1,39 @@
+{
+  "schema_version": "mainframe-env.program-status@1",
+  "current_phase": "ME.V0",
+  "current_work_item": "ME.V0 gate passed; create the required completion commit",
+  "source_identity": "unborn-main:canonical-content-sha256:473cc54f555d5d32085a56333fcf2c2ab725f5fd10b346150822f9cc0f8f2aad",
+  "completed_deliverables": [
+    {"item":"normative mainframe-env documents read","evidence":"docs/"},
+    {"item":"OpenMainframe oracle frozen clean","evidence":"conformance/0.1/inventory/oracle.json"},
+    {"item":"finite scope and profile inventory","evidence":"conformance/0.1/inventory/"},
+    {"item":"entry gate derived pass","evidence":"conformance/0.1/evidence/entry.json"},
+    {"item":"Rust workspace and deterministic xtask","evidence":"Cargo.toml, xtask/"},
+    {"item":"ME.V0 validation gate passed","evidence":"conformance/0.1/evidence/phase-v0.json"}
+  ],
+  "accepted_decisions": [
+    "mainframe-env identity and greenfield direction",
+    "0.1 release line starting at 0.1.0-alpha.0",
+    "bounded COBOL/CICS/JCL-JES/dataset/RACF-SAF/selected-zOSMF scope",
+    "20-package consolidation where proposed packages lacked independent selection boundaries",
+    "local phase commits required; remote and release actions not authorized"
+  ],
+  "unresolved_decisions": [],
+  "commands": [
+    {"command":"find initial files and calculate deterministic content digest","exit_code":0,"result":"f821878d7ad92236993e88fa2eab9355f3c493abe31bf2c49e653becc92e25b5"},
+    {"command":"git init -b main","exit_code":0,"result":"initialized local repository; no remote"},
+    {"command":"cargo +1.82 metadata --no-deps --format-version 1 --locked (OpenMainframe)","exit_code":0,"result":"55 packages"},
+    {"command":"cargo +1.82 test selected COBOL/RACF/zOSMF/CICS/JCL/JES cohorts (OpenMainframe)","exit_code":0,"result":"765 unit/integration tests passed; 3 doc tests ignored"}
+    ,{"command":"cargo check --workspace --all-targets --locked","exit_code":101,"result":"expected first-run failure because Cargo.lock did not yet exist"}
+    ,{"command":"cargo generate-lockfile","exit_code":0,"result":"locked 30 Rust 1.95-compatible packages"}
+    ,{"command":"cargo check/test/clippy/doc/fmt plus xtask versions/architecture/profiles/schemas/inventory/evidence and git diff --check","exit_code":0,"result":"ME.V0 candidate passed on Rust 1.98.0"}
+  ],
+  "known_gaps": [
+    "ME.V1 through ME.V7 are not implemented",
+    "Oracle CardDemo corpus is pinned but local corpus reproduction is pending",
+    "PostgreSQL 18 runner availability is pending",
+    "No compatibility or production promotion is claimed by V0"
+  ],
+  "stop_the_line": [],
+  "next_step": "Record the canonical ME.V0 content digest, review the staged diff, and create Complete ME.V0 workspace foundation."
+}

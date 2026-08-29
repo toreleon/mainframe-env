@@ -1,0 +1,12 @@
+{
+  "schema_version": "mainframe-env.state-catalog@1",
+  "states": [
+    {"id":"compiler-buffer","scope":"invocation","owner":"compiler","mutability":"single-owner","bound":"source/IR limits","durability":"none","safe_point":"phase boundary","schema":1,"classification":"source","retry":"pure replay"},
+    {"id":"run-unit","scope":"run-unit","owner":"execution coordinator","mutability":"leased single-owner","bound":"frames/storage/effects/output","durability":"checkpointed","safe_point":"machine action","schema":1,"classification":"application-data","retry":"at-least-once with effect records"},
+    {"id":"terminal-session","scope":"session","owner":"CICS provider","mutability":"single transaction","bound":"session/field/screen bytes","durability":"checkpointed","safe_point":"suspension","schema":1,"classification":"confidential","retry":"resume token"},
+    {"id":"dataset-catalog","scope":"singleton","owner":"dataset provider","mutability":"transactional","bound":"catalog/records/bytes","durability":"SQL and artifact storage","safe_point":"commit","schema":1,"classification":"application-data","retry":"idempotent mutation"},
+    {"id":"racf-database","scope":"singleton","owner":"RACF provider","mutability":"transactional","bound":"users/groups/profiles/audit","durability":"SQL","safe_point":"commit","schema":1,"classification":"restricted","retry":"idempotent mutation"},
+    {"id":"jes-job","scope":"artifact","owner":"JES authority","mutability":"state-machine transition","bound":"jobs/steps/spool/events","durability":"SQL plus artifact blobs","safe_point":"job transition","schema":1,"classification":"application-data","retry":"lease plus attempt"},
+    {"id":"artifact","scope":"artifact","owner":"artifact store","mutability":"immutable","bound":"artifact count/bytes/retention","durability":"local/object storage","safe_point":"conditional publish","schema":1,"classification":"source-or-executable","retry":"content-addressed"}
+  ]
+}
