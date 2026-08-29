@@ -1,17 +1,17 @@
 # CardDemo-full 0.1.1 Program Status
 
 Current phase: **CD.A — corpus and application packaging**
-Current issue: **CD-007 — file, linkage, and CALL semantics PASS**
-Next issue: **CD-008 — typed embedded host operands**
+Current issue: **CD-008 — typed embedded host operands PASS**
+Next issue: **CD-009 — generic application packages**
 Current product: **0.1.0-alpha.0**
 Target product: **0.1.1**
 CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Source identity
 
-- mainframe-env base commit: `4342e1b55797adf22c4f55eaf6567cea362a3a80`
+- mainframe-env base commit: `91eeac38c62cca69670c91eb1adb5c7d90a8a177`
 - current deterministic dirty-tree identity:
-  `sha256:b7526635dda458c23d1c630729f0e9765ccd913f4f3d0f0c9f6ed0cdf9acc0ad`
+  `sha256:80fcffb8f2dc408643e4633efb9742c2b581f48d948531f97bc8774e3307c499`
 - dirty-tree algorithm: SHA-256 of the sorted `sha256sum` records for every
   repository file except `.git/`, `target/`, and the two persistent CardDemo
   status ledgers (which carry the identity).
@@ -154,8 +154,8 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 - State: **PASS**
 - Required commit subject: `Implement CardDemo file and program calls`
-- Completion commit identity: recorded when CD-008 starts from this issue
-  commit.
+- Completion commit identity:
+  `91eeac38c62cca69670c91eb1adb5c7d90a8a177`.
 - Evidence: `conformance/0.1.1/evidence/issues/CD-007.json`
 - Evidence digest:
   `sha256:9a093cf504ddf55d5242da5f48bb2e1783cb3c48f64790305954480402260597`
@@ -174,6 +174,24 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   operands, 53 OPEN, 50 CLOSE, 34 READ, and 117 WRITE statements. CBSTM03A,
   CBSTM03B, and CSUTLDTC are present; the contract digest is
   `sha256:0cafcb6178b6c027f22fd0182bf6e7c5f74a2af0238f10476566afa4823e2c6e`.
+
+### CD-008 — typed embedded host operands
+
+- State: **PASS**
+- Required commit subject: `Lower CardDemo embedded host operations`
+- Completion commit identity: recorded when CD-009 starts from this issue
+  commit.
+- Evidence: `conformance/0.1.1/evidence/issues/CD-008.json`
+- Evidence digest:
+  `sha256:5c6d97d6499842d32d7063c64f2179917fd435321999bbd63e2abaac92fbb27b`
+- Acceptance: CICS literals normalize while storage reads dereference bytes and
+  INTO/RESP/RESP2 stay typed mutation destinations. SQL/DLI use a versioned
+  family/opcode/name/mode/value envelope; MQ uses named ordered by-reference
+  lists. No raw command string is provider authority.
+- The exact corpus contract covers 240 CICS, 20 SQL, 26 DLI, and 22 MQ
+  operations, 673 typed operands, 232 destinations, every reached opcode, and
+  four executable ABI oracles. Its shape digest is
+  `sha256:ceb16597bc10703bb52cdf03a40c082d7aa57cdb66314350b98ed289e147d76e`.
 
 ## Commands and exit codes
 
@@ -260,10 +278,18 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 - `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-file-call --check` — **1**;
   expected missing-environment failure.
 - Ordinary conformance and cumulative CD-001–CD-007 gates — **0**.
+- `cargo test -p mainframe-env-compiler -p mainframe-env-interpreter -p mainframe-env-conformance --locked`
+  — **0**; 27 compiler, 6 interpreter, and 32 conformance tests passed.
+- Workspace check and affected-package Clippy with `-D warnings` — **0**.
+- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-host --check`
+  — **0**; exact CICS/SQL/DLI/MQ operand and opcode receipt passed.
+- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-host --check` — **1**;
+  expected missing-environment failure.
+- Ordinary conformance and cumulative CD-001–CD-008 gates — **0**.
 
 ## Implementation status
 
-- Issues passed: **7 / 27**
+- Issues passed: **8 / 27**
 - Journeys passed: **0 / 20**
 - Installed CardDemo resources: **0**
 - Executed CardDemo application journeys: **0**
@@ -277,11 +303,11 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 2. The repository is still `0.1.0-alpha.0`. A 0.1.1 release cannot be cut until
    0.1.0 is finalized or an explicit version-line correction is accepted.
 
-Neither decision blocks CD-008. No CD-007 blocker remains.
+Neither decision blocks CD-009. No CD-008 blocker remains.
 
 ## Next smallest executable step
 
-Lower CICS, SQL, DLI, and MQ operands through storage-aware typed host requests.
-Start with literal normalization, INTO/FROM/LENGTH/RIDFLD/COMMAREA/RESP targets,
-then SQL host variables/indicators and DLI PCB/SSA or MQ parameter-list views;
-raw command strings must never become provider authority.
+Add generic content-addressed application manifests and an atomic, idempotent,
+restartable installer covering sources, programs, resources, data, profiles,
+and migrations. Partial, duplicate, orphan, and incompatible installations
+must remain not-ready without CardDemo-specific production branches.

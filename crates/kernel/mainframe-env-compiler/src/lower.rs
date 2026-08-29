@@ -367,6 +367,7 @@ pub fn core_mir_catalog() -> OperationCatalog {
         .filter(|kind| kind.supported())
         .chain([
             StatementKind::NextSentence,
+            StatementKind::ExecDli,
             StatementKind::Label,
             StatementKind::ProgramEnd,
         ])
@@ -450,7 +451,7 @@ fn runtime_import(kind: StatementKind) -> Option<&'static str> {
     use StatementKind as K;
     match kind {
         K::Accept | K::Display => Some("host.terminal"),
-        K::Call | K::Cancel => Some("host.program"),
+        K::Call | K::Cancel | K::ExecDli | K::ExecSql => Some("host.program"),
         K::Open | K::Close | K::Read | K::Write => Some("host.dataset"),
         K::ExecCics => Some("host.cics"),
         _ => None,
@@ -475,7 +476,7 @@ mod tests {
     #[test]
     fn core_catalog_has_no_unsupported_frozen_operations() {
         let catalog = core_mir_catalog();
-        assert!(catalog.get(&core_identity("exec_sql").unwrap()).is_none());
+        assert!(catalog.get(&core_identity("exec_sql").unwrap()).is_some());
         assert!(catalog.get(&core_identity("display").unwrap()).is_some());
     }
 }

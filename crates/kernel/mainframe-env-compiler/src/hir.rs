@@ -121,8 +121,6 @@ impl StatementKind {
         !matches!(
             self,
             Self::DuplicateLabel
-                | Self::ExecSql
-                | Self::ExecDli
                 | Self::Invoke
                 | Self::Merge
                 | Self::NextSentence
@@ -414,7 +412,14 @@ pub(crate) fn effects(kind: StatementKind) -> Vec<Effect> {
         | K::StopRun => vec![Effect::ProgramControl],
         K::Open | K::Close | K::Read => vec![Effect::DatasetRead],
         K::Rewrite | K::Write => vec![Effect::DatasetWrite],
-        K::ExecCics => vec![Effect::ProgramControl, Effect::Condition],
+        K::ExecCics | K::ExecDli | K::ExecSql => {
+            vec![
+                Effect::ProgramControl,
+                Effect::MemoryRead,
+                Effect::MemoryWrite,
+                Effect::Condition,
+            ]
+        }
         K::Allocate
         | K::Free
         | K::Move
@@ -1471,7 +1476,7 @@ mod tests {
                 .iter()
                 .filter(|kind| !kind.supported())
                 .count(),
-            6
+            5
         );
     }
     #[test]

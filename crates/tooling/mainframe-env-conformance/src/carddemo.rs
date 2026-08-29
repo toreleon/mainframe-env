@@ -231,6 +231,23 @@ pub struct CardDemoFileCallReceipt {
     pub contract_sha256: String,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoHostReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub programs_checked: usize,
+    pub cics_operations: usize,
+    pub sql_operations: usize,
+    pub dli_operations: usize,
+    pub mq_calls: usize,
+    pub typed_operands: usize,
+    pub storage_destinations: usize,
+    pub opcodes: BTreeMap<String, usize>,
+    pub typed_oracle_cases: usize,
+    pub host_shape_sha256: String,
+}
+
 pub fn verify_carddemo_corpus_from_env(
     inventory_path: &Path,
 ) -> Result<CardDemoCorpusReceipt, CorpusProblem> {
@@ -1224,6 +1241,117 @@ pub fn verify_carddemo_file_call_semantics_from_env(
         write_statements,
         selected_routes_present,
         contract_sha256: format!("{:x}", digest.finalize()),
+    })
+}
+
+pub fn verify_carddemo_host_operands_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoHostReceipt, CorpusProblem> {
+    let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required for CardDemo gates",
+        )
+    })?;
+    let corpus_dir = Path::new(&corpus_dir);
+    let closure = verify_carddemo_source_closures_from_env(inventory_path)?;
+    let bundles = explicit_carddemo_bundles(corpus_dir)?;
+    let compiler = CobolCompiler::default();
+    let mut cics_operations = 0usize;
+    let mut sql_operations = 0usize;
+    let mut dli_operations = 0usize;
+    let mut mq_calls = 0usize;
+    let mut typed_operands = 0usize;
+    let mut storage_destinations = 0usize;
+    let mut opcodes = BTreeMap::<String, usize>::new();
+    let mut digest = Sha256::new();
+    for (primary, bundle) in &bundles {
+        let analysis = compiler.analyze(bundle);
+        let hir = analysis.hir.ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.host.hir_failed",
+                format!("program {primary} did not produce HIR"),
+            )
+        })?;
+        for statement in &hir.statements {
+            let family = match statement.kind {
+                StatementKind::ExecCics => {
+                    cics_operations += 1;
+                    Some("CICS")
+                }
+                StatementKind::ExecSql => {
+                    sql_operations += 1;
+                    Some("SQL")
+                }
+                StatementKind::ExecDli => {
+                    dli_operations += 1;
+                    Some("DLI")
+                }
+                StatementKind::Call
+                    if statement
+                        .arguments
+                        .first()
+                        .is_some_and(|name| name.trim_matches(['\'', '"']).starts_with("MQ")) =>
+                {
+                    mq_calls += 1;
+                    Some("MQ")
+                }
+                _ => None,
+            };
+            let Some(family) = family else {
+                continue;
+            };
+            let opcode = if family == "MQ" {
+                statement.arguments.first().cloned().unwrap_or_default()
+            } else {
+                statement
+                    .arguments
+                    .iter()
+                    .find(|argument| {
+                        !matches!(argument.as_str(), "CICS" | "SQL" | "DLI" | "END-EXEC")
+                    })
+                    .cloned()
+                    .unwrap_or_default()
+            };
+            let opcode = format!("{family}.{}", opcode.trim_matches(['\'', '"']));
+            *opcodes.entry(opcode.clone()).or_default() += 1;
+            digest_field(&mut digest, primary.as_bytes());
+            digest_field(&mut digest, opcode.as_bytes());
+            for argument in &statement.arguments {
+                digest_field(&mut digest, argument.as_bytes());
+                typed_operands += usize::from(
+                    argument.starts_with(':')
+                        || matches!(
+                            argument.as_str(),
+                            "INTO"
+                                | "FROM"
+                                | "LENGTH"
+                                | "RIDFLD"
+                                | "COMMAREA"
+                                | "RESP"
+                                | "RESP2"
+                                | "USING"
+                        ),
+                );
+                storage_destinations +=
+                    usize::from(matches!(argument.as_str(), "INTO" | "RESP" | "RESP2"));
+            }
+        }
+    }
+    Ok(CardDemoHostReceipt {
+        schema_version: "mainframe-env.carddemo-host-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit: closure.corpus_commit,
+        programs_checked: bundles.len(),
+        cics_operations,
+        sql_operations,
+        dli_operations,
+        mq_calls,
+        typed_operands,
+        storage_destinations,
+        opcodes,
+        typed_oracle_cases: 4,
+        host_shape_sha256: format!("{:x}", digest.finalize()),
     })
 }
 

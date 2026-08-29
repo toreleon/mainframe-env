@@ -311,16 +311,13 @@ mod tests {
         }
     }
     #[test]
-    fn unsupported_exec_sql_never_publishes() {
+    fn exec_sql_publishes_through_typed_host_lowering() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SQLTEST. PROCEDURE DIVISION. EXEC SQL SELECT 1 END-EXEC. STOP RUN.";
         assert!(matches!(
             CobolCompiler::default()
                 .compile(request(source, CompilationMode::Executable))
                 .unwrap(),
-            CompilerResult::Failed {
-                completeness: Completeness::Unsupported,
-                ..
-            }
+            CompilerResult::Published { .. }
         ));
     }
     #[test]

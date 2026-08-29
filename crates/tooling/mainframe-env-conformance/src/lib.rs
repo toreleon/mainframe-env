@@ -23,11 +23,11 @@ mod carddemo;
 
 pub use carddemo::{
     CardDemoClosureReceipt, CardDemoControlReceipt, CardDemoCoreReceipt, CardDemoCorpusReceipt,
-    CardDemoFileCallReceipt, CardDemoLayoutReceipt, CardDemoSourceReceipt, CorpusProblem,
-    verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
+    CardDemoFileCallReceipt, CardDemoHostReceipt, CardDemoLayoutReceipt, CardDemoSourceReceipt,
+    CorpusProblem, verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
     verify_carddemo_corpus, verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
-    verify_carddemo_file_call_semantics_from_env, verify_carddemo_source_closures_from_env,
-    verify_carddemo_source_preprocessing_from_env,
+    verify_carddemo_file_call_semantics_from_env, verify_carddemo_host_operands_from_env,
+    verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
 };
 
 pub const HELLO_SOURCE: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. HELLO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MSG PIC X(12) VALUE 'HELLO WORLD!'.\nPROCEDURE DIVISION.\nDISPLAY MSG.\nSTOP RUN.\n";
@@ -174,7 +174,10 @@ mod tests {
     }
     #[test]
     fn unsupported_source_fails_without_artifact() {
-        assert!(compile("IDENTIFICATION DIVISION. PROGRAM-ID. X. PROCEDURE DIVISION. EXEC SQL SELECT 1 END-EXEC.").is_err());
+        assert!(
+            compile("IDENTIFICATION DIVISION. PROGRAM-ID. X. PROCEDURE DIVISION. INVOKE X.")
+                .is_err()
+        );
     }
     #[test]
     fn output_exhaustion_is_typed_failure() {
@@ -457,6 +460,142 @@ mod tests {
             ),
             MachineDrive::Completed(done) if done.output.bytes() == b"ABC\n00\n"
         ));
+    }
+
+    #[test]
+    fn cics_outbound_operands_read_storage_bytes() {
+        use mainframe_env_host_api::{CicsOperation, HostRequest};
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSABI. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(3) VALUE 'ABC'. PROCEDURE DIVISION. EXEC CICS WRITEQ TD QUEUE('Q1') FROM(DATA-X) LENGTH(3) END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("CICS operation did not call host");
+        };
+        let HostRequest::Cics(request) = effect.request else {
+            panic!("unexpected host request");
+        };
+        assert_eq!(request.operation, CicsOperation::WriteTransientData);
+        assert_eq!(request.arguments["FROM"].bytes(), b"ABC");
+        assert_eq!(request.arguments["QUEUE"].bytes(), b"Q1");
+        assert_eq!(request.arguments["LENGTH"].bytes(), b"3");
+    }
+
+    #[test]
+    fn sql_host_variables_use_typed_embedded_envelope() {
+        use mainframe_env_host_api::{EffectResult, HostRequest, HostResult, ProgramRequest};
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SQLABI. DATA DIVISION. WORKING-STORAGE SECTION. 01 IN-X PIC X(2) VALUE '42'. 01 OUT-X PIC X(3). PROCEDURE DIVISION. EXEC SQL SELECT NAME INTO :OUT-X FROM CUSTOMER WHERE ID = :IN-X END-EXEC. DISPLAY OUT-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("SQL operation did not call host");
+        };
+        let HostRequest::Program(ProgramRequest::Call { program, payload }) = &effect.request
+        else {
+            panic!("unexpected SQL request");
+        };
+        assert_eq!(program.as_str(), "MAINFRAME-SQL");
+        assert_eq!(payload.schema(), "mainframe-env.embedded-host@1");
+        assert!(payload.bytes().starts_with(b"MEHOST01"));
+        assert!(payload.bytes().windows(2).any(|window| window == b"42"));
+        assert!(
+            !payload
+                .bytes()
+                .windows(8)
+                .any(|window| window == b"CUSTOMER")
+        );
+        let mut result = 1u32.to_be_bytes().to_vec();
+        result.extend_from_slice(&3u64.to_be_bytes());
+        result.extend_from_slice(b"ANN");
+        let result = mainframe_env_execution_api::BoundedPayload::new(
+            "mainframe-env.cobol.call-result@1",
+            result,
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: effect.sequence,
+                    outcome: Ok(HostResult::Program(result)),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(done) if done.output.bytes() == b"ANN\n"
+        ));
+    }
+
+    #[test]
+    fn dli_pcb_and_ssa_are_typed_read_write_operands() {
+        use mainframe_env_host_api::{HostRequest, ProgramRequest};
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DLIABI. DATA DIVISION. WORKING-STORAGE SECTION. 01 PCB-X PIC X(4) VALUE 'PCB1'. 01 SSA-X PIC X(4) VALUE 'SSA1'. PROCEDURE DIVISION. EXEC DLI GU USING PCB-X SSA-X END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("DLI operation did not call host");
+        };
+        let HostRequest::Program(ProgramRequest::Call { program, payload }) = effect.request else {
+            panic!("unexpected DLI request");
+        };
+        assert_eq!(program.as_str(), "MAINFRAME-DLI");
+        assert_eq!(payload.schema(), "mainframe-env.embedded-host@1");
+        assert!(payload.bytes().windows(4).any(|window| window == b"PCB1"));
+        assert!(payload.bytes().windows(4).any(|window| window == b"SSA1"));
+    }
+
+    #[test]
+    fn mq_call_parameter_list_carries_names_modes_and_values() {
+        use mainframe_env_host_api::{HostRequest, ProgramRequest};
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. MQABI. DATA DIVISION. WORKING-STORAGE SECTION. 01 HCONN PIC X(4) VALUE 'HC01'. 01 HOBJ PIC X(4) VALUE 'HO01'. 01 CC PIC 9(4) VALUE 0. 01 RC PIC 9(4) VALUE 0. PROCEDURE DIVISION. CALL 'MQOPEN' USING HCONN HOBJ CC RC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("MQ call did not call host");
+        };
+        let HostRequest::Program(ProgramRequest::Call { program, payload }) = effect.request else {
+            panic!("unexpected MQ request");
+        };
+        assert_eq!(program.as_str(), "MQOPEN");
+        assert_eq!(payload.schema(), "mainframe-env.cobol.call@1");
+        for expected in [b"HCONN".as_slice(), b"HOBJ", b"CC", b"RC", b"HC01", b"HO01"] {
+            assert!(
+                payload
+                    .bytes()
+                    .windows(expected.len())
+                    .any(|window| window == expected)
+            );
+        }
     }
 
     fn drive_to_terminal(

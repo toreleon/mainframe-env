@@ -101,7 +101,11 @@ enum PendingKind {
     ProgramCall {
         targets: Vec<String>,
     },
-    Cics,
+    Cics {
+        into: Option<String>,
+        response: Option<String>,
+        response2: Option<String>,
+    },
     Ignore,
 }
 
@@ -333,7 +337,37 @@ impl ReferenceMachine {
                     self.write(target, &value)?;
                 }
             }
-            (PendingKind::Cics, HostResult::Cics(response)) => {
+            (
+                PendingKind::Cics {
+                    into,
+                    response: response_target,
+                    response2: response2_target,
+                },
+                HostResult::Cics(response),
+            ) => {
+                if let Some(target) = response_target {
+                    self.write_decimal(
+                        &target,
+                        Decimal {
+                            coefficient: i128::from(response.response),
+                            scale: 0,
+                        },
+                    )?;
+                }
+                if let Some(target) = response2_target {
+                    self.write_decimal(
+                        &target,
+                        Decimal {
+                            coefficient: i128::from(response.response2),
+                            scale: 0,
+                        },
+                    )?;
+                }
+                if let Some(target) = into
+                    && response.payload.schema() == "mainframe-env.cics.into@1"
+                {
+                    self.write(&target, response.payload.bytes())?;
+                }
                 self.deferred_drive = match response.disposition {
                     CicsDisposition::Complete => {
                         (response.response != 0).then_some(MachineDrive::Condition(Condition {
@@ -376,6 +410,7 @@ impl ReferenceMachine {
                 PendingKind::DatasetRead { .. }
                 | PendingKind::DatasetStatus { .. }
                 | PendingKind::ProgramCall { .. }
+                | PendingKind::Cics { .. }
                 | PendingKind::Ignore,
                 _,
             ) => {}
@@ -476,6 +511,8 @@ impl ReferenceMachine {
             "call" | "cancel" => return self.program_effect(name, &args),
             "open" | "close" | "read" | "write" => return self.dataset_effect(name, &args),
             "exec_cics" => return self.cics_effect(&args),
+            "exec_sql" => return self.embedded_effect("SQL", &args),
+            "exec_dli" => return self.embedded_effect("DLI", &args),
             "stop_run" | "go_back" | "halt" => return Ok(Step::Complete),
             _ => return Err(MachineProblem::InvalidOperation),
         }
@@ -704,7 +741,7 @@ impl ReferenceMachine {
             .iter()
             .map(|target| self.read(target))
             .collect::<Result<Vec<_>, _>>()?;
-        let payload = encode_call_values(&values)?;
+        let payload = encode_call_values(&targets, &values)?;
         self.effect(
             HostRequest::Program(ProgramRequest::Call { program, payload }),
             PendingKind::ProgramCall { targets },
@@ -784,7 +821,35 @@ impl ReferenceMachine {
     }
     fn cics_effect(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
         let operation = CicsOperation::from_tokens(args).ok_or(MachineProblem::UnsupportedForm)?;
-        let arguments = cics_arguments(args)?;
+        let mut arguments = cics_arguments(args)?;
+        let destination = |key: &str| {
+            arguments
+                .get(key)
+                .map(|value| String::from_utf8_lossy(value.bytes()).into_owned())
+        };
+        let into = destination("INTO");
+        let response_target = destination("RESP");
+        let response2_target = destination("RESP2");
+        for key in [
+            "FROM", "COMMAREA", "RIDFLD", "LENGTH", "QUEUE", "MAP", "MAPSET", "TRANSID",
+        ] {
+            let Some(argument) = arguments.get(key) else {
+                continue;
+            };
+            let token = String::from_utf8_lossy(argument.bytes()).into_owned();
+            if self.layout(&token).is_some() {
+                let value = self.resolve(&token)?;
+                arguments.insert(
+                    key.into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.storage-value@1",
+                        value,
+                        InvocationLimits::default(),
+                    )
+                    .map_err(|_| MachineProblem::ResourceExhausted)?,
+                );
+            }
+        }
         let condition_policy = if args.iter().any(|arg| arg.eq_ignore_ascii_case("NOHANDLE")) {
             CicsConditionPolicy::NoHandle
         } else if let Some(response) = arguments.get("RESP") {
@@ -817,7 +882,56 @@ impl ReferenceMachine {
                 condition_policy,
                 mutation,
             }),
-            PendingKind::Cics,
+            PendingKind::Cics {
+                into,
+                response: response_target,
+                response2: response2_target,
+            },
+        )
+    }
+
+    fn embedded_effect(&mut self, family: &str, args: &[String]) -> Result<Step, MachineProblem> {
+        let opcode = args
+            .iter()
+            .find(|token| !matches!(token.as_str(), "SQL" | "DLI" | "END-EXEC"))
+            .ok_or(MachineProblem::InvalidOperation)?
+            .to_ascii_uppercase();
+        let mut operands = Vec::<(String, String, Vec<u8>)>::new();
+        let mut targets = Vec::new();
+        let into = position(args, "INTO");
+        let from = position(args, "FROM");
+        for (index, token) in args.iter().enumerate() {
+            if family == "SQL" && token.starts_with(':') {
+                for name in token.trim_start_matches(':').split(':') {
+                    let name = normalize(name);
+                    let write = matches!(opcode.as_str(), "SELECT" | "FETCH")
+                        && into.is_some_and(|into| index > into)
+                        && from.is_none_or(|from| index < from);
+                    let value = if write { Vec::new() } else { self.read(&name)? };
+                    operands.push((
+                        name.clone(),
+                        if write { "write" } else { "read" }.into(),
+                        value,
+                    ));
+                    if write {
+                        targets.push(name);
+                    }
+                }
+            } else if family == "DLI"
+                && index > position(args, "USING").unwrap_or(args.len())
+                && self.layout(token).is_some()
+            {
+                let name = normalize(token);
+                operands.push((name.clone(), "read_write".into(), self.read(&name)?));
+                targets.push(name);
+            }
+        }
+        let payload = encode_embedded_operands(family, &opcode, &operands)?;
+        let program = ProgramName::new(format!("MAINFRAME-{family}"), 128)
+            .map_err(|_| MachineProblem::InvalidOperation)?;
+        self.effect(
+            HostRequest::Program(ProgramRequest::Call { program, payload }),
+            PendingKind::ProgramCall { targets },
         )
     }
     fn effect(&mut self, request: HostRequest, kind: PendingKind) -> Result<Step, MachineProblem> {
@@ -2261,7 +2375,10 @@ fn cics_arguments(tokens: &[String]) -> Result<BTreeMap<String, BoundedPayload>,
                 .position(|token| token == ")")
                 .map(|offset| index + 2 + offset)
                 .ok_or(MachineProblem::InvalidOperation)?;
-            let value = tokens[index + 2..end].join(" ");
+            let value = tokens[index + 2..end]
+                .join(" ")
+                .trim_matches(['\'', '"'])
+                .to_string();
             arguments.insert(
                 key,
                 BoundedPayload::new(
@@ -2384,6 +2501,8 @@ pub fn supported_operations() -> &'static BTreeSet<OperationIdentity> {
             "entry",
             "evaluate",
             "exec_cics",
+            "exec_dli",
+            "exec_sql",
             "exit",
             "free",
             "go_back",
@@ -3229,18 +3348,21 @@ fn civil_from_days(days: i64) -> (i32, u32, u32) {
     year += i64::from(month <= 2);
     (year as i32, month as u32, day as u32)
 }
-fn encode_call_values(values: &[Vec<u8>]) -> Result<BoundedPayload, MachineProblem> {
+fn encode_call_values(
+    names: &[String],
+    values: &[Vec<u8>],
+) -> Result<BoundedPayload, MachineProblem> {
+    if names.len() != values.len() {
+        return Err(MachineProblem::InvalidOperation);
+    }
     let mut bytes = u32::try_from(values.len())
         .map_err(|_| MachineProblem::ResourceExhausted)?
         .to_be_bytes()
         .to_vec();
-    for value in values {
-        bytes.extend_from_slice(
-            &u64::try_from(value.len())
-                .map_err(|_| MachineProblem::ResourceExhausted)?
-                .to_be_bytes(),
-        );
-        bytes.extend_from_slice(value);
+    for (name, value) in names.iter().zip(values) {
+        push_host_field(&mut bytes, name.as_bytes())?;
+        bytes.push(1);
+        push_host_field(&mut bytes, value)?;
     }
     BoundedPayload::new(
         "mainframe-env.cobol.call@1",
@@ -3248,6 +3370,42 @@ fn encode_call_values(values: &[Vec<u8>]) -> Result<BoundedPayload, MachineProbl
         InvocationLimits::default(),
     )
     .map_err(|_| MachineProblem::ResourceExhausted)
+}
+
+fn encode_embedded_operands(
+    family: &str,
+    opcode: &str,
+    operands: &[(String, String, Vec<u8>)],
+) -> Result<BoundedPayload, MachineProblem> {
+    let mut bytes = b"MEHOST01".to_vec();
+    push_host_field(&mut bytes, family.as_bytes())?;
+    push_host_field(&mut bytes, opcode.as_bytes())?;
+    bytes.extend_from_slice(
+        &u32::try_from(operands.len())
+            .map_err(|_| MachineProblem::ResourceExhausted)?
+            .to_be_bytes(),
+    );
+    for (name, mode, value) in operands {
+        push_host_field(&mut bytes, name.as_bytes())?;
+        push_host_field(&mut bytes, mode.as_bytes())?;
+        push_host_field(&mut bytes, value)?;
+    }
+    BoundedPayload::new(
+        "mainframe-env.embedded-host@1",
+        bytes,
+        InvocationLimits::default(),
+    )
+    .map_err(|_| MachineProblem::ResourceExhausted)
+}
+
+fn push_host_field(output: &mut Vec<u8>, value: &[u8]) -> Result<(), MachineProblem> {
+    output.extend_from_slice(
+        &u64::try_from(value.len())
+            .map_err(|_| MachineProblem::ResourceExhausted)?
+            .to_be_bytes(),
+    );
+    output.extend_from_slice(value);
+    Ok(())
 }
 
 fn decode_call_values(payload: &BoundedPayload) -> Result<Vec<Vec<u8>>, MachineProblem> {

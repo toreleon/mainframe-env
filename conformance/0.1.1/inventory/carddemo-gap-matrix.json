@@ -93,9 +93,11 @@
       "priority": "P0",
       "domain": "compiler-host",
       "title": "Lower CICS, SQL, DLI, and MQ operands through a storage-aware host ABI",
-      "state": "open",
+      "state": "passed",
       "depends_on": ["CD-005", "CD-006", "CD-007"],
       "commit_subject": "Lower CardDemo embedded host operations",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-008.json",
+      "evidence_digest": "sha256:5c6d97d6499842d32d7063c64f2179917fd435321999bbd63e2abaac92fbb27b",
       "acceptance": ["literal operands are normalized and variable operands read storage bytes", "INTO/FROM, LENGTH, RIDFLD, COMMAREA, RESP, and RESP2 carry typed destinations", "SQL host variables/indicators, DLI PCB/SSA, and MQ parameter lists are typed", "raw command strings are not provider authority"]
     },
     {

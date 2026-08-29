@@ -6,9 +6,9 @@
   "current_product": "0.1.0-alpha.0",
   "target_product": "0.1.1",
   "source_identity": {
-    "base_commit": "4342e1b55797adf22c4f55eaf6567cea362a3a80",
+    "base_commit": "91eeac38c62cca69670c91eb1adb5c7d90a8a177",
     "dirty_tree_algorithm": "sha256 of sorted sha256sum records, excluding .git, target, docs/delivery/CARDEMO-0.1.1-STATUS.md, and conformance/0.1.1/evidence/program-status.json",
-    "dirty_tree_digest": "sha256:b7526635dda458c23d1c630729f0e9765ccd913f4f3d0f0c9f6ed0cdf9acc0ad"
+    "dirty_tree_digest": "sha256:80fcffb8f2dc408643e4633efb9742c2b581f48d948531f97bc8774e3307c499"
   },
   "corpus": {
     "environment_key": "CARDEMO_CORPUS_DIR",
@@ -21,8 +21,8 @@
     "license": "Apache-2.0",
     "license_sha256": "09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b"
   },
-  "current_issue": "CD-007",
-  "issues": {"total":27,"completed":7,"in_progress":0,"open":20},
+  "current_issue": "CD-008",
+  "issues": {"total":27,"completed":8,"in_progress":0,"open":19},
   "journeys": {"total":20,"passed":0,"failed_or_not_run":20},
   "completed_issues": [
     {
@@ -77,8 +77,16 @@
       "id": "CD-007",
       "state": "pass",
       "commit_subject": "Implement CardDemo file and program calls",
+      "commit_identity": "91eeac38c62cca69670c91eb1adb5c7d90a8a177",
       "evidence": "conformance/0.1.1/evidence/issues/CD-007.json",
       "evidence_digest": "sha256:9a093cf504ddf55d5242da5f48bb2e1783cb3c48f64790305954480402260597"
+    },
+    {
+      "id": "CD-008",
+      "state": "pass",
+      "commit_subject": "Lower CardDemo embedded host operations",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-008.json",
+      "evidence_digest": "sha256:5c6d97d6499842d32d7063c64f2179917fd435321999bbd63e2abaac92fbb27b"
     }
   ],
   "commands": [
@@ -126,6 +134,11 @@
     ,{"command":"affected-package cargo clippy --all-targets --locked -- -D warnings","exit_code":0,"result":"pass"}
     ,{"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-file-call --check","exit_code":0,"result":"54 file bindings; 185 linkage items; 63 calls with 228 USING operands; selected routes present"}
     ,{"command":"env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-file-call --check","exit_code":1,"result":"expected carddemo.corpus.environment_missing control"}
+    ,{"command":"cargo test -p mainframe-env-compiler -p mainframe-env-interpreter -p mainframe-env-conformance --locked","exit_code":0,"result":"27 compiler, 6 interpreter, and 32 conformance tests passed"}
+    ,{"command":"cargo check --workspace --all-targets --locked","exit_code":0,"result":"pass"}
+    ,{"command":"affected-package cargo clippy --all-targets --locked -- -D warnings","exit_code":0,"result":"pass"}
+    ,{"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-host --check","exit_code":0,"result":"240 CICS, 20 SQL, 26 DLI, 22 MQ operations and exact opcode digest passed"}
+    ,{"command":"env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-host --check","exit_code":1,"result":"expected carddemo.corpus.environment_missing control"}
   ],
   "decisions": [
     "0.1.1 uses additive CardDemo profiles and preserves core-server compatibility.",
@@ -138,6 +151,6 @@
     "Resolve 0.1.0-alpha.0 release ordering before cutting 0.1.1."
   ],
   "blockers": [],
-  "next_issue": "CD-008",
-  "next_step": "Implement CD-008 storage-aware CICS, SQL, DLI, and MQ operand lowering with typed destinations and no raw-command provider authority."
+  "next_issue": "CD-009",
+  "next_step": "Implement CD-009 generic content-addressed application package manifests, atomic installation, and fail-closed readiness without CardDemo-specific production behavior."
 }
