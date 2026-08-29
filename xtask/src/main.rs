@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+use mainframe_env_conformance::verify_carddemo_corpus_from_env;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -47,12 +48,13 @@ fn run() -> TaskResult {
             check_evidence(&root)
         }
         "certification" => check_certification(&root),
+        "carddemo-corpus" => check_carddemo_corpus(&root),
         "digest" => print_digest(&root),
         "release" if check => check_release_artifacts(&root),
         "release" => generate_release_artifacts(&root),
         "help" | "--help" | "-h" => {
             println!(
-                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|conformance|certification|digest|release> --check"
+                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|conformance|certification|carddemo-corpus|digest|release> --check"
             );
             Ok(())
         }
@@ -62,6 +64,53 @@ fn run() -> TaskResult {
     if check {
         println!("{command}: pass");
     }
+    Ok(())
+}
+
+fn check_carddemo_corpus(root: &Path) -> TaskResult {
+    let inventory_path = root.join("conformance/0.1.1/inventory/carddemo-corpus.json");
+    let inventory = json(&inventory_path)?;
+    let historical = text(&inventory, "content_sha256", &inventory_path)?;
+    let fixtures_path = root.join("conformance/0.1/fixtures/manifest.json");
+    let fixtures = json(&fixtures_path)?;
+    let frozen = array(&fixtures, "fixtures", &fixtures_path)?
+        .iter()
+        .find(|fixture| fixture["id"].as_str() == Some("aws-carddemo"))
+        .and_then(|fixture| fixture["content_sha256"].as_str())
+        .ok_or("historical aws-carddemo fixture identity is missing")?;
+    require(
+        historical == frozen,
+        "0.1.1 corpus inventory rewrites the historical 0.1 content identity",
+    )?;
+
+    let receipt =
+        verify_carddemo_corpus_from_env(&inventory_path).map_err(|problem| problem.to_string())?;
+    let receipt_value = serde_json::to_value(&receipt)
+        .map_err(|error| format!("CardDemo receipt conversion failed: {error}"))?;
+    let receipt_bytes = serde_json::to_vec(&receipt_value)
+        .map_err(|error| format!("CardDemo receipt canonicalization failed: {error}"))?;
+    let receipt_digest = format!("sha256:{:x}", Sha256::digest(receipt_bytes));
+    let evidence_path = root.join("conformance/0.1.1/evidence/issues/CD-001.json");
+    let evidence = json(&evidence_path)?;
+    require(
+        evidence["issue"] == Value::String("CD-001".to_string())
+            && evidence["derived"] == Value::Bool(true)
+            && evidence["status"] == Value::String("pass".to_string()),
+        "CD-001 evidence is not a derived pass",
+    )?;
+    require(
+        evidence["corpus_receipt"] == receipt_value,
+        "CD-001 evidence corpus receipt is stale",
+    )?;
+    require(
+        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
+        "CD-001 evidence digest differs from its canonical corpus receipt",
+    )?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&receipt)
+            .map_err(|error| format!("CardDemo receipt serialization failed: {error}"))?
+    );
     Ok(())
 }
 
@@ -220,7 +269,7 @@ fn check_declared_dependency_graph(root: &Path) -> TaskResult {
     let actual = normal_internal_edges(&metadata)?;
     let path = root.join("conformance/0.1/inventory/dependency-graph.json");
     let graph = json(&path)?;
-    let declared = array(&graph, "edges", &path)?
+    let mut declared = array(&graph, "edges", &path)?
         .iter()
         .map(|edge| {
             let values = edge
@@ -241,6 +290,35 @@ fn check_declared_dependency_graph(root: &Path) -> TaskResult {
             ))
         })
         .collect::<TaskResult<BTreeSet<_>>>()?;
+    let additions_path = root.join("conformance/0.1.1/inventory/dependency-graph-additions.json");
+    if additions_path.is_file() {
+        let additions = json(&additions_path)?;
+        for edge in array(&additions, "edges", &additions_path)? {
+            let values = edge
+                .as_array()
+                .ok_or_else(|| format!("{} contains a non-array edge", additions_path.display()))?;
+            if values.len() != 2 {
+                return Err(format!(
+                    "{} contains a malformed edge",
+                    additions_path.display()
+                ));
+            }
+            declared.insert((
+                values[0]
+                    .as_str()
+                    .ok_or_else(|| {
+                        format!("{} edge source is not a string", additions_path.display())
+                    })?
+                    .to_string(),
+                values[1]
+                    .as_str()
+                    .ok_or_else(|| {
+                        format!("{} edge target is not a string", additions_path.display())
+                    })?
+                    .to_string(),
+            ));
+        }
+    }
     if actual != declared {
         let missing = actual.difference(&declared).cloned().collect::<Vec<_>>();
         let stale = declared.difference(&actual).cloned().collect::<Vec<_>>();
@@ -323,7 +401,7 @@ fn check_dependency(package: &str, dependency: &str, excluded: &BTreeSet<String>
             "dependency direction forbids {package} -> {dependency}"
         ));
     }
-    if package == "mainframe-env-conformance" {
+    if matches!(package, "mainframe-env-conformance" | "xtask") {
         return Ok(());
     }
     require(
@@ -1269,6 +1347,7 @@ mod tests {
     fn allowed_tooling_edge_is_accepted() {
         let excluded = BTreeSet::new();
         assert!(check_dependency("xtask", "serde_json", &excluded).is_ok());
+        assert!(check_dependency("xtask", "mainframe-env-conformance", &excluded).is_ok());
     }
 
     #[test]

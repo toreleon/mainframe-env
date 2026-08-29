@@ -1032,6 +1032,9 @@ dependencies = [
  "mainframe-env-ir",
  "mainframe-env-source",
  "proptest",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
 ]
 
 [[package]]
@@ -2424,6 +2427,7 @@ checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 name = "xtask"
 version = "0.1.0-alpha.0"
 dependencies = [
+ "mainframe-env-conformance",
  "serde_json",
  "sha2 0.10.9",
  "toml",

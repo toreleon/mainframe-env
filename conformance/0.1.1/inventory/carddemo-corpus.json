@@ -1,0 +1,190 @@
+{
+  "schema_version": "mainframe-env.carddemo-corpus@1",
+  "repository": "https://github.com/aws-samples/aws-mainframe-modernization-carddemo.git",
+  "commit": "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e",
+  "tree": "a1253e31c839f78d1f185b01771ba956da63b005",
+  "content_sha256": "a58a827edd293f3e66fdc192cae7dd0ccb4fd1bf1f7302bb9b1d2fb8ee1ba328",
+  "content_sha256_provenance": "historical 0.1 fixture identity retained without redefining historical evidence",
+  "executable_content_identity": {
+    "algorithm": "sha256-u64be-path-u64be-content-v1",
+    "sha256": "df62d3b541c8b296c03432ebc93cf2f007d3792e2cffff8501a8f964e9afa260",
+    "definition": "For every Git-tracked repository-relative UTF-8 path in bytewise order, hash the big-endian u64 path length, path bytes, big-endian u64 content length, and exact working-tree content bytes."
+  },
+  "license": "Apache-2.0",
+  "license_sha256": "09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b",
+  "readme_sha256": "37847e4a59bbfa4be7077b3d0bfe03cc57c08902ac0cbb80a175059c878c2f05",
+  "base_csd_sha256": "28ded93b49e188ae0100d6a964bd921a4de33414662e670b28f19bee41917cdb",
+  "modules": [
+    {
+      "id": "base",
+      "cobol_programs": 31,
+      "copybooks": 30,
+      "bms_copybooks": 17,
+      "bms_maps": 17,
+      "jcl": 38,
+      "procedures": 2,
+      "csd": 1,
+      "ebcdic_seed_files": 13,
+      "assembler": 2,
+      "macros": 2,
+      "cics_blocks": 174,
+      "cics_operation_families": 22
+    },
+    {
+      "id": "authorization-ims-db2-mq",
+      "cobol_programs": 8,
+      "copybooks": 9,
+      "bms_copybooks": 2,
+      "bms_maps": 2,
+      "jcl": 5,
+      "csd": 1,
+      "ims_definitions": 8,
+      "embedded_sql_blocks": 4,
+      "cics_blocks": 33
+    },
+    {
+      "id": "transaction-type-db2",
+      "cobol_programs": 3,
+      "copybooks": 2,
+      "bms_copybooks": 2,
+      "bms_maps": 2,
+      "jcl": 3,
+      "csd": 1,
+      "control_files": 7,
+      "declarations": 2,
+      "ddl_files": 4,
+      "embedded_sql_blocks": 28,
+      "cics_blocks": 24
+    },
+    {
+      "id": "vsam-mq",
+      "cobol_programs": 2,
+      "csd": 1,
+      "mq_calls": 18,
+      "cics_blocks": 9
+    }
+  ],
+  "totals": {
+    "cobol_programs": 44,
+    "application_and_bms_copybooks": 62,
+    "bms_maps": 21,
+    "jcl": 46,
+    "cics_blocks": 240,
+    "embedded_sql_blocks": 32,
+    "ims_dli_markers": 35,
+    "mq_calls": 22,
+    "cics_transactions": 25,
+    "cics_program_definitions": 26,
+    "runtime_dataset_definitions": 23
+  },
+  "file_count_checks": [
+    {"id":"base-cobol-programs","roots":["app/cbl"],"extensions":["cbl"],"expected":31},
+    {"id":"base-copybooks","roots":["app/cpy"],"extensions":["cpy"],"expected":30},
+    {"id":"base-bms-copybooks","roots":["app/cpy-bms"],"extensions":["cpy"],"expected":17},
+    {"id":"base-bms-maps","roots":["app/bms"],"extensions":["bms"],"expected":17},
+    {"id":"base-jcl","roots":["app/jcl"],"extensions":["jcl"],"expected":38},
+    {"id":"base-procedures","roots":["app/proc"],"extensions":["prc"],"expected":2},
+    {"id":"base-csd","roots":["app/csd"],"extensions":["csd"],"expected":1},
+    {"id":"base-ebcdic-seeds","roots":["app/data/EBCDIC"],"excluded_names":[".gitkeep"],"expected":13},
+    {"id":"base-assembler","roots":["app/asm"],"extensions":["asm"],"expected":2},
+    {"id":"base-macros","roots":["app/maclib"],"extensions":["mac"],"expected":2},
+    {"id":"authorization-cobol-programs","roots":["app/app-authorization-ims-db2-mq/cbl"],"extensions":["cbl"],"expected":8},
+    {"id":"authorization-copybooks","roots":["app/app-authorization-ims-db2-mq/cpy"],"extensions":["cpy"],"expected":9},
+    {"id":"authorization-bms-copybooks","roots":["app/app-authorization-ims-db2-mq/cpy-bms"],"extensions":["cpy"],"expected":2},
+    {"id":"authorization-bms-maps","roots":["app/app-authorization-ims-db2-mq/bms"],"extensions":["bms"],"expected":2},
+    {"id":"authorization-jcl","roots":["app/app-authorization-ims-db2-mq/jcl"],"extensions":["jcl"],"expected":5},
+    {"id":"authorization-csd","roots":["app/app-authorization-ims-db2-mq/csd"],"extensions":["csd"],"expected":1},
+    {"id":"authorization-ims-definitions","roots":["app/app-authorization-ims-db2-mq/ims"],"extensions":["dbd","psb"],"expected":8},
+    {"id":"transaction-type-cobol-programs","roots":["app/app-transaction-type-db2/cbl"],"extensions":["cbl"],"expected":3},
+    {"id":"transaction-type-copybooks","roots":["app/app-transaction-type-db2/cpy"],"extensions":["cpy"],"expected":2},
+    {"id":"transaction-type-bms-copybooks","roots":["app/app-transaction-type-db2/cpy-bms"],"extensions":["cpy"],"expected":2},
+    {"id":"transaction-type-bms-maps","roots":["app/app-transaction-type-db2/bms"],"extensions":["bms"],"expected":2},
+    {"id":"transaction-type-jcl","roots":["app/app-transaction-type-db2/jcl"],"extensions":["jcl"],"expected":3},
+    {"id":"transaction-type-csd","roots":["app/app-transaction-type-db2/csd"],"extensions":["csd"],"expected":1},
+    {"id":"transaction-type-controls","roots":["app/app-transaction-type-db2/ctl"],"extensions":["ctl"],"expected":7},
+    {"id":"transaction-type-declarations","roots":["app/app-transaction-type-db2/dcl"],"extensions":["dcl"],"expected":2},
+    {"id":"transaction-type-ddl","roots":["app/app-transaction-type-db2/ddl"],"extensions":["ddl"],"expected":4},
+    {"id":"vsam-mq-cobol-programs","roots":["app/app-vsam-mq/cbl"],"extensions":["cbl"],"expected":2},
+    {"id":"vsam-mq-csd","roots":["app/app-vsam-mq/csd"],"extensions":["csd"],"expected":1},
+    {"id":"all-cobol-programs","roots":["app/cbl","app/app-authorization-ims-db2-mq/cbl","app/app-transaction-type-db2/cbl","app/app-vsam-mq/cbl"],"extensions":["cbl"],"expected":44},
+    {"id":"all-application-and-bms-copybooks","roots":["app/cpy","app/cpy-bms","app/app-authorization-ims-db2-mq/cpy","app/app-authorization-ims-db2-mq/cpy-bms","app/app-transaction-type-db2/cpy","app/app-transaction-type-db2/cpy-bms"],"extensions":["cpy"],"expected":62},
+    {"id":"all-bms-maps","roots":["app/bms","app/app-authorization-ims-db2-mq/bms","app/app-transaction-type-db2/bms"],"extensions":["bms"],"expected":21},
+    {"id":"all-main-and-extension-jcl","roots":["app/jcl","app/app-authorization-ims-db2-mq/jcl","app/app-transaction-type-db2/jcl"],"extensions":["jcl"],"expected":46},
+    {"id":"all-csd-resources","roots":["app/csd","app/app-authorization-ims-db2-mq/csd","app/app-transaction-type-db2/csd","app/app-vsam-mq/csd"],"extensions":["csd"],"expected":4}
+  ],
+  "runtime_oracles": [
+    {
+      "path": "samples/m2/mf/CardDemo_runtime.zip",
+      "sha256": "683ef5bb461553ae9cee17c8c115f63bcb241ddeb832a2f1c62e8f96e9dbe2e3",
+      "claim": "Micro Focus migrated object, resource, application configuration, and data-catalog oracle only"
+    },
+    {
+      "path": "samples/m2/unikix/UniKix_CardDemo_runtime_v1.zip",
+      "sha256": "431f67920a1e9b980cc21a6de1a375aac0c21b62d256c584d109ff7735c436ca",
+      "claim": "UniKix migrated source/object and operator-layout oracle only"
+    },
+    {
+      "path": "samples/m2/mf/CardDemo_runtime.zip!import_dataset.json",
+      "sha256": "eddeb533aa4c84dbc823433a2467b18e9ceaedecc073232d8f95f8faaa05ae42",
+      "claim": "13 KSDS/AIX definitions, six GDG bases, one generation, and three PDS catalogs"
+    },
+    {
+      "path": "samples/m2/mf/CardDemo_runtime.zip!app_config.json",
+      "sha256": "502f11794ee49661a6253a71d1c65c4c5252498abf4c024d52ff35d9eb27c48e",
+      "claim": "TN3270, batch initiator, CICS catalog, and XA configuration observation only"
+    }
+  ],
+  "external_compatibility_copybooks": [
+    "DFHAID",
+    "DFHBMSCA",
+    "SQLCA",
+    "CMQGMOV",
+    "CMQMDV",
+    "CMQODV",
+    "CMQPMOV",
+    "CMQTML",
+    "CMQV"
+  ],
+  "external_program_services": [
+    "CEE3ABD",
+    "CEEDAYS",
+    "COBDATFT",
+    "MVSWAIT",
+    "CBLTDLI",
+    "MQOPEN",
+    "MQGET",
+    "MQPUT",
+    "MQPUT1",
+    "MQCLOSE"
+  ],
+  "reached_cobol_requirements": [
+    "fixed columns and continuations",
+    "COPY and COPY REPLACING with comment awareness",
+    "hierarchical scopes and qualified duplicate names",
+    "levels 66, 77, and 88",
+    "REDEFINES, OCCURS, OCCURS DEPENDING ON, subscripts, and indexes",
+    "reference modification and group moves",
+    "DISPLAY, COMP, COMP-3, signed and edited numeric storage",
+    "LINKAGE SECTION and PROCEDURE DIVISION USING",
+    "FD/file control, status, sequential, indexed, and relative I/O",
+    "nested IF, EVALUATE, SEARCH, PERFORM VARYING/UNTIL/THRU, and GO TO",
+    "STRING, UNSTRING, INSPECT, INITIALIZE, arithmetic, and exception clauses",
+    "CURRENT-DATE, DATE-OF-INTEGER, INTEGER-OF-DATE, LENGTH, LOWER-CASE, MOD, NUMVAL, NUMVAL-C, TEST-NUMVAL, TEST-NUMVAL-C, TRIM, and UPPER-CASE",
+    "CALL USING and compatible Language Environment services",
+    "embedded CICS, static SQL, DLI, and MQ host interactions"
+  ],
+  "corpus_inconsistencies": [
+    {
+      "id": "CDV1-COCRDSEC",
+      "detail": "CARDDEMO.CSD defines program COCRDSEC and transaction CDV1, but no corresponding source or runtime object exists in the pin."
+    },
+    {
+      "id": "REMOTE-COMPILE-MAKEFILE",
+      "detail": "scripts/remote_compile.sh invokes a Makefile that is absent from the pinned repository."
+    },
+    {
+      "id": "AUTH-CLOUD-CLIENT",
+      "detail": "The authorization README explicitly states that the external cloud POS/MQ client is not included. Conformance must supply a deterministic request producer."
+    }
+  ]
+}

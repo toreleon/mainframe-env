@@ -1,9 +1,14 @@
 # mainframe-env 0.1 Implementation Status
 
-Current phase: **ME.V7 — certification and cutover**
-Current work item: ME.V0 through ME.V7 are complete; no implementation work remains.
+Current phase: **CD.PREP — CardDemo-full 0.1.1 preparation complete**
+Current work item: CD-001 is next; 0 of 27 implementation issues and 0 of 20 application journeys pass.
 Product version: **0.1.0-alpha.0**
-Source identity: ME.V7 commit `6c946753cf1d9ba7d4123e96511bd089a0b30423`.
+Source baseline: post-audit receipt commit `3dd0de69c087315f7ec62b9176d046afbb3ea3b8`;
+the uncommitted preparation diff is identified by the working tree until reviewed.
+
+The additive 0.1.1 target is prepared under `conformance/0.1.1/` and
+`docs/delivery/CARDEMO-0.1.1-STATUS.md`. Preparation does not change the product
+version or make a CardDemo execution claim.
 
 ## Completed deliverables
 
@@ -93,6 +98,11 @@ No V0–V7 functional stop-the-line finding is open. Historical oracle attributi
 unsupported surface are retained in
 `conformance/0.1/inventory/known-gaps.json`; they do not create an alternate production route.
 
+The 0.1.1 CardDemo-full target has 27 open implementation issues. The current
+system cannot install or execute a CardDemo journey. Its separate fail-closed
+entry and gap inventory are under `conformance/0.1.1/`; they do not rewrite the
+historical 0.1 evidence.
+
 ## Commands already run
 
 All commands and exit codes are recorded in the machine status file. The unchanged oracle cohorts
@@ -100,5 +110,8 @@ passed: COBOL 37, RACF 8, z/OSMF datasets 9, z/OSMF jobs 9, CICS 317, JCL 164, a
 
 ## Next smallest executable step
 
-No implementation step remains. Tagging, publication, deployment, and remote push remain unperformed
-and require separate owner authorization.
+Implement CD-001 from
+`conformance/0.1.1/inventory/carddemo-gap-matrix.json`: make the pinned local
+CardDemo corpus an executable, license-aware, clean-tree, fail-closed input gate.
+Tagging, publication, deployment, and remote push remain unperformed and require
+separate owner authorization.

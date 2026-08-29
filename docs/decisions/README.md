@@ -9,6 +9,7 @@ ADRs capture decisions that constrain implementation and public contracts.
 | [0003](0003-contract-serialization.md) | owned contracts, codecs, identity, and schema evolution | Accepted |
 | [0004](0004-versioning-release-policy.md) | v0.1 product, contract, phase-commit, and release policy | Accepted |
 | [0005](0005-package-consolidation.md) | twenty-package physical map and split triggers | Accepted |
+| [0006](0006-carddemo-0.1.1-profile.md) | additive 0.1.1 CardDemo-full profile and new split triggers | Accepted |
 
 An accepted ADR is immutable. A material change creates a superseding ADR and
 links to the previous decision.

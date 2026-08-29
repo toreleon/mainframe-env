@@ -19,6 +19,12 @@ use mainframe_env_source::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 
+mod carddemo;
+
+pub use carddemo::{
+    CardDemoCorpusReceipt, CorpusProblem, verify_carddemo_corpus, verify_carddemo_corpus_from_env,
+};
+
 pub const HELLO_SOURCE: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. HELLO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MSG PIC X(12) VALUE 'HELLO WORLD!'.\nPROCEDURE DIVISION.\nDISPLAY MSG.\nSTOP RUN.\n";
 
 pub fn source_bundle(source: &str) -> SourceBundle {

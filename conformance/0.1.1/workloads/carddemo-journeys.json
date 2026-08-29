@@ -1,0 +1,26 @@
+{
+  "schema_version": "mainframe-env.carddemo-journeys@1",
+  "status": "planned_not_executed",
+  "journeys": [
+    {"id":"CD.J01","profile":"carddemo-base-online","name":"clean application install","observations":["package identity","resource catalog","program artifacts","map catalog","dataset record counts and digests","RACF profiles","idempotent reinstall"]},
+    {"id":"CD.J02","profile":"carddemo-base-online","name":"CC00 sign-on and invalid credentials","observations":["COSGN00 screen fields","AID and MDT input","NOTFND and wrong-password messages","no secret disclosure","RETURN TRANSID suspension"]},
+    {"id":"CD.J03","profile":"carddemo-base-online","name":"regular-user login and menu","observations":["USRSEC keyed read","COMMAREA transfer","XCTL COMEN01C","menu options and access filtering","restart from suspended menu"]},
+    {"id":"CD.J04","profile":"carddemo-base-online","name":"account view and update","observations":["ACCTDAT and cross-reference reads","BMS values","keyed rewrite","SYNCPOINT commit","rollback on injected failure"]},
+    {"id":"CD.J05","profile":"carddemo-base-online","name":"card list, detail, and update","observations":["CARDAIX browse order","CARDDAT detail","PF7/PF8 navigation","keyed rewrite","atomic base/index state"]},
+    {"id":"CD.J06","profile":"carddemo-base-online","name":"transaction list, detail, and add","observations":["TRANSACT AIX browse","date validation","record insert","duplicate condition","screen navigation"]},
+    {"id":"CD.J07","profile":"carddemo-base-online","name":"report and bill-payment flows","observations":["ASKTIME and FORMATTIME","WRITEQ TD job request","bill-payment mutation","commit and rollback","reported messages"]},
+    {"id":"CD.J08","profile":"carddemo-base-online","name":"administrator user lifecycle","observations":["admin admission","USRSEC browse","add","update","delete","duplicate/not-found conditions","regular-user denial"]},
+    {"id":"CD.J09","profile":"carddemo-base-online","name":"interactive durability and bounds","observations":["process restart while suspended","checkpoint/provider generation compatibility","session timeout","screen/input bounds","concurrent session isolation"]},
+    {"id":"CD.J10","profile":"carddemo-base","name":"base data refresh and catalog initialization","observations":["all base JCL parses","IDCAMS DEFINE/DELETE/REPRO","KSDS keys","AIX paths","GDGs","PDS members","exact seed digests"]},
+    {"id":"CD.J11","profile":"carddemo-base","name":"posting and interest cycle","observations":["CLOSEFIL/OPENFIL state","POSTTRAN step outcomes","INTCALC decimal results","dataset mutations","return codes and spool"]},
+    {"id":"CD.J12","profile":"carddemo-base","name":"backup, combine, index, statement, and report cycle","observations":["GDG generation lifecycle","SORT ordering","TRANIDX AIX","CBSTM03A/CBSTM03B linkage","report records","internal-reader submission"]},
+    {"id":"CD.J13","profile":"carddemo-db2","name":"transaction-type online CRUD","observations":["static SQL host variables","forward/backward cursors","insert/update/delete","SQLCA","commit/rollback","admin-menu integration"]},
+    {"id":"CD.J14","profile":"carddemo-db2","name":"Db2 batch maintenance and extraction","observations":["DDL install","COBTUPDT","DSNTEP4/DSNTIAUL accepted routes","Db2-to-VSAM record bytes","restart and rollback"]},
+    {"id":"CD.J15","profile":"carddemo-mq","name":"MQ date and account request-response","observations":["open/get/put/close","correlation identifiers","wait/timeout","VSAM account lookup","reply bytes","queue restart"]},
+    {"id":"CD.J16","profile":"carddemo-authorization","name":"authorization approval and decline","observations":["MQ trigger/retrieve","VSAM validation","IMS root/child insert","reply codes","duplicate/idempotent request","cross-resource commit"]},
+    {"id":"CD.J17","profile":"carddemo-authorization","name":"authorization summary, detail, and fraud marking","observations":["IMS GU/GNP navigation","BMS paging","DB2 AUTHFRDS insert/update","LINK/RETURN","SYNCPOINT rollback on injected failure"]},
+    {"id":"CD.J18","profile":"carddemo-authorization","name":"authorization purge and checkpoint recovery","observations":["BMP scheduling","GN/GNP/DLET","CHKP","available-credit adjustment","restart from checkpoint","exact remaining hierarchy"]},
+    {"id":"CD.J19","profile":"carddemo-full","name":"operator install and job submission","observations":["owned install/compile commands","z/OSMF submission","selected FTP/JES flow","authentication","job IDs and spool","repository workflow mapping"]},
+    {"id":"CD.J20","profile":"carddemo-full","name":"full mixed restart, security, and overload certification","observations":["online and batch concurrency","Db2/IMS/MQ provider failure","unknown mutation reconciliation","cancellation","2x overload","backup/restore","no cross-principal state leak"]}
+  ]
+}
