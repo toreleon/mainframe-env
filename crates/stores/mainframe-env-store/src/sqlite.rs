@@ -1,11 +1,13 @@
+use crate::runtime::{AdapterRuntime, block_on};
 use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
 use sqlx::Row;
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
+use std::future::Future;
 use std::path::Path;
-use tokio::runtime::{Builder, Runtime};
+use tokio::runtime::Builder;
 
 pub struct SqliteStateStore {
-    runtime: Runtime,
+    runtime: AdapterRuntime,
     pool: SqlitePool,
     max_payload_bytes: usize,
     max_rows: usize,
@@ -16,19 +18,22 @@ impl SqliteStateStore {
         if max_payload_bytes == 0 || max_rows == 0 {
             return Err(StoreError::CapacityExceeded);
         }
-        let runtime = Builder::new_current_thread()
-            .enable_time()
-            .build()
-            .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
-        let pool = runtime
-            .block_on(SqlitePoolOptions::new().max_connections(1).connect(url))
-            .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
-        runtime
-            .block_on(
-                sqlx::query(include_str!("../migrations/sqlite/0001-durable-state.sql"))
-                    .execute(&pool),
-            )
-            .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
+        let runtime = AdapterRuntime::new(
+            Builder::new_current_thread()
+                .enable_time()
+                .build()
+                .map_err(|error| StoreError::Infrastructure(error.to_string()))?,
+        );
+        let pool = block_on(
+            &runtime,
+            SqlitePoolOptions::new().max_connections(1).connect(url),
+        )?
+        .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
+        block_on(
+            &runtime,
+            sqlx::query(include_str!("../migrations/sqlite/0001-durable-state.sql")).execute(&pool),
+        )?
+        .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
         Ok(Self {
             runtime,
             pool,
@@ -37,11 +42,18 @@ impl SqliteStateStore {
         })
     }
 
+    fn run<F, T>(&self, future: F) -> Result<T, StoreError>
+    where
+        F: Future<Output = Result<T, sqlx::Error>> + Send,
+        T: Send,
+    {
+        block_on(&self.runtime, future)?
+            .map_err(|error| StoreError::Infrastructure(error.to_string()))
+    }
+
     pub fn integrity_check(&self) -> Result<(), StoreError> {
-        let result: String = self
-            .runtime
-            .block_on(sqlx::query_scalar("PRAGMA integrity_check").fetch_one(&self.pool))
-            .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
+        let result: String =
+            self.run(sqlx::query_scalar("PRAGMA integrity_check").fetch_one(&self.pool))?;
         if result == "ok" {
             Ok(())
         } else {
@@ -56,13 +68,11 @@ impl SqliteStateStore {
         let destination = destination
             .to_str()
             .ok_or(StoreError::IncompatibleVersion)?;
-        self.runtime
-            .block_on(
-                sqlx::query("VACUUM INTO ?")
-                    .bind(destination)
-                    .execute(&self.pool),
-            )
-            .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
+        self.run(
+            sqlx::query("VACUUM INTO ?")
+                .bind(destination)
+                .execute(&self.pool),
+        )?;
         Ok(())
     }
 }
@@ -73,17 +83,12 @@ impl ProviderStateStore for SqliteStateStore {
         namespace: &str,
         key: &str,
     ) -> Result<Option<ProviderStateRecord>, StoreError> {
-        let row = self
-            .runtime
-            .block_on(
-                sqlx::query(
-                    "SELECT version,payload FROM provider_state WHERE namespace=? AND key=?",
-                )
+        let row = self.run(
+            sqlx::query("SELECT version,payload FROM provider_state WHERE namespace=? AND key=?")
                 .bind(namespace)
                 .bind(key)
                 .fetch_optional(&self.pool),
-            )
-            .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
+        )?;
         row.map(|row| {
             let version: i64 = row
                 .try_get(0)
@@ -109,18 +114,15 @@ impl ProviderStateStore for SqliteStateStore {
         if max == 0 || max > self.max_rows {
             return Err(StoreError::CapacityExceeded);
         }
-        let rows = self
-            .runtime
-            .block_on(
-                sqlx::query(
-                    "SELECT key,version,payload FROM provider_state \
-                     WHERE namespace=? ORDER BY key LIMIT ?",
-                )
-                .bind(namespace)
-                .bind(i64::try_from(max).map_err(|_| StoreError::CapacityExceeded)?)
-                .fetch_all(&self.pool),
+        let rows = self.run(
+            sqlx::query(
+                "SELECT key,version,payload FROM provider_state \
+                 WHERE namespace=? ORDER BY key LIMIT ?",
             )
-            .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
+            .bind(namespace)
+            .bind(i64::try_from(max).map_err(|_| StoreError::CapacityExceeded)?)
+            .fetch_all(&self.pool),
+        )?;
         rows.into_iter()
             .map(|row| {
                 Ok(ProviderStateRecord {
@@ -153,48 +155,41 @@ impl ProviderStateStore for SqliteStateStore {
             if record.version != expected + 1 {
                 return Err(StoreError::Conflict);
             }
-            self.runtime
-                .block_on(
-                    sqlx::query(
-                        "UPDATE provider_state SET version=?,payload=? \
-                         WHERE namespace=? AND key=? AND version=?",
-                    )
-                    .bind(i64::try_from(record.version).map_err(|_| StoreError::Conflict)?)
-                    .bind(record.payload)
-                    .bind(record.namespace)
-                    .bind(record.key)
-                    .bind(i64::try_from(expected).map_err(|_| StoreError::Conflict)?)
-                    .execute(&self.pool),
+            self.run(
+                sqlx::query(
+                    "UPDATE provider_state SET version=?,payload=? \
+                     WHERE namespace=? AND key=? AND version=?",
                 )
-                .map_err(|error| StoreError::Infrastructure(error.to_string()))?
-                .rows_affected()
+                .bind(i64::try_from(record.version).map_err(|_| StoreError::Conflict)?)
+                .bind(record.payload)
+                .bind(record.namespace)
+                .bind(record.key)
+                .bind(i64::try_from(expected).map_err(|_| StoreError::Conflict)?)
+                .execute(&self.pool),
+            )?
+            .rows_affected()
         } else {
             if record.version != 1 {
                 return Err(StoreError::Conflict);
             }
-            let count: i64 = self
-                .runtime
-                .block_on(
-                    sqlx::query_scalar("SELECT COUNT(*) FROM provider_state").fetch_one(&self.pool),
-                )
-                .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
+            let count: i64 = self.run(
+                sqlx::query_scalar("SELECT COUNT(*) FROM provider_state").fetch_one(&self.pool),
+            )?;
             if usize::try_from(count).map_err(|_| StoreError::CapacityExceeded)? >= self.max_rows {
                 return Err(StoreError::CapacityExceeded);
             }
-            self.runtime
-                .block_on(
-                    sqlx::query(
-                        "INSERT OR IGNORE INTO provider_state(namespace,key,version,payload) \
-                         VALUES(?,?,?,?)",
-                    )
-                    .bind(record.namespace)
-                    .bind(record.key)
-                    .bind(1i64)
-                    .bind(record.payload)
-                    .execute(&self.pool),
+            self.run(
+                sqlx::query(
+                    "INSERT OR IGNORE INTO provider_state(namespace,key,version,payload) \
+                     VALUES(?,?,?,?)",
                 )
-                .map_err(|error| StoreError::Infrastructure(error.to_string()))?
-                .rows_affected()
+                .bind(record.namespace)
+                .bind(record.key)
+                .bind(1i64)
+                .bind(record.payload)
+                .execute(&self.pool),
+            )?
+            .rows_affected()
         };
         if affected == 1 {
             Ok(())
@@ -210,15 +205,13 @@ impl ProviderStateStore for SqliteStateStore {
         expected: u64,
     ) -> Result<(), StoreError> {
         let affected = self
-            .runtime
-            .block_on(
+            .run(
                 sqlx::query("DELETE FROM provider_state WHERE namespace=? AND key=? AND version=?")
                     .bind(namespace)
                     .bind(key)
                     .bind(i64::try_from(expected).map_err(|_| StoreError::Conflict)?)
                     .execute(&self.pool),
-            )
-            .map_err(|error| StoreError::Infrastructure(error.to_string()))?
+            )?
             .rows_affected();
         if affected == 1 {
             Ok(())
@@ -242,7 +235,7 @@ impl ProviderStateStore for SqliteStateStore {
         {
             return Err(StoreError::Conflict);
         }
-        self.runtime.block_on(async {
+        block_on(&self.runtime, async {
             let mut transaction = self
                 .pool
                 .begin()
@@ -259,16 +252,15 @@ impl ProviderStateStore for SqliteStateStore {
             .await
             .map_err(|error| StoreError::Infrastructure(error.to_string()))?
             .rows_affected();
-            let deleted = sqlx::query(
-                "DELETE FROM provider_state WHERE namespace=? AND key=? AND version=?",
-            )
-            .bind(&record.namespace)
-            .bind(old_key)
-            .bind(i64::try_from(expected_version).map_err(|_| StoreError::Conflict)?)
-            .execute(&mut *transaction)
-            .await
-            .map_err(|error| StoreError::Infrastructure(error.to_string()))?
-            .rows_affected();
+            let deleted =
+                sqlx::query("DELETE FROM provider_state WHERE namespace=? AND key=? AND version=?")
+                    .bind(&record.namespace)
+                    .bind(old_key)
+                    .bind(i64::try_from(expected_version).map_err(|_| StoreError::Conflict)?)
+                    .execute(&mut *transaction)
+                    .await
+                    .map_err(|error| StoreError::Infrastructure(error.to_string()))?
+                    .rows_affected();
             if inserted != 1 || deleted != 1 {
                 return Err(StoreError::Conflict);
             }
@@ -276,13 +268,66 @@ impl ProviderStateStore for SqliteStateStore {
                 .commit()
                 .await
                 .map_err(|error| StoreError::Infrastructure(error.to_string()))
-        })
+        })?
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn async_context_roundtrip(directory: &Path) {
+        let path = directory.join("async-context.db");
+        let url = format!("sqlite://{}?mode=rwc", path.display());
+        let store = SqliteStateStore::open(&url, 1024, 16).unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "async-shell".into(),
+                    key: "ready".into(),
+                    version: 1,
+                    payload: b"yes".to_vec(),
+                },
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            store
+                .get_provider_state("async-shell", "ready")
+                .unwrap()
+                .unwrap()
+                .payload,
+            b"yes"
+        );
+    }
+
+    #[test]
+    fn sqlite_adapter_runs_inside_multithread_and_current_thread_async_shells() {
+        for current_thread in [false, true] {
+            let directory = std::env::temp_dir().join(format!(
+                "mainframe-env-async-sqlite-{}-{:?}-{current_thread}",
+                std::process::id(),
+                std::thread::current().id()
+            ));
+            std::fs::create_dir_all(&directory).unwrap();
+            if current_thread {
+                Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap()
+                    .block_on(async { async_context_roundtrip(&directory) });
+            } else {
+                Builder::new_multi_thread()
+                    .worker_threads(2)
+                    .enable_all()
+                    .build()
+                    .unwrap()
+                    .block_on(async { async_context_roundtrip(&directory) });
+            }
+            std::fs::remove_file(directory.join("async-context.db")).unwrap();
+            std::fs::remove_dir(directory).unwrap();
+        }
+    }
 
     #[test]
     fn sqlite_state_survives_reopen() {

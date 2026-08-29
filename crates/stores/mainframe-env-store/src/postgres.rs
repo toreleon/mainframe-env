@@ -1,10 +1,12 @@
+use crate::runtime::{AdapterRuntime, block_on};
 use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
 use sqlx::Row;
 use sqlx::postgres::{PgPool, PgPoolOptions};
-use tokio::runtime::{Builder, Runtime};
+use std::future::Future;
+use tokio::runtime::Builder;
 
 pub struct PostgresStateStore {
-    runtime: Runtime,
+    runtime: AdapterRuntime,
     pool: PgPool,
     max_payload_bytes: usize,
     max_rows: usize,
@@ -15,27 +17,39 @@ impl PostgresStateStore {
         if max_payload_bytes == 0 || max_rows == 0 {
             return Err(StoreError::CapacityExceeded);
         }
-        let runtime = Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
-        let pool = runtime
-            .block_on(PgPoolOptions::new().max_connections(4).connect(url))
-            .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
-        runtime
-            .block_on(
-                sqlx::query(include_str!(
-                    "../migrations/postgres/0001-durable-state.sql"
-                ))
-                .execute(&pool),
-            )
-            .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
+        let runtime = AdapterRuntime::new(
+            Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|error| StoreError::Infrastructure(error.to_string()))?,
+        );
+        let pool = block_on(
+            &runtime,
+            PgPoolOptions::new().max_connections(4).connect(url),
+        )?
+        .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
+        block_on(
+            &runtime,
+            sqlx::query(include_str!(
+                "../migrations/postgres/0001-durable-state.sql"
+            ))
+            .execute(&pool),
+        )?
+        .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
         Ok(Self {
             runtime,
             pool,
             max_payload_bytes,
             max_rows,
         })
+    }
+
+    fn run<F, T>(&self, future: F) -> Result<T, StoreError>
+    where
+        F: Future<Output = Result<T, sqlx::Error>> + Send,
+        T: Send,
+    {
+        block_on(&self.runtime, future)?.map_err(infrastructure)
     }
 }
 
@@ -45,17 +59,12 @@ impl ProviderStateStore for PostgresStateStore {
         namespace: &str,
         key: &str,
     ) -> Result<Option<ProviderStateRecord>, StoreError> {
-        let row = self
-            .runtime
-            .block_on(
-                sqlx::query(
-                    "SELECT version,payload FROM provider_state WHERE namespace=$1 AND key=$2",
-                )
+        let row = self.run(
+            sqlx::query("SELECT version,payload FROM provider_state WHERE namespace=$1 AND key=$2")
                 .bind(namespace)
                 .bind(key)
                 .fetch_optional(&self.pool),
-            )
-            .map_err(infrastructure)?;
+        )?;
         row.map(|row| {
             Ok(ProviderStateRecord {
                 namespace: namespace.into(),
@@ -76,17 +85,14 @@ impl ProviderStateStore for PostgresStateStore {
         if max == 0 || max > self.max_rows {
             return Err(StoreError::CapacityExceeded);
         }
-        let rows = self
-            .runtime
-            .block_on(
-                sqlx::query(
-                    "SELECT key,version,payload FROM provider_state WHERE namespace=$1 ORDER BY key LIMIT $2",
-                )
-                .bind(namespace)
-                .bind(i64::try_from(max).map_err(|_| StoreError::CapacityExceeded)?)
-                .fetch_all(&self.pool),
+        let rows = self.run(
+            sqlx::query(
+                "SELECT key,version,payload FROM provider_state WHERE namespace=$1 ORDER BY key LIMIT $2",
             )
-            .map_err(infrastructure)?;
+            .bind(namespace)
+            .bind(i64::try_from(max).map_err(|_| StoreError::CapacityExceeded)?)
+            .fetch_all(&self.pool),
+        )?;
         rows.into_iter()
             .map(|row| {
                 Ok(ProviderStateRecord {
@@ -112,44 +118,37 @@ impl ProviderStateStore for PostgresStateStore {
             if record.version != expected + 1 {
                 return Err(StoreError::Conflict);
             }
-            self.runtime
-                .block_on(
-                    sqlx::query(
-                        "UPDATE provider_state SET version=$1,payload=$2 WHERE namespace=$3 AND key=$4 AND version=$5",
-                    )
-                    .bind(i64::try_from(record.version).map_err(|_| StoreError::Conflict)?)
-                    .bind(record.payload)
-                    .bind(record.namespace)
-                    .bind(record.key)
-                    .bind(i64::try_from(expected).map_err(|_| StoreError::Conflict)?)
-                    .execute(&self.pool),
+            self.run(
+                sqlx::query(
+                    "UPDATE provider_state SET version=$1,payload=$2 WHERE namespace=$3 AND key=$4 AND version=$5",
                 )
-                .map_err(infrastructure)?
+                .bind(i64::try_from(record.version).map_err(|_| StoreError::Conflict)?)
+                .bind(record.payload)
+                .bind(record.namespace)
+                .bind(record.key)
+                .bind(i64::try_from(expected).map_err(|_| StoreError::Conflict)?)
+                .execute(&self.pool),
+            )?
                 .rows_affected()
         } else {
             if record.version != 1 {
                 return Err(StoreError::Conflict);
             }
-            let count: i64 = self
-                .runtime
-                .block_on(
-                    sqlx::query_scalar("SELECT COUNT(*) FROM provider_state").fetch_one(&self.pool),
-                )
-                .map_err(infrastructure)?;
+            let count: i64 = self.run(
+                sqlx::query_scalar("SELECT COUNT(*) FROM provider_state").fetch_one(&self.pool),
+            )?;
             if usize::try_from(count).map_err(|_| StoreError::CapacityExceeded)? >= self.max_rows {
                 return Err(StoreError::CapacityExceeded);
             }
-            self.runtime
-                .block_on(
-                    sqlx::query(
-                        "INSERT INTO provider_state(namespace,key,version,payload) VALUES($1,$2,1,$3) ON CONFLICT DO NOTHING",
-                    )
-                    .bind(record.namespace)
-                    .bind(record.key)
-                    .bind(record.payload)
-                    .execute(&self.pool),
+            self.run(
+                sqlx::query(
+                    "INSERT INTO provider_state(namespace,key,version,payload) VALUES($1,$2,1,$3) ON CONFLICT DO NOTHING",
                 )
-                .map_err(infrastructure)?
+                .bind(record.namespace)
+                .bind(record.key)
+                .bind(record.payload)
+                .execute(&self.pool),
+            )?
                 .rows_affected()
         };
         if affected == 1 {
@@ -166,8 +165,7 @@ impl ProviderStateStore for PostgresStateStore {
         expected: u64,
     ) -> Result<(), StoreError> {
         let affected = self
-            .runtime
-            .block_on(
+            .run(
                 sqlx::query(
                     "DELETE FROM provider_state WHERE namespace=$1 AND key=$2 AND version=$3",
                 )
@@ -175,8 +173,7 @@ impl ProviderStateStore for PostgresStateStore {
                 .bind(key)
                 .bind(i64::try_from(expected).map_err(|_| StoreError::Conflict)?)
                 .execute(&self.pool),
-            )
-            .map_err(infrastructure)?
+            )?
             .rows_affected();
         if affected == 1 {
             Ok(())
@@ -200,7 +197,7 @@ impl ProviderStateStore for PostgresStateStore {
         {
             return Err(StoreError::Conflict);
         }
-        self.runtime.block_on(async {
+        block_on(&self.runtime, async {
             let mut transaction = self.pool.begin().await.map_err(infrastructure)?;
             let inserted = sqlx::query(
                 "INSERT INTO provider_state(namespace,key,version,payload) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING",
@@ -227,7 +224,7 @@ impl ProviderStateStore for PostgresStateStore {
                 return Err(StoreError::Conflict);
             }
             transaction.commit().await.map_err(infrastructure)
-        })
+        })?
     }
 }
 

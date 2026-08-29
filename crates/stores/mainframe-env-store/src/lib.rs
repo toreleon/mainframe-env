@@ -6,6 +6,7 @@ mod durable;
 mod local_artifact;
 mod memory;
 mod postgres;
+mod runtime;
 mod sqlite;
 
 pub use local_artifact::LocalArtifactStore;
