@@ -22,12 +22,12 @@ use std::collections::{BTreeMap, BTreeSet};
 mod carddemo;
 
 pub use carddemo::{
-    CardDemoClosureReceipt, CardDemoControlReceipt, CardDemoCoreReceipt, CardDemoCorpusReceipt,
-    CardDemoFileCallReceipt, CardDemoHostReceipt, CardDemoLayoutReceipt, CardDemoPackageReceipt,
-    CardDemoProgramReceipt, CardDemoResourceReceipt, CardDemoSourceReceipt, CorpusProblem,
-    verify_carddemo_application_package_from_env, verify_carddemo_control_flow_from_env,
-    verify_carddemo_core_semantics_from_env, verify_carddemo_corpus,
-    verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
+    CardDemoCicsReceipt, CardDemoClosureReceipt, CardDemoControlReceipt, CardDemoCoreReceipt,
+    CardDemoCorpusReceipt, CardDemoFileCallReceipt, CardDemoHostReceipt, CardDemoLayoutReceipt,
+    CardDemoPackageReceipt, CardDemoProgramReceipt, CardDemoResourceReceipt, CardDemoSourceReceipt,
+    CorpusProblem, verify_carddemo_application_package_from_env, verify_carddemo_cics_abi_from_env,
+    verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
+    verify_carddemo_corpus, verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
     verify_carddemo_file_call_semantics_from_env, verify_carddemo_host_operands_from_env,
     verify_carddemo_program_routing_from_env, verify_carddemo_resources_from_env,
     verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
@@ -599,6 +599,59 @@ mod tests {
                     .any(|window| window == expected)
             );
         }
+    }
+
+    #[test]
+    fn cics_response_updates_into_resp_and_eib_storage() {
+        use mainframe_env_host_api::{CicsDisposition, CicsResponse, EffectResult, HostResult};
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSRESULT. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(3). 01 RESP-X PIC 99. 01 RESP2-X PIC 99. 01 EIBRESP PIC 99. 01 EIBRESP2 PIC 99. 01 EIBCALEN PIC 99. 01 EIBAID PIC X. 01 EIBTRNID PIC X(4). PROCEDURE DIVISION. EXEC CICS READ DATASET('D') INTO(DATA-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. DISPLAY DATA-X. DISPLAY RESP-X. DISPLAY RESP2-X. DISPLAY EIBCALEN. DISPLAY EIBTRNID. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("CICS read did not call host");
+        };
+        let payload = mainframe_env_execution_api::BoundedPayload::new(
+            "mainframe-env.cics.payload@1",
+            b"ABC".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let response = CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NOTFND".into(),
+            response: 13,
+            response2: 2,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0x7d,
+            target: None,
+            next_transaction: None,
+            payload,
+        };
+        let result = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: effect.sequence,
+                outcome: Ok(HostResult::Cics(response)),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        );
+        assert!(
+            matches!(
+                result,
+                MachineDrive::Completed(ref done)
+                    if done.output.bytes() == b"ABC\n13\n02\n03\nT001\n"
+            ),
+            "{result:?}"
+        );
     }
 
     fn drive_to_terminal(

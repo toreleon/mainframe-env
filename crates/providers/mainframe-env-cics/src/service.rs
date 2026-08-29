@@ -469,7 +469,9 @@ impl CicsService {
         };
         self.persist_session(&run.session, &next, Some(current.version))?;
         state.sessions.insert(run.session.clone(), next);
-        self.response(run, disposition, "NORMAL", 0, 0, None, None, payload)
+        let mut response = self.response(run, disposition, "NORMAL", 0, 0, None, None, payload)?;
+        response.aid = current.aid;
+        Ok(response)
     }
 
     fn file(
@@ -740,6 +742,8 @@ impl CicsService {
             response2,
             applid: run.applid.clone(),
             sysid: run.sysid.clone(),
+            transaction: run.transaction.clone(),
+            aid: 0,
             target,
             next_transaction,
             payload: bounded(payload)?,

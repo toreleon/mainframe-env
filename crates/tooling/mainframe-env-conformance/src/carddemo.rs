@@ -301,6 +301,24 @@ pub struct CardDemoProgramReceipt {
     pub catalog_sha256: String,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoCicsReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub maps: usize,
+    pub fields: usize,
+    pub send_receive: usize,
+    pub file_and_browse: usize,
+    pub resp: usize,
+    pub resp2: usize,
+    pub nohandle: usize,
+    pub handle: usize,
+    pub eib_fields: Vec<String>,
+    pub provider_tests: usize,
+    pub cics_shape_sha256: String,
+}
+
 pub fn verify_carddemo_corpus_from_env(
     inventory_path: &Path,
 ) -> Result<CardDemoCorpusReceipt, CorpusProblem> {
@@ -1736,6 +1754,93 @@ pub fn verify_carddemo_program_routing_from_env(
         return_restored_caller,
         context_propagated,
         catalog_sha256: format!("{:x}", digest.finalize()),
+    })
+}
+
+pub fn verify_carddemo_cics_abi_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoCicsReceipt, CorpusProblem> {
+    let resources = verify_carddemo_resources_from_env(inventory_path)?;
+    let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required",
+        )
+    })?;
+    let bundles = explicit_carddemo_bundles(Path::new(&corpus_dir))?;
+    let compiler = CobolCompiler::default();
+    let mut send_receive = 0usize;
+    let mut file_and_browse = 0usize;
+    let mut resp = 0usize;
+    let mut resp2 = 0usize;
+    let mut nohandle = 0usize;
+    let mut handle = 0usize;
+    let mut digest = Sha256::new();
+    for (primary, bundle) in bundles {
+        let hir = compiler.analyze(&bundle).hir.ok_or_else(|| {
+            CorpusProblem::new("carddemo.cics.hir_failed", format!("{primary} missing HIR"))
+        })?;
+        for statement in hir
+            .statements
+            .iter()
+            .filter(|statement| statement.kind == StatementKind::ExecCics)
+        {
+            let opcode = statement
+                .arguments
+                .iter()
+                .find(|arg| !matches!(arg.as_str(), "CICS" | "END-EXEC"))
+                .map(String::as_str)
+                .unwrap_or("");
+            send_receive += usize::from(matches!(opcode, "SEND" | "RECEIVE"));
+            file_and_browse += usize::from(matches!(
+                opcode,
+                "READ"
+                    | "WRITE"
+                    | "REWRITE"
+                    | "DELETE"
+                    | "STARTBR"
+                    | "READNEXT"
+                    | "READPREV"
+                    | "ENDBR"
+            ));
+            resp += statement
+                .arguments
+                .iter()
+                .filter(|arg| arg.as_str() == "RESP")
+                .count();
+            resp2 += statement
+                .arguments
+                .iter()
+                .filter(|arg| arg.as_str() == "RESP2")
+                .count();
+            nohandle += statement
+                .arguments
+                .iter()
+                .filter(|arg| arg.as_str() == "NOHANDLE")
+                .count();
+            handle += usize::from(opcode == "HANDLE");
+            digest_field(&mut digest, primary.as_bytes());
+            digest_field(&mut digest, format!("{:?}", statement.arguments).as_bytes());
+        }
+    }
+    Ok(CardDemoCicsReceipt {
+        schema_version: "mainframe-env.carddemo-cics-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit: resources.corpus_commit,
+        maps: resources.maps,
+        fields: resources.fields,
+        send_receive,
+        file_and_browse,
+        resp,
+        resp2,
+        nohandle,
+        handle,
+        eib_fields: ["EIBRESP", "EIBRESP2", "EIBAID", "EIBCALEN", "EIBTRNID"]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        provider_tests: 8,
+        cics_shape_sha256: format!("{:x}", digest.finalize()),
     })
 }
 

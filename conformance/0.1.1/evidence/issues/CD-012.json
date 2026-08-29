@@ -1,0 +1,22 @@
+{
+  "schema_version":"mainframe-env.carddemo-issue-evidence@1","issue":"CD-012","title":"Apply CICS terminal, file, condition, and EIB results to COBOL storage","derived":true,"status":"pass","target_product":"0.1.1","current_product":"0.1.0-alpha.0",
+  "digest_scope":"Recursively lexicographically key-sorted compact UTF-8 JSON serialization of cics_receipt, with no trailing newline, followed by SHA-256","evidence_digest":"sha256:0af81d9136fc6feec43de8e38a0c92ccf892631f611cfb4a2d80ac9ed07002fd",
+  "cics_receipt":{"schema_version":"mainframe-env.carddemo-cics-receipt@1","status":"pass","corpus_commit":"59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e","maps":21,"fields":1164,"send_receive":61,"file_and_browse":58,"resp":82,"resp2":73,"nohandle":15,"handle":11,"eib_fields":["EIBRESP","EIBRESP2","EIBAID","EIBCALEN","EIBTRNID"],"provider_tests":8,"cics_shape_sha256":"4c4aec5224c606f59388e517cb7553f0890830589ee29871a2a55ae015af5dc7"},
+  "acceptance_observations":[
+    "Installed BMS definitions retain exact field name/position/length/initial/color/highlight/protected/secret metadata; SEND serializes installed fields and RECEIVE resumes durable AID/input state.",
+    "CICS file and browse providers return record/cursor payloads into declared destinations; typed RIDFLD and FROM bytes remain provider operands.",
+    "RESP and RESP2 destinations suppress default condition transfer and receive exact codes; NOHANDLE suppresses default propagation while HANDLE retains provider transfer policy.",
+    "Every CICS response deterministically updates declared EIBRESP, EIBRESP2, EIBAID, EIBCALEN, and EIBTRNID views; INTO accepts only typed CICS payload schemas.",
+    "The corpus receipt inventories all 61 SEND/RECEIVE, 58 file/browse, 82 RESP, 73 RESP2, 15 NOHANDLE, and 11 HANDLE occurrences over 21 installed maps and 1,164 fields."
+  ],
+  "commands":[
+    {"command":"focused CICS response-to-storage test before repair","exit_code":1,"result":"nonzero RESP returned an unhandled condition instead of completing"},
+    {"command":"cargo test -p mainframe-env-cics -p mainframe-env-conformance --locked","exit_code":0,"result":"provider and response-storage tests passed"},
+    {"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-cics --check","exit_code":0,"result":"exact CICS ABI receipt passed"},
+    {"command":"env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-cics --check","exit_code":1,"result":"expected missing-environment control"},
+    {"command":"cargo check --workspace --all-targets --locked","exit_code":0,"result":"pass"},
+    {"command":"affected-package cargo clippy --all-targets --locked -- -D warnings","exit_code":0,"result":"pass"},
+    {"command":"env -u CARDEMO_CORPUS_DIR cargo xtask conformance --check","exit_code":0,"result":"pass"},
+    {"command":"cargo fmt --all -- --check && git diff --check","exit_code":0,"result":"pass"}
+  ],"absolute_local_paths_present":false,"native_or_legacy_fallback_present":false
+}

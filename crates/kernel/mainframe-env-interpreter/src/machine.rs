@@ -7,9 +7,9 @@ use mainframe_env_execution_api::{
     Machine, MachineDrive, MachineResume, Quantum, Selector, Suspension, Transfer,
 };
 use mainframe_env_host_api::{
-    CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest, DatasetName, DatasetRequest,
-    EffectRequest, EffectResult, HostLimits, HostProblem, HostRequest, HostResult, Mutation,
-    ProgramName, ProgramRequest, TerminalRequest,
+    CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, DatasetName,
+    DatasetRequest, EffectRequest, EffectResult, HostLimits, HostProblem, HostRequest, HostResult,
+    Mutation, ProgramName, ProgramRequest, TerminalRequest,
 };
 use mainframe_env_ir::{
     Attribute, CodecLimits, Module, Operation, OperationIdentity, StorageId, decode_binary,
@@ -105,6 +105,7 @@ enum PendingKind {
         into: Option<String>,
         response: Option<String>,
         response2: Option<String>,
+        no_handle: bool,
     },
     Ignore,
 }
@@ -342,9 +343,11 @@ impl ReferenceMachine {
                     into,
                     response: response_target,
                     response2: response2_target,
+                    no_handle,
                 },
                 HostResult::Cics(response),
             ) => {
+                let responded = response_target.is_some() || no_handle;
                 if let Some(target) = response_target {
                     self.write_decimal(
                         &target,
@@ -364,19 +367,23 @@ impl ReferenceMachine {
                     )?;
                 }
                 if let Some(target) = into
-                    && response.payload.schema() == "mainframe-env.cics.into@1"
+                    && matches!(
+                        response.payload.schema(),
+                        "mainframe-env.cics.into@1" | "mainframe-env.cics.payload@1"
+                    )
                 {
                     self.write(&target, response.payload.bytes())?;
                 }
+                self.write_cics_context(&response)?;
                 self.deferred_drive = match response.disposition {
-                    CicsDisposition::Complete => {
-                        (response.response != 0).then_some(MachineDrive::Condition(Condition {
+                    CicsDisposition::Complete => (response.response != 0 && !responded).then_some(
+                        MachineDrive::Condition(Condition {
                             name: response.condition,
                             response: response.response,
                             response2: response.response2,
                             handled: false,
-                        }))
-                    }
+                        }),
+                    ),
                     CicsDisposition::Suspended => Some(MachineDrive::Suspended(Suspension {
                         kind: "cics-terminal".into(),
                         resume_token: format!(
@@ -886,8 +893,34 @@ impl ReferenceMachine {
                 into,
                 response: response_target,
                 response2: response2_target,
+                no_handle: args.iter().any(|argument| argument == "NOHANDLE"),
             },
         )
+    }
+
+    fn write_cics_context(&mut self, response: &CicsResponse) -> Result<(), MachineProblem> {
+        for (name, value) in [
+            ("EIBRESP", i128::from(response.response)),
+            ("EIBRESP2", i128::from(response.response2)),
+            ("EIBCALEN", response.payload.bytes().len() as i128),
+        ] {
+            if self.layout(name).is_some() {
+                self.write_decimal(
+                    name,
+                    Decimal {
+                        coefficient: value,
+                        scale: 0,
+                    },
+                )?;
+            }
+        }
+        if self.layout("EIBAID").is_some() {
+            self.write("EIBAID", &[response.aid])?;
+        }
+        if self.layout("EIBTRNID").is_some() {
+            self.write("EIBTRNID", response.transaction.as_bytes())?;
+        }
+        Ok(())
     }
 
     fn embedded_effect(&mut self, family: &str, args: &[String]) -> Result<Step, MachineProblem> {

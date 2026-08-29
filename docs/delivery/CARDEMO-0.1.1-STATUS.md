@@ -1,17 +1,17 @@
 # CardDemo-full 0.1.1 Program Status
 
 Current phase: **CD.A — corpus and application packaging**
-Current issue: **CD-011 — installed CICS program routing PASS**
-Next issue: **CD-012 — CICS screens and conditions**
+Current issue: **CD-012 — CICS screens and conditions PASS**
+Next issue: **CD-013 — base VSAM seed data**
 Current product: **0.1.0-alpha.0**
 Target product: **0.1.1**
 CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Source identity
 
-- mainframe-env base commit: `36162d7d333797b8161092dbedb45220a1fb82c2`
+- mainframe-env base commit: `9a972d9831a35600b5b19ad947cd2413fdf7c943`
 - current deterministic dirty-tree identity:
-  `sha256:d4ed524bc073f3cd74ab050cfbefbcb26fc68c35bfc2eeff7b7ed0b7aa0d0331`
+  `sha256:c02dc1041d34ca9ebbe6f2c1e104dd92f143c5889396b67948f60f7b974d3855`
 - dirty-tree algorithm: SHA-256 of the sorted `sha256sum` records for every
   repository file except `.git/`, `target/`, and the two persistent CardDemo
   status ledgers (which carry the identity).
@@ -232,7 +232,8 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 - State: **PASS**
 - Required commit subject: `Route installed CICS programs and transfers`
-- Completion commit identity: recorded when CD-012 starts from this issue commit.
+- Completion commit identity:
+  `9a972d9831a35600b5b19ad947cd2413fdf7c943`.
 - Evidence: `conformance/0.1.1/evidence/issues/CD-011.json`
 - Evidence digest:
   `sha256:0f60d3c84f1ccdf34ab6f8a8d88919d48f6d7d08af0de90abfaad06f4f1ba669`
@@ -241,6 +242,19 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   RETURN restores caller COMMAREA bytes.
 - The complete invocation context propagates unchanged. The catalog digest is
   `sha256:fddc6f9b6e14e8a26f097f63b34ed020c06768beff65da19f34e0b9f43e2ee3f`.
+
+### CD-012 — CICS results and BMS storage
+
+- State: **PASS**
+- Required commit subject: `Apply CICS results to COBOL storage`
+- Completion commit identity: recorded when CD-013 starts from this issue commit.
+- Evidence: `conformance/0.1.1/evidence/issues/CD-012.json`
+- Evidence digest:
+  `sha256:0af81d9136fc6feec43de8e38a0c92ccf892631f611cfb4a2d80ac9ed07002fd`
+- SEND/RECEIVE, durable AID input, installed BMS field attributes, file/browse
+  payloads, RESP/RESP2/NOHANDLE/HANDLE, and EIB storage updates pass. The CICS
+  shape digest is
+  `sha256:4c4aec5224c606f59388e517cb7553f0890830589ee29871a2a55ae015af5dc7`.
 
 ## Commands and exit codes
 
@@ -338,7 +352,7 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Implementation status
 
-- Issues passed: **11 / 27**
+- Issues passed: **12 / 27**
 - Journeys passed: **0 / 20**
 - Installed CardDemo resources: **0**
 - Executed CardDemo application journeys: **0**
@@ -352,9 +366,9 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 2. The repository is still `0.1.0-alpha.0`. A 0.1.1 release cannot be cut until
    0.1.0 is finalized or an explicit version-line correction is accepted.
 
-Neither decision blocks CD-012. No CD-011 blocker remains.
+Neither decision blocks CD-013. No CD-012 blocker remains.
 
 ## Next smallest executable step
 
-Implement BMS SEND/RECEIVE field serialization, AID/cursor/attribute behavior,
-and RESP/RESP2/HANDLE/NOHANDLE condition semantics over installed maps.
+Import the exact base EBCDIC seeds with record/key/AIX validation and
+transactional reinstall, upgrade, rollback, corrupt-input, and capacity tests.

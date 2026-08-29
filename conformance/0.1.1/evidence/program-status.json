@@ -6,9 +6,9 @@
   "current_product": "0.1.0-alpha.0",
   "target_product": "0.1.1",
   "source_identity": {
-    "base_commit": "36162d7d333797b8161092dbedb45220a1fb82c2",
+    "base_commit": "9a972d9831a35600b5b19ad947cd2413fdf7c943",
     "dirty_tree_algorithm": "sha256 of sorted sha256sum records, excluding .git, target, docs/delivery/CARDEMO-0.1.1-STATUS.md, and conformance/0.1.1/evidence/program-status.json",
-    "dirty_tree_digest": "sha256:d4ed524bc073f3cd74ab050cfbefbcb26fc68c35bfc2eeff7b7ed0b7aa0d0331"
+    "dirty_tree_digest": "sha256:c02dc1041d34ca9ebbe6f2c1e104dd92f143c5889396b67948f60f7b974d3855"
   },
   "corpus": {
     "environment_key": "CARDEMO_CORPUS_DIR",
@@ -21,8 +21,8 @@
     "license": "Apache-2.0",
     "license_sha256": "09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b"
   },
-  "current_issue": "CD-011",
-  "issues": {"total":27,"completed":11,"in_progress":0,"open":16},
+  "current_issue": "CD-012",
+  "issues": {"total":27,"completed":12,"in_progress":0,"open":15},
   "journeys": {"total":20,"passed":0,"failed_or_not_run":20},
   "completed_issues": [
     {
@@ -109,8 +109,16 @@
       "id": "CD-011",
       "state": "pass",
       "commit_subject": "Route installed CICS programs and transfers",
+      "commit_identity": "9a972d9831a35600b5b19ad947cd2413fdf7c943",
       "evidence": "conformance/0.1.1/evidence/issues/CD-011.json",
       "evidence_digest": "sha256:0f60d3c84f1ccdf34ab6f8a8d88919d48f6d7d08af0de90abfaad06f4f1ba669"
+    },
+    {
+      "id": "CD-012",
+      "state": "pass",
+      "commit_subject": "Apply CICS results to COBOL storage",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-012.json",
+      "evidence_digest": "sha256:0af81d9136fc6feec43de8e38a0c92ccf892631f611cfb4a2d80ac9ed07002fd"
     }
   ],
   "commands": [
@@ -179,6 +187,6 @@
     "Resolve 0.1.0-alpha.0 release ordering before cutting 0.1.1."
   ],
   "blockers": [],
-  "next_issue": "CD-012",
-  "next_step": "Implement CD-012 BMS SEND/RECEIVE field semantics, AID/cursor/attribute handling, and CICS condition policy over installed maps."
+  "next_issue": "CD-013",
+  "next_step": "Implement CD-013 exact base EBCDIC seed import, key/AIX validation, transactional reinstall/upgrade/rollback, and corruption/capacity controls."
 }

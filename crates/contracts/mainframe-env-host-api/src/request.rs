@@ -490,6 +490,8 @@ pub struct CicsResponse {
     pub response2: i32,
     pub applid: String,
     pub sysid: String,
+    pub transaction: String,
+    pub aid: u8,
     pub target: Option<String>,
     pub next_transaction: Option<String>,
     pub payload: BoundedPayload,
@@ -664,6 +666,7 @@ impl HostResult {
                 if response.condition.len() > limits.max_name_bytes
                     || response.applid.len() > limits.max_name_bytes
                     || response.sysid.len() > limits.max_name_bytes
+                    || response.transaction.len() > limits.max_name_bytes
                     || response
                         .target
                         .as_ref()
