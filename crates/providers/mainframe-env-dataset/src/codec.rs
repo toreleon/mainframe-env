@@ -7,10 +7,11 @@ pub(crate) struct Entry {
     pub version: u64,
     pub records: Vec<Vec<u8>>,
     pub members: BTreeMap<String, Vec<Vec<u8>>>,
+    pub relative_records: BTreeMap<u64, Vec<u8>>,
 }
 
 pub(crate) fn encode(entry: &Entry) -> Result<Vec<u8>, ()> {
-    let mut out = b"MEDS1".to_vec();
+    let mut out = b"MEDS2".to_vec();
     out.push(org(entry.attributes.organization));
     out.push(recfm(entry.attributes.record_format));
     u32v(&mut out, entry.attributes.logical_record_length);
@@ -27,6 +28,14 @@ pub(crate) fn encode(entry: &Entry) -> Result<Vec<u8>, ()> {
         bytes(&mut out, name.as_bytes())?;
         records(&mut out, value)?;
     }
+    u32v(
+        &mut out,
+        u32::try_from(entry.relative_records.len()).map_err(|_| ())?,
+    );
+    for (number, value) in &entry.relative_records {
+        u64v(&mut out, *number);
+        bytes(&mut out, value)?;
+    }
     Ok(out)
 }
 pub(crate) fn decode(
@@ -39,7 +48,8 @@ pub(crate) fn decode(
         bytes: bytes_in,
         at: 0,
     };
-    if r.take(5)? != b"MEDS1" {
+    let schema = r.take(5)?;
+    if !matches!(schema, b"MEDS1" | b"MEDS2") {
         return Err(());
     }
     let organization = org_back(r.byte()?)?;
@@ -64,6 +74,23 @@ pub(crate) fn decode(
             return Err(());
         }
     }
+    let mut relative_records = BTreeMap::new();
+    if schema == b"MEDS2" {
+        let count = usize::try_from(r.u32()?).map_err(|_| ())?;
+        if count > max_records {
+            return Err(());
+        }
+        for _ in 0..count {
+            let number = r.u64()?;
+            if number == 0
+                || relative_records
+                    .insert(number, r.bytes(max_record)?)
+                    .is_some()
+            {
+                return Err(());
+            }
+        }
+    }
     if r.at != bytes_in.len() {
         return Err(());
     }
@@ -79,6 +106,7 @@ pub(crate) fn decode(
         version,
         records,
         members,
+        relative_records,
     })
 }
 fn org(value: DatasetOrganization) -> u8 {
@@ -86,6 +114,8 @@ fn org(value: DatasetOrganization) -> u8 {
         DatasetOrganization::Sequential => 0,
         DatasetOrganization::Partitioned => 1,
         DatasetOrganization::KeySequenced => 2,
+        DatasetOrganization::EntrySequenced => 3,
+        DatasetOrganization::Relative => 4,
     }
 }
 fn org_back(value: u8) -> Result<DatasetOrganization, ()> {
@@ -93,6 +123,8 @@ fn org_back(value: u8) -> Result<DatasetOrganization, ()> {
         0 => Ok(DatasetOrganization::Sequential),
         1 => Ok(DatasetOrganization::Partitioned),
         2 => Ok(DatasetOrganization::KeySequenced),
+        3 => Ok(DatasetOrganization::EntrySequenced),
+        4 => Ok(DatasetOrganization::Relative),
         _ => Err(()),
     }
 }

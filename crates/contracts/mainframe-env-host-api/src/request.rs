@@ -32,6 +32,8 @@ pub enum DatasetOrganization {
     Sequential,
     Partitioned,
     KeySequenced,
+    EntrySequenced,
+    Relative,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RecordFormat {
@@ -96,6 +98,7 @@ impl DatasetAttributes {
                             .is_none_or(|end| end > self.logical_record_length)
                 })
             || self.key_offset.is_some() != self.key_length.is_some()
+            || (self.organization == DatasetOrganization::KeySequenced) != self.key_offset.is_some()
         {
             Err(HostProblem::Malformed)
         } else {
@@ -147,6 +150,15 @@ pub enum DatasetRequest {
         key: Option<Vec<u8>>,
         max_records: u32,
     },
+    ReadConcatenation {
+        datasets: Vec<DatasetName>,
+        member: Option<MemberName>,
+        max_records: u32,
+    },
+    ReadRelative {
+        dataset: DatasetName,
+        record_number: u64,
+    },
     Create {
         dataset: DatasetName,
         attributes: DatasetAttributes,
@@ -172,6 +184,19 @@ pub enum DatasetRequest {
         expected_version: Option<u64>,
         mutation: Mutation,
     },
+    WriteRelative {
+        dataset: DatasetName,
+        record_number: u64,
+        record: Vec<u8>,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
+    DeleteRelative {
+        dataset: DatasetName,
+        record_number: u64,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
     DefineAlternateIndex {
         base: DatasetName,
         index: DatasetName,
@@ -179,6 +204,23 @@ pub enum DatasetRequest {
         key_length: u32,
         allow_duplicates: bool,
         mutation: Mutation,
+    },
+    DefineGenerationGroup {
+        base: DatasetName,
+        limit: u32,
+        scratch: bool,
+        empty: bool,
+        mutation: Mutation,
+    },
+    CreateGeneration {
+        base: DatasetName,
+        attributes: DatasetAttributes,
+        records: Vec<Vec<u8>>,
+        mutation: Mutation,
+    },
+    ResolveGeneration {
+        base: DatasetName,
+        relative: i32,
     },
     Rename {
         from: DatasetName,
@@ -236,6 +278,11 @@ pub enum DatasetResult {
         record: Option<Vec<u8>>,
         identity: Option<Vec<u8>>,
         key: Option<Vec<u8>>,
+    },
+    Generation {
+        dataset: DatasetName,
+        absolute_generation: u32,
+        version: u64,
     },
     Condition {
         name: String,
@@ -559,6 +606,9 @@ impl HostRequest {
                 | DatasetRequest::Attributes { .. }
                 | DatasetRequest::ListMembers { .. }
                 | DatasetRequest::Read { .. }
+                | DatasetRequest::ReadConcatenation { .. }
+                | DatasetRequest::ReadRelative { .. }
+                | DatasetRequest::ResolveGeneration { .. }
                 | DatasetRequest::ReadNext { .. }
                 | DatasetRequest::StartBrowse { .. }
                 | DatasetRequest::EndBrowse { .. },
@@ -588,6 +638,10 @@ impl HostRequest {
                     | DatasetRequest::RewriteRecord { .. }
                     | DatasetRequest::DeleteRecord { .. }
                     | DatasetRequest::DefineAlternateIndex { .. }
+                    | DatasetRequest::WriteRelative { .. }
+                    | DatasetRequest::DeleteRelative { .. }
+                    | DatasetRequest::DefineGenerationGroup { .. }
+                    | DatasetRequest::CreateGeneration { .. }
                     | DatasetRequest::Rename { .. }
                     | DatasetRequest::Delete { .. }
             ) | Self::Spool(
@@ -614,6 +668,10 @@ impl HostRequest {
                 | DatasetRequest::RewriteRecord { mutation, .. }
                 | DatasetRequest::DeleteRecord { mutation, .. }
                 | DatasetRequest::DefineAlternateIndex { mutation, .. }
+                | DatasetRequest::WriteRelative { mutation, .. }
+                | DatasetRequest::DeleteRelative { mutation, .. }
+                | DatasetRequest::DefineGenerationGroup { mutation, .. }
+                | DatasetRequest::CreateGeneration { mutation, .. }
                 | DatasetRequest::Rename { mutation, .. }
                 | DatasetRequest::Delete { mutation, .. },
             )
@@ -865,6 +923,20 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
         {
             Err(HostProblem::ResourceExhausted)
         }
+        DatasetRequest::ReadConcatenation {
+            datasets,
+            max_records,
+            ..
+        } if datasets.is_empty()
+            || datasets.len() > limits.max_records
+            || *max_records == 0
+            || *max_records as usize > limits.max_records =>
+        {
+            Err(HostProblem::ResourceExhausted)
+        }
+        DatasetRequest::ReadRelative { record_number, .. } if *record_number == 0 => {
+            Err(HostProblem::Malformed)
+        }
         DatasetRequest::Create {
             attributes,
             mutation,
@@ -910,6 +982,53 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
             } else {
                 mutation.validate(limits)
             }
+        }
+        DatasetRequest::WriteRelative {
+            record_number,
+            record,
+            mutation,
+            ..
+        } => {
+            if *record_number == 0 {
+                Err(HostProblem::Malformed)
+            } else if record.len() > limits.max_record_bytes {
+                Err(HostProblem::ResourceExhausted)
+            } else {
+                mutation.validate(limits)
+            }
+        }
+        DatasetRequest::DeleteRelative {
+            record_number,
+            mutation,
+            ..
+        } => {
+            if *record_number == 0 {
+                Err(HostProblem::Malformed)
+            } else {
+                mutation.validate(limits)
+            }
+        }
+        DatasetRequest::DefineGenerationGroup {
+            limit, mutation, ..
+        } => {
+            if *limit == 0 || *limit as usize > limits.max_records {
+                Err(HostProblem::ResourceExhausted)
+            } else {
+                mutation.validate(limits)
+            }
+        }
+        DatasetRequest::CreateGeneration {
+            attributes,
+            records,
+            mutation,
+            ..
+        } => {
+            attributes.validate(limits)?;
+            validate_records(records, limits)?;
+            mutation.validate(limits)
+        }
+        DatasetRequest::ResolveGeneration { relative, .. } if *relative > 0 => {
+            Err(HostProblem::Malformed)
         }
         DatasetRequest::Rename { mutation, .. } | DatasetRequest::Delete { mutation, .. } => {
             mutation.validate(limits)

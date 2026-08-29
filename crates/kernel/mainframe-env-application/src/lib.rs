@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 use mainframe_env_execution_api::Invocation;
+use mainframe_env_host_api::{DatasetAttributes, DatasetOrganization, HostLimits, RecordFormat};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
@@ -107,6 +108,106 @@ pub struct CsdResource {
     pub kind: String,
     pub name: String,
     pub properties: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DatasetDefinition {
+    pub name: String,
+    pub attributes: DatasetAttributes,
+    pub minimum_record_length: u32,
+    pub member_extensions: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GenerationGroupDefinition {
+    pub name: String,
+    pub limit: u32,
+    pub scratch: bool,
+    pub empty: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DatasetCatalogEntry {
+    Dataset(DatasetDefinition),
+    GenerationGroup(GenerationGroupDefinition),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DatasetCatalog {
+    entries: BTreeMap<String, DatasetCatalogEntry>,
+}
+
+impl DatasetCatalog {
+    pub fn new(entries: Vec<DatasetCatalogEntry>) -> Result<Self, InstallProblem> {
+        let mut catalog = BTreeMap::new();
+        for entry in entries {
+            let name = match &entry {
+                DatasetCatalogEntry::Dataset(definition) => {
+                    validate_dataset_definition(definition)?;
+                    &definition.name
+                }
+                DatasetCatalogEntry::GenerationGroup(definition) => {
+                    validate_text(&definition.name)?;
+                    if definition.limit == 0 {
+                        return Err(InstallProblem::InvalidIdentity);
+                    }
+                    &definition.name
+                }
+            };
+            if catalog.insert(name.to_ascii_uppercase(), entry).is_some() {
+                return Err(InstallProblem::DuplicateEntry);
+            }
+        }
+        if catalog.is_empty() {
+            return Err(InstallProblem::MissingKind);
+        }
+        Ok(Self { entries: catalog })
+    }
+
+    #[must_use]
+    pub fn get(&self, name: &str) -> Option<&DatasetCatalogEntry> {
+        self.entries.get(&name.to_ascii_uppercase())
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+fn validate_dataset_definition(definition: &DatasetDefinition) -> Result<(), InstallProblem> {
+    validate_text(&definition.name)?;
+    definition
+        .attributes
+        .validate(HostLimits::default())
+        .map_err(|_| InstallProblem::InvalidIdentity)?;
+    if definition.minimum_record_length == 0
+        || definition.minimum_record_length > definition.attributes.logical_record_length
+        || matches!(
+            definition.attributes.record_format,
+            RecordFormat::Fixed | RecordFormat::FixedBlocked
+        ) && definition.minimum_record_length != definition.attributes.logical_record_length
+        || definition.attributes.organization != DatasetOrganization::Partitioned
+            && !definition.member_extensions.is_empty()
+    {
+        return Err(InstallProblem::InvalidIdentity);
+    }
+    let mut extensions = BTreeSet::new();
+    for extension in &definition.member_extensions {
+        if extension.is_empty()
+            || extension.len() > 16
+            || !extension.bytes().all(|byte| byte.is_ascii_alphanumeric())
+            || !extensions.insert(extension.to_ascii_uppercase())
+        {
+            return Err(InstallProblem::InvalidIdentity);
+        }
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -678,5 +779,102 @@ mod tests {
         }
         assert_eq!(catalog.resolve("proga", None).unwrap().generation, 2);
         assert_eq!(catalog.resolve("PROGA", Some(1)).unwrap().generation, 1);
+    }
+
+    #[test]
+    fn dataset_catalog_represents_reached_organizations_formats_and_gdgs() {
+        let definitions = [
+            (
+                "APP.KSDS",
+                DatasetOrganization::KeySequenced,
+                RecordFormat::Fixed,
+                Some((0, 4)),
+                Vec::new(),
+            ),
+            (
+                "APP.ESDS",
+                DatasetOrganization::EntrySequenced,
+                RecordFormat::Variable,
+                None,
+                Vec::new(),
+            ),
+            (
+                "APP.RRDS",
+                DatasetOrganization::Relative,
+                RecordFormat::FixedBlocked,
+                None,
+                Vec::new(),
+            ),
+            (
+                "APP.PS",
+                DatasetOrganization::Sequential,
+                RecordFormat::VariableBlocked,
+                None,
+                Vec::new(),
+            ),
+            (
+                "APP.PDS",
+                DatasetOrganization::Partitioned,
+                RecordFormat::Line,
+                None,
+                vec!["JCL".into(), "PRC".into()],
+            ),
+        ]
+        .into_iter()
+        .map(
+            |(name, organization, record_format, key, member_extensions)| {
+                DatasetCatalogEntry::Dataset(DatasetDefinition {
+                    name: name.into(),
+                    attributes: DatasetAttributes {
+                        organization,
+                        record_format,
+                        logical_record_length: 80,
+                        key_offset: key.map(|value| value.0),
+                        key_length: key.map(|value| value.1),
+                        ccsid: Some(37),
+                    },
+                    minimum_record_length: if matches!(
+                        record_format,
+                        RecordFormat::Fixed | RecordFormat::FixedBlocked
+                    ) {
+                        80
+                    } else {
+                        1
+                    },
+                    member_extensions,
+                })
+            },
+        )
+        .chain(std::iter::once(DatasetCatalogEntry::GenerationGroup(
+            GenerationGroupDefinition {
+                name: "APP.BACKUP".into(),
+                limit: 5,
+                scratch: true,
+                empty: false,
+            },
+        )))
+        .collect::<Vec<_>>();
+        let catalog = DatasetCatalog::new(definitions.clone()).unwrap();
+        assert_eq!(catalog.len(), 6);
+        assert!(matches!(
+            catalog.get("app.pds"),
+            Some(DatasetCatalogEntry::Dataset(DatasetDefinition {
+                member_extensions,
+                ..
+            })) if member_extensions == &["JCL".to_string(), "PRC".to_string()]
+        ));
+        let mut duplicate = definitions;
+        duplicate.push(DatasetCatalogEntry::GenerationGroup(
+            GenerationGroupDefinition {
+                name: "app.backup".into(),
+                limit: 5,
+                scratch: true,
+                empty: false,
+            },
+        ));
+        assert_eq!(
+            DatasetCatalog::new(duplicate),
+            Err(InstallProblem::DuplicateEntry)
+        );
     }
 }

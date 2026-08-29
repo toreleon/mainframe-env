@@ -54,9 +54,20 @@ struct AlternateIndex {
     allow_duplicates: bool,
     version: u64,
 }
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct GenerationGroup {
+    limit: u32,
+    scratch: bool,
+    empty: bool,
+    next_generation: u32,
+    generations: Vec<String>,
+    retired: Vec<String>,
+    version: u64,
+}
 struct State {
     entries: BTreeMap<String, Entry>,
     alternate_indexes: BTreeMap<String, AlternateIndex>,
+    generation_groups: BTreeMap<String, GenerationGroup>,
     cursors: BTreeMap<String, Cursor>,
     next_cursor: u64,
     replay: BTreeMap<String, Replay>,
@@ -83,8 +94,7 @@ impl DatasetService {
                 limits.max_members,
             )
             .map_err(|_| HostProblem::InfrastructureFailure)?;
-            validate_records(&entry.records, &entry.attributes, limits)
-                .map_err(|_| HostProblem::InfrastructureFailure)?;
+            validate_entry_shape(&entry, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
             if entry.attributes.organization
                 == mainframe_env_host_api::DatasetOrganization::KeySequenced
             {
@@ -123,12 +133,37 @@ impl DatasetService {
         {
             return Err(HostProblem::ResourceExhausted);
         }
+        let mut generation_groups = BTreeMap::new();
+        for row in store
+            .list_provider_state("dataset-gdg", limits.max_datasets)
+            .map_err(store_error)?
+        {
+            let group = decode_generation_group(&row.payload, row.version, limits)?;
+            for generation in &group.generations {
+                if !entries.contains_key(generation) {
+                    return Err(HostProblem::InfrastructureFailure);
+                }
+            }
+            for retired in &group.retired {
+                entries.remove(retired);
+            }
+            generation_groups.insert(row.key, group);
+        }
+        if entries
+            .len()
+            .checked_add(alternate_indexes.len())
+            .and_then(|total| total.checked_add(generation_groups.len()))
+            .is_none_or(|total| total > limits.max_datasets)
+        {
+            return Err(HostProblem::ResourceExhausted);
+        }
         Ok(Arc::new(Self {
             store,
             limits,
             state: Mutex::new(State {
                 entries,
                 alternate_indexes,
+                generation_groups,
                 cursors: BTreeMap::new(),
                 next_cursor: 1,
                 replay,
@@ -244,6 +279,7 @@ impl DatasetService {
                     .entries
                     .keys()
                     .chain(state.alternate_indexes.keys())
+                    .chain(state.generation_groups.keys())
                     .cloned()
                     .collect::<std::collections::BTreeSet<_>>();
                 for name in source_names
@@ -375,6 +411,87 @@ impl DatasetService {
                     version,
                 })
             }
+            DatasetRequest::ReadConcatenation {
+                datasets,
+                member,
+                max_records,
+            } => {
+                let mut records = Vec::new();
+                let mut identities = Vec::new();
+                let mut version = 0u64;
+                if let Some(member) = member {
+                    for dataset in datasets {
+                        let entry = entry(state, dataset)?;
+                        if entry.attributes.organization
+                            != mainframe_env_host_api::DatasetOrganization::Partitioned
+                        {
+                            return Err(HostProblem::Unsupported);
+                        }
+                        version = version.max(entry.version);
+                        if let Some(found) = entry.members.get(member.as_str()) {
+                            records.extend(found.iter().take(*max_records as usize).cloned());
+                            identities.extend((0..records.len()).map(|position| {
+                                u64::try_from(position)
+                                    .unwrap_or(u64::MAX)
+                                    .to_be_bytes()
+                                    .to_vec()
+                            }));
+                            break;
+                        }
+                    }
+                    if records.is_empty() {
+                        return Err(condition("NOTFND", 13));
+                    }
+                } else {
+                    for dataset in datasets {
+                        let entry = entry(state, dataset)?;
+                        if entry.attributes.organization
+                            == mainframe_env_host_api::DatasetOrganization::Partitioned
+                        {
+                            return Err(HostProblem::Unsupported);
+                        }
+                        version = version.max(entry.version);
+                        for record in ordered_records(entry)? {
+                            if records.len() >= *max_records as usize {
+                                break;
+                            }
+                            identities.push(
+                                u64::try_from(identities.len())
+                                    .map_err(|_| HostProblem::ResourceExhausted)?
+                                    .to_be_bytes()
+                                    .to_vec(),
+                            );
+                            records.push(record.clone());
+                        }
+                    }
+                }
+                Ok(DatasetResult::Records {
+                    records,
+                    identities,
+                    version,
+                })
+            }
+            DatasetRequest::ReadRelative {
+                dataset,
+                record_number,
+            } => {
+                let entry = entry(state, dataset)?;
+                if entry.attributes.organization
+                    != mainframe_env_host_api::DatasetOrganization::Relative
+                {
+                    return Err(HostProblem::Unsupported);
+                }
+                let record = entry
+                    .relative_records
+                    .get(record_number)
+                    .cloned()
+                    .ok_or_else(|| condition("NOTFND", 13))?;
+                Ok(DatasetResult::Records {
+                    records: vec![record],
+                    identities: vec![record_number.to_be_bytes().to_vec()],
+                    version: entry.version,
+                })
+            }
             DatasetRequest::Create {
                 dataset,
                 attributes,
@@ -388,6 +505,7 @@ impl DatasetService {
                     .entries
                     .len()
                     .checked_add(state.alternate_indexes.len())
+                    .and_then(|total| total.checked_add(state.generation_groups.len()))
                     .is_none_or(|total| total >= self.limits.max_datasets)
                 {
                     return Err(HostProblem::ResourceExhausted);
@@ -402,6 +520,7 @@ impl DatasetService {
                     version: 1,
                     records: Vec::new(),
                     members: BTreeMap::new(),
+                    relative_records: BTreeMap::new(),
                 };
                 self.persist(dataset.as_str(), &created, None)?;
                 state.entries.insert(dataset.as_str().into(), created);
@@ -439,6 +558,14 @@ impl DatasetService {
                         next.records.push(record.clone());
                     }
                     sort_keyed_records(&mut next)?;
+                } else if next.attributes.organization
+                    == mainframe_env_host_api::DatasetOrganization::EntrySequenced
+                {
+                    next.records.extend(records.clone());
+                } else if next.attributes.organization
+                    == mainframe_env_host_api::DatasetOrganization::Relative
+                {
+                    return Err(HostProblem::Unsupported);
                 } else {
                     next.records = records.clone();
                 }
@@ -545,6 +672,84 @@ impl DatasetService {
                 )?;
                 Ok(result)
             }
+            DatasetRequest::WriteRelative {
+                dataset,
+                record_number,
+                record,
+                expected_version,
+                mutation,
+            } => {
+                let current = entry(state, dataset)?.clone();
+                if current.attributes.organization
+                    != mainframe_env_host_api::DatasetOrganization::Relative
+                {
+                    return Err(HostProblem::Unsupported);
+                }
+                validate_records(
+                    std::slice::from_ref(record),
+                    &current.attributes,
+                    self.limits,
+                )?;
+                if expected_version.is_some_and(|expected| expected != current.version) {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+                let mut next = current.clone();
+                next.relative_records.insert(*record_number, record.clone());
+                next.version = next
+                    .version
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?;
+                let result = DatasetResult::Mutated {
+                    version: next.version,
+                };
+                self.persist_with_indexes(
+                    state,
+                    dataset.as_str(),
+                    &current,
+                    &next,
+                    mutation,
+                    request_digest(request),
+                    &result,
+                )?;
+                Ok(result)
+            }
+            DatasetRequest::DeleteRelative {
+                dataset,
+                record_number,
+                expected_version,
+                mutation,
+            } => {
+                let current = entry(state, dataset)?.clone();
+                if current.attributes.organization
+                    != mainframe_env_host_api::DatasetOrganization::Relative
+                {
+                    return Err(HostProblem::Unsupported);
+                }
+                if expected_version.is_some_and(|expected| expected != current.version) {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+                let mut next = current.clone();
+                if next.relative_records.remove(record_number).is_none() {
+                    return Err(condition("NOTFND", 13));
+                }
+                next.version = next
+                    .version
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?;
+                let result = DatasetResult::Mutated {
+                    version: next.version,
+                };
+                self.persist_with_indexes(
+                    state,
+                    dataset.as_str(),
+                    &current,
+                    &next,
+                    mutation,
+                    request_digest(request),
+                    &result,
+                )?;
+                Ok(result)
+            }
             DatasetRequest::DefineAlternateIndex {
                 base,
                 index,
@@ -557,6 +762,7 @@ impl DatasetService {
                     .entries
                     .len()
                     .checked_add(state.alternate_indexes.len())
+                    .and_then(|total| total.checked_add(state.generation_groups.len()))
                     .is_none_or(|total| total >= self.limits.max_datasets)
                 {
                     return Err(HostProblem::ResourceExhausted);
@@ -622,6 +828,205 @@ impl DatasetService {
                     .replay
                     .insert(mutation.idempotency_key.as_str().into(), replay);
                 Ok(result)
+            }
+            DatasetRequest::DefineGenerationGroup {
+                base,
+                limit,
+                scratch,
+                empty,
+                mutation,
+            } => {
+                if state
+                    .entries
+                    .len()
+                    .checked_add(state.alternate_indexes.len())
+                    .and_then(|total| total.checked_add(state.generation_groups.len()))
+                    .is_none_or(|total| total >= self.limits.max_datasets)
+                {
+                    return Err(HostProblem::ResourceExhausted);
+                }
+                if state.entries.contains_key(base.as_str())
+                    || state.alternate_indexes.contains_key(base.as_str())
+                    || state.generation_groups.contains_key(base.as_str())
+                {
+                    return Err(condition("DUPREC", 14));
+                }
+                let group = GenerationGroup {
+                    limit: *limit,
+                    scratch: *scratch,
+                    empty: *empty,
+                    next_generation: 1,
+                    generations: Vec::new(),
+                    retired: Vec::new(),
+                    version: 1,
+                };
+                let result = DatasetResult::Created { version: 1 };
+                let replay = Replay {
+                    request_digest: request_digest(request),
+                    result: Some(result.clone()),
+                };
+                let writes = vec![
+                    ProviderStateWrite {
+                        record: ProviderStateRecord {
+                            namespace: "dataset-gdg".into(),
+                            key: base.as_str().into(),
+                            version: 1,
+                            payload: encode_generation_group(&group)?,
+                        },
+                        expected_version: None,
+                    },
+                    ProviderStateWrite {
+                        record: ProviderStateRecord {
+                            namespace: "dataset-replay".into(),
+                            key: mutation.idempotency_key.as_str().into(),
+                            version: 2,
+                            payload: encode_replay(&replay)?,
+                        },
+                        expected_version: Some(1),
+                    },
+                ];
+                self.commit_catalog_writes(writes, mutation, &replay)?;
+                state.generation_groups.insert(base.as_str().into(), group);
+                state
+                    .replay
+                    .insert(mutation.idempotency_key.as_str().into(), replay);
+                Ok(result)
+            }
+            DatasetRequest::CreateGeneration {
+                base,
+                attributes,
+                records,
+                mutation,
+            } => {
+                attributes.validate(mainframe_env_host_api::HostLimits {
+                    max_record_bytes: self.limits.max_record_bytes,
+                    ..Default::default()
+                })?;
+                validate_records(records, attributes, self.limits)?;
+                let current = state
+                    .generation_groups
+                    .get(base.as_str())
+                    .cloned()
+                    .ok_or(HostProblem::NotFound)?;
+                if current.next_generation > 9_999 {
+                    return Err(HostProblem::ResourceExhausted);
+                }
+                let absolute = current.next_generation;
+                let name = DatasetName::new(format!("{}.G{absolute:04}V00", base.as_str()), 128)
+                    .map_err(|_| HostProblem::ResourceExhausted)?;
+                if state.entries.contains_key(name.as_str()) {
+                    return Err(condition("DUPREC", 14));
+                }
+                let entry = Entry {
+                    attributes: attributes.clone(),
+                    version: 1,
+                    records: records.clone(),
+                    members: BTreeMap::new(),
+                    relative_records: BTreeMap::new(),
+                };
+                validate_entry_shape(&entry, self.limits)?;
+                let mut next = current.clone();
+                next.version = next
+                    .version
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?;
+                next.next_generation = next
+                    .next_generation
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?;
+                next.generations.push(name.as_str().into());
+                let mut rolled = Vec::new();
+                if next.generations.len() > next.limit as usize {
+                    let remove = if next.empty {
+                        next.generations.len().saturating_sub(1)
+                    } else {
+                        next.generations.len() - next.limit as usize
+                    };
+                    rolled.extend(next.generations.drain(..remove));
+                    next.retired.extend(rolled.iter().cloned());
+                }
+                if state
+                    .entries
+                    .len()
+                    .checked_add(1)
+                    .and_then(|total| total.checked_sub(rolled.len()))
+                    .and_then(|total| total.checked_add(state.alternate_indexes.len()))
+                    .and_then(|total| total.checked_add(state.generation_groups.len()))
+                    .is_none_or(|total| total > self.limits.max_datasets)
+                {
+                    return Err(HostProblem::ResourceExhausted);
+                }
+                let result = DatasetResult::Generation {
+                    dataset: name.clone(),
+                    absolute_generation: absolute,
+                    version: next.version,
+                };
+                let replay = Replay {
+                    request_digest: request_digest(request),
+                    result: Some(result.clone()),
+                };
+                let writes = vec![
+                    ProviderStateWrite {
+                        record: ProviderStateRecord {
+                            namespace: "dataset".into(),
+                            key: name.as_str().into(),
+                            version: 1,
+                            payload: encode(&entry)
+                                .map_err(|_| HostProblem::InfrastructureFailure)?,
+                        },
+                        expected_version: None,
+                    },
+                    ProviderStateWrite {
+                        record: ProviderStateRecord {
+                            namespace: "dataset-gdg".into(),
+                            key: base.as_str().into(),
+                            version: next.version,
+                            payload: encode_generation_group(&next)?,
+                        },
+                        expected_version: Some(current.version),
+                    },
+                    ProviderStateWrite {
+                        record: ProviderStateRecord {
+                            namespace: "dataset-replay".into(),
+                            key: mutation.idempotency_key.as_str().into(),
+                            version: 2,
+                            payload: encode_replay(&replay)?,
+                        },
+                        expected_version: Some(1),
+                    },
+                ];
+                self.commit_catalog_writes(writes, mutation, &replay)?;
+                state.entries.insert(name.as_str().into(), entry);
+                for retired in rolled {
+                    state.entries.remove(&retired);
+                }
+                state.generation_groups.insert(base.as_str().into(), next);
+                state
+                    .replay
+                    .insert(mutation.idempotency_key.as_str().into(), replay);
+                Ok(result)
+            }
+            DatasetRequest::ResolveGeneration { base, relative } => {
+                let group = state
+                    .generation_groups
+                    .get(base.as_str())
+                    .ok_or(HostProblem::NotFound)?;
+                let position = isize::try_from(group.generations.len())
+                    .map_err(|_| HostProblem::ResourceExhausted)?
+                    .checked_sub(1)
+                    .and_then(|position| position.checked_add(*relative as isize))
+                    .ok_or(HostProblem::NotFound)?;
+                let name = group
+                    .generations
+                    .get(usize::try_from(position).map_err(|_| HostProblem::NotFound)?)
+                    .ok_or(HostProblem::NotFound)?;
+                let absolute = generation_number(name).ok_or(HostProblem::InfrastructureFailure)?;
+                Ok(DatasetResult::Generation {
+                    dataset: DatasetName::new(name, 128)
+                        .map_err(|_| HostProblem::InfrastructureFailure)?,
+                    absolute_generation: absolute,
+                    version: group.version,
+                })
             }
             DatasetRequest::Rename { from, to, .. } => {
                 if state.entries.contains_key(to.as_str()) {
@@ -802,6 +1207,7 @@ impl DatasetService {
         request_digest: [u8; 32],
         result: &DatasetResult,
     ) -> Result<(), HostProblem> {
+        validate_entry_shape(next, self.limits)?;
         if bytes(next) > self.limits.max_total_bytes {
             return Err(HostProblem::ResourceExhausted);
         }
@@ -872,6 +1278,27 @@ impl DatasetService {
         state
             .replay
             .insert(mutation.idempotency_key.as_str().into(), replay);
+        Ok(())
+    }
+
+    fn commit_catalog_writes(
+        &self,
+        writes: Vec<ProviderStateWrite>,
+        mutation: &mainframe_env_host_api::Mutation,
+        replay: &Replay,
+    ) -> Result<(), HostProblem> {
+        if self.store.put_provider_states_atomic(writes).is_err() {
+            let persisted = self
+                .store
+                .get_provider_state("dataset-replay", mutation.idempotency_key.as_str())
+                .map_err(store_error)?
+                .ok_or(HostProblem::UnknownOutcome)?;
+            if decode_replay(&persisted.payload).map_err(|_| HostProblem::InfrastructureFailure)?
+                != *replay
+            {
+                return Err(HostProblem::UnknownOutcome);
+            }
+        }
         Ok(())
     }
 
@@ -1173,6 +1600,139 @@ fn decode_alternate_index(payload: &[u8], version: u64) -> Result<AlternateIndex
     })
 }
 
+fn encode_generation_group(group: &GenerationGroup) -> Result<Vec<u8>, HostProblem> {
+    let mut payload = b"MEGDG1".to_vec();
+    payload.extend_from_slice(&group.limit.to_be_bytes());
+    payload.push(u8::from(group.scratch));
+    payload.push(u8::from(group.empty));
+    payload.extend_from_slice(&group.next_generation.to_be_bytes());
+    payload.extend_from_slice(
+        &u32::try_from(group.generations.len())
+            .map_err(|_| HostProblem::ResourceExhausted)?
+            .to_be_bytes(),
+    );
+    for generation in &group.generations {
+        dataset_field(&mut payload, generation.as_bytes())?;
+    }
+    payload.extend_from_slice(
+        &u32::try_from(group.retired.len())
+            .map_err(|_| HostProblem::ResourceExhausted)?
+            .to_be_bytes(),
+    );
+    for retired in &group.retired {
+        dataset_field(&mut payload, retired.as_bytes())?;
+    }
+    Ok(payload)
+}
+
+fn decode_generation_group(
+    payload: &[u8],
+    version: u64,
+    limits: DatasetLimits,
+) -> Result<GenerationGroup, HostProblem> {
+    if payload.get(..6) != Some(b"MEGDG1") || version == 0 {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let mut at = 6usize;
+    let mut take_u32 = || -> Result<u32, HostProblem> {
+        let value = u32::from_be_bytes(
+            payload
+                .get(at..at.saturating_add(4))
+                .ok_or(HostProblem::InfrastructureFailure)?
+                .try_into()
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+        );
+        at = at
+            .checked_add(4)
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        Ok(value)
+    };
+    let limit = take_u32()?;
+    let scratch = match payload.get(at) {
+        Some(0) => false,
+        Some(1) => true,
+        _ => return Err(HostProblem::InfrastructureFailure),
+    };
+    at += 1;
+    let empty = match payload.get(at) {
+        Some(0) => false,
+        Some(1) => true,
+        _ => return Err(HostProblem::InfrastructureFailure),
+    };
+    at += 1;
+    let next_generation = u32::from_be_bytes(
+        payload
+            .get(at..at.saturating_add(4))
+            .ok_or(HostProblem::InfrastructureFailure)?
+            .try_into()
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+    );
+    at += 4;
+    let generation_count = usize::try_from(u32::from_be_bytes(
+        payload
+            .get(at..at.saturating_add(4))
+            .ok_or(HostProblem::InfrastructureFailure)?
+            .try_into()
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+    ))
+    .map_err(|_| HostProblem::InfrastructureFailure)?;
+    at += 4;
+    if limit == 0 || generation_count > limit as usize || generation_count > limits.max_records {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let mut generations = Vec::with_capacity(generation_count);
+    for _ in 0..generation_count {
+        generations.push(
+            String::from_utf8(dataset_take_field(payload, &mut at, 128)?)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+        );
+    }
+    let retired_count = usize::try_from(u32::from_be_bytes(
+        payload
+            .get(at..at.saturating_add(4))
+            .ok_or(HostProblem::InfrastructureFailure)?
+            .try_into()
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+    ))
+    .map_err(|_| HostProblem::InfrastructureFailure)?;
+    at += 4;
+    if retired_count > limits.max_records {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let mut retired = Vec::with_capacity(retired_count);
+    for _ in 0..retired_count {
+        retired.push(
+            String::from_utf8(dataset_take_field(payload, &mut at, 128)?)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+        );
+    }
+    if at != payload.len()
+        || next_generation == 0
+        || generations
+            .iter()
+            .any(|name| generation_number(name).is_none())
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(GenerationGroup {
+        limit,
+        scratch,
+        empty,
+        next_generation,
+        generations,
+        retired,
+        version,
+    })
+}
+
+fn generation_number(name: &str) -> Option<u32> {
+    let marker = name.rfind(".G")? + 2;
+    let digits = name.get(marker..marker + 4)?;
+    (name.get(marker + 4..)? == "V00")
+        .then(|| digits.parse().ok())
+        .flatten()
+}
+
 fn dataset_field(payload: &mut Vec<u8>, value: &[u8]) -> Result<(), HostProblem> {
     payload.extend_from_slice(
         &u32::try_from(value.len())
@@ -1214,6 +1774,10 @@ fn mutation(request: &DatasetRequest) -> Option<&mainframe_env_host_api::Mutatio
         | DatasetRequest::RewriteRecord { mutation, .. }
         | DatasetRequest::DeleteRecord { mutation, .. }
         | DatasetRequest::DefineAlternateIndex { mutation, .. }
+        | DatasetRequest::WriteRelative { mutation, .. }
+        | DatasetRequest::DeleteRelative { mutation, .. }
+        | DatasetRequest::DefineGenerationGroup { mutation, .. }
+        | DatasetRequest::CreateGeneration { mutation, .. }
         | DatasetRequest::Rename { mutation, .. }
         | DatasetRequest::Delete { mutation, .. } => Some(mutation),
         _ => None,
@@ -1227,7 +1791,50 @@ fn atomic_dataset_request(request: &DatasetRequest) -> bool {
             | DatasetRequest::RewriteRecord { .. }
             | DatasetRequest::DeleteRecord { .. }
             | DatasetRequest::DefineAlternateIndex { .. }
+            | DatasetRequest::WriteRelative { .. }
+            | DatasetRequest::DeleteRelative { .. }
+            | DatasetRequest::DefineGenerationGroup { .. }
+            | DatasetRequest::CreateGeneration { .. }
     )
+}
+
+fn validate_entry_shape(entry: &Entry, limits: DatasetLimits) -> Result<(), HostProblem> {
+    validate_records(&entry.records, &entry.attributes, limits)?;
+    for records in entry.members.values() {
+        validate_records(records, &entry.attributes, limits)?;
+    }
+    for record in entry.relative_records.values() {
+        validate_records(std::slice::from_ref(record), &entry.attributes, limits)?;
+    }
+    let count = entry
+        .records
+        .len()
+        .checked_add(entry.members.values().map(Vec::len).sum::<usize>())
+        .and_then(|count| count.checked_add(entry.relative_records.len()))
+        .ok_or(HostProblem::ResourceExhausted)?;
+    if count > limits.max_records || bytes(entry) > limits.max_total_bytes {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    match entry.attributes.organization {
+        mainframe_env_host_api::DatasetOrganization::Partitioned
+            if !entry.records.is_empty() || !entry.relative_records.is_empty() =>
+        {
+            Err(HostProblem::Malformed)
+        }
+        mainframe_env_host_api::DatasetOrganization::Relative
+            if !entry.records.is_empty() || !entry.members.is_empty() =>
+        {
+            Err(HostProblem::Malformed)
+        }
+        mainframe_env_host_api::DatasetOrganization::Sequential
+        | mainframe_env_host_api::DatasetOrganization::KeySequenced
+        | mainframe_env_host_api::DatasetOrganization::EntrySequenced
+            if !entry.members.is_empty() || !entry.relative_records.is_empty() =>
+        {
+            Err(HostProblem::Malformed)
+        }
+        _ => Ok(()),
+    }
 }
 fn validate_records(
     records: &[Vec<u8>],
@@ -1250,6 +1857,24 @@ fn validate_records(
         .any(|record| record.len() != attributes.logical_record_length as usize)
     {
         return Err(condition("LENGERR", 22));
+    }
+    if matches!(
+        attributes.record_format,
+        mainframe_env_host_api::RecordFormat::Variable
+            | mainframe_env_host_api::RecordFormat::VariableBlocked
+            | mainframe_env_host_api::RecordFormat::Line
+    ) && records
+        .iter()
+        .any(|record| record.len() > attributes.logical_record_length as usize)
+    {
+        return Err(condition("LENGERR", 22));
+    }
+    if attributes.record_format == mainframe_env_host_api::RecordFormat::Line
+        && records
+            .iter()
+            .any(|record| record.contains(&b'\n') || record.contains(&b'\r'))
+    {
+        return Err(HostProblem::Malformed);
     }
     Ok(())
 }
@@ -1274,6 +1899,7 @@ fn bytes(entry: &Entry) -> usize {
             .flatten()
             .map(Vec::len)
             .sum::<usize>()
+        + entry.relative_records.values().map(Vec::len).sum::<usize>()
 }
 fn condition(name: &str, response: i32) -> HostProblem {
     HostProblem::Condition {
@@ -1309,6 +1935,16 @@ fn encode_replay(replay: &Replay) -> Result<Vec<u8>, HostProblem> {
             payload.push(2);
             payload.extend_from_slice(&version.to_be_bytes());
         }
+        Some(DatasetResult::Generation {
+            dataset,
+            absolute_generation,
+            version,
+        }) => {
+            payload.push(3);
+            dataset_field(&mut payload, dataset.as_str().as_bytes())?;
+            payload.extend_from_slice(&absolute_generation.to_be_bytes());
+            payload.extend_from_slice(&version.to_be_bytes());
+        }
         Some(_) => return Err(HostProblem::InfrastructureFailure),
     }
     Ok(payload)
@@ -1327,6 +1963,48 @@ fn decode_replay(payload: &[u8]) -> Result<Replay, ()> {
                 DatasetResult::Created { version }
             } else {
                 DatasetResult::Mutated { version }
+            })
+        }
+        3 => {
+            let mut at = 38usize;
+            let length = usize::try_from(u32::from_be_bytes(
+                payload
+                    .get(at..at + 4)
+                    .ok_or(())?
+                    .try_into()
+                    .map_err(|_| ())?,
+            ))
+            .map_err(|_| ())?;
+            at += 4;
+            if length == 0 || length > 128 {
+                return Err(());
+            }
+            let dataset = String::from_utf8(payload.get(at..at + length).ok_or(())?.to_vec())
+                .map_err(|_| ())?;
+            at += length;
+            let absolute_generation = u32::from_be_bytes(
+                payload
+                    .get(at..at + 4)
+                    .ok_or(())?
+                    .try_into()
+                    .map_err(|_| ())?,
+            );
+            at += 4;
+            let version = u64::from_be_bytes(
+                payload
+                    .get(at..at + 8)
+                    .ok_or(())?
+                    .try_into()
+                    .map_err(|_| ())?,
+            );
+            at += 8;
+            if at != payload.len() {
+                return Err(());
+            }
+            Some(DatasetResult::Generation {
+                dataset: DatasetName::new(dataset, 128).map_err(|_| ())?,
+                absolute_generation,
+                version,
             })
         }
         _ => return Err(()),
@@ -1466,6 +2144,244 @@ mod tests {
             }),
             Ok(DatasetResult::Records { records, .. })
                 if records == [b"AA11".to_vec(), b"BB22".to_vec()]
+        ));
+    }
+
+    #[test]
+    fn carddemo_esds_appends_records_in_arrival_order() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let name = DatasetName::new("CARDDEMO.USRSEC.ESDS", 44).unwrap();
+        service
+            .invoke(DatasetRequest::Create {
+                dataset: name.clone(),
+                attributes: attrs(DatasetOrganization::EntrySequenced),
+                mutation: mutation(1),
+            })
+            .unwrap();
+        for (sequence, record) in [(2, b"AA11".to_vec()), (3, b"BB22".to_vec())] {
+            service
+                .invoke(DatasetRequest::Write {
+                    dataset: name.clone(),
+                    member: None,
+                    records: vec![record],
+                    expected_version: Some(sequence - 1),
+                    mutation: mutation(sequence),
+                })
+                .unwrap();
+        }
+        assert!(matches!(
+            service.invoke(DatasetRequest::Read {
+                dataset: name,
+                member: None,
+                key: None,
+                max_records: 10,
+            }),
+            Ok(DatasetResult::Records { records, .. })
+                if records == [b"AA11".to_vec(), b"BB22".to_vec()]
+        ));
+    }
+
+    #[test]
+    fn carddemo_rrds_pds_concatenation_and_record_formats_are_exact() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let rrds = DatasetName::new("CARDDEMO.USRSEC.RRDS", 44).unwrap();
+        service
+            .invoke(DatasetRequest::Create {
+                dataset: rrds.clone(),
+                attributes: attrs(DatasetOrganization::Relative),
+                mutation: mutation(1),
+            })
+            .unwrap();
+        for (sequence, number, record) in [(2, 2, b"BB22".to_vec()), (3, 1, b"AA11".to_vec())] {
+            service
+                .invoke(DatasetRequest::WriteRelative {
+                    dataset: rrds.clone(),
+                    record_number: number,
+                    record,
+                    expected_version: Some(sequence - 1),
+                    mutation: mutation(sequence),
+                })
+                .unwrap();
+        }
+        assert!(matches!(
+            service.invoke(DatasetRequest::ReadRelative {
+                dataset: rrds.clone(),
+                record_number: 2,
+            }),
+            Ok(DatasetResult::Records { records, identities, .. })
+                if records == [b"BB22".to_vec()] && identities == [2u64.to_be_bytes().to_vec()]
+        ));
+        service
+            .invoke(DatasetRequest::DeleteRelative {
+                dataset: rrds.clone(),
+                record_number: 2,
+                expected_version: Some(3),
+                mutation: mutation(4),
+            })
+            .unwrap();
+        assert!(matches!(
+            service.invoke(DatasetRequest::ReadRelative {
+                dataset: rrds,
+                record_number: 2,
+            }),
+            Err(HostProblem::Condition { ref name, response: 13, .. }) if name == "NOTFND"
+        ));
+
+        let first = DatasetName::new("CARDDEMO.JCL.ONE", 44).unwrap();
+        let second = DatasetName::new("CARDDEMO.JCL.TWO", 44).unwrap();
+        let line_attributes = DatasetAttributes {
+            organization: DatasetOrganization::Partitioned,
+            record_format: RecordFormat::Line,
+            logical_record_length: 80,
+            key_offset: None,
+            key_length: None,
+            ccsid: Some(37),
+        };
+        for (sequence, dataset) in [(5, first.clone()), (6, second.clone())] {
+            service
+                .invoke(DatasetRequest::Create {
+                    dataset,
+                    attributes: line_attributes.clone(),
+                    mutation: mutation(sequence),
+                })
+                .unwrap();
+        }
+        for (sequence, dataset, member, value) in [
+            (7, first.clone(), "PROC1", b"//FIRST".to_vec()),
+            (8, second.clone(), "PROC1", b"//SECOND".to_vec()),
+            (9, second.clone(), "PROC2", b"//FALLBACK".to_vec()),
+        ] {
+            service
+                .invoke(DatasetRequest::Write {
+                    dataset,
+                    member: Some(MemberName::new(member, 8).unwrap()),
+                    records: vec![value],
+                    expected_version: None,
+                    mutation: mutation(sequence),
+                })
+                .unwrap();
+        }
+        for (member, expected) in [("PROC1", b"//FIRST".as_slice()), ("PROC2", b"//FALLBACK")] {
+            assert!(matches!(
+                service.invoke(DatasetRequest::ReadConcatenation {
+                    datasets: vec![first.clone(), second.clone()],
+                    member: Some(MemberName::new(member, 8).unwrap()),
+                    max_records: 10,
+                }),
+                Ok(DatasetResult::Records { records, .. }) if records == [expected.to_vec()]
+            ));
+        }
+        assert!(matches!(
+            service.invoke(DatasetRequest::Write {
+                dataset: first,
+                member: Some(MemberName::new("BAD", 8).unwrap()),
+                records: vec![b"LINE\nTWO".to_vec()],
+                expected_version: None,
+                mutation: mutation(10),
+            }),
+            Err(HostProblem::Malformed)
+        ));
+
+        let variable = DatasetName::new("CARDDEMO.VARIABLE", 44).unwrap();
+        service
+            .invoke(DatasetRequest::Create {
+                dataset: variable.clone(),
+                attributes: DatasetAttributes {
+                    organization: DatasetOrganization::Sequential,
+                    record_format: RecordFormat::VariableBlocked,
+                    logical_record_length: 5,
+                    key_offset: None,
+                    key_length: None,
+                    ccsid: Some(37),
+                },
+                mutation: mutation(11),
+            })
+            .unwrap();
+        assert!(matches!(
+            service.invoke(DatasetRequest::Write {
+                dataset: variable,
+                member: None,
+                records: vec![b"TOO-LONG".to_vec()],
+                expected_version: Some(1),
+                mutation: mutation(12),
+            }),
+            Err(HostProblem::Condition { ref name, response: 22, .. }) if name == "LENGERR"
+        ));
+    }
+
+    #[test]
+    fn carddemo_gdg_roll_resolution_replay_and_restart_are_durable() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let base = DatasetName::new("CARDDEMO.TRANSACT.BKUP", 44).unwrap();
+        service
+            .invoke(DatasetRequest::DefineGenerationGroup {
+                base: base.clone(),
+                limit: 2,
+                scratch: true,
+                empty: false,
+                mutation: mutation(1),
+            })
+            .unwrap();
+        let mut third = None;
+        for sequence in 2..=4 {
+            let request = DatasetRequest::CreateGeneration {
+                base: base.clone(),
+                attributes: attrs(DatasetOrganization::Sequential),
+                records: vec![format!("G{sequence:03}").into_bytes()],
+                mutation: mutation(sequence),
+            };
+            let result = service.invoke(request.clone()).unwrap();
+            if sequence == 4 {
+                assert_eq!(service.invoke(request).unwrap(), result);
+                third = Some(result);
+            }
+        }
+        assert!(matches!(
+            third,
+            Some(DatasetResult::Generation {
+                absolute_generation: 3,
+                ..
+            })
+        ));
+        assert!(matches!(
+            service.invoke(DatasetRequest::ResolveGeneration {
+                base: base.clone(),
+                relative: 0,
+            }),
+            Ok(DatasetResult::Generation { ref dataset, absolute_generation: 3, .. })
+                if dataset.as_str().ends_with(".G0003V00")
+        ));
+        assert!(matches!(
+            service.invoke(DatasetRequest::ResolveGeneration {
+                base: base.clone(),
+                relative: -1,
+            }),
+            Ok(DatasetResult::Generation {
+                absolute_generation: 2,
+                ..
+            })
+        ));
+        assert_eq!(
+            service.invoke(DatasetRequest::ResolveGeneration {
+                base: base.clone(),
+                relative: -2,
+            }),
+            Err(HostProblem::NotFound)
+        );
+        assert_eq!(
+            service.invoke(DatasetRequest::Attributes {
+                dataset: DatasetName::new("CARDDEMO.TRANSACT.BKUP.G0001V00", 64).unwrap(),
+            }),
+            Err(HostProblem::NotFound)
+        );
+        let restarted = DatasetService::open(store, DatasetLimits::default()).unwrap();
+        assert!(matches!(
+            restarted.invoke(DatasetRequest::ResolveGeneration { base, relative: 0 }),
+            Ok(DatasetResult::Generation {
+                absolute_generation: 3,
+                ..
+            })
         ));
     }
 

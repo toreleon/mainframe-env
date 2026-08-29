@@ -963,6 +963,7 @@ name = "mainframe-env-application"
 version = "0.1.0-alpha.0"
 dependencies = [
  "mainframe-env-execution-api",
+ "mainframe-env-host-api",
  "serde_json",
  "sha2 0.10.9",
 ]

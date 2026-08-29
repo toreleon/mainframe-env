@@ -120,6 +120,14 @@ host-effect sequencing, and transactional lifecycle journaling. It depends on
 IR and execution/host/store contracts, never on COBOL syntax or concrete
 providers/stores.
 
+### `mainframe-env-application`
+
+Owns content-addressed application manifests, atomic install selection, named
+program generations, BMS/CSD resource forms, and validated dataset catalogs.
+Dataset catalogs represent exact organization, record-format, record-length,
+key, PDS member-extension, and GDG roll-policy metadata through host contracts;
+they contain no provider state or local corpus paths.
+
 ## COBOL compiler modules
 
 ### `mainframe-env-compiler::syntax`

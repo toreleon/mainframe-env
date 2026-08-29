@@ -177,9 +177,11 @@
       "priority": "P0",
       "domain": "dataset-catalog",
       "title": "Add the reached dataset organizations and catalog lifecycle",
-      "state": "open",
+      "state": "passed",
       "depends_on": ["CD-009", "CD-014"],
       "commit_subject": "Add CardDemo dataset catalog forms",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-015.json",
+      "evidence_digest": "sha256:4997afd59b8772e210ffd62895de364bc5a1a2efc19012cc6bdfe1948c0a71f7",
       "acceptance": ["23 runtime import definitions are represented", "GDG base/generation roll and disposition work", "PDS member catalogs and DD concatenation work", "ESDS, RRDS, fixed/variable/line-sequential and exact LRECL/key metadata are enforced"]
     },
     {

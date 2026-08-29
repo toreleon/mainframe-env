@@ -827,21 +827,38 @@ impl ProductServer {
         principal: &str,
         request: DatasetRequest,
     ) -> Result<DatasetResult, GatewayProblem> {
+        if let DatasetRequest::ReadConcatenation { datasets, .. } = &request {
+            for dataset in datasets {
+                self.authorize_resource(
+                    principal,
+                    "DATASET",
+                    dataset.as_str(),
+                    AccessIntent::Read,
+                )?;
+            }
+        }
         let dataset = match &request {
             DatasetRequest::List { pattern, .. } => Some(pattern.as_str()),
+            DatasetRequest::ReadConcatenation { .. } => None,
             DatasetRequest::Rename { from, .. } => Some(from.as_str()),
             DatasetRequest::Attributes { dataset }
             | DatasetRequest::ListMembers { dataset, .. }
             | DatasetRequest::Read { dataset, .. }
+            | DatasetRequest::ReadRelative { dataset, .. }
             | DatasetRequest::Create { dataset, .. }
             | DatasetRequest::Write { dataset, .. }
             | DatasetRequest::RewriteRecord { dataset, .. }
             | DatasetRequest::DeleteRecord { dataset, .. }
+            | DatasetRequest::WriteRelative { dataset, .. }
+            | DatasetRequest::DeleteRelative { dataset, .. }
             | DatasetRequest::Delete { dataset, .. }
             | DatasetRequest::StartBrowse { dataset, .. }
             | DatasetRequest::ReadNext { dataset, .. }
             | DatasetRequest::EndBrowse { dataset, .. } => Some(dataset.as_str()),
-            DatasetRequest::DefineAlternateIndex { base, .. } => Some(base.as_str()),
+            DatasetRequest::DefineAlternateIndex { base, .. }
+            | DatasetRequest::DefineGenerationGroup { base, .. }
+            | DatasetRequest::CreateGeneration { base, .. }
+            | DatasetRequest::ResolveGeneration { base, .. } => Some(base.as_str()),
         };
         if let Some(dataset) = dataset {
             self.authorize_resource(
@@ -853,6 +870,8 @@ impl ProductServer {
                     DatasetRequest::Attributes { .. }
                         | DatasetRequest::ListMembers { .. }
                         | DatasetRequest::Read { .. }
+                        | DatasetRequest::ReadRelative { .. }
+                        | DatasetRequest::ResolveGeneration { .. }
                         | DatasetRequest::List { .. }
                 ) {
                     AccessIntent::Read

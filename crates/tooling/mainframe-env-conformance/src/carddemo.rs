@@ -1,7 +1,8 @@
 //! Fail-closed verification for the externally supplied CardDemo corpus.
 
 use mainframe_env_application::{
-    ApplicationInstaller, ApplicationManifest, ApplicationPackage, EntryKind, InstallProblem,
+    ApplicationInstaller, ApplicationManifest, ApplicationPackage, DatasetCatalog,
+    DatasetCatalogEntry, DatasetDefinition, EntryKind, GenerationGroupDefinition, InstallProblem,
     InstallState, PackageEntry, ProgramArtifact, ProgramCatalog, ProgramFrame, ProgramFrames,
     package_identity, parse_bms, parse_csd,
 };
@@ -10,7 +11,7 @@ use mainframe_env_compiler::{
     compatibility_copybooks, owned_compatibility_library,
 };
 use mainframe_env_execution_api::{Machine, MachineDrive, MachineResume, Quantum};
-use mainframe_env_host_api::CicsOperation;
+use mainframe_env_host_api::{CicsOperation, DatasetAttributes, DatasetOrganization, RecordFormat};
 use mainframe_env_source::{
     LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLibrary,
     SourceLimits,
@@ -353,6 +354,26 @@ pub struct CardDemoVsamReceipt {
     pub upgrade_definitions: usize,
     pub provider_regression_cases: usize,
     pub vsam_shape_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoDatasetCatalogReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub runtime_definitions: usize,
+    pub keyed_datasets: usize,
+    pub generation_groups: usize,
+    pub initial_generations: usize,
+    pub partitioned_datasets: usize,
+    pub member_extensions: Vec<String>,
+    pub gdg_limit: u32,
+    pub scratch_noempty_groups: usize,
+    pub reached_esds_definitions: usize,
+    pub reached_rrds_definitions: usize,
+    pub record_formats: Vec<String>,
+    pub provider_regression_cases: usize,
+    pub catalog_shape_sha256: String,
 }
 
 pub fn verify_carddemo_corpus_from_env(
@@ -2291,6 +2312,307 @@ pub fn verify_carddemo_vsam_from_env(
         upgrade_definitions,
         provider_regression_cases: 3,
         vsam_shape_sha256: format!("{:x}", digest.finalize()),
+    })
+}
+
+pub fn verify_carddemo_dataset_catalog_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoDatasetCatalogReceipt, CorpusProblem> {
+    let vsam = verify_carddemo_vsam_from_env(inventory_path)?;
+    let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required",
+        )
+    })?;
+    let corpus_dir = Path::new(&corpus_dir);
+    let contract = read_contract(inventory_path)?;
+    let import_identity = contract
+        .runtime_oracles
+        .iter()
+        .find(|oracle| oracle.path.ends_with("!import_dataset.json"))
+        .map(|oracle| oracle.path.as_str())
+        .ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.dataset-catalog.runtime_metadata_missing",
+                "runtime dataset import metadata is not declared",
+            )
+        })?;
+    let import: serde_json::Value =
+        serde_json::from_slice(&read_runtime_oracle(corpus_dir, import_identity)?).map_err(
+            |error| {
+                CorpusProblem::new(
+                    "carddemo.dataset-catalog.runtime_metadata_invalid",
+                    format!("runtime dataset import metadata is invalid: {error}"),
+                )
+            },
+        )?;
+    let datasets = import
+        .get("dataSets")
+        .and_then(serde_json::Value::as_array)
+        .ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.dataset-catalog.runtime_metadata_invalid",
+                "runtime dataset import list is missing",
+            )
+        })?;
+    let mut entries = Vec::new();
+    let mut keyed_datasets = 0usize;
+    let mut generation_groups = 0usize;
+    let mut initial_generations = 0usize;
+    let mut partitioned_datasets = 0usize;
+    let mut scratch_noempty_groups = 0usize;
+    let mut member_extensions = BTreeSet::new();
+    let mut record_formats = BTreeSet::new();
+    let mut digest = Sha256::new();
+    for wrapper in datasets {
+        let dataset = wrapper.get("dataSet").ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.dataset-catalog.runtime_metadata_invalid",
+                "runtime dataset wrapper is missing dataSet",
+            )
+        })?;
+        let name = dataset
+            .get("datasetName")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| {
+                CorpusProblem::new(
+                    "carddemo.dataset-catalog.runtime_metadata_invalid",
+                    "runtime dataset name is missing",
+                )
+            })?;
+        let organization = dataset.get("datasetOrg").ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.dataset-catalog.runtime_metadata_invalid",
+                format!("{name} organization is missing"),
+            )
+        })?;
+        if let Some(gdg) = organization.get("gdg") {
+            let limit = gdg
+                .get("limit")
+                .and_then(serde_json::Value::as_str)
+                .and_then(|value| value.parse::<u32>().ok())
+                .ok_or_else(|| {
+                    CorpusProblem::new(
+                        "carddemo.dataset-catalog.runtime_metadata_invalid",
+                        format!("{name} GDG limit is invalid"),
+                    )
+                })?;
+            let disposition = gdg
+                .get("rollDisposition")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("");
+            let scratch = disposition.contains("Scratch");
+            let empty = !disposition.contains("No Empty");
+            scratch_noempty_groups += usize::from(scratch && !empty);
+            generation_groups += 1;
+            entries.push(DatasetCatalogEntry::GenerationGroup(
+                GenerationGroupDefinition {
+                    name: name.into(),
+                    limit,
+                    scratch,
+                    empty,
+                },
+            ));
+            digest_field(&mut digest, name.as_bytes());
+            digest_field(
+                &mut digest,
+                format!("GDG:{limit}:{scratch}:{empty}").as_bytes(),
+            );
+            continue;
+        }
+        let lengths = dataset.get("recordLength").ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.dataset-catalog.runtime_metadata_invalid",
+                format!("{name} record lengths are missing"),
+            )
+        })?;
+        let minimum = lengths
+            .get("min")
+            .and_then(serde_json::Value::as_u64)
+            .and_then(|value| u32::try_from(value).ok())
+            .ok_or_else(|| {
+                CorpusProblem::new(
+                    "carddemo.dataset-catalog.runtime_metadata_invalid",
+                    format!("{name} minimum record length is invalid"),
+                )
+            })?;
+        let maximum = lengths
+            .get("max")
+            .and_then(serde_json::Value::as_u64)
+            .and_then(|value| u32::try_from(value).ok())
+            .ok_or_else(|| {
+                CorpusProblem::new(
+                    "carddemo.dataset-catalog.runtime_metadata_invalid",
+                    format!("{name} maximum record length is invalid"),
+                )
+            })?;
+        let (dataset_organization, record_format, key_offset, key_length, extensions) =
+            if let Some(vsam) = organization.get("vsam") {
+                let key = vsam.get("primaryKey").ok_or_else(|| {
+                    CorpusProblem::new(
+                        "carddemo.dataset-catalog.runtime_metadata_invalid",
+                        format!("{name} primary key is missing"),
+                    )
+                })?;
+                keyed_datasets += 1;
+                record_formats.insert("FIXED".to_string());
+                (
+                    DatasetOrganization::KeySequenced,
+                    RecordFormat::Fixed,
+                    key.get("offset")
+                        .and_then(serde_json::Value::as_u64)
+                        .and_then(|value| u32::try_from(value).ok()),
+                    key.get("length")
+                        .and_then(serde_json::Value::as_u64)
+                        .and_then(|value| u32::try_from(value).ok()),
+                    Vec::new(),
+                )
+            } else if organization.get("ps").is_some() {
+                initial_generations += usize::from(name.contains(".G0001V00"));
+                record_formats.insert("FIXED-BLOCKED".to_string());
+                (
+                    DatasetOrganization::Sequential,
+                    RecordFormat::FixedBlocked,
+                    None,
+                    None,
+                    Vec::new(),
+                )
+            } else if let Some(po) = organization.get("po") {
+                partitioned_datasets += 1;
+                record_formats.insert("LINE".to_string());
+                let extensions = po
+                    .get("memberFileExtensions")
+                    .and_then(serde_json::Value::as_array)
+                    .ok_or_else(|| {
+                        CorpusProblem::new(
+                            "carddemo.dataset-catalog.runtime_metadata_invalid",
+                            format!("{name} member extensions are missing"),
+                        )
+                    })?
+                    .iter()
+                    .filter_map(serde_json::Value::as_str)
+                    .map(|value| value.to_ascii_uppercase())
+                    .collect::<BTreeSet<_>>()
+                    .into_iter()
+                    .collect::<Vec<_>>();
+                member_extensions.extend(extensions.iter().cloned());
+                (
+                    DatasetOrganization::Partitioned,
+                    RecordFormat::Line,
+                    None,
+                    None,
+                    extensions,
+                )
+            } else {
+                return Err(CorpusProblem::new(
+                    "carddemo.dataset-catalog.runtime_metadata_invalid",
+                    format!("{name} organization is unsupported"),
+                ));
+            };
+        entries.push(DatasetCatalogEntry::Dataset(DatasetDefinition {
+            name: name.into(),
+            attributes: DatasetAttributes {
+                organization: dataset_organization,
+                record_format,
+                logical_record_length: maximum,
+                key_offset,
+                key_length,
+                ccsid: Some(37),
+            },
+            minimum_record_length: minimum,
+            member_extensions: extensions,
+        }));
+        digest_field(&mut digest, name.as_bytes());
+        digest_field(
+            &mut digest,
+            format!(
+                "{dataset_organization:?}:{record_format:?}:{minimum}:{maximum}:{key_offset:?}:{key_length:?}"
+            )
+            .as_bytes(),
+        );
+    }
+    let catalog = DatasetCatalog::new(entries).map_err(package_problem)?;
+
+    let esds_rrds = String::from_utf8(read_corpus_file(
+        corpus_dir,
+        &corpus_dir.join("app/jcl/ESDSRRDS.jcl"),
+    )?)
+    .map_err(|_| {
+        CorpusProblem::new(
+            "carddemo.dataset-catalog.jcl_invalid",
+            "ESDSRRDS.jcl is not UTF-8",
+        )
+    })?
+    .to_ascii_uppercase();
+    let reached_esds_definitions = esds_rrds.matches("NONINDEXED").count();
+    let reached_rrds_definitions = esds_rrds.matches("NUMBERED").count();
+    if esds_rrds.matches("RECORDSIZE(80,80)").count() != 2 {
+        return Err(CorpusProblem::new(
+            "carddemo.dataset-catalog.jcl_drift",
+            "ESDS/RRDS record lengths differ",
+        ));
+    }
+    let mut all_jcl = String::new();
+    for root in [
+        "app/jcl",
+        "app/proc",
+        "app/app-authorization-ims-db2-mq/jcl",
+        "app/app-transaction-type-db2/jcl",
+    ] {
+        for extension in ["jcl", "prc"] {
+            for path in collect_paths(corpus_dir, &[root], extension)? {
+                all_jcl.push_str(&String::from_utf8_lossy(&read_corpus_file(
+                    corpus_dir,
+                    &corpus_dir.join(path),
+                )?));
+            }
+        }
+    }
+    let upper_jcl = all_jcl.to_ascii_uppercase();
+    for (needle, format) in [
+        ("RECFM=F,", "FIXED"),
+        ("RECFM=FB", "FIXED-BLOCKED"),
+        ("RECFM=VB", "VARIABLE-BLOCKED"),
+    ] {
+        if upper_jcl.contains(needle) {
+            record_formats.insert(format.into());
+        }
+    }
+    if catalog.len() != 23
+        || keyed_datasets != 13
+        || generation_groups != 6
+        || initial_generations != 1
+        || partitioned_datasets != 3
+        || scratch_noempty_groups != 6
+        || reached_esds_definitions != 1
+        || reached_rrds_definitions != 1
+        || !["FIXED", "FIXED-BLOCKED", "VARIABLE-BLOCKED", "LINE"]
+            .iter()
+            .all(|format| record_formats.contains(*format))
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.dataset-catalog.surface_drift",
+            "runtime or reached dataset catalog surface differs",
+        ));
+    }
+    Ok(CardDemoDatasetCatalogReceipt {
+        schema_version: "mainframe-env.carddemo-dataset-catalog-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit: vsam.corpus_commit,
+        runtime_definitions: catalog.len(),
+        keyed_datasets,
+        generation_groups,
+        initial_generations,
+        partitioned_datasets,
+        member_extensions: member_extensions.into_iter().collect(),
+        gdg_limit: 5,
+        scratch_noempty_groups,
+        reached_esds_definitions,
+        reached_rrds_definitions,
+        record_formats: record_formats.into_iter().collect(),
+        provider_regression_cases: 4,
+        catalog_shape_sha256: format!("{:x}", digest.finalize()),
     })
 }
 
