@@ -1,7 +1,7 @@
 # mainframe-env 0.1 Implementation Status
 
-Current phase: **ME.V1 — foundation and contracts**
-Current work item: the ME.V1 gate passed; create the required phase commit.
+Current phase: **ME.V2 — COBOL and reference execution**
+Current work item: the ME.V2 gate passed; create the required phase commit.
 Product version: **0.1.0-alpha.0**
 Source identity: unborn `main` branch with deterministic initial content digest
 `sha256:f821878d7ad92236993e88fa2eab9355f3c493abe31bf2c49e653becc92e25b5`.
@@ -26,6 +26,13 @@ Source identity: unborn `main` branch with deterministic initial content digest
   snapshots, store contracts, and bounded in-memory stores.
 - Passed 42 ME.V1 unit/property tests plus strict Clippy/docs, architecture, inventory, and Rust
   1.95 contract MSRV checks.
+- Committed ME.V1 as `4bd5c983938354be621dcffd0cf3b6b9c5640ca5` with the required trailers.
+- Implemented bounded fixed/free and CP037 COBOL input, lossless Rowan syntax, COPY/REPLACING
+  with expansion identity, data layouts, typed HIR, Core-MIR lowering, fail-closed legality,
+  artifact publication, a deterministic bounded machine, and shared CLI compile/run/inspect paths.
+- Reproduced the frozen OpenMainframe HELLO output exactly (`sha256:9ca8206d...a637c25b`),
+  proved 37 frozen supported statement-family routes, retained six oracle-matching unsupported
+  families as compile-time diagnostics, and passed cancellation/timeout/resource/provider controls.
 
 Exact machine evidence is in
 `conformance/0.1/evidence/program-status.json` and
@@ -42,7 +49,7 @@ Exact machine evidence is in
 
 ## Known gaps and stop-the-line findings
 
-No V0 or V1 stop-the-line finding is open. ME.V2–ME.V7 implementation is pending. Current oracle gaps,
+No V0–V2 stop-the-line finding is open. ME.V3–ME.V7 implementation is pending. Current oracle gaps,
 including historical evidence revision differences, partial COBOL/CICS forms, inactive TLS/CSRF,
 and the pending PostgreSQL runner, are recorded in
 `conformance/0.1/inventory/known-gaps.json` and block only their affected later promotions.
@@ -54,5 +61,5 @@ passed: COBOL 37, RACF 8, z/OSMF datasets 9, z/OSMF jobs 9, CICS 317, JCL 164, a
 
 ## Next smallest executable step
 
-Record the canonical V1 content digest, review the complete staged diff, and create the dedicated
-`Complete ME.V1 foundation contracts` commit. Then begin the COBOL/reference-machine phase.
+Record the canonical V2 content digest, review the complete staged diff, and create the dedicated
+`Complete ME.V2 COBOL execution path` commit. Then begin dataset and RACF/SAF authorities.

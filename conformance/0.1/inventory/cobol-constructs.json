@@ -2,6 +2,7 @@
   "schema_version": "mainframe-env.cobol-constructs@1",
   "oracle_source": "OpenMainframe conformance/r0/inventory/semantic-coverage.json",
   "oracle_source_sha256": "09ae580d6438c6eb495a30a8ac33ca08a8bbf7dd37290bb7f112e8ecbe6224a6",
+  "me_v2_result": {"implemented_frozen_subforms":37,"explicit_unsupported_matching_oracle":6,"unassigned":0,"selected_backend":"mainframe-env-reference@1"},
   "constructs": [
     {"id":"cobol.statement.accept","name":"ACCEPT","oracle":"implemented","v0_1":"reimplement"},
     {"id":"cobol.statement.add","name":"ADD","oracle":"implemented","v0_1":"reimplement"},

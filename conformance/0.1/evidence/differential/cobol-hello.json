@@ -1,0 +1,16 @@
+{
+  "schema_version":"mainframe-env.differential@1",
+  "selector":"program:COBOL:HELLO",
+  "fixture":"conformance/0.1/fixtures/cobol/HELLO.cbl",
+  "fixture_sha256":"972b56b4cb02f4997ee1533be57e0d40edc533a5de58a7e73afd3b93659615e3",
+  "oracle_revision":"cee4b1df3fa5e32066b7948d528c163f8636a18e",
+  "oracle_command":"cargo +1.82 test -p open-mainframe r1_direct_hello_preserves_legacy_output_and_records_selection --locked -- --nocapture",
+  "oracle_exit_code":0,
+  "mainframe_env_command":"cargo run --quiet -p mainframe-env-cli -- run <fixture> --format fixed",
+  "mainframe_env_exit_code":0,
+  "compared_fields":["stdout bytes","return code","terminal outcome","selected reference executor"],
+  "stdout_sha256":"9ca8206d342a22fcdf95945e6bbc852c37894933a4ab7a718aa6ebd1a637c25b",
+  "expected_stdout":"================================\n     zOS-clone Hello World\n================================\nHello, World!       \nGoodbye!\n",
+  "normalization":[],
+  "status":"pass_exact"
+}

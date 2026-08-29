@@ -9,6 +9,10 @@ members = [
     "crates/contracts/mainframe-env-host-api",
     "crates/contracts/mainframe-env-store-api",
     "crates/stores/mainframe-env-store",
+    "crates/kernel/mainframe-env-compiler",
+    "crates/kernel/mainframe-env-interpreter",
+    "crates/apps/mainframe-env-cli",
+    "crates/tooling/mainframe-env-conformance",
     "xtask",
 ]
 resolver = "3"
@@ -26,6 +30,8 @@ serde_json = "1"
 sha2 = "0.10"
 toml = "0.8"
 proptest = "1"
+rowan = "0.16"
+clap = { version = "4", default-features = false, features = ["derive", "std", "help", "usage", "error-context"] }
 
 mainframe-env-source = { path = "crates/foundation/mainframe-env-source" }
 mainframe-env-diagnostics = { path = "crates/foundation/mainframe-env-diagnostics" }
@@ -35,3 +41,5 @@ mainframe-env-compiler-api = { path = "crates/contracts/mainframe-env-compiler-a
 mainframe-env-execution-api = { path = "crates/contracts/mainframe-env-execution-api" }
 mainframe-env-host-api = { path = "crates/contracts/mainframe-env-host-api" }
 mainframe-env-store-api = { path = "crates/contracts/mainframe-env-store-api" }
+mainframe-env-compiler = { path = "crates/kernel/mainframe-env-compiler" }
+mainframe-env-interpreter = { path = "crates/kernel/mainframe-env-interpreter" }

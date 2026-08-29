@@ -12,6 +12,7 @@
       {"name":"suspend","operands":"0..1","results":0,"effects":["suspension"],"terminator":true,"route":"reference"},
       {"name":"host_call","operands":"0..64","results":"0..16","effects":"catalog-declared","route":"registered host import"}
     ]},
+    {"id":"mainframe.core.cobol@1","operations":["init","accept","add","allocate","alter","call","cancel","close","compute","continue","display","divide","entry","evaluate","exec_cics","exit","free","go_back","go_to","if","initialize","inspect","json_generate","json_parse","move","multiply","open","perform","read","search","set","stop_run","string","subtract","unstring","write","xml_generate","xml_parse","label","halt"],"route":"mainframe-env-reference@1","unsupported_source_forms":["exec_sql","invoke","merge","release","return_statement","sort"]},
     {"id":"cics.typed@1","operations_source":"cics-operations.json","route":"mainframe-env-host-api typed CicsRequest"}
   ]
 }

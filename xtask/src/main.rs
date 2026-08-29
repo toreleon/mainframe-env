@@ -248,6 +248,19 @@ fn allowed_internal_dependency(package: &str, dependency: &str) -> bool {
         "mainframe-env-host-api" => &["mainframe-env-execution-api"],
         "mainframe-env-store-api" => &["mainframe-env-execution-api"],
         "mainframe-env-store" => &["mainframe-env-execution-api", "mainframe-env-store-api"],
+        "mainframe-env-compiler" => &[
+            "mainframe-env-source",
+            "mainframe-env-diagnostics",
+            "mainframe-env-encoding",
+            "mainframe-env-ir",
+            "mainframe-env-compiler-api",
+        ],
+        "mainframe-env-interpreter" => &[
+            "mainframe-env-diagnostics",
+            "mainframe-env-ir",
+            "mainframe-env-execution-api",
+            "mainframe-env-host-api",
+        ],
         _ => return true,
     };
     allowed.contains(&dependency)
@@ -320,6 +333,7 @@ fn check_inventory(root: &Path) -> TaskResult {
         "packages.json",
         "selectors.json",
         "cobol-constructs.json",
+        "cobol-cohorts.json",
         "cics-operations.json",
         "jcl-jes-coverage.json",
         "dataset-coverage.json",

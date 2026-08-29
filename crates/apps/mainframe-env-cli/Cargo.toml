@@ -1,0 +1,20 @@
+[package]
+name = "mainframe-env-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "mainframe-env"
+path = "src/main.rs"
+
+[dependencies]
+clap.workspace = true
+mainframe-env-source.workspace = true
+mainframe-env-ir.workspace = true
+mainframe-env-compiler-api.workspace = true
+mainframe-env-execution-api.workspace = true
+mainframe-env-host-api.workspace = true
+mainframe-env-compiler.workspace = true
+mainframe-env-interpreter.workspace = true
