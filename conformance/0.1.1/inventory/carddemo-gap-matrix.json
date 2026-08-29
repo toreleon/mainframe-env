@@ -105,9 +105,11 @@
       "priority": "P0",
       "domain": "application-package",
       "title": "Add a generic content-addressed application package and installer",
-      "state": "open",
+      "state": "passed",
       "depends_on": ["CD-001", "CD-003"],
       "commit_subject": "Add generic mainframe application packages",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-009.json",
+      "evidence_digest": "sha256:aebf2c87b6891e6018ee13652cfcc30609d5a2635634730338d52aba8c48c317",
       "acceptance": ["owned manifests cover sources, resources, programs, data, profiles, and migrations", "install is atomic, idempotent, restartable, and content-addressed", "partial, duplicate, orphan, or incompatible installs are not ready", "production code has no CardDemo-specific behavior"]
     },
     {

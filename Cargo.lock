@@ -959,6 +959,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
 
 [[package]]
+name = "mainframe-env-application"
+version = "0.1.0-alpha.0"
+dependencies = [
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "mainframe-env-batch"
 version = "0.1.0-alpha.0"
 dependencies = [
@@ -1022,6 +1030,7 @@ dependencies = [
 name = "mainframe-env-conformance"
 version = "0.1.0-alpha.0"
 dependencies = [
+ "mainframe-env-application",
  "mainframe-env-compiler",
  "mainframe-env-compiler-api",
  "mainframe-env-diagnostics",
@@ -1116,6 +1125,7 @@ dependencies = [
  "axum",
  "axum-server",
  "base64",
+ "mainframe-env-application",
  "mainframe-env-batch",
  "mainframe-env-cics",
  "mainframe-env-compiler",

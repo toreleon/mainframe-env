@@ -1,17 +1,17 @@
 # CardDemo-full 0.1.1 Program Status
 
 Current phase: **CD.A — corpus and application packaging**
-Current issue: **CD-008 — typed embedded host operands PASS**
-Next issue: **CD-009 — generic application packages**
+Current issue: **CD-009 — generic application packages PASS**
+Next issue: **CD-010 — BMS and CSD resources**
 Current product: **0.1.0-alpha.0**
 Target product: **0.1.1**
 CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Source identity
 
-- mainframe-env base commit: `91eeac38c62cca69670c91eb1adb5c7d90a8a177`
+- mainframe-env base commit: `b203b9d7e73047af8b74af5d919280cad97316f3`
 - current deterministic dirty-tree identity:
-  `sha256:80fcffb8f2dc408643e4633efb9742c2b581f48d948531f97bc8774e3307c499`
+  `sha256:1ceba56607a427a859838db8dbd555b0cfa762fb7f93d77b34b15c59e4dddc02`
 - dirty-tree algorithm: SHA-256 of the sorted `sha256sum` records for every
   repository file except `.git/`, `target/`, and the two persistent CardDemo
   status ledgers (which carry the identity).
@@ -179,8 +179,8 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 - State: **PASS**
 - Required commit subject: `Lower CardDemo embedded host operations`
-- Completion commit identity: recorded when CD-009 starts from this issue
-  commit.
+- Completion commit identity:
+  `b203b9d7e73047af8b74af5d919280cad97316f3`.
 - Evidence: `conformance/0.1.1/evidence/issues/CD-008.json`
 - Evidence digest:
   `sha256:5c6d97d6499842d32d7063c64f2179917fd435321999bbd63e2abaac92fbb27b`
@@ -192,6 +192,23 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   operations, 673 typed operands, 232 destinations, every reached opcode, and
   four executable ABI oracles. Its shape digest is
   `sha256:ceb16597bc10703bb52cdf03a40c082d7aa57cdb66314350b98ed289e147d76e`.
+
+### CD-009 — generic content-addressed application packages
+
+- State: **PASS**
+- Required commit subject: `Add generic mainframe application packages`
+- Completion commit identity: recorded when CD-010 starts from this issue commit.
+- Evidence: `conformance/0.1.1/evidence/issues/CD-009.json`
+- Evidence digest:
+  `sha256:aebf2c87b6891e6018ee13652cfcc30609d5a2635634730338d52aba8c48c317`
+- A generic production kernel owns canonical manifests and atomic staging,
+  commit, readiness, restart, and idempotent replay. The server composes it
+  without CardDemo-specific branches.
+- The owned package identity is
+  `sha256:e3f0674a667fe38d3b4aa823f73bf83d7ef1bc8af1f9813c18978761aee34860`;
+  source, resource, program, data, profile, and migration cohorts are exact.
+- Partial, corrupt, orphaned, incompatible, and conflicting installs fail
+  before readiness; staged state remains explicitly not-ready.
 
 ## Commands and exit codes
 
@@ -289,7 +306,7 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Implementation status
 
-- Issues passed: **8 / 27**
+- Issues passed: **9 / 27**
 - Journeys passed: **0 / 20**
 - Installed CardDemo resources: **0**
 - Executed CardDemo application journeys: **0**
@@ -303,11 +320,10 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 2. The repository is still `0.1.0-alpha.0`. A 0.1.1 release cannot be cut until
    0.1.0 is finalized or an explicit version-line correction is accepted.
 
-Neither decision blocks CD-009. No CD-008 blocker remains.
+Neither decision blocks CD-010. No CD-009 blocker remains.
 
 ## Next smallest executable step
 
-Add generic content-addressed application manifests and an atomic, idempotent,
-restartable installer covering sources, programs, resources, data, profiles,
-and migrations. Partial, duplicate, orphan, and incompatible installations
-must remain not-ready without CardDemo-specific production branches.
+Parse and install the exact BMS and CSD resource graph, retaining map fields,
+transactions, programs, files, queues, and cross-references while leaving the
+orphan CDV1/COCRDSEC decision explicit.

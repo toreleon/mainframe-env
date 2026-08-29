@@ -16,6 +16,7 @@ mainframe-env-execution-api.workspace = true
 mainframe-env-host-api.workspace = true
 mainframe-env-compiler.workspace = true
 mainframe-env-interpreter.workspace = true
+mainframe-env-application.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

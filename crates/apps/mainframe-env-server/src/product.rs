@@ -1,5 +1,6 @@
 use crate::{DefaultProgramRouter, ServerConfig, default_program_router};
 use axum::http::StatusCode;
+use mainframe_env_application::ApplicationInstaller;
 use mainframe_env_batch::{BatchService, JclBundle};
 use mainframe_env_cics::{CicsService, cics_provider};
 use mainframe_env_dataset::{DatasetService, dataset_providers};
@@ -59,6 +60,7 @@ pub struct ProductServer {
     batch: Arc<BatchService>,
     artifacts: LocalArtifactStore,
     host: Arc<ScopedHostService>,
+    applications: ApplicationInstaller,
     sessions: Mutex<BTreeMap<String, AuthSession>>,
     console: Mutex<Vec<ConsoleMessage>>,
     sequence: AtomicU64,
@@ -142,6 +144,7 @@ impl ProductServer {
             batch,
             artifacts,
             host,
+            applications: ApplicationInstaller::new("0.1.1"),
             sessions: Mutex::new(sessions),
             console: Mutex::new(console),
             sequence: AtomicU64::new(1),
@@ -160,6 +163,11 @@ impl ProductServer {
         let secrets = Arc::new(MemorySecretResolver::default());
         let program = default_program_router();
         Self::open(config, store, secrets, program)
+    }
+
+    #[must_use]
+    pub fn application_installer(&self) -> ApplicationInstaller {
+        self.applications.clone()
     }
 
     pub fn bootstrap_user(&self, user: &str, secret: &[u8]) -> Result<(), HostProblem> {

@@ -11,6 +11,7 @@ members = [
     "crates/stores/mainframe-env-store",
     "crates/kernel/mainframe-env-compiler",
     "crates/kernel/mainframe-env-interpreter",
+    "crates/kernel/mainframe-env-application",
     "crates/providers/mainframe-env-dataset",
     "crates/providers/mainframe-env-racf",
     "crates/providers/mainframe-env-cics",
@@ -61,6 +62,7 @@ mainframe-env-store-api = { path = "crates/contracts/mainframe-env-store-api" }
 mainframe-env-store = { path = "crates/stores/mainframe-env-store" }
 mainframe-env-compiler = { path = "crates/kernel/mainframe-env-compiler" }
 mainframe-env-interpreter = { path = "crates/kernel/mainframe-env-interpreter" }
+mainframe-env-application = { path = "crates/kernel/mainframe-env-application" }
 mainframe-env-dataset = { path = "crates/providers/mainframe-env-dataset" }
 mainframe-env-racf = { path = "crates/providers/mainframe-env-racf" }
 mainframe-env-cics = { path = "crates/providers/mainframe-env-cics" }

@@ -1,5 +1,9 @@
 //! Fail-closed verification for the externally supplied CardDemo corpus.
 
+use mainframe_env_application::{
+    ApplicationInstaller, ApplicationManifest, ApplicationPackage, EntryKind, InstallProblem,
+    InstallState, PackageEntry, package_identity,
+};
 use mainframe_env_compiler::{
     CobolCompiler, ControlEdgeKind, ControlRole, DataCategory, StatementKind, StorageSection,
     compatibility_copybooks, owned_compatibility_library,
@@ -246,6 +250,21 @@ pub struct CardDemoHostReceipt {
     pub opcodes: BTreeMap<String, usize>,
     pub typed_oracle_cases: usize,
     pub host_shape_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoPackageReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub package_name: String,
+    pub package_version: String,
+    pub package_identity: String,
+    pub entries: BTreeMap<String, String>,
+    pub staged_not_ready: bool,
+    pub committed_ready: bool,
+    pub idempotent_reinstall: bool,
+    pub negative_controls: usize,
 }
 
 pub fn verify_carddemo_corpus_from_env(
@@ -1353,6 +1372,130 @@ pub fn verify_carddemo_host_operands_from_env(
         typed_oracle_cases: 4,
         host_shape_sha256: format!("{:x}", digest.finalize()),
     })
+}
+
+pub fn verify_carddemo_application_package_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoPackageReceipt, CorpusProblem> {
+    let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required for CardDemo gates",
+        )
+    })?;
+    let corpus = verify_carddemo_corpus(Path::new(&corpus_dir), inventory_path)?;
+    let payloads = [
+        (EntryKind::Source, corpus.content.sha256.into_bytes()),
+        (EntryKind::Resource, b"bms=21\ncsd=1".to_vec()),
+        (EntryKind::Program, b"programs=44".to_vec()),
+        (EntryKind::Data, b"base-seeds=13".to_vec()),
+        (EntryKind::Profile, b"profiles=carddemo-full".to_vec()),
+        (
+            EntryKind::Migration,
+            b"mainframe-env.carddemo-install-migration@1".to_vec(),
+        ),
+    ];
+    let mut blobs = BTreeMap::new();
+    let mut entries = Vec::new();
+    let mut entry_receipts = BTreeMap::new();
+    for (kind, payload) in payloads {
+        let identity = format!("sha256:{:x}", Sha256::digest(&payload));
+        let path = format!("cohorts/{}", package_kind_slug(kind));
+        blobs.insert(identity.clone(), payload.clone());
+        entry_receipts.insert(path.clone(), identity.clone());
+        entries.push(PackageEntry {
+            path,
+            kind,
+            sha256: identity,
+            bytes: payload.len(),
+            depends_on: (kind != EntryKind::Source)
+                .then(|| "cohorts/source".to_string())
+                .into_iter()
+                .collect(),
+        });
+    }
+    let package = ApplicationPackage {
+        manifest: ApplicationManifest {
+            name: "AWS-CARDEMO".into(),
+            version: "0.1.1".into(),
+            target_product: "0.1.1".into(),
+            entries,
+        },
+        blobs,
+    };
+    let identity = package_identity(&package.manifest).map_err(package_problem)?;
+    let installer = ApplicationInstaller::new("0.1.1");
+    let staged = installer.stage(&package).map_err(package_problem)?;
+    let ready = installer.commit(&package).map_err(package_problem)?;
+    let replay = installer.install(&package).map_err(package_problem)?;
+    let mut negative_controls = 0usize;
+    let mut partial = package.clone();
+    partial.manifest.entries.pop();
+    negative_controls += usize::from(
+        ApplicationInstaller::new("0.1.1").install(&partial) == Err(InstallProblem::MissingKind),
+    );
+    let mut orphan = package.clone();
+    orphan.manifest.entries[0].depends_on.push("missing".into());
+    negative_controls += usize::from(
+        ApplicationInstaller::new("0.1.1").install(&orphan)
+            == Err(InstallProblem::OrphanDependency),
+    );
+    let mut corrupt = package.clone();
+    corrupt
+        .blobs
+        .values_mut()
+        .next()
+        .expect("six blobs")
+        .push(0);
+    negative_controls += usize::from(
+        ApplicationInstaller::new("0.1.1").install(&corrupt)
+            == Err(InstallProblem::ContentMismatch),
+    );
+    negative_controls += usize::from(
+        ApplicationInstaller::new("0.2.0").install(&package)
+            == Err(InstallProblem::IncompatibleProduct),
+    );
+    let mut conflict = package.clone();
+    conflict.manifest.version = "0.1.2".into();
+    negative_controls +=
+        usize::from(installer.install(&conflict) == Err(InstallProblem::IdentityConflict));
+    if negative_controls != 5 {
+        return Err(CorpusProblem::new(
+            "carddemo.package.negative_control_failed",
+            "one or more generic installer controls did not fail closed",
+        ));
+    }
+    Ok(CardDemoPackageReceipt {
+        schema_version: "mainframe-env.carddemo-package-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit: corpus.commit,
+        package_name: package.manifest.name,
+        package_version: package.manifest.version,
+        package_identity: identity,
+        entries: entry_receipts,
+        staged_not_ready: staged.state == InstallState::Staged,
+        committed_ready: ready.state == InstallState::Ready,
+        idempotent_reinstall: replay == ready,
+        negative_controls,
+    })
+}
+
+fn package_problem(problem: impl fmt::Debug) -> CorpusProblem {
+    CorpusProblem::new(
+        "carddemo.package.install_failed",
+        format!("generic application package failed: {problem:?}"),
+    )
+}
+
+const fn package_kind_slug(kind: EntryKind) -> &'static str {
+    match kind {
+        EntryKind::Source => "source",
+        EntryKind::Resource => "resource",
+        EntryKind::Program => "program",
+        EntryKind::Data => "data",
+        EntryKind::Profile => "profile",
+        EntryKind::Migration => "migration",
+    }
 }
 
 fn digest_field(digest: &mut Sha256, bytes: &[u8]) {
