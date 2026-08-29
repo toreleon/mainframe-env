@@ -322,6 +322,7 @@ pub enum SecurityDecision {
     Deny,
     NotFound,
     InvalidCredentials,
+    Expired,
     Revoked,
     Locked,
 }

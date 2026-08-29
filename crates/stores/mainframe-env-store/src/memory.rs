@@ -2,7 +2,8 @@ use mainframe_env_execution_api::{ArtifactRef, ExecutionId, IdempotencyKey, Life
 use mainframe_env_store_api::{
     ArtifactRecord, ArtifactStore, CheckpointRecord, CheckpointStore, EffectRecord, EffectState,
     EventStore, ExecutionRecord, ExecutionState, ExecutionStore, GenerationRecord, GenerationStore,
-    IdempotencyStore, SessionRecord, SessionStore, StoreError, WorkRecord, WorkState, WorkStore,
+    IdempotencyStore, ProviderStateRecord, ProviderStateStore, SessionRecord, SessionStore,
+    StoreError, WorkRecord, WorkState, WorkStore,
 };
 use std::collections::BTreeMap;
 use std::sync::{Mutex, MutexGuard};
@@ -18,6 +19,7 @@ pub struct StoreLimits {
     pub max_artifacts: usize,
     pub max_generations: usize,
     pub max_effects: usize,
+    pub max_provider_state: usize,
     pub max_blob_bytes: usize,
     pub max_total_blob_bytes: usize,
 }
@@ -34,6 +36,7 @@ impl Default for StoreLimits {
             max_artifacts: 4096,
             max_generations: 256,
             max_effects: 262_144,
+            max_provider_state: 262_144,
             max_blob_bytes: 64 * 1024 * 1024,
             max_total_blob_bytes: 512 * 1024 * 1024,
         }
@@ -50,6 +53,7 @@ struct State {
     artifacts: BTreeMap<ArtifactRef, ArtifactRecord>,
     generations: BTreeMap<String, GenerationRecord>,
     effects: BTreeMap<IdempotencyKey, EffectRecord>,
+    provider_state: BTreeMap<(String, String), ProviderStateRecord>,
     blob_bytes: usize,
 }
 
@@ -394,6 +398,118 @@ impl IdempotencyStore for MemoryStore {
 
     fn effect(&self, key: &IdempotencyKey) -> Result<Option<EffectRecord>, StoreError> {
         Ok(self.lock()?.effects.get(key).cloned())
+    }
+}
+
+impl ProviderStateStore for MemoryStore {
+    fn get_provider_state(
+        &self,
+        namespace: &str,
+        key: &str,
+    ) -> Result<Option<ProviderStateRecord>, StoreError> {
+        Ok(self
+            .lock()?
+            .provider_state
+            .get(&(namespace.to_string(), key.to_string()))
+            .cloned())
+    }
+
+    fn list_provider_state(
+        &self,
+        namespace: &str,
+        max: usize,
+    ) -> Result<Vec<ProviderStateRecord>, StoreError> {
+        if max == 0 || max > self.limits.max_provider_state {
+            return Err(StoreError::CapacityExceeded);
+        }
+        Ok(self
+            .lock()?
+            .provider_state
+            .iter()
+            .filter(|((candidate, _), _)| candidate == namespace)
+            .take(max)
+            .map(|(_, record)| record.clone())
+            .collect())
+    }
+
+    fn put_provider_state(
+        &self,
+        record: ProviderStateRecord,
+        expected_version: Option<u64>,
+    ) -> Result<(), StoreError> {
+        if record.namespace.is_empty() || record.key.is_empty() || record.version == 0 {
+            return Err(StoreError::IncompatibleVersion);
+        }
+        let mut state = self.lock()?;
+        let key = (record.namespace.clone(), record.key.clone());
+        let current = state.provider_state.get(&key);
+        match (current, expected_version) {
+            (None, None) if record.version == 1 => {}
+            (Some(current), Some(expected))
+                if current.version == expected && record.version == expected + 1 => {}
+            _ => return Err(StoreError::Conflict),
+        }
+        let old = current.map_or(0, |item| item.payload.len());
+        if old == 0 && state.provider_state.len() >= self.limits.max_provider_state {
+            return Err(StoreError::CapacityExceeded);
+        }
+        Self::reserve_blob(&mut state, old, record.payload.len(), self.limits)?;
+        state.provider_state.insert(key, record);
+        Ok(())
+    }
+
+    fn delete_provider_state(
+        &self,
+        namespace: &str,
+        key: &str,
+        expected_version: u64,
+    ) -> Result<(), StoreError> {
+        let mut state = self.lock()?;
+        let map_key = (namespace.to_string(), key.to_string());
+        let current = state
+            .provider_state
+            .get(&map_key)
+            .ok_or(StoreError::NotFound)?;
+        if current.version != expected_version {
+            return Err(StoreError::Conflict);
+        }
+        let bytes = current.payload.len();
+        state.provider_state.remove(&map_key);
+        state.blob_bytes = state.blob_bytes.saturating_sub(bytes);
+        Ok(())
+    }
+
+    fn move_provider_state(
+        &self,
+        record: ProviderStateRecord,
+        old_key: &str,
+        expected_version: u64,
+    ) -> Result<(), StoreError> {
+        if record.namespace.is_empty()
+            || record.key.is_empty()
+            || record.key == old_key
+            || record.version
+                != expected_version
+                    .checked_add(1)
+                    .ok_or(StoreError::Conflict)?
+        {
+            return Err(StoreError::Conflict);
+        }
+        let mut state = self.lock()?;
+        let old_map_key = (record.namespace.clone(), old_key.to_string());
+        let new_map_key = (record.namespace.clone(), record.key.clone());
+        let old = state
+            .provider_state
+            .get(&old_map_key)
+            .ok_or(StoreError::NotFound)?;
+        if old.version != expected_version || state.provider_state.contains_key(&new_map_key) {
+            return Err(StoreError::Conflict);
+        }
+        let old_bytes = old.payload.len();
+        Self::reserve_blob(&mut state, old_bytes, record.payload.len(), self.limits)?;
+        state.provider_state.remove(&old_map_key);
+        state.provider_state.insert(new_map_key, record);
+        Ok(())
     }
 }
 

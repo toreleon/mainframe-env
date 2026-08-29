@@ -5,6 +5,7 @@
 mod names;
 mod registry;
 mod request;
+mod service;
 
 pub use names::{
     DatasetName, HostNameProblem, JobName, MemberName, ProgramName, ResourceName, SessionId,
@@ -22,3 +23,5 @@ pub use request::{
 
 pub const HOST_CONTRACT: &str = "mainframe-env.host@1";
 pub const CICS_CONTRACT: &str = "mainframe-env.cics@1";
+
+pub use service::{AuditedEffectResult, ScopedHostService};

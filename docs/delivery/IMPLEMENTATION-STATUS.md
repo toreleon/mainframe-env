@@ -1,10 +1,10 @@
 # mainframe-env 0.1 Implementation Status
 
-Current phase: **ME.V2 — COBOL and reference execution**
-Current work item: the ME.V2 gate passed; create the required phase commit.
+Current phase: **ME.V3 — dataset and RACF/SAF authorities**
+Current work item: the ME.V3 candidate is complete; run the full gate and create the required phase commit.
 Product version: **0.1.0-alpha.0**
-Source identity: unborn `main` branch with deterministic initial content digest
-`sha256:f821878d7ad92236993e88fa2eab9355f3c493abe31bf2c49e653becc92e25b5`.
+Source identity: ME.V2 commit `a11034a382ddcb8ccd378926f1f3bb91f0b1bcc2` plus the
+current ME.V3 candidate.
 
 ## Completed deliverables
 
@@ -33,6 +33,14 @@ Source identity: unborn `main` branch with deterministic initial content digest
 - Reproduced the frozen OpenMainframe HELLO output exactly (`sha256:9ca8206d...a637c25b`),
   proved 37 frozen supported statement-family routes, retained six oracle-matching unsupported
   families as compile-time diagnostics, and passed cancellation/timeout/resource/provider controls.
+- Committed ME.V2 as `a11034a382ddcb8ccd378926f1f3bb91f0b1bcc2` with the required trailers.
+- Implemented typed dataset and RACF/SAF providers over isolated provider-state contracts, including
+  exact record/key bytes, member and browse behavior, optimistic mutation guards, atomic rename,
+  durable replay/unknown-outcome protection, Argon2 credential verification through secret references,
+  generic profiles, the RACF access hierarchy, default deny, bounded audit, and stable auth outcomes.
+- Added a durable SQLx SQLite state adapter and passed close/reopen recovery for datasets, identities,
+  groups, and profiles. Host middleware now fails closed on principal/grant, identity, cancellation,
+  deadline, request/result bound, missing provider, provider panic, and malformed-result controls.
 
 Exact machine evidence is in
 `conformance/0.1/evidence/program-status.json` and
@@ -49,7 +57,7 @@ Exact machine evidence is in
 
 ## Known gaps and stop-the-line findings
 
-No V0–V2 stop-the-line finding is open. ME.V3–ME.V7 implementation is pending. Current oracle gaps,
+No V0–V3 stop-the-line finding is open. ME.V4–ME.V7 implementation is pending. Current oracle gaps,
 including historical evidence revision differences, partial COBOL/CICS forms, inactive TLS/CSRF,
 and the pending PostgreSQL runner, are recorded in
 `conformance/0.1/inventory/known-gaps.json` and block only their affected later promotions.
@@ -61,5 +69,5 @@ passed: COBOL 37, RACF 8, z/OSMF datasets 9, z/OSMF jobs 9, CICS 317, JCL 164, a
 
 ## Next smallest executable step
 
-Record the canonical V2 content digest, review the complete staged diff, and create the dedicated
-`Complete ME.V2 COBOL execution path` commit. Then begin dataset and RACF/SAF authorities.
+Run the complete locked ME.V3 gate, record its canonical content digest, review the staged diff, and
+create the dedicated `Complete ME.V3 dataset and security authorities` commit.

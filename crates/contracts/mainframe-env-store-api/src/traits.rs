@@ -1,6 +1,6 @@
 use crate::{
     ArtifactRecord, CheckpointRecord, EffectRecord, ExecutionRecord, ExecutionState,
-    GenerationRecord, SessionRecord, StoreError, WorkRecord,
+    GenerationRecord, ProviderStateRecord, SessionRecord, StoreError, WorkRecord,
 };
 use mainframe_env_execution_api::{ArtifactRef, ExecutionId, IdempotencyKey, LifecycleEvent};
 
@@ -64,4 +64,34 @@ pub trait IdempotencyStore: Send + Sync {
     fn record_intent(&self, record: EffectRecord) -> Result<(), StoreError>;
     fn record_result(&self, key: &IdempotencyKey, record: EffectRecord) -> Result<(), StoreError>;
     fn effect(&self, key: &IdempotencyKey) -> Result<Option<EffectRecord>, StoreError>;
+}
+
+pub trait ProviderStateStore: Send + Sync {
+    fn get_provider_state(
+        &self,
+        namespace: &str,
+        key: &str,
+    ) -> Result<Option<ProviderStateRecord>, StoreError>;
+    fn list_provider_state(
+        &self,
+        namespace: &str,
+        max: usize,
+    ) -> Result<Vec<ProviderStateRecord>, StoreError>;
+    fn put_provider_state(
+        &self,
+        record: ProviderStateRecord,
+        expected_version: Option<u64>,
+    ) -> Result<(), StoreError>;
+    fn delete_provider_state(
+        &self,
+        namespace: &str,
+        key: &str,
+        expected_version: u64,
+    ) -> Result<(), StoreError>;
+    fn move_provider_state(
+        &self,
+        record: ProviderStateRecord,
+        old_key: &str,
+        expected_version: u64,
+    ) -> Result<(), StoreError>;
 }

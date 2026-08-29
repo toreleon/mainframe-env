@@ -3,5 +3,7 @@
 #![forbid(unsafe_code)]
 
 mod memory;
+mod sqlite;
 
 pub use memory::{MemoryStore, StoreLimits};
+pub use sqlite::SqliteStateStore;

@@ -1,8 +1,8 @@
 {
   "schema_version": "mainframe-env.program-status@1",
-  "current_phase": "ME.V2",
-  "current_work_item": "ME.V2 gate passed; create the required completion commit",
-  "source_identity": "commit:4bd5c983938354be621dcffd0cf3b6b9c5640ca5+canonical-content-sha256:22974f4f287637ae1c6c5675c0c393643424bd4ace7cd01044e15cc35f987b58",
+  "current_phase": "ME.V3",
+  "current_work_item": "ME.V3 candidate complete; run the full gate and create the required completion commit",
+  "source_identity": "commit:a11034a382ddcb8ccd378926f1f3bb91f0b1bcc2+canonical-content-sha256:a3b3036854e4b754c961bd6e5944850e88033006aa0de79a1a63d51cc1b8a53b",
   "completed_deliverables": [
     {"item":"normative mainframe-env documents read","evidence":"docs/"},
     {"item":"OpenMainframe oracle frozen clean","evidence":"conformance/0.1/inventory/oracle.json"},
@@ -15,6 +15,8 @@
     ,{"item":"ME.V1 completion commit","evidence":"commit 4bd5c983938354be621dcffd0cf3b6b9c5640ca5"}
     ,{"item":"ME.V2 COBOL compiler and reference machine","evidence":"conformance/0.1/evidence/v2-cobol-results.json"}
     ,{"item":"ME.V2 exact HELLO differential","evidence":"conformance/0.1/evidence/differential/cobol-hello.json"}
+    ,{"item":"ME.V2 completion commit","evidence":"commit a11034a382ddcb8ccd378926f1f3bb91f0b1bcc2"}
+    ,{"item":"ME.V3 typed dataset and RACF/SAF authorities","evidence":"conformance/0.1/evidence/v3-authority-results.json"}
   ],
   "accepted_decisions": [
     "mainframe-env identity and greenfield direction",
@@ -36,13 +38,15 @@
     ,{"command":"cargo fmt/check/test/clippy/doc, Rust 1.95 contract check, xtask gates, and git diff --check","exit_code":0,"result":"ME.V1 candidate passed; 42 V1 tests passed"}
     ,{"command":"cargo +1.82 test -p open-mainframe r1_direct_hello_preserves_legacy_output_and_records_selection --locked -- --nocapture","exit_code":0,"result":"oracle selected HELLO route passed"}
     ,{"command":"cargo fmt/check/test/clippy/doc/build, xtask gates, CLI exact HELLO run, and git diff --check","exit_code":0,"result":"ME.V2 candidate passed; exact output sha256 9ca8206d342a22fcdf95945e6bbc852c37894933a4ab7a718aa6ebd1a637c25b"}
+    ,{"command":"cargo test/clippy focused host/store/dataset/RACF suites","exit_code":0,"result":"25 focused ME.V3 tests passed, including SQLite reopen and fail-closed middleware"}
+    ,{"command":"cargo fmt/check/test/clippy/doc/build plus xtask architecture/profiles/versions/schemas/inventory/conformance","exit_code":0,"result":"ME.V3 workspace candidate passed; canonical digest a3b3036854e4b754c961bd6e5944850e88033006aa0de79a1a63d51cc1b8a53b"}
   ],
   "known_gaps": [
-    "ME.V3 through ME.V7 are not implemented",
+    "ME.V4 through ME.V7 are not implemented",
     "Oracle CardDemo corpus is pinned but local corpus reproduction is pending",
     "PostgreSQL 18 runner availability is pending",
     "No compatibility or production promotion is claimed by V0"
   ],
   "stop_the_line": [],
-  "next_step": "Record the canonical ME.V2 content digest, review the staged diff, and create Complete ME.V2 COBOL execution path."
+  "next_step": "Run the full ME.V3 workspace gate, record the canonical digest, and create Complete ME.V3 dataset and security authorities."
 }

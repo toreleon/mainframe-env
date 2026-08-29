@@ -137,6 +137,14 @@ pub struct EffectRecord {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProviderStateRecord {
+    pub namespace: String,
+    pub key: String,
+    pub version: u64,
+    pub payload: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StoreError {
     NotFound,
     AlreadyExists,

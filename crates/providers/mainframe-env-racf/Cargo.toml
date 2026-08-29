@@ -1,5 +1,5 @@
 [package]
-name = "mainframe-env-store"
+name = "mainframe-env-racf"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -7,6 +7,9 @@ license.workspace = true
 
 [dependencies]
 mainframe-env-execution-api.workspace = true
+mainframe-env-host-api.workspace = true
 mainframe-env-store-api.workspace = true
-tokio.workspace = true
-sqlx.workspace = true
+argon2.workspace = true
+
+[dev-dependencies]
+mainframe-env-store = { path = "../../stores/mainframe-env-store" }

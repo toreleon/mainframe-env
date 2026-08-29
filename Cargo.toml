@@ -11,6 +11,8 @@ members = [
     "crates/stores/mainframe-env-store",
     "crates/kernel/mainframe-env-compiler",
     "crates/kernel/mainframe-env-interpreter",
+    "crates/providers/mainframe-env-dataset",
+    "crates/providers/mainframe-env-racf",
     "crates/apps/mainframe-env-cli",
     "crates/tooling/mainframe-env-conformance",
     "xtask",
@@ -32,6 +34,9 @@ toml = "0.8"
 proptest = "1"
 rowan = "0.16"
 clap = { version = "4", default-features = false, features = ["derive", "std", "help", "usage", "error-context"] }
+tokio = { version = "1", default-features = false, features = ["rt", "sync", "time"] }
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "sqlite-bundled"] }
+argon2 = "0.6"
 
 mainframe-env-source = { path = "crates/foundation/mainframe-env-source" }
 mainframe-env-diagnostics = { path = "crates/foundation/mainframe-env-diagnostics" }
@@ -43,3 +48,5 @@ mainframe-env-host-api = { path = "crates/contracts/mainframe-env-host-api" }
 mainframe-env-store-api = { path = "crates/contracts/mainframe-env-store-api" }
 mainframe-env-compiler = { path = "crates/kernel/mainframe-env-compiler" }
 mainframe-env-interpreter = { path = "crates/kernel/mainframe-env-interpreter" }
+mainframe-env-dataset = { path = "crates/providers/mainframe-env-dataset" }
+mainframe-env-racf = { path = "crates/providers/mainframe-env-racf" }
