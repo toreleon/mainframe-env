@@ -1,0 +1,17 @@
+{
+  "schema_version":"mainframe-env.recovery-summary@1",
+  "status":"pass",
+  "results":[
+    "dataset replay, rename, and SQLite close/reopen",
+    "RACF user/group/profile SQLite close/reopen",
+    "CICS suspended-session SQLite close/reopen",
+    "JES running-to-queued warm start with bounded attempts",
+    "SQLite full durable contracts and VACUUM INTO backup/restore integrity",
+    "PostgreSQL 18 migration plus provider/execution transition",
+    "work lease expiry and higher-attempt recovery",
+    "checkpoint and artifact digest rejection",
+    "effect intent/result/unknown-outcome state"
+  ],
+  "migration_head":"0001-durable-state",
+  "exactly_once_claimed":false
+}

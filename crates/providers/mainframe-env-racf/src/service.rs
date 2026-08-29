@@ -24,6 +24,13 @@ impl MemorySecretResolver {
             .expect("secret resolver mutex")
             .insert(reference.into(), value);
     }
+    pub fn remove(&self, reference: &str) {
+        if let Ok(mut values) = self.values.lock()
+            && let Some(mut value) = values.remove(reference)
+        {
+            value.fill(0);
+        }
+    }
 }
 impl SecretResolver for MemorySecretResolver {
     fn resolve(&self, reference: &SecretRef) -> Result<Vec<u8>, HostProblem> {
@@ -345,7 +352,7 @@ impl RacfService {
         state.users.insert(user, next);
         Ok(())
     }
-    fn authenticate(
+    pub fn authenticate(
         &self,
         user: &PrincipalId,
         reference: &SecretRef,
@@ -378,7 +385,7 @@ impl RacfService {
             SecurityDecision::InvalidCredentials
         })
     }
-    fn authorize(
+    pub fn authorize(
         &self,
         principal: &PrincipalId,
         class: &str,

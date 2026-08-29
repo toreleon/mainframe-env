@@ -1,0 +1,34 @@
+[package]
+name = "mainframe-env-server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+mainframe-env-batch.workspace = true
+mainframe-env-cics.workspace = true
+mainframe-env-compiler.workspace = true
+mainframe-env-compiler-api.workspace = true
+mainframe-env-dataset.workspace = true
+mainframe-env-execution-api.workspace = true
+mainframe-env-host-api.workspace = true
+mainframe-env-interpreter.workspace = true
+mainframe-env-ir.workspace = true
+mainframe-env-racf.workspace = true
+mainframe-env-store.workspace = true
+mainframe-env-store-api.workspace = true
+mainframe-env-source.workspace = true
+mainframe-env-zosmf.workspace = true
+axum.workspace = true
+rustls.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tokio.workspace = true
+tokio-rustls.workspace = true
+toml.workspace = true
+
+[dev-dependencies]
+base64.workspace = true
+tower.workspace = true

@@ -31,7 +31,7 @@ configuration = "mainframe-env.config@1"
 zosmf = "mainframe-env.zosmf@1"
 evidence = "mainframe-env.evidence@1"
 sql_schema = 1
-migration_head = "0000-foundation"
+migration_head = "0001-durable-state"
 
 [artifacts]
 content_address = "sha256"

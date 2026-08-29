@@ -1,6 +1,7 @@
 use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
 use sqlx::Row;
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
+use std::path::Path;
 use tokio::runtime::{Builder, Runtime};
 
 pub struct SqliteStateStore {
@@ -24,12 +25,8 @@ impl SqliteStateStore {
             .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
         runtime
             .block_on(
-                sqlx::query(
-                    "CREATE TABLE IF NOT EXISTS provider_state (\
-                     namespace TEXT NOT NULL, key TEXT NOT NULL, version INTEGER NOT NULL, \
-                     payload BLOB NOT NULL, PRIMARY KEY(namespace,key))",
-                )
-                .execute(&pool),
+                sqlx::query(include_str!("../migrations/sqlite/0001-durable-state.sql"))
+                    .execute(&pool),
             )
             .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
         Ok(Self {
@@ -38,6 +35,35 @@ impl SqliteStateStore {
             max_payload_bytes,
             max_rows,
         })
+    }
+
+    pub fn integrity_check(&self) -> Result<(), StoreError> {
+        let result: String = self
+            .runtime
+            .block_on(sqlx::query_scalar("PRAGMA integrity_check").fetch_one(&self.pool))
+            .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
+        if result == "ok" {
+            Ok(())
+        } else {
+            Err(StoreError::Infrastructure(result))
+        }
+    }
+
+    pub fn backup_to(&self, destination: &Path) -> Result<(), StoreError> {
+        if destination.as_os_str().is_empty() || destination.exists() {
+            return Err(StoreError::AlreadyExists);
+        }
+        let destination = destination
+            .to_str()
+            .ok_or(StoreError::IncompatibleVersion)?;
+        self.runtime
+            .block_on(
+                sqlx::query("VACUUM INTO ?")
+                    .bind(destination)
+                    .execute(&self.pool),
+            )
+            .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
+        Ok(())
     }
 }
 
@@ -145,6 +171,15 @@ impl ProviderStateStore for SqliteStateStore {
         } else {
             if record.version != 1 {
                 return Err(StoreError::Conflict);
+            }
+            let count: i64 = self
+                .runtime
+                .block_on(
+                    sqlx::query_scalar("SELECT COUNT(*) FROM provider_state").fetch_one(&self.pool),
+                )
+                .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
+            if usize::try_from(count).map_err(|_| StoreError::CapacityExceeded)? >= self.max_rows {
+                return Err(StoreError::CapacityExceeded);
             }
             self.runtime
                 .block_on(
@@ -285,6 +320,51 @@ mod tests {
             );
         }
         let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_dir(directory);
+    }
+
+    #[test]
+    fn backup_restores_to_an_integrity_checked_database() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-sqlite-backup-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let source = directory.join("source.db");
+        let backup = directory.join("backup.db");
+        let store =
+            SqliteStateStore::open(&format!("sqlite://{}?mode=rwc", source.display()), 1024, 16)
+                .unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "backup".into(),
+                    key: "one".into(),
+                    version: 1,
+                    payload: b"durable".to_vec(),
+                },
+                None,
+            )
+            .unwrap();
+        store.integrity_check().unwrap();
+        store.backup_to(&backup).unwrap();
+        drop(store);
+        let restored =
+            SqliteStateStore::open(&format!("sqlite://{}?mode=rw", backup.display()), 1024, 16)
+                .unwrap();
+        restored.integrity_check().unwrap();
+        assert_eq!(
+            restored
+                .get_provider_state("backup", "one")
+                .unwrap()
+                .unwrap()
+                .payload,
+            b"durable"
+        );
+        drop(restored);
+        let _ = std::fs::remove_file(source);
+        let _ = std::fs::remove_file(backup);
         let _ = std::fs::remove_dir(directory);
     }
 }

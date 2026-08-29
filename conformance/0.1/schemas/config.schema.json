@@ -1,0 +1,31 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"mainframe-env.config@1",
+  "title":"mainframe-env configuration schema",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["schema_version","profile","listen","store_profile","artifact_root","max_body_bytes","max_concurrency","timeout_millis","shutdown_millis","tls"],
+  "properties":{
+    "schema_version":{"const":1},
+    "profile":{"const":"core-server"},
+    "listen":{"type":"string","minLength":1},
+    "store_profile":{"enum":["memory","sqlite","postgres"]},
+    "sqlite_url":{"type":"string"},
+    "postgres_url_reference":{"type":["string","null"]},
+    "artifact_root":{"type":"string","minLength":1},
+    "max_body_bytes":{"type":"integer","minimum":1},
+    "max_concurrency":{"type":"integer","minimum":1},
+    "timeout_millis":{"type":"integer","minimum":1},
+    "shutdown_millis":{"type":"integer","minimum":1},
+    "tls":{
+      "type":"object",
+      "additionalProperties":false,
+      "required":["enabled"],
+      "properties":{
+        "enabled":{"type":"boolean"},
+        "certificate_path":{"type":["string","null"]},
+        "private_key_reference":{"type":["string","null"]}
+      }
+    }
+  }
+}

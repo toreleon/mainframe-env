@@ -1,9 +1,9 @@
 # mainframe-env 0.1 Implementation Status
 
-Current phase: **ME.V5 — JCL workflow and JES authority**
-Current work item: the ME.V5 candidate is complete; run the full gate and create the required phase commit.
+Current phase: **ME.V6 — durable z/OSMF product**
+Current work item: the ME.V6 candidate is complete; run the full gate and create the required phase commit.
 Product version: **0.1.0-alpha.0**
-Source identity: ME.V4 commit `9cb93a0` plus the current ME.V5 candidate.
+Source identity: ME.V5 commit `4a752fa` plus the current ME.V6 candidate.
 
 ## Completed deliverables
 
@@ -54,6 +54,13 @@ Source identity: ME.V4 commit `9cb93a0` plus the current ME.V5 candidate.
 - All executable steps dispatch through `host.program.invoke`; nine accepted utilities have explicit
   routes and COBOL is injected only through the same ProgramService. Selected IEBGENER preserves exact
   input record bytes, unknown utilities fail explicitly, and SQLite recovers running work to its queue.
+- Committed ME.V5 as `4a752fa` with the required trailers.
+- Implemented the thin 23-route z/OSMF gateway and single-node product composition over the common
+  dataset, RACF, CICS, compiler/interpreter, program, and JES authorities. Added stable auth/CSRF/error
+  mapping, versioned config precedence, readiness, bounded shutdown, metrics, and Rustls construction.
+- Added embedded SQLite/PostgreSQL migration `0001-durable-state`, full durable store contracts,
+  immutable local artifacts, SQLite integrity/backup/restore, and PostgreSQL 18 execution/provider
+  compatibility. The temporary PostgreSQL test container was stopped and auto-removed after the pass.
 
 Exact machine evidence is in
 `conformance/0.1/evidence/program-status.json` and
@@ -70,10 +77,9 @@ Exact machine evidence is in
 
 ## Known gaps and stop-the-line findings
 
-No V0–V5 stop-the-line finding is open. ME.V6–ME.V7 implementation is pending. Current oracle gaps,
-including historical evidence revision differences, partial COBOL/CICS forms, inactive TLS/CSRF,
-and the pending PostgreSQL runner, are recorded in
-`conformance/0.1/inventory/known-gaps.json` and block only their affected later promotions.
+No V0–V6 stop-the-line finding is open. ME.V7 certification/cutover is pending. Historical oracle
+attribution and explicit unsupported surface are retained in
+`conformance/0.1/inventory/known-gaps.json`; they do not create an alternate production route.
 
 ## Commands already run
 
@@ -82,5 +88,5 @@ passed: COBOL 37, RACF 8, z/OSMF datasets 9, z/OSMF jobs 9, CICS 317, JCL 164, a
 
 ## Next smallest executable step
 
-Run the complete locked ME.V5 gate, record its canonical content digest, review the staged diff, and
-create the dedicated `Complete ME.V5 JCL and JES batch path` commit.
+Run the complete locked ME.V6 gate, record its canonical content digest, review the staged diff, and
+create the dedicated `Complete ME.V6 durable z/OSMF product` commit.

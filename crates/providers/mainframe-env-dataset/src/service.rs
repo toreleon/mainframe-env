@@ -93,7 +93,7 @@ impl DatasetService {
             }),
         }))
     }
-    fn invoke(&self, request: DatasetRequest) -> Result<DatasetResult, HostProblem> {
+    pub fn invoke(&self, request: DatasetRequest) -> Result<DatasetResult, HostProblem> {
         let mutation = mutation(&request);
         let mut state = self
             .state
@@ -450,6 +450,40 @@ impl DatasetService {
                 expected,
             )
             .map_err(store_error)
+    }
+
+    pub fn list_members(
+        &self,
+        dataset: &DatasetName,
+        start: Option<&str>,
+        max: usize,
+    ) -> Result<(Vec<String>, bool), HostProblem> {
+        if max == 0 || max > self.limits.max_members {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let state = self
+            .state
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let entry = entry(&state, dataset)?;
+        if entry.attributes.organization != mainframe_env_host_api::DatasetOrganization::Partitioned
+        {
+            return Err(HostProblem::Unsupported);
+        }
+        let mut members = Vec::new();
+        let mut more = false;
+        for name in entry
+            .members
+            .keys()
+            .filter(|name| start.is_none_or(|start| name.as_str() > start))
+        {
+            if members.len() == max {
+                more = true;
+                break;
+            }
+            members.push(name.clone());
+        }
+        Ok((members, more))
     }
 }
 fn entry<'a>(state: &'a State, name: &DatasetName) -> Result<&'a Entry, HostProblem> {

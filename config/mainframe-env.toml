@@ -1,0 +1,16 @@
+schema_version = 1
+profile = "core-server"
+listen = "0.0.0.0:10443"
+store_profile = "postgres"
+sqlite_url = "sqlite://mainframe-env.db?mode=rwc"
+postgres_url_reference = "secret://mainframe-env/postgres-url"
+artifact_root = "mainframe-env-artifacts"
+max_body_bytes = 4194304
+max_concurrency = 256
+timeout_millis = 30000
+shutdown_millis = 30000
+
+[tls]
+enabled = true
+certificate_path = "config/tls/server.crt"
+private_key_reference = "secret://mainframe-env/tls-private-key"

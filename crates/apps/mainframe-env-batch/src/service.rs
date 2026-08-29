@@ -606,6 +606,43 @@ impl BatchService {
         ))
     }
 
+    pub fn spool_files(&self, id: &str) -> Result<Vec<(usize, String, usize, usize)>, HostProblem> {
+        let state = self.lock()?;
+        let job = state.jobs.get(id).ok_or(HostProblem::NotFound)?;
+        Ok(job
+            .spool
+            .iter()
+            .enumerate()
+            .map(|(id, (name, records))| {
+                (
+                    id,
+                    name.clone(),
+                    records.len(),
+                    records.iter().map(Vec::len).sum(),
+                )
+            })
+            .collect())
+    }
+
+    pub fn spool_by_index(
+        &self,
+        id: &str,
+        file: usize,
+        start: usize,
+        max: usize,
+    ) -> Result<(Vec<Vec<u8>>, bool), HostProblem> {
+        let state = self.lock()?;
+        let job = state.jobs.get(id).ok_or(HostProblem::NotFound)?;
+        let records = job.spool.values().nth(file).ok_or(HostProblem::NotFound)?;
+        if max == 0 || max > self.limits.max_spool_records {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        Ok((
+            records.iter().skip(start).take(max).cloned().collect(),
+            start.saturating_add(max) < records.len(),
+        ))
+    }
+
     pub fn purge(&self, id: &str) -> Result<(), HostProblem> {
         let mut state = self.lock()?;
         let job = state.jobs.get(id).ok_or(HostProblem::NotFound)?;

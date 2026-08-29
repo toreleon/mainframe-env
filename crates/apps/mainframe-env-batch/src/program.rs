@@ -61,19 +61,25 @@ impl ProgramRouter {
 
     #[must_use]
     pub fn with_builtins(limits: InvocationLimits) -> Arc<Self> {
-        let programs = [
+        Self::with_builtins_and(BTreeMap::new(), limits).expect("built-in program catalog is valid")
+    }
+
+    pub fn with_builtins_and(
+        mut programs: BTreeMap<String, Arc<dyn Program>>,
+        limits: InvocationLimits,
+    ) -> Result<Arc<Self>, HostProblem> {
+        for name in [
             "IEFBR14", "IEBGENER", "IEBCOPY", "IEBCOMPR", "IEBDG", "IEBEDIT", "IEBUPDTE", "IDCAMS",
             "SORT",
-        ]
-        .into_iter()
-        .map(|name| {
-            (
-                name.to_string(),
-                Arc::new(Builtin(name)) as Arc<dyn Program>,
-            )
-        })
-        .collect();
-        Self::new(programs, limits).expect("built-in program catalog is valid")
+        ] {
+            if programs
+                .insert(name.to_string(), Arc::new(Builtin(name)))
+                .is_some()
+            {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+        }
+        Self::new(programs, limits)
     }
 
     #[must_use]

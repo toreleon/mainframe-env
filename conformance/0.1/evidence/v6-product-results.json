@@ -1,0 +1,36 @@
+{
+  "schema_version":"mainframe-env.v6-product-results@1",
+  "derived":true,
+  "status":"pass",
+  "product_generation":"mainframe-env-server@1",
+  "conditions":{
+    "frozen_zosmf_routes":23,
+    "all_routes_use_typed_backend":true,
+    "gateway_business_state":false,
+    "stable_auth_csrf_body_status_and_error_mapping":true,
+    "tower_trace_timeout_concurrency_and_body_layers":true,
+    "config_schema_and_precedence":true,
+    "readiness_from_store_providers_artifacts":true,
+    "admission_stop_and_bounded_graceful_shutdown":true,
+    "rustls_default_transport_construction":true,
+    "sqlite_migration_and_full_durable_contracts":true,
+    "postgresql_18_migration_and_durable_contracts":true,
+    "postgres_image_digest":"sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280",
+    "immutable_local_artifact_integrity":true,
+    "append_only_events_current_state_work_leases_checkpoints_sessions_generations_effects":true,
+    "sqlite_backup_restore_integrity":true,
+    "single_node_one_active_pool":true,
+    "excluded_routes_and_dependencies_absent":true
+  },
+  "tests":{"zosmf_gateway":2,"product_server":6,"store":10,"postgres18_explicit":1},
+  "evidence":[
+    "conformance/0.1/evidence/differential/zosmf.json",
+    "conformance/0.1/evidence/profile-closure.json",
+    "conformance/0.1/evidence/recovery-summary.json",
+    "conformance/0.1/evidence/security-summary.json",
+    "conformance/0.1/evidence/resource-summary.json",
+    "docs/runbooks/OPERATIONS.md",
+    "docs/runbooks/BACKUP-RESTORE.md",
+    "docs/runbooks/CAPACITY-AND-RECOVERY.md"
+  ]
+}

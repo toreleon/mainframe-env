@@ -1,14 +1,14 @@
 {
   "schema_version": "mainframe-env.known-gaps@1",
   "gaps": [
-    {"id":"ORACLE-EVIDENCE-REVISION","status":"open","detail":"Historical R0/R1/R2 evidence is stamped at a21f500a... while the clean executable oracle is cee4b1df...; historical results are inputs, not current parity proof.","blocks":"selector parity promotion"},
+    {"id":"ORACLE-EVIDENCE-REVISION","status":"closed_with_attribution","detail":"Historical R0/R1/R2 evidence remains attributed to a21f500a...; selected executable cohorts were independently rerun at clean oracle cee4b1df... and are recorded separately.","blocks":"none"},
     {"id":"ORACLE-R2-DOC-STATUS","status":"open","detail":"Some R2 decision prose still describes remediation while current r2-exit-gates reports scoped PASS.","blocks":"none; preserve both observations"},
     {"id":"ORACLE-R2A-GOVERNANCE","status":"not_applicable","detail":"OpenMainframe R2A remains pending governance and its portfolio scope is not a mainframe-env 0.1 obligation.","blocks":"none"},
-    {"id":"COBOL-PARTIAL-SUBFORMS","status":"open","detail":"Oracle inventories partial or unsupported subforms for 16 of 43 statements; 0.1 must implement frozen supported subforms and fail unsupported forms explicitly.","blocks":"ME.V2"},
-    {"id":"CICS-PARTIAL-UNSUPPORTED","status":"open","detail":"SEND MAP and RECEIVE MAP are partial; ASKTIME, FORMATTIME, INQUIRE, and SYNCPOINT are oracle-unsupported for the pinned set.","blocks":"ME.V4"},
-    {"id":"JES-SECURITY-DEFAULT","status":"open","detail":"Oracle JES documentation says JESSPOOL hooks default permit when RACF is absent; mainframe-env must fail closed.","blocks":"ME.V5"},
-    {"id":"ZOSMF-TLS-CSRF","status":"open","detail":"Oracle TLS/CORS configuration is inactive and CSRF middleware is not installed; mainframe-env must implement transport and mutation policy truthfully.","blocks":"ME.V6"},
-    {"id":"POSTGRES-RUNNER","status":"open","detail":"PostgreSQL 18 availability and recovery runner have not yet been established on this host.","blocks":"ME.V6 production durable profile"},
-    {"id":"CARDEMO-LOCAL-CORPUS","status":"open","detail":"Pinned CardDemo identity is frozen but corpus reproduction has not yet been executed from a local CARDDEMO_DIR in mainframe-env.","blocks":"ME.V4 compatibility promotion"}
+    {"id":"COBOL-PARTIAL-SUBFORMS","status":"closed","detail":"All frozen supported subforms route through verified HIR/MIR; the six oracle-matching unsupported families fail before publication.","blocks":"none"},
+    {"id":"CICS-PARTIAL-UNSUPPORTED","status":"closed","detail":"SEND/RECEIVE frozen subforms are typed; ASKTIME, FORMATTIME, INQUIRE, and SYNCPOINT remain explicit typed unsupported outcomes.","blocks":"none"},
+    {"id":"JES-SECURITY-DEFAULT","status":"closed","detail":"JES admission and sensitive rechecks use RACF/SAF and default deny when provider/profile/grant is absent.","blocks":"none"},
+    {"id":"ZOSMF-TLS-CSRF","status":"closed","detail":"Rustls construction is the production transport contract and every mutating accepted route enforces X-CSRF-ZOSMF-HEADER.","blocks":"none"},
+    {"id":"POSTGRES-RUNNER","status":"closed","detail":"PostgreSQL 18 container migration and durable execution/provider-state contract test passed on this host.","blocks":"none"},
+    {"id":"CARDEMO-LOCAL-CORPUS","status":"closed","detail":"Clean local CardDemo corpus at 59cc6c2... was verified against tree/content/license pins and the 174-block operation inventory.","blocks":"none"}
   ]
 }

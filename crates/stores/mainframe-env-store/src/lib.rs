@@ -2,8 +2,15 @@
 
 #![forbid(unsafe_code)]
 
+mod durable;
+mod local_artifact;
 mod memory;
+mod postgres;
 mod sqlite;
 
+pub use local_artifact::LocalArtifactStore;
 pub use memory::{MemoryStore, StoreLimits};
+pub use postgres::PostgresStateStore;
 pub use sqlite::SqliteStateStore;
+
+pub const SQL_MIGRATION_HEAD: &str = "0001-durable-state";

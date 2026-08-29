@@ -1,0 +1,28 @@
+{
+  "schema_version":"mainframe-env.phase-result@1",
+  "phase":"ME.V6",
+  "derived":true,
+  "status":"pass",
+  "product_version":"0.1.0-alpha.0",
+  "source_identity":"commit:4a752fa+canonical-content-sha256:05d6e2af6f841c9fd3e6732b38fe51bfdd3040ff9e7b7a26fd0d1628e5b21922",
+  "conditions":{
+    "all_frozen_zosmf_routes_use_release_0_1_services":true,
+    "durable_single_node_recovery_passes":true,
+    "core_profile_has_no_excluded_dependency":true,
+    "gateway_is_thin":true,
+    "overload_is_bounded":true,
+    "sqlite_and_postgresql_profiles_pass":true
+  },
+  "commands":[
+    {"command":"cargo check --workspace --all-targets --all-features --locked","exit_code":0},
+    {"command":"cargo test --workspace --all-features --locked --no-fail-fast","exit_code":0},
+    {"command":"cargo clippy --workspace --all-targets --all-features --locked -- -D warnings","exit_code":0},
+    {"command":"RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --locked","exit_code":0},
+    {"command":"cargo build --workspace --all-features --locked","exit_code":0},
+    {"command":"MAINFRAME_ENV_POSTGRES_TEST_URL=postgres://... cargo test -p mainframe-env-store postgres18_migration_and_durable_contracts --all-features -- --ignored","exit_code":0},
+    {"command":"cargo xtask architecture/profiles/versions/schemas/inventory/conformance/evidence --check","exit_code":0}
+  ],
+  "evidence":["conformance/0.1/evidence/v6-product-results.json","conformance/0.1/evidence/differential/zosmf.json","conformance/0.1/evidence/profile-closure.json","conformance/0.1/evidence/recovery-summary.json"],
+  "digest_policy":"cargo xtask digest; excludes Git metadata, target output, raw evidence, program status, and phase receipt JSON files",
+  "digest":"sha256:05d6e2af6f841c9fd3e6732b38fe51bfdd3040ff9e7b7a26fd0d1628e5b21922"
+}

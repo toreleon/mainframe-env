@@ -1,0 +1,22 @@
+{
+  "schema_version":"mainframe-env.zosmf-differential@1",
+  "status":"pass",
+  "contract":"mainframe-env.zosmf@1",
+  "oracle_revision":"cee4b1df3fa5e32066b7948d528c163f8636a18e",
+  "oracle_reproduction":{"dataset_e2e":9,"job_e2e":9,"exit_code":0},
+  "mainframe_env":{
+    "exact_route_count":23,
+    "all_route_registry_test":true,
+    "composed_dataset_create_write_read_list":true,
+    "composed_job_submit_status_spool":true,
+    "authentication_session_and_logout":true,
+    "console_subset":true,
+    "stable_error_categories":true,
+    "unadvertised_route_404":true
+  },
+  "accepted_corrections":[
+    "RACF/SAF denial replaces oracle permit-on-missing-security behavior",
+    "CSRF enforcement is active on every mutation",
+    "TLS is an explicit production readiness requirement"
+  ]
+}
