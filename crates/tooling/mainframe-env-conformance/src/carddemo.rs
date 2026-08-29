@@ -1,8 +1,12 @@
 //! Fail-closed verification for the externally supplied CardDemo corpus.
 
+use mainframe_env_compiler::CobolCompiler;
+use mainframe_env_source::{
+    LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fmt;
 use std::fs;
@@ -44,6 +48,7 @@ struct CorpusContract {
     executable_content_identity: ContentIdentity,
     runtime_oracles: Vec<RuntimeOracleContract>,
     file_count_checks: Vec<FileCountContract>,
+    external_compatibility_copybooks: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -100,6 +105,18 @@ pub struct ContentReceipt {
 pub struct RuntimeOracleReceipt {
     pub path: String,
     pub sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoSourceReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub programs_checked: usize,
+    pub copybooks_loaded: usize,
+    pub compatibility_placeholders: usize,
+    pub copy_expansions: usize,
+    pub deterministic_replays: usize,
 }
 
 pub fn verify_carddemo_corpus_from_env(
@@ -236,6 +253,236 @@ pub fn verify_carddemo_corpus(
     })
 }
 
+pub fn verify_carddemo_source_preprocessing_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoSourceReceipt, CorpusProblem> {
+    let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required for CardDemo gates",
+        )
+    })?;
+    let corpus_dir = Path::new(&corpus_dir);
+    let corpus = verify_carddemo_corpus(corpus_dir, inventory_path)?;
+    let compatibility_names = read_contract(inventory_path)?.external_compatibility_copybooks;
+    let source_paths = collect_paths(
+        corpus_dir,
+        &[
+            "app/cbl",
+            "app/app-authorization-ims-db2-mq/cbl",
+            "app/app-transaction-type-db2/cbl",
+            "app/app-vsam-mq/cbl",
+        ],
+        "cbl",
+    )?;
+    let copy_paths = collect_paths(
+        corpus_dir,
+        &[
+            "app/cpy",
+            "app/cpy-bms",
+            "app/app-authorization-ims-db2-mq/cpy",
+            "app/app-authorization-ims-db2-mq/cpy-bms",
+            "app/app-transaction-type-db2/cpy",
+            "app/app-transaction-type-db2/cpy-bms",
+        ],
+        "cpy",
+    )?;
+    if source_paths.len() != 44 || copy_paths.len() != 62 {
+        return Err(CorpusProblem::new(
+            "carddemo.source.corpus_count_drift",
+            format!(
+                "source preprocessing expected 44 programs and 62 copybooks but found {} and {}",
+                source_paths.len(),
+                copy_paths.len()
+            ),
+        ));
+    }
+
+    let limits = SourceLimits::default();
+    let copybooks = copy_paths
+        .iter()
+        .map(|path| source_file(corpus_dir, path, limits))
+        .collect::<Result<Vec<_>, _>>()?;
+    if compatibility_names.len() != 9 {
+        return Err(CorpusProblem::new(
+            "carddemo.source.corpus_count_drift",
+            format!(
+                "source preprocessing expected nine external compatibility copybooks but found {}",
+                compatibility_names.len()
+            ),
+        ));
+    }
+    let compatibility = compatibility_names
+        .iter()
+        .map(|name| {
+            if name.is_empty()
+                || !name
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+            {
+                return Err(CorpusProblem::new(
+                    "carddemo.source.bundle_invalid",
+                    "compatibility copybook name is invalid",
+                ));
+            }
+            SourceFile::input(
+            format!("compatibility/{name}.cpy"),
+            b"      * CD-002 source-expansion placeholder; CD-003 owns compatibility content.\n"
+                .to_vec(),
+            SourceFormat::Fixed,
+            SourceEncoding::Utf8,
+            limits,
+        )
+        .map_err(|error| {
+            CorpusProblem::new(
+                "carddemo.source.bundle_invalid",
+                format!("cannot create compatibility placeholder: {error}"),
+            )
+        })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let compiler = CobolCompiler::default();
+    let mut copy_expansions = 0usize;
+    for primary_path in &source_paths {
+        let primary = source_file(corpus_dir, primary_path, limits)?;
+        let mut files = Vec::with_capacity(1 + copybooks.len() + compatibility.len());
+        files.push(primary);
+        files.extend(copybooks.iter().cloned());
+        files.extend(compatibility.iter().cloned());
+        let logical = LogicalPath::new(primary_path, limits.max_path_bytes).map_err(|error| {
+            CorpusProblem::new(
+                "carddemo.source.bundle_invalid",
+                format!("invalid program logical path: {error}"),
+            )
+        })?;
+        let bundle = SourceBundle::new(&logical, files, BTreeMap::new(), Vec::new(), limits)
+            .map_err(|error| {
+                CorpusProblem::new(
+                    "carddemo.source.bundle_invalid",
+                    format!("cannot construct source closure: {error}"),
+                )
+            })?;
+        let first = compiler.analyze(&bundle);
+        let first_syntax = first.syntax.ok_or_else(|| {
+            let diagnostic = first
+                .diagnostics
+                .first()
+                .map_or("source preprocessing failed", |item| item.public_message());
+            CorpusProblem::new(
+                "carddemo.source.preprocessing_failed",
+                format!("program {primary_path} did not reach syntax: {diagnostic}"),
+            )
+        })?;
+        let second = compiler.analyze(&bundle);
+        let second_syntax = second.syntax.ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.source.nondeterministic",
+                format!("program {primary_path} failed on deterministic replay"),
+            )
+        })?;
+        if first_syntax.expansions() != second_syntax.expansions()
+            || first_syntax.semantic_origins() != second_syntax.semantic_origins()
+            || first_syntax.copy_directive_origins() != second_syntax.copy_directive_origins()
+            || first_syntax.token_count() != second_syntax.token_count()
+        {
+            return Err(CorpusProblem::new(
+                "carddemo.source.nondeterministic",
+                format!("program {primary_path} source preprocessing replay differs"),
+            ));
+        }
+        copy_expansions = copy_expansions
+            .checked_add(first_syntax.expansions().len())
+            .ok_or_else(|| {
+                CorpusProblem::new(
+                    "carddemo.source.resource_exhausted",
+                    "copy expansion counter overflow",
+                )
+            })?;
+    }
+
+    Ok(CardDemoSourceReceipt {
+        schema_version: "mainframe-env.carddemo-source-receipt@1".to_string(),
+        status: "pass".to_string(),
+        corpus_commit: corpus.commit,
+        programs_checked: source_paths.len(),
+        copybooks_loaded: copybooks.len(),
+        compatibility_placeholders: compatibility.len(),
+        copy_expansions,
+        deterministic_replays: source_paths.len(),
+    })
+}
+
+fn collect_paths(
+    corpus_dir: &Path,
+    roots: &[&str],
+    extension: &str,
+) -> Result<Vec<String>, CorpusProblem> {
+    let mut paths = Vec::new();
+    for root in roots {
+        let directory = corpus_dir.join(root);
+        let entries = fs::read_dir(&directory).map_err(|error| {
+            CorpusProblem::new(
+                "carddemo.source.file_missing",
+                format!("cannot enumerate source root {root}: {error}"),
+            )
+        })?;
+        for entry in entries {
+            let path = entry
+                .map_err(|error| {
+                    CorpusProblem::new(
+                        "carddemo.source.file_missing",
+                        format!("cannot enumerate source root {root}: {error}"),
+                    )
+                })?
+                .path();
+            if !path.is_file()
+                || !path
+                    .extension()
+                    .and_then(|value| value.to_str())
+                    .is_some_and(|value| value.eq_ignore_ascii_case(extension))
+            {
+                continue;
+            }
+            let relative = path
+                .strip_prefix(corpus_dir)
+                .ok()
+                .and_then(Path::to_str)
+                .ok_or_else(|| {
+                    CorpusProblem::new(
+                        "carddemo.source.path_invalid",
+                        "source path is not a repository-relative UTF-8 path",
+                    )
+                })?;
+            paths.push(relative.to_string());
+        }
+    }
+    paths.sort();
+    Ok(paths)
+}
+
+fn source_file(
+    corpus_dir: &Path,
+    relative: &str,
+    limits: SourceLimits,
+) -> Result<SourceFile, CorpusProblem> {
+    validate_relative_path(relative, "source file")?;
+    let bytes = read_corpus_file(corpus_dir, &corpus_dir.join(relative))?;
+    SourceFile::input(
+        relative,
+        bytes,
+        SourceFormat::Fixed,
+        SourceEncoding::Utf8,
+        limits,
+    )
+    .map_err(|error| {
+        CorpusProblem::new(
+            "carddemo.source.bundle_invalid",
+            format!("cannot load source file {relative}: {error}"),
+        )
+    })
+}
+
 fn read_runtime_oracle(root: &Path, identity: &str) -> Result<Vec<u8>, CorpusProblem> {
     let Some((archive, entry)) = identity.split_once('!') else {
         validate_relative_path(identity, "runtime oracle")?;
@@ -313,6 +560,19 @@ fn validate_contract(contract: &CorpusContract) -> Result<(), CorpusProblem> {
         return Err(CorpusProblem::new(
             "carddemo.corpus.contract_invalid",
             "runtime archive and file-count checks must be declared",
+        ));
+    }
+    if contract.external_compatibility_copybooks.is_empty()
+        || contract
+            .external_compatibility_copybooks
+            .iter()
+            .collect::<BTreeSet<_>>()
+            .len()
+            != contract.external_compatibility_copybooks.len()
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.corpus.contract_invalid",
+            "external compatibility copybook identities are empty or duplicated",
         ));
     }
     Ok(())
@@ -575,7 +835,8 @@ mod tests {
                     "roots":["app/cbl"],
                     "extensions":["cbl"],
                     "expected":1
-                }]
+                }],
+                "external_compatibility_copybooks":["DFHAID"]
             });
             fs::write(&inventory, serde_json::to_vec_pretty(&contract).unwrap()).unwrap();
             Self { root, inventory }

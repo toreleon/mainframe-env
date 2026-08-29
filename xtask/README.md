@@ -14,3 +14,5 @@ routes, and replacing selector-specific conformance tests.
 
 Verify with `cargo test -p xtask`, `cargo xtask conformance`, and (when the
 pinned checkout is available) `cargo xtask carddemo-corpus --check`.
+`cargo xtask carddemo-source --check` additionally replays all pinned COBOL
+source closures through the CD-002 preprocessing surface.

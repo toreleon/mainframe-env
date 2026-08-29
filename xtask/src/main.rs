@@ -2,7 +2,9 @@
 
 #![forbid(unsafe_code)]
 
-use mainframe_env_conformance::verify_carddemo_corpus_from_env;
+use mainframe_env_conformance::{
+    verify_carddemo_corpus_from_env, verify_carddemo_source_preprocessing_from_env,
+};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -49,12 +51,13 @@ fn run() -> TaskResult {
         }
         "certification" => check_certification(&root),
         "carddemo-corpus" => check_carddemo_corpus(&root),
+        "carddemo-source" => check_carddemo_source(&root),
         "digest" => print_digest(&root),
         "release" if check => check_release_artifacts(&root),
         "release" => generate_release_artifacts(&root),
         "help" | "--help" | "-h" => {
             println!(
-                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|conformance|certification|carddemo-corpus|digest|release> --check"
+                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|conformance|certification|carddemo-corpus|carddemo-source|digest|release> --check"
             );
             Ok(())
         }
@@ -64,6 +67,39 @@ fn run() -> TaskResult {
     if check {
         println!("{command}: pass");
     }
+    Ok(())
+}
+
+fn check_carddemo_source(root: &Path) -> TaskResult {
+    let inventory_path = root.join("conformance/0.1.1/inventory/carddemo-corpus.json");
+    let receipt = verify_carddemo_source_preprocessing_from_env(&inventory_path)
+        .map_err(|problem| problem.to_string())?;
+    let receipt_value = serde_json::to_value(&receipt)
+        .map_err(|error| format!("CardDemo source receipt conversion failed: {error}"))?;
+    let receipt_bytes = serde_json::to_vec(&receipt_value)
+        .map_err(|error| format!("CardDemo source receipt canonicalization failed: {error}"))?;
+    let receipt_digest = format!("sha256:{:x}", Sha256::digest(receipt_bytes));
+    let evidence_path = root.join("conformance/0.1.1/evidence/issues/CD-002.json");
+    let evidence = json(&evidence_path)?;
+    require(
+        evidence["issue"] == Value::String("CD-002".to_string())
+            && evidence["derived"] == Value::Bool(true)
+            && evidence["status"] == Value::String("pass".to_string()),
+        "CD-002 evidence is not a derived pass",
+    )?;
+    require(
+        evidence["source_receipt"] == receipt_value,
+        "CD-002 evidence source receipt is stale",
+    )?;
+    require(
+        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
+        "CD-002 evidence digest differs from its canonical source receipt",
+    )?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&receipt)
+            .map_err(|error| format!("CardDemo source receipt serialization failed: {error}"))?
+    );
     Ok(())
 }
 

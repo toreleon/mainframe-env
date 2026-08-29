@@ -21,9 +21,11 @@
       "priority": "P0",
       "domain": "compiler-source",
       "title": "Repair fixed-column comment-aware COPY preprocessing",
-      "state": "open",
+      "state": "passed",
       "depends_on": ["CD-001"],
       "commit_subject": "Parse CardDemo fixed source and COPY directives",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-002.json",
+      "evidence_digest": "sha256:7adea86b25b9b625226ff3c50ecbc65d2beac8e3a4a4900cffb154dcf5b549a6",
       "acceptance": ["license comments never become COPY statements", "fixed continuation and columns preserve exact provenance", "COPY and reached COPY REPLACING forms expand deterministically", "circular, missing, malformed, and limit cases have stable diagnostics"]
     },
     {

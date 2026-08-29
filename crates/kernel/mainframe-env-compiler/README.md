@@ -8,4 +8,7 @@ storage.
 
 Invariants: recovery nodes never publish; every executable statement lowers to
 a registered Core-MIR operation; source, layout, and provenance bounds are
-enforced. Verify with `cargo test -p mainframe-env-compiler`.
+enforced. Fixed-format preprocessing is column-aware, comments are never
+directive authority, continuations retain exact decoded-source origins, and
+COPY expansion records both included bytes and directive origins. Verify with
+`cargo test -p mainframe-env-compiler`.
