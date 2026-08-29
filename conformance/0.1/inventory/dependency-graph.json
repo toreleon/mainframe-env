@@ -25,6 +25,7 @@
     ["mainframe-env-cics","mainframe-env-store-api"],
     ["mainframe-env-batch","mainframe-env-execution-api"],
     ["mainframe-env-batch","mainframe-env-host-api"],
+    ["mainframe-env-batch","mainframe-env-store-api"],
     ["mainframe-env-store","mainframe-env-store-api"],
     ["mainframe-env-zosmf","mainframe-env-host-api"],
     ["mainframe-env-server","mainframe-env-zosmf"],

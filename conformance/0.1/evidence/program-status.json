@@ -1,8 +1,8 @@
 {
   "schema_version": "mainframe-env.program-status@1",
-  "current_phase": "ME.V4",
-  "current_work_item": "ME.V4 candidate complete; run the full gate and create the required completion commit",
-  "source_identity": "commit:2f8f332+canonical-content-sha256:37a8ed2089e70623cd431936c177a41aed304cb06ec28f72f71e060e3bcde580",
+  "current_phase": "ME.V5",
+  "current_work_item": "ME.V5 candidate complete; run the full gate and create the required completion commit",
+  "source_identity": "commit:9cb93a0+canonical-content-sha256:3ac8047e5db85e5291ed7fb6aa15541c2ac2f7707b0cf6d83e09d655b56c0c05",
   "completed_deliverables": [
     {"item":"normative mainframe-env documents read","evidence":"docs/"},
     {"item":"OpenMainframe oracle frozen clean","evidence":"conformance/0.1/inventory/oracle.json"},
@@ -19,6 +19,8 @@
     ,{"item":"ME.V3 typed dataset and RACF/SAF authorities","evidence":"conformance/0.1/evidence/v3-authority-results.json"}
     ,{"item":"ME.V3 completion commit","evidence":"commit 2f8f332"}
     ,{"item":"ME.V4 typed CICS runtime and selected CardDemo compatibility","evidence":"conformance/0.1/evidence/v4-cics-results.json"}
+    ,{"item":"ME.V4 completion commit","evidence":"commit 9cb93a0"}
+    ,{"item":"ME.V5 bounded JCL workflow and durable JES authority","evidence":"conformance/0.1/evidence/v5-batch-results.json"}
   ],
   "accepted_decisions": [
     "mainframe-env identity and greenfield direction",
@@ -44,13 +46,15 @@
     ,{"command":"cargo fmt/check/test/clippy/doc/build plus xtask architecture/profiles/versions/schemas/inventory/conformance","exit_code":0,"result":"ME.V3 workspace candidate passed; canonical digest a3b3036854e4b754c961bd6e5944850e88033006aa0de79a1a63d51cc1b8a53b"}
     ,{"command":"cargo test/clippy focused CICS/interpreter/host suites","exit_code":0,"result":"typed CICS provider, selected registry route, RACF denial, suspension/restart, file/program, BMS, catalog, and bounds passed"}
     ,{"command":"cargo fmt/check/test/clippy/doc/build plus xtask architecture/profiles/versions/schemas/inventory/conformance","exit_code":0,"result":"ME.V4 workspace candidate passed; canonical digest 37a8ed2089e70623cd431936c177a41aed304cb06ec28f72f71e060e3bcde580"}
+    ,{"command":"cargo test/clippy focused JCL/program/JES suites","exit_code":0,"result":"11 focused batch tests passed, including ProgramService-only COBOL dispatch and SQLite warm start"}
+    ,{"command":"cargo fmt/check/test/clippy/doc/build plus xtask architecture/profiles/versions/schemas/inventory/conformance","exit_code":0,"result":"ME.V5 workspace candidate passed; canonical digest 3ac8047e5db85e5291ed7fb6aa15541c2ac2f7707b0cf6d83e09d655b56c0c05"}
   ],
   "known_gaps": [
-    "ME.V5 through ME.V7 are not implemented",
+    "ME.V6 through ME.V7 are not implemented",
     "Oracle CardDemo corpus is pinned but local corpus reproduction is pending",
     "PostgreSQL 18 runner availability is pending",
     "No compatibility or production promotion is claimed by V0"
   ],
   "stop_the_line": [],
-  "next_step": "Run the full ME.V4 workspace gate, record the canonical digest, and create Complete ME.V4 typed CICS runtime."
+  "next_step": "Run the full ME.V5 workspace gate, record the canonical digest, and create Complete ME.V5 JCL and JES batch path."
 }

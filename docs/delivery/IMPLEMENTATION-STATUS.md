@@ -1,9 +1,9 @@
 # mainframe-env 0.1 Implementation Status
 
-Current phase: **ME.V4 — typed CICS runtime**
-Current work item: the ME.V4 candidate is complete; run the full gate and create the required phase commit.
+Current phase: **ME.V5 — JCL workflow and JES authority**
+Current work item: the ME.V5 candidate is complete; run the full gate and create the required phase commit.
 Product version: **0.1.0-alpha.0**
-Source identity: ME.V3 commit `2f8f332` plus the current ME.V4 candidate.
+Source identity: ME.V4 commit `9cb93a0` plus the current ME.V5 candidate.
 
 ## Completed deliverables
 
@@ -47,6 +47,13 @@ Source identity: ME.V3 commit `2f8f332` plus the current ME.V4 candidate.
 - Added bounded BMS maps, durable protocol-neutral terminal suspension/resume, file and program
   calls through scoped host services, typed CICS condition/EIB outcomes, transaction identity,
   transient data bounds, RACF default-deny admission, and SQLite suspended-session recovery.
+- Committed ME.V4 as `9cb93a0` with the required trailers.
+- Implemented bounded JCL planning with JOB/EXEC/DD, procedures, includes, symbols, conditions,
+  restart/skip, inline data, DD/DISP, and source provenance. JES is the sole durable job/spool
+  authority for submit, hold/release, queue/run, completion/failure, cancellation, purge, and warm start.
+- All executable steps dispatch through `host.program.invoke`; nine accepted utilities have explicit
+  routes and COBOL is injected only through the same ProgramService. Selected IEBGENER preserves exact
+  input record bytes, unknown utilities fail explicitly, and SQLite recovers running work to its queue.
 
 Exact machine evidence is in
 `conformance/0.1/evidence/program-status.json` and
@@ -63,7 +70,7 @@ Exact machine evidence is in
 
 ## Known gaps and stop-the-line findings
 
-No V0–V4 stop-the-line finding is open. ME.V5–ME.V7 implementation is pending. Current oracle gaps,
+No V0–V5 stop-the-line finding is open. ME.V6–ME.V7 implementation is pending. Current oracle gaps,
 including historical evidence revision differences, partial COBOL/CICS forms, inactive TLS/CSRF,
 and the pending PostgreSQL runner, are recorded in
 `conformance/0.1/inventory/known-gaps.json` and block only their affected later promotions.
@@ -75,5 +82,5 @@ passed: COBOL 37, RACF 8, z/OSMF datasets 9, z/OSMF jobs 9, CICS 317, JCL 164, a
 
 ## Next smallest executable step
 
-Run the complete locked ME.V4 gate, record its canonical content digest, review the staged diff, and
-create the dedicated `Complete ME.V4 typed CICS runtime` commit.
+Run the complete locked ME.V5 gate, record its canonical content digest, review the staged diff, and
+create the dedicated `Complete ME.V5 JCL and JES batch path` commit.

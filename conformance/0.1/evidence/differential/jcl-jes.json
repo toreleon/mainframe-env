@@ -1,0 +1,22 @@
+{
+  "schema_version":"mainframe-env.jcl-jes-differential@1",
+  "status":"pass",
+  "oracle_revision":"cee4b1df3fa5e32066b7948d528c163f8636a18e",
+  "oracle_reproduction":{
+    "jcl_tests":164,
+    "jes2_tests":222,
+    "exit_code":0
+  },
+  "selected_route_observations":[
+    "JCL statement and operand classification",
+    "inline bytes and procedure/symbol expansion",
+    "COND skip and restart selection",
+    "submit/queue/run/terminal transitions",
+    "JOBLOG/JESMSGLG/JESJCL/SYSPRINT records",
+    "IEFBR14 and IEBGENER program dispatch",
+    "missing program failure and cancellation",
+    "submit idempotency and warm-start recovery"
+  ],
+  "intentional_corrections":[],
+  "legacy_dependency_linked":false
+}

@@ -1,0 +1,34 @@
+{
+  "schema_version":"mainframe-env.v5-batch-results@1",
+  "derived":true,
+  "status":"pass",
+  "authority":"mainframe-env-batch@1",
+  "conditions":{
+    "bounded_jcl_source_and_parser":true,
+    "job_exec_dd_proc_pend_set_if_else_endif_include_output_typed":true,
+    "continuation_comments_inline_custom_delimiter_and_concatenation":true,
+    "procedures_symbols_overrides_and_provenance":true,
+    "cond_even_only_boolean_if_and_restart_skip":true,
+    "typed_workflow_and_dd_disposition":true,
+    "all_exec_pgm_through_program_service":true,
+    "accepted_program_selectors":10,
+    "explicit_builtin_utility_routes":9,
+    "cobol_program_service_route":true,
+    "generic_success_route":false,
+    "one_durable_job_and_spool_authority":true,
+    "submit_hold_release_run_complete_fail_cancel_purge":true,
+    "joblog_jesmsglg_jesjcl_sysout_sysprint":true,
+    "queue_active_spool_event_attempt_bounds":true,
+    "security_admission_and_sensitive_recheck":true,
+    "dataset_dd_allocation_and_disposition_host_routes":true,
+    "sqlite_warm_start_running_to_queue":true
+  },
+  "tests":{"jcl":3,"program_router":3,"jes_service":5,"focused_total":11},
+  "evidence":[
+    "conformance/0.1/evidence/differential/jcl-jes.json",
+    "conformance/0.1/inventory/jcl-jes-coverage.json",
+    "crates/apps/mainframe-env-batch/src/jcl.rs",
+    "crates/apps/mainframe-env-batch/src/program.rs",
+    "crates/apps/mainframe-env-batch/src/service.rs"
+  ]
+}
