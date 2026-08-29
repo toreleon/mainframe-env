@@ -2,6 +2,7 @@
   "schema_version": "mainframe-env.dependency-graph@1",
   "direction": "applications -> kernel/adapters -> contracts -> foundation",
   "edges": [
+    ["mainframe-env-application","mainframe-env-execution-api"],
     ["mainframe-env-batch","mainframe-env-execution-api"],
     ["mainframe-env-batch","mainframe-env-host-api"],
     ["mainframe-env-batch","mainframe-env-store-api"],

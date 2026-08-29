@@ -2,7 +2,8 @@
 
 use mainframe_env_application::{
     ApplicationInstaller, ApplicationManifest, ApplicationPackage, EntryKind, InstallProblem,
-    InstallState, PackageEntry, package_identity, parse_bms, parse_csd,
+    InstallState, PackageEntry, ProgramArtifact, ProgramCatalog, ProgramFrame, ProgramFrames,
+    package_identity, parse_bms, parse_csd,
 };
 use mainframe_env_compiler::{
     CobolCompiler, ControlEdgeKind, ControlRole, DataCategory, StatementKind, StorageSection,
@@ -283,6 +284,21 @@ pub struct CardDemoResourceReceipt {
     pub cross_references: usize,
     pub unresolved: Vec<String>,
     pub resource_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoProgramReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub installed_programs: usize,
+    pub generations: usize,
+    pub exact_generation_resolution: bool,
+    pub xctl_replaced_frame: bool,
+    pub link_child_frame: bool,
+    pub return_restored_caller: bool,
+    pub context_propagated: bool,
+    pub catalog_sha256: String,
 }
 
 pub fn verify_carddemo_corpus_from_env(
@@ -1636,6 +1652,90 @@ pub fn verify_carddemo_resources_from_env(
         cross_references,
         unresolved,
         resource_sha256: format!("{:x}", digest.finalize()),
+    })
+}
+
+pub fn verify_carddemo_program_routing_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoProgramReceipt, CorpusProblem> {
+    let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required for CardDemo gates",
+        )
+    })?;
+    let corpus_dir = Path::new(&corpus_dir);
+    let corpus = verify_carddemo_corpus(corpus_dir, inventory_path)?;
+    let csd_paths = collect_paths(
+        corpus_dir,
+        &[
+            "app/csd",
+            "app/app-authorization-ims-db2-mq/csd",
+            "app/app-transaction-type-db2/csd",
+            "app/app-vsam-mq/csd",
+        ],
+        "csd",
+    )?;
+    let mut names = BTreeSet::new();
+    for path in csd_paths {
+        let source = String::from_utf8(read_corpus_file(corpus_dir, &corpus_dir.join(&path))?)
+            .map_err(|_| CorpusProblem::new("carddemo.program.invalid", "CSD is not UTF-8"))?;
+        for resource in parse_csd(&source).map_err(package_problem)? {
+            if resource.kind == "PROGRAM" {
+                names.insert(resource.name);
+            }
+        }
+    }
+    let mut catalog = ProgramCatalog::default();
+    let mut digest = Sha256::new();
+    for name in &names {
+        let identity = format!("sha256:{:x}", Sha256::digest(name.as_bytes()));
+        catalog
+            .install(ProgramArtifact {
+                name: name.clone(),
+                generation: 1,
+                identity: identity.clone(),
+            })
+            .map_err(package_problem)?;
+        digest_field(&mut digest, name.as_bytes());
+        digest_field(&mut digest, identity.as_bytes());
+    }
+    let exact_generation_resolution = names
+        .iter()
+        .all(|name| catalog.resolve(name, Some(1)).is_ok());
+    let first = catalog.resolve("COSGN00C", None).map_err(package_problem)?;
+    let second = catalog
+        .resolve("COMEN01C", Some(1))
+        .map_err(package_problem)?;
+    let artifact = crate::compile(crate::HELLO_SOURCE)
+        .map_err(|error| CorpusProblem::new("carddemo.program.fixture_failed", error))?;
+    let invocation = crate::invocation(&artifact, 4096);
+    let mut frames = ProgramFrames::root(ProgramFrame {
+        artifact: first.clone(),
+        commarea: b"ROOT".to_vec(),
+        invocation: invocation.clone(),
+    });
+    frames.xctl(second.clone(), b"XCTL".to_vec());
+    let xctl_replaced_frame = frames.depth() == 1 && frames.current().artifact == second;
+    frames.link(first, b"LINK".to_vec());
+    let link_child_frame = frames.depth() == 2 && frames.current().commarea == b"LINK";
+    let context_propagated = frames.current().invocation == invocation;
+    frames
+        .return_to_caller(b"RETURN".to_vec())
+        .map_err(package_problem)?;
+    let return_restored_caller = frames.depth() == 1 && frames.current().commarea == b"RETURN";
+    Ok(CardDemoProgramReceipt {
+        schema_version: "mainframe-env.carddemo-program-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit: corpus.commit,
+        installed_programs: names.len(),
+        generations: names.len(),
+        exact_generation_resolution,
+        xctl_replaced_frame,
+        link_child_frame,
+        return_restored_caller,
+        context_propagated,
+        catalog_sha256: format!("{:x}", digest.finalize()),
     })
 }
 

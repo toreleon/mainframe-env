@@ -6,9 +6,9 @@
   "current_product": "0.1.0-alpha.0",
   "target_product": "0.1.1",
   "source_identity": {
-    "base_commit": "6a8c7ccec048d3e9e2fd5a3f47608962debe8829",
+    "base_commit": "36162d7d333797b8161092dbedb45220a1fb82c2",
     "dirty_tree_algorithm": "sha256 of sorted sha256sum records, excluding .git, target, docs/delivery/CARDEMO-0.1.1-STATUS.md, and conformance/0.1.1/evidence/program-status.json",
-    "dirty_tree_digest": "sha256:9a0da9699a03504a3c3974a292eb6ce382d8e41dc8dc1298637756e88376d260"
+    "dirty_tree_digest": "sha256:d4ed524bc073f3cd74ab050cfbefbcb26fc68c35bfc2eeff7b7ed0b7aa0d0331"
   },
   "corpus": {
     "environment_key": "CARDEMO_CORPUS_DIR",
@@ -21,8 +21,8 @@
     "license": "Apache-2.0",
     "license_sha256": "09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b"
   },
-  "current_issue": "CD-010",
-  "issues": {"total":27,"completed":10,"in_progress":0,"open":17},
+  "current_issue": "CD-011",
+  "issues": {"total":27,"completed":11,"in_progress":0,"open":16},
   "journeys": {"total":20,"passed":0,"failed_or_not_run":20},
   "completed_issues": [
     {
@@ -101,8 +101,16 @@
       "id": "CD-010",
       "state": "pass",
       "commit_subject": "Install BMS and CICS resource catalogs",
+      "commit_identity": "36162d7d333797b8161092dbedb45220a1fb82c2",
       "evidence": "conformance/0.1.1/evidence/issues/CD-010.json",
       "evidence_digest": "sha256:c36fa5b51c47af8a2f764736654941b6c2069a56893d7d87b047eaffce580ed3"
+    },
+    {
+      "id": "CD-011",
+      "state": "pass",
+      "commit_subject": "Route installed CICS programs and transfers",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-011.json",
+      "evidence_digest": "sha256:0f60d3c84f1ccdf34ab6f8a8d88919d48f6d7d08af0de90abfaad06f4f1ba669"
     }
   ],
   "commands": [
@@ -171,6 +179,6 @@
     "Resolve 0.1.0-alpha.0 release ordering before cutting 0.1.1."
   ],
   "blockers": [],
-  "next_issue": "CD-011",
-  "next_step": "Implement CD-011 installed CICS program/generation resolution and XCTL/LINK/RETURN frame semantics with COMMAREA propagation."
+  "next_issue": "CD-012",
+  "next_step": "Implement CD-012 BMS SEND/RECEIVE field semantics, AID/cursor/attribute handling, and CICS condition policy over installed maps."
 }

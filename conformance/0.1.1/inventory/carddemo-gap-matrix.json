@@ -129,9 +129,11 @@
       "priority": "P0",
       "domain": "program-control",
       "title": "Install named program catalogs and CICS transfer/linkage",
-      "state": "open",
+      "state": "passed",
       "depends_on": ["CD-007", "CD-008", "CD-009", "CD-010"],
       "commit_subject": "Route installed CICS programs and transfers",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-011.json",
+      "evidence_digest": "sha256:0f60d3c84f1ccdf34ab6f8a8d88919d48f6d7d08af0de90abfaad06f4f1ba669",
       "acceptance": ["installed COBOL artifacts resolve by program name and generation", "XCTL replaces the frame without JSON batch payload assumptions", "LINK creates a child frame and RETURN restores its caller", "COMMAREA and LINKAGE bytes, principal, grants, limits, trace, and provider pins propagate"]
     },
     {

@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+use mainframe_env_execution_api::Invocation;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
@@ -106,6 +107,115 @@ pub struct CsdResource {
     pub kind: String,
     pub name: String,
     pub properties: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProgramArtifact {
+    pub name: String,
+    pub generation: u64,
+    pub identity: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProgramFrame {
+    pub artifact: ProgramArtifact,
+    pub commarea: Vec<u8>,
+    pub invocation: Invocation,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct ProgramCatalog {
+    programs: BTreeMap<String, BTreeMap<u64, ProgramArtifact>>,
+}
+
+impl ProgramCatalog {
+    pub fn install(&mut self, artifact: ProgramArtifact) -> Result<(), InstallProblem> {
+        validate_text(&artifact.name)?;
+        validate_sha256(&artifact.identity)?;
+        if artifact.generation == 0 {
+            return Err(InstallProblem::InvalidIdentity);
+        }
+        let generations = self
+            .programs
+            .entry(artifact.name.to_ascii_uppercase())
+            .or_default();
+        if let Some(existing) = generations.get(&artifact.generation) {
+            return if existing == &artifact {
+                Ok(())
+            } else {
+                Err(InstallProblem::IdentityConflict)
+            };
+        }
+        generations.insert(artifact.generation, artifact);
+        Ok(())
+    }
+
+    pub fn resolve(
+        &self,
+        name: &str,
+        generation: Option<u64>,
+    ) -> Result<ProgramArtifact, InstallProblem> {
+        let generations = self
+            .programs
+            .get(&name.to_ascii_uppercase())
+            .ok_or(InstallProblem::UnknownStage)?;
+        generation
+            .map_or_else(
+                || generations.last_key_value().map(|(_, value)| value.clone()),
+                |generation| generations.get(&generation).cloned(),
+            )
+            .ok_or(InstallProblem::UnknownStage)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProgramFrames {
+    frames: Vec<ProgramFrame>,
+}
+
+impl ProgramFrames {
+    pub fn root(frame: ProgramFrame) -> Self {
+        Self {
+            frames: vec![frame],
+        }
+    }
+
+    #[must_use]
+    pub fn current(&self) -> &ProgramFrame {
+        self.frames.last().expect("root frame is retained")
+    }
+
+    pub fn xctl(&mut self, artifact: ProgramArtifact, commarea: Vec<u8>) {
+        let invocation = self.current().invocation.clone();
+        *self.frames.last_mut().expect("root frame is retained") = ProgramFrame {
+            artifact,
+            commarea,
+            invocation,
+        };
+    }
+
+    pub fn link(&mut self, artifact: ProgramArtifact, commarea: Vec<u8>) {
+        let invocation = self.current().invocation.clone();
+        self.frames.push(ProgramFrame {
+            artifact,
+            commarea,
+            invocation,
+        });
+    }
+
+    pub fn return_to_caller(&mut self, commarea: Vec<u8>) -> Result<(), InstallProblem> {
+        if self.frames.len() <= 1 {
+            return Err(InstallProblem::UnknownStage);
+        }
+        self.frames.pop();
+        self.frames.last_mut().expect("caller remains").commarea = commarea;
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn depth(&self) -> usize {
+        self.frames.len()
+    }
 }
 
 pub fn parse_bms(source: &str) -> Result<BmsMap, InstallProblem> {
@@ -552,5 +662,21 @@ mod tests {
         .unwrap();
         assert_eq!(csd.len(), 2);
         assert_eq!(csd[1].properties["PROGRAM"], "PROGA");
+    }
+
+    #[test]
+    fn program_catalog_resolves_exact_and_latest_generations() {
+        let mut catalog = ProgramCatalog::default();
+        for generation in [1, 2] {
+            catalog
+                .install(ProgramArtifact {
+                    name: "PROGA".into(),
+                    generation,
+                    identity: format!("sha256:{:064x}", generation),
+                })
+                .unwrap();
+        }
+        assert_eq!(catalog.resolve("proga", None).unwrap().generation, 2);
+        assert_eq!(catalog.resolve("PROGA", Some(1)).unwrap().generation, 1);
     }
 }

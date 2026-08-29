@@ -1,17 +1,17 @@
 # CardDemo-full 0.1.1 Program Status
 
 Current phase: **CD.A — corpus and application packaging**
-Current issue: **CD-010 — BMS and CSD resources PASS**
-Next issue: **CD-011 — installed CICS program routing**
+Current issue: **CD-011 — installed CICS program routing PASS**
+Next issue: **CD-012 — CICS screens and conditions**
 Current product: **0.1.0-alpha.0**
 Target product: **0.1.1**
 CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Source identity
 
-- mainframe-env base commit: `6a8c7ccec048d3e9e2fd5a3f47608962debe8829`
+- mainframe-env base commit: `36162d7d333797b8161092dbedb45220a1fb82c2`
 - current deterministic dirty-tree identity:
-  `sha256:9a0da9699a03504a3c3974a292eb6ce382d8e41dc8dc1298637756e88376d260`
+  `sha256:d4ed524bc073f3cd74ab050cfbefbcb26fc68c35bfc2eeff7b7ed0b7aa0d0331`
 - dirty-tree algorithm: SHA-256 of the sorted `sha256sum` records for every
   repository file except `.git/`, `target/`, and the two persistent CardDemo
   status ledgers (which carry the identity).
@@ -215,7 +215,8 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 - State: **PASS**
 - Required commit subject: `Install BMS and CICS resource catalogs`
-- Completion commit identity: recorded when CD-011 starts from this issue commit.
+- Completion commit identity:
+  `36162d7d333797b8161092dbedb45220a1fb82c2`.
 - Evidence: `conformance/0.1.1/evidence/issues/CD-010.json`
 - Evidence digest:
   `sha256:c36fa5b51c47af8a2f764736654941b6c2069a56893d7d87b047eaffce580ed3`
@@ -226,6 +227,20 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   `CDV1 -> COCRDSEC` edge; no object or fallback is synthesized. The exact
   resource digest is
   `sha256:246382391f8d8e6f002c903590c841ec3c2c9357ffa07d5e70be41a9116db29c`.
+
+### CD-011 — installed program routing and CICS frames
+
+- State: **PASS**
+- Required commit subject: `Route installed CICS programs and transfers`
+- Completion commit identity: recorded when CD-012 starts from this issue commit.
+- Evidence: `conformance/0.1.1/evidence/issues/CD-011.json`
+- Evidence digest:
+  `sha256:0f60d3c84f1ccdf34ab6f8a8d88919d48f6d7d08af0de90abfaad06f4f1ba669`
+- All 26 installed program definitions resolve immutable exact/latest
+  generations. XCTL replaces at constant depth, LINK creates a child, and
+  RETURN restores caller COMMAREA bytes.
+- The complete invocation context propagates unchanged. The catalog digest is
+  `sha256:fddc6f9b6e14e8a26f097f63b34ed020c06768beff65da19f34e0b9f43e2ee3f`.
 
 ## Commands and exit codes
 
@@ -323,7 +338,7 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Implementation status
 
-- Issues passed: **10 / 27**
+- Issues passed: **11 / 27**
 - Journeys passed: **0 / 20**
 - Installed CardDemo resources: **0**
 - Executed CardDemo application journeys: **0**
@@ -337,10 +352,9 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 2. The repository is still `0.1.0-alpha.0`. A 0.1.1 release cannot be cut until
    0.1.0 is finalized or an explicit version-line correction is accepted.
 
-Neither decision blocks CD-011. No CD-010 blocker remains.
+Neither decision blocks CD-012. No CD-011 blocker remains.
 
 ## Next smallest executable step
 
-Resolve installed program artifacts by name and generation, then implement
-XCTL frame replacement, LINK child frames, RETURN restoration, and exact
-COMMAREA/LINKAGE plus invocation-context propagation.
+Implement BMS SEND/RECEIVE field serialization, AID/cursor/attribute behavior,
+and RESP/RESP2/HANDLE/NOHANDLE condition semantics over installed maps.
