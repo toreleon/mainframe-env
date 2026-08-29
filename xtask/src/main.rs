@@ -8,8 +8,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::ffi::OsStr;
 use std::fs;
+use std::io::{Read, Write};
+use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::thread;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 type TaskResult<T = ()> = Result<T, String>;
 
@@ -29,6 +33,7 @@ fn run() -> TaskResult {
     match command.as_str() {
         "versions" => check_versions(&root),
         "architecture" => check_architecture(&root),
+        "runtime-architecture" => check_runtime_architecture(&root),
         "profiles" => check_profiles(&root),
         "schemas" => check_schemas(&root),
         "inventory" => check_inventory(&root),
@@ -47,7 +52,7 @@ fn run() -> TaskResult {
         "release" => generate_release_artifacts(&root),
         "help" | "--help" | "-h" => {
             println!(
-                "cargo xtask <versions|architecture|profiles|schemas|inventory|evidence|conformance|certification|digest|release> --check"
+                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|conformance|certification|digest|release> --check"
             );
             Ok(())
         }
@@ -204,6 +209,95 @@ fn check_architecture(root: &Path) -> TaskResult {
             }
         }
     }
+    check_declared_dependency_graph(root)?;
+    check_common_execution_route(root)?;
+    check_runtime_unit_gates(root)?;
+    Ok(())
+}
+
+fn check_declared_dependency_graph(root: &Path) -> TaskResult {
+    let metadata = workspace_metadata(root)?;
+    let actual = normal_internal_edges(&metadata)?;
+    let path = root.join("conformance/0.1/inventory/dependency-graph.json");
+    let graph = json(&path)?;
+    let declared = array(&graph, "edges", &path)?
+        .iter()
+        .map(|edge| {
+            let values = edge
+                .as_array()
+                .ok_or_else(|| format!("{} contains a non-array edge", path.display()))?;
+            if values.len() != 2 {
+                return Err(format!("{} contains a malformed edge", path.display()));
+            }
+            Ok((
+                values[0]
+                    .as_str()
+                    .ok_or_else(|| format!("{} edge source is not a string", path.display()))?
+                    .to_string(),
+                values[1]
+                    .as_str()
+                    .ok_or_else(|| format!("{} edge target is not a string", path.display()))?
+                    .to_string(),
+            ))
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    if actual != declared {
+        let missing = actual.difference(&declared).cloned().collect::<Vec<_>>();
+        let stale = declared.difference(&actual).cloned().collect::<Vec<_>>();
+        return Err(format!(
+            "declared dependency graph differs from Cargo metadata; missing={missing:?} stale={stale:?}"
+        ));
+    }
+    Ok(())
+}
+
+fn check_common_execution_route(root: &Path) -> TaskResult {
+    for directory in ["crates/apps", "crates/gateways"] {
+        let mut files = Vec::new();
+        collect_extension(&root.join(directory), OsStr::new("rs"), &mut files)?;
+        for file in files {
+            let source = read(&file)?;
+            require(
+                !source.contains(".drive("),
+                &format!(
+                    "{} drives a machine outside ExecutionCoordinator",
+                    file.display()
+                ),
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn check_runtime_unit_gates(root: &Path) -> TaskResult {
+    for (package, test) in [
+        (
+            "mainframe-env-store",
+            "sqlite_adapter_runs_inside_multithread_and_current_thread_async_shells",
+        ),
+        (
+            "mainframe-env-server",
+            "cobol_cics_job_uses_scoped_principal_and_typed_host_route",
+        ),
+    ] {
+        let status = Command::new("cargo")
+            .args([
+                "test",
+                "-p",
+                package,
+                test,
+                "--all-features",
+                "--locked",
+                "--quiet",
+            ])
+            .current_dir(root)
+            .status()
+            .map_err(|error| format!("runtime architecture test {test}: {error}"))?;
+        require(
+            status.success(),
+            &format!("runtime architecture test {test} failed"),
+        )?;
+    }
     Ok(())
 }
 
@@ -271,6 +365,45 @@ fn allowed_internal_dependency(package: &str, dependency: &str) -> bool {
     allowed.contains(&dependency)
 }
 
+fn workspace_metadata(root: &Path) -> TaskResult<Value> {
+    let output = Command::new("cargo")
+        .args(["metadata", "--no-deps", "--format-version", "1", "--locked"])
+        .current_dir(root)
+        .output()
+        .map_err(|error| format!("cargo metadata: {error}"))?;
+    require(output.status.success(), "cargo metadata failed")?;
+    serde_json::from_slice(&output.stdout).map_err(|error| format!("cargo metadata JSON: {error}"))
+}
+
+fn normal_internal_edges(metadata: &Value) -> TaskResult<BTreeSet<(String, String)>> {
+    let packages = metadata["packages"]
+        .as_array()
+        .ok_or("metadata packages missing")?;
+    let names = packages
+        .iter()
+        .filter_map(|package| package["name"].as_str().map(str::to_string))
+        .collect::<BTreeSet<_>>();
+    let mut edges = BTreeSet::new();
+    for package in packages {
+        let source = package["name"].as_str().ok_or("package name missing")?;
+        for dependency in package["dependencies"]
+            .as_array()
+            .ok_or("package dependencies missing")?
+        {
+            if !dependency["kind"].is_null() {
+                continue;
+            }
+            let target = dependency["name"]
+                .as_str()
+                .ok_or("dependency name missing")?;
+            if names.contains(target) {
+                edges.insert((source.to_string(), target.to_string()));
+            }
+        }
+    }
+    Ok(edges)
+}
+
 fn check_profiles(root: &Path) -> TaskResult {
     let inventory_path = root.join("conformance/0.1/inventory/packages.json");
     let profiles_path = root.join("conformance/0.1/inventory/profiles.json");
@@ -302,6 +435,56 @@ fn check_profiles(root: &Path) -> TaskResult {
                 unique.insert(name),
                 &format!("profile {id} repeats package {name}"),
             )?;
+        }
+    }
+    let metadata = workspace_metadata(root)?;
+    let edges = normal_internal_edges(&metadata)?;
+    let adjacency = edges.into_iter().fold(
+        BTreeMap::<String, BTreeSet<String>>::new(),
+        |mut map, edge| {
+            map.entry(edge.0).or_default().insert(edge.1);
+            map
+        },
+    );
+    for (profile_id, roots) in [
+        ("core-server", vec!["mainframe-env-server"]),
+        (
+            "conformance",
+            vec![
+                "mainframe-env-server",
+                "mainframe-env-cli",
+                "mainframe-env-conformance",
+            ],
+        ),
+    ] {
+        let declared = array(&profiles, "profiles", &profiles_path)?
+            .iter()
+            .find(|profile| profile["id"].as_str() == Some(profile_id))
+            .ok_or_else(|| format!("profile {profile_id} is missing"))?["packages"]
+            .as_array()
+            .ok_or_else(|| format!("profile {profile_id} packages are missing"))?
+            .iter()
+            .map(|package| {
+                package
+                    .as_str()
+                    .map(str::to_string)
+                    .ok_or_else(|| format!("profile {profile_id} has a non-string package"))
+            })
+            .collect::<TaskResult<BTreeSet<_>>>()?;
+        let mut closure = BTreeSet::new();
+        let mut pending = roots.into_iter().map(str::to_string).collect::<Vec<_>>();
+        while let Some(package) = pending.pop() {
+            if !closure.insert(package.clone()) {
+                continue;
+            }
+            pending.extend(adjacency.get(&package).into_iter().flatten().cloned());
+        }
+        if declared != closure {
+            return Err(format!(
+                "profile {profile_id} differs from its Cargo closure; missing={:?} extra={:?}",
+                closure.difference(&declared).collect::<Vec<_>>(),
+                declared.difference(&closure).collect::<Vec<_>>()
+            ));
         }
     }
     Ok(())
@@ -470,13 +653,122 @@ fn check_evidence(root: &Path) -> TaskResult {
     Ok(())
 }
 
+fn check_runtime_architecture(root: &Path) -> TaskResult {
+    check_architecture(root)?;
+    let status = Command::new("cargo")
+        .args([
+            "build",
+            "--release",
+            "-p",
+            "mainframe-env-server",
+            "--all-features",
+            "--locked",
+        ])
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("release server build: {error}"))?;
+    require(status.success(), "release server build failed")?;
+    release_server_sqlite_smoke(root)
+}
+
+fn release_server_sqlite_smoke(root: &Path) -> TaskResult {
+    let binary = root.join("target/release/mainframe-env-server");
+    require(binary.is_file(), "release server binary is missing")?;
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| error.to_string())?
+        .as_nanos();
+    let directory = env::temp_dir().join(format!(
+        "mainframe-env-runtime-architecture-{}-{nonce}",
+        std::process::id()
+    ));
+    fs::create_dir(&directory).map_err(|error| format!("{}: {error}", directory.display()))?;
+    let database = directory.join("state.db");
+    let listener = TcpListener::bind("127.0.0.1:0").map_err(|error| error.to_string())?;
+    let port = listener
+        .local_addr()
+        .map_err(|error| error.to_string())?
+        .port();
+    drop(listener);
+    let mut child = Command::new(&binary)
+        .arg(root.join("config/mainframe-env.toml"))
+        .current_dir(&directory)
+        .env("MAINFRAME_ENV_STORE", "sqlite")
+        .env("MAINFRAME_ENV_TLS", "false")
+        .env("MAINFRAME_ENV_LISTEN", format!("127.0.0.1:{port}"))
+        .env(
+            "MAINFRAME_ENV_SQLITE_URL",
+            format!("sqlite://{}?mode=rwc", database.display()),
+        )
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("start release server: {error}"))?;
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let mut passed = false;
+    let mut failure = None;
+    while Instant::now() < deadline {
+        if let Some(status) = child.try_wait().map_err(|error| error.to_string())? {
+            let mut stderr = String::new();
+            if let Some(mut pipe) = child.stderr.take() {
+                let _ = pipe.read_to_string(&mut stderr);
+            }
+            failure = Some(format!("release server exited {status}: {stderr}"));
+            break;
+        }
+        if let Ok(mut stream) = TcpStream::connect(("127.0.0.1", port)) {
+            let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
+            let _ = stream.set_write_timeout(Some(Duration::from_secs(2)));
+            if stream
+                .write_all(
+                    b"GET /zosmf/info HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+                )
+                .is_ok()
+            {
+                let mut response = String::new();
+                if stream.read_to_string(&mut response).is_ok()
+                    && response.contains(" 200 ")
+                    && response.contains("\"ready\":true")
+                {
+                    passed = true;
+                    break;
+                }
+            }
+        }
+        thread::sleep(Duration::from_millis(50));
+    }
+    if child
+        .try_wait()
+        .map_err(|error| error.to_string())?
+        .is_none()
+    {
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+    if database.exists() {
+        fs::remove_file(&database).map_err(|error| format!("{}: {error}", database.display()))?;
+    }
+    let artifacts = directory.join("mainframe-env-artifacts");
+    if artifacts.exists() {
+        fs::remove_dir_all(&artifacts)
+            .map_err(|error| format!("{}: {error}", artifacts.display()))?;
+    }
+    fs::remove_dir(&directory).map_err(|error| format!("{}: {error}", directory.display()))?;
+    require(
+        passed,
+        failure
+            .as_deref()
+            .unwrap_or("release SQLite server did not become ready"),
+    )
+}
+
 fn check_certification(root: &Path) -> TaskResult {
     check_versions(root)?;
-    check_architecture(root)?;
     check_profiles(root)?;
     check_schemas(root)?;
     check_inventory(root)?;
     check_evidence(root)?;
+    check_runtime_architecture(root)?;
 
     let inventory = root.join("conformance/0.1/inventory");
     let packages_path = inventory.join("packages.json");

@@ -106,6 +106,7 @@ Inject:
 - formatting and diff hygiene;
 - narrow affected tests;
 - architecture/dependency check;
+- async-context store and composed execution-route regression checks;
 - schema/fixture check when relevant.
 
 ### Milestone gate
@@ -122,6 +123,7 @@ Inject:
 - long-running mixed workload and leak tests;
 - overload/backpressure and cancellation evidence;
 - database backup/restore and restart recovery;
+- release-binary SQLite startup, readiness, and shutdown smoke;
 - security/advisory/license checks;
 - compatibility and cutover rehearsal; and
 - reproducible artifacts and documentation.

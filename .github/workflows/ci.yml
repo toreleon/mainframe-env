@@ -19,6 +19,7 @@ jobs:
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - run: RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --locked
       - run: cargo xtask conformance --check
+      - run: cargo xtask runtime-architecture --check
 
   contract-msrv:
     runs-on: ubuntu-latest
