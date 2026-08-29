@@ -1,0 +1,113 @@
+{
+  "schema_version": "mainframe-env.carddemo-issue-evidence@1",
+  "issue": "CD-017",
+  "title": "Install least-privilege CardDemo identities and resource profiles",
+  "derived": true,
+  "status": "pass",
+  "target_product": "0.1.1",
+  "current_product": "0.1.0-alpha.0",
+  "digest_scope": "Recursively lexicographically key-sorted compact UTF-8 JSON serialization of security_receipt, with no trailing newline, followed by SHA-256",
+  "evidence_digest": "sha256:55f704aafb446c37e1c47ec20096b5a78bd1b661d0c4bb78f52fb0ee83896c38",
+  "security_receipt": {
+    "schema_version": "mainframe-env.carddemo-security-receipt@1",
+    "status": "pass",
+    "corpus_commit": "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e",
+    "transport_users": 2,
+    "application_signon_records": 10,
+    "identities_distinct": true,
+    "groups": 2,
+    "profiles": 64,
+    "permissions": 114,
+    "resource_classes": [
+      "DATASET",
+      "DB2",
+      "FACILITY",
+      "IMS",
+      "JES",
+      "OPERCMDS",
+      "QUEUE",
+      "TCICSTRN"
+    ],
+    "transaction_profiles": 25,
+    "program_profiles": 26,
+    "dataset_profiles": 8,
+    "queue_profiles": 1,
+    "regular_allow_checks": 4,
+    "regular_deny_checks": 8,
+    "admin_allow_checks": 8,
+    "redacted_fields": 4,
+    "manifest_replay": true,
+    "security_shape_sha256": "284ac2b2e60249032a02c82b66ff6852f43e48b05c005b238ae0867fc9780b95"
+  },
+  "acceptance_observations": [
+    "Two transport identities are installed in separate regular and administrator groups. The ten corpus application sign-on records remain application data, and APPUSER cannot authenticate as a transport identity.",
+    "Sixty-four exact default-deny profiles cover all 25 transactions, 26 programs, eight CICS datasets, the JOBS transient-data queue, and scoped Db2, IMS, JES, and operator resources.",
+    "A regular identity can execute ordinary transactions and programs, read application data, and write the application queue, but cannot administer users, update datasets, or access Db2, IMS, JES, operator, or unrelated resources.",
+    "An administrator receives only the enumerated application permissions; manifest installation is atomic, capacity-bounded, restart-durable, and exactly replayable.",
+    "RACF audits persist across restart and replace password, card-number, queue-payload, and protected-field values with a redaction marker before durable storage."
+  ],
+  "commands": [
+    {
+      "command": "cargo test -p mainframe-env-racf carddemo_audit_redacts_application_and_transport_secrets --locked before repair",
+      "exit_code": 1,
+      "result": "focused regression proved a password value was retained in audit fields"
+    },
+    {
+      "command": "CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-security --check before CD-017 evidence",
+      "exit_code": 1,
+      "result": "derived receipt had no issue evidence yet"
+    },
+    {
+      "command": "cargo test -p mainframe-env-racf carddemo --locked",
+      "exit_code": 0,
+      "result": "two atomic-manifest, identity, decision, persistence, capacity, and audit-redaction regressions passed"
+    },
+    {
+      "command": "cargo test -p mainframe-env-cics --locked",
+      "exit_code": 0,
+      "result": "12 CICS admission, resource-authorization, queue, session, and runtime tests passed"
+    },
+    {
+      "command": "cargo test -p mainframe-env-conformance --locked",
+      "exit_code": 0,
+      "result": "36 conformance tests passed"
+    },
+    {
+      "command": "affected-package cargo clippy --all-targets --locked -- -D warnings",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-security --check",
+      "exit_code": 0,
+      "result": "exact 64-profile, eight-class least-privilege receipt passed"
+    },
+    {
+      "command": "env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-security --check",
+      "exit_code": 1,
+      "result": "expected missing-environment control"
+    },
+    {
+      "command": "cargo check --workspace --all-targets --locked",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "all cumulative CardDemo gates through carddemo-security",
+      "exit_code": 0,
+      "result": "17 corpus-derived issue gates passed"
+    },
+    {
+      "command": "env -u CARDEMO_CORPUS_DIR cargo xtask conformance --check",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "cargo fmt --all -- --check && git diff --check && JSON parse checks",
+      "exit_code": 0,
+      "result": "pass"
+    }
+  ],
+  "absolute_local_paths_present": false,
+  "native_or_legacy_fallback_present": false
+}

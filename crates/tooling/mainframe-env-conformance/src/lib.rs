@@ -26,16 +26,16 @@ pub use carddemo::{
     CardDemoControlReceipt, CardDemoCoreReceipt, CardDemoCorpusReceipt,
     CardDemoDatasetCatalogReceipt, CardDemoFileCallReceipt, CardDemoHostReceipt,
     CardDemoLayoutReceipt, CardDemoPackageReceipt, CardDemoProgramReceipt, CardDemoResourceReceipt,
-    CardDemoSeedReceipt, CardDemoSourceReceipt, CardDemoVsamReceipt, CorpusProblem,
-    verify_carddemo_application_package_from_env, verify_carddemo_cics_abi_from_env,
+    CardDemoSecurityReceipt, CardDemoSeedReceipt, CardDemoSourceReceipt, CardDemoVsamReceipt,
+    CorpusProblem, verify_carddemo_application_package_from_env, verify_carddemo_cics_abi_from_env,
     verify_carddemo_cics_runtime_from_env, verify_carddemo_control_flow_from_env,
     verify_carddemo_core_semantics_from_env, verify_carddemo_corpus,
     verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
     verify_carddemo_dataset_catalog_from_env, verify_carddemo_file_call_semantics_from_env,
     verify_carddemo_host_operands_from_env, verify_carddemo_program_routing_from_env,
-    verify_carddemo_resources_from_env, verify_carddemo_seeds_from_env,
-    verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
-    verify_carddemo_vsam_from_env,
+    verify_carddemo_resources_from_env, verify_carddemo_security_from_env,
+    verify_carddemo_seeds_from_env, verify_carddemo_source_closures_from_env,
+    verify_carddemo_source_preprocessing_from_env, verify_carddemo_vsam_from_env,
 };
 
 pub const HELLO_SOURCE: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. HELLO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MSG PIC X(12) VALUE 'HELLO WORLD!'.\nPROCEDURE DIVISION.\nDISPLAY MSG.\nSTOP RUN.\n";

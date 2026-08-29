@@ -6,7 +6,9 @@ use mainframe_env_host_api::{
     HostProvider, HostRequest, HostResult, ResourceName, SecretRef, SecurityDecision,
     SecurityRequest,
 };
-use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
+use mainframe_env_store_api::{
+    ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
+};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
 
@@ -52,6 +54,37 @@ pub struct RacfLimits {
     pub max_audits: usize,
     pub max_name_bytes: usize,
 }
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RacfUserDefinition {
+    pub user: String,
+    pub credential: SecretRef,
+    pub groups: BTreeSet<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RacfProfileDefinition {
+    pub class: String,
+    pub pattern: String,
+    pub owner: String,
+    pub uacc: Option<AccessIntent>,
+    pub permissions: BTreeMap<String, AccessIntent>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RacfManifest {
+    pub groups: BTreeSet<String>,
+    pub users: Vec<RacfUserDefinition>,
+    pub profiles: Vec<RacfProfileDefinition>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RacfInstallReceipt {
+    pub groups: usize,
+    pub users: usize,
+    pub profiles: usize,
+    pub permissions: usize,
+    pub replayed: bool,
+}
 impl Default for RacfLimits {
     fn default() -> Self {
         Self {
@@ -87,6 +120,7 @@ struct State {
     groups: BTreeMap<String, u64>,
     profiles: BTreeMap<(String, String), Profile>,
     audits: Vec<AuditEvent>,
+    next_audit: u64,
 }
 pub struct RacfService {
     store: Arc<dyn ProviderStateStore>,
@@ -122,6 +156,17 @@ impl RacfService {
             let profile = decode_profile(&row.payload, row.version)?;
             profiles.insert((profile.class.clone(), profile.pattern.clone()), profile);
         }
+        let mut audits = Vec::new();
+        for row in store
+            .list_provider_state("racf-audit", limits.max_audits)
+            .map_err(store_error)?
+        {
+            audits.push(decode_audit(&row.payload, limits)?);
+        }
+        let next_audit = u64::try_from(audits.len())
+            .map_err(|_| HostProblem::ResourceExhausted)?
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
         Ok(Arc::new(Self {
             store,
             secrets,
@@ -130,9 +175,195 @@ impl RacfService {
                 users,
                 groups,
                 profiles,
-                audits: Vec::new(),
+                audits,
+                next_audit,
             }),
         }))
+    }
+    pub fn install_manifest(
+        &self,
+        manifest: RacfManifest,
+    ) -> Result<RacfInstallReceipt, HostProblem> {
+        let groups = manifest
+            .groups
+            .iter()
+            .map(|group| normalize(group, 8))
+            .collect::<Result<BTreeSet<_>, _>>()?;
+        if groups.len() != manifest.groups.len() {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        let mut users = BTreeMap::new();
+        for definition in &manifest.users {
+            let user = normalize(&definition.user, 8)?;
+            let user_groups = definition
+                .groups
+                .iter()
+                .map(|group| normalize(group, 8))
+                .collect::<Result<BTreeSet<_>, _>>()?;
+            if !user_groups.is_subset(&groups) {
+                return Err(HostProblem::NotFound);
+            }
+            let mut secret = self.secrets.resolve(&definition.credential)?;
+            let hash_result = Argon2::default()
+                .hash_password_with_salt(&secret, format!("mainframe-env:{user}").as_bytes())
+                .map(|hash| hash.to_string());
+            secret.fill(0);
+            let record = User {
+                hash: hash_result.map_err(|_| HostProblem::ProviderFailure)?,
+                expired: false,
+                revoked: false,
+                locked: false,
+                groups: user_groups,
+                version: 1,
+            };
+            if users.insert(user, record).is_some() {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+        }
+        let principals = groups
+            .iter()
+            .chain(users.keys())
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let mut profiles = BTreeMap::new();
+        for definition in &manifest.profiles {
+            let class = normalize(&definition.class, 32)?;
+            let pattern = normalize_pattern(&definition.pattern, self.limits.max_name_bytes)?;
+            let owner = normalize(&definition.owner, 8)?;
+            if !principals.contains(&owner)
+                || definition.permissions.len() > self.limits.max_permissions
+            {
+                return Err(HostProblem::NotFound);
+            }
+            let mut permissions = BTreeMap::new();
+            for (principal, access) in &definition.permissions {
+                let principal = normalize(principal, 8)?;
+                if !principals.contains(&principal)
+                    || permissions.insert(principal, *access).is_some()
+                {
+                    return Err(HostProblem::NotFound);
+                }
+            }
+            let profile = Profile {
+                class: class.clone(),
+                pattern: pattern.clone(),
+                owner,
+                uacc: definition.uacc,
+                permissions,
+                version: 1,
+            };
+            if profiles.insert((class, pattern), profile).is_some() {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+        }
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        if state
+            .groups
+            .len()
+            .checked_add(
+                groups
+                    .iter()
+                    .filter(|group| !state.groups.contains_key(*group))
+                    .count(),
+            )
+            .is_none_or(|total| total > self.limits.max_groups)
+            || state
+                .users
+                .len()
+                .checked_add(
+                    users
+                        .keys()
+                        .filter(|user| !state.users.contains_key(*user))
+                        .count(),
+                )
+                .is_none_or(|total| total > self.limits.max_users)
+            || state
+                .profiles
+                .len()
+                .checked_add(
+                    profiles
+                        .keys()
+                        .filter(|key| !state.profiles.contains_key(*key))
+                        .count(),
+                )
+                .is_none_or(|total| total > self.limits.max_profiles)
+        {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let mut writes = Vec::new();
+        for group in &groups {
+            if state.groups.contains_key(group) {
+                continue;
+            }
+            writes.push(ProviderStateWrite {
+                record: ProviderStateRecord {
+                    namespace: "racf-group".into(),
+                    key: group.clone(),
+                    version: 1,
+                    payload: Vec::new(),
+                },
+                expected_version: None,
+            });
+        }
+        for (name, user) in &users {
+            if let Some(existing) = state.users.get(name) {
+                if existing != user {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+                continue;
+            }
+            writes.push(ProviderStateWrite {
+                record: ProviderStateRecord {
+                    namespace: "racf-user".into(),
+                    key: name.clone(),
+                    version: 1,
+                    payload: encode_user(user)?,
+                },
+                expected_version: None,
+            });
+        }
+        for ((class, pattern), profile) in &profiles {
+            if let Some(existing) = state.profiles.get(&(class.clone(), pattern.clone())) {
+                if existing != profile {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+                continue;
+            }
+            writes.push(ProviderStateWrite {
+                record: ProviderStateRecord {
+                    namespace: "racf-profile".into(),
+                    key: profile_key(class, pattern),
+                    version: 1,
+                    payload: encode_profile(profile)?,
+                },
+                expected_version: None,
+            });
+        }
+        let replayed = writes.is_empty();
+        if !replayed {
+            self.store
+                .put_provider_states_atomic(writes)
+                .map_err(store_error)?;
+        }
+        for group in &groups {
+            state.groups.entry(group.clone()).or_insert(1);
+        }
+        state.users.extend(users);
+        state.profiles.extend(profiles);
+        Ok(RacfInstallReceipt {
+            groups: groups.len(),
+            users: manifest.users.len(),
+            profiles: manifest.profiles.len(),
+            permissions: manifest
+                .profiles
+                .iter()
+                .map(|profile| profile.permissions.len())
+                .sum(),
+            replayed,
+        })
     }
     pub fn add_group(&self, name: &str) -> Result<(), HostProblem> {
         let name = normalize(name, self.limits.max_name_bytes)?;
@@ -431,6 +662,7 @@ impl RacfService {
         )
     }
     fn audit(&self, event: AuditEvent) -> Result<SecurityDecision, HostProblem> {
+        let event = redact_audit(event, self.limits)?;
         let mut state = self
             .state
             .lock()
@@ -438,8 +670,27 @@ impl RacfService {
         if state.audits.len() >= self.limits.max_audits {
             return Err(HostProblem::ResourceExhausted);
         }
+        let key = format!("{:020}", state.next_audit);
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "racf-audit".into(),
+                    key,
+                    version: 1,
+                    payload: encode_audit(&event)?,
+                },
+                None,
+            )
+            .map_err(store_error)?;
+        state.next_audit = state
+            .next_audit
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
         state.audits.push(event);
         Ok(SecurityDecision::Allow)
+    }
+    pub fn record_audit(&self, event: AuditEvent) -> Result<SecurityDecision, HostProblem> {
+        self.audit(event)
     }
     fn invoke(&self, request: SecurityRequest) -> Result<SecurityDecision, HostProblem> {
         match request {
@@ -707,6 +958,94 @@ fn decode_profile(bytes: &[u8], version: u64) -> Result<Profile, HostProblem> {
         version,
     })
 }
+fn redact_audit(mut event: AuditEvent, limits: RacfLimits) -> Result<AuditEvent, HostProblem> {
+    if event.action.is_empty()
+        || event.action.len() > limits.max_name_bytes
+        || event.resource_hash.is_empty()
+        || event.resource_hash.len() > limits.max_name_bytes
+        || event.decision.is_empty()
+        || event.decision.len() > limits.max_name_bytes
+        || event.fields.len() > limits.max_permissions
+    {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    for (name, value) in &mut event.fields {
+        if name.is_empty() || name.len() > limits.max_name_bytes {
+            return Err(HostProblem::Malformed);
+        }
+        let upper = name.to_ascii_uppercase();
+        if [
+            "PASSWORD",
+            "CREDENTIAL",
+            "SECRET",
+            "CARD",
+            "QUEUE_PAYLOAD",
+            "PROTECTED",
+        ]
+        .iter()
+        .any(|marker| upper.contains(marker))
+        {
+            *value = "<redacted>".into();
+        } else if value.len() > limits.max_name_bytes {
+            return Err(HostProblem::ResourceExhausted);
+        }
+    }
+    Ok(event)
+}
+fn encode_audit(event: &AuditEvent) -> Result<Vec<u8>, HostProblem> {
+    let mut out = b"MERA1".to_vec();
+    field(&mut out, event.action.as_bytes())?;
+    field(&mut out, event.resource_hash.as_bytes())?;
+    field(&mut out, event.decision.as_bytes())?;
+    u32v(
+        &mut out,
+        u32::try_from(event.fields.len()).map_err(|_| HostProblem::ResourceExhausted)?,
+    );
+    for (name, value) in &event.fields {
+        field(&mut out, name.as_bytes())?;
+        field(&mut out, value.as_bytes())?;
+    }
+    Ok(out)
+}
+fn decode_audit(bytes: &[u8], limits: RacfLimits) -> Result<AuditEvent, HostProblem> {
+    let mut reader = Reader { bytes, at: 0 };
+    if reader.take(5)? != b"MERA1" {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let action = String::from_utf8(reader.field(limits.max_name_bytes)?)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    let resource_hash = String::from_utf8(reader.field(limits.max_name_bytes)?)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    let decision = String::from_utf8(reader.field(limits.max_name_bytes)?)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    let count = usize::try_from(reader.u32()?).map_err(|_| HostProblem::InfrastructureFailure)?;
+    if count > limits.max_permissions {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let mut fields = BTreeMap::new();
+    for _ in 0..count {
+        let name = String::from_utf8(reader.field(limits.max_name_bytes)?)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let value = String::from_utf8(reader.field(limits.max_name_bytes)?)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        if fields.insert(name, value).is_some() {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+    }
+    if reader.at != bytes.len() {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    redact_audit(
+        AuditEvent {
+            action,
+            resource_hash,
+            decision,
+            fields,
+        },
+        limits,
+    )
+    .map_err(|_| HostProblem::InfrastructureFailure)
+}
 fn access(value: u8) -> Result<Option<AccessIntent>, HostProblem> {
     Ok(match value {
         0 => None,
@@ -782,6 +1121,62 @@ mod tests {
         let resolver = Arc::new(MemorySecretResolver::default());
         let service = RacfService::open(store, resolver.clone(), Default::default()).unwrap();
         (service, resolver)
+    }
+    fn carddemo_manifest() -> RacfManifest {
+        let profiles = [
+            ("TCICSTRN", "CICS.CC00", "CARDUSR", AccessIntent::Execute),
+            ("TCICSTRN", "CICS.CA00", "CARDADM", AccessIntent::Execute),
+            (
+                "FACILITY",
+                "CICS.PROGRAM.COSGN00C",
+                "CARDUSR",
+                AccessIntent::Execute,
+            ),
+            (
+                "FACILITY",
+                "CICS.PROGRAM.**",
+                "CARDADM",
+                AccessIntent::Execute,
+            ),
+            (
+                "DATASET",
+                "AWS.M2.CARDDEMO.**",
+                "CARDUSR",
+                AccessIntent::Read,
+            ),
+            ("QUEUE", "CICS.TD.**", "CARDADM", AccessIntent::Update),
+            ("DB2", "CARDDEMO.**", "CARDADM", AccessIntent::Update),
+            ("IMS", "CARDDEMO.**", "CARDADM", AccessIntent::Update),
+            ("JES", "CARDDEMO.**", "CARDADM", AccessIntent::Control),
+            ("OPERCMDS", "CARDDEMO.**", "CARDADM", AccessIntent::Control),
+        ]
+        .into_iter()
+        .map(
+            |(class, pattern, principal, access)| RacfProfileDefinition {
+                class: class.into(),
+                pattern: pattern.into(),
+                owner: "WEBADM".into(),
+                uacc: None,
+                permissions: BTreeMap::from([(principal.into(), access)]),
+            },
+        )
+        .collect();
+        RacfManifest {
+            groups: ["CARDUSR".into(), "CARDADM".into()].into_iter().collect(),
+            users: vec![
+                RacfUserDefinition {
+                    user: "WEBUSER".into(),
+                    credential: SecretRef::new("secret:webuser", Default::default()).unwrap(),
+                    groups: ["CARDUSR".into()].into_iter().collect(),
+                },
+                RacfUserDefinition {
+                    user: "WEBADM".into(),
+                    credential: SecretRef::new("secret:webadmin", Default::default()).unwrap(),
+                    groups: ["CARDADM".into()].into_iter().collect(),
+                },
+            ],
+            profiles,
+        }
     }
     #[test]
     fn authentication_and_replay_resolution_do_not_expose_secret() {
@@ -870,6 +1265,172 @@ mod tests {
                 )
                 .unwrap(),
             SecurityDecision::Deny
+        );
+    }
+
+    #[test]
+    fn carddemo_audit_redacts_application_and_transport_secrets() {
+        let (service, _) = setup();
+        service
+            .audit(AuditEvent {
+                action: "CARDDEMO.SIGNON".into(),
+                resource_hash: "sha256:resource".into(),
+                decision: "DENY".into(),
+                fields: BTreeMap::from([
+                    ("password".into(), "TRANSPORT-PASSWORD".into()),
+                    ("card_number".into(), "0000000000000001".into()),
+                    ("queue_payload".into(), "SECRET-MESSAGE".into()),
+                    ("protected_field".into(), "PRIVATE".into()),
+                    ("transaction".into(), "CC00".into()),
+                ]),
+            })
+            .unwrap();
+        let audits = service.audits();
+        assert_eq!(audits[0].fields["transaction"], "CC00");
+        for key in [
+            "password",
+            "card_number",
+            "queue_payload",
+            "protected_field",
+        ] {
+            assert_eq!(audits[0].fields[key], "<redacted>");
+        }
+        let shown = format!("{audits:?}");
+        for secret in [
+            "TRANSPORT-PASSWORD",
+            "0000000000000001",
+            "SECRET-MESSAGE",
+            "PRIVATE",
+        ] {
+            assert!(!shown.contains(secret));
+        }
+    }
+
+    #[test]
+    fn carddemo_manifest_is_atomic_distinct_and_least_privilege() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let resolver = Arc::new(MemorySecretResolver::default());
+        resolver.insert("secret:webuser", b"WEB-PASSWORD".to_vec());
+        resolver.insert("secret:webadmin", b"ADMIN-PASSWORD".to_vec());
+        resolver.insert("secret:appuser", b"APP-PASSWORD".to_vec());
+        let service =
+            RacfService::open(store.clone(), resolver.clone(), Default::default()).unwrap();
+        let receipt = service.install_manifest(carddemo_manifest()).unwrap();
+        assert_eq!(
+            (receipt.groups, receipt.users, receipt.profiles),
+            (2, 2, 10)
+        );
+        assert!(!receipt.replayed);
+        assert!(
+            service
+                .install_manifest(carddemo_manifest())
+                .unwrap()
+                .replayed
+        );
+        let regular = PrincipalId::new("WEBUSER", InvocationLimits::default()).unwrap();
+        let admin = PrincipalId::new("WEBADM", InvocationLimits::default()).unwrap();
+        assert_eq!(
+            service
+                .authenticate(
+                    &PrincipalId::new("APPUSER", InvocationLimits::default()).unwrap(),
+                    &SecretRef::new("secret:appuser", Default::default()).unwrap(),
+                )
+                .unwrap(),
+            SecurityDecision::InvalidCredentials
+        );
+        for (class, resource, intent) in [
+            ("TCICSTRN", "CICS.CC00", AccessIntent::Execute),
+            ("FACILITY", "CICS.PROGRAM.COSGN00C", AccessIntent::Execute),
+            (
+                "DATASET",
+                "AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS",
+                AccessIntent::Read,
+            ),
+        ] {
+            assert_eq!(
+                service
+                    .authorize(
+                        &regular,
+                        class,
+                        &ResourceName::new(resource, 246).unwrap(),
+                        intent,
+                    )
+                    .unwrap(),
+                SecurityDecision::Allow
+            );
+        }
+        for (class, resource, intent) in [
+            ("TCICSTRN", "CICS.CA00", AccessIntent::Execute),
+            ("QUEUE", "CICS.TD.JOBS", AccessIntent::Update),
+            (
+                "DATASET",
+                "AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS",
+                AccessIntent::Update,
+            ),
+            ("DB2", "CARDDEMO.PENDING", AccessIntent::Read),
+            ("IMS", "CARDDEMO.AUTH", AccessIntent::Read),
+            ("JES", "CARDDEMO.REPORT", AccessIntent::Control),
+            ("OPERCMDS", "CARDDEMO.CEMT", AccessIntent::Control),
+        ] {
+            assert_eq!(
+                service
+                    .authorize(
+                        &regular,
+                        class,
+                        &ResourceName::new(resource, 246).unwrap(),
+                        intent,
+                    )
+                    .unwrap(),
+                SecurityDecision::Deny
+            );
+        }
+        for (class, resource, intent) in [
+            ("QUEUE", "CICS.TD.JOBS", AccessIntent::Update),
+            ("DB2", "CARDDEMO.PENDING", AccessIntent::Update),
+            ("IMS", "CARDDEMO.AUTH", AccessIntent::Update),
+            ("JES", "CARDDEMO.REPORT", AccessIntent::Control),
+            ("OPERCMDS", "CARDDEMO.CEMT", AccessIntent::Control),
+        ] {
+            assert_eq!(
+                service
+                    .authorize(
+                        &admin,
+                        class,
+                        &ResourceName::new(resource, 246).unwrap(),
+                        intent,
+                    )
+                    .unwrap(),
+                SecurityDecision::Allow
+            );
+        }
+        service
+            .audit(AuditEvent {
+                action: "CARDDEMO".into(),
+                resource_hash: "hash".into(),
+                decision: "ALLOW".into(),
+                fields: BTreeMap::from([("password".into(), "WEB-PASSWORD".into())]),
+            })
+            .unwrap();
+        let restarted = RacfService::open(store, resolver, Default::default()).unwrap();
+        assert_eq!(restarted.audits()[0].fields["password"], "<redacted>");
+
+        let bounded_store: Arc<dyn ProviderStateStore> =
+            Arc::new(MemoryStore::new(Default::default()));
+        let bounded_resolver = Arc::new(MemorySecretResolver::default());
+        bounded_resolver.insert("secret:webuser", b"WEB-PASSWORD".to_vec());
+        bounded_resolver.insert("secret:webadmin", b"ADMIN-PASSWORD".to_vec());
+        let bounded = RacfService::open(
+            bounded_store,
+            bounded_resolver,
+            RacfLimits {
+                max_profiles: 1,
+                ..RacfLimits::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            bounded.install_manifest(carddemo_manifest()),
+            Err(HostProblem::ResourceExhausted)
         );
     }
     #[test]

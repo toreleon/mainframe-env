@@ -1042,6 +1042,7 @@ dependencies = [
  "mainframe-env-host-api",
  "mainframe-env-interpreter",
  "mainframe-env-ir",
+ "mainframe-env-racf",
  "mainframe-env-source",
  "mainframe-env-store",
  "proptest",

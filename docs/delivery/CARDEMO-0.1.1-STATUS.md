@@ -1,17 +1,17 @@
 # CardDemo-full 0.1.1 Program Status
 
 Current phase: **CD.D — VSAM and application data**
-Current issue: **CD-016 — exact CardDemo seeds and resource aliases PASS**
-Next issue: **CD-017 — least-privilege identities and resource profiles**
+Current issue: **CD-017 — least-privilege identities and resource profiles IN PROGRESS**
+Next issue: **CD-018 — durable public CICS sessions and terminal compatibility**
 Current product: **0.1.0-alpha.0**
 Target product: **0.1.1**
 CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Source identity
 
-- mainframe-env base commit: `5ae89724b45d5779004ecddb795a3193b35dd507`
+- mainframe-env base commit: `d1ab85c5ad5fd0e9e13d0b811a10a1dcba37d018`
 - current deterministic dirty-tree identity:
-  `sha256:80d984a91ac71f2a3a8f8af9fb17018cd827b2cc9f1e724db733397741ab732e`
+  `sha256:5d08b760dae652267cc4f364bbcd3196225e035a79068e0c3b7c33e037196acb`
 - dirty-tree algorithm: SHA-256 of the sorted `sha256sum` records for every
   repository file except `.git/`, `target/`, and the two persistent CardDemo
   status ledgers (which carry the identity).
@@ -315,7 +315,8 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 - State: **PASS**
 - Required commit subject: `Install CardDemo datasets and seed records`
-- Completion commit identity: recorded when CD-017 starts from this issue commit.
+- Completion commit identity:
+  `d1ab85c5ad5fd0e9e13d0b811a10a1dcba37d018`.
 - Evidence: `conformance/0.1.1/evidence/issues/CD-016.json`
 - Evidence digest:
   `sha256:3b0615948b4eaa65c656850c4a3b57aa180daf6e1e29737ba06ebf6c57a53021`
@@ -465,6 +466,19 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 - `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-vsam --check` — **1**;
   expected missing-environment failure.
 - Ordinary conformance, JSON, formatting, redaction, and diff checks — **0**.
+- Focused pre-repair RACF audit regression — **1**; password values were
+  retained before durable audit redaction was added.
+- RACF CardDemo manifest and CICS tests — **0**; 14 atomic installation,
+  identity, authorization, persistence, redaction, queue, and runtime tests
+  passed.
+- Workspace all-target check and affected-package Clippy with `-D warnings` —
+  **0**.
+- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-security --check`
+  — **0**; exact 64-profile/eight-class least-privilege receipt passed.
+- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-security --check` — **1**;
+  expected missing-environment failure.
+- All 17 cumulative CardDemo issue gates, ordinary conformance, JSON,
+  formatting, redaction, and diff checks — **0**.
 
 ## Implementation status
 

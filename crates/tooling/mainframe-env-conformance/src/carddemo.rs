@@ -12,11 +12,14 @@ use mainframe_env_compiler::{
 };
 use mainframe_env_dataset::{DatasetLimits, DatasetSeedObject, DatasetService};
 use mainframe_env_execution_api::{
-    IdempotencyKey, InvocationLimits, Machine, MachineDrive, MachineResume, Quantum,
+    IdempotencyKey, InvocationLimits, Machine, MachineDrive, MachineResume, PrincipalId, Quantum,
 };
 use mainframe_env_host_api::{
-    CicsOperation, DatasetAttributes, DatasetName, DatasetOrganization, DatasetRequest, Mutation,
-    RecordFormat,
+    AccessIntent, AuditEvent, CicsOperation, DatasetAttributes, DatasetName, DatasetOrganization,
+    DatasetRequest, Mutation, RecordFormat, ResourceName, SecretRef, SecurityDecision,
+};
+use mainframe_env_racf::{
+    MemorySecretResolver, RacfManifest, RacfProfileDefinition, RacfService, RacfUserDefinition,
 };
 use mainframe_env_source::{
     LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLibrary,
@@ -404,6 +407,30 @@ pub struct CardDemoSeedReceipt {
     pub negative_controls: usize,
     pub install_identity: String,
     pub seed_shape_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoSecurityReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub transport_users: usize,
+    pub application_signon_records: usize,
+    pub identities_distinct: bool,
+    pub groups: usize,
+    pub profiles: usize,
+    pub permissions: usize,
+    pub resource_classes: Vec<String>,
+    pub transaction_profiles: usize,
+    pub program_profiles: usize,
+    pub dataset_profiles: usize,
+    pub queue_profiles: usize,
+    pub regular_allow_checks: usize,
+    pub regular_deny_checks: usize,
+    pub admin_allow_checks: usize,
+    pub redacted_fields: usize,
+    pub manifest_replay: bool,
+    pub security_shape_sha256: String,
 }
 
 pub fn verify_carddemo_corpus_from_env(
@@ -2945,6 +2972,334 @@ pub fn verify_carddemo_seeds_from_env(
         negative_controls: 2,
         install_identity: installed.identity,
         seed_shape_sha256: format!("{:x}", shape.finalize()),
+    })
+}
+
+pub fn verify_carddemo_security_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoSecurityReceipt, CorpusProblem> {
+    let seeds = verify_carddemo_seeds_from_env(inventory_path)?;
+    let resources = verify_carddemo_resources_from_env(inventory_path)?;
+    let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required",
+        )
+    })?;
+    let corpus_dir = Path::new(&corpus_dir);
+    let mut installed_resources = Vec::new();
+    for root in [
+        "app/csd",
+        "app/app-authorization-ims-db2-mq/csd",
+        "app/app-transaction-type-db2/csd",
+        "app/app-vsam-mq/csd",
+    ] {
+        for path in collect_paths(corpus_dir, &[root], "csd")? {
+            let source = String::from_utf8(read_corpus_file(corpus_dir, &corpus_dir.join(path))?)
+                .map_err(|_| {
+                CorpusProblem::new("carddemo.security.csd_invalid", "CSD is not UTF-8")
+            })?;
+            installed_resources.extend(parse_csd(&source).map_err(package_problem)?);
+        }
+    }
+    let transactions = installed_resources
+        .iter()
+        .filter(|resource| resource.kind == "TRANSACTION")
+        .map(|resource| resource.name.clone())
+        .collect::<BTreeSet<_>>();
+    let programs = installed_resources
+        .iter()
+        .filter(|resource| resource.kind == "PROGRAM")
+        .map(|resource| resource.name.clone())
+        .collect::<BTreeSet<_>>();
+    let files = installed_resources
+        .iter()
+        .filter(|resource| resource.kind == "FILE")
+        .filter_map(|resource| resource.properties.get("DSNAME").cloned())
+        .collect::<BTreeSet<_>>();
+    let queues = installed_resources
+        .iter()
+        .filter(|resource| resource.kind == "TDQUEUE")
+        .map(|resource| resource.name.clone())
+        .collect::<BTreeSet<_>>();
+    if transactions.len() != resources.transactions
+        || programs.len() != resources.programs
+        || files.len() != resources.files
+        || queues.len() != resources.tdqueues
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.security.resource_drift",
+            "installed security resource counts differ",
+        ));
+    }
+    let mut profiles = Vec::new();
+    let mut shape = Sha256::new();
+    for transaction in &transactions {
+        let mut permissions = BTreeMap::from([("CARDADM".into(), AccessIntent::Execute)]);
+        if transaction != "CA00" && !transaction.starts_with("CU") {
+            permissions.insert("CARDUSR".into(), AccessIntent::Execute);
+        }
+        profiles.push(RacfProfileDefinition {
+            class: "TCICSTRN".into(),
+            pattern: format!("CICS.{transaction}"),
+            owner: "WEBADM".into(),
+            uacc: None,
+            permissions,
+        });
+    }
+    for program in &programs {
+        let mut permissions = BTreeMap::from([("CARDADM".into(), AccessIntent::Execute)]);
+        if !program.starts_with("COADM") && !program.starts_with("COUSR") {
+            permissions.insert("CARDUSR".into(), AccessIntent::Execute);
+        }
+        profiles.push(RacfProfileDefinition {
+            class: "FACILITY".into(),
+            pattern: format!("CICS.PROGRAM.{program}"),
+            owner: "WEBADM".into(),
+            uacc: None,
+            permissions,
+        });
+    }
+    for dataset in &files {
+        profiles.push(RacfProfileDefinition {
+            class: "DATASET".into(),
+            pattern: dataset.clone(),
+            owner: "WEBADM".into(),
+            uacc: None,
+            permissions: BTreeMap::from([
+                ("CARDUSR".into(), AccessIntent::Read),
+                ("CARDADM".into(), AccessIntent::Update),
+            ]),
+        });
+    }
+    for queue in &queues {
+        profiles.push(RacfProfileDefinition {
+            class: "QUEUE".into(),
+            pattern: format!("CICS.TD.{queue}"),
+            owner: "WEBADM".into(),
+            uacc: None,
+            permissions: BTreeMap::from([
+                ("CARDUSR".into(), AccessIntent::Update),
+                ("CARDADM".into(), AccessIntent::Update),
+            ]),
+        });
+    }
+    for class in ["DB2", "IMS", "JES", "OPERCMDS"] {
+        profiles.push(RacfProfileDefinition {
+            class: class.into(),
+            pattern: "CARDDEMO.**".into(),
+            owner: "WEBADM".into(),
+            uacc: None,
+            permissions: BTreeMap::from([(
+                "CARDADM".into(),
+                if matches!(class, "JES" | "OPERCMDS") {
+                    AccessIntent::Control
+                } else {
+                    AccessIntent::Update
+                },
+            )]),
+        });
+    }
+    for profile in &profiles {
+        digest_field(&mut shape, profile.class.as_bytes());
+        digest_field(&mut shape, profile.pattern.as_bytes());
+        digest_field(&mut shape, format!("{:?}", profile.permissions).as_bytes());
+    }
+    let secrets = Arc::new(MemorySecretResolver::default());
+    secrets.insert("secret:webuser", b"transport-user-secret".to_vec());
+    secrets.insert("secret:webadmin", b"transport-admin-secret".to_vec());
+    secrets.insert("secret:application", b"application-secret".to_vec());
+    let service = RacfService::open(
+        Arc::new(MemoryStore::new(Default::default())),
+        secrets,
+        Default::default(),
+    )
+    .map_err(|problem| CorpusProblem::new("carddemo.security.open_failed", problem.to_string()))?;
+    let manifest = RacfManifest {
+        groups: ["CARDUSR".into(), "CARDADM".into()].into_iter().collect(),
+        users: vec![
+            RacfUserDefinition {
+                user: "WEBUSER".into(),
+                credential: SecretRef::new("secret:webuser", Default::default())
+                    .expect("static secret reference"),
+                groups: ["CARDUSR".into()].into_iter().collect(),
+            },
+            RacfUserDefinition {
+                user: "WEBADM".into(),
+                credential: SecretRef::new("secret:webadmin", Default::default())
+                    .expect("static secret reference"),
+                groups: ["CARDADM".into()].into_iter().collect(),
+            },
+        ],
+        profiles,
+    };
+    let install = service
+        .install_manifest(manifest.clone())
+        .map_err(|problem| {
+            CorpusProblem::new("carddemo.security.install_failed", problem.to_string())
+        })?;
+    let manifest_replay = service
+        .install_manifest(manifest)
+        .map(|receipt| receipt.replayed)
+        .unwrap_or(false);
+    let regular =
+        PrincipalId::new("WEBUSER", InvocationLimits::default()).expect("static regular principal");
+    let admin =
+        PrincipalId::new("WEBADM", InvocationLimits::default()).expect("static admin principal");
+    let check = |principal: &PrincipalId,
+                 class: &str,
+                 resource: &str,
+                 intent: AccessIntent,
+                 expected: SecurityDecision|
+     -> Result<(), CorpusProblem> {
+        let actual = service
+            .authorize(
+                principal,
+                class,
+                &ResourceName::new(resource, 246).map_err(|_| {
+                    CorpusProblem::new("carddemo.security.resource_invalid", resource)
+                })?,
+                intent,
+            )
+            .map_err(|problem| {
+                CorpusProblem::new(
+                    "carddemo.security.authorization_failed",
+                    problem.to_string(),
+                )
+            })?;
+        if actual != expected {
+            return Err(CorpusProblem::new(
+                "carddemo.security.decision_drift",
+                format!("{class}:{resource} returned {actual:?}"),
+            ));
+        }
+        Ok(())
+    };
+    let regular_allows = [
+        ("TCICSTRN", "CICS.CC00", AccessIntent::Execute),
+        ("FACILITY", "CICS.PROGRAM.COSGN00C", AccessIntent::Execute),
+        (
+            "DATASET",
+            "AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS",
+            AccessIntent::Read,
+        ),
+        ("QUEUE", "CICS.TD.JOBS", AccessIntent::Update),
+    ];
+    for (class, resource, intent) in regular_allows {
+        check(&regular, class, resource, intent, SecurityDecision::Allow)?;
+    }
+    let regular_denies = [
+        ("TCICSTRN", "CICS.CA00", AccessIntent::Execute),
+        ("FACILITY", "CICS.PROGRAM.COADM01C", AccessIntent::Execute),
+        (
+            "DATASET",
+            "AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS",
+            AccessIntent::Update,
+        ),
+        ("DB2", "CARDDEMO.PENDING", AccessIntent::Update),
+        ("IMS", "CARDDEMO.AUTH", AccessIntent::Update),
+        ("JES", "CARDDEMO.REPORT", AccessIntent::Control),
+        ("OPERCMDS", "CARDDEMO.CEMT", AccessIntent::Control),
+        ("DATASET", "SYS1.PARMLIB", AccessIntent::Read),
+    ];
+    for (class, resource, intent) in regular_denies {
+        check(&regular, class, resource, intent, SecurityDecision::Deny)?;
+    }
+    let admin_allows = [
+        ("TCICSTRN", "CICS.CA00", AccessIntent::Execute),
+        ("FACILITY", "CICS.PROGRAM.COADM01C", AccessIntent::Execute),
+        (
+            "DATASET",
+            "AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS",
+            AccessIntent::Update,
+        ),
+        ("QUEUE", "CICS.TD.JOBS", AccessIntent::Update),
+        ("DB2", "CARDDEMO.PENDING", AccessIntent::Update),
+        ("IMS", "CARDDEMO.AUTH", AccessIntent::Update),
+        ("JES", "CARDDEMO.REPORT", AccessIntent::Control),
+        ("OPERCMDS", "CARDDEMO.CEMT", AccessIntent::Control),
+    ];
+    for (class, resource, intent) in admin_allows {
+        check(&admin, class, resource, intent, SecurityDecision::Allow)?;
+    }
+    let identities_distinct = service
+        .authenticate(
+            &PrincipalId::new("APPUSER", InvocationLimits::default())
+                .expect("static application principal"),
+            &SecretRef::new("secret:application", Default::default())
+                .expect("static secret reference"),
+        )
+        .map(|decision| decision == SecurityDecision::InvalidCredentials)
+        .unwrap_or(false);
+    service
+        .record_audit(AuditEvent {
+            action: "CARDDEMO.SIGNON".into(),
+            resource_hash: "sha256:resource".into(),
+            decision: "DENY".into(),
+            fields: BTreeMap::from([
+                ("password".into(), "transport-user-secret".into()),
+                ("card_number".into(), "0000000000000001".into()),
+                ("queue_payload".into(), "message-secret".into()),
+                ("protected_field".into(), "private".into()),
+                ("transaction".into(), "CC00".into()),
+            ]),
+        })
+        .map_err(|problem| {
+            CorpusProblem::new("carddemo.security.audit_failed", problem.to_string())
+        })?;
+    let audit = service
+        .audits()
+        .pop()
+        .ok_or_else(|| CorpusProblem::new("carddemo.security.audit_failed", "audit is missing"))?;
+    let redacted_fields = audit
+        .fields
+        .values()
+        .filter(|value| value.as_str() == "<redacted>")
+        .count();
+    let application_signon_records =
+        fs::metadata(corpus_dir.join("app/data/EBCDIC/AWS.M2.CARDDEMO.USRSEC.PS"))
+            .map_err(|error| {
+                CorpusProblem::new("carddemo.security.seed_missing", error.to_string())
+            })?
+            .len() as usize
+            / 80;
+    let classes = [
+        "DATASET", "DB2", "FACILITY", "IMS", "JES", "OPERCMDS", "QUEUE", "TCICSTRN",
+    ];
+    if install.groups != 2
+        || install.users != 2
+        || install.profiles != 64
+        || !manifest_replay
+        || !identities_distinct
+        || application_signon_records != 10
+        || redacted_fields != 4
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.security.surface_drift",
+            "security manifest or decisions differ from the pinned contract",
+        ));
+    }
+    Ok(CardDemoSecurityReceipt {
+        schema_version: "mainframe-env.carddemo-security-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit: seeds.corpus_commit,
+        transport_users: install.users,
+        application_signon_records,
+        identities_distinct,
+        groups: install.groups,
+        profiles: install.profiles,
+        permissions: install.permissions,
+        resource_classes: classes.into_iter().map(str::to_string).collect(),
+        transaction_profiles: transactions.len(),
+        program_profiles: programs.len(),
+        dataset_profiles: files.len(),
+        queue_profiles: queues.len(),
+        regular_allow_checks: regular_allows.len(),
+        regular_deny_checks: regular_denies.len(),
+        admin_allow_checks: admin_allows.len(),
+        redacted_fields,
+        manifest_replay,
+        security_shape_sha256: format!("{:x}", shape.finalize()),
     })
 }
 

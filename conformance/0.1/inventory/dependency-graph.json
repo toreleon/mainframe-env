@@ -35,6 +35,7 @@
     ["mainframe-env-conformance","mainframe-env-host-api"],
     ["mainframe-env-conformance","mainframe-env-interpreter"],
     ["mainframe-env-conformance","mainframe-env-ir"],
+    ["mainframe-env-conformance","mainframe-env-racf"],
     ["mainframe-env-conformance","mainframe-env-source"],
     ["mainframe-env-conformance","mainframe-env-store"],
     ["mainframe-env-dataset","mainframe-env-execution-api"],

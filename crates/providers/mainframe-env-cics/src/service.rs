@@ -1249,10 +1249,9 @@ impl CicsService {
 
     fn write_transient(
         &self,
-        run: &Run,
+        run: &mut Run,
         request: &CicsRequest,
     ) -> Result<CicsResponse, HostProblem> {
-        let mut state = self.lock()?;
         let queue = argument_text(request, "QUEUE")
             .or_else(|_| argument_text(request, "TDQUEUE"))?
             .trim()
@@ -1265,6 +1264,13 @@ impl CicsService {
         {
             return Err(HostProblem::Malformed);
         }
+        self.authorize(
+            run,
+            "QUEUE",
+            &format!("CICS.TD.{queue}"),
+            AccessIntent::Update,
+        )?;
+        let mut state = self.lock()?;
         let value = argument_bytes(request, "FROM").unwrap_or_default();
         let mutation = request
             .mutation
