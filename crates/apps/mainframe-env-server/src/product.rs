@@ -835,10 +835,13 @@ impl ProductServer {
             | DatasetRequest::Read { dataset, .. }
             | DatasetRequest::Create { dataset, .. }
             | DatasetRequest::Write { dataset, .. }
+            | DatasetRequest::RewriteRecord { dataset, .. }
+            | DatasetRequest::DeleteRecord { dataset, .. }
             | DatasetRequest::Delete { dataset, .. }
             | DatasetRequest::StartBrowse { dataset, .. }
             | DatasetRequest::ReadNext { dataset, .. }
             | DatasetRequest::EndBrowse { dataset, .. } => Some(dataset.as_str()),
+            DatasetRequest::DefineAlternateIndex { base, .. } => Some(base.as_str()),
         };
         if let Some(dataset) = dataset {
             self.authorize_resource(

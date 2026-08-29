@@ -165,9 +165,11 @@
       "priority": "P0",
       "domain": "vsam",
       "title": "Implement keyed VSAM record and alternate-index semantics",
-      "state": "open",
+      "state": "passed",
       "depends_on": ["CD-007", "CD-009"],
       "commit_subject": "Implement CardDemo keyed VSAM semantics",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-014.json",
+      "evidence_digest": "sha256:49e0e68b55ea47c90b5b5f8fcc3404de2f241ef7c750fa296ac2cd17a6dc6ecb",
       "acceptance": ["KSDS read/write/rewrite/delete operate on records rather than whole datasets", "STARTBR/READNEXT/READPREV/ENDBR use stable key order", "AIX paths support duplicate policy and base-record identity", "base and every index mutate atomically with exact CICS conditions"]
     },
     {

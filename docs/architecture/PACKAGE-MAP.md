@@ -152,8 +152,11 @@ job execution state.
 ### `mainframe-env-dataset`
 
 Owns the 0.1 dataset/catalog authority and storage adapters required by accepted
-fixtures. Filesystem paths remain provider-private. Callers use typed dataset
-host requests and DD bindings.
+fixtures. Key-sequenced records are addressed by stable primary identity;
+alternate-index paths retain ordered alternate/base identities and duplicate
+policy. A record mutation and every affected index generation commit in one
+provider-state transaction. Filesystem paths remain provider-private. Callers
+use typed dataset host requests and DD bindings.
 
 ### `mainframe-env-cics`
 

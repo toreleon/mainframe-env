@@ -1,17 +1,17 @@
 # CardDemo-full 0.1.1 Program Status
 
-Current phase: **CD.C — base CICS and terminal runtime**
-Current issue: **CD-013 — reached CICS operations and unit-of-work semantics PASS**
-Next issue: **CD-014 — keyed VSAM and alternate-index semantics**
+Current phase: **CD.D — VSAM and application data**
+Current issue: **CD-014 — keyed VSAM and alternate-index semantics PASS**
+Next issue: **CD-015 — dataset organizations and catalog lifecycle**
 Current product: **0.1.0-alpha.0**
 Target product: **0.1.1**
 CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Source identity
 
-- mainframe-env base commit: `742982c052298c4855d5867aab505c216e896331`
+- mainframe-env base commit: `4309a0ad597315f8994d213c4cd6140fca961220`
 - current deterministic dirty-tree identity:
-  `sha256:b7949fd33c288ae049872a0df3b3a821c557a12a1882adb17850cf12eb6643b3`
+  `sha256:ab27d3e7578cd03e9e7750f696dee478df79cf912b3e4cf8f00a7258fdf8e6d4`
 - dirty-tree algorithm: SHA-256 of the sorted `sha256sum` records for every
   repository file except `.git/`, `target/`, and the two persistent CardDemo
   status ledgers (which carry the identity).
@@ -261,7 +261,8 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 - State: **PASS**
 - Required commit subject: `Complete CardDemo CICS operations`
-- Completion commit identity: recorded when CD-014 starts from this issue commit.
+- Completion commit identity:
+  `4309a0ad597315f8994d213c4cd6140fca961220`.
 - Evidence: `conformance/0.1.1/evidence/issues/CD-013.json`
 - Evidence digest:
   `sha256:a1229fa5539697f08853c9bf4e73a6048af21ddb272d439cc56fa52ec3c7a61d`
@@ -273,6 +274,23 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   idempotently; unresolved intent remains an explicit unknown outcome until
   reconciliation. The residual runtime shape digest is
   `sha256:a18d2cdae251d027a032866cabf4380511a84b056a410b1cdd3be0877ea14c9f`.
+
+### CD-014 — keyed VSAM records and alternate indexes
+
+- State: **PASS**
+- Required commit subject: `Implement CardDemo keyed VSAM semantics`
+- Completion commit identity: recorded when CD-015 starts from this issue commit.
+- Evidence: `conformance/0.1.1/evidence/issues/CD-014.json`
+- Evidence digest:
+  `sha256:49e0e68b55ea47c90b5b5f8fcc3404de2f241ef7c750fa296ac2cd17a6dc6ecb`
+- KSDS insert/read/rewrite/delete now operate by primary identity; forward and
+  reverse browse use stable key order, implicit CICS cursors, and exact
+  DUPREC/NOTFND/INVREQ/LENGERR/ENDFILE conditions.
+- Alternate paths preserve ordered alternate/base identities and duplicate
+  policy. Base record, all UPGRADE index generations, and replay result commit
+  atomically and recover intent-only restart. The pinned surface has 10 base
+  clusters, three AIX paths, 13 exact key ranges, and shape digest
+  `sha256:0064821883815d2257ba1477a433a342bcc06a3f82878668c4f8eefac2f76f60`.
 
 ## Commands and exit codes
 
@@ -378,10 +396,21 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 - `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-cics-runtime --check` —
   **1**; expected missing-environment failure.
 - Ordinary conformance, JSON, formatting, redaction, and diff checks — **0**.
+- Focused pre-repair KSDS insert regression — **1**; the second WRITE replaced
+  the first record.
+- Affected dataset, CICS, host API, interpreter, conformance, server, and xtask
+  tests — **0**; 87 tests passed.
+- Workspace all-target check and affected-package Clippy with `-D warnings` —
+  **0**.
+- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-vsam --check`
+  — **0**; exact key/AIX/reached-operation receipt passed.
+- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-vsam --check` — **1**;
+  expected missing-environment failure.
+- Ordinary conformance, JSON, formatting, redaction, and diff checks — **0**.
 
 ## Implementation status
 
-- Issues passed: **13 / 27**
+- Issues passed: **14 / 27**
 - Journeys passed: **0 / 20**
 - Installed CardDemo resources: **0**
 - Executed CardDemo application journeys: **0**
@@ -395,9 +424,9 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 2. The repository is still `0.1.0-alpha.0`. A 0.1.1 release cannot be cut until
    0.1.0 is finalized or an explicit version-line correction is accepted.
 
-Neither decision blocks CD-014. No CD-013 blocker remains.
+Neither decision blocks CD-015. No CD-014 blocker remains.
 
 ## Next smallest executable step
 
-Implement keyed KSDS record insert/read/rewrite/delete, stable browse order,
-alternate-index duplicate policy, and atomic base/index CICS conditions.
+Implement the 23 runtime dataset definitions, GDG base/generation lifecycle,
+PDS members/DD concatenation, and reached ESDS/RRDS/fixed/variable/line forms.

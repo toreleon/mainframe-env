@@ -159,6 +159,27 @@ pub enum DatasetRequest {
         expected_version: Option<u64>,
         mutation: Mutation,
     },
+    RewriteRecord {
+        dataset: DatasetName,
+        key: Vec<u8>,
+        record: Vec<u8>,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
+    DeleteRecord {
+        dataset: DatasetName,
+        key: Vec<u8>,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
+    DefineAlternateIndex {
+        base: DatasetName,
+        index: DatasetName,
+        key_offset: u32,
+        key_length: u32,
+        allow_duplicates: bool,
+        mutation: Mutation,
+    },
     Rename {
         from: DatasetName,
         to: DatasetName,
@@ -201,6 +222,7 @@ pub enum DatasetResult {
     },
     Records {
         records: Vec<Vec<u8>>,
+        identities: Vec<Vec<u8>>,
         version: u64,
     },
     Created {
@@ -212,6 +234,8 @@ pub enum DatasetResult {
     Browse {
         cursor: String,
         record: Option<Vec<u8>>,
+        identity: Option<Vec<u8>>,
+        key: Option<Vec<u8>>,
     },
     Condition {
         name: String,
@@ -561,6 +585,9 @@ impl HostRequest {
             Self::Dataset(
                 DatasetRequest::Create { .. }
                     | DatasetRequest::Write { .. }
+                    | DatasetRequest::RewriteRecord { .. }
+                    | DatasetRequest::DeleteRecord { .. }
+                    | DatasetRequest::DefineAlternateIndex { .. }
                     | DatasetRequest::Rename { .. }
                     | DatasetRequest::Delete { .. }
             ) | Self::Spool(
@@ -584,6 +611,9 @@ impl HostRequest {
             Self::Dataset(
                 DatasetRequest::Create { mutation, .. }
                 | DatasetRequest::Write { mutation, .. }
+                | DatasetRequest::RewriteRecord { mutation, .. }
+                | DatasetRequest::DeleteRecord { mutation, .. }
+                | DatasetRequest::DefineAlternateIndex { mutation, .. }
                 | DatasetRequest::Rename { mutation, .. }
                 | DatasetRequest::Delete { mutation, .. },
             )
@@ -677,8 +707,46 @@ impl HostResult {
             {
                 Err(HostProblem::ResourceExhausted)
             }
-            Self::Dataset(DatasetResult::Records { records, .. }) => {
-                validate_records(records, limits)
+            Self::Dataset(DatasetResult::Records {
+                records,
+                identities,
+                ..
+            }) => {
+                validate_records(records, limits)?;
+                if identities.len() != records.len()
+                    || identities
+                        .iter()
+                        .any(|identity| identity.len() > limits.max_record_bytes)
+                {
+                    Err(HostProblem::Malformed)
+                } else {
+                    Ok(())
+                }
+            }
+            Self::Dataset(DatasetResult::Browse {
+                record,
+                identity,
+                key,
+                ..
+            }) if record
+                .as_ref()
+                .is_some_and(|value| value.len() > limits.max_record_bytes)
+                || identity
+                    .as_ref()
+                    .is_some_and(|value| value.len() > limits.max_record_bytes)
+                || key
+                    .as_ref()
+                    .is_some_and(|value| value.len() > limits.max_record_bytes) =>
+            {
+                Err(HostProblem::ResourceExhausted)
+            }
+            Self::Dataset(DatasetResult::Browse {
+                record,
+                identity,
+                key,
+                ..
+            }) if record.is_some() != identity.is_some() || record.is_some() != key.is_some() => {
+                Err(HostProblem::Malformed)
             }
             Self::Program(payload) | Self::Spool(payload) | Self::Terminal(payload)
                 if payload.bytes().len() > limits.max_state_bytes =>
@@ -810,6 +878,38 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
         } => {
             validate_records(records, limits)?;
             mutation.validate(limits)
+        }
+        DatasetRequest::RewriteRecord {
+            key,
+            record,
+            mutation,
+            ..
+        } if key.len() > limits.max_record_bytes || record.len() > limits.max_record_bytes => {
+            Err(HostProblem::ResourceExhausted)
+        }
+        DatasetRequest::RewriteRecord { mutation, .. } => mutation.validate(limits),
+        DatasetRequest::DeleteRecord { key, mutation, .. } => {
+            if key.len() > limits.max_record_bytes {
+                Err(HostProblem::ResourceExhausted)
+            } else {
+                mutation.validate(limits)
+            }
+        }
+        DatasetRequest::DefineAlternateIndex {
+            key_offset,
+            key_length,
+            mutation,
+            ..
+        } => {
+            if *key_length == 0
+                || key_offset
+                    .checked_add(*key_length)
+                    .is_none_or(|end| end as usize > limits.max_record_bytes)
+            {
+                Err(HostProblem::Malformed)
+            } else {
+                mutation.validate(limits)
+            }
         }
         DatasetRequest::Rename { mutation, .. } | DatasetRequest::Delete { mutation, .. } => {
             mutation.validate(limits)

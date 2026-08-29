@@ -25,7 +25,7 @@ pub use carddemo::{
     CardDemoCicsReceipt, CardDemoCicsRuntimeReceipt, CardDemoClosureReceipt,
     CardDemoControlReceipt, CardDemoCoreReceipt, CardDemoCorpusReceipt, CardDemoFileCallReceipt,
     CardDemoHostReceipt, CardDemoLayoutReceipt, CardDemoPackageReceipt, CardDemoProgramReceipt,
-    CardDemoResourceReceipt, CardDemoSourceReceipt, CorpusProblem,
+    CardDemoResourceReceipt, CardDemoSourceReceipt, CardDemoVsamReceipt, CorpusProblem,
     verify_carddemo_application_package_from_env, verify_carddemo_cics_abi_from_env,
     verify_carddemo_cics_runtime_from_env, verify_carddemo_control_flow_from_env,
     verify_carddemo_core_semantics_from_env, verify_carddemo_corpus,
@@ -33,6 +33,7 @@ pub use carddemo::{
     verify_carddemo_file_call_semantics_from_env, verify_carddemo_host_operands_from_env,
     verify_carddemo_program_routing_from_env, verify_carddemo_resources_from_env,
     verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
+    verify_carddemo_vsam_from_env,
 };
 
 pub const HELLO_SOURCE: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. HELLO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MSG PIC X(12) VALUE 'HELLO WORLD!'.\nPROCEDURE DIVISION.\nDISPLAY MSG.\nSTOP RUN.\n";
@@ -458,6 +459,7 @@ mod tests {
                     sequence: effect.sequence,
                     outcome: Ok(HostResult::Dataset(DatasetResult::Records {
                         records: vec![b"ABC".to_vec()],
+                        identities: vec![b"ABC".to_vec()],
                         version: 1,
                     })),
                 }),

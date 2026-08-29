@@ -1,14 +1,14 @@
 {
   "schema_version": "mainframe-env.carddemo-program-status@1",
-  "phase": "CD.C",
+  "phase": "CD.D",
   "phase_status": "in_progress",
   "implementation_status": "in_progress",
   "current_product": "0.1.0-alpha.0",
   "target_product": "0.1.1",
   "source_identity": {
-    "base_commit": "742982c052298c4855d5867aab505c216e896331",
+    "base_commit": "4309a0ad597315f8994d213c4cd6140fca961220",
     "dirty_tree_algorithm": "sha256 of sorted sha256sum records, excluding .git, target, docs/delivery/CARDEMO-0.1.1-STATUS.md, and conformance/0.1.1/evidence/program-status.json",
-    "dirty_tree_digest": "sha256:b7949fd33c288ae049872a0df3b3a821c557a12a1882adb17850cf12eb6643b3"
+    "dirty_tree_digest": "sha256:ab27d3e7578cd03e9e7750f696dee478df79cf912b3e4cf8f00a7258fdf8e6d4"
   },
   "corpus": {
     "environment_key": "CARDEMO_CORPUS_DIR",
@@ -21,8 +21,8 @@
     "license": "Apache-2.0",
     "license_sha256": "09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b"
   },
-  "current_issue": "CD-013",
-  "issues": {"total":27,"completed":13,"in_progress":0,"open":14},
+  "current_issue": "CD-014",
+  "issues": {"total":27,"completed":14,"in_progress":0,"open":13},
   "journeys": {"total":20,"passed":0,"failed_or_not_run":20},
   "completed_issues": [
     {
@@ -125,8 +125,16 @@
       "id": "CD-013",
       "state": "pass",
       "commit_subject": "Complete CardDemo CICS operations",
+      "commit_identity": "4309a0ad597315f8994d213c4cd6140fca961220",
       "evidence": "conformance/0.1.1/evidence/issues/CD-013.json",
       "evidence_digest": "sha256:a1229fa5539697f08853c9bf4e73a6048af21ddb272d439cc56fa52ec3c7a61d"
+    },
+    {
+      "id": "CD-014",
+      "state": "pass",
+      "commit_subject": "Implement CardDemo keyed VSAM semantics",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-014.json",
+      "evidence_digest": "sha256:49e0e68b55ea47c90b5b5f8fcc3404de2f241ef7c750fa296ac2cd17a6dc6ecb"
     }
   ],
   "commands": [
@@ -189,6 +197,12 @@
     ,{"command":"affected-package cargo clippy --all-targets --locked -- -D warnings","exit_code":0,"result":"pass"}
     ,{"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-cics-runtime --check","exit_code":0,"result":"240 reached statements and 24 executable variants passed"}
     ,{"command":"env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-cics-runtime --check","exit_code":1,"result":"expected carddemo.corpus.environment_missing control"}
+    ,{"command":"cargo test -p mainframe-env-dataset carddemo_ksds_write_inserts_records_without_replacing_the_cluster --locked","exit_code":1,"result":"focused pre-repair regression proved KSDS WRITE replaced the cluster"}
+    ,{"command":"affected dataset/CICS/host API/interpreter/conformance/server/xtask tests","exit_code":0,"result":"87 tests passed"}
+    ,{"command":"cargo check --workspace --all-targets --locked","exit_code":0,"result":"pass"}
+    ,{"command":"affected-package cargo clippy --all-targets --locked -- -D warnings","exit_code":0,"result":"pass"}
+    ,{"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-vsam --check","exit_code":0,"result":"13 runtime keyed paths, three AIX paths, and 58 operations passed"}
+    ,{"command":"env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-vsam --check","exit_code":1,"result":"expected carddemo.corpus.environment_missing control"}
   ],
   "decisions": [
     "0.1.1 uses additive CardDemo profiles and preserves core-server compatibility.",
@@ -201,6 +215,6 @@
     "Resolve 0.1.0-alpha.0 release ordering before cutting 0.1.1."
   ],
   "blockers": [],
-  "next_issue": "CD-014",
-  "next_step": "Implement CD-014 keyed KSDS record mutation, stable browse order, alternate-index duplicate policy, and atomic base/index conditions."
+  "next_issue": "CD-015",
+  "next_step": "Implement CD-015 runtime dataset definitions, GDG lifecycle, PDS/DD concatenation, and reached ESDS/RRDS/fixed/variable/line forms."
 }

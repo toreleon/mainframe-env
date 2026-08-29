@@ -896,6 +896,7 @@ impl ReferenceMachine {
                 "MILLISECONDS",
             ],
             CicsOperation::Link => &["COMMAREA"],
+            CicsOperation::ReadNext | CicsOperation::ReadPrev => &["RIDFLD"],
             _ => &[],
         };
         let outputs = output_names
@@ -1095,7 +1096,7 @@ impl ReferenceMachine {
             sequence: self.effect_sequence,
             kind,
         });
-        Ok(Step::Effect(effect))
+        Ok(Step::Effect(Box::new(effect)))
     }
     fn mutation(&self) -> Result<Mutation, MachineProblem> {
         Ok(Mutation {
@@ -2181,7 +2182,7 @@ impl ReferenceMachine {
 enum Step {
     Next,
     Jump(usize),
-    Effect(EffectRequest),
+    Effect(Box<EffectRequest>),
     Complete,
 }
 
@@ -2225,7 +2226,7 @@ impl Machine for ReferenceMachine {
                     Step::Jump(target) => self.pc = target,
                     Step::Effect(effect) => {
                         self.pc += 1;
-                        return Ok(MachineDrive::HostCall(effect));
+                        return Ok(MachineDrive::HostCall(*effect));
                     }
                     Step::Complete => return Ok(MachineDrive::Completed(self.complete()?)),
                 }

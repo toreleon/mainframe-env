@@ -1,0 +1,22 @@
+{
+  "schema_version":"mainframe-env.carddemo-issue-evidence@1","issue":"CD-014","title":"Implement keyed VSAM record and alternate-index semantics","derived":true,"status":"pass","target_product":"0.1.1","current_product":"0.1.0-alpha.0",
+  "digest_scope":"Recursively lexicographically key-sorted compact UTF-8 JSON serialization of vsam_receipt, with no trailing newline, followed by SHA-256","evidence_digest":"sha256:49e0e68b55ea47c90b5b5f8fcc3404de2f241ef7c750fa296ac2cd17a6dc6ecb",
+  "vsam_receipt":{"schema_version":"mainframe-env.carddemo-vsam-receipt@1","status":"pass","corpus_commit":"59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e","runtime_keyed_paths":13,"base_clusters":10,"alternate_index_paths":3,"key_offsets_and_lengths":{"AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS":"offset=0,length=11,record=300","AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.PATH":"offset=16,length=11,record=150","AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS":"offset=0,length=16,record=150","AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH":"offset=25,length=11,record=50","AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS":"offset=0,length=16,record=50","AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS":"offset=0,length=9,record=500","AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS":"offset=0,length=16,record=50","AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS":"offset=0,length=17,record=50","AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS":"offset=0,length=6,record=60","AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH":"offset=304,length=26,record=350","AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS":"offset=0,length=16,record=350","AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS":"offset=0,length=2,record=60","AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS":"offset=0,length=8,record=80"},"reached_file_operations":{"DELETE":1,"ENDBR":6,"READ":27,"READNEXT":4,"READPREV":6,"REWRITE":5,"STARTBR":6,"WRITE":3},"aix_definitions":4,"unique_aix_names":3,"nonunique_definitions":4,"upgrade_definitions":4,"provider_regression_cases":3,"vsam_shape_sha256":"0064821883815d2257ba1477a433a342bcc06a3f82878668c4f8eefac2f76f60"},
+  "acceptance_observations":[
+    "KSDS WRITE inserts by the declared primary key without replacing the cluster; duplicate insert, missing rewrite/delete, changed rewrite key, and length errors return typed DUPREC, NOTFND, INVREQ, and LENGERR conditions.",
+    "READ, STARTBR, READNEXT, READPREV, and ENDBR use stable primary or alternate-key order. Cursors retain bounded logical-key/base-identity pairs, and CICS preserves the cursor and current base identity without a non-corpus CURSOR operand.",
+    "Alternate-index paths retain base-record identities, sorted duplicate order, UNIQUE/NONUNIQUE policy, and restartable metadata. All 13 runtime keyed paths and their exact key/record ranges validate.",
+    "Insert, rewrite, delete, every affected UPGRADE index generation, and the idempotency result use one atomic provider-state transaction. Intent-only restart safely retries; final replay does not apply a record twice.",
+    "The corpus receipt derives 58 reached file/browse statements plus four source AIX definitions for three unique NONUNIQUE UPGRADE indexes."
+  ],
+  "commands":[
+    {"command":"cargo test -p mainframe-env-dataset carddemo_ksds_write_inserts_records_without_replacing_the_cluster --locked","exit_code":1,"result":"focused pre-repair regression proved the second KSDS WRITE replaced the first record"},
+    {"command":"cargo test -p mainframe-env-dataset -p mainframe-env-cics -p mainframe-env-host-api -p mainframe-env-interpreter -p mainframe-env-conformance -p mainframe-env-server -p xtask --locked","exit_code":0,"result":"87 dataset, CICS, contract, interpreter, conformance, server, and gate tests passed"},
+    {"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-vsam --check","exit_code":0,"result":"exact runtime key metadata, AIX source, and reached operation receipt passed"},
+    {"command":"env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-vsam --check","exit_code":1,"result":"expected missing-environment control"},
+    {"command":"cargo check --workspace --all-targets --locked","exit_code":0,"result":"pass"},
+    {"command":"affected-package cargo clippy --all-targets --locked -- -D warnings","exit_code":0,"result":"pass"},
+    {"command":"env -u CARDEMO_CORPUS_DIR cargo xtask conformance --check","exit_code":0,"result":"pass"},
+    {"command":"cargo fmt --all -- --check && git diff --check","exit_code":0,"result":"pass"}
+  ],"absolute_local_paths_present":false,"native_or_legacy_fallback_present":false
+}

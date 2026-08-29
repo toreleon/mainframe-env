@@ -96,6 +96,11 @@ the CICS authority reconciles it. Pseudo-conversational COMMAREA continuations
 and transient-data queue records use provider-state compare-and-swap identities
 rather than worker memory.
 
+Keyed dataset insert, rewrite, and delete commit the base cluster, every
+upgradable alternate-index generation, and the idempotency result as one atomic
+provider-state write. A restart that observes only the preceding intent can
+safely retry; a final result replays without applying the record twice.
+
 ## Scheduling
 
 The single-node scheduler provides bounded lanes:

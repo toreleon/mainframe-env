@@ -337,6 +337,24 @@ pub struct CardDemoCicsRuntimeReceipt {
     pub cics_runtime_sha256: String,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoVsamReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub runtime_keyed_paths: usize,
+    pub base_clusters: usize,
+    pub alternate_index_paths: usize,
+    pub key_offsets_and_lengths: BTreeMap<String, String>,
+    pub reached_file_operations: BTreeMap<String, usize>,
+    pub aix_definitions: usize,
+    pub unique_aix_names: usize,
+    pub nonunique_definitions: usize,
+    pub upgrade_definitions: usize,
+    pub provider_regression_cases: usize,
+    pub vsam_shape_sha256: String,
+}
+
 pub fn verify_carddemo_corpus_from_env(
     inventory_path: &Path,
 ) -> Result<CardDemoCorpusReceipt, CorpusProblem> {
@@ -2022,6 +2040,257 @@ pub fn verify_carddemo_cics_runtime_from_env(
         format_destinations: format_destinations.into_iter().collect(),
         runtime_regression_cases: 8,
         cics_runtime_sha256: format!("{:x}", digest.finalize()),
+    })
+}
+
+pub fn verify_carddemo_vsam_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoVsamReceipt, CorpusProblem> {
+    let cics = verify_carddemo_cics_runtime_from_env(inventory_path)?;
+    let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required",
+        )
+    })?;
+    let corpus_dir = Path::new(&corpus_dir);
+    let contract = read_contract(inventory_path)?;
+    let import_identity = contract
+        .runtime_oracles
+        .iter()
+        .find(|oracle| oracle.path.ends_with("!import_dataset.json"))
+        .map(|oracle| oracle.path.as_str())
+        .ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.vsam.runtime_metadata_missing",
+                "runtime dataset import metadata is not declared",
+            )
+        })?;
+    let import: serde_json::Value =
+        serde_json::from_slice(&read_runtime_oracle(corpus_dir, import_identity)?).map_err(
+            |error| {
+                CorpusProblem::new(
+                    "carddemo.vsam.runtime_metadata_invalid",
+                    format!("runtime dataset import metadata is invalid: {error}"),
+                )
+            },
+        )?;
+    let datasets = import
+        .get("dataSets")
+        .and_then(serde_json::Value::as_array)
+        .ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.vsam.runtime_metadata_invalid",
+                "runtime dataset import list is missing",
+            )
+        })?;
+    let mut key_offsets_and_lengths = BTreeMap::new();
+    let mut base_clusters = 0usize;
+    let mut alternate_index_paths = 0usize;
+    for wrapper in datasets {
+        let Some(dataset) = wrapper.get("dataSet") else {
+            continue;
+        };
+        let Some(vsam) = dataset
+            .get("datasetOrg")
+            .and_then(|value| value.get("vsam"))
+        else {
+            continue;
+        };
+        if vsam.get("format").and_then(serde_json::Value::as_str) != Some("KS") {
+            continue;
+        }
+        let name = dataset
+            .get("datasetName")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| {
+                CorpusProblem::new(
+                    "carddemo.vsam.runtime_metadata_invalid",
+                    "keyed dataset name is missing",
+                )
+            })?;
+        let key = vsam.get("primaryKey").ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.vsam.runtime_metadata_invalid",
+                format!("{name} primary key is missing"),
+            )
+        })?;
+        let offset = key
+            .get("offset")
+            .and_then(serde_json::Value::as_u64)
+            .ok_or_else(|| {
+                CorpusProblem::new(
+                    "carddemo.vsam.runtime_metadata_invalid",
+                    format!("{name} key offset is missing"),
+                )
+            })?;
+        let length = key
+            .get("length")
+            .and_then(serde_json::Value::as_u64)
+            .ok_or_else(|| {
+                CorpusProblem::new(
+                    "carddemo.vsam.runtime_metadata_invalid",
+                    format!("{name} key length is missing"),
+                )
+            })?;
+        let record_length = dataset
+            .get("recordLength")
+            .and_then(|value| value.get("max"))
+            .and_then(serde_json::Value::as_u64)
+            .ok_or_else(|| {
+                CorpusProblem::new(
+                    "carddemo.vsam.runtime_metadata_invalid",
+                    format!("{name} record length is missing"),
+                )
+            })?;
+        if length == 0
+            || offset
+                .checked_add(length)
+                .is_none_or(|end| end > record_length)
+        {
+            return Err(CorpusProblem::new(
+                "carddemo.vsam.runtime_key_invalid",
+                format!("{name} key is outside its record"),
+            ));
+        }
+        if name.ends_with(".AIX.PATH") {
+            alternate_index_paths += 1;
+        } else {
+            base_clusters += 1;
+        }
+        key_offsets_and_lengths.insert(
+            name.to_string(),
+            format!("offset={offset},length={length},record={record_length}"),
+        );
+    }
+
+    let compiler = CobolCompiler::default();
+    let mut reached_file_operations = BTreeMap::new();
+    let mut digest = Sha256::new();
+    for (primary, bundle) in explicit_carddemo_bundles(corpus_dir)? {
+        let hir = compiler.analyze(&bundle).hir.ok_or_else(|| {
+            CorpusProblem::new("carddemo.vsam.hir_failed", format!("{primary} missing HIR"))
+        })?;
+        for statement in hir
+            .statements
+            .iter()
+            .filter(|statement| statement.kind == StatementKind::ExecCics)
+        {
+            let opcode = statement
+                .arguments
+                .iter()
+                .find(|argument| !matches!(argument.as_str(), "CICS" | "END-EXEC"))
+                .map(String::as_str)
+                .unwrap_or("");
+            if matches!(
+                opcode,
+                "DELETE"
+                    | "ENDBR"
+                    | "READ"
+                    | "READNEXT"
+                    | "READPREV"
+                    | "REWRITE"
+                    | "STARTBR"
+                    | "WRITE"
+            ) {
+                *reached_file_operations.entry(opcode.into()).or_insert(0) += 1;
+                digest_field(&mut digest, primary.as_bytes());
+                digest_field(&mut digest, format!("{:?}", statement.arguments).as_bytes());
+            }
+        }
+    }
+    let expected_operations = BTreeMap::from([
+        ("DELETE".into(), 1),
+        ("ENDBR".into(), 6),
+        ("READ".into(), 27),
+        ("READNEXT".into(), 4),
+        ("READPREV".into(), 6),
+        ("REWRITE".into(), 5),
+        ("STARTBR".into(), 6),
+        ("WRITE".into(), 3),
+    ]);
+    if reached_file_operations != expected_operations {
+        return Err(CorpusProblem::new(
+            "carddemo.vsam.operation_drift",
+            "reached CICS file operation counts differ",
+        ));
+    }
+
+    let mut aix_definitions = 0usize;
+    let mut nonunique_definitions = 0usize;
+    let mut upgrade_definitions = 0usize;
+    let mut aix_names = BTreeSet::new();
+    for relative in collect_paths(corpus_dir, &["app/jcl"], "jcl")? {
+        let source = String::from_utf8(read_corpus_file(corpus_dir, &corpus_dir.join(&relative))?)
+            .map_err(|_| {
+                CorpusProblem::new(
+                    "carddemo.vsam.jcl_invalid",
+                    format!("{relative} is not UTF-8"),
+                )
+            })?
+            .to_ascii_uppercase();
+        let mut remaining = source.as_str();
+        while let Some(start) = remaining.find("DEFINE ALTERNATEINDEX") {
+            let block = &remaining[start..];
+            let end = block.find("/*").unwrap_or(block.len());
+            let block = &block[..end];
+            aix_definitions += 1;
+            nonunique_definitions += usize::from(block.contains("NONUNIQUEKEY"));
+            upgrade_definitions += usize::from(block.contains("UPGRADE"));
+            let name_start = block.find("NAME(").ok_or_else(|| {
+                CorpusProblem::new(
+                    "carddemo.vsam.jcl_invalid",
+                    format!("{relative} alternate index name is missing"),
+                )
+            })? + 5;
+            let name_end = block[name_start..].find(')').ok_or_else(|| {
+                CorpusProblem::new(
+                    "carddemo.vsam.jcl_invalid",
+                    format!("{relative} alternate index name is unterminated"),
+                )
+            })? + name_start;
+            let name = block[name_start..name_end].trim();
+            aix_names.insert(name.to_string());
+            digest_field(&mut digest, relative.as_bytes());
+            digest_field(&mut digest, name.as_bytes());
+            remaining = &block[end.min(block.len())..];
+            if end == block.len() {
+                break;
+            }
+        }
+    }
+    for (name, key) in &key_offsets_and_lengths {
+        digest_field(&mut digest, name.as_bytes());
+        digest_field(&mut digest, key.as_bytes());
+    }
+    if key_offsets_and_lengths.len() != 13
+        || base_clusters != 10
+        || alternate_index_paths != 3
+        || aix_definitions != 4
+        || aix_names.len() != 3
+        || nonunique_definitions != 4
+        || upgrade_definitions != 4
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.vsam.surface_drift",
+            "runtime KSDS/AIX or source AIX definitions differ from the pinned surface",
+        ));
+    }
+    Ok(CardDemoVsamReceipt {
+        schema_version: "mainframe-env.carddemo-vsam-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit: cics.corpus_commit,
+        runtime_keyed_paths: key_offsets_and_lengths.len(),
+        base_clusters,
+        alternate_index_paths,
+        key_offsets_and_lengths,
+        reached_file_operations,
+        aix_definitions,
+        unique_aix_names: aix_names.len(),
+        nonunique_definitions,
+        upgrade_definitions,
+        provider_regression_cases: 3,
+        vsam_shape_sha256: format!("{:x}", digest.finalize()),
     })
 }
 

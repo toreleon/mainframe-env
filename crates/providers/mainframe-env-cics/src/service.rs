@@ -82,6 +82,8 @@ struct Run {
     handlers: BTreeMap<String, String>,
     abend_handler: Option<String>,
     retrieve: Vec<u8>,
+    current_records: BTreeMap<String, Vec<u8>>,
+    browses: BTreeMap<String, String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -260,6 +262,8 @@ impl CicsService {
                 handlers: BTreeMap::new(),
                 abend_handler: None,
                 retrieve,
+                current_records: BTreeMap::new(),
+                browses: BTreeMap::new(),
             },
         );
         Ok(())
@@ -331,6 +335,8 @@ impl CicsService {
                 handlers: BTreeMap::new(),
                 abend_handler: None,
                 retrieve: Vec::new(),
+                current_records: BTreeMap::new(),
+                browses: BTreeMap::new(),
             },
         );
         Ok(continuation)
@@ -939,8 +945,12 @@ impl CicsService {
     }
 
     fn file(&self, run: &mut Run, request: &CicsRequest) -> Result<CicsResponse, HostProblem> {
-        let name = argument_text(request, "DATASET").or_else(|_| argument_text(request, "FILE"))?;
+        let name = argument_text(request, "DATASET")
+            .or_else(|_| argument_text(request, "FILE"))?
+            .trim()
+            .to_ascii_uppercase();
         let dataset = DatasetName::new(name, 128).map_err(|_| HostProblem::Malformed)?;
+        let dataset_key = dataset.as_str().to_string();
         self.authorize(
             run,
             "DATASET",
@@ -952,21 +962,44 @@ impl CicsService {
             .transpose()?;
         let host_request = match request.operation {
             CicsOperation::Read => DatasetRequest::Read {
-                dataset,
+                dataset: dataset.clone(),
                 member,
                 key: argument_bytes(request, "RIDFLD"),
                 max_records: 1,
             },
-            CicsOperation::Write | CicsOperation::Rewrite => {
+            CicsOperation::Write => {
                 let sequence = run
                     .host_sequence
                     .checked_add(1)
                     .ok_or(HostProblem::ResourceExhausted)?;
                 let mutation = nested_mutation(run, sequence)?;
                 DatasetRequest::Write {
-                    dataset,
+                    dataset: dataset.clone(),
                     member,
                     records: vec![argument_bytes(request, "FROM").unwrap_or_default()],
+                    expected_version: argument_optional(request, "VERSION")
+                        .map(|value| value.parse().map_err(|_| HostProblem::Malformed))
+                        .transpose()?,
+                    mutation,
+                }
+            }
+            CicsOperation::Rewrite => {
+                let sequence = run
+                    .host_sequence
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?;
+                let mutation = nested_mutation(run, sequence)?;
+                let key = argument_bytes(request, "RIDFLD")
+                    .or_else(|| run.current_records.get(&dataset_key).cloned())
+                    .ok_or_else(|| HostProblem::Condition {
+                        name: "INVREQ".into(),
+                        response: 16,
+                        response2: 0,
+                    })?;
+                DatasetRequest::RewriteRecord {
+                    dataset: dataset.clone(),
+                    key,
+                    record: argument_bytes(request, "FROM").unwrap_or_default(),
                     expected_version: argument_optional(request, "VERSION")
                         .map(|value| value.parse().map_err(|_| HostProblem::Malformed))
                         .transpose()?,
@@ -979,9 +1012,16 @@ impl CicsService {
                     .checked_add(1)
                     .ok_or(HostProblem::ResourceExhausted)?;
                 let mutation = nested_mutation(run, sequence)?;
-                DatasetRequest::Delete {
-                    dataset,
-                    member,
+                let key = argument_bytes(request, "RIDFLD")
+                    .or_else(|| run.current_records.get(&dataset_key).cloned())
+                    .ok_or_else(|| HostProblem::Condition {
+                        name: "INVREQ".into(),
+                        response: 16,
+                        response2: 0,
+                    })?;
+                DatasetRequest::DeleteRecord {
+                    dataset: dataset.clone(),
+                    key,
                     expected_version: argument_optional(request, "VERSION")
                         .map(|value| value.parse().map_err(|_| HostProblem::Malformed))
                         .transpose()?,
@@ -989,37 +1029,85 @@ impl CicsService {
                 }
             }
             CicsOperation::StartBrowse => DatasetRequest::StartBrowse {
-                dataset,
+                dataset: dataset.clone(),
                 key: argument_bytes(request, "RIDFLD").unwrap_or_default(),
             },
             CicsOperation::ReadNext | CicsOperation::ReadPrev => DatasetRequest::ReadNext {
-                dataset,
-                cursor: argument_text(request, "CURSOR")?,
+                dataset: dataset.clone(),
+                cursor: argument_optional(request, "CURSOR")
+                    .or_else(|| run.browses.get(&dataset_key).cloned())
+                    .ok_or_else(|| HostProblem::Condition {
+                        name: "INVREQ".into(),
+                        response: 16,
+                        response2: 0,
+                    })?,
                 reverse: request.operation == CicsOperation::ReadPrev,
             },
             CicsOperation::EndBrowse => DatasetRequest::EndBrowse {
-                dataset,
-                cursor: argument_text(request, "CURSOR")?,
+                dataset: dataset.clone(),
+                cursor: argument_optional(request, "CURSOR")
+                    .or_else(|| run.browses.get(&dataset_key).cloned())
+                    .ok_or_else(|| HostProblem::Condition {
+                        name: "INVREQ".into(),
+                        response: 16,
+                        response2: 0,
+                    })?,
             },
             _ => return Err(HostProblem::Malformed),
         };
+        let operation = request.operation;
         let result = self.nested(run, HostRequest::Dataset(host_request))?;
+        let mut browse_key = None;
         let payload = match result {
-            HostResult::Dataset(DatasetResult::Records { records, .. }) => {
+            HostResult::Dataset(DatasetResult::Records {
+                records,
+                identities,
+                ..
+            }) => {
+                if let Some(identity) = identities.first() {
+                    run.current_records
+                        .insert(dataset_key.clone(), identity.clone());
+                }
                 records.into_iter().next().unwrap_or_default()
             }
-            HostResult::Dataset(DatasetResult::Browse { cursor, record }) => {
-                let mut value = cursor.into_bytes();
-                if let Some(record) = record {
-                    value.push(b'\n');
-                    value.extend_from_slice(&record);
+            HostResult::Dataset(DatasetResult::Browse {
+                cursor,
+                record,
+                identity,
+                key,
+            }) => {
+                if operation == CicsOperation::StartBrowse {
+                    run.browses.insert(dataset_key.clone(), cursor);
+                } else if operation == CicsOperation::EndBrowse {
+                    run.browses.remove(&dataset_key);
+                    run.current_records.remove(&dataset_key);
                 }
-                value
+                if let Some(identity) = identity {
+                    run.current_records.insert(dataset_key.clone(), identity);
+                }
+                browse_key = key;
+                if matches!(operation, CicsOperation::ReadNext | CicsOperation::ReadPrev)
+                    && record.is_none()
+                {
+                    return Err(HostProblem::Condition {
+                        name: "ENDFILE".into(),
+                        response: 20,
+                        response2: 0,
+                    });
+                }
+                record.unwrap_or_default()
             }
             HostResult::Dataset(_) => Vec::new(),
             _ => return Err(HostProblem::ProviderFailure),
         };
-        self.response(
+        if operation == CicsOperation::Delete {
+            run.current_records.remove(&dataset_key);
+        } else if operation == CicsOperation::Write
+            && let Some(identity) = argument_bytes(request, "RIDFLD")
+        {
+            run.current_records.insert(dataset_key, identity);
+        }
+        let mut response = self.response(
             run,
             CicsDisposition::Complete,
             "NORMAL",
@@ -1028,7 +1116,11 @@ impl CicsService {
             None,
             None,
             payload,
-        )
+        )?;
+        if let Some(key) = browse_key {
+            response.outputs.insert("RIDFLD".into(), bounded(key)?);
+        }
+        Ok(response)
     }
 
     fn transfer(&self, run: &mut Run, request: &CicsRequest) -> Result<CicsResponse, HostProblem> {
@@ -1965,6 +2057,16 @@ mod tests {
         descriptor: CapabilityDescriptor,
     }
 
+    #[derive(Default)]
+    struct DatasetTrace {
+        requests: Mutex<Vec<DatasetRequest>>,
+    }
+
+    struct TracedDataset {
+        descriptor: CapabilityDescriptor,
+        trace: Arc<DatasetTrace>,
+    }
+
     impl HostProvider for Authority {
         fn descriptor(&self) -> &CapabilityDescriptor {
             &self.descriptor
@@ -1976,6 +2078,7 @@ mod tests {
                 HostRequest::Dataset(DatasetRequest::Read { .. }) => {
                     Ok(HostResult::Dataset(DatasetResult::Records {
                         records: vec![b"CARD0001".to_vec()],
+                        identities: vec![b"CARD0001".to_vec()],
                         version: 1,
                     }))
                 }
@@ -2018,6 +2121,52 @@ mod tests {
         }
     }
 
+    impl HostProvider for TracedDataset {
+        fn descriptor(&self) -> &CapabilityDescriptor {
+            &self.descriptor
+        }
+
+        fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
+            let outcome = match effect.request {
+                HostRequest::Dataset(request) => {
+                    self.trace.requests.lock().unwrap().push(request.clone());
+                    match request {
+                        DatasetRequest::StartBrowse { .. } => {
+                            Ok(HostResult::Dataset(DatasetResult::Browse {
+                                cursor: "CURSOR-1".into(),
+                                record: None,
+                                identity: None,
+                                key: None,
+                            }))
+                        }
+                        DatasetRequest::ReadNext { .. } => {
+                            Ok(HostResult::Dataset(DatasetResult::Browse {
+                                cursor: "CURSOR-1".into(),
+                                record: Some(b"AA11".to_vec()),
+                                identity: Some(b"AA".to_vec()),
+                                key: Some(b"AA".to_vec()),
+                            }))
+                        }
+                        DatasetRequest::EndBrowse { .. } => {
+                            Ok(HostResult::Dataset(DatasetResult::Browse {
+                                cursor: "CURSOR-1".into(),
+                                record: None,
+                                identity: None,
+                                key: None,
+                            }))
+                        }
+                        _ => Ok(HostResult::Dataset(DatasetResult::Mutated { version: 2 })),
+                    }
+                }
+                _ => Err(HostProblem::Malformed),
+            };
+            EffectResult {
+                sequence: effect.sequence,
+                outcome,
+            }
+        }
+    }
+
     fn descriptor(capability: &str) -> CapabilityDescriptor {
         let limits = InvocationLimits::default();
         CapabilityDescriptor {
@@ -2047,6 +2196,31 @@ mod tests {
             }) as Arc<dyn HostProvider>
         })
         .collect();
+        Arc::new(ScopedHostService::new(
+            Arc::new(RegistrySnapshot::new(1, providers, InvocationLimits::default()).unwrap()),
+            HostLimits::default(),
+        ))
+    }
+
+    fn traced_authorities(trace: Arc<DatasetTrace>) -> Arc<ScopedHostService> {
+        let mut providers = [
+            "host.security.authorize",
+            "host.program.invoke",
+            "host.clock",
+        ]
+        .into_iter()
+        .map(|capability| {
+            Arc::new(Authority {
+                descriptor: descriptor(capability),
+            }) as Arc<dyn HostProvider>
+        })
+        .collect::<Vec<_>>();
+        for capability in ["host.dataset.read", "host.dataset.write"] {
+            providers.push(Arc::new(TracedDataset {
+                descriptor: descriptor(capability),
+                trace: trace.clone(),
+            }));
+        }
         Arc::new(ScopedHostService::new(
             Arc::new(RegistrySnapshot::new(1, providers, InvocationLimits::default()).unwrap()),
             HostLimits::default(),
@@ -2686,6 +2860,86 @@ mod tests {
             .unwrap();
         assert_eq!(transferred.disposition, CicsDisposition::Transfer);
         assert_eq!(transferred.target.as_deref(), Some("COCRDLIC"));
+    }
+
+    #[test]
+    fn carddemo_cics_browse_rewrite_and_delete_reuse_base_record_identity() {
+        let trace = Arc::new(DatasetTrace::default());
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service =
+            CicsService::open(traced_authorities(trace.clone()), store, Default::default())
+                .unwrap();
+        let (invocation, _) = registered(&service);
+        let start = request(
+            CicsOperation::StartBrowse,
+            BTreeMap::from([
+                ("DATASET".into(), argument(b"CARDDEMO.CARDDAT")),
+                ("RIDFLD".into(), argument(b"AA")),
+            ]),
+            1,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, start.clone(), 1), start)
+            .unwrap();
+        let next = request(
+            CicsOperation::ReadNext,
+            BTreeMap::from([("DATASET".into(), argument(b"CARDDEMO.CARDDAT"))]),
+            2,
+        );
+        let browsed = service
+            .invoke(&effect(&invocation.run_unit_id, next.clone(), 2), next)
+            .unwrap();
+        assert_eq!(browsed.payload.bytes(), b"AA11");
+        assert_eq!(browsed.outputs["RIDFLD"].bytes(), b"AA");
+        let rewrite = request(
+            CicsOperation::Rewrite,
+            BTreeMap::from([
+                ("DATASET".into(), argument(b"CARDDEMO.CARDDAT")),
+                ("FROM".into(), argument(b"AA22")),
+            ]),
+            3,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, rewrite.clone(), 3),
+                rewrite,
+            )
+            .unwrap();
+        let delete = request(
+            CicsOperation::Delete,
+            BTreeMap::from([("DATASET".into(), argument(b"CARDDEMO.CARDDAT"))]),
+            4,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, delete.clone(), 4), delete)
+            .unwrap();
+        let end = request(
+            CicsOperation::EndBrowse,
+            BTreeMap::from([("DATASET".into(), argument(b"CARDDEMO.CARDDAT"))]),
+            5,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, end.clone(), 5), end)
+            .unwrap();
+
+        let requests = trace.requests.lock().unwrap();
+        assert!(matches!(
+            &requests[1],
+            DatasetRequest::ReadNext { cursor, .. } if cursor == "CURSOR-1"
+        ));
+        assert!(matches!(
+            &requests[2],
+            DatasetRequest::RewriteRecord { key, record, .. }
+                if key == b"AA" && record == b"AA22"
+        ));
+        assert!(matches!(
+            &requests[3],
+            DatasetRequest::DeleteRecord { key, .. } if key == b"AA"
+        ));
+        assert!(matches!(
+            &requests[4],
+            DatasetRequest::EndBrowse { cursor, .. } if cursor == "CURSOR-1"
+        ));
     }
 
     #[test]
