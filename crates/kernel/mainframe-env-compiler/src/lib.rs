@@ -15,7 +15,8 @@ pub use hir::{
 };
 pub use lower::{CORE_NAMESPACE, core_mir_catalog, core_mir_profile};
 pub use semantic::{
-    CobolLayout, DataCategory, DataReference, ResolutionProblem, SemanticModel, StorageSection,
+    CobolFileBinding, CobolLayout, DataCategory, DataReference, ResolutionProblem, SemanticModel,
+    StorageSection,
 };
 pub use service::{CobolAnalysis, CobolCompiler, CobolCompilerLimits};
 pub use syntax::{

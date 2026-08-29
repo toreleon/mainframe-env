@@ -64,6 +64,16 @@ struct ResolvedReference {
     length: usize,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct FileMetadata {
+    assignment: String,
+    organization: String,
+    access_mode: String,
+    record_key: Option<String>,
+    relative_key: Option<String>,
+    file_status: Option<String>,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct Decimal {
     coefficient: i128,
@@ -78,8 +88,19 @@ enum CobolValue {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum PendingKind {
-    Accept { target: String },
-    DatasetRead { target: Option<String> },
+    Accept {
+        target: String,
+    },
+    DatasetRead {
+        target: Option<String>,
+        status: Option<String>,
+    },
+    DatasetStatus {
+        status: Option<String>,
+    },
+    ProgramCall {
+        targets: Vec<String>,
+    },
     Cics,
     Ignore,
 }
@@ -111,6 +132,7 @@ pub struct ReferenceMachine {
     views_by_id: BTreeMap<StorageId, StorageView>,
     layouts: BTreeMap<String, LayoutMetadata>,
     simple_layouts: BTreeMap<String, Vec<String>>,
+    files: BTreeMap<String, FileMetadata>,
     labels: BTreeMap<String, usize>,
     control_nodes: BTreeMap<usize, usize>,
     loop_reentry: BTreeSet<usize>,
@@ -142,6 +164,7 @@ impl ReferenceMachine {
             .cloned()
             .collect();
         let (layouts, simple_layouts) = layout_metadata(&operations)?;
+        let files = file_metadata(&operations)?;
         let labels = operations
             .iter()
             .enumerate()
@@ -178,6 +201,7 @@ impl ReferenceMachine {
             views_by_id,
             layouts,
             simple_layouts,
+            files,
             labels,
             control_nodes,
             loop_reentry: BTreeSet::new(),
@@ -270,6 +294,7 @@ impl ReferenceMachine {
             (
                 PendingKind::DatasetRead {
                     target: Some(target),
+                    status,
                 },
                 HostResult::Dataset(mainframe_env_host_api::DatasetResult::Records {
                     records, ..
@@ -277,6 +302,35 @@ impl ReferenceMachine {
             ) => {
                 if let Some(record) = records.first() {
                     self.write(&target, record)?;
+                }
+                if let Some(status) = status {
+                    self.write(&status, if records.is_empty() { b"10" } else { b"00" })?;
+                }
+            }
+            (
+                PendingKind::DatasetRead { status, .. } | PendingKind::DatasetStatus { status },
+                HostResult::Dataset(mainframe_env_host_api::DatasetResult::Condition {
+                    status: condition_status,
+                    ..
+                }),
+            ) => {
+                if let Some(status) = status {
+                    self.write(&status, condition_status.as_bytes())?;
+                }
+            }
+            (PendingKind::DatasetRead { status, .. }, HostResult::Dataset(_))
+            | (PendingKind::DatasetStatus { status }, HostResult::Dataset(_)) => {
+                if let Some(status) = status {
+                    self.write(&status, b"00")?;
+                }
+            }
+            (PendingKind::ProgramCall { targets }, HostResult::Program(payload)) => {
+                let values = decode_call_values(&payload)?;
+                if values.len() != targets.len() {
+                    return Err(MachineProblem::UnexpectedHostResult);
+                }
+                for (target, value) in targets.iter().zip(values) {
+                    self.write(target, &value)?;
                 }
             }
             (PendingKind::Cics, HostResult::Cics(response)) => {
@@ -318,7 +372,13 @@ impl ReferenceMachine {
                     })),
                 };
             }
-            (PendingKind::DatasetRead { .. } | PendingKind::Ignore, _) => {}
+            (
+                PendingKind::DatasetRead { .. }
+                | PendingKind::DatasetStatus { .. }
+                | PendingKind::ProgramCall { .. }
+                | PendingKind::Ignore,
+                _,
+            ) => {}
             _ => return Err(MachineProblem::UnexpectedHostResult),
         }
         Ok(())
@@ -331,7 +391,7 @@ impl ReferenceMachine {
             return Ok(step);
         }
         match name {
-            "define" => {}
+            "define" | "file" => {}
             "init" => {
                 let bytes = bytes_attribute(operation, "initial")?;
                 let reference = operation
@@ -627,34 +687,78 @@ impl ReferenceMachine {
             128,
         )
         .map_err(|_| MachineProblem::InvalidOperation)?;
-        let request = if name == "cancel" {
-            ProgramRequest::Cancel { program }
-        } else {
-            ProgramRequest::Call {
-                program,
-                payload: empty_payload()?,
-            }
-        };
-        self.effect(HostRequest::Program(request), PendingKind::Ignore)
+        if name == "cancel" {
+            return self.effect(
+                HostRequest::Program(ProgramRequest::Cancel { program }),
+                PendingKind::Ignore,
+            );
+        }
+        let targets = position(args, "USING").map_or_else(Vec::new, |using| {
+            args[using + 1..]
+                .iter()
+                .filter(|argument| !matches!(argument.as_str(), "BY" | "REFERENCE" | "CONTENT"))
+                .cloned()
+                .collect()
+        });
+        let values = targets
+            .iter()
+            .map(|target| self.read(target))
+            .collect::<Result<Vec<_>, _>>()?;
+        let payload = encode_call_values(&values)?;
+        self.effect(
+            HostRequest::Program(ProgramRequest::Call { program, payload }),
+            PendingKind::ProgramCall { targets },
+        )
     }
     fn dataset_effect(&mut self, name: &str, args: &[String]) -> Result<Step, MachineProblem> {
-        let dataset = DatasetName::new(
-            args.first()
-                .ok_or(MachineProblem::InvalidOperation)?
-                .trim_matches(['\'', '"']),
-            128,
-        )
-        .map_err(|_| MachineProblem::InvalidOperation)?;
+        let logical = args
+            .first()
+            .ok_or(MachineProblem::InvalidOperation)?
+            .trim_matches(['\'', '"']);
+        let file = self.files.get(&normalize(logical)).cloned();
+        let dataset_name = self
+            .invocation
+            .bindings
+            .get(&format!("cobol.dd.{}", normalize(logical)))
+            .map(|payload| String::from_utf8_lossy(payload.bytes()).into_owned())
+            .unwrap_or_else(|| {
+                file.as_ref()
+                    .map(|file| file.assignment.clone())
+                    .unwrap_or_else(|| logical.to_string())
+            });
+        let dataset =
+            DatasetName::new(&dataset_name, 128).map_err(|_| MachineProblem::InvalidOperation)?;
+        let status = self
+            .invocation
+            .bindings
+            .get(&format!("cobol.file-status.{}", normalize(logical)))
+            .map(|payload| String::from_utf8_lossy(payload.bytes()).into_owned())
+            .or_else(|| file.as_ref().and_then(|file| file.file_status.clone()));
+        let default_key = file
+            .as_ref()
+            .filter(|file| file.access_mode == "RANDOM")
+            .and_then(|file| file.record_key.as_ref().or(file.relative_key.as_ref()))
+            .map(|key| self.resolve(key))
+            .transpose()?;
         let request = match name {
             "read" => DatasetRequest::Read {
                 dataset,
                 member: None,
-                key: None,
+                key: position(args, "KEY")
+                    .and_then(|index| {
+                        args.get(
+                            index + usize::from(args.get(index + 1).is_some_and(|v| v == "IS")) + 1,
+                        )
+                    })
+                    .map(|key| self.resolve(key))
+                    .transpose()?
+                    .or(default_key),
                 max_records: 1,
             },
             "write" => {
-                let record = args
-                    .get(1)
+                let record = position(args, "FROM")
+                    .and_then(|index| args.get(index + 1))
+                    .or_else(|| args.get(1))
                     .map(|value| self.resolve(value))
                     .transpose()?
                     .unwrap_or_default();
@@ -668,11 +772,15 @@ impl ReferenceMachine {
             }
             _ => DatasetRequest::Attributes { dataset },
         };
-        let target = (name == "read").then(|| args.get(2).cloned()).flatten();
-        self.effect(
-            HostRequest::Dataset(request),
-            PendingKind::DatasetRead { target },
-        )
+        let target = (name == "read")
+            .then(|| position(args, "INTO").and_then(|index| args.get(index + 1).cloned()))
+            .flatten();
+        let pending = if name == "read" {
+            PendingKind::DatasetRead { target, status }
+        } else {
+            PendingKind::DatasetStatus { status }
+        };
+        self.effect(HostRequest::Dataset(request), pending)
     }
     fn cics_effect(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
         let operation = CicsOperation::from_tokens(args).ok_or(MachineProblem::UnsupportedForm)?;
@@ -2261,6 +2369,7 @@ pub fn supported_operations() -> &'static BTreeSet<OperationIdentity> {
             "init",
             "define",
             "control",
+            "file",
             "accept",
             "add",
             "allocate",
@@ -2404,6 +2513,38 @@ fn layout_metadata(operations: &[Operation]) -> Result<LayoutState, MachineProbl
         }
     }
     Ok((layouts, simple))
+}
+
+fn file_metadata(
+    operations: &[Operation],
+) -> Result<BTreeMap<String, FileMetadata>, MachineProblem> {
+    let mut files = BTreeMap::new();
+    for operation in operations
+        .iter()
+        .filter(|operation| operation.identity.name() == "file")
+    {
+        let name = text_attribute(operation, "name")?.to_ascii_uppercase();
+        let optional = |field: &str| -> Result<Option<String>, MachineProblem> {
+            Ok(match text_attribute(operation, field)? {
+                "" => None,
+                value => Some(value.to_ascii_uppercase()),
+            })
+        };
+        let metadata = FileMetadata {
+            assignment: text_attribute(operation, "assignment")?.to_ascii_uppercase(),
+            organization: text_attribute(operation, "organization")?.to_ascii_uppercase(),
+            access_mode: text_attribute(operation, "access_mode")?.to_ascii_uppercase(),
+            record_key: optional("record_key")?,
+            relative_key: optional("relative_key")?,
+            file_status: optional("file_status")?,
+        };
+        if files.insert(name, metadata).is_some() {
+            return Err(MachineProblem::InvalidArtifact(
+                "duplicate file metadata".into(),
+            ));
+        }
+    }
+    Ok(files)
 }
 
 fn text_attribute<'a>(operation: &'a Operation, name: &str) -> Result<&'a str, MachineProblem> {
@@ -3088,13 +3229,44 @@ fn civil_from_days(days: i64) -> (i32, u32, u32) {
     year += i64::from(month <= 2);
     (year as i32, month as u32, day as u32)
 }
-fn empty_payload() -> Result<BoundedPayload, MachineProblem> {
+fn encode_call_values(values: &[Vec<u8>]) -> Result<BoundedPayload, MachineProblem> {
+    let mut bytes = u32::try_from(values.len())
+        .map_err(|_| MachineProblem::ResourceExhausted)?
+        .to_be_bytes()
+        .to_vec();
+    for value in values {
+        bytes.extend_from_slice(
+            &u64::try_from(value.len())
+                .map_err(|_| MachineProblem::ResourceExhausted)?
+                .to_be_bytes(),
+        );
+        bytes.extend_from_slice(value);
+    }
     BoundedPayload::new(
-        "mainframe-env.program-call@1",
-        Vec::new(),
+        "mainframe-env.cobol.call@1",
+        bytes,
         InvocationLimits::default(),
     )
     .map_err(|_| MachineProblem::ResourceExhausted)
+}
+
+fn decode_call_values(payload: &BoundedPayload) -> Result<Vec<Vec<u8>>, MachineProblem> {
+    if payload.schema() != "mainframe-env.cobol.call-result@1" {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
+    let mut input = SnapshotInput::new(payload.bytes());
+    let count = usize::try_from(input.u32()?).map_err(|_| MachineProblem::ResourceExhausted)?;
+    if count > InvocationLimits::default().max_bindings {
+        return Err(MachineProblem::ResourceExhausted);
+    }
+    let mut values = Vec::with_capacity(count);
+    for _ in 0..count {
+        values.push(input.bytes(InvocationLimits::default().max_payload_bytes)?);
+    }
+    if !input.finished() {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
+    Ok(values)
 }
 fn failure_drive(category: FailureCategory, message: &str) -> MachineDrive<EffectRequest> {
     MachineDrive::Failed(

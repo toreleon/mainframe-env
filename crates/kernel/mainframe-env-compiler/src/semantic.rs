@@ -54,6 +54,17 @@ pub struct DataReference {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CobolFileBinding {
+    pub select_name: String,
+    pub assignment: String,
+    pub organization: String,
+    pub access_mode: String,
+    pub record_key: Option<String>,
+    pub relative_key: Option<String>,
+    pub file_status: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ResolutionProblem {
     Missing(String),
     Ambiguous(String),
@@ -65,6 +76,7 @@ pub enum ResolutionProblem {
 pub struct SemanticModel {
     pub program_id: String,
     pub layouts: Vec<CobolLayout>,
+    pub files: Vec<CobolFileBinding>,
     by_qualified: BTreeMap<String, usize>,
     by_simple: BTreeMap<String, Vec<usize>>,
     pub storage_bytes: usize,
@@ -79,6 +91,7 @@ impl SemanticModel {
         let cleaned = strip_comments(source);
         let upper = cleaned.to_ascii_uppercase();
         let program_id = extract_program_id(&upper).ok_or(SemanticProblem::MissingProgramId)?;
+        let files = file_bindings(&cleaned)?;
         let data_start = upper.find("DATA DIVISION").unwrap_or(0);
         let data_end = upper[data_start..]
             .find("PROCEDURE DIVISION")
@@ -125,6 +138,7 @@ impl SemanticModel {
         Ok(Self {
             program_id,
             layouts,
+            files,
             by_qualified,
             by_simple,
             storage_bytes: cursor,
@@ -210,6 +224,90 @@ impl SemanticModel {
             length,
         })
     }
+}
+
+fn file_bindings(source: &str) -> Result<Vec<CobolFileBinding>, SemanticProblem> {
+    let upper = source.to_ascii_uppercase();
+    let Some(start) = upper.find("FILE-CONTROL") else {
+        return Ok(Vec::new());
+    };
+    let end = upper[start..]
+        .find("DATA DIVISION")
+        .map_or(source.len(), |offset| start + offset);
+    let mut bindings = Vec::new();
+    for sentence in source[start..end].split('.') {
+        let words = words(sentence)
+            .into_iter()
+            .map(str::to_ascii_uppercase)
+            .collect::<Vec<_>>();
+        let Some(select) = words.iter().position(|word| word == "SELECT") else {
+            continue;
+        };
+        let select_name = words
+            .get(select + 1)
+            .cloned()
+            .ok_or_else(|| SemanticProblem::InvalidDeclaration(sentence.into()))?;
+        let assignment = find_after_owned(&words, "ASSIGN")
+            .and_then(|value| (value != "TO").then_some(value))
+            .or_else(|| {
+                words
+                    .iter()
+                    .position(|word| word == "ASSIGN")
+                    .and_then(|index| words.get(index + 2).cloned())
+            })
+            .ok_or_else(|| SemanticProblem::InvalidDeclaration(sentence.into()))?;
+        let organization = find_after_owned(&words, "ORGANIZATION")
+            .filter(|value| value != "IS")
+            .or_else(|| word_after_optional_is(&words, "ORGANIZATION"))
+            .unwrap_or_else(|| "SEQUENTIAL".into());
+        let access_mode = words
+            .iter()
+            .position(|word| word == "ACCESS")
+            .and_then(|index| {
+                words[index + 1..]
+                    .iter()
+                    .position(|word| word == "MODE")
+                    .map(|offset| index + 1 + offset)
+            })
+            .and_then(|index| {
+                words
+                    .get(index + 1 + usize::from(words.get(index + 1).is_some_and(|v| v == "IS")))
+                    .cloned()
+            })
+            .unwrap_or_else(|| "SEQUENTIAL".into());
+        bindings.push(CobolFileBinding {
+            select_name,
+            assignment,
+            organization,
+            access_mode,
+            record_key: word_after_optional_is(&words, "KEY"),
+            relative_key: words
+                .windows(2)
+                .position(|pair| pair[0] == "RELATIVE" && pair[1] == "KEY")
+                .and_then(|index| {
+                    words.get(
+                        index
+                            + 2
+                            + usize::from(words.get(index + 2).is_some_and(|word| word == "IS")),
+                    )
+                })
+                .cloned(),
+            file_status: words
+                .iter()
+                .position(|word| word == "FILE")
+                .and_then(|index| words.get(index + 1).filter(|word| *word == "STATUS"))
+                .and_then(|_| word_after_optional_is(&words, "STATUS")),
+        });
+    }
+    bindings.sort_by(|left, right| left.select_name.cmp(&right.select_name));
+    Ok(bindings)
+}
+
+fn word_after_optional_is(words: &[String], keyword: &str) -> Option<String> {
+    let index = words.iter().position(|word| word == keyword)?;
+    words
+        .get(index + 1 + usize::from(words.get(index + 1).is_some_and(|word| word == "IS")))
+        .cloned()
 }
 
 #[derive(Clone, Debug)]
@@ -1095,7 +1193,7 @@ mod tests {
 
     #[test]
     fn file_and_linkage_roots_keep_section_and_reference_identity() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. T. DATA DIVISION. FILE SECTION. FD INPUT-FILE. 01 INPUT-RECORD. 05 INPUT-ID PIC X(8). WORKING-STORAGE SECTION. 77 FLAG-X PIC X. LINKAGE SECTION. 01 DFHCOMMAREA. 05 LINK-BYTE PIC X OCCURS 1 TO 8 TIMES DEPENDING ON FLAG-X. PROCEDURE DIVISION. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. T. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT INPUT-FILE ASSIGN TO INPUTDD ORGANIZATION IS INDEXED ACCESS MODE IS RANDOM RECORD KEY IS INPUT-ID FILE STATUS IS FILE-STATUS. SELECT REL-FILE ASSIGN TO RELDD ORGANIZATION IS RELATIVE ACCESS MODE IS RANDOM RELATIVE KEY IS REL-NUM FILE STATUS IS REL-STATUS. DATA DIVISION. FILE SECTION. FD INPUT-FILE. 01 INPUT-RECORD. 05 INPUT-ID PIC X(8). WORKING-STORAGE SECTION. 77 FLAG-X PIC X. 77 FILE-STATUS PIC XX. 77 REL-NUM PIC 9(4). 77 REL-STATUS PIC XX. LINKAGE SECTION. 01 DFHCOMMAREA. 05 LINK-BYTE PIC X OCCURS 1 TO 8 TIMES DEPENDING ON FLAG-X. PROCEDURE DIVISION. STOP RUN.";
         let model = SemanticModel::analyze(source, 1024, 32).unwrap();
         assert_eq!(
             model.layout("INPUT-RECORD").unwrap().section,
@@ -1112,5 +1210,14 @@ mod tests {
                 .length,
             1
         );
+        assert_eq!(model.files.len(), 2);
+        assert_eq!(model.files[0].select_name, "INPUT-FILE");
+        assert_eq!(model.files[0].assignment, "INPUTDD");
+        assert_eq!(model.files[0].organization, "INDEXED");
+        assert_eq!(model.files[0].access_mode, "RANDOM");
+        assert_eq!(model.files[0].record_key.as_deref(), Some("INPUT-ID"));
+        assert_eq!(model.files[0].file_status.as_deref(), Some("FILE-STATUS"));
+        assert_eq!(model.files[1].organization, "RELATIVE");
+        assert_eq!(model.files[1].relative_key.as_deref(), Some("REL-NUM"));
     }
 }

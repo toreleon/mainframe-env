@@ -110,6 +110,47 @@ pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, 
             )
             .map_err(|_| LowerProblem::LimitExceeded)?;
     }
+    for file in &hir.files {
+        let attributes = BTreeMap::from([
+            ("name".into(), Attribute::Text(file.select_name.clone())),
+            (
+                "assignment".into(),
+                Attribute::Text(file.assignment.clone()),
+            ),
+            (
+                "organization".into(),
+                Attribute::Text(file.organization.clone()),
+            ),
+            (
+                "access_mode".into(),
+                Attribute::Text(file.access_mode.clone()),
+            ),
+            (
+                "record_key".into(),
+                Attribute::Text(file.record_key.clone().unwrap_or_default()),
+            ),
+            (
+                "relative_key".into(),
+                Attribute::Text(file.relative_key.clone().unwrap_or_default()),
+            ),
+            (
+                "file_status".into(),
+                Attribute::Text(file.file_status.clone().unwrap_or_default()),
+            ),
+        ]);
+        builder
+            .add_operation(
+                block,
+                core_identity("file")?,
+                Vec::new(),
+                0,
+                attributes,
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .map_err(|_| LowerProblem::LimitExceeded)?;
+    }
     for layout in hir
         .layouts
         .iter()
@@ -307,6 +348,13 @@ pub fn core_mir_catalog() -> OperationCatalog {
             0,
         ))
         .expect("unique define");
+    catalog
+        .register(OperationSchema::pure(
+            core_identity("file").expect("static identity"),
+            0,
+            0,
+        ))
+        .expect("unique file");
     let mut control =
         OperationSchema::pure(core_identity("control").expect("static identity"), 0, 0);
     control.allowed_effects = BTreeSet::from([Effect::ProgramControl, Effect::Condition]);

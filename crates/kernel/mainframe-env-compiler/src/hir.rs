@@ -1,4 +1,4 @@
-use crate::{CobolLayout, LosslessSyntax, SemanticModel};
+use crate::{CobolFileBinding, CobolLayout, LosslessSyntax, SemanticModel};
 use mainframe_env_ir::{
     Attribute, Effect, IrLimits, Module, ModuleBuilder, OperationCatalog, OperationIdentity,
     OperationSchema, StorageReference,
@@ -246,6 +246,7 @@ pub struct ControlEdge {
 pub struct CobolHir {
     pub program_id: String,
     pub layouts: Vec<CobolLayout>,
+    pub files: Vec<CobolFileBinding>,
     pub statements: Vec<HirStatement>,
     pub control_nodes: Vec<ControlNode>,
     pub control_edges: Vec<ControlEdge>,
@@ -274,6 +275,7 @@ impl CobolHir {
         Ok(Self {
             program_id: semantic.program_id.clone(),
             layouts: semantic.layouts.clone(),
+            files: semantic.files.clone(),
             statements,
             control_nodes: parsed.nodes,
             control_edges: parsed.edges,

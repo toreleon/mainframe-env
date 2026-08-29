@@ -1,17 +1,17 @@
 # CardDemo-full 0.1.1 Program Status
 
 Current phase: **CD.A — corpus and application packaging**
-Current issue: **CD-006 — exact COBOL core execution semantics PASS**
-Next issue: **CD-007 — file, linkage, and CALL semantics**
+Current issue: **CD-007 — file, linkage, and CALL semantics PASS**
+Next issue: **CD-008 — typed embedded host operands**
 Current product: **0.1.0-alpha.0**
 Target product: **0.1.1**
 CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Source identity
 
-- mainframe-env base commit: `aaec5b737e0b90b98b5ad83ad129c504bfe72c37`
+- mainframe-env base commit: `4342e1b55797adf22c4f55eaf6567cea362a3a80`
 - current deterministic dirty-tree identity:
-  `sha256:0b4fa17d9a8a659163cb9da26a66f2d1b598333e7224e7e1eabb0abf095a1978`
+  `sha256:b7526635dda458c23d1c630729f0e9765ccd913f4f3d0f0c9f6ed0cdf9acc0ad`
 - dirty-tree algorithm: SHA-256 of the sorted `sha256sum` records for every
   repository file except `.git/`, `target/`, and the two persistent CardDemo
   status ledgers (which carry the identity).
@@ -126,8 +126,8 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 - State: **PASS**
 - Required commit subject: `Execute CardDemo COBOL core semantics`
-- Completion commit identity: recorded when CD-007 starts from this issue
-  commit.
+- Completion commit identity:
+  `4342e1b55797adf22c4f55eaf6567cea362a3a80`.
 - Evidence: `conformance/0.1.1/evidence/issues/CD-006.json`
 - Evidence digest:
   `sha256:30752d833bc42b004b693fd5f562a4caf7fc9bd129bde076cc28daeba2efc130`
@@ -149,6 +149,31 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   `sha256:b8272836a041f06233c5c948b3bbf8153e2d102314c6fcd8bedc81a2642d0b06`;
   two exact executable oracles produce
   `sha256:173a2d4b676bff2baf13a4fa0aaa8183a29751cf4b93d36fa8f1353ccdedd278`.
+
+### CD-007 — file, linkage, and CALL semantics
+
+- State: **PASS**
+- Required commit subject: `Implement CardDemo file and program calls`
+- Completion commit identity: recorded when CD-008 starts from this issue
+  commit.
+- Evidence: `conformance/0.1.1/evidence/issues/CD-007.json`
+- Evidence digest:
+  `sha256:9a093cf504ddf55d5242da5f48bb2e1783cb3c48f64790305954480402260597`
+- Acceptance: 54 lowered SELECT definitions retain DD assignment,
+  organization, access mode, record/relative key, and FILE STATUS. The corpus
+  has 31 indexed and 23 sequential bindings; focused relative-key coverage is
+  explicit even though the pinned program corpus reaches none.
+- Dataset effects consume explicit `cobol.dd.<SELECT>` authority or the lowered
+  ASSIGN name, carry random keys, mutate READ INTO records, serialize WRITE
+  FROM bytes, and update success, EOF, or provider condition status.
+- CALL USING sends bounded ordered `mainframe-env.cobol.call@1` values and
+  accepts only exact-arity `mainframe-env.cobol.call-result@1` responses before
+  mutating caller storage. The selected AB-to-XY roundtrip proves by-reference
+  return behavior.
+- The exact corpus contract covers 185 linkage items, 63 calls with 228 USING
+  operands, 53 OPEN, 50 CLOSE, 34 READ, and 117 WRITE statements. CBSTM03A,
+  CBSTM03B, and CSUTLDTC are present; the contract digest is
+  `sha256:0cafcb6178b6c027f22fd0182bf6e7c5f74a2af0238f10476566afa4823e2c6e`.
 
 ## Commands and exit codes
 
@@ -227,10 +252,18 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 - Full-library CLI login compilation — **0**; a legal artifact was emitted with
   no diagnostics after structured CFG and core semantics lowering.
 - Ordinary conformance and cumulative CD-001–CD-006 gates — **0**.
+- `cargo test -p mainframe-env-compiler -p mainframe-env-interpreter -p mainframe-env-conformance --locked`
+  — **0**; 27 compiler, 6 interpreter, and 28 conformance tests passed.
+- Workspace check and affected-package Clippy with `-D warnings` — **0**.
+- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-file-call --check`
+  — **0**; the exact 44-program file/call contract passed.
+- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-file-call --check` — **1**;
+  expected missing-environment failure.
+- Ordinary conformance and cumulative CD-001–CD-007 gates — **0**.
 
 ## Implementation status
 
-- Issues passed: **6 / 27**
+- Issues passed: **7 / 27**
 - Journeys passed: **0 / 20**
 - Installed CardDemo resources: **0**
 - Executed CardDemo application journeys: **0**
@@ -244,11 +277,11 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 2. The repository is still `0.1.0-alpha.0`. A 0.1.1 release cannot be cut until
    0.1.0 is finalized or an explicit version-line correction is accepted.
 
-Neither decision blocks CD-007. No CD-006 blocker remains.
+Neither decision blocks CD-008. No CD-007 blocker remains.
 
 ## Next smallest executable step
 
-Implement typed SELECT/FD bindings, FILE STATUS and AT END/INVALID KEY updates,
-LINKAGE storage, and by-reference CALL mutation. Start with the pinned
-CBSTM03A-to-CBSTM03B and CSUTLDTC selected routes before generalizing the host
-program and dataset effects.
+Lower CICS, SQL, DLI, and MQ operands through storage-aware typed host requests.
+Start with literal normalization, INTO/FROM/LENGTH/RIDFLD/COMMAREA/RESP targets,
+then SQL host variables/indicators and DLI PCB/SSA or MQ parameter-list views;
+raw command strings must never become provider authority.

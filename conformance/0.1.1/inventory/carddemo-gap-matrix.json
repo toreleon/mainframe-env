@@ -81,9 +81,11 @@
       "priority": "P0",
       "domain": "compiler-runtime",
       "title": "Implement COBOL file, linkage, and CALL semantics",
-      "state": "open",
+      "state": "passed",
       "depends_on": ["CD-004", "CD-005", "CD-006"],
       "commit_subject": "Implement CardDemo file and program calls",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-007.json",
+      "evidence_digest": "sha256:9a093cf504ddf55d5242da5f48bb2e1783cb3c48f64790305954480402260597",
       "acceptance": ["SELECT/FD/DD bindings and sequential/indexed/relative file verbs lower to typed effects", "FILE STATUS and AT END/INVALID KEY behavior update storage", "CALL USING passes by-reference linkage areas and returns mutations", "CBSTM03A to CBSTM03B and CSUTLDTC calls execute through ProgramService"]
     },
     {

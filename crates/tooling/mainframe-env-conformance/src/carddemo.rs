@@ -1,8 +1,8 @@
 //! Fail-closed verification for the externally supplied CardDemo corpus.
 
 use mainframe_env_compiler::{
-    CobolCompiler, ControlEdgeKind, ControlRole, DataCategory, compatibility_copybooks,
-    owned_compatibility_library,
+    CobolCompiler, ControlEdgeKind, ControlRole, DataCategory, StatementKind, StorageSection,
+    compatibility_copybooks, owned_compatibility_library,
 };
 use mainframe_env_execution_api::{Machine, MachineDrive, MachineResume, Quantum};
 use mainframe_env_source::{
@@ -206,6 +206,29 @@ pub struct CardDemoCoreReceipt {
     pub oracle_cases: usize,
     pub oracle_output_sha256: String,
     pub core_shape_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoFileCallReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub programs_checked: usize,
+    pub file_bindings: usize,
+    pub organizations: BTreeMap<String, usize>,
+    pub access_modes: BTreeMap<String, usize>,
+    pub keyed_files: usize,
+    pub relative_key_files: usize,
+    pub file_status_bindings: usize,
+    pub linkage_items: usize,
+    pub call_statements: usize,
+    pub call_using_operands: usize,
+    pub open_statements: usize,
+    pub close_statements: usize,
+    pub read_statements: usize,
+    pub write_statements: usize,
+    pub selected_routes_present: bool,
+    pub contract_sha256: String,
 }
 
 pub fn verify_carddemo_corpus_from_env(
@@ -1079,6 +1102,129 @@ fn core_oracle_outputs() -> Result<Vec<Vec<u8>>, CorpusProblem> {
         outputs.push(output);
     }
     Ok(outputs)
+}
+
+pub fn verify_carddemo_file_call_semantics_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoFileCallReceipt, CorpusProblem> {
+    let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required for CardDemo gates",
+        )
+    })?;
+    let corpus_dir = Path::new(&corpus_dir);
+    let closure = verify_carddemo_source_closures_from_env(inventory_path)?;
+    let bundles = explicit_carddemo_bundles(corpus_dir)?;
+    let compiler = CobolCompiler::default();
+    let mut file_bindings = 0usize;
+    let mut organizations = BTreeMap::<String, usize>::new();
+    let mut access_modes = BTreeMap::<String, usize>::new();
+    let mut keyed_files = 0usize;
+    let mut relative_key_files = 0usize;
+    let mut file_status_bindings = 0usize;
+    let mut linkage_items = 0usize;
+    let mut call_statements = 0usize;
+    let mut call_using_operands = 0usize;
+    let mut open_statements = 0usize;
+    let mut close_statements = 0usize;
+    let mut read_statements = 0usize;
+    let mut write_statements = 0usize;
+    let mut selected = BTreeSet::new();
+    let mut digest = Sha256::new();
+    for (primary, bundle) in &bundles {
+        let analysis = compiler.analyze(bundle);
+        let semantic = analysis.semantic.ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.file_call.semantic_failed",
+                format!("program {primary} did not produce semantics"),
+            )
+        })?;
+        let hir = analysis.hir.ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.file_call.hir_failed",
+                format!("program {primary} did not produce HIR"),
+            )
+        })?;
+        if ["CBSTM03A.CBL", "CBSTM03B.CBL", "CSUTLDTC.CBL"]
+            .iter()
+            .any(|name| primary.to_ascii_uppercase().ends_with(name))
+        {
+            selected.insert(primary.to_ascii_uppercase());
+        }
+        for file in &semantic.files {
+            digest_field(&mut digest, primary.as_bytes());
+            digest_field(&mut digest, file.select_name.as_bytes());
+            digest_field(&mut digest, file.assignment.as_bytes());
+            digest_field(&mut digest, file.organization.as_bytes());
+            digest_field(&mut digest, file.access_mode.as_bytes());
+            digest_field(
+                &mut digest,
+                file.record_key.as_deref().unwrap_or("").as_bytes(),
+            );
+            digest_field(
+                &mut digest,
+                file.file_status.as_deref().unwrap_or("").as_bytes(),
+            );
+            *organizations.entry(file.organization.clone()).or_default() += 1;
+            *access_modes.entry(file.access_mode.clone()).or_default() += 1;
+            keyed_files += usize::from(file.record_key.is_some());
+            relative_key_files += usize::from(file.relative_key.is_some());
+            file_status_bindings += usize::from(file.file_status.is_some());
+        }
+        linkage_items += semantic
+            .layouts
+            .iter()
+            .filter(|layout| layout.section == StorageSection::Linkage)
+            .count();
+        for statement in &hir.statements {
+            match statement.kind {
+                StatementKind::Call => {
+                    call_statements += 1;
+                    if let Some(using) = statement.arguments.iter().position(|arg| arg == "USING") {
+                        call_using_operands += statement.arguments[using + 1..]
+                            .iter()
+                            .filter(|arg| !matches!(arg.as_str(), "BY" | "REFERENCE" | "CONTENT"))
+                            .count();
+                    }
+                }
+                StatementKind::Open => open_statements += 1,
+                StatementKind::Close => close_statements += 1,
+                StatementKind::Read => read_statements += 1,
+                StatementKind::Write => write_statements += 1,
+                _ => {}
+            }
+        }
+        file_bindings = checked_total(file_bindings, semantic.files.len(), "file binding")?;
+    }
+    let selected_routes_present = selected.len() == 3;
+    if !selected_routes_present {
+        return Err(CorpusProblem::new(
+            "carddemo.file_call.route_missing",
+            "selected CBSTM03A, CBSTM03B, and CSUTLDTC routes are incomplete",
+        ));
+    }
+    Ok(CardDemoFileCallReceipt {
+        schema_version: "mainframe-env.carddemo-file-call-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit: closure.corpus_commit,
+        programs_checked: bundles.len(),
+        file_bindings,
+        organizations,
+        access_modes,
+        keyed_files,
+        relative_key_files,
+        file_status_bindings,
+        linkage_items,
+        call_statements,
+        call_using_operands,
+        open_statements,
+        close_statements,
+        read_statements,
+        write_statements,
+        selected_routes_present,
+        contract_sha256: format!("{:x}", digest.finalize()),
+    })
 }
 
 fn digest_field(digest: &mut Sha256, bytes: &[u8]) {

@@ -23,10 +23,11 @@ mod carddemo;
 
 pub use carddemo::{
     CardDemoClosureReceipt, CardDemoControlReceipt, CardDemoCoreReceipt, CardDemoCorpusReceipt,
-    CardDemoLayoutReceipt, CardDemoSourceReceipt, CorpusProblem,
+    CardDemoFileCallReceipt, CardDemoLayoutReceipt, CardDemoSourceReceipt, CorpusProblem,
     verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
     verify_carddemo_corpus, verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
-    verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
+    verify_carddemo_file_call_semantics_from_env, verify_carddemo_source_closures_from_env,
+    verify_carddemo_source_preprocessing_from_env,
 };
 
 pub const HELLO_SOURCE: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. HELLO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MSG PIC X(12) VALUE 'HELLO WORLD!'.\nPROCEDURE DIVISION.\nDISPLAY MSG.\nSTOP RUN.\n";
@@ -354,6 +355,108 @@ mod tests {
             drive_to_terminal(&mut first),
             drive_to_terminal(&mut restored)
         );
+    }
+
+    #[test]
+    fn call_using_roundtrips_by_reference_storage() {
+        use mainframe_env_host_api::{EffectResult, HostRequest, HostResult, ProgramRequest};
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CALLER. DATA DIVISION. WORKING-STORAGE SECTION. 01 ARG-X PIC X(2) VALUE 'AB'. PROCEDURE DIVISION. CALL 'SUB' USING ARG-X. DISPLAY ARG-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let effect = loop {
+            match machine.drive(MachineResume::Start, Quantum::new(16, 1024).unwrap()) {
+                MachineDrive::Continue => {}
+                MachineDrive::HostCall(effect) => break effect,
+                other => panic!("{other:?}"),
+            }
+        };
+        let HostRequest::Program(ProgramRequest::Call { program, payload }) = &effect.request
+        else {
+            panic!("unexpected request: {:?}", effect.request);
+        };
+        assert_eq!(program.as_str(), "SUB");
+        assert_eq!(payload.schema(), "mainframe-env.cobol.call@1");
+        assert!(payload.bytes().ends_with(b"AB"));
+        let mut result = 1u32.to_be_bytes().to_vec();
+        result.extend_from_slice(&2u64.to_be_bytes());
+        result.extend_from_slice(b"XY");
+        let result = mainframe_env_execution_api::BoundedPayload::new(
+            "mainframe-env.cobol.call-result@1",
+            result,
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: effect.sequence,
+                    outcome: Ok(HostResult::Program(result)),
+                }),
+                Quantum::new(32, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(done) if done.output.bytes() == b"XY\n"
+        ));
+    }
+
+    #[test]
+    fn dataset_read_uses_dd_binding_and_updates_file_status() {
+        use mainframe_env_host_api::{
+            DatasetRequest, DatasetResult, EffectResult, HostRequest, HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. READER. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(3). 01 STATUS-X PIC XX. PROCEDURE DIVISION. READ INPUT-FILE INTO REC-X. DISPLAY REC-X. DISPLAY STATUS-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut invocation = invocation(&artifact, 1024);
+        invocation.bindings.insert(
+            "cobol.dd.INPUT-FILE".into(),
+            mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.dataset-name@1",
+                b"USER.INPUT".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        invocation.bindings.insert(
+            "cobol.file-status.INPUT-FILE".into(),
+            mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.storage-name@1",
+                b"STATUS-X".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        let mut machine =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("dataset read did not call host");
+        };
+        assert!(matches!(
+            effect.request,
+            HostRequest::Dataset(DatasetRequest::Read { ref dataset, .. })
+                if dataset.as_str() == "USER.INPUT"
+        ));
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: effect.sequence,
+                    outcome: Ok(HostResult::Dataset(DatasetResult::Records {
+                        records: vec![b"ABC".to_vec()],
+                        version: 1,
+                    })),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(done) if done.output.bytes() == b"ABC\n00\n"
+        ));
     }
 
     fn drive_to_terminal(

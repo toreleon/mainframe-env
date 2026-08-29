@@ -1,0 +1,52 @@
+{
+  "schema_version": "mainframe-env.carddemo-issue-evidence@1",
+  "issue": "CD-007",
+  "title": "Implement COBOL file, linkage, and CALL semantics",
+  "derived": true,
+  "status": "pass",
+  "target_product": "0.1.1",
+  "current_product": "0.1.0-alpha.0",
+  "digest_scope": "Recursively lexicographically key-sorted compact UTF-8 JSON serialization of file_call_receipt, with no trailing newline, followed by SHA-256",
+  "evidence_digest": "sha256:9a093cf504ddf55d5242da5f48bb2e1783cb3c48f64790305954480402260597",
+  "file_call_receipt": {
+    "schema_version": "mainframe-env.carddemo-file-call-receipt@1",
+    "status": "pass",
+    "corpus_commit": "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e",
+    "programs_checked": 44,
+    "file_bindings": 54,
+    "organizations": {"INDEXED":31,"SEQUENTIAL":23},
+    "access_modes": {"RANDOM":17,"SEQUENTIAL":37},
+    "keyed_files": 31,
+    "relative_key_files": 0,
+    "file_status_bindings": 52,
+    "linkage_items": 185,
+    "call_statements": 63,
+    "call_using_operands": 228,
+    "open_statements": 53,
+    "close_statements": 50,
+    "read_statements": 34,
+    "write_statements": 117,
+    "selected_routes_present": true,
+    "contract_sha256": "0cafcb6178b6c027f22fd0182bf6e7c5f74a2af0238f10476566afa4823e2c6e"
+  },
+  "acceptance_observations": [
+    "SELECT metadata lowers logical name, DD assignment, organization, access mode, record/relative key, and FILE STATUS into typed executable definitions; sequential, indexed, and focused relative declarations are tested.",
+    "Invocation cobol.dd.<SELECT> bindings override the declared assignment as explicit runtime authority; absent overrides use the lowered ASSIGN name rather than raw source text.",
+    "READ keys use explicit KEY operands or lowered random record/relative keys, READ INTO mutates the exact record view, WRITE FROM emits the selected bytes, and successful, empty, or condition results update FILE STATUS deterministically.",
+    "CALL USING encodes bounded ordered by-reference values in mainframe-env.cobol.call@1 and accepts only an exact mainframe-env.cobol.call-result@1 arity before mutating caller storage.",
+    "A selected-route host roundtrip proves caller storage changes from AB to XY, while a DD-bound dataset read proves USER.INPUT authority, record mutation, and status 00 output.",
+    "The pinned corpus contains 54 file bindings, 185 linkage layouts, 63 CALL statements with 228 USING operands, and the exact reached OPEN/CLOSE/READ/WRITE inventory; CBSTM03A, CBSTM03B, and CSUTLDTC are all present."
+  ],
+  "commands": [
+    {"command":"focused CALL USING and DD-bound READ tests before repair","exit_code":1,"result":"by-reference return and file-status mutation were absent"},
+    {"command":"cargo test -p mainframe-env-compiler -p mainframe-env-interpreter -p mainframe-env-conformance --locked","exit_code":0,"result":"27 compiler, 6 interpreter, and 28 conformance tests passed"},
+    {"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-file-call --check","exit_code":0,"result":"44-program file/call contract receipt passed"},
+    {"command":"env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-file-call --check","exit_code":1,"result":"expected fail-closed missing-environment control"},
+    {"command":"cargo check --workspace --all-targets --locked","exit_code":0,"result":"pass"},
+    {"command":"affected-package cargo clippy --all-targets --locked -- -D warnings","exit_code":0,"result":"pass"},
+    {"command":"env -u CARDEMO_CORPUS_DIR cargo xtask conformance --check","exit_code":0,"result":"architecture, profiles, schemas, inventory, and evidence passed"},
+    {"command":"cargo fmt --all -- --check && git diff --check","exit_code":0,"result":"pass"}
+  ],
+  "absolute_local_paths_present": false,
+  "native_or_legacy_fallback_present": false
+}
