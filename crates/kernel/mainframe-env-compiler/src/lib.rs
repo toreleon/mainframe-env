@@ -9,7 +9,10 @@ mod semantic;
 mod service;
 mod syntax;
 
-pub use hir::{CobolHir, HirStatement, StatementKind, cobol_hir_catalog};
+pub use hir::{
+    CobolHir, ControlEdge, ControlEdgeKind, ControlNode, ControlRole, ControlScope, HirStatement,
+    StatementKind, cobol_hir_catalog,
+};
 pub use lower::{CORE_NAMESPACE, core_mir_catalog, core_mir_profile};
 pub use semantic::{
     CobolLayout, DataCategory, DataReference, ResolutionProblem, SemanticModel, StorageSection,

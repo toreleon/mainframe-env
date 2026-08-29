@@ -1,17 +1,17 @@
 # CardDemo-full 0.1.1 Program Status
 
 Current phase: **CD.A — corpus and application packaging**
-Current issue: **CD-004 — acceptance passed; focused completion commit in progress**
-Next issue: **CD-003 — complete source closures and compatibility copybooks**
+Current issue: **CD-005 — typed structured COBOL control flow PASS**
+Next issue: **CD-006 — exact COBOL core execution semantics**
 Current product: **0.1.0-alpha.0**
 Target product: **0.1.1**
 CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Source identity
 
-- mainframe-env base commit: `11d32398021b2240a95f757eec152a7607cba3a0`
+- mainframe-env base commit: `8697e1d1fbe2001415c560eb227325bd2e64bb2e`
 - current deterministic dirty-tree identity:
-  `sha256:06de0e812699b751b446c5128a3d03fff21f45c32b0c2196b81d106d2c50c3df`
+  `sha256:56e60bd25f4210ee5d72fd5292383baaae19a7d794d85f4dde5e86b023b26bc2`
 - dirty-tree algorithm: SHA-256 of the sorted `sha256sum` records for every
   repository file except `.git/`, `target/`, and the two persistent CardDemo
   status ledgers (which carry the identity).
@@ -79,9 +79,8 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 - State: **PASS**
 - Required commit subject: `Implement CardDemo COBOL data layouts`
-- Completion commit identity: the focused commit containing this ledger and the
-  `CardDemo-Issue: CD-004=pass` trailer; its hash is recorded on the next
-  continuation to avoid self-reference.
+- Completion commit identity:
+  `8697e1d1fbe2001415c560eb227325bd2e64bb2e`.
 - Evidence: `conformance/0.1.1/evidence/issues/CD-004.json`
 - Evidence digest:
   `sha256:728eb45dd6cf917e16f25da43bf3b29b5d102da94ef359d7f73ec886de865bc8`
@@ -97,6 +96,30 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   sections, and reached display/edited/binary/packed bytes have focused tests.
 - The full login now clears semantics and stops at CD-005 HIR
   `UnknownStatement`.
+
+### CD-005 — typed structured COBOL control flow
+
+- State: **PASS**
+- Required commit subject: `Build structured CardDemo COBOL control flow`
+- Completion commit identity: recorded when CD-006 starts from this issue commit.
+- Evidence: `conformance/0.1.1/evidence/issues/CD-005.json`
+- Evidence digest:
+  `sha256:759e61a9a56883c64b632916b33e17cd627fd326270a5bf0eb7bc68a135937b6`
+- Acceptance: all 44 closures now produce HIR with 11,117 typed statements,
+  14,317 control nodes, and 18,983 edges. Nested IF/EVALUATE/SEARCH and
+  inline PERFORM scopes retain parents, branches, explicit or implicit ends,
+  and 1,205 true, 1,207 false, and 44 loop edges.
+- Paragraph PERFORM/THRU and GO TO/NEXT SENTENCE resolve 1,201 call,
+  1,201 return, and 201 transfer edges. EXIT, GOBACK, STOP RUN, labels,
+  branch markers, and generic END-* terminators keep distinct identities.
+- Unknown, unmatched, unterminated, and missing-target input fails HIR. The
+  pinned corpus's one duplicate paragraph becomes an unsupported recovered
+  node; multiline structured control remains unsupported until CD-006 consumes
+  its graph, so neither condition can publish partial behavior.
+- The exact structured-control digest is
+  `sha256:f0a73e52901638049da34143b8456768c0b7fb8df541ba57496cf71d8de143cb`.
+  The full login reaches HIR completion and stops at the typed CD-006
+  `StructuredControl` boundary.
 
 ## Commands and exit codes
 
@@ -153,10 +176,22 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   `UnknownStatement`.
 - Final format, JSON, redaction, diff, ordinary conformance, and cumulative
   CD-001–CD-004 gates — **0**.
+- `cargo test -p mainframe-env-compiler -p mainframe-env-conformance -p mainframe-env-cli -p mainframe-env-server -p xtask --locked`
+  — **0**; 27 compiler, 19 conformance, 3 CLI, 10 server, and 5 xtask tests
+  passed.
+- `cargo check --workspace --all-targets --locked` and affected-package Clippy
+  with `-D warnings` — **0**.
+- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-control --check`
+  — **0**; all 44 HIR models and the exact CD-005 receipt passed.
+- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-control --check` — **1**;
+  expected missing-environment failure.
+- Full-library CLI login inspection — **0**; HIR completion reaches the typed
+  CD-006 `StructuredControl` boundary without artifact publication.
+- Ordinary conformance and cumulative CD-001–CD-005 gates — **0**.
 
 ## Implementation status
 
-- Issues passed: **4 / 27**
+- Issues passed: **5 / 27**
 - Journeys passed: **0 / 20**
 - Installed CardDemo resources: **0**
 - Executed CardDemo application journeys: **0**
@@ -170,10 +205,11 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 2. The repository is still `0.1.0-alpha.0`. A 0.1.1 release cannot be cut until
    0.1.0 is finalized or an explicit version-line correction is accepted.
 
-Neither decision blocks CD-005. No CD-004 blocker remains.
+Neither decision blocks CD-006. No CD-005 blocker remains.
 
 ## Next smallest executable step
 
-Commit CD-004 locally with its exact subject and evidence trailers. Then record
-that commit hash and begin CD-005 from the real HIR `UnknownStatement` cohort,
-replacing period-leading classification with typed structured control flow.
+Use the typed CD-005 control graph to implement exact CardDemo moves, group
+moves, decimal arithmetic, STRING/UNSTRING/INSPECT/INITIALIZE, condition names,
+subscripts, reference modification, overflow behavior, and reached intrinsic
+functions without relaxing the fail-closed `StructuredControl` boundary.

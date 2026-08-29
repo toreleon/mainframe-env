@@ -57,9 +57,11 @@
       "priority": "P0",
       "domain": "compiler-control",
       "title": "Replace period-leading classification with structured COBOL control flow",
-      "state": "open",
+      "state": "passed",
       "depends_on": ["CD-002", "CD-004"],
       "commit_subject": "Build structured CardDemo COBOL control flow",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-005.json",
+      "evidence_digest": "sha256:759e61a9a56883c64b632916b33e17cd627fd326270a5bf0eb7bc68a135937b6",
       "acceptance": ["typed AST represents nested IF/EVALUATE/SEARCH", "PERFORM paragraph, THRU, VARYING, TIMES, and UNTIL produce explicit CFG", "GO TO, EXIT, GOBACK, STOP RUN, NEXT SENTENCE, and scope terminators preserve control identity", "unknown or recovered nodes cannot publish"]
     },
     {

@@ -18,9 +18,11 @@ pub enum StatementKind {
     Continue,
     Display,
     Divide,
+    DuplicateLabel,
     Entry,
     Evaluate,
     ExecCics,
+    ExecDli,
     ExecSql,
     Exit,
     Free,
@@ -35,15 +37,18 @@ pub enum StatementKind {
     Merge,
     Move,
     Multiply,
+    NextSentence,
     Open,
     Perform,
     Read,
     Release,
+    Rewrite,
     ReturnStatement,
     Search,
     Set,
     Sort,
     StopRun,
+    StructuredControl,
     String,
     Subtract,
     Unstring,
@@ -69,9 +74,11 @@ impl StatementKind {
             Self::Continue => "continue",
             Self::Display => "display",
             Self::Divide => "divide",
+            Self::DuplicateLabel => "duplicate_label",
             Self::Entry => "entry",
             Self::Evaluate => "evaluate",
             Self::ExecCics => "exec_cics",
+            Self::ExecDli => "exec_dli",
             Self::ExecSql => "exec_sql",
             Self::Exit => "exit",
             Self::Free => "free",
@@ -86,15 +93,18 @@ impl StatementKind {
             Self::Merge => "merge",
             Self::Move => "move",
             Self::Multiply => "multiply",
+            Self::NextSentence => "next_sentence",
             Self::Open => "open",
             Self::Perform => "perform",
             Self::Read => "read",
             Self::Release => "release",
+            Self::Rewrite => "rewrite",
             Self::ReturnStatement => "return_statement",
             Self::Search => "search",
             Self::Set => "set",
             Self::Sort => "sort",
             Self::StopRun => "stop_run",
+            Self::StructuredControl => "structured_control",
             Self::String => "string",
             Self::Subtract => "subtract",
             Self::Unstring => "unstring",
@@ -110,12 +120,17 @@ impl StatementKind {
     pub const fn supported(self) -> bool {
         !matches!(
             self,
-            Self::ExecSql
+            Self::DuplicateLabel
+                | Self::ExecSql
+                | Self::ExecDli
                 | Self::Invoke
                 | Self::Merge
+                | Self::NextSentence
                 | Self::Release
+                | Self::Rewrite
                 | Self::ReturnStatement
                 | Self::Sort
+                | Self::StructuredControl
         )
     }
 
@@ -176,11 +191,64 @@ pub struct HirStatement {
     pub line: usize,
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum ControlScope {
+    If,
+    Evaluate,
+    Search,
+    Perform,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum ControlRole {
+    Statement,
+    BlockStart,
+    Branch,
+    BlockEnd,
+    Label,
+    ExternalTarget,
+    Recovered,
+    Transfer,
+    Terminator,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ControlNode {
+    pub id: usize,
+    pub line: usize,
+    pub role: ControlRole,
+    pub scope: Option<ControlScope>,
+    pub parent: Option<usize>,
+    pub statement: Option<usize>,
+    pub text: String,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum ControlEdgeKind {
+    Fallthrough,
+    Branch,
+    True,
+    False,
+    Loop,
+    Call,
+    Transfer,
+    Return,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ControlEdge {
+    pub from: usize,
+    pub to: usize,
+    pub kind: ControlEdgeKind,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CobolHir {
     pub program_id: String,
     pub layouts: Vec<CobolLayout>,
     pub statements: Vec<HirStatement>,
+    pub control_nodes: Vec<ControlNode>,
+    pub control_edges: Vec<ControlEdge>,
     pub module: Module,
 }
 
@@ -192,24 +260,8 @@ impl CobolHir {
     ) -> Result<Self, HirProblem> {
         let procedure =
             procedure_text(syntax.semantic_text()).ok_or(HirProblem::MissingProcedure)?;
-        let mut statements = Vec::new();
-        for (line, sentence) in split_sentences(procedure) {
-            if sentence.trim().is_empty() {
-                continue;
-            }
-            let kind = classify(&sentence).ok_or(HirProblem::UnknownStatement)?;
-            let arguments = if kind == StatementKind::Label {
-                vec![sentence.trim().to_ascii_uppercase()]
-            } else {
-                semantic_tokens(&sentence)
-            };
-            validate_form(kind, &arguments)?;
-            statements.push(HirStatement {
-                kind,
-                arguments,
-                line,
-            });
-        }
+        let parsed = parse_procedure(procedure, limits.max_operations.saturating_sub(1))?;
+        let mut statements = parsed.statements;
         if statements.len() > limits.max_operations.saturating_sub(1) {
             return Err(HirProblem::StatementLimitExceeded);
         }
@@ -223,26 +275,45 @@ impl CobolHir {
             program_id: semantic.program_id.clone(),
             layouts: semantic.layouts.clone(),
             statements,
+            control_nodes: parsed.nodes,
+            control_edges: parsed.edges,
             module,
         })
     }
 
     #[must_use]
     pub fn unsupported(&self) -> BTreeSet<StatementKind> {
-        self.statements
+        let mut unsupported = self
+            .statements
             .iter()
             .filter(|statement| !statement.kind.supported())
             .map(|statement| statement.kind)
-            .collect()
+            .collect::<BTreeSet<_>>();
+        if self.control_nodes.iter().any(|start| {
+            start.role == ControlRole::BlockStart
+                && self.control_nodes.iter().any(|end| {
+                    end.role == ControlRole::BlockEnd
+                        && end.parent == Some(start.id)
+                        && end.line != start.line
+                })
+        }) {
+            unsupported.insert(StatementKind::StructuredControl);
+        }
+        unsupported
     }
 }
 
 pub fn cobol_hir_catalog() -> OperationCatalog {
     let mut catalog = OperationCatalog::default();
-    for kind in StatementKind::frozen()
-        .into_iter()
-        .chain([StatementKind::Label, StatementKind::ProgramEnd])
-    {
+    for kind in StatementKind::frozen().into_iter().chain([
+        StatementKind::NextSentence,
+        StatementKind::ExecDli,
+        StatementKind::Rewrite,
+        StatementKind::DuplicateLabel,
+        StatementKind::StructuredControl,
+        StatementKind::Label,
+        StatementKind::ProgramEnd,
+    ]) {
         let identity =
             OperationIdentity::new("cobol.hir", kind.slug(), 1).expect("static HIR identity");
         let mut schema = OperationSchema::pure(identity, 0, 0);
@@ -261,6 +332,16 @@ fn build_module(
 ) -> Result<Module, HirProblem> {
     let mut builder = ModuleBuilder::new(limits);
     let mut storage = BTreeMap::new();
+    let mut backing_lengths = layouts
+        .iter()
+        .map(|layout| (layout.qualified_name.clone(), layout.length))
+        .collect::<BTreeMap<_, _>>();
+    for layout in layouts {
+        if let Some(target) = &layout.alias_of {
+            let required = backing_lengths.entry(target.clone()).or_default();
+            *required = (*required).max(layout.length);
+        }
+    }
     for layout in layouts.iter().filter(|layout| layout.length > 0) {
         let alias = layout
             .alias_of
@@ -271,10 +352,18 @@ fn build_module(
                 offset: 0,
                 length: layout.length as u64,
             });
+        let storage_length = if alias.is_some() {
+            layout.length
+        } else {
+            backing_lengths
+                .get(&layout.qualified_name)
+                .copied()
+                .unwrap_or(layout.length)
+        };
         let id = builder
             .add_storage(
                 layout.qualified_name.to_ascii_lowercase(),
-                layout.length as u64,
+                storage_length as u64,
                 alias,
             )
             .map_err(|_| HirProblem::InvalidLayout)?;
@@ -289,14 +378,15 @@ fn build_module(
     for statement in statements {
         let mut attributes = BTreeMap::new();
         attributes.insert("line".into(), Attribute::Integer(statement.line as i64));
-        for (index, argument) in statement.arguments.iter().enumerate() {
-            attributes.insert(format!("arg_{index:03}"), Attribute::Text(argument.clone()));
-        }
+        attributes.insert(
+            "arguments".into(),
+            Attribute::Bytes(encode_arguments(&statement.arguments)),
+        );
         builder
             .add_operation(
                 block,
                 OperationIdentity::new("cobol.hir", statement.kind.slug(), 1)
-                    .map_err(|_| HirProblem::UnknownStatement)?,
+                    .map_err(|_| HirProblem::UnknownStatement(statement.line))?,
                 Vec::new(),
                 0,
                 attributes,
@@ -307,6 +397,15 @@ fn build_module(
             .map_err(|_| HirProblem::StatementLimitExceeded)?;
     }
     builder.finish().map_err(|_| HirProblem::InvalidLayout)
+}
+
+fn encode_arguments(arguments: &[String]) -> Vec<u8> {
+    let mut encoded = Vec::new();
+    for argument in arguments {
+        encoded.extend_from_slice(&(argument.len() as u64).to_be_bytes());
+        encoded.extend_from_slice(argument.as_bytes());
+    }
+    encoded
 }
 
 pub(crate) fn effects(kind: StatementKind) -> Vec<Effect> {
@@ -324,7 +423,7 @@ pub(crate) fn effects(kind: StatementKind) -> Vec<Effect> {
         | K::Exit
         | K::StopRun => vec![Effect::ProgramControl],
         K::Open | K::Close | K::Read => vec![Effect::DatasetRead],
-        K::Write => vec![Effect::DatasetWrite],
+        K::Rewrite | K::Write => vec![Effect::DatasetWrite],
         K::ExecCics => vec![Effect::ProgramControl, Effect::Condition],
         K::Allocate
         | K::Free
@@ -352,14 +451,675 @@ fn procedure_text(source: &str) -> Option<&str> {
     let dot = rest.find('.')?;
     Some(&rest[dot + 1..])
 }
+
+#[derive(Debug)]
+struct ParsedProcedure {
+    statements: Vec<HirStatement>,
+    nodes: Vec<ControlNode>,
+    edges: Vec<ControlEdge>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ScopeFrame {
+    scope: ControlScope,
+    start: usize,
+}
+
+#[derive(Debug)]
+struct InternalTransfer {
+    node: usize,
+    target: String,
+    through: Option<String>,
+    kind: ControlEdgeKind,
+}
+
+#[derive(Debug)]
+struct NextSentenceTransfer {
+    node: usize,
+    sentence: usize,
+}
+
+#[derive(Debug)]
+struct ProcedureParser {
+    statements: Vec<HirStatement>,
+    nodes: Vec<ControlNode>,
+    edges: Vec<ControlEdge>,
+    scopes: Vec<ScopeFrame>,
+    branch_tails: BTreeMap<usize, Vec<usize>>,
+    branch_counts: BTreeMap<usize, usize>,
+    transfers: Vec<InternalTransfer>,
+    next_sentence: Vec<NextSentenceTransfer>,
+    sentence_first_nodes: Vec<Option<usize>>,
+    last_node: Option<usize>,
+    fallthrough_open: bool,
+    has_unsupported_include: bool,
+    max_statements: usize,
+}
+
+impl ProcedureParser {
+    fn new(max_statements: usize, sentence_count: usize) -> Self {
+        Self {
+            statements: Vec::new(),
+            nodes: Vec::new(),
+            edges: Vec::new(),
+            scopes: Vec::new(),
+            branch_tails: BTreeMap::new(),
+            branch_counts: BTreeMap::new(),
+            transfers: Vec::new(),
+            next_sentence: Vec::new(),
+            sentence_first_nodes: vec![None; sentence_count],
+            last_node: None,
+            fallthrough_open: true,
+            has_unsupported_include: false,
+            max_statements,
+        }
+    }
+
+    fn finish(mut self) -> Result<ParsedProcedure, HirProblem> {
+        if !self.scopes.is_empty() {
+            return Err(HirProblem::UnmatchedScope);
+        }
+        for statement in &self.statements {
+            validate_form(statement.kind, &statement.arguments)?;
+        }
+        let mut labels = BTreeMap::new();
+        let mut label_order = Vec::new();
+        for node_index in 0..self.nodes.len() {
+            if self.nodes[node_index].role == ControlRole::Label {
+                let name = self.nodes[node_index].text.to_ascii_uppercase();
+                if labels.contains_key(&name) {
+                    self.nodes[node_index].role = ControlRole::Recovered;
+                    if let Some(statement) = self.nodes[node_index].statement {
+                        self.statements[statement].kind = StatementKind::DuplicateLabel;
+                    }
+                } else {
+                    labels.insert(name.clone(), self.nodes[node_index].id);
+                    label_order.push((name, self.nodes[node_index].id));
+                }
+            }
+        }
+        if self.has_unsupported_include {
+            let external_targets = self
+                .transfers
+                .iter()
+                .flat_map(|transfer| {
+                    std::iter::once(&transfer.target).chain(transfer.through.iter())
+                })
+                .filter(|target| !labels.contains_key(*target))
+                .cloned()
+                .collect::<BTreeSet<_>>();
+            for target in external_targets {
+                let id = self.nodes.len();
+                self.nodes.push(ControlNode {
+                    id,
+                    line: 0,
+                    role: ControlRole::ExternalTarget,
+                    scope: None,
+                    parent: None,
+                    statement: None,
+                    text: target.clone(),
+                });
+                labels.insert(target.clone(), id);
+                label_order.push((target, id));
+            }
+        }
+        for transfer in &self.transfers {
+            let target = labels
+                .get(&transfer.target)
+                .copied()
+                .ok_or_else(|| HirProblem::MissingTarget(transfer.target.clone()))?;
+            self.edges.push(ControlEdge {
+                from: transfer.node,
+                to: target,
+                kind: transfer.kind,
+            });
+            if transfer.kind == ControlEdgeKind::Call {
+                let endpoint_start = if let Some(through) = &transfer.through {
+                    labels
+                        .get(through)
+                        .copied()
+                        .ok_or_else(|| HirProblem::MissingTarget(through.clone()))?
+                } else {
+                    target
+                };
+                let endpoint = paragraph_end(endpoint_start, &label_order, self.nodes.len());
+                if let Some(return_to) = transfer
+                    .node
+                    .checked_add(1)
+                    .filter(|id| *id < self.nodes.len())
+                {
+                    self.edges.push(ControlEdge {
+                        from: endpoint,
+                        to: return_to,
+                        kind: ControlEdgeKind::Return,
+                    });
+                }
+            }
+        }
+        for transfer in &self.next_sentence {
+            let target = self
+                .sentence_first_nodes
+                .iter()
+                .skip(transfer.sentence.saturating_add(1))
+                .flatten()
+                .next()
+                .copied()
+                .ok_or_else(|| HirProblem::MissingTarget("<next-sentence>".into()))?;
+            self.edges.push(ControlEdge {
+                from: transfer.node,
+                to: target,
+                kind: ControlEdgeKind::Transfer,
+            });
+        }
+        self.edges
+            .sort_by_key(|edge| (edge.from, edge.to, edge.kind));
+        self.edges.dedup();
+        Ok(ParsedProcedure {
+            statements: self.statements,
+            nodes: self.nodes,
+            edges: self.edges,
+        })
+    }
+
+    fn push_node(
+        &mut self,
+        sentence: usize,
+        line: usize,
+        role: ControlRole,
+        scope: Option<ControlScope>,
+        statement: Option<usize>,
+        text: String,
+    ) -> usize {
+        let id = self.nodes.len();
+        let parent = self.scopes.last().map(|frame| frame.start);
+        if self.sentence_first_nodes[sentence].is_none() {
+            self.sentence_first_nodes[sentence] = Some(id);
+        }
+        if self.fallthrough_open
+            && let Some(previous) = self.last_node
+        {
+            let kind = if self.nodes[previous].role == ControlRole::BlockStart
+                && matches!(
+                    self.nodes[previous].scope,
+                    Some(ControlScope::If | ControlScope::Perform)
+                ) {
+                ControlEdgeKind::True
+            } else {
+                ControlEdgeKind::Fallthrough
+            };
+            self.edges.push(ControlEdge {
+                from: previous,
+                to: id,
+                kind,
+            });
+        }
+        self.nodes.push(ControlNode {
+            id,
+            line,
+            role,
+            scope,
+            parent,
+            statement,
+            text,
+        });
+        self.last_node = Some(id);
+        self.fallthrough_open = true;
+        id
+    }
+
+    fn push_statement(
+        &mut self,
+        sentence: usize,
+        line: usize,
+        text: &str,
+        kind: StatementKind,
+    ) -> Result<usize, HirProblem> {
+        if self.statements.len() >= self.max_statements {
+            return Err(HirProblem::StatementLimitExceeded);
+        }
+        let arguments = semantic_tokens(text);
+        if kind == StatementKind::ExecSql
+            && arguments
+                .iter()
+                .any(|argument| argument.as_str() == "INCLUDE")
+        {
+            self.has_unsupported_include = true;
+        }
+        let statement = self.statements.len();
+        self.statements.push(HirStatement {
+            kind,
+            arguments,
+            line,
+        });
+        let scope = scope_for(kind, text);
+        let role = statement_role(kind, scope);
+        let node = self.push_node(
+            sentence,
+            line,
+            role,
+            scope,
+            Some(statement),
+            text.trim().to_string(),
+        );
+        if let Some(scope) = scope {
+            self.scopes.push(ScopeFrame { scope, start: node });
+        }
+        match kind {
+            StatementKind::GoTo => {
+                let target = go_to_target(text).ok_or(HirProblem::UnsupportedForm)?;
+                self.transfers.push(InternalTransfer {
+                    node,
+                    target,
+                    through: None,
+                    kind: ControlEdgeKind::Transfer,
+                });
+                self.fallthrough_open = false;
+            }
+            StatementKind::Perform if scope.is_none() => {
+                let (target, through) = perform_targets(text).ok_or(HirProblem::UnsupportedForm)?;
+                self.transfers.push(InternalTransfer {
+                    node,
+                    target,
+                    through,
+                    kind: ControlEdgeKind::Call,
+                });
+            }
+            StatementKind::NextSentence => {
+                self.next_sentence
+                    .push(NextSentenceTransfer { node, sentence });
+                self.fallthrough_open = false;
+            }
+            StatementKind::GoBack | StatementKind::StopRun => {
+                self.fallthrough_open = false;
+            }
+            _ => {}
+        }
+        Ok(node)
+    }
+
+    fn push_branch(
+        &mut self,
+        sentence: usize,
+        line: usize,
+        text: &str,
+        expected: &[ControlScope],
+        kind: ControlEdgeKind,
+    ) -> Result<usize, HirProblem> {
+        let frame = self
+            .scopes
+            .iter()
+            .rev()
+            .find(|frame| expected.contains(&frame.scope))
+            .copied()
+            .ok_or(HirProblem::UnmatchedScope)?;
+        self.record_branch_tail(frame.start);
+        self.fallthrough_open = false;
+        let node = self.push_node(
+            sentence,
+            line,
+            ControlRole::Branch,
+            Some(frame.scope),
+            None,
+            text.trim().to_string(),
+        );
+        self.nodes[node].parent = Some(frame.start);
+        *self.branch_counts.entry(frame.start).or_default() += 1;
+        self.edges.push(ControlEdge {
+            from: frame.start,
+            to: node,
+            kind,
+        });
+        Ok(node)
+    }
+
+    fn close_scope(
+        &mut self,
+        sentence: usize,
+        line: usize,
+        scope: ControlScope,
+        text: &str,
+    ) -> Result<(), HirProblem> {
+        let frame = self.scopes.pop().ok_or(HirProblem::UnmatchedScope)?;
+        if frame.scope != scope {
+            return Err(HirProblem::UnmatchedScope);
+        }
+        self.record_branch_tail(frame.start);
+        self.fallthrough_open = false;
+        let node = self.push_node(
+            sentence,
+            line,
+            ControlRole::BlockEnd,
+            Some(scope),
+            None,
+            text.trim().to_string(),
+        );
+        self.nodes[node].parent = Some(frame.start);
+        self.connect_scope_end(frame, node);
+        Ok(())
+    }
+
+    fn close_sentence_scopes(
+        &mut self,
+        sentence: usize,
+        line: usize,
+        depth: usize,
+    ) -> Result<(), HirProblem> {
+        if self.scopes.len() < depth {
+            return Err(HirProblem::UnmatchedScope);
+        }
+        while self.scopes.len() > depth {
+            let frame = self.scopes.pop().ok_or(HirProblem::UnmatchedScope)?;
+            self.record_branch_tail(frame.start);
+            self.fallthrough_open = false;
+            let node = self.push_node(
+                sentence,
+                line,
+                ControlRole::BlockEnd,
+                Some(frame.scope),
+                None,
+                ".".to_string(),
+            );
+            self.nodes[node].parent = Some(frame.start);
+            self.connect_scope_end(frame, node);
+        }
+        Ok(())
+    }
+
+    fn push_terminator(&mut self, sentence: usize, line: usize, text: &str) {
+        self.push_node(
+            sentence,
+            line,
+            ControlRole::Terminator,
+            None,
+            None,
+            text.trim().to_string(),
+        );
+    }
+
+    fn record_branch_tail(&mut self, start: usize) {
+        if self.fallthrough_open
+            && let Some(tail) = self.last_node.filter(|tail| *tail != start)
+        {
+            self.branch_tails.entry(start).or_default().push(tail);
+        }
+    }
+
+    fn connect_scope_end(&mut self, frame: ScopeFrame, end: usize) {
+        let tails = self.branch_tails.remove(&frame.start).unwrap_or_default();
+        match frame.scope {
+            ControlScope::Perform => {
+                for tail in tails {
+                    self.edges.push(ControlEdge {
+                        from: tail,
+                        to: frame.start,
+                        kind: ControlEdgeKind::Loop,
+                    });
+                }
+                self.edges.push(ControlEdge {
+                    from: frame.start,
+                    to: end,
+                    kind: ControlEdgeKind::False,
+                });
+            }
+            ControlScope::If | ControlScope::Evaluate | ControlScope::Search => {
+                for tail in tails {
+                    self.edges.push(ControlEdge {
+                        from: tail,
+                        to: end,
+                        kind: ControlEdgeKind::Fallthrough,
+                    });
+                }
+                let branch_count = self.branch_counts.remove(&frame.start).unwrap_or(0);
+                if frame.scope != ControlScope::If || branch_count == 0 {
+                    self.edges.push(ControlEdge {
+                        from: frame.start,
+                        to: end,
+                        kind: if frame.scope == ControlScope::If {
+                            ControlEdgeKind::False
+                        } else {
+                            ControlEdgeKind::Branch
+                        },
+                    });
+                }
+            }
+        }
+    }
+}
+
+fn paragraph_end(start: usize, labels: &[(String, usize)], node_count: usize) -> usize {
+    labels
+        .iter()
+        .map(|(_, node)| *node)
+        .find(|node| *node > start)
+        .unwrap_or(node_count)
+        .saturating_sub(1)
+}
+
+fn parse_procedure(source: &str, max_statements: usize) -> Result<ParsedProcedure, HirProblem> {
+    let sentences = split_sentences(source);
+    let mut parser = ProcedureParser::new(max_statements, sentences.len());
+    for (sentence_index, (start_line, sentence)) in sentences.iter().enumerate() {
+        let depth = parser.scopes.len();
+        let mut exec: Option<(usize, String)> = None;
+        let mut extendable_statement = None;
+        let mut extendable_control = None;
+        for (offset, raw) in sentence.lines().enumerate() {
+            let line_number = start_line.saturating_add(offset);
+            let line = raw.trim();
+            if line.is_empty() || line.starts_with("*>") {
+                continue;
+            }
+            let upper = line.to_ascii_uppercase();
+            if let Some((exec_line, exec_text)) = &mut exec {
+                exec_text.push(' ');
+                exec_text.push_str(line);
+                if contains_word(&upper, "END-EXEC") {
+                    let text = std::mem::take(exec_text);
+                    let kind = classify(&text).ok_or(HirProblem::UnknownStatement(*exec_line))?;
+                    parser.push_statement(sentence_index, *exec_line, &text, kind)?;
+                    exec = None;
+                }
+                continue;
+            }
+            if is_exec_start(&upper) {
+                if contains_word(&upper, "END-EXEC") {
+                    let kind = classify(line).ok_or(HirProblem::UnknownStatement(line_number))?;
+                    parser.push_statement(sentence_index, line_number, line, kind)?;
+                } else {
+                    exec = Some((line_number, line.to_string()));
+                }
+                extendable_statement = None;
+                extendable_control = None;
+                continue;
+            }
+            if let Some(scope) = explicit_scope_end(&upper) {
+                parser.close_scope(sentence_index, line_number, scope, line)?;
+                extendable_statement = None;
+                extendable_control = None;
+            } else if is_terminator(&upper) {
+                parser.push_terminator(sentence_index, line_number, line);
+                extendable_statement = None;
+                extendable_control = None;
+            } else if upper == "ELSE" || upper.starts_with("ELSE ") {
+                let node = parser.push_branch(
+                    sentence_index,
+                    line_number,
+                    line,
+                    &[ControlScope::If],
+                    ControlEdgeKind::False,
+                )?;
+                extendable_statement = None;
+                extendable_control = Some(node);
+            } else if upper == "WHEN" || upper.starts_with("WHEN ") {
+                let node = parser.push_branch(
+                    sentence_index,
+                    line_number,
+                    line,
+                    &[ControlScope::Evaluate, ControlScope::Search],
+                    ControlEdgeKind::Branch,
+                )?;
+                extendable_statement = None;
+                extendable_control = Some(node);
+            } else if is_conditional_branch(&upper) {
+                let node = parser.push_node(
+                    sentence_index,
+                    line_number,
+                    ControlRole::Branch,
+                    None,
+                    None,
+                    line.to_string(),
+                );
+                extendable_statement = None;
+                extendable_control = Some(node);
+            } else if extendable_statement.is_none()
+                && extendable_control.is_none()
+                && classify(line).is_none()
+                && is_paragraph_header(&upper)
+            {
+                let statement = parser.statements.len();
+                if statement >= max_statements {
+                    return Err(HirProblem::StatementLimitExceeded);
+                }
+                let label = upper
+                    .split_whitespace()
+                    .next()
+                    .ok_or(HirProblem::UnknownStatement(line_number))?;
+                parser.statements.push(HirStatement {
+                    kind: StatementKind::Label,
+                    arguments: vec![label.to_string()],
+                    line: line_number,
+                });
+                parser.push_node(
+                    sentence_index,
+                    line_number,
+                    ControlRole::Label,
+                    None,
+                    Some(statement),
+                    label.to_string(),
+                );
+                extendable_statement = None;
+                extendable_control = None;
+            } else if let Some(kind) = classify(line) {
+                let node = parser.push_statement(sentence_index, line_number, line, kind)?;
+                extendable_statement = parser.nodes[node].statement;
+                extendable_control = None;
+                add_inline_markers(&mut parser, sentence_index, line_number, &upper, kind)?;
+            } else if let Some(statement) = extendable_statement {
+                let extra = semantic_tokens_continuation(line);
+                if extra.is_empty() {
+                    return Err(HirProblem::UnknownStatement(line_number));
+                }
+                parser.statements[statement].arguments.extend(extra);
+                if let Some(node) = parser
+                    .nodes
+                    .iter_mut()
+                    .rev()
+                    .find(|node| node.statement == Some(statement))
+                {
+                    node.text.push(' ');
+                    node.text.push_str(line);
+                }
+            } else if let Some(node) = extendable_control {
+                parser.nodes[node].text.push(' ');
+                parser.nodes[node].text.push_str(line);
+            } else {
+                return Err(HirProblem::UnknownStatement(line_number));
+            }
+        }
+        if exec.is_some() {
+            return Err(HirProblem::UnterminatedExec);
+        }
+        let end_line = start_line.saturating_add(sentence.lines().count().saturating_sub(1));
+        parser.close_sentence_scopes(sentence_index, end_line, depth)?;
+    }
+    parser.finish()
+}
+
+fn add_inline_markers(
+    parser: &mut ProcedureParser,
+    sentence: usize,
+    line: usize,
+    upper: &str,
+    kind: StatementKind,
+) -> Result<(), HirProblem> {
+    if kind == StatementKind::If && contains_word_after_first(upper, "ELSE") {
+        parser.push_branch(
+            sentence,
+            line,
+            "ELSE",
+            &[ControlScope::If],
+            ControlEdgeKind::False,
+        )?;
+    }
+    if matches!(kind, StatementKind::Evaluate | StatementKind::Search)
+        && contains_word_after_first(upper, "WHEN")
+    {
+        parser.push_branch(
+            sentence,
+            line,
+            "WHEN",
+            &[ControlScope::Evaluate, ControlScope::Search],
+            ControlEdgeKind::Branch,
+        )?;
+    }
+    if let Some(scope) = inline_scope_end(upper) {
+        parser.close_scope(sentence, line, scope, scope_end_text(scope))?;
+    }
+    Ok(())
+}
+
+fn scope_end_text(scope: ControlScope) -> &'static str {
+    match scope {
+        ControlScope::If => "END-IF",
+        ControlScope::Evaluate => "END-EVALUATE",
+        ControlScope::Search => "END-SEARCH",
+        ControlScope::Perform => "END-PERFORM",
+    }
+}
+
 fn split_sentences(source: &str) -> Vec<(usize, String)> {
     let mut result = Vec::new();
     let mut current = String::new();
     let mut quote = None;
+    let mut comment = false;
+    let mut in_exec = false;
+    let mut word = String::new();
+    let mut previous_word = String::new();
     let mut line = 1usize;
     let mut start_line = 1usize;
     let chars: Vec<char> = source.chars().collect();
     for (index, ch) in chars.iter().enumerate() {
+        if comment {
+            if *ch == '\n' {
+                comment = false;
+                current.push(*ch);
+                line += 1;
+                if current.trim().is_empty() {
+                    start_line = line;
+                }
+            }
+            continue;
+        }
+        if quote.is_none() && *ch == '*' && chars.get(index.saturating_add(1)) == Some(&'>') {
+            comment = true;
+            word.clear();
+            previous_word.clear();
+            continue;
+        }
+        if quote.is_none() {
+            if ch.is_ascii_alphanumeric() || *ch == '-' {
+                word.push(ch.to_ascii_uppercase());
+            } else if !word.is_empty() {
+                let completed = std::mem::take(&mut word);
+                if previous_word == "EXEC" && matches!(completed.as_str(), "CICS" | "SQL" | "DLI") {
+                    in_exec = true;
+                }
+                if completed == "END-EXEC" {
+                    in_exec = false;
+                }
+                previous_word = completed;
+            }
+        }
         if matches!(*ch, '\'' | '"') {
             if quote == Some(*ch) {
                 quote = None;
@@ -372,7 +1132,7 @@ fn split_sentences(source: &str) -> Vec<(usize, String)> {
             && index + 1 < chars.len()
             && chars[index - 1].is_ascii_digit()
             && chars[index + 1].is_ascii_digit();
-        if *ch == '.' && quote.is_none() && !decimal {
+        if *ch == '.' && quote.is_none() && !decimal && !in_exec {
             result.push((start_line, current.trim().to_string()));
             current.clear();
             start_line = line;
@@ -399,7 +1159,9 @@ fn classify(sentence: &str) -> Option<StatementKind> {
         ("GOBACK", StatementKind::GoBack),
         ("GO TO", StatementKind::GoTo),
         ("EXEC CICS", StatementKind::ExecCics),
+        ("EXEC DLI", StatementKind::ExecDli),
         ("EXEC SQL", StatementKind::ExecSql),
+        ("NEXT SENTENCE", StatementKind::NextSentence),
         ("JSON GENERATE", StatementKind::JsonGenerate),
         ("JSON PARSE", StatementKind::JsonParse),
         ("XML GENERATE", StatementKind::XmlGenerate),
@@ -438,6 +1200,7 @@ fn classify(sentence: &str) -> Option<StatementKind> {
         "PERFORM" => StatementKind::Perform,
         "READ" => StatementKind::Read,
         "RELEASE" => StatementKind::Release,
+        "REWRITE" => StatementKind::Rewrite,
         "RETURN" => StatementKind::ReturnStatement,
         "SEARCH" => StatementKind::Search,
         "SET" => StatementKind::Set,
@@ -446,9 +1209,161 @@ fn classify(sentence: &str) -> Option<StatementKind> {
         "SUBTRACT" => StatementKind::Subtract,
         "UNSTRING" => StatementKind::Unstring,
         "WRITE" => StatementKind::Write,
-        _ if upper.split_whitespace().count() == 1 => StatementKind::Label,
         _ => return None,
     })
+}
+
+fn semantic_tokens_continuation(text: &str) -> Vec<String> {
+    semantic_tokens(&format!("_ {text}"))
+}
+
+fn scope_for(kind: StatementKind, text: &str) -> Option<ControlScope> {
+    match kind {
+        StatementKind::If => Some(ControlScope::If),
+        StatementKind::Evaluate => Some(ControlScope::Evaluate),
+        StatementKind::Search => Some(ControlScope::Search),
+        StatementKind::Perform if is_inline_perform(text) => Some(ControlScope::Perform),
+        _ => None,
+    }
+}
+
+fn statement_role(kind: StatementKind, scope: Option<ControlScope>) -> ControlRole {
+    if scope.is_some() {
+        ControlRole::BlockStart
+    } else if matches!(
+        kind,
+        StatementKind::Call
+            | StatementKind::Exit
+            | StatementKind::GoBack
+            | StatementKind::GoTo
+            | StatementKind::NextSentence
+            | StatementKind::Perform
+            | StatementKind::StopRun
+    ) {
+        ControlRole::Transfer
+    } else {
+        ControlRole::Statement
+    }
+}
+
+fn is_inline_perform(text: &str) -> bool {
+    let upper = text.trim().to_ascii_uppercase();
+    let mut words = upper.split_whitespace();
+    if words.next() != Some("PERFORM") {
+        return false;
+    }
+    match words.next() {
+        None | Some("UNTIL" | "VARYING" | "WITH") => true,
+        Some(first) if first.chars().all(|ch| ch.is_ascii_digit()) => true,
+        Some(_) => false,
+    }
+}
+
+fn perform_targets(text: &str) -> Option<(String, Option<String>)> {
+    let words: Vec<String> = text
+        .split_whitespace()
+        .map(|word| word.trim_matches([',', '.']).to_ascii_uppercase())
+        .collect();
+    let target = words.get(1)?.clone();
+    let through = words
+        .windows(2)
+        .find(|pair| matches!(pair[0].as_str(), "THRU" | "THROUGH"))
+        .map(|pair| pair[1].clone());
+    Some((target, through))
+}
+
+fn go_to_target(text: &str) -> Option<String> {
+    let words: Vec<String> = text
+        .split_whitespace()
+        .map(|word| word.trim_matches([',', '.']).to_ascii_uppercase())
+        .collect();
+    words
+        .windows(2)
+        .find(|pair| pair[0] == "TO")
+        .map(|pair| pair[1].clone())
+}
+
+fn is_exec_start(upper: &str) -> bool {
+    ["EXEC CICS", "EXEC SQL", "EXEC DLI"]
+        .iter()
+        .any(|prefix| upper.starts_with(prefix))
+}
+
+fn is_paragraph_header(upper: &str) -> bool {
+    let words: Vec<&str> = upper.split_whitespace().collect();
+    let candidate = match words.as_slice() {
+        [name] => *name,
+        [name, "SECTION"] => *name,
+        _ => return false,
+    };
+    !candidate.is_empty()
+        && candidate.chars().any(|ch| ch.is_ascii_alphabetic())
+        && candidate
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_'))
+}
+
+fn explicit_scope_end(upper: &str) -> Option<ControlScope> {
+    if upper == "END-IF" {
+        Some(ControlScope::If)
+    } else if upper == "END-EVALUATE" {
+        Some(ControlScope::Evaluate)
+    } else if upper == "END-SEARCH" {
+        Some(ControlScope::Search)
+    } else if upper == "END-PERFORM" {
+        Some(ControlScope::Perform)
+    } else {
+        None
+    }
+}
+
+fn inline_scope_end(upper: &str) -> Option<ControlScope> {
+    [
+        ("END-IF", ControlScope::If),
+        ("END-EVALUATE", ControlScope::Evaluate),
+        ("END-SEARCH", ControlScope::Search),
+        ("END-PERFORM", ControlScope::Perform),
+    ]
+    .into_iter()
+    .find(|(marker, _)| contains_word_after_first(upper, marker))
+    .map(|(_, scope)| scope)
+}
+
+fn is_terminator(upper: &str) -> bool {
+    upper
+        .split_whitespace()
+        .next()
+        .is_some_and(|word| word.starts_with("END-"))
+}
+
+fn is_conditional_branch(upper: &str) -> bool {
+    [
+        "AT END",
+        "NOT AT END",
+        "INVALID KEY",
+        "NOT INVALID KEY",
+        "ON EXCEPTION",
+        "NOT ON EXCEPTION",
+        "ON SIZE ERROR",
+        "NOT ON SIZE ERROR",
+        "OVERFLOW",
+        "ON OVERFLOW",
+        "NOT ON OVERFLOW",
+    ]
+    .iter()
+    .any(|prefix| upper == *prefix || upper.starts_with(&format!("{prefix} ")))
+}
+
+fn contains_word(text: &str, needle: &str) -> bool {
+    text.split(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '-'))
+        .any(|word| word == needle)
+}
+
+fn contains_word_after_first(text: &str, needle: &str) -> bool {
+    text.split_whitespace()
+        .skip(1)
+        .map(|word| word.trim_matches(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '-')))
+        .any(|word| word == needle)
 }
 fn semantic_tokens(sentence: &str) -> Vec<String> {
     let mut tokens = Vec::new();
@@ -505,18 +1420,14 @@ fn validate_form(kind: StatementKind, arguments: &[String]) -> Result<(), HirPro
     use StatementKind as K;
     let contains = |value: &str| arguments.iter().any(|argument| argument == value);
     let valid = match kind {
-        K::Perform => {
-            arguments.first().is_some_and(|first| first != "VARYING") && !contains("UNTIL")
-        }
-        K::If => arguments.len() >= 4 && contains("DISPLAY"),
-        K::Evaluate => !arguments.is_empty() && contains("WHEN"),
-        K::Search => !arguments.is_empty() && contains("WHEN"),
+        K::Perform => !arguments.is_empty(),
+        K::If | K::Evaluate | K::Search => !arguments.is_empty(),
         K::JsonParse | K::XmlParse => contains("INTO"),
         K::Move => contains("TO"),
         K::Add => contains("TO"),
         K::Subtract => contains("FROM"),
         K::Multiply => contains("BY"),
-        K::Divide => contains("INTO"),
+        K::Divide => contains("INTO") || contains("BY"),
         K::Compute => contains("="),
         K::String | K::Unstring => contains("INTO"),
         K::GoTo
@@ -532,8 +1443,11 @@ fn validate_form(kind: StatementKind, arguments: &[String]) -> Result<(), HirPro
         | K::Open
         | K::Close
         | K::Read
+        | K::Rewrite
         | K::Write
-        | K::ExecCics => !arguments.is_empty(),
+        | K::ExecCics
+        | K::ExecDli
+        | K::ExecSql => !arguments.is_empty(),
         _ => true,
     };
     if valid {
@@ -543,18 +1457,22 @@ fn validate_form(kind: StatementKind, arguments: &[String]) -> Result<(), HirPro
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum HirProblem {
     MissingProcedure,
-    UnknownStatement,
+    UnknownStatement(usize),
     StatementLimitExceeded,
     InvalidLayout,
     UnsupportedForm,
+    UnmatchedScope,
+    UnterminatedExec,
+    MissingTarget(String),
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn registry_freezes_43_statement_variants() {
         assert_eq!(StatementKind::frozen().len(), 43);
@@ -569,5 +1487,118 @@ mod tests {
     #[test]
     fn sentence_split_does_not_split_decimal() {
         assert_eq!(split_sentences("COMPUTE A = 1.5. STOP RUN.").len(), 2);
+    }
+
+    #[test]
+    fn sentence_split_ignores_comment_and_embedded_host_periods() {
+        let source = "*> sentence. comment\nEXEC SQL SELECT A.COL FROM T END-EXEC. STOP RUN.";
+        let sentences = split_sentences(source);
+        assert_eq!(sentences.len(), 2);
+        assert!(sentences[0].1.contains("A.COL"));
+    }
+
+    #[test]
+    fn nested_scopes_and_explicit_terminators_have_control_identity() {
+        let parsed = parse_procedure(
+            "MAIN.\nIF A = 1\n EVALUATE B\n  WHEN 1\n   SEARCH T\n    WHEN C = 2\n     CONTINUE\n   END-SEARCH\n END-EVALUATE\nELSE\n CONTINUE\nEND-IF.\nSTOP RUN.",
+            128,
+        )
+        .unwrap();
+        let starts = parsed
+            .nodes
+            .iter()
+            .filter(|node| node.role == ControlRole::BlockStart)
+            .map(|node| node.scope.unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            starts,
+            vec![
+                ControlScope::If,
+                ControlScope::Evaluate,
+                ControlScope::Search
+            ]
+        );
+        assert_eq!(
+            parsed
+                .nodes
+                .iter()
+                .filter(|node| node.role == ControlRole::BlockEnd)
+                .count(),
+            3
+        );
+        assert!(
+            parsed
+                .edges
+                .iter()
+                .any(|edge| edge.kind == ControlEdgeKind::False)
+        );
+        assert!(parsed.nodes.iter().all(|node| {
+            node.role == ControlRole::Label
+                || node.parent.is_some()
+                || node.scope != Some(ControlScope::Search)
+        }));
+    }
+
+    #[test]
+    fn perform_go_to_and_next_sentence_resolve_explicit_edges() {
+        let parsed = parse_procedure(
+            "MAIN.\nPERFORM WORK THRU WORK-EXIT\nPERFORM VARYING I FROM 1 BY 1 UNTIL I > 2\n CONTINUE\nEND-PERFORM\nGO TO DONE.\nWORK.\nCONTINUE.\nWORK-EXIT.\nEXIT.\nDONE.\nNEXT SENTENCE.\nDISPLAY 'SKIPPED'.\nGOBACK.",
+            128,
+        )
+        .unwrap();
+        assert!(
+            parsed
+                .edges
+                .iter()
+                .any(|edge| edge.kind == ControlEdgeKind::Call)
+        );
+        assert!(
+            parsed
+                .edges
+                .iter()
+                .any(|edge| edge.kind == ControlEdgeKind::Return)
+        );
+        assert!(
+            parsed
+                .edges
+                .iter()
+                .filter(|edge| edge.kind == ControlEdgeKind::Transfer)
+                .count()
+                >= 2
+        );
+        assert!(parsed.nodes.iter().any(|node| {
+            node.role == ControlRole::BlockStart && node.scope == Some(ControlScope::Perform)
+        }));
+    }
+
+    #[test]
+    fn malformed_or_recovered_control_cannot_build_hir() {
+        assert_eq!(
+            parse_procedure("END-IF.", 16).unwrap_err(),
+            HirProblem::UnmatchedScope
+        );
+        assert_eq!(
+            parse_procedure("FLY TO MARS.", 16).unwrap_err(),
+            HirProblem::UnknownStatement(1)
+        );
+        assert_eq!(
+            parse_procedure("GO TO MISSING.", 16).unwrap_err(),
+            HirProblem::MissingTarget("MISSING".into())
+        );
+        assert_eq!(
+            parse_procedure("EXEC CICS RETURN.", 16).unwrap_err(),
+            HirProblem::UnterminatedExec
+        );
+
+        let recovered = parse_procedure("DUP. EXIT. DUP. EXIT.", 16).unwrap();
+        assert!(
+            recovered
+                .nodes
+                .iter()
+                .any(|node| { node.role == ControlRole::Recovered && node.text == "DUP" })
+        );
+        assert!(recovered.statements.iter().any(|statement| {
+            statement.kind == StatementKind::DuplicateLabel && !statement.kind.supported()
+        }));
     }
 }

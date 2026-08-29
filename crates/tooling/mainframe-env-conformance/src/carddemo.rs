@@ -1,6 +1,9 @@
 //! Fail-closed verification for the externally supplied CardDemo corpus.
 
-use mainframe_env_compiler::{CobolCompiler, compatibility_copybooks, owned_compatibility_library};
+use mainframe_env_compiler::{
+    CobolCompiler, ControlEdgeKind, ControlRole, compatibility_copybooks,
+    owned_compatibility_library,
+};
 use mainframe_env_source::{
     LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLibrary,
     SourceLimits,
@@ -152,6 +155,30 @@ pub struct CardDemoLayoutReceipt {
     pub linkage_items: usize,
     pub max_program_storage_bytes: usize,
     pub layout_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoControlReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub programs_checked: usize,
+    pub hir_models: usize,
+    pub statements: usize,
+    pub control_nodes: usize,
+    pub control_edges: usize,
+    pub block_starts: usize,
+    pub branches: usize,
+    pub true_edges: usize,
+    pub false_edges: usize,
+    pub loop_edges: usize,
+    pub explicit_scope_ends: usize,
+    pub implicit_scope_ends: usize,
+    pub recovered_nodes: usize,
+    pub paragraph_calls: usize,
+    pub transfers: usize,
+    pub returns: usize,
+    pub control_sha256: String,
 }
 
 pub fn verify_carddemo_corpus_from_env(
@@ -732,6 +759,123 @@ pub fn verify_carddemo_data_layouts_from_env(
         linkage_items,
         max_program_storage_bytes,
         layout_sha256: format!("{:x}", layout_digest.finalize()),
+    })
+}
+
+pub fn verify_carddemo_control_flow_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoControlReceipt, CorpusProblem> {
+    let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required for CardDemo gates",
+        )
+    })?;
+    let corpus_dir = Path::new(&corpus_dir);
+    let closure = verify_carddemo_source_closures_from_env(inventory_path)?;
+    let bundles = explicit_carddemo_bundles(corpus_dir)?;
+    let compiler = CobolCompiler::default();
+    let mut statements = 0usize;
+    let mut control_nodes = 0usize;
+    let mut control_edges = 0usize;
+    let mut block_starts = 0usize;
+    let mut branches = 0usize;
+    let mut true_edges = 0usize;
+    let mut false_edges = 0usize;
+    let mut loop_edges = 0usize;
+    let mut explicit_scope_ends = 0usize;
+    let mut implicit_scope_ends = 0usize;
+    let mut recovered_nodes = 0usize;
+    let mut paragraph_calls = 0usize;
+    let mut transfers = 0usize;
+    let mut returns = 0usize;
+    let mut control_digest = Sha256::new();
+    for (primary, bundle) in &bundles {
+        let analysis = compiler.analyze(bundle);
+        let hir = analysis.hir.ok_or_else(|| {
+            let diagnostic = analysis
+                .diagnostics
+                .first()
+                .map_or("HIR construction failed", |item| item.public_message());
+            CorpusProblem::new(
+                "carddemo.control.hir_failed",
+                format!("program {primary} failed HIR construction: {diagnostic}"),
+            )
+        })?;
+        digest_field(&mut control_digest, primary.as_bytes());
+        for statement in &hir.statements {
+            digest_field(
+                &mut control_digest,
+                format!("{:?}", statement.kind).as_bytes(),
+            );
+            digest_field(&mut control_digest, &(statement.line as u64).to_be_bytes());
+            for argument in &statement.arguments {
+                digest_field(&mut control_digest, argument.as_bytes());
+            }
+        }
+        for node in &hir.control_nodes {
+            digest_field(&mut control_digest, &(node.id as u64).to_be_bytes());
+            digest_field(&mut control_digest, &(node.line as u64).to_be_bytes());
+            digest_field(&mut control_digest, format!("{:?}", node.role).as_bytes());
+            digest_field(&mut control_digest, format!("{:?}", node.scope).as_bytes());
+            digest_field(
+                &mut control_digest,
+                &(node.parent.unwrap_or(usize::MAX) as u64).to_be_bytes(),
+            );
+            digest_field(&mut control_digest, node.text.as_bytes());
+            block_starts += usize::from(node.role == ControlRole::BlockStart);
+            branches += usize::from(node.role == ControlRole::Branch);
+            explicit_scope_ends +=
+                usize::from(node.role == ControlRole::BlockEnd && node.text.starts_with("END-"));
+            implicit_scope_ends +=
+                usize::from(node.role == ControlRole::BlockEnd && node.text == ".");
+            recovered_nodes += usize::from(node.role == ControlRole::Recovered);
+        }
+        for edge in &hir.control_edges {
+            digest_field(&mut control_digest, &(edge.from as u64).to_be_bytes());
+            digest_field(&mut control_digest, &(edge.to as u64).to_be_bytes());
+            digest_field(&mut control_digest, format!("{:?}", edge.kind).as_bytes());
+            paragraph_calls += usize::from(edge.kind == ControlEdgeKind::Call);
+            transfers += usize::from(edge.kind == ControlEdgeKind::Transfer);
+            returns += usize::from(edge.kind == ControlEdgeKind::Return);
+            true_edges += usize::from(edge.kind == ControlEdgeKind::True);
+            false_edges += usize::from(edge.kind == ControlEdgeKind::False);
+            loop_edges += usize::from(edge.kind == ControlEdgeKind::Loop);
+        }
+        statements = checked_total(statements, hir.statements.len(), "statement")?;
+        control_nodes = checked_total(control_nodes, hir.control_nodes.len(), "control node")?;
+        control_edges = checked_total(control_edges, hir.control_edges.len(), "control edge")?;
+    }
+    Ok(CardDemoControlReceipt {
+        schema_version: "mainframe-env.carddemo-control-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit: closure.corpus_commit,
+        programs_checked: bundles.len(),
+        hir_models: bundles.len(),
+        statements,
+        control_nodes,
+        control_edges,
+        block_starts,
+        branches,
+        true_edges,
+        false_edges,
+        loop_edges,
+        explicit_scope_ends,
+        implicit_scope_ends,
+        recovered_nodes,
+        paragraph_calls,
+        transfers,
+        returns,
+        control_sha256: format!("{:x}", control_digest.finalize()),
+    })
+}
+
+fn checked_total(current: usize, increment: usize, name: &str) -> Result<usize, CorpusProblem> {
+    current.checked_add(increment).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.control.resource_exhausted",
+            format!("{name} counter overflow"),
+        )
     })
 }
 

@@ -6,9 +6,9 @@
   "current_product": "0.1.0-alpha.0",
   "target_product": "0.1.1",
   "source_identity": {
-    "base_commit": "11d32398021b2240a95f757eec152a7607cba3a0",
+    "base_commit": "8697e1d1fbe2001415c560eb227325bd2e64bb2e",
     "dirty_tree_algorithm": "sha256 of sorted sha256sum records, excluding .git, target, docs/delivery/CARDEMO-0.1.1-STATUS.md, and conformance/0.1.1/evidence/program-status.json",
-    "dirty_tree_digest": "sha256:06de0e812699b751b446c5128a3d03fff21f45c32b0c2196b81d106d2c50c3df"
+    "dirty_tree_digest": "sha256:56e60bd25f4210ee5d72fd5292383baaae19a7d794d85f4dde5e86b023b26bc2"
   },
   "corpus": {
     "environment_key": "CARDEMO_CORPUS_DIR",
@@ -21,8 +21,8 @@
     "license": "Apache-2.0",
     "license_sha256": "09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b"
   },
-  "current_issue": "CD-004",
-  "issues": {"total":27,"completed":4,"in_progress":0,"open":23},
+  "current_issue": "CD-005",
+  "issues": {"total":27,"completed":5,"in_progress":0,"open":22},
   "journeys": {"total":20,"passed":0,"failed_or_not_run":20},
   "completed_issues": [
     {
@@ -53,9 +53,16 @@
       "id": "CD-004",
       "state": "pass",
       "commit_subject": "Implement CardDemo COBOL data layouts",
-      "commit_identity": "self:focused-commit-containing-this-ledger",
+      "commit_identity": "8697e1d1fbe2001415c560eb227325bd2e64bb2e",
       "evidence": "conformance/0.1.1/evidence/issues/CD-004.json",
       "evidence_digest": "sha256:728eb45dd6cf917e16f25da43bf3b29b5d102da94ef359d7f73ec886de865bc8"
+    },
+    {
+      "id": "CD-005",
+      "state": "pass",
+      "commit_subject": "Build structured CardDemo COBOL control flow",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-005.json",
+      "evidence_digest": "sha256:759e61a9a56883c64b632916b33e17cd627fd326270a5bf0eb7bc68a135937b6"
     }
   ],
   "commands": [
@@ -86,6 +93,12 @@
     ,{"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-layout --check","exit_code":0,"result":"44 semantic models; 15296 layouts; exact digest pass"}
     ,{"command":"env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-layout --check","exit_code":1,"result":"expected carddemo.corpus.environment_missing control"}
     ,{"command":"full-library CLI COSGN00C compile","exit_code":1,"result":"expected next-phase HIR UnknownStatement proves semantic completion"}
+    ,{"command":"cargo test -p mainframe-env-compiler -p mainframe-env-conformance -p mainframe-env-cli -p mainframe-env-server -p xtask --locked","exit_code":0,"result":"27 compiler, 19 conformance, 3 CLI, 10 server, and 5 xtask tests passed"}
+    ,{"command":"cargo check --workspace --all-targets --locked","exit_code":0,"result":"pass"}
+    ,{"command":"affected-package cargo clippy --all-targets --locked -- -D warnings","exit_code":0,"result":"pass"}
+    ,{"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-control --check","exit_code":0,"result":"44 HIR models; 11117 statements; 14317 nodes; 18983 edges; exact digest pass"}
+    ,{"command":"env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-control --check","exit_code":1,"result":"expected carddemo.corpus.environment_missing control"}
+    ,{"command":"full-library CLI COSGN00C inspect","exit_code":0,"result":"HIR completion reaches typed StructuredControl CD-006 boundary without publication"}
   ],
   "decisions": [
     "0.1.1 uses additive CardDemo profiles and preserves core-server compatibility.",
@@ -98,6 +111,6 @@
     "Resolve 0.1.0-alpha.0 release ordering before cutting 0.1.1."
   ],
   "blockers": [],
-  "next_issue": "CD-003",
-  "next_step": "Commit CD-004, record its hash on continuation, then implement CD-005 typed structured control flow from the real HIR UnknownStatement cohort."
+  "next_issue": "CD-006",
+  "next_step": "Consume the typed CD-005 control graph while implementing exact CardDemo core data, decimal, string, condition, and intrinsic-function semantics."
 }

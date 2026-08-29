@@ -22,10 +22,10 @@ use std::collections::{BTreeMap, BTreeSet};
 mod carddemo;
 
 pub use carddemo::{
-    CardDemoClosureReceipt, CardDemoCorpusReceipt, CardDemoLayoutReceipt, CardDemoSourceReceipt,
-    CorpusProblem, verify_carddemo_corpus, verify_carddemo_corpus_from_env,
-    verify_carddemo_data_layouts_from_env, verify_carddemo_source_closures_from_env,
-    verify_carddemo_source_preprocessing_from_env,
+    CardDemoClosureReceipt, CardDemoControlReceipt, CardDemoCorpusReceipt, CardDemoLayoutReceipt,
+    CardDemoSourceReceipt, CorpusProblem, verify_carddemo_control_flow_from_env,
+    verify_carddemo_corpus, verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
+    verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
 };
 
 pub const HELLO_SOURCE: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. HELLO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MSG PIC X(12) VALUE 'HELLO WORLD!'.\nPROCEDURE DIVISION.\nDISPLAY MSG.\nSTOP RUN.\n";
@@ -234,7 +234,7 @@ mod tests {
         assert_eq!(cases.len(), 37);
         for statement in cases {
             let source = format!(
-                "IDENTIFICATION DIVISION. PROGRAM-ID. ROUTE. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9(3) VALUE 1. 01 B PIC 9(3) VALUE 2. 01 P USAGE POINTER. 01 J PIC X(64). 01 T PIC X(8). PROCEDURE DIVISION. {statement}. STOP RUN."
+                "IDENTIFICATION DIVISION. PROGRAM-ID. ROUTE. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9(3) VALUE 1. 01 B PIC 9(3) VALUE 2. 01 P USAGE POINTER. 01 J PIC X(64). 01 T PIC X(8). PROCEDURE DIVISION. {statement}. STOP RUN. PARA. EXIT."
             );
             assert!(compile(&source).is_ok(), "missing route for {statement}");
         }

@@ -324,6 +324,44 @@ mod tests {
         ));
     }
     #[test]
+    fn recovered_duplicate_paragraph_never_publishes() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DUPTEST. PROCEDURE DIVISION. DUP. EXIT. DUP. EXIT. STOP RUN.";
+        let analysis = CobolCompiler::default().analyze(&bundle(source));
+        assert!(analysis.hir.as_ref().is_some_and(|hir| {
+            hir.statements
+                .iter()
+                .any(|statement| statement.kind == crate::StatementKind::DuplicateLabel)
+        }));
+        assert_eq!(analysis.completeness, Completeness::Unsupported);
+        assert!(matches!(
+            CobolCompiler::default()
+                .compile(request(source, CompilationMode::Executable))
+                .unwrap(),
+            CompilerResult::Failed {
+                completeness: Completeness::Unsupported,
+                ..
+            }
+        ));
+    }
+    #[test]
+    fn multiline_structured_control_waits_for_cfg_lowering() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. FLOW. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9 VALUE 1. PROCEDURE DIVISION. IF A = 1\n DISPLAY 'YES'\nEND-IF. STOP RUN.";
+        let analysis = CobolCompiler::default().analyze(&bundle(source));
+        assert!(analysis.hir.as_ref().is_some_and(|hir| {
+            hir.unsupported()
+                .contains(&crate::StatementKind::StructuredControl)
+        }));
+        assert!(matches!(
+            CobolCompiler::default()
+                .compile(request(source, CompilationMode::Executable))
+                .unwrap(),
+            CompilerResult::Failed {
+                completeness: Completeness::Unsupported,
+                ..
+            }
+        ));
+    }
+    #[test]
     fn analysis_retains_lossless_syntax() {
         let analysis = CobolCompiler::default().analyze(&bundle(HELLO));
         assert_eq!(analysis.syntax.unwrap().text(), HELLO);
