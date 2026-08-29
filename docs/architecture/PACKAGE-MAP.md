@@ -77,10 +77,12 @@ dependency boundary. It may grow only through an ADR demonstrating an in-scope
 The machine package inventory consolidates the proposed map to 20 packages.
 IR codecs remain with `mainframe-env-ir`; CICS contracts remain with
 `mainframe-env-host-api`; execution coordination remains with the interpreter
-kernel; JCL and JES share the batch state authority; and memory/SQL/artifact
-adapters share the store package. These units do not require independent 0.1
-publication or provider selection boundaries. The exact accepted mapping and
-justification is `conformance/0.1/inventory/packages.json`.
+kernel; COBOL syntax, semantics, HIR, and lowering remain private modules of the
+compiler kernel; JCL and JES share the batch state authority; and
+memory/SQL/artifact adapters share the store package. These units do not require
+independent 0.1 publication or provider selection boundaries. ADR 0005 records
+the decision, and the exact accepted mapping and justification is
+`conformance/0.1/inventory/packages.json`.
 
 ## Foundation packages
 
@@ -89,8 +91,7 @@ justification is `conformance/0.1/inventory/packages.json`.
 | `mainframe-env-source` | source bytes, IDs, formats, maps, COPY/precompiler provenance | language semantics, Tokio, stores |
 | `mainframe-env-diagnostics` | stable diagnostic/problem DTOs and codes | Miette renderers, gateway types |
 | `mainframe-env-encoding` | CCSID/EBCDIC conversion and collation primitives | compiler/execution engines |
-| `mainframe-env-ir` | in-memory IR, dialect identities, verifier primitives | COBOL AST, backends, codecs |
-| `mainframe-env-ir-codec` | versioned text/binary/envelope codecs | concrete frontend/backend |
+| `mainframe-env-ir` | in-memory IR, verifier, versioned text/binary/envelope codecs | COBOL AST, backends |
 
 ## Contract packages
 
@@ -98,9 +99,8 @@ justification is `conformance/0.1/inventory/packages.json`.
 |---|---|
 | `mainframe-env-compiler-api` | compiler stages, requests/results, legality, artifact descriptors |
 | `mainframe-env-execution-api` | invocation, context, limits, outcomes, events, lifecycle identity |
-| `mainframe-env-host-api` | dataset, program, JES/spool, terminal, security, clock and audit requests/results |
+| `mainframe-env-host-api` | dataset, program, JES/spool, terminal, security, clock, audit, and typed CICS requests/results |
 | `mainframe-env-store-api` | execution, event, work, checkpoint, session, artifact metadata, idempotency stores |
-| `mainframe-env-cics-api` | typed CICS operations, requests, conditions, EIB/effects and provider contracts |
 
 These packages expose only mainframe-env-owned types and remain independent of
 Axum, Tokio, SQLx, concrete providers, and current-workspace crates.
@@ -112,40 +112,36 @@ Axum, Tokio, SQLx, concrete providers, and current-workspace crates.
 Owns pipeline planning, compiler registration, pass execution, legality gates,
 artifact fingerprinting, publication, and bounded caches.
 
-### `mainframe-env-execution`
-
-Owns admission, capability selection, bounded lanes, run units, frames,
-machine driving, suspension/resume, cancellation, host-effect sequencing, and
-execution lifecycle.
-
 ### `mainframe-env-interpreter`
 
-Owns the deterministic reference MIR machine. It depends on IR, semantic/CICS
-contracts, and execution/host contracts, never on COBOL syntax or concrete
-providers.
+Owns the deterministic reference MIR machine and common execution coordinator:
+admission, run units, machine driving, suspension/resume, cancellation,
+host-effect sequencing, and transactional lifecycle journaling. It depends on
+IR and execution/host/store contracts, never on COBOL syntax or concrete
+providers/stores.
 
-## COBOL packages
+## COBOL compiler modules
 
-### `mainframe-env-cobol-syntax`
+### `mainframe-env-compiler::syntax`
 
 Owns source formats, preprocessing, COPY expansion, lexer, lossless CST, typed
 AST, syntax diagnostics, and source provenance.
 
-### `mainframe-env-cobol`
+### `mainframe-env-compiler::{semantic,hir,lower}`
 
 Owns semantic analysis, layouts, storage/alias meaning, HIR, verification,
 lowering, and compiler integration. Its lowering modules are grouped by control,
 data, arithmetic, strings, files, program control, and CICS.
 
-## Batch packages
+## Batch package
 
-### `mainframe-env-jcl`
+### `mainframe-env-batch::jcl`
 
 Owns JCL syntax, procedure/symbol expansion, DD and step model, conditions,
 workflow plan, and dispatch through `ProgramService`. It does not instantiate
 utility or COBOL implementations directly.
 
-### `mainframe-env-jes`
+### `mainframe-env-batch::service`
 
 Owns job lifecycle, admission, job/step identity, spool/SYSOUT, cancellation,
 purge, status, and JES-facing host operations. JCL describes workflow; JES owns
@@ -175,9 +171,7 @@ locks directly.
 
 | Package | Purpose |
 |---|---|
-| `mainframe-env-store-memory` | bounded deterministic unit/conformance stores |
-| `mainframe-env-store-sql` | SQLite local and PostgreSQL production metadata/state adapters |
-| `mainframe-env-artifacts` | immutable local/object-store artifacts, integrity, retention |
+| `mainframe-env-store` | bounded memory, SQLite/PostgreSQL metadata/state, and immutable local artifact adapters behind separate owned interfaces |
 
 No messaging broker package is required for 0.1. Store state is authoritative;
 in-process notifications are bounded and reconstructible.

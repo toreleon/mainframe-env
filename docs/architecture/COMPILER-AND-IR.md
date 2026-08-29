@@ -134,17 +134,19 @@ route.
 
 ## COBOL organization
 
-COBOL is large enough to justify separate syntax and semantic/compiler crates.
+COBOL is large enough to require separate syntax and semantic/compiler
+responsibilities. ADR 0005 keeps them as private modules in one 0.1 compiler
+crate because they have no independent consumer or publication boundary.
 
 ```text
-mainframe-env-cobol-syntax
+mainframe-env-compiler::syntax
   source formats
   preprocessor and COPY expansion
   lexer
   lossless CST
   typed AST
 
-mainframe-env-cobol
+mainframe-env-compiler::{semantic,hir,lower}
   semantic analysis
   layout and storage
   HIR construction and verification

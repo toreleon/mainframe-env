@@ -77,7 +77,8 @@ Exact machine evidence is in
 - The 43 R0 COBOL statement variants and 22 pinned CardDemo CICS operations form the finite
   language/transaction freeze; already unsupported oracle behavior stays explicitly unsupported.
 - The proposed package map is consolidated to 20 packages where a separate package would not
-  enforce an independent stable contract, provider selection, or application boundary.
+  enforce an independent stable contract, provider selection, or application boundary; ADR 0005
+  records the exact physical-to-logical mapping and future split triggers.
 - OpenMainframe remains an out-of-process oracle and is never a production dependency.
 
 ## Known gaps and stop-the-line findings

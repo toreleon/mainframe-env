@@ -1,6 +1,6 @@
 {
   "schema_version": "mainframe-env.packages@1",
-  "consolidation_decision": "The proposed 28-package map is consolidated to 20 packages where codecs, CICS contracts, execution coordination, JCL/JES, and store adapters do not require separate 0.1 publication or selection boundaries.",
+  "consolidation_decision": "ADR 0005 consolidates the proposed 28-package map to 20 packages where IR codecs, CICS contracts, execution coordination, COBOL syntax/semantics, JCL/JES, and store adapters do not require separate 0.1 publication or selection boundaries.",
   "packages": [
     {"name":"mainframe-env-source","layer":"foundation","phase":"ME.V1","justification":"Exact bytes, logical paths, formats, source IDs, and provenance boundary"},
     {"name":"mainframe-env-diagnostics","layer":"foundation","phase":"ME.V1","justification":"Stable problem and diagnostic contract"},
