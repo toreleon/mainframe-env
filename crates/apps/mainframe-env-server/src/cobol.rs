@@ -5,9 +5,8 @@ use mainframe_env_compiler_api::{
     CompilerService,
 };
 use mainframe_env_execution_api::{
-    ArtifactRef, CapabilityId, ExecutionId, ExecutionOutcome, IdempotencyKey, Invocation,
-    InvocationLimits, Principal, PrincipalId, RequestId, ResourceLimits, RunUnitId, Selector,
-    ServiceClass, TraceId,
+    ArtifactRef, ExecutionId, ExecutionOutcome, IdempotencyKey, Invocation, InvocationLimits,
+    Principal, RequestId, RunUnitId, Selector, TraceId,
 };
 use mainframe_env_host_api::{
     CapabilityDescriptor, EffectRequest, EffectResult, HostProblem, HostProvider, ScopedHostService,
@@ -20,7 +19,7 @@ use mainframe_env_source::{
     LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
 };
 use mainframe_env_store_api::PlatformStore;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 
@@ -51,8 +50,8 @@ impl HostProvider for DefaultProgramRouter {
         self.router.descriptor()
     }
 
-    fn invoke(&self, effect: EffectRequest) -> EffectResult {
-        self.router.invoke(effect)
+    fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
+        self.router.invoke(invocation, effect)
     }
 }
 
@@ -84,7 +83,11 @@ impl CobolProgram {
 }
 
 impl Program for CobolProgram {
-    fn execute(&self, input: &ProgramInput) -> Result<ProgramOutput, HostProblem> {
+    fn execute(
+        &self,
+        parent: &Invocation,
+        input: &ProgramInput,
+    ) -> Result<ProgramOutput, HostProblem> {
         let source = input
             .dds
             .iter()
@@ -124,19 +127,6 @@ impl Program for CobolProgram {
         };
         let limits = InvocationLimits::default();
         let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
-        let grants = [
-            "host.audit",
-            "host.cics.execute",
-            "host.dataset.read",
-            "host.dataset.write",
-            "host.program.invoke",
-            "host.terminal",
-        ]
-        .into_iter()
-        .map(|grant| {
-            CapabilityId::new(grant, limits).map_err(|_| HostProblem::InfrastructureFailure)
-        })
-        .collect::<Result<BTreeSet<_>, _>>()?;
         let invocation = Invocation::new(
             RequestId::new(format!("batch-cobol-request-{sequence}"), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
@@ -144,29 +134,31 @@ impl Program for CobolProgram {
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
             RunUnitId::new(format!("batch-cobol-run-{sequence}"), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
-            None,
+            Some(parent.execution_id.clone()),
             Selector::new("program:COBOL", limits).map_err(|_| HostProblem::Malformed)?,
             ArtifactRef::new(format!("sha256:{}", artifact.id().to_hex()), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
             Principal::new(
-                PrincipalId::new("BATCH", limits)
-                    .map_err(|_| HostProblem::InfrastructureFailure)?,
-                grants,
+                parent.principal.id().clone(),
+                parent.principal.grants().clone(),
                 limits,
             )
             .map_err(|_| HostProblem::InfrastructureFailure)?,
-            ServiceClass::Batch,
-            0,
-            1000,
+            parent.service_class,
+            parent.priority,
+            parent.deadline_tick,
             TraceId::new(format!("batch-cobol-trace-{sequence}"), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
             IdempotencyKey::new(format!("batch-cobol-effect-{sequence}"), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
-            1,
-            ResourceLimits::default(),
-            BTreeMap::new(),
+            parent.attempt,
+            parent.limits,
+            parent.bindings.clone(),
             limits,
         )
+        .and_then(|invocation| {
+            invocation.with_provider_generations(parent.provider_generations.clone(), limits)
+        })
         .map_err(|_| HostProblem::InfrastructureFailure)?;
         let mut machine = ReferenceMachine::from_binary(
             artifact.payload(),
@@ -222,15 +214,45 @@ impl Program for CobolProgram {
 mod tests {
     use super::*;
     use mainframe_env_batch::DdPlan;
+    use mainframe_env_execution_api::{PrincipalId, ResourceLimits, ServiceClass};
     use mainframe_env_host_api::{HostLimits, RegistrySnapshot};
     use mainframe_env_store::MemoryStore;
     use mainframe_env_store_api::{ExecutionState, PlatformStore};
+    use std::collections::BTreeSet;
+
+    fn parent() -> Invocation {
+        let limits = InvocationLimits::default();
+        Invocation::new(
+            RequestId::new("parent-request", limits).unwrap(),
+            ExecutionId::new("parent-execution", limits).unwrap(),
+            RunUnitId::new("parent-run", limits).unwrap(),
+            None,
+            Selector::new("program:test", limits).unwrap(),
+            ArtifactRef::new("artifact", limits).unwrap(),
+            Principal::new(
+                PrincipalId::new("BATCH", limits).unwrap(),
+                BTreeSet::new(),
+                limits,
+            )
+            .unwrap(),
+            ServiceClass::Batch,
+            0,
+            1000,
+            TraceId::new("parent-trace", limits).unwrap(),
+            IdempotencyKey::new("parent-key", limits).unwrap(),
+            1,
+            ResourceLimits::default(),
+            BTreeMap::new(),
+            limits,
+        )
+        .unwrap()
+    }
 
     #[test]
     fn default_cobol_program_compiles_and_runs_reference_machine() {
         let program = CobolProgram::new();
         let output = program
-            .execute(&ProgramInput {
+            .execute(&parent(), &ProgramInput {
                 parameter: None,
                 dds: vec![DdPlan {
                     name: "SYSIN".into(),
@@ -259,7 +281,7 @@ mod tests {
         assert!(program.host.set(host).is_ok());
         assert!(program.store.set(store.clone()).is_ok());
         let output = program
-            .execute(&ProgramInput {
+            .execute(&parent(), &ProgramInput {
                 parameter: None,
                 dds: vec![DdPlan {
                     name: "SYSIN".into(),

@@ -428,10 +428,19 @@ impl ReferenceMachine {
         } else {
             CicsConditionPolicy::Default
         };
-        let mutation = operation
+        let mut mutation = operation
             .is_mutating()
             .then(|| self.mutation())
             .transpose()?;
+        if let Some(mutation) = &mut mutation {
+            mutation.transaction = Some(
+                self.invocation
+                    .bindings
+                    .get("cics.transaction")
+                    .map(|payload| String::from_utf8_lossy(payload.bytes()).into_owned())
+                    .unwrap_or_else(|| "DEFAULT".into()),
+            );
+        }
         self.effect(
             HostRequest::Cics(CicsRequest {
                 operation,

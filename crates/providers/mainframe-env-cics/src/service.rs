@@ -205,6 +205,33 @@ impl CicsService {
         Ok(())
     }
 
+    fn ensure_run(&self, invocation: &Invocation) -> Result<(), HostProblem> {
+        {
+            let state = self.lock()?;
+            if state.runs.contains_key(&invocation.run_unit_id) {
+                return Ok(());
+            }
+        }
+        let session = SessionId::new(
+            format!("session-{}", invocation.run_unit_id),
+            InvocationLimits::default().max_binding_bytes,
+        )
+        .map_err(|_| HostProblem::ResourceExhausted)?;
+        match self.create_session(&session, 24, 80) {
+            Ok(()) | Err(HostProblem::IdempotencyConflict) => {}
+            Err(problem) => return Err(problem),
+        }
+        let transaction = invocation
+            .bindings
+            .get("cics.transaction")
+            .and_then(|payload| std::str::from_utf8(payload.bytes()).ok())
+            .unwrap_or("DEFAULT");
+        match self.register_run(invocation.clone(), &session, transaction, "ME01", "S001") {
+            Ok(()) | Err(HostProblem::IdempotencyConflict) => Ok(()),
+            Err(problem) => Err(problem),
+        }
+    }
+
     pub fn register_map(&self, definition: BmsMapDefinition) -> Result<(), HostProblem> {
         validate_map(&definition, self.limits)?;
         let mut state = self.lock()?;
@@ -755,7 +782,13 @@ impl HostProvider for Provider {
         &self.descriptor
     }
 
-    fn invoke(&self, effect: EffectRequest) -> EffectResult {
+    fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
+        if let Err(problem) = self.service.ensure_run(invocation) {
+            return EffectResult {
+                sequence: effect.sequence,
+                outcome: Err(problem),
+            };
+        }
         let sequence = effect.sequence;
         let request = match effect.request.clone() {
             HostRequest::Cics(request) => request,
@@ -1027,7 +1060,7 @@ mod tests {
             &self.descriptor
         }
 
-        fn invoke(&self, effect: EffectRequest) -> EffectResult {
+        fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
             let outcome = match effect.request {
                 HostRequest::Security(_) => Ok(HostResult::Security(SecurityDecision::Allow)),
                 HostRequest::Dataset(DatasetRequest::Read { .. }) => {

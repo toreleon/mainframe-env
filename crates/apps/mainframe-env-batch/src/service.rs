@@ -851,7 +851,7 @@ mod tests {
             &self.descriptor
         }
 
-        fn invoke(&self, effect: EffectRequest) -> EffectResult {
+        fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
             let outcome = match effect.request {
                 HostRequest::Security(_) => Ok(HostResult::Security(SecurityDecision::Allow)),
                 _ => Err(HostProblem::Malformed),
@@ -1024,7 +1024,7 @@ mod tests {
     }
 
     impl Program for CobolProgram {
-        fn execute(&self, _: &ProgramInput) -> Result<ProgramOutput, HostProblem> {
+        fn execute(&self, _: &Invocation, _: &ProgramInput) -> Result<ProgramOutput, HostProblem> {
             self.calls.fetch_add(1, Ordering::SeqCst);
             Ok(ProgramOutput {
                 return_code: 4,

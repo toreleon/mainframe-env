@@ -1,5 +1,5 @@
 use crate::DdPlan;
-use mainframe_env_execution_api::{BoundedPayload, CapabilityId, InvocationLimits};
+use mainframe_env_execution_api::{BoundedPayload, CapabilityId, Invocation, InvocationLimits};
 use mainframe_env_host_api::{
     CapabilityDescriptor, EffectRequest, EffectResult, HostProblem, HostProvider, HostRequest,
     HostResult, ProgramRequest,
@@ -21,7 +21,11 @@ pub struct ProgramOutput {
 }
 
 pub trait Program: Send + Sync {
-    fn execute(&self, input: &ProgramInput) -> Result<ProgramOutput, HostProblem>;
+    fn execute(
+        &self,
+        invocation: &Invocation,
+        input: &ProgramInput,
+    ) -> Result<ProgramOutput, HostProblem>;
 }
 
 pub struct ProgramRouter {
@@ -93,7 +97,7 @@ impl HostProvider for ProgramRouter {
         &self.descriptor
     }
 
-    fn invoke(&self, effect: EffectRequest) -> EffectResult {
+    fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
         let sequence = effect.sequence;
         let outcome = (|| {
             let (program, payload) = match effect.request {
@@ -111,7 +115,7 @@ impl HostProvider for ProgramRouter {
                 .programs
                 .get(program.as_str())
                 .ok_or(HostProblem::NotFound)?;
-            let output = implementation.execute(&input)?;
+            let output = implementation.execute(invocation, &input)?;
             let bytes = serde_json::to_vec(&output).map_err(|_| HostProblem::ProviderFailure)?;
             Ok(HostResult::Program(
                 BoundedPayload::new(
@@ -136,7 +140,7 @@ pub fn decode_program_output(payload: &BoundedPayload) -> Result<ProgramOutput, 
 struct Builtin(&'static str);
 
 impl Program for Builtin {
-    fn execute(&self, input: &ProgramInput) -> Result<ProgramOutput, HostProblem> {
+    fn execute(&self, _: &Invocation, input: &ProgramInput) -> Result<ProgramOutput, HostProblem> {
         match self.0 {
             "IEFBR14" => output(0, vec![b"IEFBR14".to_vec()]),
             "IEBGENER" => {
@@ -228,6 +232,39 @@ fn output(return_code: i32, records: Vec<Vec<u8>>) -> Result<ProgramOutput, Host
 #[cfg(test)]
 mod tests {
     use super::*;
+    use mainframe_env_execution_api::{
+        ArtifactRef, ExecutionId, IdempotencyKey, Principal, PrincipalId, RequestId,
+        ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
+    };
+    use std::collections::{BTreeMap, BTreeSet};
+
+    fn invocation() -> Invocation {
+        let limits = InvocationLimits::default();
+        Invocation::new(
+            RequestId::new("request", limits).unwrap(),
+            ExecutionId::new("execution", limits).unwrap(),
+            RunUnitId::new("run", limits).unwrap(),
+            None,
+            Selector::new("program:test", limits).unwrap(),
+            ArtifactRef::new("artifact", limits).unwrap(),
+            Principal::new(
+                PrincipalId::new("USER", limits).unwrap(),
+                BTreeSet::new(),
+                limits,
+            )
+            .unwrap(),
+            ServiceClass::Batch,
+            0,
+            100,
+            TraceId::new("trace", limits).unwrap(),
+            IdempotencyKey::new("key", limits).unwrap(),
+            1,
+            ResourceLimits::default(),
+            BTreeMap::new(),
+            limits,
+        )
+        .unwrap()
+    }
 
     fn input(name: &str, bytes: &[u8]) -> ProgramInput {
         ProgramInput {
@@ -256,14 +293,14 @@ mod tests {
     fn generate_and_sort_transform_exact_records() {
         assert_eq!(
             Builtin("IEBGENER")
-                .execute(&input("SYSUT1", b"B\nA\n"))
+                .execute(&invocation(), &input("SYSUT1", b"B\nA\n"))
                 .unwrap()
                 .records,
             vec![b"B".to_vec(), b"A".to_vec()]
         );
         assert_eq!(
             Builtin("SORT")
-                .execute(&input("SORTIN", b"B\nA\n"))
+                .execute(&invocation(), &input("SORTIN", b"B\nA\n"))
                 .unwrap()
                 .records,
             vec![b"A".to_vec(), b"B".to_vec()]
@@ -273,7 +310,7 @@ mod tests {
     #[test]
     fn idcams_unknown_command_is_not_generic_success() {
         assert_eq!(
-            Builtin("IDCAMS").execute(&input("SYSIN", b"UNKNOWN THING")),
+            Builtin("IDCAMS").execute(&invocation(), &input("SYSIN", b"UNKNOWN THING")),
             Err(HostProblem::Unsupported)
         );
     }

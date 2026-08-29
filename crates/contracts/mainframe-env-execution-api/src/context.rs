@@ -181,6 +181,9 @@ pub struct Invocation {
     pub attempt: u32,
     pub limits: ResourceLimits,
     pub bindings: BTreeMap<String, BoundedPayload>,
+    pub cancellation: Option<Cancellation>,
+    pub provider_generations: BTreeMap<CapabilityId, String>,
+    pub audit_correlation: String,
 }
 
 impl Invocation {
@@ -218,6 +221,7 @@ impl Invocation {
         {
             return Err(InvocationProblem::BindingLimitExceeded);
         }
+        let audit_correlation = trace_id.as_str().to_string();
         Ok(Self {
             request_id,
             execution_id,
@@ -234,7 +238,34 @@ impl Invocation {
             attempt,
             limits: resource_limits.validate()?,
             bindings,
+            cancellation: None,
+            provider_generations: BTreeMap::new(),
+            audit_correlation,
         })
+    }
+
+    pub fn with_provider_generations(
+        mut self,
+        generations: BTreeMap<CapabilityId, String>,
+        limits: InvocationLimits,
+    ) -> Result<Self, InvocationProblem> {
+        if generations.len() > limits.max_capabilities
+            || generations.iter().any(|(capability, generation)| {
+                !self.principal.has_grant(capability)
+                    || generation.is_empty()
+                    || generation.len() > limits.max_identity_bytes
+            })
+        {
+            return Err(InvocationProblem::InvalidProviderGeneration);
+        }
+        self.provider_generations = generations;
+        Ok(self)
+    }
+
+    #[must_use]
+    pub fn with_cancellation(mut self, cancellation: Cancellation) -> Self {
+        self.cancellation = Some(cancellation);
+        self
     }
 }
 
@@ -248,6 +279,7 @@ pub enum InvocationProblem {
     InvalidAttempt,
     InvalidDeadline,
     BindingLimitExceeded,
+    InvalidProviderGeneration,
 }
 
 impl fmt::Display for InvocationProblem {

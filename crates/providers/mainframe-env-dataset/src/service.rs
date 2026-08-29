@@ -1,8 +1,8 @@
 use crate::codec::{Entry, decode, encode};
-use mainframe_env_execution_api::{CapabilityId, InvocationLimits};
+use mainframe_env_execution_api::{CapabilityId, Invocation, InvocationLimits};
 use mainframe_env_host_api::{
     CapabilityDescriptor, DatasetName, DatasetRequest, DatasetResult, EffectRequest, EffectResult,
-    HostProblem, HostProvider, HostRequest, HostResult,
+    HostProblem, HostProvider, HostRequest, HostResult, MemberName,
 };
 use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
 use sha2::{Digest, Sha256};
@@ -206,6 +206,34 @@ impl DatasetService {
                     attributes: entry.attributes.clone(),
                     version: entry.version,
                 })
+            }
+            DatasetRequest::ListMembers {
+                dataset,
+                start,
+                max_items,
+            } => {
+                let entry = entry(state, dataset)?;
+                if entry.attributes.organization
+                    != mainframe_env_host_api::DatasetOrganization::Partitioned
+                {
+                    return Err(HostProblem::Unsupported);
+                }
+                let mut names = Vec::new();
+                let mut more = false;
+                for name in entry.members.keys().filter(|name| {
+                    start
+                        .as_ref()
+                        .is_none_or(|start| name.as_str() > start.as_str())
+                }) {
+                    if names.len() >= *max_items as usize {
+                        more = true;
+                        break;
+                    }
+                    names.push(
+                        MemberName::new(name, 8).map_err(|_| HostProblem::InfrastructureFailure)?,
+                    );
+                }
+                Ok(DatasetResult::Members { names, more })
             }
             DatasetRequest::Read {
                 dataset,
@@ -617,7 +645,7 @@ impl HostProvider for Provider {
     fn descriptor(&self) -> &CapabilityDescriptor {
         &self.descriptor
     }
-    fn invoke(&self, request: EffectRequest) -> EffectResult {
+    fn invoke(&self, _: &Invocation, request: EffectRequest) -> EffectResult {
         let sequence = request.sequence;
         let outcome = match request.request {
             HostRequest::Dataset(request) => self.service.invoke(request).map(HostResult::Dataset),

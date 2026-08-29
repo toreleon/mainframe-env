@@ -56,9 +56,7 @@ pub struct ProductServer {
     store: Arc<dyn PlatformStore>,
     secrets: Arc<MemorySecretResolver>,
     racf: Arc<RacfService>,
-    dataset: Arc<DatasetService>,
     batch: Arc<BatchService>,
-    cics: Arc<CicsService>,
     artifacts: LocalArtifactStore,
     host: Arc<ScopedHostService>,
     sessions: Mutex<BTreeMap<String, AuthSession>>,
@@ -141,9 +139,7 @@ impl ProductServer {
             store,
             secrets,
             racf,
-            dataset,
             batch,
-            cics,
             artifacts,
             host,
             sessions: Mutex::new(sessions),
@@ -181,8 +177,8 @@ impl ProductServer {
                 format!("{}.**", user.to_ascii_uppercase()),
                 AccessIntent::Alter,
             ),
-            ("JESJOBS", "JOB.**".into(), AccessIntent::Execute),
-            ("FACILITY", "CONSOLE.**".into(), AccessIntent::Execute),
+            ("JESJOBS", "JOB.**".into(), AccessIntent::Alter),
+            ("FACILITY", "CONSOLE.**".into(), AccessIntent::Alter),
             ("TCICSTRN", "CICS.**".into(), AccessIntent::Execute),
         ] {
             self.racf.define_profile(class, &pattern, user, None)?;
@@ -207,7 +203,7 @@ impl ProductServer {
     pub fn ready(&self) -> bool {
         self.accepting.load(Ordering::SeqCst)
             && self.store.get_provider_state("jes-meta", "next-id").is_ok()
-            && Arc::strong_count(&self.cics) > 0
+            && self.host.capability_ready("host.cics.execute")
             && self.artifacts.is_ready()
     }
 
@@ -419,14 +415,19 @@ impl ProductServer {
                 let created_member = if member.is_some()
                     && attributes.organization == DatasetOrganization::Partitioned
                 {
-                    self.dataset
-                        .list_members(&name, None, 4096)
-                        .map(|(members, _)| {
-                            !members.iter().any(|value| {
-                                Some(value.as_str()) == member.as_ref().map(MemberName::as_str)
-                            })
-                        })
-                        .unwrap_or(true)
+                    match self.dataset_call(
+                        &principal,
+                        DatasetRequest::ListMembers {
+                            dataset: name.clone(),
+                            start: None,
+                            max_items: 4096,
+                        },
+                    )? {
+                        DatasetResult::Members { names, .. } => !names.iter().any(|value| {
+                            Some(value.as_str()) == member.as_ref().map(MemberName::as_str)
+                        }),
+                        _ => return Err(gateway_problem(HostProblem::ProviderFailure)),
+                    }
                 } else {
                     false
                 };
@@ -478,15 +479,23 @@ impl ProductServer {
                 max,
             } => {
                 let name = dataset_name(&dataset)?;
-                self.authorize_resource(&principal, "DATASET", name.as_str(), AccessIntent::Read)?;
-                let (items, more) = self
-                    .dataset
-                    .list_members(&name, start.as_deref(), max)
-                    .map_err(gateway_problem)?;
+                let start = member_name(start)?;
+                let DatasetResult::Members { names: items, more } = self.dataset_call(
+                    &principal,
+                    DatasetRequest::ListMembers {
+                        dataset: name,
+                        start,
+                        max_items: u32::try_from(max)
+                            .map_err(|_| gateway_problem(HostProblem::ResourceExhausted))?,
+                    },
+                )?
+                else {
+                    return Err(gateway_problem(HostProblem::ProviderFailure));
+                };
                 let count = items.len();
                 Ok(GatewayResponse::json(
                     StatusCode::OK,
-                    json!({"items":items.into_iter().map(|member|json!({"member":member})).collect::<Vec<_>>(),"returnedRows":count,"moreRows":more}),
+                    json!({"items":items.into_iter().map(|member|json!({"member":member.as_str()})).collect::<Vec<_>>(),"returnedRows":count,"moreRows":more}),
                 ))
             }
             GatewayRequest::DatasetSearch {
@@ -519,13 +528,15 @@ impl ProductServer {
             }
             GatewayRequest::Ams { control } => self.ams(&principal, &control),
             GatewayRequest::JobList { owner, prefix, max } => {
-                let owner = owner
-                    .as_deref()
-                    .map(|value| {
-                        PrincipalId::new(value, InvocationLimits::default())
-                            .map_err(|_| gateway_problem(HostProblem::Malformed))
-                    })
-                    .transpose()?;
+                let requested_owner = owner.as_deref().unwrap_or(&principal);
+                if !requested_owner.eq_ignore_ascii_case(&principal) {
+                    return Err(gateway_problem(HostProblem::Unauthorized));
+                }
+                self.authorize_resource(&principal, "JESJOBS", "JOB.**", AccessIntent::Read)?;
+                let owner = Some(
+                    PrincipalId::new(requested_owner, InvocationLimits::default())
+                        .map_err(|_| gateway_problem(HostProblem::Malformed))?,
+                );
                 let (jobs, _) = self
                     .batch
                     .list(owner.as_ref(), None, max)
@@ -542,8 +553,14 @@ impl ProductServer {
                 Ok(GatewayResponse::json(StatusCode::OK, Value::Array(items)))
             }
             GatewayRequest::JobSubmit { jcl } => {
+                let capabilities = job_capabilities(&jcl);
                 let invocation = self
-                    .invocation(&principal, "zosmf:job-submit")
+                    .invocation(
+                        &principal,
+                        "zosmf:job-submit",
+                        ServiceClass::Batch,
+                        &capabilities,
+                    )
                     .map_err(gateway_problem)?;
                 let snapshot = self
                     .batch
@@ -625,11 +642,23 @@ impl ProductServer {
             GatewayRequest::JobStatus { jobname, jobid } => {
                 let job = self.batch.get(&jobid).map_err(gateway_problem)?;
                 verify_job(&principal, &jobname, &job)?;
+                self.authorize_resource(
+                    &principal,
+                    "JESJOBS",
+                    &format!("JOB.{}", job.name),
+                    AccessIntent::Read,
+                )?;
                 Ok(GatewayResponse::json(StatusCode::OK, job_json(job)))
             }
             GatewayRequest::JobCancel { jobname, jobid } => {
                 let job = self.batch.get(&jobid).map_err(gateway_problem)?;
                 verify_job(&principal, &jobname, &job)?;
+                self.authorize_resource(
+                    &principal,
+                    "JESJOBS",
+                    &format!("JOB.{}", job.name),
+                    AccessIntent::Alter,
+                )?;
                 match self.store.request_cancellation(&format!("jes:{jobid}")) {
                     Ok(_) | Err(StoreError::NotFound) => {}
                     Err(error) => return Err(gateway_problem(store_error(error))),
@@ -640,12 +669,24 @@ impl ProductServer {
             GatewayRequest::JobPurge { jobname, jobid } => {
                 let job = self.batch.get(&jobid).map_err(gateway_problem)?;
                 verify_job(&principal, &jobname, &job)?;
+                self.authorize_resource(
+                    &principal,
+                    "JESJOBS",
+                    &format!("JOB.{}", job.name),
+                    AccessIntent::Alter,
+                )?;
                 self.batch.purge(&jobid).map_err(gateway_problem)?;
                 Ok(GatewayResponse::empty(StatusCode::NO_CONTENT))
             }
             GatewayRequest::SpoolList { jobname, jobid } => {
                 let job = self.batch.get(&jobid).map_err(gateway_problem)?;
                 verify_job(&principal, &jobname, &job)?;
+                self.authorize_resource(
+                    &principal,
+                    "JESJOBS",
+                    &format!("JOB.{}", job.name),
+                    AccessIntent::Read,
+                )?;
                 let files = self
                     .batch
                     .spool_files(&jobid)
@@ -664,6 +705,12 @@ impl ProductServer {
             } => {
                 let job = self.batch.get(&jobid).map_err(gateway_problem)?;
                 verify_job(&principal, &jobname, &job)?;
+                self.authorize_resource(
+                    &principal,
+                    "JESJOBS",
+                    &format!("JOB.{}", job.name),
+                    AccessIntent::Read,
+                )?;
                 let records = self
                     .batch
                     .spool_by_index(&jobid, file, start, max)
@@ -776,6 +823,7 @@ impl ProductServer {
             DatasetRequest::List { pattern, .. } => Some(pattern.as_str()),
             DatasetRequest::Rename { from, .. } => Some(from.as_str()),
             DatasetRequest::Attributes { dataset }
+            | DatasetRequest::ListMembers { dataset, .. }
             | DatasetRequest::Read { dataset, .. }
             | DatasetRequest::Create { dataset, .. }
             | DatasetRequest::Write { dataset, .. }
@@ -792,6 +840,7 @@ impl ProductServer {
                 if matches!(
                     request,
                     DatasetRequest::Attributes { .. }
+                        | DatasetRequest::ListMembers { .. }
                         | DatasetRequest::Read { .. }
                         | DatasetRequest::List { .. }
                 ) {
@@ -801,8 +850,18 @@ impl ProductServer {
                 },
             )?;
         }
+        let capability = if dataset_mutation(&request).is_some() {
+            "host.dataset.write"
+        } else {
+            "host.dataset.read"
+        };
         let invocation = self
-            .invocation(principal, "zosmf:dataset")
+            .invocation(
+                principal,
+                "zosmf:dataset",
+                ServiceClass::System,
+                &[capability],
+            )
             .map_err(gateway_problem)?;
         let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
         let mutation = dataset_mutation(&request);
@@ -832,37 +891,62 @@ impl ProductServer {
         resource: &str,
         intent: AccessIntent,
     ) -> Result<(), GatewayProblem> {
-        match self
-            .racf
-            .authorize(
-                &PrincipalId::new(principal, InvocationLimits::default())
-                    .map_err(|_| gateway_problem(HostProblem::Unauthorized))?,
-                class,
-                &ResourceName::new(resource, 246)
-                    .map_err(|_| gateway_problem(HostProblem::Malformed))?,
-                intent,
+        let invocation = self
+            .invocation(
+                principal,
+                "security:authorize",
+                ServiceClass::System,
+                &["host.security.authorize"],
             )
-            .map_err(gateway_problem)?
-        {
-            SecurityDecision::Allow => Ok(()),
-            _ => Err(gateway_problem(HostProblem::Unauthorized)),
+            .map_err(gateway_problem)?;
+        let result = self.host.invoke(
+            &invocation,
+            1,
+            false,
+            EffectRequest {
+                run_unit: invocation.run_unit_id.clone(),
+                sequence: 1,
+                deadline_tick: invocation.deadline_tick,
+                idempotency_key: None,
+                request: HostRequest::Security(
+                    mainframe_env_host_api::SecurityRequest::Authorize {
+                        principal: invocation.principal.id().clone(),
+                        class: class.into(),
+                        resource: ResourceName::new(resource, 246)
+                            .map_err(|_| gateway_problem(HostProblem::Malformed))?,
+                        intent,
+                    },
+                ),
+            },
+        );
+        match result.effect.outcome.map_err(gateway_problem)? {
+            HostResult::Security(SecurityDecision::Allow) => Ok(()),
+            HostResult::Security(_) => Err(gateway_problem(HostProblem::Unauthorized)),
+            _ => Err(gateway_problem(HostProblem::ProviderFailure)),
         }
     }
 
-    fn invocation(&self, principal: &str, selector: &str) -> Result<Invocation, HostProblem> {
+    fn invocation(
+        &self,
+        principal: &str,
+        selector: &str,
+        service_class: ServiceClass,
+        required_capabilities: &[&str],
+    ) -> Result<Invocation, HostProblem> {
         let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
         let limits = InvocationLimits::default();
-        let grants = [
-            "host.security.authorize",
-            "host.audit",
-            "host.dataset.read",
-            "host.dataset.write",
-            "host.program.invoke",
-            "host.cics.execute",
-        ]
-        .into_iter()
-        .map(|name| CapabilityId::new(name, limits).map_err(|_| HostProblem::InfrastructureFailure))
-        .collect::<Result<BTreeSet<_>, _>>()?;
+        let grants = required_capabilities
+            .iter()
+            .copied()
+            .map(|name| {
+                CapabilityId::new(name, limits).map_err(|_| HostProblem::InfrastructureFailure)
+            })
+            .collect::<Result<BTreeSet<_>, _>>()?;
+        let generations = grants
+            .iter()
+            .cloned()
+            .map(|capability| (capability, "1".to_string()))
+            .collect();
         Invocation::new(
             RequestId::new(format!("request-{sequence}"), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
@@ -880,7 +964,7 @@ impl ProductServer {
                 limits,
             )
             .map_err(|_| HostProblem::InfrastructureFailure)?,
-            ServiceClass::System,
+            service_class,
             0,
             100,
             TraceId::new(format!("trace-{sequence}"), limits)
@@ -892,6 +976,7 @@ impl ProductServer {
             BTreeMap::new(),
             limits,
         )
+        .and_then(|invocation| invocation.with_provider_generations(generations, limits))
         .map_err(|_| HostProblem::InfrastructureFailure)
     }
 
@@ -1291,6 +1376,21 @@ fn wildcard(pattern: &str, value: &str) -> bool {
             .is_some_and(|prefix| value.starts_with(prefix))
 }
 
+fn job_capabilities(jcl: &[u8]) -> Vec<&'static str> {
+    let source = String::from_utf8_lossy(jcl).to_ascii_uppercase();
+    let mut capabilities = vec!["host.security.authorize", "host.program.invoke"];
+    if source.contains("DSN=") || source.contains("DISP=") {
+        capabilities.extend(["host.dataset.read", "host.dataset.write"]);
+    }
+    if source.contains("EXEC CICS") {
+        capabilities.push("host.cics.execute");
+    }
+    if source.contains("ACCEPT ") {
+        capabilities.push("host.terminal");
+    }
+    capabilities
+}
+
 fn control_name(control: &str, keyword: &str) -> Option<String> {
     let upper = control.to_ascii_uppercase();
     let start = upper.find(&format!("{keyword}("))? + keyword.len() + 1;
@@ -1511,6 +1611,48 @@ mod tests {
         assert!(server.ready());
         assert!(server.graceful_shutdown().await);
         assert!(!server.ready());
+    }
+
+    #[tokio::test]
+    async fn cobol_cics_job_uses_scoped_principal_and_typed_host_route() {
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let app = server.router();
+        let response = call(
+            &app,
+            Method::PUT,
+            "/zosmf/restjobs/jobs",
+            "//CICSJOB JOB CLASS=A\n//STEP1 EXEC PGM=COBOL\n//SYSIN DD *\nIDENTIFICATION DIVISION.\nPROGRAM-ID. CICSBATCH.\nPROCEDURE DIVISION.\nEXEC CICS ASSIGN END-EXEC.\nDISPLAY 'CICS OK'.\nSTOP RUN.\n/*\n",
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let job: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), 65536).await.unwrap()).unwrap();
+        assert_eq!(job["retcode"], "CC 0000");
+        assert!(server.metrics().outbox_delivered >= 5);
+    }
+
+    #[test]
+    fn invocation_grants_are_selector_scoped_and_generation_pinned() {
+        let server = ProductServer::memory(config()).unwrap();
+        let invocation = server
+            .invocation(
+                "IBMUSER",
+                "zosmf:dataset",
+                ServiceClass::System,
+                &["host.dataset.read"],
+            )
+            .unwrap();
+        assert_eq!(invocation.principal.grants().len(), 1);
+        let capability =
+            CapabilityId::new("host.dataset.read", InvocationLimits::default()).unwrap();
+        assert_eq!(
+            invocation.provider_generations.get(&capability),
+            Some(&"1".to_string())
+        );
+        assert!(!invocation.principal.has_grant(
+            &CapabilityId::new("host.cics.execute", InvocationLimits::default()).unwrap()
+        ));
     }
 
     #[test]

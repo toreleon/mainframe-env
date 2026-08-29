@@ -1,6 +1,6 @@
 use argon2::Argon2;
 use argon2::password_hash::{PasswordHasher, PasswordVerifier, phc::PasswordHash};
-use mainframe_env_execution_api::{CapabilityId, InvocationLimits, PrincipalId};
+use mainframe_env_execution_api::{CapabilityId, Invocation, InvocationLimits, PrincipalId};
 use mainframe_env_host_api::{
     AccessIntent, AuditEvent, CapabilityDescriptor, EffectRequest, EffectResult, HostProblem,
     HostProvider, HostRequest, HostResult, ResourceName, SecretRef, SecurityDecision,
@@ -500,7 +500,7 @@ impl HostProvider for Provider {
     fn descriptor(&self) -> &CapabilityDescriptor {
         &self.descriptor
     }
-    fn invoke(&self, request: EffectRequest) -> EffectResult {
+    fn invoke(&self, _: &Invocation, request: EffectRequest) -> EffectResult {
         let sequence = request.sequence;
         let outcome = match request.request {
             HostRequest::Security(request) => {

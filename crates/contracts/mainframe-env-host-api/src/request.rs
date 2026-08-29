@@ -136,6 +136,11 @@ pub enum DatasetRequest {
     Attributes {
         dataset: DatasetName,
     },
+    ListMembers {
+        dataset: DatasetName,
+        start: Option<MemberName>,
+        max_items: u32,
+    },
     Read {
         dataset: DatasetName,
         member: Option<MemberName>,
@@ -184,6 +189,10 @@ pub enum DatasetRequest {
 pub enum DatasetResult {
     Listed {
         names: Vec<DatasetName>,
+        more: bool,
+    },
+    Members {
+        names: Vec<MemberName>,
         more: bool,
     },
     Attributes {
@@ -505,6 +514,7 @@ impl HostRequest {
             Self::Dataset(
                 DatasetRequest::List { .. }
                 | DatasetRequest::Attributes { .. }
+                | DatasetRequest::ListMembers { .. }
                 | DatasetRequest::Read { .. }
                 | DatasetRequest::ReadNext { .. }
                 | DatasetRequest::StartBrowse { .. }
@@ -637,6 +647,11 @@ impl HostResult {
             {
                 Err(HostProblem::ResourceExhausted)
             }
+            Self::Dataset(DatasetResult::Members { names, .. })
+                if names.len() > limits.max_records =>
+            {
+                Err(HostProblem::ResourceExhausted)
+            }
             Self::Dataset(DatasetResult::Records { records, .. }) => {
                 validate_records(records, limits)
             }
@@ -726,6 +741,11 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
         } if *max_items == 0
             || *max_items as usize > limits.max_records
             || pattern.len() > limits.max_name_bytes =>
+        {
+            Err(HostProblem::ResourceExhausted)
+        }
+        DatasetRequest::ListMembers { max_items, .. }
+            if *max_items == 0 || *max_items as usize > limits.max_records =>
         {
             Err(HostProblem::ResourceExhausted)
         }

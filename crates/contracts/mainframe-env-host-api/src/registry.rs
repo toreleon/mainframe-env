@@ -1,5 +1,5 @@
 use crate::{EffectRequest, EffectResult, HostProblem};
-use mainframe_env_execution_api::{CapabilityId, InvocationLimits};
+use mainframe_env_execution_api::{CapabilityId, Invocation, InvocationLimits};
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
 
@@ -38,7 +38,7 @@ impl CapabilityDescriptor {
 
 pub trait HostProvider: Send + Sync {
     fn descriptor(&self) -> &CapabilityDescriptor;
-    fn invoke(&self, request: EffectRequest) -> EffectResult;
+    fn invoke(&self, invocation: &Invocation, request: EffectRequest) -> EffectResult;
 }
 
 #[derive(Clone)]
@@ -150,7 +150,7 @@ mod tests {
         fn descriptor(&self) -> &CapabilityDescriptor {
             &self.descriptor
         }
-        fn invoke(&self, request: EffectRequest) -> EffectResult {
+        fn invoke(&self, _: &Invocation, request: EffectRequest) -> EffectResult {
             EffectResult {
                 sequence: request.sequence,
                 outcome: Err(HostProblem::Unsupported),

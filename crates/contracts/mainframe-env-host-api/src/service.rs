@@ -34,7 +34,7 @@ impl ScopedHostService {
         let sequence = request.sequence;
         let result = if request.run_unit != invocation.run_unit_id {
             Err(HostProblem::Malformed)
-        } else if cancellation_requested {
+        } else if cancellation_requested || invocation.cancellation.is_some() {
             Err(HostProblem::Cancelled)
         } else if now_tick >= invocation.deadline_tick || now_tick >= request.deadline_tick {
             Err(HostProblem::TimedOut)
@@ -45,23 +45,33 @@ impl ScopedHostService {
         } else {
             match self.registry.select(&capability) {
                 Ok(provider)
+                    if invocation
+                        .provider_generations
+                        .get(&capability)
+                        .is_some_and(|required| required != &provider.descriptor().generation) =>
+                {
+                    Err(HostProblem::ProviderFailure)
+                }
+                Ok(provider)
                     if format!("{:?}", request.request).len()
                         > provider.descriptor().max_request_bytes =>
                 {
                     Err(HostProblem::ResourceExhausted)
                 }
-                Ok(provider) => match catch_unwind(AssertUnwindSafe(|| provider.invoke(request))) {
-                    Ok(effect) => effect.validate(sequence, self.limits).and_then(|()| {
-                        if format!("{:?}", effect.outcome).len()
-                            > provider.descriptor().max_result_bytes
-                        {
-                            Err(HostProblem::ResourceExhausted)
-                        } else {
-                            effect.outcome
-                        }
-                    }),
-                    Err(_) => Err(HostProblem::InfrastructureFailure),
-                },
+                Ok(provider) => {
+                    match catch_unwind(AssertUnwindSafe(|| provider.invoke(invocation, request))) {
+                        Ok(effect) => effect.validate(sequence, self.limits).and_then(|()| {
+                            if format!("{:?}", effect.outcome).len()
+                                > provider.descriptor().max_result_bytes
+                            {
+                                Err(HostProblem::ResourceExhausted)
+                            } else {
+                                effect.outcome
+                            }
+                        }),
+                        Err(_) => Err(HostProblem::InfrastructureFailure),
+                    }
+                }
                 Err(problem) => Err(problem),
             }
         };
@@ -87,6 +97,10 @@ impl ScopedHostService {
                         invocation.execution_id.as_str().to_string(),
                     ),
                     (
+                        "audit_correlation".to_string(),
+                        invocation.audit_correlation.clone(),
+                    ),
+                    (
                         "run_unit".to_string(),
                         invocation.run_unit_id.as_str().to_string(),
                     ),
@@ -94,6 +108,15 @@ impl ScopedHostService {
                 ]),
             },
         }
+    }
+
+    #[must_use]
+    pub fn capability_ready(&self, capability: &str) -> bool {
+        mainframe_env_execution_api::CapabilityId::new(
+            capability,
+            mainframe_env_execution_api::InvocationLimits::default(),
+        )
+        .is_ok_and(|capability| self.registry.select(&capability).is_ok())
     }
 }
 
@@ -114,7 +137,7 @@ mod tests {
         fn descriptor(&self) -> &CapabilityDescriptor {
             &self.descriptor
         }
-        fn invoke(&self, _: EffectRequest) -> EffectResult {
+        fn invoke(&self, _: &Invocation, _: EffectRequest) -> EffectResult {
             panic!("provider panic")
         }
     }
@@ -222,6 +245,44 @@ mod tests {
                 .effect
                 .outcome,
             Err(HostProblem::Unsupported)
+        );
+    }
+
+    #[test]
+    fn provider_generation_and_durable_cancellation_are_rechecked() {
+        let limits = InvocationLimits::default();
+        let capability = CapabilityId::new("host.state.read", limits).unwrap();
+        let generation_mismatch = invocation(true)
+            .with_provider_generations(BTreeMap::from([(capability, "stale".into())]), limits)
+            .unwrap();
+        assert_eq!(
+            service()
+                .invoke(
+                    &generation_mismatch,
+                    1,
+                    false,
+                    request(&generation_mismatch.run_unit_id)
+                )
+                .effect
+                .outcome,
+            Err(HostProblem::ProviderFailure)
+        );
+
+        let cancelled = invocation(true).with_cancellation(
+            mainframe_env_execution_api::Cancellation::new(
+                mainframe_env_execution_api::CancellationId::new("cancel", limits).unwrap(),
+                "operator request",
+                1,
+                limits,
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            service()
+                .invoke(&cancelled, 1, false, request(&cancelled.run_unit_id))
+                .effect
+                .outcome,
+            Err(HostProblem::Cancelled)
         );
     }
 }
