@@ -63,6 +63,7 @@ pub struct JobSnapshot {
     pub priority: u8,
     pub state: JobState,
     pub return_code: Option<i32>,
+    pub abend_code: Option<String>,
     pub active_step: Option<String>,
     pub attempt: u32,
     pub version: u64,
@@ -77,6 +78,8 @@ struct Job {
     priority: u8,
     state: JobState,
     return_code: Option<i32>,
+    #[serde(default)]
+    abend_code: Option<String>,
     active_step: Option<String>,
     attempt: u32,
     version: u64,
@@ -229,6 +232,7 @@ impl BatchService {
                 JobState::Queued
             },
             return_code: None,
+            abend_code: None,
             active_step: None,
             attempt: 0,
             version: 1,
@@ -344,6 +348,11 @@ impl BatchService {
                 )?;
             }
             Err(problem) => {
+                if let HostProblem::Condition { name, .. } = &problem
+                    && let Some(code) = name.strip_prefix("ABEND:")
+                {
+                    job.abend_code = Some(code.to_string());
+                }
                 job.state = JobState::Failed;
                 job.events.push(format!("failed:{problem:?}"));
                 append_spool(
@@ -406,6 +415,13 @@ impl BatchService {
                 &mut dds,
                 &mut effect_sequence,
             )?;
+            for dd in &mut dds {
+                if !is_program_library_dd(dd)
+                    && let Some(raw_name) = dd.dataset.clone()
+                {
+                    dd.dataset = Some(resolved_dataset(job, dd, &raw_name, &dataset_resolutions));
+                }
+            }
             let input = ProgramInput {
                 parameter: step.parameter.clone(),
                 dds,
@@ -725,6 +741,9 @@ impl BatchService {
         effect_sequence: &mut u64,
     ) -> Result<(), HostProblem> {
         for dd in &step.dds {
+            if is_program_library_dd(dd) {
+                continue;
+            }
             let Some(raw_name) = &dd.dataset else {
                 continue;
             };
@@ -855,6 +874,9 @@ impl BatchService {
         effect_sequence: &mut u64,
     ) -> Result<(), HostProblem> {
         for dd in dds {
+            if is_program_library_dd(dd) {
+                continue;
+            }
             let Some(raw_name) = &dd.dataset else {
                 continue;
             };
@@ -1078,6 +1100,9 @@ impl BatchService {
         abnormal: bool,
     ) -> Result<(), HostProblem> {
         for dd in &step.dds {
+            if is_program_library_dd(dd) {
+                continue;
+            }
             let Some(raw_name) = &dd.dataset else {
                 continue;
             };
@@ -1377,6 +1402,10 @@ fn dataset_attributes_for_dd(dd: &crate::DdPlan) -> Result<DatasetAttributes, Ho
     })
 }
 
+fn is_program_library_dd(dd: &crate::DdPlan) -> bool {
+    dd.name.eq_ignore_ascii_case("STEPLIB") || dd.name.eq_ignore_ascii_case("JOBLIB")
+}
+
 fn normalize_records(
     records: &[Vec<u8>],
     attributes: &DatasetAttributes,
@@ -1636,6 +1665,7 @@ fn snapshot(job: &Job) -> JobSnapshot {
         priority: job.priority,
         state: job.state,
         return_code: job.return_code,
+        abend_code: job.abend_code.clone(),
         active_step: job.active_step.clone(),
         attempt: job.attempt,
         version: job.version,

@@ -132,6 +132,7 @@ pub struct MachineSnapshot {
     pub altered_targets: BTreeMap<String, String>,
     pub loop_reentry: BTreeSet<usize>,
     pub loop_counts: BTreeMap<usize, i128>,
+    pub last_file_status: String,
 }
 
 pub struct ReferenceMachine {
@@ -150,6 +151,7 @@ pub struct ReferenceMachine {
     loop_reentry: BTreeSet<usize>,
     loop_counts: BTreeMap<usize, i128>,
     altered: BTreeMap<String, String>,
+    last_file_status: String,
     pc: usize,
     output: Vec<u8>,
     effect_sequence: u64,
@@ -308,6 +310,7 @@ impl ReferenceMachine {
             loop_reentry: BTreeSet::new(),
             loop_counts: BTreeMap::new(),
             altered: BTreeMap::new(),
+            last_file_status: "00".into(),
             pc: 0,
             output: Vec::new(),
             effect_sequence: 0,
@@ -343,7 +346,7 @@ impl ReferenceMachine {
     #[must_use]
     pub fn snapshot(&self) -> MachineSnapshot {
         MachineSnapshot {
-            schema_version: 3,
+            schema_version: 4,
             program_counter: self.pc,
             effect_sequence: self.effect_sequence,
             output: self.output.clone(),
@@ -352,14 +355,16 @@ impl ReferenceMachine {
             altered_targets: self.altered.clone(),
             loop_reentry: self.loop_reentry.clone(),
             loop_counts: self.loop_counts.clone(),
+            last_file_status: self.last_file_status.clone(),
         }
     }
 
     pub fn restore(&mut self, snapshot: MachineSnapshot) -> Result<(), MachineProblem> {
-        if !matches!(snapshot.schema_version, 1..=3)
+        if !matches!(snapshot.schema_version, 1..=4)
             || snapshot.program_counter > self.operations.len()
             || snapshot.base_storage.iter().map(Vec::len).sum::<usize>()
                 > self.invocation.limits.max_storage_bytes as usize
+            || snapshot.last_file_status.len() != 2
         {
             return Err(MachineProblem::IncompatibleSnapshot);
         }
@@ -379,6 +384,11 @@ impl ReferenceMachine {
         self.altered = snapshot.altered_targets;
         self.loop_reentry = snapshot.loop_reentry;
         self.loop_counts = snapshot.loop_counts;
+        self.last_file_status = if snapshot.schema_version < 4 {
+            "00".into()
+        } else {
+            snapshot.last_file_status
+        };
         self.pending = None;
         self.deferred_drive = None;
         Ok(())
@@ -390,6 +400,7 @@ impl ReferenceMachine {
             "mainframe-env.reference-machine-checkpoint@1"
                 | "mainframe-env.reference-machine-checkpoint@2"
                 | "mainframe-env.reference-machine-checkpoint@3"
+                | "mainframe-env.reference-machine-checkpoint@4"
         ) {
             return Err(MachineProblem::IncompatibleSnapshot);
         }
@@ -479,6 +490,11 @@ impl ReferenceMachine {
                     records, ..
                 }),
             ) => {
+                self.last_file_status = if records.is_empty() {
+                    "10".into()
+                } else {
+                    "00".into()
+                };
                 if let Some(record) = records.first() {
                     self.write(&target, record)?;
                 }
@@ -493,17 +509,28 @@ impl ReferenceMachine {
                     ..
                 }),
             ) => {
+                self.last_file_status.clone_from(&condition_status);
                 if let Some(status) = status {
                     self.write(&status, condition_status.as_bytes())?;
                 }
             }
             (PendingKind::DatasetRead { status, .. }, HostResult::Dataset(_))
             | (PendingKind::DatasetStatus { status }, HostResult::Dataset(_)) => {
+                self.last_file_status = "00".into();
                 if let Some(status) = status {
                     self.write(&status, b"00")?;
                 }
             }
             (PendingKind::ProgramCall { targets }, HostResult::Program(payload)) => {
+                if payload.schema() == "mainframe-env.program.abend@1" {
+                    let code = String::from_utf8(payload.bytes().to_vec())
+                        .map_err(|_| MachineProblem::UnexpectedHostResult)?;
+                    self.deferred_drive = Some(MachineDrive::Abend(Abend {
+                        code,
+                        reason: Some("compatible CEE3ABD service".into()),
+                    }));
+                    return Ok(());
+                }
                 let values = decode_call_values(&payload)?;
                 if values.len() != targets.len() {
                     return Err(MachineProblem::UnexpectedHostResult);
@@ -756,7 +783,9 @@ impl ReferenceMachine {
             "entry" | "label" | "continue" => {}
             "accept" => return self.accept_effect(&args),
             "call" | "cancel" => return self.program_effect(name, &args),
-            "open" | "close" | "read" | "write" => return self.dataset_effect(name, &args),
+            "open" | "close" | "read" | "rewrite" | "write" => {
+                return self.dataset_effect(name, &args);
+            }
             "exec_cics" => return self.cics_effect(&args),
             "exec_sql" => return self.embedded_effect("SQL", &args),
             "exec_dli" => return self.embedded_effect("DLI", &args),
@@ -872,8 +901,20 @@ impl ReferenceMachine {
         let parent = optional_integer_attribute(operation, "control_parent")
             .and_then(|node| usize::try_from(node).ok())
             .and_then(|node| self.control_nodes.get(&node))
-            .and_then(|pc| self.operations.get(*pc))
-            .ok_or(MachineProblem::InvalidOperation)?;
+            .and_then(|pc| self.operations.get(*pc));
+        let Some(parent) = parent else {
+            let upper = text.to_ascii_uppercase();
+            return Ok(match upper.as_str() {
+                "AT END" => self.last_file_status == "10",
+                "NOT AT END" => self.last_file_status != "10",
+                "INVALID KEY" | "ON EXCEPTION" | "ON SIZE ERROR" | "OVERFLOW" | "ON OVERFLOW" => {
+                    self.last_file_status != "00"
+                }
+                "NOT INVALID KEY" | "NOT ON EXCEPTION" | "NOT ON SIZE ERROR"
+                | "NOT ON OVERFLOW" => self.last_file_status == "00",
+                _ => false,
+            });
+        };
         let scope = optional_text_attribute(parent, "control_scope").unwrap_or("");
         if scope == "evaluate" {
             let subject = arguments(parent);
@@ -1094,15 +1135,30 @@ impl ReferenceMachine {
         )
     }
     fn dataset_effect(&mut self, name: &str, args: &[String]) -> Result<Step, MachineProblem> {
-        let logical = args
-            .first()
-            .ok_or(MachineProblem::InvalidOperation)?
-            .trim_matches(['\'', '"']);
+        let logical = if name == "open" {
+            args.iter().find(|argument| {
+                !matches!(
+                    argument.as_str(),
+                    "INPUT" | "OUTPUT" | "I-O" | "EXTEND" | "SHARING" | "WITH"
+                )
+            })
+        } else {
+            args.first()
+        }
+        .ok_or(MachineProblem::InvalidOperation)?
+        .trim_matches(['\'', '"']);
         let file = self.files.get(&normalize(logical)).cloned();
         let dataset_name = self
             .invocation
             .bindings
             .get(&format!("cobol.dd.{}", normalize(logical)))
+            .or_else(|| {
+                file.as_ref().and_then(|file| {
+                    self.invocation
+                        .bindings
+                        .get(&format!("cobol.dd.{}", normalize(&file.assignment)))
+                })
+            })
             .map(|payload| String::from_utf8_lossy(payload.bytes()).into_owned())
             .unwrap_or_else(|| {
                 file.as_ref()
@@ -1149,6 +1205,21 @@ impl ReferenceMachine {
                     dataset,
                     member: None,
                     records: vec![record],
+                    expected_version: None,
+                    mutation: self.mutation()?,
+                }
+            }
+            "rewrite" => {
+                let record = position(args, "FROM")
+                    .and_then(|index| args.get(index + 1))
+                    .or_else(|| args.first())
+                    .map(|value| self.resolve(value))
+                    .transpose()?
+                    .unwrap_or_default();
+                DatasetRequest::RewriteRecord {
+                    dataset,
+                    key: default_key.ok_or(MachineProblem::InvalidOperation)?,
+                    record,
                     expected_version: None,
                     mutation: self.mutation()?,
                 }
@@ -2956,7 +3027,7 @@ impl Machine for ReferenceMachine {
         }
         let bytes = encode_snapshot(&self.snapshot())?;
         BoundedPayload::new(
-            "mainframe-env.reference-machine-checkpoint@3",
+            "mainframe-env.reference-machine-checkpoint@4",
             bytes,
             InvocationLimits {
                 max_payload_bytes: usize::try_from(
@@ -2979,7 +3050,7 @@ impl Machine for ReferenceMachine {
 }
 
 fn encode_snapshot(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
-    let mut bytes = b"MECP0003".to_vec();
+    let mut bytes = b"MECP0004".to_vec();
     bytes.extend_from_slice(&snapshot.schema_version.to_be_bytes());
     bytes.extend_from_slice(&u64::try_from(snapshot.program_counter).ok()?.to_be_bytes());
     bytes.extend_from_slice(&snapshot.effect_sequence.to_be_bytes());
@@ -3026,6 +3097,7 @@ fn encode_snapshot(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
         bytes.extend_from_slice(&u64::try_from(*node).ok()?.to_be_bytes());
         bytes.extend_from_slice(&count.to_be_bytes());
     }
+    push_bytes(&mut bytes, snapshot.last_file_status.as_bytes())?;
     Some(bytes)
 }
 
@@ -3047,6 +3119,7 @@ fn decode_snapshot(
         b"MECP0001" => 1,
         b"MECP0002" => 2,
         b"MECP0003" => 3,
+        b"MECP0004" => 4,
         _ => return Err(MachineProblem::IncompatibleSnapshot),
     };
     let schema_version = input.u32()?;
@@ -3130,6 +3203,11 @@ fn decode_snapshot(
             }
         }
     }
+    let last_file_status = if header_version >= 4 {
+        String::from_utf8(input.bytes(2)?).map_err(|_| MachineProblem::IncompatibleSnapshot)?
+    } else {
+        "00".into()
+    };
     if !input.finished() {
         return Err(MachineProblem::IncompatibleSnapshot);
     }
@@ -3143,6 +3221,7 @@ fn decode_snapshot(
         altered_targets,
         loop_reentry,
         loop_counts,
+        last_file_status,
     })
 }
 
@@ -3401,6 +3480,7 @@ pub fn supported_operations() -> &'static BTreeSet<OperationIdentity> {
             "open",
             "perform",
             "read",
+            "rewrite",
             "search",
             "set",
             "stop_run",
@@ -4626,10 +4706,16 @@ mod tests {
             first.drive(MachineResume::Start, Quantum::new(1, 1024).unwrap()),
             MachineDrive::Continue
         );
+        first.last_file_status = "10".into();
         let checkpoint = first.checkpoint().unwrap();
+        assert_eq!(
+            checkpoint.schema(),
+            "mainframe-env.reference-machine-checkpoint@4"
+        );
         let mut restored =
             ReferenceMachine::from_binary(&binary(), invocation, CodecLimits::default()).unwrap();
         restored.restore_checkpoint(&checkpoint).unwrap();
+        assert_eq!(restored.last_file_status, "10");
         let first_done = first.drive(MachineResume::Start, Quantum::new(100, 1024).unwrap());
         let restored_done = restored.drive(MachineResume::Start, Quantum::new(100, 1024).unwrap());
         assert_eq!(first_done, restored_done);

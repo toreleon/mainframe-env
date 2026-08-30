@@ -75,6 +75,32 @@ impl HostProvider for DefaultProgramRouter {
                     .map(HostResult::Program),
             };
         }
+        if let HostRequest::Program(ProgramRequest::Call { program, payload }) = &effect.request
+            && payload.schema() == "mainframe-env.program.input@1"
+            && !self
+                .router
+                .supported_programs()
+                .any(|name| name.eq_ignore_ascii_case(program.as_str()))
+        {
+            return EffectResult {
+                sequence: effect.sequence,
+                outcome: self
+                    .cobol
+                    .execute_installed_batch(invocation, program.as_str(), payload)
+                    .and_then(|output| {
+                        serde_json::to_vec(&output).map_err(|_| HostProblem::ProviderFailure)
+                    })
+                    .and_then(|bytes| {
+                        BoundedPayload::new(
+                            "mainframe-env.program.output@1",
+                            bytes,
+                            InvocationLimits::default(),
+                        )
+                        .map_err(|_| HostProblem::ResourceExhausted)
+                    })
+                    .map(HostResult::Program),
+            };
+        }
         self.router.invoke(invocation, effect)
     }
 }
@@ -88,6 +114,11 @@ pub fn default_program_router() -> Arc<DefaultProgramRouter> {
     )
     .expect("owned program catalog is valid");
     Arc::new(DefaultProgramRouter { router, cobol })
+}
+
+#[must_use]
+pub const fn compatible_system_services() -> &'static [&'static str] {
+    &["CEEDAYS", "COBDATFT", "MVSWAIT", "CEE3ABD"]
 }
 
 struct CobolProgram {
@@ -116,15 +147,35 @@ impl CobolProgram {
         if program.eq_ignore_ascii_case("CEEDAYS") {
             return execute_ceedays(payload);
         }
+        if program.eq_ignore_ascii_case("MVSWAIT") {
+            return execute_mvswait(payload);
+        }
+        if program.eq_ignore_ascii_case("COBDATFT") {
+            return execute_cobdatft(payload);
+        }
+        if program.eq_ignore_ascii_case("CEE3ABD") {
+            return execute_cee3abd(payload);
+        }
         let store = self.store.get().ok_or(HostProblem::InfrastructureFailure)?;
         let artifacts = self
             .artifacts
             .get()
             .ok_or(HostProblem::InfrastructureFailure)?;
-        let catalog = store
-            .get_provider_state("online-program", &program.to_ascii_uppercase())
+        let name = program.to_ascii_uppercase();
+        let catalog = match store
+            .get_provider_state("batch-program", &name)
             .map_err(|_| HostProblem::InfrastructureFailure)?
-            .ok_or(HostProblem::NotFound)?;
+        {
+            Some(catalog) => catalog,
+            None => store
+                .get_provider_state("online-program", &name)
+                .map_err(|_| HostProblem::InfrastructureFailure)?
+                .ok_or_else(|| HostProblem::Condition {
+                    name: format!("PROGRAM-NOTFOUND:{name}"),
+                    response: -7,
+                    response2: 0,
+                })?,
+        };
         let artifact = ArtifactRef::new(
             String::from_utf8(catalog.payload).map_err(|_| HostProblem::InfrastructureFailure)?,
             InvocationLimits::default(),
@@ -133,7 +184,11 @@ impl CobolProgram {
         let record = artifacts
             .get_artifact(&artifact)
             .map_err(|_| HostProblem::InfrastructureFailure)?
-            .ok_or(HostProblem::NotFound)?;
+            .ok_or_else(|| HostProblem::Condition {
+                name: format!("ARTIFACT-NOTFOUND:{name}"),
+                response: -8,
+                response2: 0,
+            })?;
         let call_values = decode_cobol_call_values(payload)?;
         let limits = InvocationLimits::default();
         let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
@@ -198,7 +253,11 @@ impl CobolProgram {
             ExecutionOutcome::Cancelled => Err(HostProblem::Cancelled),
             ExecutionOutcome::TimedOut => Err(HostProblem::TimedOut),
             ExecutionOutcome::ResourceExhausted(_) => Err(HostProblem::ResourceExhausted),
-            ExecutionOutcome::ProviderFailure(_) => Err(HostProblem::ProviderFailure),
+            ExecutionOutcome::ProviderFailure(problem) => Err(HostProblem::Condition {
+                name: format!("BATCH-PROVIDER:{}", problem.public_message),
+                response: -6,
+                response2: 0,
+            }),
             ExecutionOutcome::InfrastructureFailure(_) => Err(HostProblem::InfrastructureFailure),
             ExecutionOutcome::Abend(_) => Err(HostProblem::Condition {
                 name: "INSTALLED-CALL-ABEND".into(),
@@ -227,6 +286,171 @@ impl CobolProgram {
             }),
         }
     }
+
+    fn execute_installed_batch(
+        &self,
+        parent: &Invocation,
+        program: &str,
+        payload: &BoundedPayload,
+    ) -> Result<ProgramOutput, HostProblem> {
+        let input: ProgramInput =
+            serde_json::from_slice(payload.bytes()).map_err(|_| HostProblem::Malformed)?;
+        let store = self.store.get().ok_or(HostProblem::InfrastructureFailure)?;
+        let artifacts = self
+            .artifacts
+            .get()
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let catalog = store
+            .get_provider_state("batch-program", &program.to_ascii_uppercase())
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .ok_or(HostProblem::NotFound)?;
+        let artifact = ArtifactRef::new(
+            String::from_utf8(catalog.payload).map_err(|_| HostProblem::InfrastructureFailure)?,
+            InvocationLimits::default(),
+        )
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let record = artifacts
+            .get_artifact(&artifact)
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .ok_or(HostProblem::NotFound)?;
+        let limits = InvocationLimits::default();
+        let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
+        let mut bindings = parent.bindings.clone();
+        for dd in &input.dds {
+            if let Some(dataset) = &dd.dataset {
+                bindings.insert(
+                    format!("cobol.dd.{}", dd.name.to_ascii_uppercase()),
+                    BoundedPayload::new(
+                        "mainframe-env.dataset-name@1",
+                        dataset.as_bytes().to_vec(),
+                        limits,
+                    )
+                    .map_err(|_| HostProblem::ResourceExhausted)?,
+                );
+            }
+            if dd.name.eq_ignore_ascii_case("SYSIN") && !dd.inline_data.is_empty() {
+                bindings.insert(
+                    "cobol.terminal.input".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.terminal.input@1",
+                        dd.inline_data.clone(),
+                        limits,
+                    )
+                    .map_err(|_| HostProblem::ResourceExhausted)?,
+                );
+            }
+        }
+        let invocation = Invocation::new(
+            RequestId::new(
+                format!(
+                    "batch-installed-request-{}-{sequence}",
+                    parent.execution_id.as_str()
+                ),
+                limits,
+            )
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+            ExecutionId::new(
+                format!(
+                    "batch-installed-execution-{}-{sequence}",
+                    parent.execution_id.as_str()
+                ),
+                limits,
+            )
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+            RunUnitId::new(
+                format!(
+                    "batch-installed-run-{}-{sequence}",
+                    parent.execution_id.as_str()
+                ),
+                limits,
+            )
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+            Some(parent.execution_id.clone()),
+            Selector::new(format!("program:{}", program.to_ascii_uppercase()), limits)
+                .map_err(|_| HostProblem::Malformed)?,
+            artifact,
+            Principal::new(
+                parent.principal.id().clone(),
+                parent.principal.grants().clone(),
+                limits,
+            )
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+            parent.service_class,
+            parent.priority,
+            parent.deadline_tick,
+            TraceId::new(
+                format!(
+                    "batch-installed-trace-{}-{sequence}",
+                    parent.execution_id.as_str()
+                ),
+                limits,
+            )
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+            IdempotencyKey::new(
+                format!(
+                    "batch-installed-effect-{}-{sequence}",
+                    parent.execution_id.as_str()
+                ),
+                limits,
+            )
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+            parent.attempt,
+            parent.limits,
+            bindings,
+            limits,
+        )
+        .and_then(|invocation| {
+            invocation.with_provider_generations(parent.provider_generations.clone(), limits)
+        })
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let mut machine = ReferenceMachine::from_binary(
+            &record.payload,
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .map_err(|_| HostProblem::ProviderFailure)?;
+        let coordinator = ExecutionCoordinator::durable(
+            Arc::clone(self.host.get().ok_or(HostProblem::InfrastructureFailure)?),
+            Arc::clone(self.store.get().ok_or(HostProblem::InfrastructureFailure)?),
+            CoordinatorLimits::default(),
+        );
+        match coordinator.execute(&mut machine, &invocation, ExecutionControl::default()) {
+            ExecutionOutcome::Completed(completion) => Ok(ProgramOutput {
+                return_code: completion.return_code,
+                records: completion
+                    .output
+                    .bytes()
+                    .split(|byte| *byte == b'\n')
+                    .filter(|record| !record.is_empty())
+                    .map(<[u8]>::to_vec)
+                    .collect(),
+                dd_outputs: BTreeMap::new(),
+            }),
+            ExecutionOutcome::Condition(condition) => Ok(ProgramOutput {
+                return_code: condition.response,
+                records: vec![condition.name.into_bytes()],
+                dd_outputs: BTreeMap::new(),
+            }),
+            ExecutionOutcome::Abend(abend) => Err(HostProblem::Condition {
+                name: format!("ABEND:{}", abend.code),
+                response: -1,
+                response2: 0,
+            }),
+            ExecutionOutcome::Cancelled => Err(HostProblem::Cancelled),
+            ExecutionOutcome::TimedOut => Err(HostProblem::TimedOut),
+            ExecutionOutcome::ResourceExhausted(_) => Err(HostProblem::ResourceExhausted),
+            ExecutionOutcome::ProviderFailure(problem) => Err(HostProblem::Condition {
+                name: format!("BATCH-PROVIDER:{}", problem.public_message),
+                response: -6,
+                response2: 0,
+            }),
+            ExecutionOutcome::InfrastructureFailure(_) => Err(HostProblem::InfrastructureFailure),
+            ExecutionOutcome::Rejected(_)
+            | ExecutionOutcome::Suspended(_)
+            | ExecutionOutcome::Invoke(_)
+            | ExecutionOutcome::Transfer(_) => Err(HostProblem::Unsupported),
+        }
+    }
 }
 
 impl Program for CobolProgram {
@@ -251,12 +475,30 @@ impl Program for CobolProgram {
         let limits = InvocationLimits::default();
         let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
         let invocation = Invocation::new(
-            RequestId::new(format!("batch-cobol-request-{sequence}"), limits)
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
-            ExecutionId::new(format!("batch-cobol-execution-{sequence}"), limits)
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
-            RunUnitId::new(format!("batch-cobol-run-{sequence}"), limits)
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            RequestId::new(
+                format!(
+                    "batch-cobol-request-{}-{sequence}",
+                    parent.execution_id.as_str()
+                ),
+                limits,
+            )
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+            ExecutionId::new(
+                format!(
+                    "batch-cobol-execution-{}-{sequence}",
+                    parent.execution_id.as_str()
+                ),
+                limits,
+            )
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+            RunUnitId::new(
+                format!(
+                    "batch-cobol-run-{}-{sequence}",
+                    parent.execution_id.as_str()
+                ),
+                limits,
+            )
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
             Some(parent.execution_id.clone()),
             Selector::new("program:COBOL", limits).map_err(|_| HostProblem::Malformed)?,
             ArtifactRef::new(format!("sha256:{}", artifact.id().to_hex()), limits)
@@ -270,10 +512,22 @@ impl Program for CobolProgram {
             parent.service_class,
             parent.priority,
             parent.deadline_tick,
-            TraceId::new(format!("batch-cobol-trace-{sequence}"), limits)
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
-            IdempotencyKey::new(format!("batch-cobol-effect-{sequence}"), limits)
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            TraceId::new(
+                format!(
+                    "batch-cobol-trace-{}-{sequence}",
+                    parent.execution_id.as_str()
+                ),
+                limits,
+            )
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+            IdempotencyKey::new(
+                format!(
+                    "batch-cobol-effect-{}-{sequence}",
+                    parent.execution_id.as_str()
+                ),
+                limits,
+            )
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
             parent.attempt,
             parent.limits,
             parent.bindings.clone(),
@@ -391,10 +645,17 @@ fn execute_ceedays(payload: &BoundedPayload) -> Result<BoundedPayload, HostProbl
     }
     let date = cee_vstring(&values[0]).ok_or(HostProblem::Malformed)?;
     let picture = cee_vstring(&values[1]).ok_or(HostProblem::Malformed)?;
-    let valid = valid_ceedays_date(date, picture);
+    let parsed = parse_ceedays_date(date, picture);
     values[2].fill(0);
     values[3].fill(0);
-    if !valid {
+    if let Some((year, month, day)) = parsed {
+        let lilian = civil_day(year, month, day) - civil_day(1582, 10, 14);
+        let lilian = i32::try_from(lilian).map_err(|_| HostProblem::ResourceExhausted)?;
+        if values[2].len() != 4 {
+            return Err(HostProblem::Malformed);
+        }
+        values[2].copy_from_slice(&lilian.to_be_bytes());
+    } else {
         if values[3].len() < 8 {
             return Err(HostProblem::Malformed);
         }
@@ -404,12 +665,71 @@ fn execute_ceedays(payload: &BoundedPayload) -> Result<BoundedPayload, HostProbl
     encode_cobol_call_result(&values).map_err(|_| HostProblem::ProviderFailure)
 }
 
+fn execute_mvswait(payload: &BoundedPayload) -> Result<BoundedPayload, HostProblem> {
+    let values = decode_cobol_call_values(payload)?;
+    if values.len() != 1 || values[0].len() != 4 {
+        return Err(HostProblem::Malformed);
+    }
+    encode_cobol_call_result(&values).map_err(|_| HostProblem::ProviderFailure)
+}
+
+fn execute_cobdatft(payload: &BoundedPayload) -> Result<BoundedPayload, HostProblem> {
+    let mut values = decode_cobol_call_values(payload)?;
+    if values.len() != 1 || values[0].len() < 80 {
+        return Err(HostProblem::Malformed);
+    }
+    let record = &mut values[0];
+    let input = record[1..21].to_vec();
+    let valid = match (record[0], record[21]) {
+        (b'1', b'1') if input.get(4) != Some(&b'-') => {
+            record[22..26].copy_from_slice(&input[..4]);
+            record[26] = b'-';
+            record[27..29].copy_from_slice(&input[4..6]);
+            record[29] = b'-';
+            record[30..32].copy_from_slice(&input[6..8]);
+            true
+        }
+        (b'2', b'2') => {
+            record[22..26].copy_from_slice(&input[..4]);
+            record[26..28].copy_from_slice(&input[5..7]);
+            record[28..30].copy_from_slice(&input[8..10]);
+            true
+        }
+        _ => false,
+    };
+    if !valid {
+        record[42..55].copy_from_slice(b"INVALID INPUT");
+    }
+    encode_cobol_call_result(&values).map_err(|_| HostProblem::ProviderFailure)
+}
+
+fn execute_cee3abd(payload: &BoundedPayload) -> Result<BoundedPayload, HostProblem> {
+    let values = decode_cobol_call_values(payload)?;
+    if values.len() > 2 || values.iter().any(|value| value.len() != 4) {
+        return Err(HostProblem::Malformed);
+    }
+    let code = values.first().map_or(999, |value| {
+        i32::from_be_bytes(value.as_slice().try_into().unwrap_or(999i32.to_be_bytes()))
+    });
+    BoundedPayload::new(
+        "mainframe-env.program.abend@1",
+        format!("U{:04}", code.unsigned_abs().min(9999)).into_bytes(),
+        InvocationLimits::default(),
+    )
+    .map_err(|_| HostProblem::ResourceExhausted)
+}
+
 fn cee_vstring(value: &[u8]) -> Option<&[u8]> {
     let length = usize::try_from(i16::from_be_bytes(value.get(..2)?.try_into().ok()?)).ok()?;
     value.get(2..2usize.checked_add(length)?)
 }
 
+#[cfg(test)]
 fn valid_ceedays_date(value: &[u8], picture: &[u8]) -> bool {
+    parse_ceedays_date(value, picture).is_some()
+}
+
+fn parse_ceedays_date(value: &[u8], picture: &[u8]) -> Option<(u32, u32, u32)> {
     let value = trim_ascii(value);
     let picture = trim_ascii(picture);
     let (year, month, day) = match picture {
@@ -419,7 +739,7 @@ fn valid_ceedays_date(value: &[u8], picture: &[u8]) -> bool {
             (&value[..4], &value[5..7], &value[8..])
         }
         b"YYYYMMDD" if value.len() == 8 => (&value[..4], &value[4..6], &value[6..]),
-        _ => return false,
+        _ => return None,
     };
     let number = |bytes: &[u8]| -> Option<u32> {
         bytes.iter().try_fold(0u32, |value, byte| {
@@ -427,24 +747,32 @@ fn valid_ceedays_date(value: &[u8], picture: &[u8]) -> bool {
                 .then(|| value * 10 + u32::from(*byte - b'0'))
         })
     };
-    let Some(year) = number(year) else {
-        return false;
-    };
-    let Some(month) = number(month) else {
-        return false;
-    };
-    let Some(day) = number(day) else {
-        return false;
-    };
+    let year = number(year)?;
+    let month = number(month)?;
+    let day = number(day)?;
     let leap = year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400));
     let days = match month {
         1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
         4 | 6 | 9 | 11 => 30,
         2 if leap => 29,
         2 => 28,
-        _ => return false,
+        _ => return None,
     };
-    day >= 1 && day <= days
+    (year <= 9999 && (year, month, day) >= (1582, 10, 15) && day >= 1 && day <= days)
+        .then_some((year, month, day))
+}
+
+fn civil_day(year: u32, month: u32, day: u32) -> i64 {
+    let mut year = i64::from(year);
+    let month = i64::from(month);
+    let day = i64::from(day);
+    year -= i64::from(month <= 2);
+    let era = year.div_euclid(400);
+    let year_of_era = year - era * 400;
+    let shifted_month = month + if month > 2 { -3 } else { 9 };
+    let day_of_year = (153 * shifted_month + 2) / 5 + day - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    era * 146_097 + day_of_era
 }
 
 fn trim_ascii(mut value: &[u8]) -> &[u8] {
@@ -579,6 +907,47 @@ mod tests {
         .unwrap()
     }
 
+    fn call_payload(values: &[Vec<u8>]) -> BoundedPayload {
+        let mut bytes = u32::try_from(values.len()).unwrap().to_be_bytes().to_vec();
+        for (index, value) in values.iter().enumerate() {
+            let name = format!("ARG{}", index + 1);
+            bytes.extend_from_slice(&(name.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(name.as_bytes());
+            bytes.push(1);
+            bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(value);
+        }
+        BoundedPayload::new(
+            "mainframe-env.cobol.call@1",
+            bytes,
+            InvocationLimits::default(),
+        )
+        .unwrap()
+    }
+
+    fn vstring(value: &[u8]) -> Vec<u8> {
+        let mut output = i16::try_from(value.len()).unwrap().to_be_bytes().to_vec();
+        output.extend_from_slice(value);
+        output
+    }
+
+    fn call_result(payload: &BoundedPayload) -> Vec<Vec<u8>> {
+        assert_eq!(payload.schema(), "mainframe-env.cobol.call-result@1");
+        let mut at = 0usize;
+        let count = u32::from_be_bytes(payload.bytes()[at..at + 4].try_into().unwrap()) as usize;
+        at += 4;
+        let mut values = Vec::with_capacity(count);
+        for _ in 0..count {
+            let length =
+                u64::from_be_bytes(payload.bytes()[at..at + 8].try_into().unwrap()) as usize;
+            at += 8;
+            values.push(payload.bytes()[at..at + length].to_vec());
+            at += length;
+        }
+        assert_eq!(at, payload.bytes().len());
+        values
+    }
+
     #[test]
     fn default_cobol_program_compiles_and_runs_reference_machine() {
         let program = CobolProgram::new();
@@ -614,6 +983,43 @@ mod tests {
         assert!(valid_ceedays_date(b"20240229", b"YYYYMMDD"));
         assert!(!valid_ceedays_date(b"20230229", b"YYYYMMDD"));
         assert!(!valid_ceedays_date(b"20111301", b"YYYYMMDD"));
+    }
+
+    #[test]
+    fn compatible_date_wait_and_abend_services_match_reached_abis() {
+        let mut date_record = vec![b' '; 80];
+        date_record[0] = b'1';
+        date_record[1..9].copy_from_slice(b"20260830");
+        date_record[21] = b'1';
+        let converted = execute_cobdatft(&call_payload(&[date_record])).unwrap();
+        let converted = call_result(&converted);
+        assert_eq!(&converted[0][22..32], b"2026-08-30");
+        assert_eq!(&converted[0][42..80], vec![b' '; 38]);
+
+        let days = execute_ceedays(&call_payload(&[
+            vstring(b"1988-05-16"),
+            vstring(b"YYYY-MM-DD"),
+            vec![0; 4],
+            vec![0; 12],
+        ]))
+        .unwrap();
+        let days = call_result(&days);
+        assert_eq!(
+            i32::from_be_bytes(days[2].as_slice().try_into().unwrap()),
+            148_138
+        );
+        assert_eq!(days[3], vec![0; 12]);
+
+        let waited = execute_mvswait(&call_payload(&[36i32.to_be_bytes().to_vec()])).unwrap();
+        assert_eq!(call_result(&waited)[0], 36i32.to_be_bytes());
+
+        let abend = execute_cee3abd(&call_payload(&[
+            999i32.to_be_bytes().to_vec(),
+            0i32.to_be_bytes().to_vec(),
+        ]))
+        .unwrap();
+        assert_eq!(abend.schema(), "mainframe-env.program.abend@1");
+        assert_eq!(abend.bytes(), b"U0999");
     }
 
     #[test]
@@ -697,8 +1103,11 @@ mod tests {
             })
             .unwrap();
         assert_eq!(output.records, vec![b"DURABLE".to_vec()]);
-        let execution =
-            ExecutionId::new("batch-cobol-execution-1", InvocationLimits::default()).unwrap();
+        let execution = ExecutionId::new(
+            "batch-cobol-execution-parent-execution-1",
+            InvocationLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             store.get_execution(&execution).unwrap().unwrap().state,
             ExecutionState::Completed

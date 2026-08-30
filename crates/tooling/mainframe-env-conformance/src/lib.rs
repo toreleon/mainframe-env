@@ -22,16 +22,18 @@ use std::collections::{BTreeMap, BTreeSet};
 mod carddemo;
 
 pub use carddemo::{
-    CardDemoBaseOnlineReceipt, CardDemoCicsReceipt, CardDemoCicsRuntimeReceipt,
-    CardDemoClosureReceipt, CardDemoControlReceipt, CardDemoCoreReceipt, CardDemoCorpusReceipt,
-    CardDemoDatasetCatalogReceipt, CardDemoFileCallReceipt, CardDemoHostReceipt,
-    CardDemoJclReceipt, CardDemoLayoutReceipt, CardDemoPackageReceipt, CardDemoProgramReceipt,
-    CardDemoResourceReceipt, CardDemoSecurityReceipt, CardDemoSeedReceipt, CardDemoSourceReceipt,
-    CardDemoTerminalReceipt, CardDemoUtilityReceipt, CardDemoVsamReceipt, CorpusProblem,
+    CardDemoBaseOnlineReceipt, CardDemoBatchProgramReceipt, CardDemoCicsReceipt,
+    CardDemoCicsRuntimeReceipt, CardDemoClosureReceipt, CardDemoControlReceipt,
+    CardDemoCoreReceipt, CardDemoCorpusReceipt, CardDemoDatasetCatalogReceipt,
+    CardDemoFileCallReceipt, CardDemoHostReceipt, CardDemoJclReceipt, CardDemoLayoutReceipt,
+    CardDemoPackageReceipt, CardDemoProgramReceipt, CardDemoResourceReceipt,
+    CardDemoSecurityReceipt, CardDemoSeedReceipt, CardDemoSourceReceipt, CardDemoTerminalReceipt,
+    CardDemoUtilityReceipt, CardDemoVsamReceipt, CorpusProblem,
     verify_carddemo_application_package_from_env, verify_carddemo_base_online_from_env,
-    verify_carddemo_cics_abi_from_env, verify_carddemo_cics_runtime_from_env,
-    verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
-    verify_carddemo_corpus, verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
+    verify_carddemo_batch_programs_from_env, verify_carddemo_cics_abi_from_env,
+    verify_carddemo_cics_runtime_from_env, verify_carddemo_control_flow_from_env,
+    verify_carddemo_core_semantics_from_env, verify_carddemo_corpus,
+    verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
     verify_carddemo_dataset_catalog_from_env, verify_carddemo_file_call_semantics_from_env,
     verify_carddemo_host_operands_from_env, verify_carddemo_jcl_from_env,
     verify_carddemo_program_routing_from_env, verify_carddemo_resources_from_env,
@@ -547,7 +549,7 @@ mod tests {
         let checkpoint = first.checkpoint().unwrap();
         assert_eq!(
             checkpoint.schema(),
-            "mainframe-env.reference-machine-checkpoint@3"
+            "mainframe-env.reference-machine-checkpoint@4"
         );
         let mut restored =
             ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())

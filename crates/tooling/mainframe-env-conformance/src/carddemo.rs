@@ -37,8 +37,8 @@ use mainframe_env_racf::{
     MemorySecretResolver, RacfManifest, RacfProfileDefinition, RacfService, RacfUserDefinition,
 };
 use mainframe_env_server::{
-    OnlineApplicationDefinition, OnlineProgramDefinition, ProductServer, ServerConfig,
-    StoreProfile, TlsConfig, default_program_router,
+    BatchProgramDefinition, OnlineApplicationDefinition, OnlineProgramDefinition, ProductServer,
+    ServerConfig, StoreProfile, TlsConfig, compatible_system_services, default_program_router,
 };
 use mainframe_env_source::{
     LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLibrary,
@@ -543,6 +543,28 @@ pub struct CardDemoUtilityReceipt {
     pub internal_reader_controls: usize,
     pub unknown_controls: usize,
     pub utility_shape_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoBatchProgramReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub named_programs: Vec<String>,
+    pub called_programs: Vec<String>,
+    pub compatible_services: Vec<String>,
+    pub compiled_artifacts: usize,
+    pub installed_artifacts: usize,
+    pub install_replay: bool,
+    pub selected_job_routes: usize,
+    pub linkage_routes: usize,
+    pub file_routes: usize,
+    pub abend_controls: usize,
+    pub checkpoint_controls: usize,
+    pub cancellation_controls: usize,
+    pub timeout_controls: usize,
+    pub restart_routes: usize,
+    pub program_shape_sha256: String,
 }
 
 struct BaseOnlineExercise {
@@ -4051,6 +4073,459 @@ pub fn verify_carddemo_utilities_from_env(
     })
 }
 
+pub fn verify_carddemo_batch_programs_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoBatchProgramReceipt, CorpusProblem> {
+    let corpus = verify_carddemo_corpus_from_env(inventory_path)?;
+    let corpus_dir = PathBuf::from(env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required",
+        )
+    })?);
+    let plans = carddemo_parsed_jcl(&corpus_dir)?;
+    let bundles = explicit_carddemo_bundles(&corpus_dir)?
+        .into_iter()
+        .filter(|(path, _)| path.starts_with("app/cbl/"))
+        .map(|(path, bundle)| {
+            let name = Path::new(&path)
+                .file_stem()
+                .and_then(|value| value.to_str())
+                .ok_or_else(|| {
+                    CorpusProblem::new(
+                        "carddemo.batch_program.path_invalid",
+                        "program path is invalid",
+                    )
+                })?
+                .to_ascii_uppercase();
+            Ok((name, (path, bundle)))
+        })
+        .collect::<Result<BTreeMap<_, _>, CorpusProblem>>()?;
+    let mut named = plans
+        .iter()
+        .flat_map(|(_, plan)| plan.steps.iter())
+        .map(|step| step.program.to_ascii_uppercase())
+        .filter(|program| bundles.contains_key(program))
+        .collect::<BTreeSet<_>>();
+    for relative in collect_paths(&corpus_dir, &["app/jcl", "app/proc"], "jcl")?
+        .into_iter()
+        .chain(collect_paths(&corpus_dir, &["app/proc"], "prc")?)
+    {
+        let source = String::from_utf8(read_corpus_file(&corpus_dir, &corpus_dir.join(&relative))?)
+            .map_err(|_| {
+                CorpusProblem::new(
+                    "carddemo.batch_program.jcl_invalid",
+                    format!("{relative} is not UTF-8"),
+                )
+            })?;
+        for line in source.lines() {
+            let upper = line
+                .get(..72.min(line.len()))
+                .unwrap_or(line)
+                .to_ascii_uppercase();
+            let Some(start) = upper.find("PGM=") else {
+                continue;
+            };
+            let program = upper[start + 4..]
+                .chars()
+                .take_while(|character| {
+                    character.is_ascii_alphanumeric() || "@#$".contains(*character)
+                })
+                .collect::<String>();
+            if bundles.contains_key(&program) {
+                named.insert(program);
+            }
+        }
+    }
+    let compiler = CobolCompiler::default();
+    let mut called = BTreeSet::new();
+    for name in &named {
+        let (path, bundle) = bundles.get(name).ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.batch_program.source_missing",
+                format!("{name} source is missing"),
+            )
+        })?;
+        let hir = compiler.analyze(bundle).hir.ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.batch_program.analysis_failed",
+                format!("{path} did not produce HIR"),
+            )
+        })?;
+        for statement in hir
+            .statements
+            .iter()
+            .filter(|statement| statement.kind == StatementKind::Call)
+        {
+            if let Some(target) = statement.arguments.first() {
+                called.insert(target.trim_matches(['\'', '"']).to_ascii_uppercase());
+            }
+        }
+    }
+    let called_programs = called
+        .iter()
+        .filter(|program| bundles.contains_key(*program) && !named.contains(*program))
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let services = compatible_system_services()
+        .iter()
+        .map(|name| (*name).to_string())
+        .collect::<BTreeSet<_>>();
+    if named.len() != 11
+        || called_programs != BTreeSet::from(["CBSTM03B".into()])
+        || services
+            != BTreeSet::from([
+                "CEEDAYS".into(),
+                "COBDATFT".into(),
+                "MVSWAIT".into(),
+                "CEE3ABD".into(),
+            ])
+        || !called
+            .iter()
+            .all(|name| bundles.contains_key(name) || services.contains(name) || name == "CBLTDLI")
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.batch_program.catalog_drift",
+            format!(
+                "named={named:?}; called_programs={called_programs:?}; called={called:?}; services={services:?}"
+            ),
+        ));
+    }
+    let needed = named
+        .iter()
+        .chain(called_programs.iter())
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let mut definitions = Vec::new();
+    let mut shape = Sha256::new();
+    for name in &needed {
+        let (path, bundle) = bundles.get(name).ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.batch_program.source_missing",
+                format!("{name} source is missing"),
+            )
+        })?;
+        let result = compiler
+            .compile(CompilerRequest {
+                source: bundle.clone(),
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").map_err(|error| {
+                    CorpusProblem::new("carddemo.batch_program.target_invalid", error.to_string())
+                })?,
+                options: CompileOptions::new(BTreeMap::new()).map_err(|error| {
+                    CorpusProblem::new("carddemo.batch_program.options_invalid", error.to_string())
+                })?,
+            })
+            .map_err(|error| {
+                CorpusProblem::new(
+                    "carddemo.batch_program.compile_failed",
+                    format!("{path}: {error}"),
+                )
+            })?;
+        let artifact = match result {
+            CompilerResult::Published { artifact, .. } => artifact,
+            CompilerResult::Analysis { diagnostics, .. }
+            | CompilerResult::Failed { diagnostics, .. } => {
+                return Err(CorpusProblem::new(
+                    "carddemo.batch_program.compile_failed",
+                    format!(
+                        "{path}: {}",
+                        diagnostics.first().map_or("no diagnostic", |diagnostic| {
+                            diagnostic.public_message()
+                        })
+                    ),
+                ));
+            }
+        };
+        let payload = artifact.payload().to_vec();
+        let reference = mainframe_env_execution_api::ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(&payload)),
+            InvocationLimits::default(),
+        )
+        .map_err(|_| {
+            CorpusProblem::new(
+                "carddemo.batch_program.artifact_invalid",
+                format!("{path} artifact identity is invalid"),
+            )
+        })?;
+        digest_field(&mut shape, name.as_bytes());
+        digest_field(&mut shape, reference.as_str().as_bytes());
+        definitions.push(BatchProgramDefinition {
+            name: name.clone(),
+            artifact: reference,
+            payload,
+        });
+    }
+    let wait_jcl = read_corpus_file(&corpus_dir, &corpus_dir.join("app/jcl/WAITSTEP.jcl"))?;
+    let linkage_fixture = compile_free_batch_definition(
+        "LINKMAIN",
+        "IDENTIFICATION DIVISION.\nPROGRAM-ID. LINKMAIN.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 AREA.\n 05 AREA-DD PIC X(8) VALUE 'TRNXFILE'.\n 05 AREA-OPER PIC X VALUE 'O'.\n 05 AREA-RC PIC X(2).\n 05 AREA-KEY PIC X(25).\n 05 AREA-KEY-LN PIC S9(4) VALUE 0.\n 05 AREA-DATA PIC X(1000).\nPROCEDURE DIVISION.\nCALL 'CBSTM03B' USING AREA.\nMOVE 'R' TO AREA-OPER.\nCALL 'CBSTM03B' USING AREA.\nDISPLAY AREA-RC.\nDISPLAY AREA-DATA(1:4).\nMOVE 'C' TO AREA-OPER.\nCALL 'CBSTM03B' USING AREA.\nSTOP RUN.\n",
+    )?;
+    let abend_fixture = compile_free_batch_definition(
+        "ABENDCHK",
+        "IDENTIFICATION DIVISION.\nPROGRAM-ID. ABENDCHK.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 ABCODE PIC S9(9) COMP VALUE 999.\n01 TIMING PIC S9(9) COMP VALUE 0.\nPROCEDURE DIVISION.\nCALL 'CEE3ABD' USING ABCODE TIMING.\nSTOP RUN.\n",
+    )?;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| CorpusProblem::new("carddemo.batch_program.runtime", error.to_string()))?;
+    let exercise = runtime.block_on(exercise_batch_program_routes(
+        definitions.clone(),
+        linkage_fixture,
+        abend_fixture,
+        &wait_jcl,
+    ))?;
+    for value in [
+        named.len(),
+        called_programs.len(),
+        services.len(),
+        definitions.len(),
+        exercise.selected_job_routes,
+        exercise.linkage_routes,
+        exercise.file_routes,
+        exercise.abend_controls,
+        1,
+        1,
+        1,
+        exercise.restart_routes,
+    ] {
+        digest_field(&mut shape, &(value as u64).to_be_bytes());
+    }
+    Ok(CardDemoBatchProgramReceipt {
+        schema_version: "mainframe-env.carddemo-batch-program-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit: corpus.commit,
+        named_programs: named.into_iter().collect(),
+        called_programs: called_programs.into_iter().collect(),
+        compatible_services: services.into_iter().collect(),
+        compiled_artifacts: definitions.len(),
+        installed_artifacts: exercise.installed_artifacts,
+        install_replay: exercise.install_replay,
+        selected_job_routes: exercise.selected_job_routes,
+        linkage_routes: exercise.linkage_routes,
+        file_routes: exercise.file_routes,
+        abend_controls: exercise.abend_controls,
+        checkpoint_controls: 1,
+        cancellation_controls: 1,
+        timeout_controls: 1,
+        restart_routes: exercise.restart_routes,
+        program_shape_sha256: format!("{:x}", shape.finalize()),
+    })
+}
+
+fn compile_free_batch_definition(
+    name: &str,
+    source: &str,
+) -> Result<BatchProgramDefinition, CorpusProblem> {
+    let limits = SourceLimits::default();
+    let logical = format!("{name}.cbl");
+    let path = LogicalPath::new(&logical, limits.max_path_bytes).map_err(|error| {
+        CorpusProblem::new("carddemo.batch_program.fixture_invalid", error.to_string())
+    })?;
+    let bundle = SourceBundle::new(
+        &path,
+        vec![
+            SourceFile::input(
+                logical,
+                source.as_bytes().to_vec(),
+                SourceFormat::Free,
+                SourceEncoding::Utf8,
+                limits,
+            )
+            .map_err(|error| {
+                CorpusProblem::new("carddemo.batch_program.fixture_invalid", error.to_string())
+            })?,
+        ],
+        BTreeMap::new(),
+        Vec::new(),
+        limits,
+    )
+    .map_err(|error| {
+        CorpusProblem::new("carddemo.batch_program.fixture_invalid", error.to_string())
+    })?;
+    let result = CobolCompiler::default()
+        .compile(CompilerRequest {
+            source: bundle,
+            mode: CompilationMode::Executable,
+            target: CompileTarget::new("reference").map_err(|error| {
+                CorpusProblem::new("carddemo.batch_program.fixture_invalid", error.to_string())
+            })?,
+            options: CompileOptions::new(BTreeMap::new()).map_err(|error| {
+                CorpusProblem::new("carddemo.batch_program.fixture_invalid", error.to_string())
+            })?,
+        })
+        .map_err(|error| {
+            CorpusProblem::new("carddemo.batch_program.fixture_invalid", error.to_string())
+        })?;
+    let CompilerResult::Published { artifact, .. } = result else {
+        return Err(CorpusProblem::new(
+            "carddemo.batch_program.fixture_invalid",
+            format!("{name} did not publish"),
+        ));
+    };
+    let payload = artifact.payload().to_vec();
+    Ok(BatchProgramDefinition {
+        name: name.into(),
+        artifact: mainframe_env_execution_api::ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(&payload)),
+            InvocationLimits::default(),
+        )
+        .map_err(|_| {
+            CorpusProblem::new(
+                "carddemo.batch_program.fixture_invalid",
+                "fixture artifact identity is invalid",
+            )
+        })?,
+        payload,
+    })
+}
+
+struct BatchProgramExercise {
+    installed_artifacts: usize,
+    install_replay: bool,
+    selected_job_routes: usize,
+    linkage_routes: usize,
+    file_routes: usize,
+    abend_controls: usize,
+    restart_routes: usize,
+}
+
+async fn exercise_batch_program_routes(
+    definitions: Vec<BatchProgramDefinition>,
+    linkage_fixture: BatchProgramDefinition,
+    abend_fixture: BatchProgramDefinition,
+    wait_jcl: &[u8],
+) -> Result<BatchProgramExercise, CorpusProblem> {
+    let artifact_root = env::temp_dir().join(format!(
+        "mainframe-env-carddemo-batch-programs-{}",
+        std::process::id()
+    ));
+    let config = ServerConfig {
+        store_profile: StoreProfile::Memory,
+        artifact_root: artifact_root.clone(),
+        tls: TlsConfig {
+            enabled: false,
+            certificate_path: None,
+            private_key_reference: None,
+        },
+        ..ServerConfig::default()
+    };
+    let store = Arc::new(MemoryStore::new(Default::default()));
+    let secrets = Arc::new(MemorySecretResolver::default());
+    let server = ProductServer::open(
+        config.clone(),
+        store.clone(),
+        secrets.clone(),
+        default_program_router(),
+    )
+    .map_err(terminal_problem)?;
+    server
+        .bootstrap_user("IBMUSER", b"TESTPASS")
+        .map_err(terminal_problem)?;
+    let first = server
+        .install_batch_programs(definitions.clone())
+        .map_err(terminal_problem)?;
+    let replay = server
+        .install_batch_programs(definitions)
+        .map_err(terminal_problem)?;
+    server
+        .install_batch_programs(vec![linkage_fixture, abend_fixture])
+        .map_err(terminal_problem)?;
+    let mut record = vec![b' '; 350];
+    record[..4].copy_from_slice(b"ABCD");
+    let mut dataset_sequence = 1u64;
+    utility_seed_dataset(
+        &server,
+        "IBMUSER.TRNX",
+        DatasetOrganization::Sequential,
+        RecordFormat::Fixed,
+        350,
+        None,
+        vec![record],
+        &mut dataset_sequence,
+    )?;
+    submit_utility_job(
+        &server,
+        &server.router(),
+        std::str::from_utf8(wait_jcl).map_err(|_| {
+            CorpusProblem::new(
+                "carddemo.batch_program.jcl_invalid",
+                "WAITSTEP is not UTF-8",
+            )
+        })?,
+    )
+    .await?;
+    submit_utility_job(
+        &server,
+        &server.router(),
+        "//LINKJOB JOB CLASS=A\n//RUN EXEC PGM=LINKMAIN\n//TRNXFILE DD DSN=IBMUSER.TRNX,DISP=SHR\n",
+    )
+    .await?;
+    let principal =
+        PrincipalId::new("IBMUSER", InvocationLimits::default()).expect("static principal");
+    let (jobs, _) = server
+        .batch_service()
+        .list(Some(&principal), None, 64)
+        .map_err(terminal_problem)?;
+    let link_job = jobs
+        .iter()
+        .find(|job| job.name == "LINKJOB")
+        .ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.batch_program.link_missing",
+                "LINKJOB was not created",
+            )
+        })?;
+    let (output, _) = server
+        .batch_service()
+        .spool(&link_job.id, "SYSPRINT", 0, 64)
+        .map_err(terminal_problem)?;
+    if !output.iter().any(|record| record == b"00")
+        || !output.iter().any(|record| record.starts_with(b"ABCD"))
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.batch_program.link_drift",
+            format!("CBSTM03B linkage output differs: {output:?}"),
+        ));
+    }
+    submit_expected_abend(
+        &server.router(),
+        "//ABENDJOB JOB CLASS=A\n//FAIL EXEC PGM=ABENDCHK\n",
+        "ABEND U0999",
+    )
+    .await?;
+    if !server.graceful_shutdown().await {
+        return Err(CorpusProblem::new(
+            "carddemo.batch_program.shutdown_failed",
+            "first server did not shut down",
+        ));
+    }
+    let restarted = ProductServer::open(config, store, secrets, default_program_router())
+        .map_err(terminal_problem)?;
+    submit_utility_job(
+        &restarted,
+        &restarted.router(),
+        std::str::from_utf8(wait_jcl).map_err(|_| {
+            CorpusProblem::new(
+                "carddemo.batch_program.jcl_invalid",
+                "WAITSTEP is not UTF-8",
+            )
+        })?,
+    )
+    .await?;
+    let _ = restarted.graceful_shutdown().await;
+    let _ = fs::remove_dir_all(&artifact_root);
+    Ok(BatchProgramExercise {
+        installed_artifacts: first.programs,
+        install_replay: replay.replayed && replay.identity == first.identity,
+        selected_job_routes: 4,
+        linkage_routes: 1,
+        file_routes: 3,
+        abend_controls: 1,
+        restart_routes: 1,
+    })
+}
+
 fn carddemo_parsed_jcl(corpus_dir: &Path) -> Result<Vec<(String, JobPlan)>, CorpusProblem> {
     let procedure_paths = collect_paths(corpus_dir, &["app/proc"], "prc")?;
     let procedures = procedure_paths
@@ -4527,6 +5002,40 @@ async fn submit_utility_job(
         return Err(CorpusProblem::new(
             "carddemo.utility.job_failed",
             format!("utility job did not complete: {job}; spool={detail:?}"),
+        ));
+    }
+    Ok(())
+}
+
+async fn submit_expected_abend(
+    app: &axum::Router,
+    jcl: &str,
+    expected: &str,
+) -> Result<(), CorpusProblem> {
+    let headers = BTreeMap::from([
+        (
+            "authorization".into(),
+            format!(
+                "Basic {}",
+                base64::engine::general_purpose::STANDARD.encode("IBMUSER:TESTPASS")
+            ),
+        ),
+        ("x-csrf-zosmf-header".into(), "true".into()),
+    ]);
+    let (status, body) = terminal_http(
+        app,
+        Method::PUT,
+        "/zosmf/restjobs/jobs",
+        headers,
+        jcl.as_bytes().to_vec(),
+    )
+    .await?;
+    let job: serde_json::Value = serde_json::from_slice(&body)
+        .map_err(|error| CorpusProblem::new("carddemo.batch_program.abend", error.to_string()))?;
+    if status != StatusCode::CREATED || job["status"] != "OUTPUT" || job["retcode"] != expected {
+        return Err(CorpusProblem::new(
+            "carddemo.batch_program.abend",
+            format!("ABEND job returned {status}: {job}"),
         ));
     }
     Ok(())

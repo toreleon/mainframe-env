@@ -256,10 +256,18 @@ fn lower_structured(
                 .skip(node.id + 1)
                 .find(|candidate| {
                     candidate.parent == node.parent
-                        && matches!(candidate.role, ControlRole::Branch | ControlRole::BlockEnd)
+                        && matches!(
+                            candidate.role,
+                            ControlRole::Branch | ControlRole::BlockEnd | ControlRole::Terminator
+                        )
                 })
                 .map(|candidate| candidate.id)
-                .ok_or(LowerProblem::InvalidOperation)?;
+                .ok_or_else(|| {
+                    LowerProblem::InvalidControl(format!(
+                        "branch node {} parent {:?} has no following sibling: {}",
+                        node.id, node.parent, node.text
+                    ))
+                })?;
             control.insert(
                 "edge_branch_false".into(),
                 Attribute::Integer(false_target as i64),
@@ -430,6 +438,7 @@ pub fn core_mir_catalog() -> OperationCatalog {
         .chain([
             StatementKind::NextSentence,
             StatementKind::ExecDli,
+            StatementKind::Rewrite,
             StatementKind::Label,
             StatementKind::ProgramEnd,
         ])
@@ -514,7 +523,7 @@ fn runtime_import(kind: StatementKind) -> Option<&'static str> {
     match kind {
         K::Accept | K::Display => Some("host.terminal"),
         K::Call | K::Cancel | K::ExecDli | K::ExecSql => Some("host.program"),
-        K::Open | K::Close | K::Read | K::Write => Some("host.dataset"),
+        K::Open | K::Close | K::Read | K::Rewrite | K::Write => Some("host.dataset"),
         K::ExecCics => Some("host.cics"),
         _ => None,
     }
@@ -524,11 +533,12 @@ fn core_identity(name: &str) -> Result<OperationIdentity, LowerProblem> {
     OperationIdentity::new(CORE_NAMESPACE, name, 1).map_err(|_| LowerProblem::InvalidOperation)
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum LowerProblem {
     UnsupportedConstruct,
     InvalidLayout,
     InvalidOperation,
+    InvalidControl(String),
     LimitExceeded,
 }
 

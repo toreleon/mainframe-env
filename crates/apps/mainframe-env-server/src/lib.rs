@@ -6,11 +6,11 @@ mod cobol;
 mod config;
 mod product;
 
-pub use cobol::{DefaultProgramRouter, default_program_router};
+pub use cobol::{DefaultProgramRouter, compatible_system_services, default_program_router};
 pub use config::{ConfigOverrides, ServerConfig, StoreProfile, TlsConfig};
 pub use product::{
-    OnlineApplicationDefinition, OnlineInstallReceipt, OnlineProgramDefinition, ProductMetrics,
-    ProductServer,
+    BatchInstallReceipt, BatchProgramDefinition, OnlineApplicationDefinition, OnlineInstallReceipt,
+    OnlineProgramDefinition, ProductMetrics, ProductServer,
 };
 
 pub const SERVER_GENERATION: &str = "mainframe-env-server@1";

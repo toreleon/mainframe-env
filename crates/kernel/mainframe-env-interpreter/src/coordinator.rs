@@ -580,7 +580,7 @@ mod tests {
     }
 
     #[test]
-    fn completion_and_cancellation_use_one_driver() {
+    fn completion_cancellation_and_timeout_use_one_driver() {
         let coordinator = ExecutionCoordinator::local(CoordinatorLimits::default());
         assert!(matches!(
             coordinator.execute(
@@ -600,6 +600,17 @@ mod tests {
                 }
             ),
             ExecutionOutcome::Cancelled
+        );
+        assert_eq!(
+            coordinator.execute(
+                &mut CompleteMachine,
+                &invocation(),
+                ExecutionControl {
+                    now_tick: 100,
+                    cancellation_requested: false,
+                }
+            ),
+            ExecutionOutcome::TimedOut
         );
     }
 }

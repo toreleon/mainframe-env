@@ -17,7 +17,7 @@ use mainframe_env_host_api::{
     DatasetName, DatasetOrganization, DatasetRequest, DatasetResult, EffectRequest, EffectResult,
     HostLimits, HostProblem, HostProvider, HostRequest, HostResult, MemberName, Mutation,
     RecordFormat, RegistrySnapshot, ResourceName, ScopedHostService, SecretRef, SecurityDecision,
-    SessionId,
+    SessionId, TerminalRequest,
 };
 use mainframe_env_interpreter::{
     CoordinatorLimits, ExecutionControl, ExecutionCoordinator, ReferenceMachine,
@@ -61,6 +61,20 @@ pub struct OnlineProgramDefinition {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BatchProgramDefinition {
+    pub name: String,
+    pub artifact: ArtifactRef,
+    pub payload: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BatchInstallReceipt {
+    pub programs: usize,
+    pub identity: String,
+    pub replayed: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OnlineApplicationDefinition {
     pub programs: Vec<OnlineProgramDefinition>,
     pub transactions: BTreeMap<String, String>,
@@ -93,6 +107,11 @@ struct ConsoleMessage {
     text: Vec<u8>,
 }
 
+struct SequenceState {
+    next: u64,
+    version: Option<u64>,
+}
+
 pub struct ProductServer {
     config: ServerConfig,
     store: Arc<dyn PlatformStore>,
@@ -109,7 +128,7 @@ pub struct ProductServer {
     online_traces: Mutex<BTreeMap<String, Vec<CicsTraceEntry>>>,
     sessions: Mutex<BTreeMap<String, AuthSession>>,
     console: Mutex<Vec<ConsoleMessage>>,
-    sequence: AtomicU64,
+    sequence: Mutex<SequenceState>,
     accepting: AtomicBool,
     requests: AtomicU64,
     failures: AtomicU64,
@@ -214,7 +233,48 @@ impl ProductServer {
                 return Err(HostProblem::InfrastructureFailure);
             }
         }
+        for row in store
+            .list_provider_state("batch-program", 4096)
+            .map_err(store_error)?
+        {
+            let artifact = ArtifactRef::new(
+                String::from_utf8(row.payload).map_err(|_| HostProblem::InfrastructureFailure)?,
+                InvocationLimits::default(),
+            )
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+            if artifacts
+                .get_artifact(&artifact)
+                .map_err(store_error)?
+                .is_none()
+            {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+        }
         cics.register_programs(&online_programs.keys().cloned().collect())?;
+        let sequence = match store
+            .get_provider_state("server-meta", "next-sequence")
+            .map_err(store_error)?
+        {
+            Some(row) => {
+                let next = u64::from_be_bytes(
+                    row.payload
+                        .as_slice()
+                        .try_into()
+                        .map_err(|_| HostProblem::InfrastructureFailure)?,
+                );
+                if next == 0 {
+                    return Err(HostProblem::InfrastructureFailure);
+                }
+                SequenceState {
+                    next,
+                    version: Some(row.version),
+                }
+            }
+            None => SequenceState {
+                next: 1,
+                version: None,
+            },
+        };
         let product = Arc::new(Self {
             config,
             store,
@@ -231,7 +291,7 @@ impl ProductServer {
             online_traces: Mutex::new(BTreeMap::new()),
             sessions: Mutex::new(sessions),
             console: Mutex::new(console),
-            sequence: AtomicU64::new(1),
+            sequence: Mutex::new(sequence),
             accepting: AtomicBool::new(true),
             requests: AtomicU64::new(0),
             failures: AtomicU64::new(0),
@@ -407,6 +467,71 @@ impl ProductServer {
             programs: definition.programs.len(),
             transactions: definition.transactions.len(),
             maps: definition.maps.len(),
+            identity: format!("sha256:{:x}", identity.finalize()),
+            replayed,
+        })
+    }
+
+    pub fn install_batch_programs(
+        &self,
+        definitions: Vec<BatchProgramDefinition>,
+    ) -> Result<BatchInstallReceipt, HostProblem> {
+        if definitions.is_empty() || definitions.len() > 4096 {
+            return Err(HostProblem::Malformed);
+        }
+        let mut programs = BTreeMap::new();
+        let mut identity = Sha256::new();
+        for definition in &definitions {
+            let name = normalize_online_name(&definition.name, 128)?;
+            let digest: [u8; 32] = Sha256::digest(&definition.payload).into();
+            if definition.artifact.as_str() != format!("sha256:{}", hex_digest(&digest))
+                || programs
+                    .insert(name.clone(), definition.artifact.clone())
+                    .is_some()
+            {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            self.artifacts
+                .put_artifact(ArtifactRecord {
+                    artifact: definition.artifact.clone(),
+                    media_type: "application/vnd.mainframe-env.core-mir".into(),
+                    payload_digest: digest,
+                    payload: definition.payload.clone(),
+                })
+                .map_err(store_error)?;
+            digest_online_field(&mut identity, name.as_bytes());
+            digest_online_field(&mut identity, definition.artifact.as_str().as_bytes());
+        }
+        let mut writes = Vec::new();
+        for (name, artifact) in &programs {
+            match self
+                .store
+                .get_provider_state("batch-program", name)
+                .map_err(store_error)?
+            {
+                Some(current) if current.payload != artifact.as_str().as_bytes() => {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+                Some(_) => {}
+                None => writes.push(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: "batch-program".into(),
+                        key: name.clone(),
+                        version: 1,
+                        payload: artifact.as_str().as_bytes().to_vec(),
+                    },
+                    expected_version: None,
+                }),
+            }
+        }
+        let replayed = writes.is_empty();
+        if !replayed {
+            self.store
+                .put_provider_states_atomic(writes)
+                .map_err(store_error)?;
+        }
+        Ok(BatchInstallReceipt {
+            programs: definitions.len(),
             identity: format!("sha256:{:x}", identity.finalize()),
             replayed,
         })
@@ -976,7 +1101,7 @@ impl ProductServer {
                         member,
                         records,
                         expected_version: Some(version),
-                        mutation: self.mutation(),
+                        mutation: self.mutation().map_err(gateway_problem)?,
                     },
                 )?;
                 Ok(GatewayResponse::empty(if created_member {
@@ -994,7 +1119,7 @@ impl ProductServer {
                     DatasetRequest::Create {
                         dataset: dataset_name(&dataset)?,
                         attributes: dataset_attributes(&attributes).map_err(gateway_problem)?,
-                        mutation: self.mutation(),
+                        mutation: self.mutation().map_err(gateway_problem)?,
                     },
                 )?;
                 Ok(GatewayResponse::empty(StatusCode::CREATED))
@@ -1006,7 +1131,7 @@ impl ProductServer {
                         dataset: dataset_name(&dataset)?,
                         member: member_name(member)?,
                         expected_version: None,
-                        mutation: self.mutation(),
+                        mutation: self.mutation().map_err(gateway_problem)?,
                     },
                 )?;
                 Ok(GatewayResponse::empty(StatusCode::NO_CONTENT))
@@ -1462,7 +1587,7 @@ impl ProductServer {
     }
 
     fn verify(&self, user: &str, secret: &[u8]) -> Result<(), HostProblem> {
-        let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
+        let sequence = self.next_sequence()?;
         let reference = format!("request:{sequence}");
         self.secrets.insert(&reference, secret.to_vec());
         let result = self.racf.authenticate(
@@ -1608,7 +1733,7 @@ impl ProductServer {
                 &[capability],
             )
             .map_err(gateway_problem)?;
-        let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
+        let sequence = self.next_sequence().map_err(gateway_problem)?;
         let mutation = dataset_mutation(&request);
         let idempotency_key = mutation.map(|mutation| mutation.idempotency_key.clone());
         let result = self.host.invoke(
@@ -1671,6 +1796,36 @@ impl ProductServer {
         }
     }
 
+    fn next_sequence(&self) -> Result<u64, HostProblem> {
+        let mut state = self
+            .sequence
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let current = state.next;
+        let successor = current
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        let version = state
+            .version
+            .unwrap_or(0)
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "server-meta".into(),
+                    key: "next-sequence".into(),
+                    version,
+                    payload: successor.to_be_bytes().to_vec(),
+                },
+                state.version,
+            )
+            .map_err(store_error)?;
+        state.next = successor;
+        state.version = Some(version);
+        Ok(current)
+    }
+
     fn invocation(
         &self,
         principal: &str,
@@ -1678,7 +1833,7 @@ impl ProductServer {
         service_class: ServiceClass,
         required_capabilities: &[&str],
     ) -> Result<Invocation, HostProblem> {
-        let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
+        let sequence = self.next_sequence()?;
         let limits = InvocationLimits::default();
         let grants = required_capabilities
             .iter()
@@ -1725,9 +1880,9 @@ impl ProductServer {
         .map_err(|_| HostProblem::InfrastructureFailure)
     }
 
-    fn mutation(&self) -> Mutation {
-        let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
-        Mutation {
+    fn mutation(&self) -> Result<Mutation, HostProblem> {
+        let sequence = self.next_sequence()?;
+        Ok(Mutation {
             sequence,
             idempotency_key: IdempotencyKey::new(
                 format!("mutation-{sequence}"),
@@ -1735,11 +1890,11 @@ impl ProductServer {
             )
             .expect("bounded generated key"),
             transaction: Some(format!("zosmf-{sequence}")),
-        }
+        })
     }
 
     fn idempotency(&self, kind: &str) -> Result<IdempotencyKey, HostProblem> {
-        let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
+        let sequence = self.next_sequence()?;
         IdempotencyKey::new(
             format!("zosmf-{kind}-{sequence}"),
             InvocationLimits::default(),
@@ -1843,7 +1998,7 @@ impl ProductServer {
                             key_length: Some(8),
                             ccsid: Some(37),
                         },
-                        mutation: self.mutation(),
+                        mutation: self.mutation().map_err(gateway_problem)?,
                     },
                 )?;
                 Ok(GatewayResponse::json(
@@ -1861,7 +2016,7 @@ impl ProductServer {
                         dataset: dataset_name(name)?,
                         member: None,
                         expected_version: None,
-                        mutation: self.mutation(),
+                        mutation: self.mutation().map_err(gateway_problem)?,
                     },
                 )?;
                 Ok(GatewayResponse::json(
@@ -1902,7 +2057,7 @@ impl ProductServer {
                         member: None,
                         records,
                         expected_version: Some(version),
-                        mutation: self.mutation(),
+                        mutation: self.mutation().map_err(gateway_problem)?,
                     },
                 )?;
                 Ok(GatewayResponse::json(
@@ -1942,7 +2097,7 @@ impl ProductServer {
         if messages.len() >= 65536 {
             return Err(gateway_problem(HostProblem::ResourceExhausted));
         }
-        let key = format!("{:016}", self.sequence.fetch_add(1, Ordering::Relaxed));
+        let key = format!("{:016}", self.next_sequence().map_err(gateway_problem)?);
         let mut payload = name.to_ascii_uppercase().into_bytes();
         payload.push(0);
         payload.extend_from_slice(&text);
@@ -2037,6 +2192,7 @@ fn scoped_host(
     let mut providers = dataset_providers(dataset.clone(), limits);
     providers.extend(racf_providers(racf.clone(), limits));
     providers.push(Arc::new(SystemClockProvider::new(limits)) as Arc<dyn HostProvider>);
+    providers.push(Arc::new(BatchTerminalProvider::new(limits)) as Arc<dyn HostProvider>);
     providers.push(program);
     if include_cics {
         providers.push(cics.ok_or(HostProblem::InfrastructureFailure)?);
@@ -2052,6 +2208,50 @@ fn scoped_host(
 
 struct SystemClockProvider {
     descriptor: CapabilityDescriptor,
+}
+
+struct BatchTerminalProvider {
+    descriptor: CapabilityDescriptor,
+}
+
+impl BatchTerminalProvider {
+    fn new(limits: InvocationLimits) -> Self {
+        Self {
+            descriptor: CapabilityDescriptor {
+                capability: CapabilityId::new("host.terminal", limits)
+                    .expect("static terminal capability"),
+                provider_id: "mainframe-env-batch-terminal".into(),
+                generation: "1".into(),
+                request_schema: "mainframe-env.terminal-request@1".into(),
+                result_schema: "mainframe-env.terminal-result@1".into(),
+                max_request_bytes: 64 * 1024,
+                max_result_bytes: 4 * 1024 * 1024,
+                ready: true,
+            },
+        }
+    }
+}
+
+impl HostProvider for BatchTerminalProvider {
+    fn descriptor(&self) -> &CapabilityDescriptor {
+        &self.descriptor
+    }
+
+    fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
+        let outcome = match effect.request {
+            HostRequest::Terminal(TerminalRequest::Read { .. }) => invocation
+                .bindings
+                .get("cobol.terminal.input")
+                .cloned()
+                .map(HostResult::Terminal)
+                .ok_or(HostProblem::NotFound),
+            _ => Err(HostProblem::Unsupported),
+        };
+        EffectResult {
+            sequence: effect.sequence,
+            outcome,
+        }
+    }
 }
 
 impl SystemClockProvider {
@@ -2416,7 +2616,7 @@ fn job_capabilities(jcl: &[u8]) -> Vec<&'static str> {
     if source.contains("ASKTIME") || source.contains("FORMATTIME") {
         capabilities.push("host.clock");
     }
-    if source.contains("ACCEPT ") {
+    if source.contains("ACCEPT ") || source.contains("SYSIN") {
         capabilities.push("host.terminal");
     }
     capabilities
@@ -2431,6 +2631,10 @@ fn control_name(control: &str, keyword: &str) -> Option<String> {
 }
 
 fn job_json(job: mainframe_env_batch::JobSnapshot) -> Value {
+    let retcode = job
+        .abend_code
+        .map(|code| format!("ABEND {code}"))
+        .or_else(|| job.return_code.map(|code| format!("CC {code:04}")));
     json!({
         "jobid":job.id,
         "jobname":job.name,
@@ -2438,7 +2642,7 @@ fn job_json(job: mainframe_env_batch::JobSnapshot) -> Value {
         "status":if matches!(job.state, mainframe_env_batch::JobState::Completed | mainframe_env_batch::JobState::Failed | mainframe_env_batch::JobState::Cancelled) {"OUTPUT"} else {"ACTIVE"},
         "type":"JOB",
         "class":job.class.to_string(),
-        "retcode":job.return_code.map(|code|format!("CC {code:04}"))
+        "retcode":retcode
     })
 }
 
@@ -2919,6 +3123,121 @@ mod tests {
                 .unwrap(),
             b"HELLO"
         );
+    }
+
+    #[tokio::test]
+    async fn installed_cobswait_runs_by_named_jes_program_and_calls_mvswait() {
+        let limits = SourceLimits::default();
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. COBSWAIT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MVSWAIT-TIME PIC 9(8) COMP.\n01 PARM-VALUE PIC X(8).\nPROCEDURE DIVISION.\nACCEPT PARM-VALUE FROM SYSIN.\nMOVE PARM-VALUE TO MVSWAIT-TIME.\nCALL 'MVSWAIT' USING MVSWAIT-TIME.\nDISPLAY 'WAIT COMPLETE'.\nSTOP RUN.\n";
+        let path = LogicalPath::new("COBSWAIT.cbl", limits.max_path_bytes).unwrap();
+        let bundle = SourceBundle::new(
+            &path,
+            vec![
+                SourceFile::input(
+                    "COBSWAIT.cbl",
+                    source.to_vec(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("COBSWAIT fixture did not publish");
+        };
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_batch_programs(vec![BatchProgramDefinition {
+                name: "COBSWAIT".into(),
+                artifact: ArtifactRef::new(
+                    format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+                payload: artifact.payload().to_vec(),
+            }])
+            .unwrap();
+        let response = call(
+            &server.router(),
+            Method::PUT,
+            "/zosmf/restjobs/jobs",
+            "//WAITJOB JOB CLASS=A\n//WAIT EXEC PGM=COBSWAIT\n//STEPLIB DD DSN=IBMUSER.LOADLIB,DISP=SHR\n//SYSIN DD *\n00000000\n/*\n",
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let job: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), 65_536).await.unwrap()).unwrap();
+        assert_eq!(job["retcode"], "CC 0000");
+        assert_eq!(job["status"], "OUTPUT");
+
+        let abend_source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. ABENDER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 ABCODE PIC S9(9) COMP VALUE 999.\n01 TIMING PIC S9(9) COMP VALUE 0.\nPROCEDURE DIVISION.\nCALL 'CEE3ABD' USING ABCODE TIMING.\nSTOP RUN.\n";
+        let path = LogicalPath::new("ABENDER.cbl", limits.max_path_bytes).unwrap();
+        let bundle = SourceBundle::new(
+            &path,
+            vec![
+                SourceFile::input(
+                    "ABENDER.cbl",
+                    abend_source.to_vec(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let CompilerResult::Published {
+            artifact: abender, ..
+        } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("ABENDER fixture did not publish");
+        };
+        server
+            .install_batch_programs(vec![BatchProgramDefinition {
+                name: "ABENDER".into(),
+                artifact: ArtifactRef::new(
+                    format!("sha256:{:x}", Sha256::digest(abender.payload())),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+                payload: abender.payload().to_vec(),
+            }])
+            .unwrap();
+        let response = call(
+            &server.router(),
+            Method::PUT,
+            "/zosmf/restjobs/jobs",
+            "//ABENDJOB JOB CLASS=A\n//FAIL EXEC PGM=ABENDER\n",
+        )
+        .await;
+        let job: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), 65_536).await.unwrap()).unwrap();
+        assert_eq!(job["retcode"], "ABEND U0999");
+        assert_eq!(job["status"], "OUTPUT");
     }
 
     #[test]

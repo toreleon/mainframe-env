@@ -1,0 +1,116 @@
+{
+  "schema_version": "mainframe-env.carddemo-issue-evidence@1",
+  "issue": "CD-022",
+  "title": "Run named CardDemo COBOL batch programs and compatible system routines",
+  "derived": true,
+  "status": "pass",
+  "target_product": "0.1.1",
+  "current_product": "0.1.0-alpha.0",
+  "digest_scope": "Recursively lexicographically key-sorted compact UTF-8 JSON serialization of batch_program_receipt, with no trailing newline, followed by SHA-256",
+  "evidence_digest": "sha256:0cdd22145f02539cc1cc2db317ff998b1f6238e451f5691c38af5b480513703c",
+  "batch_program_receipt": {
+    "schema_version": "mainframe-env.carddemo-batch-program-receipt@1",
+    "status": "pass",
+    "corpus_commit": "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e",
+    "named_programs": [
+      "CBACT01C",
+      "CBACT02C",
+      "CBACT03C",
+      "CBACT04C",
+      "CBCUS01C",
+      "CBEXPORT",
+      "CBIMPORT",
+      "CBSTM03A",
+      "CBTRN02C",
+      "CBTRN03C",
+      "COBSWAIT"
+    ],
+    "called_programs": [
+      "CBSTM03B"
+    ],
+    "compatible_services": [
+      "CEE3ABD",
+      "CEEDAYS",
+      "COBDATFT",
+      "MVSWAIT"
+    ],
+    "compiled_artifacts": 12,
+    "installed_artifacts": 12,
+    "install_replay": true,
+    "selected_job_routes": 4,
+    "linkage_routes": 1,
+    "file_routes": 3,
+    "abend_controls": 1,
+    "checkpoint_controls": 1,
+    "cancellation_controls": 1,
+    "timeout_controls": 1,
+    "restart_routes": 1,
+    "program_shape_sha256": "e29138138ace26b3cf024ff179817d1776cf3b5916bd9408b42964b810c7c247"
+  },
+  "acceptance_observations": [
+    "All 11 source-backed base PGM entries, including the CBSTM03A entry recovered from the sole accepted-unsupported JCL file, compile into legal reference artifacts. CBSTM03B is derived from reached CALL targets, compiled with them, and all 12 artifacts install through the bounded content-addressed batch catalog with deterministic replay.",
+    "Named JES dispatch resolves the persisted batch catalog instead of source or native load modules. The actual pinned WAITSTEP job executes COBSWAIT, STEPLIB selection, SYSIN ACCEPT, and the explicit bounded MVSWAIT service through the public z/OSMF route before and after server restart.",
+    "The owned compatible services implement the reached COBDATFT 80-byte linkage conversion, CEEDAYS INT4 Lilian date and feedback ABI, MVSWAIT binary argument ABI, and CEE3ABD abnormal disposition. CEE3ABD is propagated through the interpreter and JES as ABEND U0999 rather than normal or generic-success completion.",
+    "The exact compiled CBSTM03B artifact executes OPEN, READ, and CLOSE against a DD-bound dataset through its 1038-byte linkage area and returns status 00 plus exact record bytes to its caller. REWRITE and NEXT SENTENCE are now legal reached operations, assignment-name DD lookup is explicit, and parentless file-condition branches plus file status survive checkpoint version 4.",
+    "Return codes and spool are observed through public jobs; server request/idempotency sequence state and named execution identities remain unique across restart. Cancellation, timeout, checkpoint corruption, warm-start recovery, and resource bounds retain typed terminal outcomes in focused coordinator, machine, and JES regressions."
+  ],
+  "commands": [
+    {
+      "command": "cargo test -p mainframe-env-server installed_cobswait_runs_by_named_jes_program_and_calls_mvswait -- --nocapture before repair",
+      "exit_code": 101,
+      "result": "focused named-PGM regression reached OUTPUT with null retcode because installed artifacts were not dispatchable from JES"
+    },
+    {
+      "command": "npx -y @zowe/cli@8.36.0 jobs submit local-file <redacted-local-checkout>/app/jcl/WAITSTEP.jcl --<ephemeral-local-zosmf-connection>",
+      "exit_code": 0,
+      "result": "actual pinned WAITSTEP completed CC 0000 and Zowe spool reported WAIT COBSWAIT RC=0000"
+    },
+    {
+      "command": "CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-batch-programs --check before CD-022 evidence",
+      "exit_code": 1,
+      "result": "derived named-program receipt passed and reported only the required missing issue evidence"
+    },
+    {
+      "command": "cargo test -p mainframe-env-compiler -p mainframe-env-interpreter -p mainframe-env-batch -p mainframe-env-dataset -p mainframe-env-server -p mainframe-env-conformance -p xtask --locked",
+      "exit_code": 0,
+      "result": "147 compiler, interpreter, JES, dataset, server, conformance, and gate tests passed"
+    },
+    {
+      "command": "affected-package cargo clippy --all-targets --locked -- -D warnings",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-batch-programs --check",
+      "exit_code": 0,
+      "result": "12 corpus artifacts, four compatible services, four public routes, linkage/file/ABEND controls, and restart passed"
+    },
+    {
+      "command": "env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-batch-programs --check",
+      "exit_code": 1,
+      "result": "expected missing-environment control"
+    },
+    {
+      "command": "cargo check --workspace --all-targets --locked",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "cargo xtask architecture --check && cargo xtask runtime-architecture --check && cargo xtask profiles --check && cargo xtask schemas --check && cargo xtask inventory --check && cargo xtask evidence --check",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "env -u CARDEMO_CORPUS_DIR cargo xtask conformance --check",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "cargo fmt --all -- --check && git diff --check && JSON parse and redaction checks",
+      "exit_code": 0,
+      "result": "pass"
+    }
+  ],
+  "absolute_local_paths_present": false,
+  "native_or_legacy_fallback_present": false
+}

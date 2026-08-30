@@ -1,17 +1,17 @@
 # CardDemo-full 0.1.1 Program Status
 
 Current phase: **CD.E — JCL/JES and base batch**
-Current issue: **CD-021 — DD and selected utility effects IN PROGRESS**
-Next issue: **CD-022 — named CardDemo batch programs and services**
+Current issue: **CD-022 — named CardDemo batch programs and services IN PROGRESS**
+Next issue: **CD-023 — complete base batch journey certification**
 Current product: **0.1.0-alpha.0**
 Target product: **0.1.1**
 CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Source identity
 
-- mainframe-env base commit: `f5fab8636611a112e59f40e22fe20cb5a35205c5`
+- mainframe-env base commit: `6b5bc675d5a2f93b6f7deee19caf7f4dd4049514`
 - current deterministic dirty-tree identity:
-  `sha256:be64db40b6205ca511ff3b1cd6fcf7040426fab752b69c42ab447696fbaf79bc`
+  `sha256:05a0c1553265d4c35854527819b61c123c015c58ac3e881a0a0e75235a9b7314`
 - dirty-tree algorithm: SHA-256 of the sorted `sha256sum` records for every
   repository file except `.git/`, `target/`, and the two persistent CardDemo
   status ledgers (which carry the identity).
@@ -405,6 +405,26 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   procedure defaults, persisted-plan compatibility, malformed input, missing
   procedures, and resource limits are regression tested.
 
+### CD-021 — exact DD and selected utility effects
+
+- State: **PASS**
+- Required commit subject: `Execute CardDemo DD and utility effects`
+- Completion commit identity:
+  `6b5bc675d5a2f93b6f7deee19caf7f4dd4049514`.
+- Evidence: `conformance/0.1.1/evidence/issues/CD-021.json`
+- Evidence digest:
+  `sha256:56b95c75078ef21247446e6798939d11452dd45c5ddc8cb451ae2640664ff715`
+- Dataset DD allocation, hydration, output, normal/abnormal DISP, temporary
+  PASS/delete, DCB attributes, PDS members, RRDS records, GDGs, AIX paths, and
+  internal-reader child submission execute through bounded typed effects.
+- IDCAMS DELETE/DEFINE/REPRO/LISTCAT/AIX/PATH/BLDINDEX plus IEBGENER, SORT,
+  and IEFBR14 have explicit exact routes. Reached SDSF, FTP, and IKJEFT1B
+  dispositions fail explicitly before generic dispatch; unknown utility and
+  IDCAMS controls cannot succeed or partially mutate state.
+- Zowe CLI 8.36.0 submitted the actual ESDSRRDS, DEFGDGD, and INTRDRJ1 corpus
+  jobs through the public server. All completed `CC 0000`; Zowe observed exact
+  dataset/GDG state and the queued INTRDRJ2 child.
+
 ## Commands and exit codes
 
 - `cargo test -p mainframe-env-conformance --locked` — **0**; 19 passed,
@@ -629,10 +649,30 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 - Workspace all-target check — **0**.
 - Architecture, runtime architecture, profile, schema, inventory, evidence,
   and ordinary conformance gates — **0**.
+- Focused pre-repair named COBSWAIT JES regression — **101**; the installed
+  artifact reached OUTPUT with no return code because named `PGM=` dispatch was
+  absent.
+- Zowe CLI 8.36.0 submitted the actual pinned `WAITSTEP.jcl` against the
+  ephemeral local ProductServer — **0**; `WAITSTEP` completed `CC 0000` and
+  JOBLOG reported `WAIT COBSWAIT RC=0000`.
+- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-batch-programs --check`
+  before evidence — **1**; the complete derived receipt passed and only the
+  required CD-022 evidence file was absent.
+- Compiler, interpreter, JES, dataset, server, conformance, and xtask suites —
+  **0**; 147 tests passed.
+- Affected-package Clippy with `-D warnings` — **0**.
+- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-batch-programs --check`
+  — **0**; 11 named entries, CBSTM03B, 12 compiled/installed artifacts, four
+  compatible services, four public jobs, three file routes, linkage, ABEND,
+  checkpoint, cancellation, timeout, replay, and restart controls passed.
+- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-batch-programs --check` —
+  **1**; expected missing-environment failure.
+- Workspace all-target, architecture, runtime architecture, profile, schema,
+  inventory, evidence, and ordinary conformance gates — **0**.
 
 ## Implementation status
 
-- Issues passed: **20 / 27**
+- Issues passed: **21 / 27**
 - Journeys passed: **9 / 20**
 - Installed CardDemo base-online resources: **18 programs, 17 transactions,
   17 maps**
@@ -647,11 +687,11 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 2. The repository is still `0.1.0-alpha.0`. A 0.1.1 release cannot be cut until
    0.1.0 is finalized or an explicit version-line correction is accepted.
 
-Neither decision blocks CD-021. No CD-020 blocker remains.
+Neither decision blocks CD-022. No CD-021 blocker remains.
 
 ## Next smallest executable step
 
-Connect parsed DDs to exact dataset disposition, temporary, GDG, and
-concatenation lifecycle; implement reached IDCAMS, IEBGENER, SORT, IEFBR14,
-SDSF/CICS file-control, internal-reader, FTP, and report routes; and prove that
-unknown utility or control statements cannot return generic success.
+Resolve every reached base named batch `PGM=` entry to an installed artifact or
+explicit compatible system service. Execute COBDATFT, MVSWAIT, CEEDAYS,
+CEE3ABD, and CBSTM03A/CBSTM03B linkage with exact files, return codes, ABEND,
+spool, checkpoint, cancellation, timeout, and durable restart behavior.

@@ -123,9 +123,7 @@ impl StatementKind {
             Self::DuplicateLabel
                 | Self::Invoke
                 | Self::Merge
-                | Self::NextSentence
                 | Self::Release
-                | Self::Rewrite
                 | Self::ReturnStatement
                 | Self::Sort
                 | Self::StructuredControl
