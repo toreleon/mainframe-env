@@ -1073,6 +1073,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "mainframe-env-db2"
+version = "0.1.0-alpha.0"
+dependencies = [
+ "mainframe-env-execution-api",
+ "mainframe-env-host-api",
+ "mainframe-env-store",
+ "mainframe-env-store-api",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "mainframe-env-diagnostics"
 version = "0.1.0-alpha.0"
 dependencies = [
@@ -1147,6 +1160,7 @@ dependencies = [
  "mainframe-env-compiler",
  "mainframe-env-compiler-api",
  "mainframe-env-dataset",
+ "mainframe-env-db2",
  "mainframe-env-encoding",
  "mainframe-env-execution-api",
  "mainframe-env-host-api",

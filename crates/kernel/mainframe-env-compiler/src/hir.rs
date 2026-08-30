@@ -971,17 +971,33 @@ fn parse_procedure(source: &str, max_statements: usize) -> Result<ParsedProcedur
                 )?;
                 extendable_statement = None;
                 extendable_control = Some(node);
-            } else if is_conditional_branch(&upper) {
+            } else if let Some((condition, action)) = conditional_branch_parts(line) {
                 let node = parser.push_node(
                     sentence_index,
                     line_number,
                     ControlRole::Branch,
                     None,
                     None,
-                    line.to_string(),
+                    condition,
                 );
-                extendable_statement = None;
-                extendable_control = Some(node);
+                if action.is_empty() {
+                    extendable_statement = None;
+                    extendable_control = Some(node);
+                } else {
+                    let kind =
+                        classify(&action).ok_or(HirProblem::UnknownStatement(line_number))?;
+                    let action_node =
+                        parser.push_statement(sentence_index, line_number, &action, kind)?;
+                    extendable_statement = parser.nodes[action_node].statement;
+                    extendable_control = None;
+                    add_inline_markers(
+                        &mut parser,
+                        sentence_index,
+                        line_number,
+                        &action.to_ascii_uppercase(),
+                        kind,
+                    )?;
+                }
             } else if extendable_statement.is_none()
                 && extendable_control.is_none()
                 && classify(line).is_none()
@@ -1367,22 +1383,31 @@ fn is_terminator(upper: &str) -> bool {
     })
 }
 
-fn is_conditional_branch(upper: &str) -> bool {
+fn conditional_branch_parts(line: &str) -> Option<(String, String)> {
+    let trimmed = line.trim();
+    let upper = trimmed.to_ascii_uppercase();
     [
-        "AT END",
         "NOT AT END",
-        "INVALID KEY",
+        "AT END",
         "NOT INVALID KEY",
-        "ON EXCEPTION",
+        "INVALID KEY",
         "NOT ON EXCEPTION",
-        "ON SIZE ERROR",
+        "ON EXCEPTION",
         "NOT ON SIZE ERROR",
-        "OVERFLOW",
-        "ON OVERFLOW",
+        "ON SIZE ERROR",
         "NOT ON OVERFLOW",
+        "ON OVERFLOW",
+        "OVERFLOW",
     ]
     .iter()
-    .any(|prefix| upper == *prefix || upper.starts_with(&format!("{prefix} ")))
+    .find_map(|prefix| {
+        (upper == *prefix || upper.starts_with(&format!("{prefix} "))).then(|| {
+            (
+                (*prefix).to_string(),
+                trimmed[prefix.len()..].trim_start().to_string(),
+            )
+        })
+    })
 }
 
 fn contains_word(text: &str, needle: &str) -> bool {

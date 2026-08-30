@@ -21,6 +21,7 @@
         "mainframe-env-dataset",
         "mainframe-env-racf",
         "mainframe-env-cics",
+        "mainframe-env-db2",
         "mainframe-env-store",
         "mainframe-env-zosmf",
         "mainframe-env-server"
@@ -46,6 +47,7 @@
         "mainframe-env-dataset",
         "mainframe-env-racf",
         "mainframe-env-cics",
+        "mainframe-env-db2",
         "mainframe-env-store",
         "mainframe-env-zosmf",
         "mainframe-env-server",

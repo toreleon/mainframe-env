@@ -9,8 +9,9 @@ use mainframe_env_execution_api::{
 };
 use mainframe_env_host_api::{
     CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, DatasetName,
-    DatasetRequest, EffectRequest, EffectResult, HostLimits, HostProblem, HostRequest, HostResult,
-    Mutation, ProgramName, ProgramRequest, TerminalRequest,
+    DatasetRequest, Db2HostVariable, Db2Operation, Db2Request, EffectRequest, EffectResult,
+    HostLimits, HostProblem, HostRequest, HostResult, Mutation, ProgramName, ProgramRequest,
+    TerminalRequest,
 };
 use mainframe_env_ir::{
     Attribute, CodecLimits, Module, Operation, OperationIdentity, StorageId, decode_binary,
@@ -108,6 +109,9 @@ enum PendingKind {
     ProgramCall {
         targets: Vec<String>,
     },
+    Db2 {
+        targets: Vec<String>,
+    },
     Cics {
         operation: CicsOperation,
         argument_summary: String,
@@ -166,6 +170,7 @@ pub struct ReferenceMachine {
     altered: BTreeMap<String, String>,
     last_file_status: String,
     dataset_cursors: BTreeMap<String, String>,
+    sql_cursors: BTreeMap<String, Vec<String>>,
     pc: usize,
     output: Vec<u8>,
     effect_sequence: u64,
@@ -236,6 +241,14 @@ impl ReferenceMachine {
                     scale: 0,
                 }),
             ),
+            (
+                "SQLCODE".into(),
+                CobolValue::Decimal(Decimal {
+                    coefficient: 0,
+                    scale: 0,
+                }),
+            ),
+            ("SQLSTATE".into(), CobolValue::Bytes(b"00000".to_vec())),
         ]);
         if let Some(commarea) = invocation.bindings.get("cics.commarea")
             && let Some(storage) = module
@@ -327,6 +340,7 @@ impl ReferenceMachine {
             altered: BTreeMap::new(),
             last_file_status: "00".into(),
             dataset_cursors: BTreeMap::new(),
+            sql_cursors: BTreeMap::new(),
             pc: 0,
             output: Vec::new(),
             effect_sequence: 0,
@@ -667,6 +681,37 @@ impl ReferenceMachine {
                     self.write(target, &value)?;
                 }
             }
+            (PendingKind::Db2 { targets }, HostResult::Db2(result)) => {
+                self.write_decimal(
+                    "SQLCODE",
+                    Decimal {
+                        coefficient: i128::from(result.sqlcode),
+                        scale: 0,
+                    },
+                )?;
+                self.write("SQLSTATE", result.sqlstate.as_bytes())?;
+                if self.layout("SQLERRML").is_some() {
+                    self.write_decimal(
+                        "SQLERRML",
+                        Decimal {
+                            coefficient: i128::try_from(result.message.len())
+                                .map_err(|_| MachineProblem::ResourceExhausted)?,
+                            scale: 0,
+                        },
+                    )?;
+                }
+                if self.layout("SQLERRMC").is_some() {
+                    self.write("SQLERRMC", result.message.as_bytes())?;
+                }
+                if let Some(row) = result.rows.first() {
+                    if row.columns.len() != targets.len() {
+                        return Err(MachineProblem::UnexpectedHostResult);
+                    }
+                    for (target, value) in targets.iter().zip(&row.columns) {
+                        self.write_value(target, &CobolValue::Bytes(value.clone()))?;
+                    }
+                }
+            }
             (
                 PendingKind::Cics {
                     operation,
@@ -808,6 +853,7 @@ impl ReferenceMachine {
                 PendingKind::DatasetRead { .. }
                 | PendingKind::DatasetStatus { .. }
                 | PendingKind::ProgramCall { .. }
+                | PendingKind::Db2 { .. }
                 | PendingKind::Cics { .. }
                 | PendingKind::Ignore,
                 _,
@@ -915,7 +961,7 @@ impl ReferenceMachine {
                 return self.dataset_effect(name, &args);
             }
             "exec_cics" => return self.cics_effect(&args),
-            "exec_sql" => return self.embedded_effect("SQL", &args),
+            "exec_sql" => return self.sql_effect(&args),
             "exec_dli" => return self.embedded_effect("DLI", &args),
             "stop_run" | "go_back" | "halt" => return Ok(Step::Complete),
             _ => return Err(MachineProblem::InvalidOperation),
@@ -1199,11 +1245,21 @@ impl ReferenceMachine {
         )
     }
 
-    fn perform_return_pc(&self, call_pc: usize) -> usize {
-        self.operations
+    fn perform_return_pc(&mut self, call_pc: usize) -> Result<usize, MachineProblem> {
+        let operation = self
+            .operations
             .get(call_pc)
-            .and_then(|operation| self.control_target(operation, "edge_fallthrough").ok())
-            .unwrap_or(call_pc.saturating_add(1))
+            .cloned()
+            .ok_or(MachineProblem::InvalidOperation)?;
+        if optional_integer_attribute(&operation, "edge_loop").is_some() {
+            return match self.perform_control_end(&operation)? {
+                Step::Jump(target) => Ok(target),
+                _ => Err(MachineProblem::InvalidOperation),
+            };
+        }
+        Ok(self
+            .control_target(&operation, "edge_fallthrough")
+            .unwrap_or(call_pc.saturating_add(1)))
     }
 
     fn finish_perform(&mut self) -> Result<usize, MachineProblem> {
@@ -1211,14 +1267,14 @@ impl ReferenceMachine {
             .perform_stack
             .pop()
             .ok_or(MachineProblem::InvalidOperation)?;
-        let mut return_pc = self.perform_return_pc(completed_pc);
+        let mut return_pc = self.perform_return_pc(completed_pc)?;
         while let Some(outer_call_pc) = self.perform_stack.last().copied() {
             if self.perform_endpoint(outer_call_pc) != Some(completed_pc) {
                 break;
             }
             self.perform_stack.pop();
             completed_pc = outer_call_pc;
-            return_pc = self.perform_return_pc(completed_pc);
+            return_pc = self.perform_return_pc(completed_pc)?;
         }
         Ok(return_pc)
     }
@@ -1696,6 +1752,112 @@ impl ReferenceMachine {
         self.effect(
             HostRequest::Program(ProgramRequest::Call { program, payload }),
             PendingKind::ProgramCall { targets },
+        )
+    }
+
+    fn sql_effect(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
+        let opcode_index = args
+            .iter()
+            .position(|token| !matches!(token.as_str(), "SQL" | "END-EXEC"))
+            .ok_or(MachineProblem::InvalidOperation)?;
+        let opcode = args[opcode_index].to_ascii_uppercase();
+        if opcode == "DECLARE" {
+            let cursor = args
+                .get(opcode_index + 1)
+                .ok_or(MachineProblem::InvalidOperation)?;
+            if args
+                .get(opcode_index + 2)
+                .is_some_and(|token| token == "CURSOR")
+            {
+                self.sql_cursors.insert(normalize(cursor), args.to_vec());
+            }
+            return Ok(Step::Next);
+        }
+        let mut statement_tokens = args.to_vec();
+        let cursor = if matches!(opcode.as_str(), "OPEN" | "FETCH" | "CLOSE") {
+            Some(
+                args.get(opcode_index + 1)
+                    .ok_or(MachineProblem::InvalidOperation)?
+                    .to_ascii_uppercase(),
+            )
+        } else {
+            None
+        };
+        if opcode == "OPEN" {
+            statement_tokens = self
+                .sql_cursors
+                .get(&normalize(cursor.as_deref().unwrap_or_default()))
+                .cloned()
+                .ok_or(MachineProblem::InvalidOperation)?;
+        }
+        let into = position(&statement_tokens, "INTO");
+        let from = position(&statement_tokens, "FROM");
+        let mut inputs = BTreeMap::new();
+        let mut targets = Vec::new();
+        for (index, token) in statement_tokens.iter().enumerate() {
+            if !token.starts_with(':') {
+                continue;
+            }
+            for raw_name in token.trim_start_matches(':').split(':') {
+                let name = normalize(raw_name);
+                if self.layout(&name).is_none() && !self.implicit.contains_key(&name) {
+                    continue;
+                }
+                let write = matches!(opcode.as_str(), "SELECT" | "FETCH")
+                    && into.is_some_and(|into| index > into)
+                    && from.is_none_or(|from| index < from);
+                if write {
+                    targets.push(name);
+                } else {
+                    inputs.insert(
+                        name.clone(),
+                        Db2HostVariable {
+                            value: self.read(&name)?,
+                            indicator: None,
+                        },
+                    );
+                }
+            }
+        }
+        let operation = match opcode.as_str() {
+            "SELECT"
+                if statement_tokens
+                    .iter()
+                    .any(|token| token.starts_with("COUNT")) =>
+            {
+                Db2Operation::Count
+            }
+            "SELECT" => Db2Operation::Select,
+            "INSERT" => Db2Operation::Insert,
+            "UPDATE" => Db2Operation::Update,
+            "DELETE" => Db2Operation::Delete,
+            "OPEN" => Db2Operation::OpenCursor,
+            "FETCH" => Db2Operation::FetchCursor,
+            "CLOSE" => Db2Operation::CloseCursor,
+            "COMMIT" => Db2Operation::Commit,
+            "ROLLBACK" => Db2Operation::Rollback,
+            _ => return Err(MachineProblem::UnsupportedForm),
+        };
+        let mutation = operation
+            .is_mutating()
+            .then(|| self.mutation())
+            .transpose()?;
+        self.effect(
+            HostRequest::Db2(Db2Request {
+                operation,
+                statement: statement_tokens
+                    .iter()
+                    .filter(|token| !matches!(token.as_str(), "SQL" | "END-EXEC"))
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(" "),
+                cursor,
+                inputs,
+                outputs: targets.clone(),
+                max_rows: 1,
+                mutation,
+            }),
+            PendingKind::Db2 { targets },
         )
     }
     fn effect(&mut self, request: HostRequest, kind: PendingKind) -> Result<Step, MachineProblem> {
@@ -2540,6 +2702,11 @@ impl ReferenceMachine {
             tokens
         };
         let tokens = strip_condition_parentheses(tokens);
+        let tokens = if tokens.last().is_some_and(|token| token == "THEN") {
+            &tokens[..tokens.len() - 1]
+        } else {
+            tokens
+        };
         if let Some(or) = top_level_position(tokens, "OR") {
             let left = &tokens[..or];
             let right_tokens = &tokens[or + 1..];
@@ -2566,7 +2733,14 @@ impl ReferenceMachine {
         if let Some(matched) = self.condition_name_matches(tokens)? {
             return Ok(matched);
         }
-        if tokens.len() >= 2 {
+        if tokens.len() >= 2
+            && !tokens.iter().any(|token| {
+                matches!(
+                    token.as_str(),
+                    "=" | "<>" | ">" | "<" | ">=" | "<=" | "EQUAL" | "GREATER" | "LESS"
+                )
+            })
+        {
             let class = tokens.last().map(String::as_str).unwrap_or_default();
             if matches!(
                 class,
@@ -2889,7 +3063,7 @@ impl ReferenceMachine {
                 };
                 let start = resolve_bound(&start)?;
                 let requested = resolve_bound(&requested)?;
-                if start == 0 || requested == 0 || start - 1 + requested > length {
+                if start == 0 || start - 1 + requested > length {
                     return Err(MachineProblem::ReferenceModificationError);
                 }
                 offset = offset
@@ -4546,7 +4720,23 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
     let mut digit_index = 0usize;
     let mut output = Vec::with_capacity(layout.length);
     let mut suppressing = true;
-    for byte in expanded_picture(&layout.picture, layout.length.saturating_add(layout.digits))? {
+    let picture = expanded_picture(&layout.picture, layout.length.saturating_add(layout.digits))?;
+    let first_nonzero = digits.bytes().position(|digit| digit != b'0');
+    let has_floating_plus = picture.windows(2).any(|pair| pair == b"++");
+    let floating_sign_slot = if value.coefficient < 0 || has_floating_plus {
+        first_nonzero.and_then(|position| position.checked_sub(1))
+    } else {
+        None
+    };
+    if (value.coefficient < 0 || has_floating_plus)
+        && first_nonzero == Some(0)
+        && picture
+            .first()
+            .is_some_and(|symbol| matches!(symbol, b'+' | b'-'))
+    {
+        return Err(MachineProblem::SizeError);
+    }
+    for (picture_index, byte) in picture.iter().copied().enumerate() {
         match byte {
             b'9' => {
                 output.push(*digits.as_bytes().get(digit_index).unwrap_or(&b'0'));
@@ -4575,6 +4765,22 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
                         digit
                     },
                 );
+                digit_index += 1;
+            }
+            b'+' | b'-'
+                if picture.get(picture_index.wrapping_sub(1)) == Some(&byte)
+                    || picture.get(picture_index + 1) == Some(&byte) =>
+            {
+                let digit = *digits.as_bytes().get(digit_index).unwrap_or(&b'0');
+                if floating_sign_slot == Some(digit_index) {
+                    output.push(if value.coefficient < 0 { b'-' } else { b'+' });
+                    suppressing = false;
+                } else if suppressing && digit == b'0' && digit_index + 1 < layout.digits {
+                    output.push(b' ');
+                } else {
+                    output.push(digit);
+                    suppressing = false;
+                }
                 digit_index += 1;
             }
             b'+' => output.push(if value.coefficient < 0 { b'-' } else { b'+' }),

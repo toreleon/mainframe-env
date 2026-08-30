@@ -25,22 +25,23 @@ pub use carddemo::{
     CardDemoBaseBatchReceipt, CardDemoBaseOnlineReceipt, CardDemoBatchProgramReceipt,
     CardDemoCicsReceipt, CardDemoCicsRuntimeReceipt, CardDemoClosureReceipt,
     CardDemoControlReceipt, CardDemoCoreReceipt, CardDemoCorpusReceipt,
-    CardDemoDatasetCatalogReceipt, CardDemoFileCallReceipt, CardDemoHostReceipt,
-    CardDemoJclReceipt, CardDemoLayoutReceipt, CardDemoPackageReceipt, CardDemoProgramReceipt,
-    CardDemoResourceReceipt, CardDemoSecurityReceipt, CardDemoSeedReceipt, CardDemoSourceReceipt,
-    CardDemoTerminalReceipt, CardDemoUtilityReceipt, CardDemoVsamReceipt, CorpusProblem,
-    verify_carddemo_application_package_from_env, verify_carddemo_base_batch_from_env,
-    verify_carddemo_base_online_from_env, verify_carddemo_batch_programs_from_env,
-    verify_carddemo_cics_abi_from_env, verify_carddemo_cics_runtime_from_env,
-    verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
-    verify_carddemo_corpus, verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
-    verify_carddemo_dataset_catalog_from_env, verify_carddemo_file_call_semantics_from_env,
-    verify_carddemo_host_operands_from_env, verify_carddemo_jcl_from_env,
-    verify_carddemo_program_routing_from_env, verify_carddemo_resources_from_env,
-    verify_carddemo_security_from_env, verify_carddemo_seeds_from_env,
-    verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
-    verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
-    verify_carddemo_vsam_from_env,
+    CardDemoDatasetCatalogReceipt, CardDemoDb2Receipt, CardDemoFileCallReceipt,
+    CardDemoHostReceipt, CardDemoJclReceipt, CardDemoLayoutReceipt, CardDemoPackageReceipt,
+    CardDemoProgramReceipt, CardDemoResourceReceipt, CardDemoSecurityReceipt, CardDemoSeedReceipt,
+    CardDemoSourceReceipt, CardDemoTerminalReceipt, CardDemoUtilityReceipt, CardDemoVsamReceipt,
+    CorpusProblem, verify_carddemo_application_package_from_env,
+    verify_carddemo_base_batch_from_env, verify_carddemo_base_online_from_env,
+    verify_carddemo_batch_programs_from_env, verify_carddemo_cics_abi_from_env,
+    verify_carddemo_cics_runtime_from_env, verify_carddemo_control_flow_from_env,
+    verify_carddemo_core_semantics_from_env, verify_carddemo_corpus,
+    verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
+    verify_carddemo_dataset_catalog_from_env, verify_carddemo_db2_from_env,
+    verify_carddemo_file_call_semantics_from_env, verify_carddemo_host_operands_from_env,
+    verify_carddemo_jcl_from_env, verify_carddemo_program_routing_from_env,
+    verify_carddemo_resources_from_env, verify_carddemo_security_from_env,
+    verify_carddemo_seeds_from_env, verify_carddemo_source_closures_from_env,
+    verify_carddemo_source_preprocessing_from_env, verify_carddemo_terminal_from_env,
+    verify_carddemo_utilities_from_env, verify_carddemo_vsam_from_env,
 };
 
 pub const HELLO_SOURCE: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. HELLO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MSG PIC X(12) VALUE 'HELLO WORLD!'.\nPROCEDURE DIVISION.\nDISPLAY MSG.\nSTOP RUN.\n";
@@ -395,6 +396,15 @@ mod tests {
         }
     }
     #[test]
+    fn zero_length_reference_modification_is_a_noop() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. ZLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 SOURCE-X PIC X(5) VALUE SPACES. 01 TARGET-X PIC X(5) VALUE 'ABCDE'. 01 LENGTH-X PIC 9 VALUE 0. PROCEDURE DIVISION. MOVE SOURCE-X(1:LENGTH-X) TO TARGET-X(3:LENGTH-X). DISPLAY TARGET-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"ABCDE\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
     fn subscripted_condition_names_resolve_their_occurring_parent() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CONDITION. DATA DIVISION. WORKING-STORAGE SECTION. 01 FLAGS PIC X(2) VALUE ' S'. 01 FLAG-ARRAY REDEFINES FLAGS. 05 FLAG PIC X OCCURS 2 TIMES. 88 SELECTED VALUE 'S'. 01 I PIC 9 VALUE 2. 01 ZERO-I PIC 9 VALUE 0. 01 PROTECT PIC X VALUE '1'. 88 PROTECT-YES VALUE '1'. 01 DONE-X PIC X VALUE '0'. 88 DONE-YES VALUE '1'. 01 ERROR-X PIC X VALUE '1'. 88 ERROR-ON VALUE '1'. 01 VALUE-X PIC X VALUE 'A'. PROCEDURE DIVISION. IF SELECTED(ZERO-I) DISPLAY 'NO' END-IF. IF SELECTED(I) DISPLAY 'YES' END-IF. IF VALUE-X = LOW-VALUES OR PROTECT-YES DISPLAY 'OR' END-IF. IF PROTECT = '1' DISPLAY 'LITERAL' END-IF. IF I >= 3 OR DONE-YES OR ERROR-ON DISPLAY 'CHAIN' END-IF. IF VALUE-X = 'A' AND NOT DONE-YES DISPLAY 'AND-NOT' END-IF. STOP RUN.";
         let artifact = compile(source).unwrap();
@@ -433,6 +443,35 @@ mod tests {
         }
     }
     #[test]
+    fn evaluate_true_compares_binary_sqlcode_to_zero() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SQLZERO. DATA DIVISION. WORKING-STORAGE SECTION. 01 SQLCODE PIC S9(9) COMP-5 VALUE 0. PROCEDURE DIVISION.\nEVALUATE TRUE\n WHEN SQLCODE = ZERO\n  DISPLAY 'OK'\n WHEN OTHER\n  DISPLAY 'NO'\nEND-EVALUATE.\nSTOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"OK\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn floating_minus_picture_formats_reached_sqlcodes() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SQLFORMAT. DATA DIVISION. WORKING-STORAGE SECTION. 01 SQLCODE PIC S9(9) COMP-5 VALUE 100. 01 WS-DISP-SQLCODE PIC ----9. PROCEDURE DIVISION. MOVE SQLCODE TO WS-DISP-SQLCODE. DISPLAY WS-DISP-SQLCODE. MOVE -911 TO SQLCODE. MOVE SQLCODE TO WS-DISP-SQLCODE. DISPLAY WS-DISP-SQLCODE. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => {
+                assert_eq!(done.output.bytes(), b"  100\n -911\n")
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn explicit_then_is_not_part_of_the_if_condition() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. IFTHEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 FILE-STATUS PIC XX VALUE '00'. PROCEDURE DIVISION. IF FILE-STATUS = '00' THEN DISPLAY 'OK' ELSE DISPLAY 'NO' END-IF. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"OK\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
     fn perform_through_same_paragraph_returns_at_its_sentence_endpoint() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SAMETHRU. PROCEDURE DIVISION. PERFORM WORK-PARA THRU WORK-PARA. DISPLAY 'DONE'. STOP RUN. WORK-PARA. DISPLAY 'WORK'. WORK-EXIT. EXIT. NEXT-PARA. DISPLAY 'WRONG'.";
         let artifact = compile(source).unwrap();
@@ -451,6 +490,69 @@ mod tests {
             }
             other => panic!("{other:?}"),
         }
+    }
+    #[test]
+    fn inline_perform_loop_resumes_after_nested_paragraph_perform() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. NESTLOOP. DATA DIVISION. WORKING-STORAGE SECTION. 01 I PIC 9 VALUE 0. 01 DONE-X PIC X VALUE 'N'. PROCEDURE DIVISION.\nPERFORM READ-PARA\nPERFORM UNTIL DONE-X = 'Y'\n PERFORM TREAT-PARA\n PERFORM READ-PARA\nEND-PERFORM.\nSTOP RUN.\nREAD-PARA.\nADD 1 TO I.\nIF I > 3\n MOVE 'Y' TO DONE-X\nEND-IF.\nEXIT.\nTREAT-PARA.\nDISPLAY I.\nEXIT.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"1\n2\n3\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn nested_read_perform_takes_at_end_branch_before_loop_reentry() {
+        use mainframe_env_host_api::{DatasetResult, EffectResult, HostRequest, HostResult};
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. READLOOP. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X. 01 LASTREC PIC X VALUE 'N'. PROCEDURE DIVISION.\nPERFORM READ-PARA\nPERFORM UNTIL LASTREC = 'Y'\n DISPLAY REC-X\n PERFORM READ-PARA\nEND-PERFORM.\nSTOP RUN.\nREAD-PARA.\nREAD INPUT-FILE INTO REC-X\n AT END MOVE 'Y' TO LASTREC\nEND-READ.\nEXIT.";
+        let artifact = compile(source).unwrap();
+        let mut invocation = invocation(&artifact, 1024);
+        invocation.bindings.insert(
+            "cobol.dd.INPUT-FILE".into(),
+            mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.dataset-name@1",
+                b"USER.INPUT".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        let mut machine =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        let mut records = [b"A".to_vec(), b"B".to_vec(), b"C".to_vec()]
+            .into_iter()
+            .map(|record| vec![record])
+            .chain(std::iter::once(Vec::new()));
+        let mut resume = MachineResume::Start;
+        let mut reads = 0usize;
+        for _ in 0..100 {
+            match machine.drive(resume, Quantum::new(256, 1024).unwrap()) {
+                MachineDrive::Continue => resume = MachineResume::Start,
+                MachineDrive::HostCall(effect) => {
+                    assert!(matches!(effect.request, HostRequest::Dataset(_)));
+                    reads += 1;
+                    let records = records.next().expect("bounded read count");
+                    resume = MachineResume::HostResult(EffectResult {
+                        sequence: effect.sequence,
+                        outcome: Ok(HostResult::Dataset(DatasetResult::Records {
+                            identities: records.clone(),
+                            records,
+                            version: reads as u64,
+                        })),
+                    });
+                }
+                MachineDrive::Completed(done) => {
+                    assert_eq!(reads, 4);
+                    assert_eq!(done.output.bytes(), b"A\nB\nC\n");
+                    return;
+                }
+                other => panic!(
+                    "{other:?}; reads={reads}; position={}",
+                    machine.position_summary()
+                ),
+            }
+        }
+        panic!("read loop did not terminate");
     }
     #[test]
     fn split_relational_operators_are_normalized_in_conditions() {
@@ -770,8 +872,10 @@ mod tests {
     }
 
     #[test]
-    fn sql_host_variables_use_typed_embedded_envelope() {
-        use mainframe_env_host_api::{EffectResult, HostRequest, HostResult, ProgramRequest};
+    fn sql_host_variables_use_typed_db2_request() {
+        use mainframe_env_host_api::{
+            Db2Operation, Db2Result, Db2Row, EffectResult, HostRequest, HostResult,
+        };
 
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SQLABI. DATA DIVISION. WORKING-STORAGE SECTION. 01 IN-X PIC X(2) VALUE '42'. 01 OUT-X PIC X(3). PROCEDURE DIVISION. EXEC SQL SELECT NAME INTO :OUT-X FROM CUSTOMER WHERE ID = :IN-X END-EXEC. DISPLAY OUT-X. STOP RUN.";
         let artifact = compile(source).unwrap();
@@ -786,38 +890,73 @@ mod tests {
         else {
             panic!("SQL operation did not call host");
         };
-        let HostRequest::Program(ProgramRequest::Call { program, payload }) = &effect.request
-        else {
+        let HostRequest::Db2(request) = &effect.request else {
             panic!("unexpected SQL request");
         };
-        assert_eq!(program.as_str(), "MAINFRAME-SQL");
-        assert_eq!(payload.schema(), "mainframe-env.embedded-host@1");
-        assert!(payload.bytes().starts_with(b"MEHOST01"));
-        assert!(payload.bytes().windows(2).any(|window| window == b"42"));
-        assert!(
-            !payload
-                .bytes()
-                .windows(8)
-                .any(|window| window == b"CUSTOMER")
-        );
-        let mut result = 1u32.to_be_bytes().to_vec();
-        result.extend_from_slice(&3u64.to_be_bytes());
-        result.extend_from_slice(b"ANN");
-        let result = mainframe_env_execution_api::BoundedPayload::new(
-            "mainframe-env.cobol.call-result@1",
-            result,
-            InvocationLimits::default(),
-        )
-        .unwrap();
+        assert_eq!(request.operation, Db2Operation::Select);
+        assert_eq!(request.inputs["IN-X"].value, b"42");
+        assert_eq!(request.outputs, vec!["OUT-X"]);
+        assert!(request.statement.contains("CUSTOMER"));
         assert!(matches!(
             machine.drive(
                 MachineResume::HostResult(EffectResult {
                     sequence: effect.sequence,
-                    outcome: Ok(HostResult::Program(result)),
+                    outcome: Ok(HostResult::Db2(Db2Result {
+                        sqlcode: 0,
+                        sqlstate: "00000".into(),
+                        message: "ROW".into(),
+                        rows: vec![Db2Row {
+                            columns: vec![b"ANN".to_vec()]
+                        }],
+                        affected_rows: 0,
+                    })),
                 }),
                 Quantum::new(64, 1024).unwrap(),
             ),
             MachineDrive::Completed(done) if done.output.bytes() == b"ANN\n"
+        ));
+    }
+
+    #[test]
+    fn sql_numeric_outputs_use_cobol_receiver_encoding() {
+        use mainframe_env_host_api::{
+            Db2Operation, Db2Result, Db2Row, EffectResult, HostRequest, HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SQLCOUNT. DATA DIVISION. WORKING-STORAGE SECTION. 01 COUNT-X PIC S9(4) COMP-3. 01 DISPLAY-X PIC 9(4). PROCEDURE DIVISION. EXEC SQL SELECT COUNT(1) INTO :COUNT-X FROM CUSTOMER END-EXEC. MOVE COUNT-X TO DISPLAY-X. DISPLAY DISPLAY-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("SQL COUNT did not call host");
+        };
+        assert!(matches!(
+            &effect.request,
+            HostRequest::Db2(request) if request.operation == Db2Operation::Count
+        ));
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: effect.sequence,
+                    outcome: Ok(HostResult::Db2(Db2Result {
+                        sqlcode: 0,
+                        sqlstate: "00000".into(),
+                        message: "COUNT".into(),
+                        rows: vec![Db2Row {
+                            columns: vec![b"7".to_vec()]
+                        }],
+                        affected_rows: 0,
+                    })),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(done) if done.output.bytes() == b"0007\n"
         ));
     }
 

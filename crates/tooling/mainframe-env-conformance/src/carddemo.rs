@@ -25,6 +25,7 @@ use mainframe_env_compiler_api::{
     CompilerService,
 };
 use mainframe_env_dataset::{DatasetLimits, DatasetSeedObject, DatasetService};
+use mainframe_env_diagnostics::Completeness;
 use mainframe_env_encoding::CodePage;
 use mainframe_env_execution_api::{
     ArtifactRef, BoundedPayload, CapabilityId, ExecutionId, IdempotencyKey, Invocation,
@@ -33,8 +34,9 @@ use mainframe_env_execution_api::{
 };
 use mainframe_env_host_api::{
     AccessIntent, AuditEvent, CicsConditionPolicy, CicsOperation, CicsRequest, DatasetAttributes,
-    DatasetName, DatasetOrganization, DatasetRequest, DatasetResult, EffectRequest, HostProblem,
-    MemberName, Mutation, RecordFormat, ResourceName, SecretRef, SecurityDecision, SessionId,
+    DatasetName, DatasetOrganization, DatasetRequest, DatasetResult, Db2HostVariable, Db2Operation,
+    Db2Request, EffectRequest, HostProblem, MemberName, Mutation, RecordFormat, ResourceName,
+    SecretRef, SecurityDecision, SessionId,
 };
 use mainframe_env_racf::{
     MemorySecretResolver, RacfManifest, RacfProfileDefinition, RacfService, RacfUserDefinition,
@@ -588,6 +590,29 @@ pub struct CardDemoBaseBatchReceipt {
     pub journey_shape_sha256: String,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoDb2Receipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub programs_compiled: usize,
+    pub sql_include_expansions: usize,
+    pub sql_operations: BTreeMap<String, usize>,
+    pub ddl_files: usize,
+    pub online_routes: usize,
+    pub batch_routes: usize,
+    pub extraction_records: usize,
+    pub authorization_controls: usize,
+    pub restart_controls: usize,
+    pub rollback_controls: usize,
+    pub conflict_controls: usize,
+    pub failure_controls: usize,
+    pub table_sha256: BTreeMap<String, String>,
+    pub dataset_sha256: BTreeMap<String, String>,
+    pub spool_sha256: BTreeMap<String, String>,
+    pub db2_shape_sha256: String,
+}
+
 struct BaseOnlineExercise {
     initial_screen_bytes: usize,
     screen_paths: usize,
@@ -600,6 +625,20 @@ struct BaseOnlineExercise {
     resource_controls: usize,
     install_replay: bool,
     observations: Vec<String>,
+}
+
+struct Db2Exercise {
+    online_routes: usize,
+    batch_routes: usize,
+    extraction_records: usize,
+    authorization_controls: usize,
+    restart_controls: usize,
+    rollback_controls: usize,
+    conflict_controls: usize,
+    failure_controls: usize,
+    table_sha256: BTreeMap<String, String>,
+    dataset_sha256: BTreeMap<String, String>,
+    spool_sha256: BTreeMap<String, String>,
 }
 
 pub fn verify_carddemo_corpus_from_env(
@@ -3205,7 +3244,8 @@ pub fn verify_carddemo_security_from_env(
     let mut shape = Sha256::new();
     for transaction in &transactions {
         let mut permissions = BTreeMap::from([("CARDADM".into(), AccessIntent::Execute)]);
-        if transaction != "CA00" && !transaction.starts_with("CU") {
+        if transaction != "CA00" && !transaction.starts_with("CU") && !transaction.starts_with("CT")
+        {
             permissions.insert("CARDUSR".into(), AccessIntent::Execute);
         }
         profiles.push(RacfProfileDefinition {
@@ -3218,7 +3258,10 @@ pub fn verify_carddemo_security_from_env(
     }
     for program in &programs {
         let mut permissions = BTreeMap::from([("CARDADM".into(), AccessIntent::Execute)]);
-        if !program.starts_with("COADM") && !program.starts_with("COUSR") {
+        if !program.starts_with("COADM")
+            && !program.starts_with("COUSR")
+            && !program.starts_with("COTRT")
+        {
             permissions.insert("CARDUSR".into(), AccessIntent::Execute);
         }
         profiles.push(RacfProfileDefinition {
@@ -4325,6 +4368,952 @@ pub fn verify_carddemo_base_batch_from_env(
         online,
         definitions,
     ))
+}
+
+pub fn verify_carddemo_db2_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoDb2Receipt, CorpusProblem> {
+    let corpus_dir = PathBuf::from(env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required",
+        )
+    })?);
+    let corpus = verify_carddemo_corpus(&corpus_dir, inventory_path)?;
+    let compiler = CobolCompiler::default();
+    let mut sql_include_expansions = 0usize;
+    let mut sql_operations = BTreeMap::new();
+    let bundles = carddemo_db2_bundles(&corpus_dir)?;
+    for (relative, bundle) in &bundles {
+        let analysis = compiler.analyze(bundle);
+        if analysis.completeness != Completeness::Complete {
+            return Err(CorpusProblem::new(
+                "carddemo.db2.compile_failed",
+                format!(
+                    "{relative}: {}",
+                    analysis
+                        .diagnostics
+                        .first()
+                        .map_or("incomplete Db2 compilation", |problem| problem
+                            .public_message())
+                ),
+            ));
+        }
+        let syntax = analysis.syntax.ok_or_else(|| {
+            CorpusProblem::new("carddemo.db2.compile_failed", "Db2 syntax is missing")
+        })?;
+        sql_include_expansions += syntax
+            .expansions()
+            .iter()
+            .filter(|expansion| {
+                matches!(
+                    expansion.source.as_str().rsplit('/').next(),
+                    Some(
+                        "SQLCA.cpy"
+                            | "DCLTRTYP.dcl"
+                            | "DCLTRCAT.dcl"
+                            | "CSDB2RWY.cpy"
+                            | "CSDB2RPY.cpy"
+                    )
+                )
+            })
+            .count();
+        for statement in analysis
+            .hir
+            .ok_or_else(|| CorpusProblem::new("carddemo.db2.compile_failed", "Db2 HIR is missing"))?
+            .statements
+            .into_iter()
+            .filter(|statement| statement.kind == StatementKind::ExecSql)
+        {
+            let opcode = statement
+                .arguments
+                .iter()
+                .find(|token| !matches!(token.as_str(), "SQL" | "END-EXEC"))
+                .ok_or_else(|| {
+                    CorpusProblem::new("carddemo.db2.compile_failed", "SQL statement has no opcode")
+                })?;
+            *sql_operations.entry(opcode.clone()).or_default() += 1;
+        }
+        let result = compiler
+            .compile(CompilerRequest {
+                source: bundle.clone(),
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").expect("static target"),
+                options: CompileOptions::new(BTreeMap::new()).expect("static options"),
+            })
+            .map_err(|problem| {
+                CorpusProblem::new(
+                    "carddemo.db2.compile_failed",
+                    format!("{relative}: {problem:?}"),
+                )
+            })?;
+        if !matches!(result, CompilerResult::Published { .. }) {
+            return Err(CorpusProblem::new(
+                "carddemo.db2.compile_failed",
+                format!("{relative} did not publish"),
+            ));
+        }
+    }
+    let programs_compiled = bundles.len();
+    let db2_catalog = bundles
+        .iter()
+        .map(|(relative, bundle)| {
+            let name = Path::new(relative)
+                .file_stem()
+                .and_then(|value| value.to_str())
+                .ok_or_else(|| {
+                    CorpusProblem::new("carddemo.db2.program_invalid", "program name is invalid")
+                })?
+                .to_ascii_uppercase();
+            Ok((name, (relative.clone(), bundle.clone())))
+        })
+        .collect::<Result<BTreeMap<_, _>, CorpusProblem>>()?;
+    let definitions = compile_carddemo_batch_definitions(
+        &db2_catalog,
+        &BTreeSet::from(["COBTUPDT".to_string()]),
+    )?;
+    let online = carddemo_db2_online_definition(&corpus_dir)?;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| CorpusProblem::new("carddemo.db2.runtime", error.to_string()))?;
+    let exercise = runtime.block_on(exercise_db2_routes(&corpus_dir, online, definitions))?;
+    let ddl_files = collect_paths(&corpus_dir, &["app/app-transaction-type-db2/ddl"], "ddl")?.len();
+    let mut shape = Sha256::new();
+    digest_field(&mut shape, corpus.commit.as_bytes());
+    for (opcode, count) in &sql_operations {
+        digest_field(&mut shape, opcode.as_bytes());
+        digest_field(&mut shape, &(*count as u64).to_be_bytes());
+    }
+    for map in [
+        &exercise.table_sha256,
+        &exercise.dataset_sha256,
+        &exercise.spool_sha256,
+    ] {
+        for (name, digest) in map {
+            digest_field(&mut shape, name.as_bytes());
+            digest_field(&mut shape, digest.as_bytes());
+        }
+    }
+    Ok(CardDemoDb2Receipt {
+        schema_version: "mainframe-env.carddemo-db2-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit: corpus.commit,
+        programs_compiled,
+        sql_include_expansions,
+        sql_operations,
+        ddl_files,
+        online_routes: exercise.online_routes,
+        batch_routes: exercise.batch_routes,
+        extraction_records: exercise.extraction_records,
+        authorization_controls: exercise.authorization_controls,
+        restart_controls: exercise.restart_controls,
+        rollback_controls: exercise.rollback_controls,
+        conflict_controls: exercise.conflict_controls,
+        failure_controls: exercise.failure_controls,
+        table_sha256: exercise.table_sha256,
+        dataset_sha256: exercise.dataset_sha256,
+        spool_sha256: exercise.spool_sha256,
+        db2_shape_sha256: format!("{:x}", shape.finalize()),
+    })
+}
+
+async fn exercise_db2_routes(
+    corpus_dir: &Path,
+    online: OnlineApplicationDefinition,
+    definitions: Vec<BatchProgramDefinition>,
+) -> Result<Db2Exercise, CorpusProblem> {
+    let artifact_root =
+        env::temp_dir().join(format!("mainframe-env-carddemo-db2-{}", std::process::id()));
+    let config = ServerConfig {
+        store_profile: StoreProfile::Memory,
+        artifact_root: artifact_root.clone(),
+        tls: TlsConfig {
+            enabled: false,
+            certificate_path: None,
+            private_key_reference: None,
+        },
+        ..ServerConfig::default()
+    };
+    let store = Arc::new(MemoryStore::new(Default::default()));
+    let secrets = Arc::new(MemorySecretResolver::default());
+    let server = ProductServer::open(
+        config.clone(),
+        store.clone(),
+        secrets.clone(),
+        default_program_router(),
+    )
+    .map_err(terminal_problem)?;
+    server
+        .bootstrap_user("IBMUSER", b"TESTPASS")
+        .map_err(terminal_problem)?;
+    install_base_online_authorities(&server, corpus_dir, &online)?;
+    server
+        .install_online_application(online)
+        .map_err(terminal_problem)?;
+    server
+        .install_batch_programs(definitions)
+        .map_err(terminal_problem)?;
+    let racf = server.racf_service();
+    racf.define_profile("DATASET", "AWS.M2.CARDDEMO.**", "IBMUSER", None)
+        .map_err(terminal_problem)?;
+    racf.permit(
+        "DATASET",
+        "AWS.M2.CARDDEMO.**",
+        "IBMUSER",
+        AccessIntent::Alter,
+    )
+    .map_err(terminal_problem)?;
+    racf.define_profile("DATASET", "INPFILE", "IBMUSER", None)
+        .map_err(terminal_problem)?;
+    racf.permit("DATASET", "INPFILE", "IBMUSER", AccessIntent::Alter)
+        .map_err(terminal_problem)?;
+
+    let mut sequence = 40_000u64;
+    utility_seed_dataset(
+        &server,
+        "AWS.M2.CARDDEMO.CNTL",
+        DatasetOrganization::Partitioned,
+        RecordFormat::Variable,
+        4_096,
+        None,
+        Vec::new(),
+        &mut sequence,
+    )?;
+    for relative in collect_paths(corpus_dir, &["app/app-transaction-type-db2/ctl"], "ctl")? {
+        let member = Path::new(&relative)
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .ok_or_else(|| {
+                CorpusProblem::new("carddemo.db2.control_invalid", "control member is invalid")
+            })?;
+        let source = String::from_utf8(read_corpus_file(corpus_dir, &corpus_dir.join(&relative))?)
+            .map_err(|_| {
+                CorpusProblem::new(
+                    "carddemo.db2.control_invalid",
+                    format!("{relative} is not UTF-8"),
+                )
+            })?;
+        utility_write_dataset(
+            &server,
+            "AWS.M2.CARDDEMO.CNTL",
+            Some(member),
+            source
+                .lines()
+                .map(|line| line.as_bytes().to_vec())
+                .collect(),
+            &mut sequence,
+        )?;
+    }
+    utility_seed_dataset(
+        &server,
+        "INPFILE",
+        DatasetOrganization::Sequential,
+        RecordFormat::Fixed,
+        53,
+        None,
+        ["A98BATCH INSERT", "U02BATCH PAYMENT", "D98"]
+            .into_iter()
+            .map(|record| {
+                let mut record = record.as_bytes().to_vec();
+                record.resize(53, b' ');
+                record
+            })
+            .collect(),
+        &mut sequence,
+    )?;
+    for dataset in ["AWS.M2.CARDDEMO.TRANTYPE.PS", "AWS.M2.CARDDEMO.TRANCATG.PS"] {
+        utility_seed_dataset(
+            &server,
+            dataset,
+            DatasetOrganization::Sequential,
+            RecordFormat::Fixed,
+            60,
+            None,
+            vec![vec![b' '; 60]],
+            &mut sequence,
+        )?;
+    }
+    for base in [
+        "AWS.M2.CARDDEMO.TRANTYPE.BKUP",
+        "AWS.M2.CARDDEMO.TRANCATG.PS.BKUP",
+    ] {
+        server
+            .dataset_service()
+            .invoke(DatasetRequest::DefineGenerationGroup {
+                base: DatasetName::new(base, 128).expect("static Db2 GDG base"),
+                limit: 5,
+                scratch: true,
+                empty: false,
+                mutation: Mutation {
+                    sequence,
+                    idempotency_key: IdempotencyKey::new(
+                        format!("carddemo-db2-gdg-{sequence}"),
+                        InvocationLimits::default(),
+                    )
+                    .expect("bounded Db2 GDG mutation"),
+                    transaction: Some("CD-024".into()),
+                },
+            })
+            .map_err(terminal_problem)?;
+        sequence += 1;
+    }
+
+    let app = server.router();
+    let mut job_ids = BTreeMap::new();
+    let create = String::from_utf8(read_corpus_file(
+        corpus_dir,
+        &corpus_dir.join("app/app-transaction-type-db2/jcl/CREADB21.jcl"),
+    )?)
+    .map_err(|_| CorpusProblem::new("carddemo.db2.jcl_invalid", "CREADB21 is not UTF-8"))?;
+    let create_id = submit_job_with_retcode(&server, &app, &create, "CC 0000").await?;
+    job_ids.insert("CREADB2".into(), create_id);
+    if server
+        .db2_service()
+        .table_rows("CARDDEMO.TRANSACTION_TYPE")
+        .map_err(terminal_problem)?
+        .len()
+        != 7
+        || server
+            .db2_service()
+            .table_rows("CARDDEMO.TRANSACTION_TYPE_CATEGORY")
+            .map_err(terminal_problem)?
+            .len()
+            != 18
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.db2.load_drift",
+            "CREADB21 did not create and load 7 type plus 18 category rows",
+        ));
+    }
+
+    let denied = terminal_http(
+        &app,
+        Method::POST,
+        "/mainframe-env/cics/v1/sessions",
+        BTreeMap::from([
+            (
+                "authorization".into(),
+                format!(
+                    "Basic {}",
+                    base64::engine::general_purpose::STANDARD.encode("WEBUSER:transport-password")
+                ),
+            ),
+            ("x-csrf-zosmf-header".into(), "true".into()),
+        ]),
+        br#"{"transaction":"CTLI"}"#.to_vec(),
+    )
+    .await?;
+    if denied.0 != StatusCode::FORBIDDEN {
+        return Err(CorpusProblem::new(
+            "carddemo.db2.authorization_drift",
+            format!(
+                "regular-user CTLI launch returned {}: {}",
+                denied.0,
+                String::from_utf8_lossy(&denied.1)
+            ),
+        ));
+    }
+
+    let list_menu = open_carddemo_menu(
+        &server,
+        &app,
+        "WEBADM",
+        "admin-transport-password",
+        "ADMIN001",
+        "PASSWORD",
+        "COADM01",
+    )
+    .await?;
+    let list_screen = carddemo_terminal_exchange(
+        &app,
+        &list_menu.session,
+        &list_menu.headers,
+        0x7d,
+        BTreeMap::from([("OPTION".into(), "5".into())]),
+    )
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.list_failed",
+            format!("CTLI: {}", problem.detail),
+        )
+    })?;
+    require_online_mapset(&list_screen, "COTRTLI", "Db2 transaction-type list")?;
+    let update_menu = open_carddemo_menu(
+        &server,
+        &app,
+        "WEBADM",
+        "admin-transport-password",
+        "ADMIN001",
+        "PASSWORD",
+        "COADM01",
+    )
+    .await?;
+    let update_screen = carddemo_terminal_exchange(
+        &app,
+        &update_menu.session,
+        &update_menu.headers,
+        0x7d,
+        BTreeMap::from([("OPTION".into(), "6".into())]),
+    )
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.maintenance_failed",
+            format!("CTTU launch: {}", problem.detail),
+        )
+    })?;
+    require_online_mapset(
+        &update_screen,
+        "COTRTUP",
+        "Db2 transaction-type maintenance",
+    )?;
+    let missing = carddemo_terminal_exchange(
+        &app,
+        &update_menu.session,
+        &update_menu.headers,
+        0x7d,
+        BTreeMap::from([("TRTYPCD".into(), "99".into())]),
+    )
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.maintenance_failed",
+            format!("CTTU lookup: {}", problem.detail),
+        )
+    })?;
+    require_online_mapset(&missing, "COTRTUP", "Db2 missing type lookup")?;
+    let create = carddemo_terminal_exchange(
+        &app,
+        &update_menu.session,
+        &update_menu.headers,
+        0xf5,
+        BTreeMap::new(),
+    )
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.maintenance_failed",
+            format!("CTTU create request: {}", problem.detail),
+        )
+    })?;
+    require_online_mapset(&create, "COTRTUP", "Db2 create confirmation")?;
+    let described = carddemo_terminal_exchange(
+        &app,
+        &update_menu.session,
+        &update_menu.headers,
+        0x7d,
+        BTreeMap::from([("TRTYDSC".into(), "ONLINE SPECIAL".into())]),
+    )
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.maintenance_failed",
+            format!("CTTU description: {}", problem.detail),
+        )
+    })?;
+    require_online_mapset(&described, "COTRTUP", "Db2 insert validation")?;
+    let inserted = carddemo_terminal_exchange(
+        &app,
+        &update_menu.session,
+        &update_menu.headers,
+        0xf5,
+        BTreeMap::new(),
+    )
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.maintenance_failed",
+            format!("CTTU insert: {}", problem.detail),
+        )
+    })?;
+    require_online_mapset(&inserted, "COTRTUP", "Db2 online insert")?;
+    if !server
+        .db2_service()
+        .table_rows("CARDDEMO.TRANSACTION_TYPE")
+        .map_err(terminal_problem)?
+        .iter()
+        .any(|row| row.first().is_some_and(|value| value == b"99"))
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.db2.online_insert_drift",
+            format!(
+                "CTTU did not commit type 99; trace={:?}",
+                server
+                    .online_trace(&update_menu.session)
+                    .unwrap_or_default()
+            ),
+        ));
+    }
+
+    let edit_menu = open_carddemo_menu(
+        &server,
+        &app,
+        "WEBADM",
+        "admin-transport-password",
+        "ADMIN001",
+        "PASSWORD",
+        "COADM01",
+    )
+    .await?;
+    let edit_screen = carddemo_terminal_exchange(
+        &app,
+        &edit_menu.session,
+        &edit_menu.headers,
+        0x7d,
+        BTreeMap::from([("OPTION".into(), "6".into())]),
+    )
+    .await?;
+    require_online_mapset(&edit_screen, "COTRTUP", "Db2 update route")?;
+    let selected = carddemo_terminal_exchange(
+        &app,
+        &edit_menu.session,
+        &edit_menu.headers,
+        0x7d,
+        BTreeMap::from([("TRTYPCD".into(), "99".into())]),
+    )
+    .await?;
+    require_online_mapset(&selected, "COTRTUP", "Db2 update lookup")?;
+    let reviewed = carddemo_terminal_exchange(
+        &app,
+        &edit_menu.session,
+        &edit_menu.headers,
+        0x7d,
+        BTreeMap::from([("TRTYDSC".into(), "ONLINE UPDATED".into())]),
+    )
+    .await?;
+    require_online_mapset(&reviewed, "COTRTUP", "Db2 update validation")?;
+    let updated = carddemo_terminal_exchange(
+        &app,
+        &edit_menu.session,
+        &edit_menu.headers,
+        0xf5,
+        BTreeMap::new(),
+    )
+    .await?;
+    require_online_mapset(&updated, "COTRTUP", "Db2 online update")?;
+    if !server
+        .db2_service()
+        .table_rows("CARDDEMO.TRANSACTION_TYPE")
+        .map_err(terminal_problem)?
+        .iter()
+        .any(|row| {
+            row.first().is_some_and(|value| value == b"99")
+                && row
+                    .get(1)
+                    .is_some_and(|value| value.as_slice() == b"ONLINE UPDATED")
+        })
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.db2.online_update_drift",
+            "CTTU did not commit the updated type 99 description",
+        ));
+    }
+
+    let delete_menu = open_carddemo_menu(
+        &server,
+        &app,
+        "WEBADM",
+        "admin-transport-password",
+        "ADMIN001",
+        "PASSWORD",
+        "COADM01",
+    )
+    .await?;
+    let delete_screen = carddemo_terminal_exchange(
+        &app,
+        &delete_menu.session,
+        &delete_menu.headers,
+        0x7d,
+        BTreeMap::from([("OPTION".into(), "6".into())]),
+    )
+    .await?;
+    require_online_mapset(&delete_screen, "COTRTUP", "Db2 delete route")?;
+    let selected = carddemo_terminal_exchange(
+        &app,
+        &delete_menu.session,
+        &delete_menu.headers,
+        0x7d,
+        BTreeMap::from([("TRTYPCD".into(), "99".into())]),
+    )
+    .await?;
+    require_online_mapset(&selected, "COTRTUP", "Db2 delete lookup")?;
+    let confirmed = carddemo_terminal_exchange(
+        &app,
+        &delete_menu.session,
+        &delete_menu.headers,
+        0xf4,
+        BTreeMap::new(),
+    )
+    .await?;
+    require_online_mapset(&confirmed, "COTRTUP", "Db2 delete confirmation")?;
+    let deleted = carddemo_terminal_exchange(
+        &app,
+        &delete_menu.session,
+        &delete_menu.headers,
+        0xf4,
+        BTreeMap::new(),
+    )
+    .await?;
+    require_online_mapset(&deleted, "COTRTUP", "Db2 online delete")?;
+    if server
+        .db2_service()
+        .table_rows("CARDDEMO.TRANSACTION_TYPE")
+        .map_err(terminal_problem)?
+        .iter()
+        .any(|row| row.first().is_some_and(|value| value == b"99"))
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.db2.online_delete_drift",
+            "CTTU did not delete type 99",
+        ));
+    }
+
+    let rollback = db2_control_invocation("db2-rollback")?;
+    server
+        .db2_service()
+        .execute(
+            &rollback,
+            &db2_control_request(
+                Db2Operation::Insert,
+                50_001,
+                BTreeMap::from([
+                    ("DCL-TR-TYPE".into(), db2_variable("97")),
+                    ("DCL-TR-DESCRIPTION".into(), db2_variable("ROLLBACK")),
+                ]),
+            )?,
+        )
+        .map_err(terminal_problem)?;
+    server
+        .db2_service()
+        .execute(
+            &rollback,
+            &db2_control_request(Db2Operation::Rollback, 50_002, BTreeMap::new())?,
+        )
+        .map_err(terminal_problem)?;
+    if server
+        .db2_service()
+        .table_rows("CARDDEMO.TRANSACTION_TYPE")
+        .map_err(terminal_problem)?
+        .iter()
+        .any(|row| row.first().is_some_and(|value| value == b"97"))
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.db2.rollback_drift",
+            "rolled-back type 97 became visible",
+        ));
+    }
+    let left = db2_control_invocation("db2-conflict-left")?;
+    let right = db2_control_invocation("db2-conflict-right")?;
+    for (invocation, sequence, description) in [(&left, 50_003, "LEFT"), (&right, 50_004, "RIGHT")]
+    {
+        server
+            .db2_service()
+            .execute(
+                invocation,
+                &db2_control_request(
+                    Db2Operation::Update,
+                    sequence,
+                    BTreeMap::from([
+                        ("DCL-TR-TYPE".into(), db2_variable("02")),
+                        ("DCL-TR-DESCRIPTION".into(), db2_variable(description)),
+                    ]),
+                )?,
+            )
+            .map_err(terminal_problem)?;
+    }
+    let left_commit = server
+        .db2_service()
+        .execute(
+            &left,
+            &db2_control_request(Db2Operation::Commit, 50_005, BTreeMap::new())?,
+        )
+        .map_err(terminal_problem)?;
+    let right_commit = server
+        .db2_service()
+        .execute(
+            &right,
+            &db2_control_request(Db2Operation::Commit, 50_006, BTreeMap::new())?,
+        )
+        .map_err(terminal_problem)?;
+    if left_commit.sqlcode != 0 || right_commit.sqlcode != -911 {
+        return Err(CorpusProblem::new(
+            "carddemo.db2.conflict_drift",
+            "concurrent Db2 units did not return commit then -911 conflict",
+        ));
+    }
+    let failure_invocation = db2_control_invocation("db2-failure")?;
+    let duplicate = server
+        .db2_service()
+        .execute(
+            &failure_invocation,
+            &db2_control_request(
+                Db2Operation::Insert,
+                50_007,
+                BTreeMap::from([
+                    ("DCL-TR-TYPE".into(), db2_variable("01")),
+                    ("DCL-TR-DESCRIPTION".into(), db2_variable("DUPLICATE")),
+                ]),
+            )?,
+        )
+        .map_err(terminal_problem)?;
+    server
+        .db2_service()
+        .execute(
+            &failure_invocation,
+            &db2_control_request(Db2Operation::Rollback, 50_008, BTreeMap::new())?,
+        )
+        .map_err(terminal_problem)?;
+    let restricted = server
+        .db2_service()
+        .execute(
+            &failure_invocation,
+            &db2_control_request(
+                Db2Operation::Delete,
+                50_009,
+                BTreeMap::from([("DCL-TR-TYPE".into(), db2_variable("01"))]),
+            )?,
+        )
+        .map_err(terminal_problem)?;
+    if duplicate.sqlcode != -803 || restricted.sqlcode != -532 {
+        return Err(CorpusProblem::new(
+            "carddemo.db2.failure_drift",
+            "duplicate and referential failures did not return -803 and -532",
+        ));
+    }
+
+    let maintenance = String::from_utf8(read_corpus_file(
+        corpus_dir,
+        &corpus_dir.join("app/app-transaction-type-db2/jcl/MNTTRDB2.jcl"),
+    )?)
+    .map_err(|_| CorpusProblem::new("carddemo.db2.jcl_invalid", "MNTTRDB2 is not UTF-8"))?;
+    let maintenance_id = submit_job_with_retcode(&server, &app, &maintenance, "CC 0000").await?;
+    job_ids.insert("MNTTRDB2".into(), maintenance_id);
+    let maintained_rows = server
+        .db2_service()
+        .table_rows("CARDDEMO.TRANSACTION_TYPE")
+        .map_err(terminal_problem)?;
+    if maintained_rows
+        .iter()
+        .any(|row| row.first().is_some_and(|value| value == b"98"))
+        || !maintained_rows.iter().any(|row| {
+            row.first().is_some_and(|value| value == b"02")
+                && row
+                    .get(1)
+                    .is_some_and(|value| value.as_slice() == b"BATCH PAYMENT")
+        })
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.db2.batch_maintenance_drift",
+            format!(
+                "COBTUPDT did not apply insert, update, and delete commands: {:?}",
+                maintained_rows
+                    .iter()
+                    .map(|row| row
+                        .iter()
+                        .map(|column| String::from_utf8_lossy(column).to_string())
+                        .collect::<Vec<_>>())
+                    .collect::<Vec<_>>()
+            ),
+        ));
+    }
+    let extract = String::from_utf8(read_corpus_file(
+        corpus_dir,
+        &corpus_dir.join("app/app-transaction-type-db2/jcl/TRANEXTR.jcl"),
+    )?)
+    .map_err(|_| CorpusProblem::new("carddemo.db2.jcl_invalid", "TRANEXTR is not UTF-8"))?;
+    let extract_id = submit_job_with_retcode(&server, &app, &extract, "CC 0000").await?;
+    job_ids.insert("TRANEXTR".into(), extract_id);
+
+    let extracted_type = utility_records(&server, "AWS.M2.CARDDEMO.TRANTYPE.PS", None)?;
+    let extracted_category = utility_records(&server, "AWS.M2.CARDDEMO.TRANCATG.PS", None)?;
+    let extraction_records = extracted_type.len() + extracted_category.len();
+    if extraction_records < 25
+        || extracted_type.iter().any(|record| record.len() != 60)
+        || extracted_category.iter().any(|record| record.len() != 60)
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.db2.extract_drift",
+            "DSNTIAUL extraction did not produce exact 60-byte type/category records",
+        ));
+    }
+
+    let table_sha256 = db2_table_digests(&server)?;
+    let dataset_sha256 = db2_dataset_digests(&server)?;
+    let spool_sha256 = base_batch_spool_digests(&server, &job_ids)?;
+    let restart_session = list_menu.session;
+    let restart_headers = list_menu.headers;
+    drop(app);
+    if !server.graceful_shutdown().await {
+        return Err(CorpusProblem::new(
+            "carddemo.db2.shutdown_failed",
+            "Db2 server did not shut down",
+        ));
+    }
+    drop(racf);
+    drop(server);
+    let restarted = ProductServer::open(config, store, secrets, default_program_router())
+        .map_err(terminal_problem)?;
+    if db2_table_digests(&restarted)? != table_sha256
+        || db2_dataset_digests(&restarted)? != dataset_sha256
+        || base_batch_spool_digests(&restarted, &job_ids)? != spool_sha256
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.db2.restart_drift",
+            "Db2 tables, extracted datasets, or spool changed across restart",
+        ));
+    }
+    let restarted_app = restarted.router();
+    let resumed = carddemo_terminal_exchange(
+        &restarted_app,
+        &restart_session,
+        &restart_headers,
+        0xf8,
+        BTreeMap::new(),
+    )
+    .await?;
+    require_online_mapset(&resumed, "COTRTLI", "Db2 cursor restart")?;
+    let _ = restarted.graceful_shutdown().await;
+    drop(restarted);
+    let _ = fs::remove_dir_all(&artifact_root);
+    Ok(Db2Exercise {
+        online_routes: 2,
+        batch_routes: 3,
+        extraction_records,
+        authorization_controls: 1,
+        restart_controls: 1,
+        rollback_controls: 1,
+        conflict_controls: 1,
+        failure_controls: 2,
+        table_sha256,
+        dataset_sha256,
+        spool_sha256,
+    })
+}
+
+fn db2_control_invocation(run: &str) -> Result<Invocation, CorpusProblem> {
+    let limits = InvocationLimits::default();
+    let grants = ["host.db2.read", "host.db2.write"]
+        .into_iter()
+        .map(|capability| CapabilityId::new(capability, limits))
+        .collect::<Result<BTreeSet<_>, _>>()
+        .map_err(|_| CorpusProblem::new("carddemo.db2.control_invalid", "Db2 grant is invalid"))?;
+    Invocation::new(
+        RequestId::new(format!("carddemo-db2-request-{run}"), limits)
+            .map_err(|_| CorpusProblem::new("carddemo.db2.control_invalid", "request invalid"))?,
+        ExecutionId::new(format!("carddemo-db2-execution-{run}"), limits)
+            .map_err(|_| CorpusProblem::new("carddemo.db2.control_invalid", "execution invalid"))?,
+        RunUnitId::new(run, limits)
+            .map_err(|_| CorpusProblem::new("carddemo.db2.control_invalid", "run invalid"))?,
+        None,
+        Selector::new("program:DB2-CONTROL", limits).expect("static Db2 control selector"),
+        ArtifactRef::new("db2-control", limits).expect("static Db2 control artifact"),
+        Principal::new(
+            PrincipalId::new("WEBADM", limits).expect("static Db2 principal"),
+            grants,
+            limits,
+        )
+        .expect("bounded Db2 principal"),
+        ServiceClass::Interactive,
+        0,
+        1_000_000,
+        TraceId::new(format!("carddemo-db2-trace-{run}"), limits).expect("bounded Db2 trace"),
+        IdempotencyKey::new(format!("carddemo-db2-invocation-{run}"), limits)
+            .expect("bounded Db2 invocation key"),
+        1,
+        ResourceLimits::default(),
+        BTreeMap::new(),
+        limits,
+    )
+    .map_err(|_| {
+        CorpusProblem::new(
+            "carddemo.db2.control_invalid",
+            "Db2 control invocation is invalid",
+        )
+    })
+}
+
+fn db2_variable(value: &str) -> Db2HostVariable {
+    Db2HostVariable {
+        value: value.as_bytes().to_vec(),
+        indicator: None,
+    }
+}
+
+fn db2_control_request(
+    operation: Db2Operation,
+    sequence: u64,
+    inputs: BTreeMap<String, Db2HostVariable>,
+) -> Result<Db2Request, CorpusProblem> {
+    let statement = match operation {
+        Db2Operation::Insert => "INSERT INTO CARDDEMO.TRANSACTION_TYPE",
+        Db2Operation::Update => "UPDATE CARDDEMO.TRANSACTION_TYPE",
+        Db2Operation::Delete => "DELETE FROM CARDDEMO.TRANSACTION_TYPE",
+        Db2Operation::Commit => "COMMIT",
+        Db2Operation::Rollback => "ROLLBACK",
+        _ => "CONTROL",
+    };
+    let mutation = operation.is_mutating().then(|| {
+        IdempotencyKey::new(
+            format!("carddemo-db2-control-{sequence}"),
+            InvocationLimits::default(),
+        )
+        .map(|idempotency_key| Mutation {
+            sequence,
+            idempotency_key,
+            transaction: Some("CD-024-CONTROL".into()),
+        })
+        .map_err(|_| {
+            CorpusProblem::new(
+                "carddemo.db2.control_invalid",
+                "Db2 control mutation is invalid",
+            )
+        })
+    });
+    Ok(Db2Request {
+        operation,
+        statement: statement.into(),
+        cursor: None,
+        inputs,
+        outputs: Vec::new(),
+        max_rows: 64,
+        mutation: mutation.transpose()?,
+    })
+}
+
+fn db2_table_digests(server: &ProductServer) -> Result<BTreeMap<String, String>, CorpusProblem> {
+    let mut output = BTreeMap::new();
+    for table in [
+        "CARDDEMO.TRANSACTION_TYPE",
+        "CARDDEMO.TRANSACTION_TYPE_CATEGORY",
+    ] {
+        let rows = server
+            .db2_service()
+            .table_rows(table)
+            .map_err(terminal_problem)?;
+        let mut digest = Sha256::new();
+        for row in rows {
+            for column in row {
+                digest_field(&mut digest, &column);
+            }
+        }
+        output.insert(table.into(), format!("{:x}", digest.finalize()));
+    }
+    Ok(output)
+}
+
+fn db2_dataset_digests(server: &ProductServer) -> Result<BTreeMap<String, String>, CorpusProblem> {
+    let mut output = BTreeMap::new();
+    for dataset in ["AWS.M2.CARDDEMO.TRANTYPE.PS", "AWS.M2.CARDDEMO.TRANCATG.PS"] {
+        let records = utility_records(server, dataset, None)?;
+        let mut digest = Sha256::new();
+        for record in records {
+            digest_field(&mut digest, &record);
+        }
+        output.insert(dataset.into(), format!("{:x}", digest.finalize()));
+    }
+    Ok(output)
 }
 
 async fn exercise_base_batch_routes(
@@ -6786,7 +7775,16 @@ async fn carddemo_terminal_exchange(
             .map_err(|error| CorpusProblem::new("carddemo.online.request", error.to_string()))?,
     )
     .await?;
-    require_terminal_status(input.0, StatusCode::OK, "CardDemo terminal input")?;
+    if input.0 != StatusCode::OK {
+        return Err(CorpusProblem::new(
+            "carddemo.online.exchange_failed",
+            format!(
+                "terminal input returned {}: {}",
+                input.0,
+                String::from_utf8_lossy(&input.1)
+            ),
+        ));
+    }
     let resumed = terminal_http(
         app,
         Method::POST,
@@ -8074,7 +9072,8 @@ fn install_base_online_authorities(
             .map_err(terminal_problem)?;
         racf.permit("TCICSTRN", &resource, "WEBADM", AccessIntent::Execute)
             .map_err(terminal_problem)?;
-        if transaction != "CA00" && !transaction.starts_with("CU") {
+        if transaction != "CA00" && !transaction.starts_with("CU") && !transaction.starts_with("CT")
+        {
             racf.permit("TCICSTRN", &resource, "WEBUSER", AccessIntent::Execute)
                 .map_err(terminal_problem)?;
         }
@@ -8085,7 +9084,10 @@ fn install_base_online_authorities(
             .map_err(terminal_problem)?;
         racf.permit("FACILITY", &resource, "WEBADM", AccessIntent::Execute)
             .map_err(terminal_problem)?;
-        if !program.starts_with("COADM") && !program.starts_with("COUSR") {
+        if !program.starts_with("COADM")
+            && !program.starts_with("COUSR")
+            && !program.starts_with("COTRT")
+        {
             racf.permit("FACILITY", &resource, "WEBUSER", AccessIntent::Execute)
                 .map_err(terminal_problem)?;
         }
@@ -8541,8 +9543,16 @@ fn carddemo_base_maps(
     corpus_dir: &Path,
     semantic_models: &[SemanticModel],
 ) -> Result<Vec<BmsMapDefinition>, CorpusProblem> {
+    carddemo_maps(corpus_dir, &["app/bms"], semantic_models)
+}
+
+fn carddemo_maps(
+    corpus_dir: &Path,
+    roots: &[&str],
+    semantic_models: &[SemanticModel],
+) -> Result<Vec<BmsMapDefinition>, CorpusProblem> {
     let mut maps = Vec::new();
-    for relative in collect_paths(corpus_dir, &["app/bms"], "bms")? {
+    for relative in collect_paths(corpus_dir, roots, "bms")? {
         let source = String::from_utf8(read_corpus_file(corpus_dir, &corpus_dir.join(relative))?)
             .map_err(|_| {
             CorpusProblem::new("carddemo.terminal.bms_invalid", "BMS is not UTF-8")
@@ -8825,6 +9835,114 @@ fn carddemo_base_online_definition(
     })
 }
 
+fn carddemo_db2_online_definition(
+    corpus_dir: &Path,
+) -> Result<OnlineApplicationDefinition, CorpusProblem> {
+    let mut definition = carddemo_base_online_definition(corpus_dir)?;
+    let bundles = carddemo_db2_bundles(corpus_dir)?
+        .into_iter()
+        .map(|(relative, bundle)| {
+            let name = Path::new(&relative)
+                .file_stem()
+                .and_then(|value| value.to_str())
+                .ok_or_else(|| {
+                    CorpusProblem::new("carddemo.db2.program_invalid", "program name is invalid")
+                })?
+                .to_ascii_uppercase();
+            Ok((name, (relative, bundle)))
+        })
+        .collect::<Result<BTreeMap<_, _>, CorpusProblem>>()?;
+    let csd = String::from_utf8(read_corpus_file(
+        corpus_dir,
+        &corpus_dir.join("app/app-transaction-type-db2/csd/CRDDEMOD.csd"),
+    )?)
+    .map_err(|_| CorpusProblem::new("carddemo.db2.csd_invalid", "Db2 CSD is not UTF-8"))?;
+    let transactions = parse_csd(&csd)
+        .map_err(package_problem)?
+        .into_iter()
+        .filter(|resource| resource.kind == "TRANSACTION")
+        .map(|resource| {
+            let program = resource.properties.get("PROGRAM").ok_or_else(|| {
+                CorpusProblem::new(
+                    "carddemo.db2.csd_invalid",
+                    format!("{} program is missing", resource.name),
+                )
+            })?;
+            if !bundles.contains_key(program) {
+                return Err(CorpusProblem::new(
+                    "carddemo.db2.program_missing",
+                    format!("{program} source closure is missing"),
+                ));
+            }
+            Ok((resource.name, program.clone()))
+        })
+        .collect::<Result<BTreeMap<_, _>, CorpusProblem>>()?;
+    let compiler = CobolCompiler::default();
+    let mut semantic_models = Vec::new();
+    for program in transactions.values().collect::<BTreeSet<_>>() {
+        let (relative, bundle) = bundles.get(program).ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.db2.program_missing",
+                format!("{program} source closure is missing"),
+            )
+        })?;
+        let analysis = compiler.analyze(bundle);
+        semantic_models.push(analysis.semantic.ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.db2.compile_failed",
+                format!("{relative}: semantic model is missing"),
+            )
+        })?);
+        let result = compiler
+            .compile(CompilerRequest {
+                source: bundle.clone(),
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").expect("static target"),
+                options: CompileOptions::new(BTreeMap::new()).expect("static options"),
+            })
+            .map_err(|problem| {
+                CorpusProblem::new(
+                    "carddemo.db2.compile_failed",
+                    format!("{relative}: {problem:?}"),
+                )
+            })?;
+        let CompilerResult::Published { artifact, .. } = result else {
+            return Err(CorpusProblem::new(
+                "carddemo.db2.compile_failed",
+                format!("{relative} did not publish"),
+            ));
+        };
+        let payload = artifact.payload().to_vec();
+        definition.programs.push(OnlineProgramDefinition {
+            name: (*program).clone(),
+            artifact: ArtifactRef::new(
+                format!("sha256:{:x}", Sha256::digest(&payload)),
+                InvocationLimits::default(),
+            )
+            .map_err(|_| {
+                CorpusProblem::new("carddemo.db2.artifact_invalid", "artifact ID is invalid")
+            })?,
+            payload,
+        });
+    }
+    definition.transactions.extend(transactions);
+    definition.maps.extend(carddemo_maps(
+        corpus_dir,
+        &["app/app-transaction-type-db2/bms"],
+        &semantic_models,
+    )?);
+    if definition.programs.len() != 20
+        || definition.transactions.len() != 19
+        || definition.maps.len() != 19
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.db2.catalog_drift",
+            "Db2 application resource counts differ",
+        ));
+    }
+    Ok(definition)
+}
+
 fn carddemo_base_seed_objects(corpus_dir: &Path) -> Result<Vec<DatasetSeedObject>, CorpusProblem> {
     let mappings = [
         (
@@ -9029,6 +10147,58 @@ fn explicit_carddemo_bundles(
         bundles.push((primary_path, bundle));
     }
     Ok(bundles)
+}
+
+fn carddemo_db2_bundles(corpus_dir: &Path) -> Result<Vec<(String, SourceBundle)>, CorpusProblem> {
+    let limits = SourceLimits::default();
+    let dcl_paths = collect_paths(corpus_dir, &["app/app-transaction-type-db2/dcl"], "dcl")?;
+    let dcl_files = dcl_paths
+        .iter()
+        .map(|path| source_file(corpus_dir, path, limits))
+        .collect::<Result<Vec<_>, _>>()?;
+    let dcl_members = dcl_paths
+        .iter()
+        .map(|path| LogicalPath::new(path, limits.max_path_bytes))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|problem| {
+            CorpusProblem::new(
+                "carddemo.db2.closure_invalid",
+                format!("Db2 DCL path is invalid: {problem}"),
+            )
+        })?;
+    let dcl_library = SourceLibrary::new("db2-dcl", dcl_members, limits).map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.closure_invalid",
+            format!("Db2 DCL library is invalid: {problem}"),
+        )
+    })?;
+    explicit_carddemo_bundles(corpus_dir)?
+        .into_iter()
+        .filter(|(relative, _)| relative.starts_with("app/app-transaction-type-db2/cbl/"))
+        .map(|(relative, bundle)| {
+            let mut files = bundle.files().to_vec();
+            files.extend(dcl_files.iter().cloned());
+            let mut libraries = bundle.libraries().to_vec();
+            libraries.insert(libraries.len().saturating_sub(1), dcl_library.clone());
+            let mut options = bundle.options().clone();
+            options.insert("cobol.sql-precompile".into(), "true".into());
+            let primary =
+                LogicalPath::new(&relative, limits.max_path_bytes).map_err(|problem| {
+                    CorpusProblem::new(
+                        "carddemo.db2.closure_invalid",
+                        format!("Db2 primary path is invalid: {problem}"),
+                    )
+                })?;
+            SourceBundle::with_libraries(&primary, files, libraries, options, Vec::new(), limits)
+                .map(|bundle| (relative, bundle))
+                .map_err(|problem| {
+                    CorpusProblem::new(
+                        "carddemo.db2.closure_invalid",
+                        format!("Db2 source closure is invalid: {problem}"),
+                    )
+                })
+        })
+        .collect()
 }
 
 fn collect_paths(

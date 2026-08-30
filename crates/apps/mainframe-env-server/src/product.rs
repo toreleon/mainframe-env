@@ -7,6 +7,7 @@ use mainframe_env_cics::{
     BmsMapDefinition, CicsService, CicsTerminalSnapshot, CicsTraceEntry, cics_provider,
 };
 use mainframe_env_dataset::{DatasetService, dataset_providers};
+use mainframe_env_db2::{Db2Service, db2_providers};
 use mainframe_env_encoding::CodePage;
 use mainframe_env_execution_api::{
     ArtifactRef, BoundedPayload, CapabilityId, ExecutionId, ExecutionOutcome, IdempotencyKey,
@@ -120,6 +121,7 @@ pub struct ProductServer {
     racf: Arc<RacfService>,
     cics: Arc<CicsService>,
     dataset: Arc<DatasetService>,
+    db2: Arc<Db2Service>,
     batch: Arc<BatchService>,
     artifacts: LocalArtifactStore,
     host: Arc<ScopedHostService>,
@@ -150,14 +152,23 @@ impl ProductServer {
         let provider_store: Arc<dyn ProviderStateStore> = store.clone();
         let racf = RacfService::open(provider_store.clone(), secrets.clone(), Default::default())?;
         let dataset = DatasetService::open(provider_store.clone(), Default::default())?;
+        let db2 = Db2Service::open(provider_store.clone(), Default::default())?;
         let inner_program: Arc<dyn HostProvider> = program.clone();
-        let inner = scoped_host(&racf, &dataset, inner_program, false, None)?;
+        let inner = scoped_host(
+            &racf,
+            &dataset,
+            inner_program,
+            db2_providers(db2.clone(), InvocationLimits::default()),
+            false,
+            None,
+        )?;
         let cics = CicsService::open(inner, provider_store.clone(), Default::default())?;
         let program_provider: Arc<dyn HostProvider> = program.clone();
         let host = scoped_host(
             &racf,
             &dataset,
             program_provider,
+            db2_providers(db2.clone(), InvocationLimits::default()),
             true,
             Some(cics_provider(cics.clone(), InvocationLimits::default())),
         )?;
@@ -283,6 +294,7 @@ impl ProductServer {
             racf,
             cics,
             dataset,
+            db2,
             batch,
             artifacts,
             host,
@@ -328,6 +340,11 @@ impl ProductServer {
     #[must_use]
     pub fn dataset_service(&self) -> Arc<DatasetService> {
         self.dataset.clone()
+    }
+
+    #[must_use]
+    pub fn db2_service(&self) -> Arc<Db2Service> {
+        self.db2.clone()
     }
 
     #[must_use]
@@ -835,6 +852,8 @@ impl ProductServer {
         self.accepting.load(Ordering::SeqCst)
             && self.store.get_provider_state("jes-meta", "next-id").is_ok()
             && self.host.capability_ready("host.cics.execute")
+            && self.host.capability_ready("host.db2.read")
+            && self.host.capability_ready("host.db2.write")
             && self.artifacts.is_ready()
     }
 
@@ -2002,6 +2021,8 @@ impl ProductServer {
                     "host.cics.execute",
                     "host.dataset.read",
                     "host.dataset.write",
+                    "host.db2.read",
+                    "host.db2.write",
                     "host.program.invoke",
                     "host.clock",
                 ],
@@ -2265,6 +2286,7 @@ fn scoped_host(
     racf: &Arc<RacfService>,
     dataset: &Arc<DatasetService>,
     program: Arc<dyn HostProvider>,
+    additional: Vec<Arc<dyn HostProvider>>,
     include_cics: bool,
     cics: Option<Arc<dyn HostProvider>>,
 ) -> Result<Arc<ScopedHostService>, HostProblem> {
@@ -2274,6 +2296,7 @@ fn scoped_host(
     providers.push(Arc::new(SystemClockProvider::new(limits)) as Arc<dyn HostProvider>);
     providers.push(Arc::new(BatchTerminalProvider::new(limits)) as Arc<dyn HostProvider>);
     providers.push(program);
+    providers.extend(additional);
     if include_cics {
         providers.push(cics.ok_or(HostProblem::InfrastructureFailure)?);
     }
@@ -2692,6 +2715,9 @@ fn job_capabilities(jcl: &[u8]) -> Vec<&'static str> {
     }
     if source.contains("EXEC CICS") || source.contains("PGM=SDSF") {
         capabilities.push("host.cics.execute");
+    }
+    if source.contains("EXEC SQL") || source.contains("PGM=IKJEFT01") {
+        capabilities.extend(["host.db2.read", "host.db2.write"]);
     }
     if source.contains("ASKTIME") || source.contains("FORMATTIME") {
         capabilities.push("host.clock");

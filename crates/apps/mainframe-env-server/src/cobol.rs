@@ -509,10 +509,30 @@ impl CobolProgram {
                 response2: 0,
             }),
             ExecutionOutcome::InfrastructureFailure(_) => Err(HostProblem::InfrastructureFailure),
-            ExecutionOutcome::Rejected(_) => Err(HostProblem::Unsupported),
-            ExecutionOutcome::Suspended(_)
-            | ExecutionOutcome::Invoke(_)
-            | ExecutionOutcome::Transfer(_) => Err(HostProblem::Unsupported),
+            ExecutionOutcome::Rejected(problem) => Err(HostProblem::Condition {
+                name: format!(
+                    "BATCH-INSTALLED-REJECTED:{} at {}",
+                    problem.public_message,
+                    machine.position_summary()
+                ),
+                response: -2,
+                response2: 0,
+            }),
+            ExecutionOutcome::Suspended(_) => Err(HostProblem::Condition {
+                name: "BATCH-INSTALLED-SUSPENDED".into(),
+                response: -3,
+                response2: 0,
+            }),
+            ExecutionOutcome::Invoke(_) => Err(HostProblem::Condition {
+                name: "BATCH-INSTALLED-INVOKE".into(),
+                response: -4,
+                response2: 0,
+            }),
+            ExecutionOutcome::Transfer(_) => Err(HostProblem::Condition {
+                name: "BATCH-INSTALLED-TRANSFER".into(),
+                response: -5,
+                response2: 0,
+            }),
         }
     }
 }

@@ -519,10 +519,16 @@ pub fn core_mir_profile() -> LegalityProfile {
     let catalog = core_mir_catalog();
     LegalityProfile {
         allowed_operations: catalog.identities().cloned().collect(),
-        allowed_runtime_imports: ["host.terminal", "host.program", "host.dataset", "host.cics"]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+        allowed_runtime_imports: [
+            "host.terminal",
+            "host.program",
+            "host.dataset",
+            "host.cics",
+            "host.db2",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect(),
     }
 }
 
@@ -530,7 +536,8 @@ fn runtime_import(kind: StatementKind) -> Option<&'static str> {
     use StatementKind as K;
     match kind {
         K::Accept | K::Display => Some("host.terminal"),
-        K::Call | K::Cancel | K::ExecDli | K::ExecSql => Some("host.program"),
+        K::Call | K::Cancel | K::ExecDli => Some("host.program"),
+        K::ExecSql => Some("host.db2"),
         K::Open | K::Close | K::Read | K::Rewrite | K::Write => Some("host.dataset"),
         K::ExecCics => Some("host.cics"),
         _ => None,

@@ -6,9 +6,9 @@ use mainframe_env_execution_api::{
 use mainframe_env_host_api::{
     AccessIntent, CapabilityDescriptor, CicsConditionPolicy, CicsDisposition, CicsOperation,
     CicsRequest, CicsResponse, CicsUnitOfWorkOutcome, ClockRequest, DatasetName, DatasetRequest,
-    DatasetResult, EffectRequest, EffectResult, HostProblem, HostProvider, HostRequest, HostResult,
-    MemberName, Mutation, ProgramName, ProgramRequest, ResourceName, ScopedHostService,
-    SecurityDecision, SecurityRequest, SessionId,
+    DatasetResult, Db2Operation, Db2Request, EffectRequest, EffectResult, HostProblem,
+    HostProvider, HostRequest, HostResult, MemberName, Mutation, ProgramName, ProgramRequest,
+    ResourceName, ScopedHostService, SecurityDecision, SecurityRequest, SessionId,
 };
 use mainframe_env_store_api::{
     ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
@@ -1730,6 +1730,7 @@ impl CicsService {
                 None,
             )
             .map_err(store_error)?;
+        self.syncpoint_db2(run, outcome)?;
         if outcome == CicsUnitOfWorkOutcome::RolledBack {
             self.rollback_run(run)?;
         } else {
@@ -1755,6 +1756,62 @@ impl CicsService {
             return Err(HostProblem::UnknownOutcome);
         }
         self.uow_response(run, outcome)
+    }
+
+    fn syncpoint_db2(
+        &self,
+        run: &mut Run,
+        outcome: CicsUnitOfWorkOutcome,
+    ) -> Result<(), HostProblem> {
+        let capability = CapabilityId::new("host.db2.write", InvocationLimits::default())
+            .expect("static Db2 capability");
+        if !self.host.capability_ready(capability.as_str())
+            || !run.invocation.principal.has_grant(&capability)
+        {
+            return Ok(());
+        }
+        run.host_sequence = run
+            .host_sequence
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        let key = nested_key(run, run.host_sequence)?;
+        let result = self.host.invoke(
+            &run.invocation,
+            run.invocation.deadline_tick.saturating_sub(1),
+            false,
+            EffectRequest {
+                run_unit: run.invocation.run_unit_id.clone(),
+                sequence: run.host_sequence,
+                deadline_tick: run.invocation.deadline_tick,
+                idempotency_key: Some(key.clone()),
+                request: HostRequest::Db2(Db2Request {
+                    operation: if outcome == CicsUnitOfWorkOutcome::RolledBack {
+                        Db2Operation::Rollback
+                    } else {
+                        Db2Operation::Commit
+                    },
+                    statement: String::new(),
+                    cursor: None,
+                    inputs: BTreeMap::new(),
+                    outputs: Vec::new(),
+                    max_rows: 0,
+                    mutation: Some(Mutation {
+                        sequence: run.host_sequence,
+                        idempotency_key: key,
+                        transaction: Some(run.transaction.clone()),
+                    }),
+                }),
+            },
+        );
+        match result.effect.outcome? {
+            HostResult::Db2(result) if result.sqlcode == 0 => Ok(()),
+            HostResult::Db2(result) => Err(HostProblem::Condition {
+                name: format!("SQLCODE{}", result.sqlcode),
+                response: result.sqlcode,
+                response2: 0,
+            }),
+            _ => Err(HostProblem::ProviderFailure),
+        }
     }
 
     fn rollback_run(&self, run: &mut Run) -> Result<(), HostProblem> {

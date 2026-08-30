@@ -161,6 +161,16 @@ pub(crate) fn decode_and_lex(
     let decoded = decode_file(file, limits)?;
     let normalized = normalize_source(&decoded, file.path(), file.format(), limits)?;
     let expanded = expand_copies(&normalized, bundle, limits, &mut Vec::new())?;
+    let expanded = if bundle
+        .options()
+        .get("cobol.sql-precompile")
+        .is_some_and(|value| value == "true")
+    {
+        let expanded = expand_sql_includes(&expanded, bundle, limits, &mut Vec::new())?;
+        hoist_sql_cursor_declarations(&expanded, limits)?
+    } else {
+        expanded
+    };
     let mut syntax = lex(&decoded, limits)?;
     syntax.semantic_text = expanded.text;
     syntax.expansions = expanded.expansions;
@@ -454,6 +464,235 @@ fn expand_copies(
 }
 
 #[derive(Clone, Debug)]
+struct SqlIncludeDirective {
+    start: usize,
+    end: usize,
+    name: String,
+}
+
+fn expand_sql_includes(
+    source: &ExpandedSource,
+    bundle: &SourceBundle,
+    limits: SyntaxLimits,
+    stack: &mut Vec<String>,
+) -> Result<ExpandedSource, SyntaxProblem> {
+    let mut output = ExpandedSource::default();
+    let mut cursor = 0usize;
+    while let Some(directive) = find_sql_include(&source.text, cursor)? {
+        append_expanded_slice(&mut output, source, cursor..directive.start);
+        if stack.contains(&directive.name) {
+            return Err(SyntaxProblem::CircularPrecompilerInclude(directive.name));
+        }
+        if stack.len() >= limits.max_copy_depth {
+            return Err(SyntaxProblem::PrecompilerIncludeDepthExceeded);
+        }
+        let dependency = bundle
+            .resolve_library_member(&directive.name)
+            .map_err(|problem| match problem {
+                LibraryProblem::MissingMember(_) => {
+                    SyntaxProblem::PrecompilerIncludeNotFound(directive.name.clone())
+                }
+                LibraryProblem::AmbiguousMember { .. } => {
+                    SyntaxProblem::AmbiguousPrecompilerInclude(directive.name.clone())
+                }
+                _ => SyntaxProblem::InvalidPrecompilerInclude,
+            })?;
+        stack.push(directive.name.clone());
+        let decoded = decode_file(dependency, limits)?;
+        let normalized =
+            normalize_source(&decoded, dependency.path(), dependency.format(), limits)?;
+        let copied = expand_copies(&normalized, bundle, limits, &mut Vec::new())?;
+        let mut expanded = expand_sql_includes(&copied, bundle, limits, stack)?;
+        stack.pop();
+        let output_start = output.text.len();
+        append_expanded(&mut output, std::mem::take(&mut expanded));
+        let output_end = output.text.len();
+        output.expansions.push(Expansion {
+            output_start,
+            output_end,
+            source: dependency.path().clone(),
+        });
+        if output.text.len() > limits.max_expanded_bytes {
+            return Err(SyntaxProblem::SourceLimitExceeded);
+        }
+        cursor = directive.end;
+    }
+    append_expanded_slice(&mut output, source, cursor..source.text.len());
+    output
+        .copy_directive_origins
+        .extend(source.copy_directive_origins.iter().cloned());
+    output
+        .expansions
+        .sort_by_key(|expansion| (expansion.output_start, expansion.output_end));
+    if output.text.len() > limits.max_expanded_bytes {
+        return Err(SyntaxProblem::SourceLimitExceeded);
+    }
+    Ok(output)
+}
+
+fn find_sql_include(
+    source: &str,
+    from: usize,
+) -> Result<Option<SqlIncludeDirective>, SyntaxProblem> {
+    let mut cursor = from;
+    while let Some((start, end)) = next_semantic_word(source, &mut cursor)? {
+        if !source[start..end].eq_ignore_ascii_case("EXEC") {
+            continue;
+        }
+        let mut probe = cursor;
+        let Some((sql_start, sql_end)) = next_semantic_word(source, &mut probe)? else {
+            continue;
+        };
+        if !source[sql_start..sql_end].eq_ignore_ascii_case("SQL") {
+            continue;
+        }
+        let Some((include_start, include_end)) = next_semantic_word(source, &mut probe)? else {
+            continue;
+        };
+        if !source[include_start..include_end].eq_ignore_ascii_case("INCLUDE") {
+            continue;
+        }
+        let (name_start, name_end) = next_semantic_word(source, &mut probe)?
+            .ok_or(SyntaxProblem::InvalidPrecompilerInclude)?;
+        let name = source[name_start..name_end].to_ascii_uppercase();
+        let (terminal_start, terminal_end) = next_semantic_word(source, &mut probe)?
+            .ok_or(SyntaxProblem::InvalidPrecompilerInclude)?;
+        if !source[terminal_start..terminal_end].eq_ignore_ascii_case("END-EXEC") {
+            return Err(SyntaxProblem::InvalidPrecompilerInclude);
+        }
+        let end = terminal_end + usize::from(source.as_bytes().get(terminal_end) == Some(&b'.'));
+        return Ok(Some(SqlIncludeDirective { start, end, name }));
+    }
+    Ok(None)
+}
+
+fn hoist_sql_cursor_declarations(
+    source: &ExpandedSource,
+    limits: SyntaxLimits,
+) -> Result<ExpandedSource, SyntaxProblem> {
+    let procedure = source
+        .text
+        .to_ascii_uppercase()
+        .find("PROCEDURE DIVISION")
+        .ok_or(SyntaxProblem::InvalidPrecompilerInclude)?;
+    let mut declarations = Vec::new();
+    let mut cursor = 0usize;
+    while let Some(range) = find_sql_cursor_declaration(&source.text, cursor)? {
+        cursor = range.end;
+        if range.start < procedure {
+            declarations.push(range);
+        }
+    }
+    if declarations.is_empty() {
+        return Ok(source.clone());
+    }
+    let mut without = ExpandedSource::default();
+    cursor = 0;
+    for range in &declarations {
+        append_expanded_slice(&mut without, source, cursor..range.start);
+        cursor = range.end;
+    }
+    append_expanded_slice(&mut without, source, cursor..source.text.len());
+    let upper = without.text.to_ascii_uppercase();
+    let procedure = upper
+        .find("PROCEDURE DIVISION")
+        .ok_or(SyntaxProblem::InvalidPrecompilerInclude)?;
+    let insert = procedure
+        + without.text[procedure..]
+            .find('.')
+            .ok_or(SyntaxProblem::InvalidPrecompilerInclude)?
+        + 1;
+    let mut output = ExpandedSource::default();
+    append_expanded_slice(&mut output, &without, 0..insert);
+    output.text.push('\n');
+    for range in declarations {
+        append_expanded_slice(&mut output, source, range);
+        output.text.push('\n');
+    }
+    append_expanded_slice(&mut output, &without, insert..without.text.len());
+    output
+        .copy_directive_origins
+        .extend(source.copy_directive_origins.iter().cloned());
+    if output.text.len() > limits.max_expanded_bytes {
+        return Err(SyntaxProblem::SourceLimitExceeded);
+    }
+    Ok(output)
+}
+
+fn find_sql_cursor_declaration(
+    source: &str,
+    from: usize,
+) -> Result<Option<Range<usize>>, SyntaxProblem> {
+    let mut cursor = from;
+    while let Some((start, end)) = next_semantic_word(source, &mut cursor)? {
+        if !source[start..end].eq_ignore_ascii_case("EXEC") {
+            continue;
+        }
+        let mut probe = cursor;
+        let Some((sql_start, sql_end)) = next_semantic_word(source, &mut probe)? else {
+            continue;
+        };
+        if !source[sql_start..sql_end].eq_ignore_ascii_case("SQL") {
+            continue;
+        }
+        let Some((declare_start, declare_end)) = next_semantic_word(source, &mut probe)? else {
+            continue;
+        };
+        if !source[declare_start..declare_end].eq_ignore_ascii_case("DECLARE") {
+            continue;
+        }
+        let _cursor_name = next_semantic_word(source, &mut probe)?
+            .ok_or(SyntaxProblem::InvalidPrecompilerInclude)?;
+        let Some((kind_start, kind_end)) = next_semantic_word(source, &mut probe)? else {
+            return Err(SyntaxProblem::InvalidPrecompilerInclude);
+        };
+        if !source[kind_start..kind_end].eq_ignore_ascii_case("CURSOR") {
+            continue;
+        }
+        loop {
+            let Some((terminal_start, terminal_end)) = next_semantic_word(source, &mut probe)?
+            else {
+                return Err(SyntaxProblem::InvalidPrecompilerInclude);
+            };
+            if source[terminal_start..terminal_end].eq_ignore_ascii_case("END-EXEC") {
+                let end =
+                    terminal_end + usize::from(source.as_bytes().get(terminal_end) == Some(&b'.'));
+                return Ok(Some(start..end));
+            }
+        }
+    }
+    Ok(None)
+}
+
+fn next_semantic_word(
+    source: &str,
+    cursor: &mut usize,
+) -> Result<Option<(usize, usize)>, SyntaxProblem> {
+    let bytes = source.as_bytes();
+    while *cursor < bytes.len() {
+        if source[*cursor..].starts_with("*>") {
+            *cursor = source[*cursor..]
+                .find('\n')
+                .map_or(bytes.len(), |offset| *cursor + offset + 1);
+            continue;
+        }
+        if matches!(bytes[*cursor], b'\'' | b'"') {
+            *cursor = skip_quoted(source, *cursor)?;
+            continue;
+        }
+        if is_word_byte(bytes[*cursor]) {
+            let start = *cursor;
+            while bytes.get(*cursor).is_some_and(|byte| is_word_byte(*byte)) {
+                *cursor += 1;
+            }
+            return Ok(Some((start, *cursor)));
+        }
+        *cursor += source[*cursor..].chars().next().map_or(1, char::len_utf8);
+    }
+    Ok(None)
+}
+
+#[derive(Clone, Debug)]
 struct CopyDirective {
     start: usize,
     end: usize,
@@ -735,7 +974,7 @@ fn append_normalized_slice(
     output.text.push_str(&source.text[range.clone()]);
     output
         .origins
-        .extend(slice_origins(&source.origins, range, output_start));
+        .extend(slice_origins(&source.origins, range.clone(), output_start));
 }
 
 fn append_expanded_slice(
@@ -747,7 +986,15 @@ fn append_expanded_slice(
     output.text.push_str(&source.text[range.clone()]);
     output
         .origins
-        .extend(slice_origins(&source.origins, range, output_start));
+        .extend(slice_origins(&source.origins, range.clone(), output_start));
+    for expansion in source.expansions.iter().filter(|expansion| {
+        expansion.output_start >= range.start && expansion.output_end <= range.end
+    }) {
+        let mut expansion = expansion.clone();
+        expansion.output_start = output_start + expansion.output_start - range.start;
+        expansion.output_end = output_start + expansion.output_end - range.start;
+        output.expansions.push(expansion);
+    }
 }
 
 fn append_expanded(output: &mut ExpandedSource, mut source: ExpandedSource) {
@@ -916,6 +1163,11 @@ pub(crate) enum SyntaxProblem {
     CopyDepthExceeded,
     InvalidCopy,
     InvalidContinuation,
+    PrecompilerIncludeNotFound(String),
+    AmbiguousPrecompilerInclude(String),
+    CircularPrecompilerInclude(String),
+    PrecompilerIncludeDepthExceeded,
+    InvalidPrecompilerInclude,
 }
 impl fmt::Display for SyntaxProblem {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -7,7 +7,11 @@
     ["mainframe-env-conformance", "mainframe-env-batch"],
     ["mainframe-env-conformance", "mainframe-env-cics"],
     ["mainframe-env-conformance", "mainframe-env-server"],
+    ["mainframe-env-db2", "mainframe-env-execution-api"],
+    ["mainframe-env-db2", "mainframe-env-host-api"],
+    ["mainframe-env-db2", "mainframe-env-store-api"],
     ["mainframe-env-interpreter", "mainframe-env-encoding"],
+    ["mainframe-env-server", "mainframe-env-db2"],
     ["mainframe-env-server", "mainframe-env-encoding"],
     ["xtask", "mainframe-env-conformance"]
   ]

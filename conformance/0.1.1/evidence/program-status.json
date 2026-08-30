@@ -1,14 +1,14 @@
 {
   "schema_version": "mainframe-env.carddemo-program-status@1",
-  "phase": "CD.E",
+  "phase": "CD.F",
   "phase_status": "in_progress",
   "implementation_status": "in_progress",
   "current_product": "0.1.0-alpha.0",
   "target_product": "0.1.1",
   "source_identity": {
-    "base_commit": "f63684682aeae1479eb4e79439c8a814dfecd22d",
+    "base_commit": "60cd4ad57dad5d0dd65b7d5c957b8acc9b90ce32",
     "dirty_tree_algorithm": "sha256 of sorted sha256sum records, excluding .git, target, docs/delivery/CARDEMO-0.1.1-STATUS.md, and conformance/0.1.1/evidence/program-status.json",
-    "dirty_tree_digest": "sha256:8e42b37569ccf961b1af3bdd15316e117484f47ec0020ca5792989c9bff487fc"
+    "dirty_tree_digest": "sha256:f77007a89706f9806d9cf4ae367eb337b0d245449126dfe88ffc30f2223559e8"
   },
   "corpus": {
     "environment_key": "CARDEMO_CORPUS_DIR",
@@ -21,9 +21,9 @@
     "license": "Apache-2.0",
     "license_sha256": "09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b"
   },
-  "current_issue": "CD-023",
-  "issues": {"total":27,"completed":22,"in_progress":1,"open":4},
-  "journeys": {"total":20,"passed":9,"failed_or_not_run":11},
+  "current_issue": "CD-024",
+  "issues": {"total":27,"completed":23,"in_progress":1,"open":3},
+  "journeys": {"total":20,"passed":12,"failed_or_not_run":8},
   "completed_issues": [
     {
       "id": "CD-001",
@@ -200,6 +200,14 @@
       "commit_identity": "f63684682aeae1479eb4e79439c8a814dfecd22d",
       "evidence": "conformance/0.1.1/evidence/issues/CD-022.json",
       "evidence_digest": "sha256:110244e9ba24d1468498439f0937c28836719b1acae8bf1c289969dc0143a142"
+    },
+    {
+      "id": "CD-023",
+      "state": "pass",
+      "commit_subject": "Certify CardDemo base batch journeys",
+      "commit_identity": "60cd4ad57dad5d0dd65b7d5c957b8acc9b90ce32",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-023.json",
+      "evidence_digest": "sha256:6a1645a1771693029363857af993ccc1b64cbb94d53ff86934b2776040fc1398"
     }
   ],
   "commands": [
@@ -326,6 +334,18 @@
     ,{"command":"env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-utilities --check","exit_code":1,"result":"expected carddemo.corpus.environment_missing control"}
     ,{"command":"cargo check --workspace --all-targets --locked","exit_code":0,"result":"pass"}
     ,{"command":"architecture, runtime architecture, profile, schema, inventory, evidence, and ordinary conformance gates","exit_code":0,"result":"pass"}
+    ,{"command":"cargo test -p mainframe-env-compiler sql_include_precompile_resolves_data_and_procedure_members before repair","exit_code":101,"result":"focused regression proved SQL INCLUDE data and procedure members were absent from the executable closure"}
+    ,{"command":"focused EVALUATE SQLCODE, edited SQLCODE, explicit THEN, numeric SQL output, zero-length reference modification, nested PERFORM loop, and inline AT END regressions","exit_code":0,"result":"pass after each first-failure repair"}
+    ,{"command":"Zowe CLI 8.36.0 submit exact CREADB21, MNTTRDB2, and TRANEXTR against ephemeral local ProductServer","exit_code":0,"result":"all three reached OUTPUT CC 0000; COBTUPDT spool reported successful A98 insert, U02 update, and D98 delete; DSNTIAUL reported 7 plus 18 rows"}
+    ,{"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-db2 --check before evidence","exit_code":1,"result":"derived receipt passed and only CD-024 evidence was missing"}
+    ,{"command":"cargo test -p mainframe-env-host-api -p mainframe-env-compiler -p mainframe-env-interpreter -p mainframe-env-batch -p mainframe-env-cics -p mainframe-env-db2 -p mainframe-env-server -p mainframe-env-conformance -p xtask --locked","exit_code":0,"result":"185 affected tests passed"}
+    ,{"command":"affected-package cargo clippy --all-targets --locked -- -D warnings","exit_code":0,"result":"pass"}
+    ,{"command":"cargo check --workspace --all-targets --locked","exit_code":0,"result":"pass"}
+    ,{"command":"architecture, runtime architecture, profile, schema, inventory, and evidence gates","exit_code":0,"result":"pass with additive Db2 package, dependency, and profile declarations"}
+    ,{"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-db2 --check","exit_code":0,"result":"CD.J13 and CD.J14 passed with online CRUD, three batch routes, 25 extracted records, and authorization/restart/rollback/conflict/failure controls"}
+    ,{"command":"env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-db2 --check","exit_code":1,"result":"expected carddemo.corpus.environment_missing control"}
+    ,{"command":"env -u CARDEMO_CORPUS_DIR cargo xtask conformance --check","exit_code":0,"result":"pass"}
+    ,{"command":"formatting, diff, JSON parse, and evidence redaction checks","exit_code":0,"result":"pass"}
     ,{"command":"initial exact CLOSEFIL through local z/OSMF contract","exit_code":1,"result":"focused public-route regression reached JOB00001 OUTPUT with FAILED Unsupported before typed SDSF/CICS file control"}
     ,{"command":"Zowe CLI 8.36.0 submit exact CLOSEFIL and OPENFIL against ephemeral local ProductServer","exit_code":0,"result":"both jobs completed CC 0000 and exact CMDOUT reported all five files CLOSED then OPEN"}
     ,{"command":"Zowe CLI 8.36.0 submit corrected pinned CREASTMT through stdin against ephemeral local ProductServer","exit_code":0,"result":"CREASTMT completed CC 0000 after exact INITIALIZE, linkage, ALTER, table, file, and statement output paths"}
@@ -362,6 +382,6 @@
     "Resolve 0.1.0-alpha.0 release ordering before cutting 0.1.1."
   ],
   "blockers": [],
-  "next_issue": "CD-024",
-  "next_step": "Execute CD.J10 through CD.J12 through public job and operator entry points; compare exact initialization, posting, interest, backup, combine, AIX, statement, report, CICS close/open, internal-reader, restart, rollback, cancellation, dataset, and spool observations."
+  "next_issue": "CD-025",
+  "next_step": "Review the complete CD-024 diff, stage only the reached Db2 workflow implementation and derived evidence, and create the required local completion commit."
 }

@@ -8,9 +8,9 @@ use mainframe_env_execution_api::{
 use mainframe_env_host_api::{
     AccessIntent, CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest,
     DatasetAttributes, DatasetName, DatasetOrganization, DatasetRequest, DatasetResult,
-    EffectRequest, HostProblem, HostRequest, HostResult, MemberName, Mutation, ProgramName,
-    ProgramRequest, RecordFormat, ResourceName, ScopedHostService, SecurityDecision,
-    SecurityRequest,
+    Db2Operation, Db2Request, EffectRequest, HostProblem, HostRequest, HostResult, MemberName,
+    Mutation, ProgramName, ProgramRequest, RecordFormat, ResourceName, ScopedHostService,
+    SecurityDecision, SecurityRequest,
 };
 use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
 use serde::{Deserialize, Serialize};
@@ -469,6 +469,8 @@ impl BatchService {
                 }
                 let output = if step.program.eq_ignore_ascii_case("SDSF") {
                     self.execute_sdsf(invocation, job, step, &input, &mut effect_sequence)?
+                } else if step.program.eq_ignore_ascii_case("IKJEFT01") {
+                    self.execute_db2_tso(invocation, job, step, &input, &mut effect_sequence)?
                 } else {
                     let bytes =
                         serde_json::to_vec(&input).map_err(|_| HostProblem::ProviderFailure)?;
@@ -636,6 +638,177 @@ impl BatchService {
                 ),
             ]),
         })
+    }
+
+    fn execute_db2_tso(
+        &self,
+        invocation: &Invocation,
+        job: &Job,
+        step: &StepPlan,
+        input: &ProgramInput,
+        effect_sequence: &mut u64,
+    ) -> Result<crate::ProgramOutput, HostProblem> {
+        let control = input_dd_text(input, "SYSTSIN")?;
+        if control.to_ascii_uppercase().contains("FREE PLAN")
+            || control.to_ascii_uppercase().contains("FREE PACKAGE")
+        {
+            let result = self.db2_call(
+                invocation,
+                job,
+                step,
+                effect_sequence,
+                Db2Operation::FreePlans,
+                control,
+                0,
+            )?;
+            return Ok(crate::ProgramOutput {
+                return_code: i32::from(result.sqlcode != 0) * 8,
+                records: vec![format!("IKJEFT01 SQLCODE={}", result.sqlcode).into_bytes()],
+                dd_outputs: BTreeMap::new(),
+            });
+        }
+        let program = tso_run_program(&control)?;
+        if program == "COBTUPDT" {
+            let payload = BoundedPayload::new(
+                "mainframe-env.program.input@1",
+                serde_json::to_vec(input).map_err(|_| HostProblem::ProviderFailure)?,
+                InvocationLimits::default(),
+            )
+            .map_err(|_| HostProblem::ResourceExhausted)?;
+            let sequence = next_effect_sequence(invocation, effect_sequence)?;
+            let key = effect_key(job, step, sequence)?;
+            let result = self.host.invoke(
+                invocation,
+                invocation.deadline_tick.saturating_sub(1),
+                false,
+                EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence,
+                    deadline_tick: invocation.deadline_tick,
+                    idempotency_key: Some(key),
+                    request: HostRequest::Program(ProgramRequest::Call {
+                        program: ProgramName::new(program, 128)
+                            .map_err(|_| HostProblem::Malformed)?,
+                        payload,
+                    }),
+                },
+            );
+            return match result.effect.outcome? {
+                HostResult::Program(payload) => decode_program_output(&payload),
+                _ => Err(HostProblem::ProviderFailure),
+            };
+        }
+        let statement = input_dd_text(input, "SYSIN")?;
+        let operation = match program.as_str() {
+            "DSNTIAD" | "DSNTEP4" => Db2Operation::ExecuteScript,
+            "DSNTIAUL" => Db2Operation::Extract,
+            _ => return Err(HostProblem::Unsupported),
+        };
+        let result = self.db2_call(
+            invocation,
+            job,
+            step,
+            effect_sequence,
+            operation,
+            statement,
+            4_096,
+        )?;
+        let dd_outputs = if operation == Db2Operation::Extract {
+            let ccsid = input
+                .dds
+                .iter()
+                .find(|dd| dd.name.eq_ignore_ascii_case("SYSREC00"))
+                .and_then(|dd| dd.ccsid);
+            BTreeMap::from([(
+                "SYSREC00".into(),
+                result
+                    .rows
+                    .iter()
+                    .map(|row| {
+                        let record = row
+                            .columns
+                            .first()
+                            .cloned()
+                            .ok_or(HostProblem::ProviderFailure)?;
+                        match ccsid {
+                            None | Some(1208) => Ok(record),
+                            Some(37) => mainframe_env_encoding::CodePage::Cp037
+                                .encode(
+                                    std::str::from_utf8(&record)
+                                        .map_err(|_| HostProblem::ProviderFailure)?,
+                                    record.len().saturating_mul(4).max(1),
+                                )
+                                .map_err(|_| HostProblem::ProviderFailure),
+                            Some(_) => Err(HostProblem::Unsupported),
+                        }
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+            )])
+        } else {
+            BTreeMap::new()
+        };
+        Ok(crate::ProgramOutput {
+            return_code: i32::from(result.sqlcode != 0) * 8,
+            records: vec![
+                format!(
+                    "IKJEFT01 {program} SQLCODE={} ROWS={}",
+                    result.sqlcode,
+                    result.rows.len()
+                )
+                .into_bytes(),
+            ],
+            dd_outputs,
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn db2_call(
+        &self,
+        invocation: &Invocation,
+        job: &Job,
+        step: &StepPlan,
+        effect_sequence: &mut u64,
+        operation: Db2Operation,
+        statement: String,
+        max_rows: u32,
+    ) -> Result<mainframe_env_host_api::Db2Result, HostProblem> {
+        let sequence = next_effect_sequence(invocation, effect_sequence)?;
+        let mutation = if operation.is_mutating() {
+            let key = effect_key(job, step, sequence)?;
+            Some(Mutation {
+                sequence,
+                idempotency_key: key,
+                transaction: Some(job.id.clone()),
+            })
+        } else {
+            None
+        };
+        let result = self.host.invoke(
+            invocation,
+            invocation.deadline_tick.saturating_sub(1),
+            false,
+            EffectRequest {
+                run_unit: invocation.run_unit_id.clone(),
+                sequence,
+                deadline_tick: invocation.deadline_tick,
+                idempotency_key: mutation
+                    .as_ref()
+                    .map(|mutation| mutation.idempotency_key.clone()),
+                request: HostRequest::Db2(Db2Request {
+                    operation,
+                    statement,
+                    cursor: None,
+                    inputs: BTreeMap::new(),
+                    outputs: Vec::new(),
+                    max_rows,
+                    mutation,
+                }),
+            },
+        );
+        match result.effect.outcome? {
+            HostResult::Db2(result) => Ok(result),
+            _ => Err(HostProblem::ProviderFailure),
+        }
     }
 
     fn execute_idcams(
@@ -1581,7 +1754,9 @@ fn dataset_attributes_for_dd(dd: &crate::DdPlan) -> Result<DatasetAttributes, Ho
 }
 
 fn is_program_library_dd(dd: &crate::DdPlan) -> bool {
-    dd.name.eq_ignore_ascii_case("STEPLIB") || dd.name.eq_ignore_ascii_case("JOBLIB")
+    dd.name.eq_ignore_ascii_case("STEPLIB")
+        || dd.name.eq_ignore_ascii_case("JOBLIB")
+        || dd.name.eq_ignore_ascii_case("DBRMLIB")
 }
 
 fn normalize_records(
@@ -1665,6 +1840,24 @@ fn input_dd_text(input: &ProgramInput, name: &str) -> Result<String, HostProblem
     )
     .map(|text| text.to_ascii_uppercase())
     .map_err(|_| HostProblem::Malformed)
+}
+
+fn tso_run_program(control: &str) -> Result<String, HostProblem> {
+    let upper = control.to_ascii_uppercase();
+    let start = upper.find("RUN PROGRAM(").ok_or(HostProblem::Unsupported)? + "RUN PROGRAM(".len();
+    let end = upper[start..]
+        .find(')')
+        .map(|offset| start + offset)
+        .ok_or(HostProblem::Malformed)?;
+    let program = upper[start..end].trim();
+    if program.is_empty()
+        || program.len() > 128
+        || !program.bytes().all(|byte| byte.is_ascii_alphanumeric())
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(program.into())
+    }
 }
 
 struct SdsfFileControl {

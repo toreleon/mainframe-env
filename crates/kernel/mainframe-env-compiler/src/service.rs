@@ -275,7 +275,7 @@ mod tests {
     use super::*;
     use mainframe_env_compiler_api::{CompileOptions, CompileTarget};
     use mainframe_env_source::{
-        LogicalPath, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
+        LogicalPath, SourceEncoding, SourceFile, SourceFormat, SourceLibrary, SourceLimits,
     };
     use std::collections::BTreeMap;
     fn bundle(source: &str) -> SourceBundle {
@@ -316,6 +316,75 @@ mod tests {
         assert!(matches!(
             CobolCompiler::default()
                 .compile(request(source, CompilationMode::Executable))
+                .unwrap(),
+            CompilerResult::Published { .. }
+        ));
+    }
+
+    #[test]
+    fn sql_include_precompile_resolves_data_and_procedure_members() {
+        let limits = SourceLimits::default();
+        let primary_path = LogicalPath::new("SQLMAIN.cbl", limits.max_path_bytes).unwrap();
+        let dcl_path = LogicalPath::new("DCLROW.dcl", limits.max_path_bytes).unwrap();
+        let procedure_path = LogicalPath::new("SQLPROC.cpy", limits.max_path_bytes).unwrap();
+        let primary = SourceFile::input(
+            primary_path.as_str(),
+            b"IDENTIFICATION DIVISION. PROGRAM-ID. SQLMAIN. DATA DIVISION. WORKING-STORAGE SECTION. EXEC SQL INCLUDE DCLROW END-EXEC. 01 KEY-X PIC X(2) VALUE '01'. PROCEDURE DIVISION. EXEC SQL INCLUDE SQLPROC END-EXEC. PERFORM SQL-READ. STOP RUN."
+                .to_vec(),
+            SourceFormat::Free,
+            SourceEncoding::Utf8,
+            limits,
+        )
+        .unwrap();
+        let dcl = SourceFile::input(
+            dcl_path.as_str(),
+            b"01 DCL-ROW. 05 DCL-COL PIC X(2).".to_vec(),
+            SourceFormat::Free,
+            SourceEncoding::Utf8,
+            limits,
+        )
+        .unwrap();
+        let procedure = SourceFile::input(
+            procedure_path.as_str(),
+            b"SQL-READ. EXEC SQL SELECT COL INTO :DCL-COL FROM CARDDEMO.T WHERE COL = :KEY-X END-EXEC. EXIT."
+                .to_vec(),
+            SourceFormat::Free,
+            SourceEncoding::Utf8,
+            limits,
+        )
+        .unwrap();
+        let library =
+            SourceLibrary::new("sql-includes", vec![dcl_path, procedure_path], limits).unwrap();
+        let source = SourceBundle::with_libraries(
+            &primary_path,
+            vec![primary, dcl, procedure],
+            vec![library],
+            BTreeMap::from([("cobol.sql-precompile".into(), "true".into())]),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let analysis = CobolCompiler::default().analyze(&source);
+        assert!(analysis.semantic.as_ref().is_some_and(|semantic| {
+            semantic
+                .layouts
+                .iter()
+                .any(|layout| layout.name == "DCL-COL")
+        }));
+        assert!(analysis.hir.as_ref().is_some_and(|hir| {
+            hir.statements.iter().all(|statement| {
+                statement.kind != crate::StatementKind::ExecSql
+                    || !statement.arguments.iter().any(|token| token == "INCLUDE")
+            })
+        }));
+        assert!(matches!(
+            CobolCompiler::default()
+                .compile(CompilerRequest {
+                    source,
+                    mode: CompilationMode::Executable,
+                    target: CompileTarget::new("reference").unwrap(),
+                    options: CompileOptions::new(BTreeMap::new()).unwrap(),
+                })
                 .unwrap(),
             CompilerResult::Published { .. }
         ));

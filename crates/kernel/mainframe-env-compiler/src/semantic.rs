@@ -969,7 +969,7 @@ struct PictureDetails {
 }
 
 fn picture_details(pic: &str) -> PictureDetails {
-    let bytes = pic.as_bytes();
+    let bytes = expanded_picture_symbols(pic);
     let mut storage = 0usize;
     let mut digits = 0usize;
     let mut numeric = false;
@@ -980,13 +980,7 @@ fn picture_details(pic: &str) -> PictureDetails {
     let mut index = 0usize;
     while index < bytes.len() {
         let byte = bytes[index].to_ascii_uppercase();
-        let mut repeat = 1usize;
-        if bytes.get(index + 1) == Some(&b'(')
-            && let Some(close) = pic[index + 2..].find(')')
-        {
-            repeat = pic[index + 2..index + 2 + close].parse().unwrap_or(1);
-            index += close + 2;
-        }
+        let repeat = 1usize;
         match byte {
             b'9' => {
                 numeric = true;
@@ -1022,6 +1016,14 @@ fn picture_details(pic: &str) -> PictureDetails {
                 numeric = true;
                 edited = true;
                 signed = true;
+                if bytes.get(index.wrapping_sub(1)) == Some(&byte)
+                    || bytes.get(index + 1) == Some(&byte)
+                {
+                    digits += 1;
+                    if fractional {
+                        scale += 1;
+                    }
+                }
                 storage += repeat;
             }
             b'.' => {
@@ -1045,6 +1047,35 @@ fn picture_details(pic: &str) -> PictureDetails {
         edited,
         signed,
     }
+}
+
+fn expanded_picture_symbols(pic: &str) -> Vec<u8> {
+    let bytes = pic.as_bytes();
+    let mut symbols = Vec::with_capacity(bytes.len());
+    let mut index = 0usize;
+    while index < bytes.len() {
+        let symbol = bytes[index].to_ascii_uppercase();
+        index += 1;
+        let repeat = if bytes.get(index) == Some(&b'(') {
+            let Some(relative_close) = bytes[index + 1..].iter().position(|byte| *byte == b')')
+            else {
+                symbols.push(symbol);
+                continue;
+            };
+            let close = index + 1 + relative_close;
+            let repeat = std::str::from_utf8(&bytes[index + 1..close])
+                .ok()
+                .and_then(|value| value.parse::<usize>().ok())
+                .filter(|value| *value > 0)
+                .unwrap_or(1);
+            index = close + 1;
+            repeat
+        } else {
+            1
+        };
+        symbols.extend(std::iter::repeat_n(symbol, repeat));
+    }
+    symbols
 }
 
 fn initial_value(
@@ -1291,7 +1322,7 @@ mod tests {
 
     #[test]
     fn display_binary_packed_and_edited_storage_lengths_are_bounded() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. T. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC S9(4). 01 B PIC S9(9) COMP. 01 C PIC S9(7)V99 COMP-3 VALUE -123.45. 01 D PIC ZZ,ZZ9.99-. PROCEDURE DIVISION. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. T. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC S9(4). 01 B PIC S9(9) COMP. 01 C PIC S9(7)V99 COMP-3 VALUE -123.45. 01 D PIC ZZ,ZZ9.99-. 01 E PIC ----9. PROCEDURE DIVISION. STOP RUN.";
         let model = SemanticModel::analyze(source, 1024, 32).unwrap();
         assert_eq!(model.layout("A").unwrap().length, 4);
         assert_eq!(model.layout("B").unwrap().length, 4);
@@ -1301,6 +1332,7 @@ mod tests {
             DataCategory::NumericEdited
         );
         assert_eq!(model.layout("D").unwrap().length, 10);
+        assert_eq!(model.layout("E").unwrap().digits, 5);
     }
 
     #[test]

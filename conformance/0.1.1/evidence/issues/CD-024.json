@@ -1,0 +1,137 @@
+{
+  "schema_version": "mainframe-env.carddemo-issue-evidence@1",
+  "issue": "CD-024",
+  "title": "Implement the reached static Db2 compiler and provider surface",
+  "derived": true,
+  "status": "pass",
+  "target_product": "0.1.1",
+  "current_product": "0.1.0-alpha.0",
+  "digest_scope": "Recursively lexicographically key-sorted compact UTF-8 JSON serialization of db2_receipt, with no trailing newline, followed by SHA-256",
+  "evidence_digest": "sha256:f3462e5617f2b0a625058af59069bdbb8685d0b5ea4edc23baa95c51013f5b1d",
+  "db2_receipt": {
+    "schema_version": "mainframe-env.carddemo-db2-receipt@1",
+    "status": "pass",
+    "corpus_commit": "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e",
+    "programs_compiled": 3,
+    "sql_include_expansions": 9,
+    "sql_operations": {
+      "CLOSE": 2,
+      "DECLARE": 2,
+      "DELETE": 3,
+      "FETCH": 3,
+      "INSERT": 2,
+      "OPEN": 2,
+      "SELECT": 3,
+      "UPDATE": 3
+    },
+    "ddl_files": 4,
+    "online_routes": 2,
+    "batch_routes": 3,
+    "extraction_records": 25,
+    "authorization_controls": 1,
+    "restart_controls": 1,
+    "rollback_controls": 1,
+    "conflict_controls": 1,
+    "failure_controls": 2,
+    "table_sha256": {
+      "CARDDEMO.TRANSACTION_TYPE": "38e7f83c6b8d255b62e480bd92d3f2ed229a2770a6c876d67e5165703bfd0ea0",
+      "CARDDEMO.TRANSACTION_TYPE_CATEGORY": "09ba2bd5417fd18937eb22b3dfc8fd3676a567ea59c558d50b1ee6c11cb9980f"
+    },
+    "dataset_sha256": {
+      "AWS.M2.CARDDEMO.TRANCATG.PS": "732b2beef2c01ef73d425906db54026b2f23ee8dc969b56d440990114d259185",
+      "AWS.M2.CARDDEMO.TRANTYPE.PS": "af32b11c82cf76ebc96f9ca48dbcb037eaf370d3468a3c069fadbd3eedf03f8e"
+    },
+    "spool_sha256": {
+      "CREADB2": "763fc45d904f098f6e25e4d0ba6c0bf65ebeee95d834716dbf45a0ac5b45fde0",
+      "MNTTRDB2": "b330e4ad444d2d00cd173e9e2f711dfa2f3e8a8d0d82e2a30a620e1862154c82",
+      "TRANEXTR": "4b61edf2fbb3eb093665f6e0466ad46b40b29f5a5a4001c4f97932d0ebcf1d42"
+    },
+    "db2_shape_sha256": "3a67d0aeba977ba039afd3a227ea97891976a2cafbd8c5d184823601ce955857"
+  },
+  "acceptance_observations": [
+    "The SQL precompiler expands nine ordered SQLCA, DCL, and procedure members across the three pinned Db2 COBOL programs. Typed lowering covers the reached SELECT, COUNT, INSERT, UPDATE, DELETE, DECLARE, OPEN, FETCH, CLOSE, COMMIT, and ROLLBACK surface without a generic SQL fallback.",
+    "CD.J13 enters the administrator menu through the public CICS session route, denies CTLI to the regular transport principal, executes forward cursor listing, and performs the application-defined lookup/create/insert, lookup/update/confirm, and lookup/delete/confirm CTTU screen sequences. SQLCA, packed numeric results, floating edited SQLCODE display, CICS syncpoint commit, rollback, duplicate -803, referential -532, and concurrent -911 observations are exact.",
+    "CD.J14 submits the exact pinned CREADB21, MNTTRDB2, and TRANEXTR JCL through the public z/OSMF route. CREADB21 installs four DDL inputs and loads seven type plus eighteen category rows; COBTUPDT consumes all three A98, U02, and D98 records; DSNTIAUL exports seven plus eighteen exact 60-byte records after online CRUD restores the table.",
+    "Zowe CLI 8.36.0 independently submitted all three exact jobs to the ephemeral local ProductServer and observed OUTPUT CC 0000. MNTTRDB2 SYSPRINT reports successful add, update, and delete; TRANEXTR JOBLOG reports all five steps RC 0000 and SYSPRINT reports DSNTIAUL ROWS=7 and ROWS=18.",
+    "The durable Db2 tables, CICS continuation, extracted datasets, and three job spools remain byte-identical across graceful shutdown and warm restart; PF8 resumes the suspended list cursor through the public terminal route. No absolute corpus path or native/runtime-archive fallback enters the receipt."
+  ],
+  "commands": [
+    {
+      "command": "cargo test -p mainframe-env-compiler sql_include_precompile_resolves_data_and_procedure_members -- --nocapture before repair",
+      "exit_code": 101,
+      "result": "focused regression proved SQL INCLUDE DCL/procedure members did not enter the semantic and executable closure"
+    },
+    {
+      "command": "cargo test -p mainframe-env-conformance inline_perform_loop_resumes_after_nested_paragraph_perform -- --nocapture before repair",
+      "exit_code": 101,
+      "result": "focused regression proved a paragraph PERFORM at an inline-loop tail skipped loop reentry"
+    },
+    {
+      "command": "cargo test -p mainframe-env-conformance nested_read_perform_takes_at_end_branch_before_loop_reentry -- --nocapture before repair",
+      "exit_code": 101,
+      "result": "focused regression proved inline AT END action text was discarded and EOF reread indefinitely"
+    },
+    {
+      "command": "npx -y @zowe/cli@8.36.0 zos-jobs submit local-file <redacted-local-checkout>/app/app-transaction-type-db2/jcl/CREADB21.jcl --<ephemeral-local-zosmf-connection>",
+      "exit_code": 0,
+      "result": "JOB00001 CREADB2 reached OUTPUT CC 0000; FREEPLN, CRCRDDB, LDTTYPE, RUNTEP2, and LDTCCAT all reported RC 0000"
+    },
+    {
+      "command": "npx -y @zowe/cli@8.36.0 zos-jobs submit local-file <redacted-local-checkout>/app/app-transaction-type-db2/jcl/MNTTRDB2.jcl --<ephemeral-local-zosmf-connection>",
+      "exit_code": 0,
+      "result": "JOB00002 MNTTRDB2 reached OUTPUT CC 0000; Zowe spool showed successful A98 insert, U02 update, and D98 delete"
+    },
+    {
+      "command": "npx -y @zowe/cli@8.36.0 zos-jobs submit local-file <redacted-local-checkout>/app/app-transaction-type-db2/jcl/TRANEXTR.jcl --<ephemeral-local-zosmf-connection>",
+      "exit_code": 0,
+      "result": "JOB00003 TRANEXTR reached OUTPUT CC 0000; all five steps returned RC 0000 and DSNTIAUL reported 7 plus 18 rows"
+    },
+    {
+      "command": "CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-db2 --check before CD-024 evidence",
+      "exit_code": 1,
+      "result": "the complete derived Db2 receipt passed and only the required CD-024 evidence file was absent"
+    },
+    {
+      "command": "cargo test -p mainframe-env-host-api -p mainframe-env-compiler -p mainframe-env-interpreter -p mainframe-env-batch -p mainframe-env-cics -p mainframe-env-db2 -p mainframe-env-server -p mainframe-env-conformance -p xtask --locked",
+      "exit_code": 0,
+      "result": "185 affected contract, compiler, interpreter, JES, CICS, Db2, server, conformance, and gate tests passed"
+    },
+    {
+      "command": "affected-package cargo clippy --all-targets --locked -- -D warnings",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "cargo check --workspace --all-targets --locked",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "cargo xtask architecture --check && cargo xtask runtime-architecture --check && cargo xtask profiles --check && cargo xtask schemas --check && cargo xtask inventory --check && cargo xtask evidence --check",
+      "exit_code": 0,
+      "result": "pass with the additive Db2 provider package, dependency edges, and profile closure declared"
+    },
+    {
+      "command": "env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-db2 --check",
+      "exit_code": 1,
+      "result": "expected carddemo.corpus.environment_missing control"
+    },
+    {
+      "command": "CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-db2 --check",
+      "exit_code": 0,
+      "result": "CD.J13 and CD.J14 passed with three compiled programs, two online routes, three batch routes, 25 extracted records, and all security, restart, rollback, conflict, and failure controls"
+    },
+    {
+      "command": "env -u CARDEMO_CORPUS_DIR cargo xtask conformance --check",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "cargo fmt --all -- --check && git diff --check && JSON parse and redaction checks",
+      "exit_code": 0,
+      "result": "pass"
+    }
+  ],
+  "absolute_local_paths_present": false,
+  "native_or_legacy_fallback_present": false
+}

@@ -461,6 +461,62 @@ pub enum StateRequest {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Db2Operation {
+    ExecuteScript,
+    FreePlans,
+    Select,
+    Insert,
+    Update,
+    Delete,
+    Count,
+    DeclareCursor,
+    OpenCursor,
+    FetchCursor,
+    CloseCursor,
+    Commit,
+    Rollback,
+    Extract,
+}
+
+impl Db2Operation {
+    #[must_use]
+    pub const fn is_mutating(self) -> bool {
+        !matches!(self, Self::Select | Self::Count | Self::Extract)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Db2HostVariable {
+    pub value: Vec<u8>,
+    pub indicator: Option<i16>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Db2Request {
+    pub operation: Db2Operation,
+    pub statement: String,
+    pub cursor: Option<String>,
+    pub inputs: BTreeMap<String, Db2HostVariable>,
+    pub outputs: Vec<String>,
+    pub max_rows: u32,
+    pub mutation: Option<Mutation>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Db2Row {
+    pub columns: Vec<Vec<u8>>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Db2Result {
+    pub sqlcode: i32,
+    pub sqlstate: String,
+    pub message: String,
+    pub rows: Vec<Db2Row>,
+    pub affected_rows: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CicsOperation {
     Abend,
     Asktime,
@@ -614,6 +670,7 @@ pub enum HostRequest {
     Clock(ClockRequest),
     State(StateRequest),
     Cics(CicsRequest),
+    Db2(Db2Request),
 }
 
 impl HostRequest {
@@ -643,6 +700,8 @@ impl HostRequest {
             Self::State(StateRequest::Get { .. }) => "host.state.read",
             Self::State(_) => "host.state.write",
             Self::Cics(_) => "host.cics.execute",
+            Self::Db2(request) if request.operation.is_mutating() => "host.db2.write",
+            Self::Db2(_) => "host.db2.read",
         };
         CapabilityId::new(name, limits).expect("built-in capability identities are valid")
     }
@@ -679,6 +738,7 @@ impl HostRequest {
                     | ProgramRequest::Abend { .. }
             ) | Self::State(StateRequest::Put { .. } | StateRequest::Delete { .. })
         ) || matches!(self, Self::Cics(CicsRequest { operation, .. }) if operation.is_mutating())
+            || matches!(self, Self::Db2(request) if request.operation.is_mutating())
     }
 
     #[must_use]
@@ -709,6 +769,7 @@ impl HostRequest {
                 StateRequest::Put { mutation, .. } | StateRequest::Delete { mutation, .. },
             ) => Some(mutation),
             Self::Cics(request) => request.mutation.as_ref(),
+            Self::Db2(request) => request.mutation.as_ref(),
             _ => None,
         }
     }
@@ -757,6 +818,35 @@ impl HostRequest {
                 }
                 Ok(())
             }
+            Self::Db2(request) => {
+                if request.statement.len() > limits.max_state_bytes
+                    || request.cursor.as_ref().is_some_and(|cursor| {
+                        cursor.is_empty() || cursor.len() > limits.max_name_bytes
+                    })
+                    || request.inputs.len() > limits.max_fields
+                    || request.outputs.len() > limits.max_fields
+                    || request.max_rows as usize > limits.max_records
+                    || request.inputs.iter().any(|(name, variable)| {
+                        name.is_empty()
+                            || name.len() > limits.max_name_bytes
+                            || variable.value.len() > limits.max_record_bytes
+                    })
+                    || request
+                        .outputs
+                        .iter()
+                        .any(|name| name.is_empty() || name.len() > limits.max_name_bytes)
+                {
+                    return Err(HostProblem::ResourceExhausted);
+                }
+                if request.operation.is_mutating() {
+                    request
+                        .mutation
+                        .as_ref()
+                        .ok_or(HostProblem::MissingIdempotency)?
+                        .validate(limits)?;
+                }
+                Ok(())
+            }
             _ => Ok(()),
         }
     }
@@ -775,6 +865,7 @@ pub enum HostResult {
         version: u64,
     },
     Cics(CicsResponse),
+    Db2(Db2Result),
 }
 
 impl HostResult {
@@ -862,6 +953,20 @@ impl HostResult {
                             total.checked_add(value.bytes().len())
                         })
                         .is_none_or(|total| total > limits.max_state_bytes) =>
+            {
+                Err(HostProblem::ResourceExhausted)
+            }
+            Self::Db2(result)
+                if result.sqlstate.len() != 5
+                    || result.message.len() > limits.max_state_bytes
+                    || result.rows.len() > limits.max_records
+                    || result.rows.iter().any(|row| {
+                        row.columns.len() > limits.max_fields
+                            || row
+                                .columns
+                                .iter()
+                                .any(|column| column.len() > limits.max_record_bytes)
+                    }) =>
             {
                 Err(HostProblem::ResourceExhausted)
             }

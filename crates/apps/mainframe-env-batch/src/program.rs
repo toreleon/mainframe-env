@@ -37,6 +37,7 @@ pub enum UtilityDisposition {
     CicsFileControl,
     NetworkFtp,
     ReportRexx,
+    Db2Tso,
 }
 
 #[must_use]
@@ -46,6 +47,7 @@ pub fn utility_disposition(program: &str) -> Option<UtilityDisposition> {
         "SDSF" => UtilityDisposition::CicsFileControl,
         "FTP" => UtilityDisposition::NetworkFtp,
         "IKJEFT1B" => UtilityDisposition::ReportRexx,
+        "IKJEFT01" => UtilityDisposition::Db2Tso,
         _ => return None,
     })
 }
