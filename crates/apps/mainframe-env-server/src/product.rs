@@ -260,6 +260,11 @@ impl ProductServer {
     }
 
     #[must_use]
+    pub fn batch_service(&self) -> Arc<BatchService> {
+        self.batch.clone()
+    }
+
+    #[must_use]
     pub fn dataset_service(&self) -> Arc<DatasetService> {
         self.dataset.clone()
     }
@@ -841,6 +846,7 @@ impl ProductServer {
             GatewayRequest::DatasetList {
                 pattern,
                 start,
+                attributes,
                 max,
             } => {
                 let result = self.dataset_call(
@@ -860,11 +866,43 @@ impl ProductServer {
                 let DatasetResult::Listed { names, more } = result else {
                     return Err(gateway_problem(HostProblem::ProviderFailure));
                 };
-                let count = names.len();
+                let mut items = Vec::with_capacity(names.len());
+                for name in names {
+                    let mut item = json!({"dsname":name.as_str()});
+                    if attributes {
+                        let result = self.dataset_call(
+                            &principal,
+                            DatasetRequest::Attributes {
+                                dataset: name.clone(),
+                            },
+                        )?;
+                        let DatasetResult::Attributes { attributes, .. } = result else {
+                            return Err(gateway_problem(HostProblem::ProviderFailure));
+                        };
+                        item["dsorg"] = json!(match attributes.organization {
+                            DatasetOrganization::Sequential => "PS",
+                            DatasetOrganization::Partitioned => "PO",
+                            DatasetOrganization::KeySequenced
+                            | DatasetOrganization::EntrySequenced
+                            | DatasetOrganization::Relative => "VS",
+                        });
+                        item["recfm"] = json!(match attributes.record_format {
+                            RecordFormat::Fixed => "F",
+                            RecordFormat::FixedBlocked => "FB",
+                            RecordFormat::Variable => "V",
+                            RecordFormat::VariableBlocked => "VB",
+                            RecordFormat::Undefined => "U",
+                            RecordFormat::Line => "LINE",
+                        });
+                        item["lrecl"] = json!(attributes.logical_record_length);
+                    }
+                    items.push(item);
+                }
+                let count = items.len();
                 let mut response = GatewayResponse::json(
                     StatusCode::OK,
                     json!({
-                        "items":names.into_iter().map(|name| json!({"dsname":name.as_str()})).collect::<Vec<_>>(),
+                        "items":items,
                         "returnedRows":count,
                         "moreRows":more
                     }),
@@ -1027,8 +1065,16 @@ impl ProductServer {
                 ))
             }
             GatewayRequest::Ams { control } => self.ams(&principal, &control),
-            GatewayRequest::JobList { owner, prefix, max } => {
-                let requested_owner = owner.as_deref().unwrap_or(&principal);
+            GatewayRequest::JobList {
+                owner,
+                prefix,
+                jobid,
+                max,
+            } => {
+                let requested_owner = owner
+                    .as_deref()
+                    .filter(|owner| *owner != "*")
+                    .unwrap_or(&principal);
                 if !requested_owner.eq_ignore_ascii_case(&principal) {
                     return Err(gateway_problem(HostProblem::Unauthorized));
                 }
@@ -1047,6 +1093,9 @@ impl ProductServer {
                         prefix
                             .as_ref()
                             .is_none_or(|prefix| wildcard(prefix, &job.name))
+                            && jobid
+                                .as_ref()
+                                .is_none_or(|jobid| job.id.eq_ignore_ascii_case(jobid))
                     })
                     .map(job_json)
                     .collect::<Vec<_>>();
@@ -1192,7 +1241,24 @@ impl ProductServer {
                     .spool_files(&jobid)
                     .map_err(gateway_problem)?
                     .into_iter()
-                    .map(|(id, ddname, records, bytes)|json!({"id":id,"ddname":ddname,"class":"A","byte-count":bytes,"record-count":records}))
+                    .map(|(id, ddname, records, bytes)| {
+                        let stepname = if ddname.starts_with("JES") {
+                            "JES2"
+                        } else {
+                            ""
+                        };
+                        json!({
+                            "jobid":job.id,
+                            "jobname":job.name,
+                            "id":id,
+                            "ddname":ddname,
+                            "stepname":stepname,
+                            "procstep":"",
+                            "class":"A",
+                            "byte-count":bytes,
+                            "record-count":records
+                        })
+                    })
                     .collect::<Vec<_>>();
                 Ok(GatewayResponse::json(StatusCode::OK, Value::Array(files)))
             }
@@ -2292,7 +2358,7 @@ fn records_for_write(
     let mut records = bytes
         .split(|byte| *byte == b'\n')
         .filter(|record| !record.is_empty())
-        .map(<[u8]>::to_vec)
+        .map(|record| record.strip_suffix(b"\r").unwrap_or(record).to_vec())
         .collect::<Vec<_>>();
     if records.is_empty() {
         records.push(Vec::new());
@@ -2341,7 +2407,7 @@ fn wildcard(pattern: &str, value: &str) -> bool {
 fn job_capabilities(jcl: &[u8]) -> Vec<&'static str> {
     let source = String::from_utf8_lossy(jcl).to_ascii_uppercase();
     let mut capabilities = vec!["host.security.authorize", "host.program.invoke"];
-    if source.contains("DSN=") || source.contains("DISP=") {
+    if source.contains("DSN=") || source.contains("DISP=") || source.contains("PGM=IDCAMS") {
         capabilities.extend(["host.dataset.read", "host.dataset.write"]);
     }
     if source.contains("EXEC CICS") {
@@ -2525,7 +2591,7 @@ mod tests {
                 &app,
                 Method::PUT,
                 "/zosmf/restfiles/ds/IBMUSER.TEST.SEQ",
-                "HELLO FROM ZOWE CLI",
+                "HELLO FROM ZOWE CLI\r\n",
             )
             .await
             .status(),
@@ -2554,6 +2620,59 @@ mod tests {
             serde_json::from_slice(&to_bytes(response.into_body(), 65536).await.unwrap()).unwrap();
         assert_eq!(body["returnedRows"], 1);
         assert_eq!(body["items"][0]["dsname"], "IBMUSER.TEST.SEQ");
+        assert_eq!(
+            call(
+                &app,
+                Method::POST,
+                "/zosmf/restfiles/ds/IBMUSER.TEST.PDS",
+                r#"{"dsorg":"PO","recfm":"FB","lrecl":80}"#,
+            )
+            .await
+            .status(),
+            StatusCode::CREATED
+        );
+        let attributes = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(Method::GET)
+                    .uri("/zosmf/restfiles/ds?dslevel=IBMUSER.TEST.PDS&start=IBMUSER.TEST.PDS")
+                    .header("authorization", basic())
+                    .header("x-ibm-attributes", "base")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(attributes.status(), StatusCode::OK);
+        let attributes: Value =
+            serde_json::from_slice(&to_bytes(attributes.into_body(), 65_536).await.unwrap())
+                .unwrap();
+        assert_eq!(attributes["returnedRows"], 1);
+        assert_eq!(attributes["items"][0]["dsorg"], "PO");
+        assert_eq!(attributes["items"][0]["recfm"], "FB");
+        assert_eq!(attributes["items"][0]["lrecl"], 80);
+        assert_eq!(
+            call(
+                &app,
+                Method::PUT,
+                "/zosmf/restfiles/ds/IBMUSER.TEST.PDS(MEMBER)",
+                "//MEMBER JOB CLASS=A\r\n",
+            )
+            .await
+            .status(),
+            StatusCode::CREATED
+        );
+        let members = call(
+            &app,
+            Method::GET,
+            "/zosmf/restfiles/ds/IBMUSER.TEST.PDS/member",
+            "",
+        )
+        .await;
+        let members: Value =
+            serde_json::from_slice(&to_bytes(members.into_body(), 65_536).await.unwrap()).unwrap();
+        assert_eq!(members["items"][0]["member"], "MEMBER");
     }
 
     #[tokio::test]
@@ -2582,6 +2701,27 @@ mod tests {
         )
         .await;
         assert_eq!(files.status(), StatusCode::OK);
+        let files: Value =
+            serde_json::from_slice(&to_bytes(files.into_body(), 65_536).await.unwrap()).unwrap();
+        assert!(files.as_array().unwrap().iter().all(|file| {
+            file["jobid"] == id
+                && file["jobname"] == "TESTJOB"
+                && file.get("stepname").is_some()
+                && file.get("procstep").is_some()
+        }));
+        let by_id = call(
+            &app,
+            Method::GET,
+            &format!("/zosmf/restjobs/jobs?owner=*&jobid={id}"),
+            "",
+        )
+        .await;
+        assert_eq!(by_id.status(), StatusCode::OK);
+        let by_id: Value =
+            serde_json::from_slice(&to_bytes(by_id.into_body(), 65_536).await.unwrap()).unwrap();
+        assert_eq!(by_id.as_array().unwrap().len(), 1);
+        assert_eq!(by_id[0]["jobid"], id);
+        assert_eq!(by_id[0]["retcode"], "CC 0000");
         let console = call(
             &app,
             Method::PUT,
@@ -2872,6 +3012,7 @@ mod tests {
                     GatewayRequest::DatasetList {
                         pattern: "IBMUSER.**".into(),
                         start: None,
+                        attributes: false,
                         max: 10,
                     },
                 )

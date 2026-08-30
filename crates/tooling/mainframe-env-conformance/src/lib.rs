@@ -27,7 +27,7 @@ pub use carddemo::{
     CardDemoDatasetCatalogReceipt, CardDemoFileCallReceipt, CardDemoHostReceipt,
     CardDemoJclReceipt, CardDemoLayoutReceipt, CardDemoPackageReceipt, CardDemoProgramReceipt,
     CardDemoResourceReceipt, CardDemoSecurityReceipt, CardDemoSeedReceipt, CardDemoSourceReceipt,
-    CardDemoTerminalReceipt, CardDemoVsamReceipt, CorpusProblem,
+    CardDemoTerminalReceipt, CardDemoUtilityReceipt, CardDemoVsamReceipt, CorpusProblem,
     verify_carddemo_application_package_from_env, verify_carddemo_base_online_from_env,
     verify_carddemo_cics_abi_from_env, verify_carddemo_cics_runtime_from_env,
     verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
@@ -37,7 +37,8 @@ pub use carddemo::{
     verify_carddemo_program_routing_from_env, verify_carddemo_resources_from_env,
     verify_carddemo_security_from_env, verify_carddemo_seeds_from_env,
     verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
-    verify_carddemo_terminal_from_env, verify_carddemo_vsam_from_env,
+    verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
+    verify_carddemo_vsam_from_env,
 };
 
 pub const HELLO_SOURCE: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. HELLO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MSG PIC X(12) VALUE 'HELLO WORLD!'.\nPROCEDURE DIVISION.\nDISPLAY MSG.\nSTOP RUN.\n";

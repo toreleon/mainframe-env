@@ -1,17 +1,17 @@
 # CardDemo-full 0.1.1 Program Status
 
 Current phase: **CD.E — JCL/JES and base batch**
-Current issue: **CD-020 — actual CardDemo JCL and procedure parsing IN PROGRESS**
-Next issue: **CD-021 — DD and selected utility effects**
+Current issue: **CD-021 — DD and selected utility effects IN PROGRESS**
+Next issue: **CD-022 — named CardDemo batch programs and services**
 Current product: **0.1.0-alpha.0**
 Target product: **0.1.1**
 CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Source identity
 
-- mainframe-env base commit: `da74f19c7147ae860631bf6c9aa4e21f5c1b5a8c`
+- mainframe-env base commit: `f5fab8636611a112e59f40e22fe20cb5a35205c5`
 - current deterministic dirty-tree identity:
-  `sha256:4be2c032436b6821ec3c19ae86efe84ec77cc90da72aad212379c6cf6a4dcfd6`
+  `sha256:be64db40b6205ca511ff3b1cd6fcf7040426fab752b69c42ab447696fbaf79bc`
 - dirty-tree algorithm: SHA-256 of the sorted `sha256sum` records for every
   repository file except `.git/`, `target/`, and the two persistent CardDemo
   status ledgers (which carry the identity).
@@ -386,6 +386,25 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   CICS compensation, and reached numeric/figurative semantics are explicitly
   regression tested.
 
+### CD-020 — actual CardDemo JCL and procedure parsing
+
+- State: **PASS**
+- Required commit subject: `Parse CardDemo JCL and procedures`
+- Completion commit identity:
+  `f5fab8636611a112e59f40e22fe20cb5a35205c5`.
+- Evidence: `conformance/0.1.1/evidence/issues/CD-020.json`
+- Evidence digest:
+  `sha256:5327411d614fd8269314c030ba4a58ca743ceddc99a34208ed2c079d2dfa2ae6`
+- All 46 pinned main and extension JCL paths have explicit per-file results:
+  45 parse into bounded job plans and CREASTMT is the sole hash-pinned accepted
+  correction for its broken orphan DD continuation.
+- The two procedures, 114 steps, 464 DDs, 243 continuations, five symbols, 12
+  conditions, three procedure calls, six overrides, 24 concatenations, 86
+  instream DDs, and 591 instream records retain deterministic provenance.
+- Padded/default instream termination, JCLLIB, nested symbols, COND/IF,
+  procedure defaults, persisted-plan compatibility, malformed input, missing
+  procedures, and resource limits are regression tested.
+
 ## Commands and exit codes
 
 - `cargo test -p mainframe-env-conformance --locked` — **0**; 19 passed,
@@ -588,10 +607,32 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 - Workspace all-target check — **0**.
 - Architecture, runtime architecture, profile, schema, inventory, evidence,
   ordinary conformance, JSON, formatting, redaction, and diff gates — **0**.
+- Focused pre-repair dataset-backed IEBGENER regression — **101**; SYSUT2
+  retained stale output instead of the copied SYSUT1 records.
+- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-utilities --check`
+  before evidence — **1**; the derived utility receipt passed and only the
+  required CD-021 evidence file was absent.
+- Zowe CLI 8.36.0 against the ephemeral local ProductServer — **0**:
+  `ESDSRRDS.jcl` completed all six steps `CC 0000` and exposed exact PS, ESDS,
+  and RRDS records; `DEFGDGD.jcl` completed six GDG/copy steps `CC 0000` and
+  exposed `G0001V00`; `INTRDRJ1.JCL` completed `CC 0000`, wrote the internal
+  reader spool marker, and queued `INTRDRJ2`.
+- Batch, dataset, z/OSMF gateway, server, conformance, and xtask suites — **0**;
+  115 tests passed.
+- Affected-package Clippy with `-D warnings` — **0**.
+- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-utilities --check`
+  — **0**; 45 parsed jobs, 62 IDCAMS steps, 96 validated statements, seven
+  selected public routes, seven exact mutations, and all DISP, GDG, AIX,
+  internal-reader, external-route, and negative controls passed.
+- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-utilities --check` — **1**;
+  expected missing-environment failure.
+- Workspace all-target check — **0**.
+- Architecture, runtime architecture, profile, schema, inventory, evidence,
+  and ordinary conformance gates — **0**.
 
 ## Implementation status
 
-- Issues passed: **19 / 27**
+- Issues passed: **20 / 27**
 - Journeys passed: **9 / 20**
 - Installed CardDemo base-online resources: **18 programs, 17 transactions,
   17 maps**
@@ -606,11 +647,11 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 2. The repository is still `0.1.0-alpha.0`. A 0.1.1 release cannot be cut until
    0.1.0 is finalized or an explicit version-line correction is accepted.
 
-Neither decision blocks CD-020. No CD-019 blocker remains.
+Neither decision blocks CD-021. No CD-020 blocker remains.
 
 ## Next smallest executable step
 
-Parse all 46 pinned JCL and procedure files into explicit parsed or accepted
-unsupported results with fixed-width delimiters, continuations, symbols,
-conditions, procedures, overrides, concatenations, instream data, provenance,
-and bounded malformed-input behavior.
+Connect parsed DDs to exact dataset disposition, temporary, GDG, and
+concatenation lifecycle; implement reached IDCAMS, IEBGENER, SORT, IEFBR14,
+SDSF/CICS file-control, internal-reader, FTP, and report routes; and prove that
+unknown utility or control statements cannot return generic success.

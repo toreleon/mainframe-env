@@ -557,7 +557,7 @@ impl DatasetService {
                     .filter(|name| {
                         start
                             .as_ref()
-                            .is_none_or(|start| name.as_str() > start.as_str())
+                            .is_none_or(|start| name.as_str() >= start.as_str())
                     })
                 {
                     if names.len() >= *max_items as usize {
@@ -603,7 +603,7 @@ impl DatasetService {
                 for name in entry.members.keys().filter(|name| {
                     start
                         .as_ref()
-                        .is_none_or(|start| name.as_str() > start.as_str())
+                        .is_none_or(|start| name.as_str() >= start.as_str())
                 }) {
                     if names.len() >= *max_items as usize {
                         more = true;
@@ -649,6 +649,29 @@ impl DatasetService {
                     (records, identities, index.version)
                 } else {
                     let entry = entry(state, dataset)?;
+                    if entry.attributes.organization
+                        == mainframe_env_host_api::DatasetOrganization::Relative
+                    {
+                        if member.is_some() || key.is_some() {
+                            return Err(HostProblem::Unsupported);
+                        }
+                        let selected = entry
+                            .relative_records
+                            .iter()
+                            .take(*max_records as usize)
+                            .map(|(record_number, record)| {
+                                (record.clone(), record_number.to_be_bytes().to_vec())
+                            })
+                            .collect::<Vec<_>>();
+                        return Ok(DatasetResult::Records {
+                            records: selected.iter().map(|(record, _)| record.clone()).collect(),
+                            identities: selected
+                                .into_iter()
+                                .map(|(_, identity)| identity)
+                                .collect(),
+                            version: entry.version,
+                        });
+                    }
                     let records = if let Some(member) = member {
                         entry
                             .members
@@ -2758,6 +2781,17 @@ mod tests {
             }),
             Ok(DatasetResult::Records { records, identities, .. })
                 if records == [b"BB22".to_vec()] && identities == [2u64.to_be_bytes().to_vec()]
+        ));
+        assert!(matches!(
+            service.invoke(DatasetRequest::Read {
+                dataset: rrds.clone(),
+                member: None,
+                key: None,
+                max_records: 10,
+            }),
+            Ok(DatasetResult::Records { records, identities, .. })
+                if records == [b"AA11".to_vec(), b"BB22".to_vec()]
+                    && identities == [1u64.to_be_bytes().to_vec(), 2u64.to_be_bytes().to_vec()]
         ));
         service
             .invoke(DatasetRequest::DeleteRelative {

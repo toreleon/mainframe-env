@@ -18,6 +18,8 @@ pub struct ProgramInput {
 pub struct ProgramOutput {
     pub return_code: i32,
     pub records: Vec<Vec<u8>>,
+    #[serde(default)]
+    pub dd_outputs: BTreeMap<String, Vec<Vec<u8>>>,
 }
 
 pub trait Program: Send + Sync {
@@ -26,6 +28,25 @@ pub trait Program: Send + Sync {
         invocation: &Invocation,
         input: &ProgramInput,
     ) -> Result<ProgramOutput, HostProblem>;
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UtilityDisposition {
+    Implemented,
+    CicsFileControl,
+    NetworkFtp,
+    ReportRexx,
+}
+
+#[must_use]
+pub fn utility_disposition(program: &str) -> Option<UtilityDisposition> {
+    Some(match program.to_ascii_uppercase().as_str() {
+        "IDCAMS" | "IEBGENER" | "SORT" | "IEFBR14" => UtilityDisposition::Implemented,
+        "SDSF" => UtilityDisposition::CicsFileControl,
+        "FTP" => UtilityDisposition::NetworkFtp,
+        "IKJEFT1B" => UtilityDisposition::ReportRexx,
+        _ => return None,
+    })
 }
 
 pub struct ProgramRouter {
@@ -159,21 +180,16 @@ impl Program for Builtin {
         match self.0 {
             "IEFBR14" => output(0, vec![b"IEFBR14".to_vec()]),
             "IEBGENER" => {
-                let records = dd(input, "SYSUT1")?
-                    .inline_data
-                    .split(|byte| *byte == b'\n')
-                    .filter(|record| !record.is_empty())
-                    .map(<[u8]>::to_vec)
-                    .collect();
-                output(0, records)
+                let records = dd_records(input, "SYSUT1")?;
+                output_to(0, records, "SYSUT2")
             }
             "IEBCOPY" => output(0, vec![summary("IEBCOPY", input)]),
             "IEBCOMPR" => {
-                let left = dd(input, "SYSUT1")?;
-                let right = dd(input, "SYSUT2")?;
+                let left = dd_records(input, "SYSUT1")?;
+                let right = dd_records(input, "SYSUT2")?;
                 output(
-                    i32::from(left.inline_data != right.inline_data) * 8,
-                    vec![if left.inline_data == right.inline_data {
+                    i32::from(left != right) * 8,
+                    vec![if left == right {
                         b"IEBCOMPR EQUAL".to_vec()
                     } else {
                         b"IEBCOMPR DIFFERENT".to_vec()
@@ -200,32 +216,42 @@ impl Program for Builtin {
                     .split_whitespace()
                     .next()
                     .ok_or(HostProblem::Malformed)?;
-                if !matches!(command, "LISTCAT" | "DEFINE" | "DELETE" | "REPRO") {
+                if !matches!(
+                    command,
+                    "LISTCAT" | "DEFINE" | "DELETE" | "REPRO" | "BLDINDEX"
+                ) {
                     return Err(HostProblem::Unsupported);
                 }
                 output(0, vec![format!("IDCAMS {command}").into_bytes()])
             }
             "SORT" => {
-                let mut records = dd(input, "SORTIN")?
-                    .inline_data
-                    .split(|byte| *byte == b'\n')
-                    .filter(|record| !record.is_empty())
-                    .map(<[u8]>::to_vec)
-                    .collect::<Vec<_>>();
+                let mut records = dd_records(input, "SORTIN")?;
                 records.sort();
-                output(0, records)
+                output_to(0, records, "SORTOUT")
             }
             _ => Err(HostProblem::Unsupported),
         }
     }
 }
 
-fn dd<'a>(input: &'a ProgramInput, name: &str) -> Result<&'a DdPlan, HostProblem> {
-    input
+fn dd_records(input: &ProgramInput, name: &str) -> Result<Vec<Vec<u8>>, HostProblem> {
+    let dds = input
         .dds
         .iter()
-        .find(|dd| dd.name == name)
-        .ok_or(HostProblem::NotFound)
+        .filter(|dd| dd.name.eq_ignore_ascii_case(name))
+        .collect::<Vec<_>>();
+    if dds.is_empty() {
+        return Err(HostProblem::NotFound);
+    }
+    Ok(dds
+        .into_iter()
+        .flat_map(|dd| {
+            dd.inline_data
+                .split(|byte| *byte == b'\n')
+                .filter(|record| !record.is_empty())
+                .map(<[u8]>::to_vec)
+        })
+        .collect())
 }
 
 fn summary(name: &str, input: &ProgramInput) -> Vec<u8> {
@@ -241,6 +267,19 @@ fn output(return_code: i32, records: Vec<Vec<u8>>) -> Result<ProgramOutput, Host
     Ok(ProgramOutput {
         return_code,
         records,
+        dd_outputs: BTreeMap::new(),
+    })
+}
+
+fn output_to(
+    return_code: i32,
+    records: Vec<Vec<u8>>,
+    dd: &str,
+) -> Result<ProgramOutput, HostProblem> {
+    Ok(ProgramOutput {
+        return_code,
+        records: records.clone(),
+        dd_outputs: BTreeMap::from([(dd.into(), records)]),
     })
 }
 
@@ -287,6 +326,11 @@ mod tests {
             dds: vec![DdPlan {
                 name: name.into(),
                 dataset: None,
+                member: None,
+                generation: None,
+                organization: None,
+                record_format: None,
+                logical_record_length: None,
                 temporary: false,
                 sysout: None,
                 disposition: Vec::new(),
@@ -303,6 +347,19 @@ mod tests {
         let router = ProgramRouter::with_builtins(InvocationLimits::default());
         assert_eq!(router.supported_programs().len(), 9);
         assert!(!router.supported_programs().any(|name| name == "UNKNOWN"));
+        assert_eq!(
+            utility_disposition("SDSF"),
+            Some(UtilityDisposition::CicsFileControl)
+        );
+        assert_eq!(
+            utility_disposition("FTP"),
+            Some(UtilityDisposition::NetworkFtp)
+        );
+        assert_eq!(
+            utility_disposition("IKJEFT1B"),
+            Some(UtilityDisposition::ReportRexx)
+        );
+        assert_eq!(utility_disposition("UNKNOWN"), None);
     }
 
     #[test]

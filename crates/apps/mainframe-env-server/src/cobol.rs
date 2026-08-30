@@ -310,10 +310,12 @@ impl Program for CobolProgram {
                     .filter(|record| !record.is_empty())
                     .map(<[u8]>::to_vec)
                     .collect(),
+                dd_outputs: BTreeMap::new(),
             }),
             ExecutionOutcome::Condition(condition) => Ok(ProgramOutput {
                 return_code: condition.response,
                 records: vec![condition.name.into_bytes()],
+                dd_outputs: BTreeMap::new(),
             }),
             ExecutionOutcome::Abend(_) => Err(HostProblem::Condition {
                 name: "ABEND".into(),
@@ -586,6 +588,11 @@ mod tests {
                 dds: vec![DdPlan {
                     name: "SYSIN".into(),
                     dataset: None,
+                    member: None,
+                    generation: None,
+                    organization: None,
+                    record_format: None,
+                    logical_record_length: None,
                     temporary: false,
                     sysout: None,
                     disposition: Vec::new(),
@@ -621,6 +628,11 @@ mod tests {
                         DdPlan {
                             name: "SYSIN".into(),
                             dataset: None,
+                            member: None,
+                            generation: None,
+                            organization: None,
+                            record_format: None,
+                            logical_record_length: None,
                             temporary: false,
                             sysout: None,
                             disposition: Vec::new(),
@@ -632,6 +644,11 @@ mod tests {
                         DdPlan {
                             name: "SYSLIB".into(),
                             dataset: Some("MESSAGE.cpy".into()),
+                            member: None,
+                            generation: None,
+                            organization: None,
+                            record_format: None,
+                            logical_record_length: None,
                             temporary: false,
                             sysout: None,
                             disposition: Vec::new(),
@@ -664,6 +681,11 @@ mod tests {
                 dds: vec![DdPlan {
                     name: "SYSIN".into(),
                     dataset: None,
+                    member: None,
+                    generation: None,
+                    organization: None,
+                    record_format: None,
+                    logical_record_length: None,
                     temporary: false,
                     sysout: None,
                     disposition: Vec::new(),

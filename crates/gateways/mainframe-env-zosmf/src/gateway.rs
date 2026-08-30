@@ -36,6 +36,7 @@ pub enum GatewayRequest {
     DatasetList {
         pattern: String,
         start: Option<String>,
+        attributes: bool,
         max: usize,
     },
     DatasetRead {
@@ -71,6 +72,7 @@ pub enum GatewayRequest {
     JobList {
         owner: Option<String>,
         prefix: Option<String>,
+        jobid: Option<String>,
         max: usize,
     },
     JobSubmit {
@@ -341,6 +343,7 @@ async fn dataset_list(
         GatewayRequest::DatasetList {
             pattern: query.dslevel.unwrap_or_else(|| "**".into()),
             start: query.start,
+            attributes: headers.contains_key("x-ibm-attributes"),
             max,
         },
     )
@@ -489,6 +492,7 @@ async fn ams(
 struct JobListQuery {
     owner: Option<String>,
     prefix: Option<String>,
+    jobid: Option<String>,
     max: Option<usize>,
 }
 
@@ -503,6 +507,7 @@ async fn job_list(
         GatewayRequest::JobList {
             owner: query.owner,
             prefix: query.prefix,
+            jobid: query.jobid,
             max: query.max.unwrap_or(100).min(state.limits.max_page_items),
         },
     )

@@ -53,6 +53,16 @@ pub enum Disposition {
 pub struct DdPlan {
     pub name: String,
     pub dataset: Option<String>,
+    #[serde(default)]
+    pub member: Option<String>,
+    #[serde(default)]
+    pub generation: Option<i32>,
+    #[serde(default)]
+    pub organization: Option<String>,
+    #[serde(default)]
+    pub record_format: Option<String>,
+    #[serde(default)]
+    pub logical_record_length: Option<u32>,
     pub temporary: bool,
     pub sysout: Option<String>,
     pub disposition: Vec<Disposition>,
@@ -581,9 +591,43 @@ fn dd_plan(
     limits: JclLimits,
 ) -> Result<DdPlan, HostProblem> {
     let values = assignments(&statement.operands);
-    let dataset = values.get("DSN").or_else(|| values.get("DSNAME")).cloned();
+    let (dataset, member, generation) = values
+        .get("DSN")
+        .or_else(|| values.get("DSNAME"))
+        .map(|value| dataset_and_member(value))
+        .unwrap_or((None, None, None));
     let temporary = dataset.as_ref().is_some_and(|name| name.starts_with("&&"));
     let sysout = values.get("SYSOUT").cloned();
+    let dcb_values = values
+        .get("DCB")
+        .map(|value| assignments(value.trim().trim_matches(['(', ')'])))
+        .unwrap_or_default();
+    let parameter = |name: &str| values.get(name).or_else(|| dcb_values.get(name));
+    let organization = parameter("DSORG")
+        .map(|value| match value.to_ascii_uppercase().as_str() {
+            "PS" => Ok("PS".into()),
+            "PO" | "PO-E" => Ok("PO".into()),
+            _ => Err(HostProblem::Unsupported),
+        })
+        .transpose()?
+        .or_else(|| {
+            parameter("DSNTYPE")
+                .is_some_and(|value| value.eq_ignore_ascii_case("LIBRARY"))
+                .then(|| "PO".into())
+        });
+    let record_format = parameter("RECFM")
+        .map(|value| match value.to_ascii_uppercase().as_str() {
+            "F" => Ok("F".into()),
+            "FB" | "FBA" => Ok("FB".into()),
+            "V" => Ok("V".into()),
+            "VB" | "VBA" => Ok("VB".into()),
+            "U" => Ok("U".into()),
+            _ => Err(HostProblem::Unsupported),
+        })
+        .transpose()?;
+    let logical_record_length = parameter("LRECL")
+        .map(|value| value.parse::<u32>().map_err(|_| HostProblem::Malformed))
+        .transpose()?;
     let disposition = values
         .get("DISP")
         .map(|value| {
@@ -602,6 +646,11 @@ fn dd_plan(
     Ok(DdPlan {
         name: statement.name.clone(),
         dataset,
+        member,
+        generation,
+        organization,
+        record_format,
+        logical_record_length,
         temporary,
         sysout,
         disposition,
@@ -610,6 +659,25 @@ fn dd_plan(
         source_line: statement.line,
         source_end_line: statement.end_line,
     })
+}
+
+fn dataset_and_member(value: &str) -> (Option<String>, Option<String>, Option<i32>) {
+    let Some(open) = value.rfind('(') else {
+        return (Some(value.to_string()), None, None);
+    };
+    if !value.ends_with(')') || open == 0 {
+        return (Some(value.to_string()), None, None);
+    }
+    let qualifier = &value[open + 1..value.len() - 1];
+    if let Ok(relative) = qualifier.parse::<i32>() {
+        (Some(value[..open].to_string()), None, Some(relative))
+    } else {
+        (
+            Some(value[..open].to_string()),
+            Some(qualifier.to_ascii_uppercase()),
+            None,
+        )
+    }
 }
 
 fn push_dd(
@@ -818,6 +886,26 @@ mod tests {
         assert_eq!(plan.steps[0].program, "IEBGENER");
         assert_eq!(plan.steps[0].dds[0].inline_data, b"HELLO\n");
         assert!(!plan.steps[0].condition.should_run(4, false));
+    }
+
+    #[test]
+    fn dd_allocation_attributes_preserve_nested_dcb_and_library_type() {
+        let plan = parse_jcl(
+            &JclBundle {
+                primary: "//J JOB CLASS=A\n//S EXEC PGM=IEBGENER\n//OUT DD DSN=U.OUT,DISP=(NEW,CATLG,DELETE),\n// DCB=(LRECL=80,RECFM=FBA,DSORG=PS)\n//LIB DD DSN=U.LIB,DISP=(NEW,CATLG,DELETE),\n// DSNTYPE=LIBRARY,RECFM=FB,LRECL=132\n".into(),
+                ..Default::default()
+            },
+            JclLimits::default(),
+        )
+        .unwrap();
+        let output = &plan.steps[0].dds[0];
+        assert_eq!(output.organization.as_deref(), Some("PS"));
+        assert_eq!(output.record_format.as_deref(), Some("FB"));
+        assert_eq!(output.logical_record_length, Some(80));
+        let library = &plan.steps[0].dds[1];
+        assert_eq!(library.organization.as_deref(), Some("PO"));
+        assert_eq!(library.record_format.as_deref(), Some("FB"));
+        assert_eq!(library.logical_record_length, Some(132));
     }
 
     #[test]

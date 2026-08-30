@@ -9,7 +9,10 @@ use mainframe_env_application::{
     InstallState, PackageEntry, ProgramArtifact, ProgramCatalog, ProgramFrame, ProgramFrames,
     package_identity, parse_bms, parse_csd,
 };
-use mainframe_env_batch::{JclBundle, JclLimits, StepCondition, parse_jcl};
+use mainframe_env_batch::{
+    JclBundle, JclLimits, JobPlan, JobState, StepCondition, UtilityDisposition, parse_jcl,
+    utility_disposition, validate_idcams_control,
+};
 use mainframe_env_cics::{BmsFieldDefinition, BmsMapDefinition, CicsFileDefinition};
 use mainframe_env_compiler::{
     CobolCompiler, ControlEdgeKind, ControlRole, DataCategory, SemanticModel, StatementKind,
@@ -27,8 +30,8 @@ use mainframe_env_execution_api::{
 };
 use mainframe_env_host_api::{
     AccessIntent, AuditEvent, CicsConditionPolicy, CicsOperation, CicsRequest, DatasetAttributes,
-    DatasetName, DatasetOrganization, DatasetRequest, DatasetResult, EffectRequest, Mutation,
-    RecordFormat, ResourceName, SecretRef, SecurityDecision, SessionId,
+    DatasetName, DatasetOrganization, DatasetRequest, DatasetResult, EffectRequest, MemberName,
+    Mutation, RecordFormat, ResourceName, SecretRef, SecurityDecision, SessionId,
 };
 use mainframe_env_racf::{
     MemorySecretResolver, RacfManifest, RacfProfileDefinition, RacfService, RacfUserDefinition,
@@ -518,6 +521,28 @@ pub struct CardDemoJclReceipt {
     pub provenance_spans: usize,
     pub negative_controls: usize,
     pub jcl_shape_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoUtilityReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub jcl_files: usize,
+    pub parsed_jobs: usize,
+    pub idcams_steps: usize,
+    pub inline_idcams_controls: usize,
+    pub idcams_statements: usize,
+    pub implemented_utilities: Vec<String>,
+    pub explicit_external_utilities: BTreeMap<String, String>,
+    pub selected_job_routes: usize,
+    pub exact_dataset_mutations: usize,
+    pub disposition_controls: usize,
+    pub gdg_controls: usize,
+    pub aix_controls: usize,
+    pub internal_reader_controls: usize,
+    pub unknown_controls: usize,
+    pub utility_shape_sha256: String,
 }
 
 struct BaseOnlineExercise {
@@ -3896,6 +3921,615 @@ fn verify_jcl_negative_controls(limits: JclLimits) -> Result<usize, CorpusProble
         }
     }
     Ok(4)
+}
+
+pub fn verify_carddemo_utilities_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoUtilityReceipt, CorpusProblem> {
+    let corpus = verify_carddemo_corpus_from_env(inventory_path)?;
+    let corpus_dir = PathBuf::from(env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required",
+        )
+    })?);
+    let plans = carddemo_parsed_jcl(&corpus_dir)?;
+    let mut idcams_steps = 0usize;
+    let mut inline_idcams_controls = 0usize;
+    let mut idcams_statements = 0usize;
+    let mut reached_programs = BTreeSet::new();
+    let mut shape = Sha256::new();
+    for (relative, plan) in &plans {
+        digest_field(&mut shape, relative.as_bytes());
+        for step in &plan.steps {
+            reached_programs.insert(step.program.clone());
+            if step.program == "IDCAMS" {
+                idcams_steps += 1;
+                if let Some(control) = step
+                    .dds
+                    .iter()
+                    .find(|dd| dd.name == "SYSIN" && !dd.inline_data.is_empty())
+                {
+                    inline_idcams_controls += 1;
+                    idcams_statements +=
+                        validate_idcams_control(&control.inline_data).map_err(|problem| {
+                            CorpusProblem::new(
+                                "carddemo.utility.idcams_invalid",
+                                format!(
+                                    "{relative} contains unsupported IDCAMS control: {problem:?}"
+                                ),
+                            )
+                        })?;
+                }
+            }
+        }
+    }
+    let implemented_utilities = ["IDCAMS", "IEBGENER", "SORT", "IEFBR14"]
+        .into_iter()
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let explicit_external_utilities: BTreeMap<String, String> = BTreeMap::from([
+        ("FTP".into(), "network-ftp-explicit-unsupported".into()),
+        ("IKJEFT1B".into(), "report-rexx-explicit-unsupported".into()),
+        (
+            "SDSF".into(),
+            "cics-file-control-explicit-unsupported".into(),
+        ),
+    ]);
+    if implemented_utilities.iter().any(|program| {
+        !reached_programs.contains(program)
+            || utility_disposition(program) != Some(UtilityDisposition::Implemented)
+    }) || explicit_external_utilities.keys().any(|program| {
+        !reached_programs.contains(program)
+            || utility_disposition(program)
+                .is_none_or(|value| value == UtilityDisposition::Implemented)
+    }) {
+        return Err(CorpusProblem::new(
+            "carddemo.utility.route_drift",
+            "reached utility dispositions differ from the explicit catalog",
+        ));
+    }
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| CorpusProblem::new("carddemo.utility.runtime", error.to_string()))?;
+    let exercise = runtime.block_on(exercise_utility_routes())?;
+    let unknown_controls = usize::from(
+        validate_idcams_control(b"UNKNOWN CONTROL")
+            == Err(mainframe_env_host_api::HostProblem::Unsupported),
+    ) + usize::from(utility_disposition("NOTREAL").is_none());
+    if plans.len() != 45
+        || idcams_steps == 0
+        || inline_idcams_controls == 0
+        || idcams_statements == 0
+        || exercise.selected_job_routes != 7
+        || exercise.exact_dataset_mutations != 7
+        || exercise.disposition_controls != 1
+        || exercise.gdg_controls != 1
+        || exercise.aix_controls != 1
+        || exercise.internal_reader_controls != 1
+        || unknown_controls != 2
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.utility.coverage_drift",
+            "utility execution observations differ from the bounded contract",
+        ));
+    }
+    for value in [
+        idcams_steps,
+        inline_idcams_controls,
+        idcams_statements,
+        exercise.selected_job_routes,
+        exercise.exact_dataset_mutations,
+        exercise.disposition_controls,
+        exercise.gdg_controls,
+        exercise.aix_controls,
+        exercise.internal_reader_controls,
+        unknown_controls,
+    ] {
+        digest_field(&mut shape, &(value as u64).to_be_bytes());
+    }
+    Ok(CardDemoUtilityReceipt {
+        schema_version: "mainframe-env.carddemo-utility-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit: corpus.commit,
+        jcl_files: 46,
+        parsed_jobs: plans.len(),
+        idcams_steps,
+        inline_idcams_controls,
+        idcams_statements,
+        implemented_utilities,
+        explicit_external_utilities,
+        selected_job_routes: exercise.selected_job_routes,
+        exact_dataset_mutations: exercise.exact_dataset_mutations,
+        disposition_controls: exercise.disposition_controls,
+        gdg_controls: exercise.gdg_controls,
+        aix_controls: exercise.aix_controls,
+        internal_reader_controls: exercise.internal_reader_controls,
+        unknown_controls,
+        utility_shape_sha256: format!("{:x}", shape.finalize()),
+    })
+}
+
+fn carddemo_parsed_jcl(corpus_dir: &Path) -> Result<Vec<(String, JobPlan)>, CorpusProblem> {
+    let procedure_paths = collect_paths(corpus_dir, &["app/proc"], "prc")?;
+    let procedures = procedure_paths
+        .iter()
+        .map(|relative| {
+            let name = Path::new(relative)
+                .file_stem()
+                .and_then(|value| value.to_str())
+                .ok_or_else(|| {
+                    CorpusProblem::new("carddemo.utility.path_invalid", "procedure path is invalid")
+                })?
+                .to_ascii_uppercase();
+            let source =
+                String::from_utf8(read_corpus_file(corpus_dir, &corpus_dir.join(relative))?)
+                    .map_err(|_| {
+                        CorpusProblem::new(
+                            "carddemo.utility.source_invalid",
+                            "procedure is not UTF-8",
+                        )
+                    })?;
+            Ok((name, source))
+        })
+        .collect::<Result<BTreeMap<_, _>, CorpusProblem>>()?;
+    collect_paths(
+        corpus_dir,
+        &[
+            "app/jcl",
+            "app/app-authorization-ims-db2-mq/jcl",
+            "app/app-transaction-type-db2/jcl",
+        ],
+        "jcl",
+    )?
+    .into_iter()
+    .filter(|relative| relative != "app/jcl/CREASTMT.JCL")
+    .map(|relative| {
+        let source = String::from_utf8(read_corpus_file(corpus_dir, &corpus_dir.join(&relative))?)
+            .map_err(|_| {
+                CorpusProblem::new("carddemo.utility.source_invalid", "JCL is not UTF-8")
+            })?;
+        let plan = parse_jcl(
+            &JclBundle {
+                primary: source,
+                cataloged_procedures: procedures.clone(),
+                ..Default::default()
+            },
+            JclLimits::default(),
+        )
+        .map_err(|problem| {
+            CorpusProblem::new(
+                "carddemo.utility.plan_failed",
+                format!("{relative} failed: {problem:?}"),
+            )
+        })?;
+        Ok((relative, plan))
+    })
+    .collect()
+}
+
+struct UtilityExercise {
+    selected_job_routes: usize,
+    exact_dataset_mutations: usize,
+    disposition_controls: usize,
+    gdg_controls: usize,
+    aix_controls: usize,
+    internal_reader_controls: usize,
+}
+
+async fn exercise_utility_routes() -> Result<UtilityExercise, CorpusProblem> {
+    let artifact_root = env::temp_dir().join(format!(
+        "mainframe-env-carddemo-utilities-{}",
+        std::process::id()
+    ));
+    let server = ProductServer::open(
+        ServerConfig {
+            store_profile: StoreProfile::Memory,
+            artifact_root: artifact_root.clone(),
+            tls: TlsConfig {
+                enabled: false,
+                certificate_path: None,
+                private_key_reference: None,
+            },
+            ..ServerConfig::default()
+        },
+        Arc::new(MemoryStore::new(Default::default())),
+        Arc::new(MemorySecretResolver::default()),
+        default_program_router(),
+    )
+    .map_err(terminal_problem)?;
+    server
+        .bootstrap_user("IBMUSER", b"TESTPASS")
+        .map_err(terminal_problem)?;
+    let app = server.router();
+    let mut sequence = 1u64;
+    utility_seed_dataset(
+        &server,
+        "IBMUSER.INPUT",
+        DatasetOrganization::Sequential,
+        RecordFormat::Fixed,
+        6,
+        None,
+        vec![b"SECOND".to_vec(), b"FIRST ".to_vec()],
+        &mut sequence,
+    )?;
+    for name in ["IBMUSER.OUTPUT", "IBMUSER.SORTOUT", "IBMUSER.TARGET"] {
+        utility_seed_dataset(
+            &server,
+            name,
+            DatasetOrganization::Sequential,
+            RecordFormat::Fixed,
+            6,
+            None,
+            if name == "IBMUSER.TARGET" {
+                vec![b"STALE ".to_vec()]
+            } else {
+                Vec::new()
+            },
+            &mut sequence,
+        )?;
+    }
+    submit_utility_job(
+        &server,
+        &app,
+        "//COPYJOB JOB CLASS=A\n//COPY EXEC PGM=IEBGENER\n//SYSUT1 DD DSN=IBMUSER.INPUT,DISP=SHR\n//SYSUT2 DD DSN=IBMUSER.OUTPUT,DISP=OLD\n",
+    )
+    .await?;
+    if utility_records(&server, "IBMUSER.OUTPUT", None)?
+        != vec![b"SECOND".to_vec(), b"FIRST ".to_vec()]
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.utility.iebgener_drift",
+            "dataset-backed IEBGENER output differs",
+        ));
+    }
+    submit_utility_job(
+        &server,
+        &app,
+        "//SORTJOB JOB CLASS=A\n//SORT EXEC PGM=SORT\n//SORTIN DD DSN=IBMUSER.INPUT,DISP=SHR\n//SORTOUT DD DSN=IBMUSER.SORTOUT,DISP=OLD\n//SYSIN DD *\n SORT FIELDS=(1,6,CH,A)\n/*\n",
+    )
+    .await?;
+    if utility_records(&server, "IBMUSER.SORTOUT", None)?
+        != vec![b"FIRST ".to_vec(), b"SECOND".to_vec()]
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.utility.sort_drift",
+            "dataset-backed SORT output differs",
+        ));
+    }
+    submit_utility_job(
+        &server,
+        &app,
+        "//AMSJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//INPUT DD DSN=IBMUSER.INPUT,DISP=SHR\n//OUTPUT DD DSN=IBMUSER.TARGET,DISP=OLD\n//SYSIN DD *\n DELETE IBMUSER.TARGET\n IF MAXCC LE 08 THEN SET MAXCC = 0\n DEFINE CLUSTER (NAME(IBMUSER.TARGET) NONINDEXED RECORDSIZE(6 6))\n REPRO INFILE(INPUT) OUTFILE(OUTPUT)\n/*\n",
+    )
+    .await?;
+    if utility_records(&server, "IBMUSER.TARGET", None)?
+        != vec![b"SECOND".to_vec(), b"FIRST ".to_vec()]
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.utility.idcams_drift",
+            "IDCAMS DELETE/DEFINE/REPRO output differs",
+        ));
+    }
+    submit_utility_job(
+        &server,
+        &app,
+        "//TEMPJOB JOB CLASS=A\n//MAKE EXEC PGM=IEFBR14\n//WORK DD DSN=&&WORK,DISP=(NEW,PASS,DELETE)\n//USE EXEC PGM=IEFBR14\n//INPUT DD DSN=&&WORK,DISP=(OLD,DELETE,DELETE)\n",
+    )
+    .await?;
+    submit_utility_job(
+        &server,
+        &app,
+        "//GDGJOB JOB CLASS=A\n//DEFINE EXEC PGM=IDCAMS\n//SYSIN DD *\n DEFINE GENERATIONDATAGROUP (NAME(IBMUSER.HISTORY) LIMIT(3) SCRATCH NOEMPTY)\n/*\n//COPY EXEC PGM=IEBGENER\n//SYSUT1 DD *\nGENERATION\n/*\n//SYSUT2 DD DSN=IBMUSER.HISTORY(+1),DISP=(NEW,CATLG,DELETE)\n",
+    )
+    .await?;
+    let generation = match server
+        .dataset_service()
+        .invoke(DatasetRequest::ResolveGeneration {
+            base: DatasetName::new("IBMUSER.HISTORY", 128).expect("static dataset"),
+            relative: 0,
+        })
+        .map_err(terminal_problem)?
+    {
+        DatasetResult::Generation { dataset, .. } => dataset,
+        _ => {
+            return Err(CorpusProblem::new(
+                "carddemo.utility.gdg_drift",
+                "GDG resolution returned the wrong result",
+            ));
+        }
+    };
+    if utility_records(&server, generation.as_str(), None)? != vec![b"GENERATION".to_vec()] {
+        return Err(CorpusProblem::new(
+            "carddemo.utility.gdg_drift",
+            "GDG generation output differs",
+        ));
+    }
+    utility_seed_dataset(
+        &server,
+        "IBMUSER.BASE",
+        DatasetOrganization::KeySequenced,
+        RecordFormat::Fixed,
+        8,
+        Some((0, 4)),
+        vec![b"0002BBBB".to_vec(), b"0001AAAA".to_vec()],
+        &mut sequence,
+    )?;
+    submit_utility_job(
+        &server,
+        &app,
+        "//AIXJOB JOB CLASS=A\n//AIX EXEC PGM=IDCAMS\n//SYSIN DD *\n DEFINE ALTERNATEINDEX (NAME(IBMUSER.BASE.AIX) RELATE(IBMUSER.BASE) KEYS(4 0) NONUNIQUEKEY UPGRADE)\n DEFINE PATH (NAME(IBMUSER.BASE.PATH) PATHENTRY(IBMUSER.BASE.AIX))\n BLDINDEX INDATASET(IBMUSER.BASE) OUTDATASET(IBMUSER.BASE.AIX)\n/*\n",
+    )
+    .await?;
+    if utility_records(&server, "IBMUSER.BASE.AIX", None)?.len() != 2 {
+        return Err(CorpusProblem::new(
+            "carddemo.utility.aix_drift",
+            "AIX browse state differs",
+        ));
+    }
+    utility_seed_dataset(
+        &server,
+        "IBMUSER.JCL",
+        DatasetOrganization::Partitioned,
+        RecordFormat::Fixed,
+        80,
+        None,
+        Vec::new(),
+        &mut sequence,
+    )?;
+    utility_write_dataset(
+        &server,
+        "IBMUSER.JCL",
+        Some("CHILD"),
+        vec![
+            b"//CHILD JOB CLASS=A".to_vec(),
+            b"//RUN EXEC PGM=IEFBR14".to_vec(),
+        ],
+        &mut sequence,
+    )?;
+    submit_utility_job(
+        &server,
+        &app,
+        "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DSN=IBMUSER.JCL(CHILD),DISP=SHR\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n",
+    )
+    .await?;
+    let principal =
+        PrincipalId::new("IBMUSER", InvocationLimits::default()).expect("static principal");
+    let (jobs, _) = server
+        .batch_service()
+        .list(Some(&principal), None, 64)
+        .map_err(terminal_problem)?;
+    if !jobs
+        .iter()
+        .any(|job| job.name == "CHILD" && job.state == JobState::Queued)
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.utility.internal_reader_drift",
+            "internal reader did not submit the copied child job",
+        ));
+    }
+    let _ = fs::remove_dir_all(&artifact_root);
+    Ok(UtilityExercise {
+        selected_job_routes: 7,
+        exact_dataset_mutations: 7,
+        disposition_controls: 1,
+        gdg_controls: 1,
+        aix_controls: 1,
+        internal_reader_controls: 1,
+    })
+}
+
+fn utility_seed_dataset(
+    server: &ProductServer,
+    name: &str,
+    organization: DatasetOrganization,
+    record_format: RecordFormat,
+    lrecl: u32,
+    key: Option<(u32, u32)>,
+    records: Vec<Vec<u8>>,
+    sequence: &mut u64,
+) -> Result<(), CorpusProblem> {
+    let dataset = DatasetName::new(name, 128)
+        .map_err(|_| CorpusProblem::new("carddemo.utility.dataset", "dataset name is invalid"))?;
+    let mutation = |value, suffix: &str| {
+        IdempotencyKey::new(
+            format!("utility-{suffix}-{value}"),
+            InvocationLimits::default(),
+        )
+        .map(|idempotency_key| Mutation {
+            sequence: value,
+            idempotency_key,
+            transaction: Some("CD-021".into()),
+        })
+        .map_err(|_| CorpusProblem::new("carddemo.utility.dataset", "mutation is invalid"))
+    };
+    let created = server
+        .dataset_service()
+        .invoke(DatasetRequest::Create {
+            dataset: dataset.clone(),
+            attributes: DatasetAttributes {
+                organization,
+                record_format,
+                logical_record_length: lrecl,
+                key_offset: key.map(|value| value.0),
+                key_length: key.map(|value| value.1),
+                ccsid: Some(1208),
+            },
+            mutation: mutation(*sequence, "create")?,
+        })
+        .map_err(terminal_problem)?;
+    *sequence += 1;
+    if !records.is_empty() {
+        let version = match created {
+            DatasetResult::Created { version } => version,
+            _ => {
+                return Err(CorpusProblem::new(
+                    "carddemo.utility.dataset",
+                    "dataset create returned the wrong result",
+                ));
+            }
+        };
+        server
+            .dataset_service()
+            .invoke(DatasetRequest::Write {
+                dataset,
+                member: None,
+                records,
+                expected_version: Some(version),
+                mutation: mutation(*sequence, "write")?,
+            })
+            .map_err(terminal_problem)?;
+        *sequence += 1;
+    }
+    Ok(())
+}
+
+fn utility_write_dataset(
+    server: &ProductServer,
+    name: &str,
+    member: Option<&str>,
+    records: Vec<Vec<u8>>,
+    sequence: &mut u64,
+) -> Result<(), CorpusProblem> {
+    let dataset = DatasetName::new(name, 128)
+        .map_err(|_| CorpusProblem::new("carddemo.utility.dataset", "dataset name is invalid"))?;
+    let (attributes, version) = match server
+        .dataset_service()
+        .invoke(DatasetRequest::Attributes {
+            dataset: dataset.clone(),
+        })
+        .map_err(terminal_problem)?
+    {
+        DatasetResult::Attributes {
+            attributes,
+            version,
+        } => (attributes, version),
+        _ => {
+            return Err(CorpusProblem::new(
+                "carddemo.utility.dataset",
+                "dataset attributes returned the wrong result",
+            ));
+        }
+    };
+    let records = records
+        .into_iter()
+        .map(|mut record| {
+            if matches!(
+                attributes.record_format,
+                RecordFormat::Fixed | RecordFormat::FixedBlocked
+            ) {
+                record.resize(attributes.logical_record_length as usize, b' ');
+            }
+            record
+        })
+        .collect();
+    let key = IdempotencyKey::new(
+        format!("utility-member-{sequence}"),
+        InvocationLimits::default(),
+    )
+    .map_err(|_| CorpusProblem::new("carddemo.utility.dataset", "mutation is invalid"))?;
+    server
+        .dataset_service()
+        .invoke(DatasetRequest::Write {
+            dataset,
+            member: member
+                .map(|member| {
+                    MemberName::new(member, 8).map_err(|_| {
+                        CorpusProblem::new("carddemo.utility.dataset", "member name is invalid")
+                    })
+                })
+                .transpose()?,
+            records,
+            expected_version: Some(version),
+            mutation: Mutation {
+                sequence: *sequence,
+                idempotency_key: key,
+                transaction: Some("CD-021".into()),
+            },
+        })
+        .map_err(terminal_problem)?;
+    *sequence += 1;
+    Ok(())
+}
+
+fn utility_records(
+    server: &ProductServer,
+    name: &str,
+    member: Option<&str>,
+) -> Result<Vec<Vec<u8>>, CorpusProblem> {
+    match server
+        .dataset_service()
+        .invoke(DatasetRequest::Read {
+            dataset: DatasetName::new(name, 128).map_err(|_| {
+                CorpusProblem::new("carddemo.utility.dataset", "dataset name is invalid")
+            })?,
+            member: member
+                .map(|member| {
+                    MemberName::new(member, 8).map_err(|_| {
+                        CorpusProblem::new("carddemo.utility.dataset", "member name is invalid")
+                    })
+                })
+                .transpose()?,
+            key: None,
+            max_records: 4_096,
+        })
+        .map_err(terminal_problem)?
+    {
+        DatasetResult::Records { records, .. } => Ok(records),
+        _ => Err(CorpusProblem::new(
+            "carddemo.utility.dataset",
+            "dataset read returned the wrong result",
+        )),
+    }
+}
+
+async fn submit_utility_job(
+    server: &ProductServer,
+    app: &axum::Router,
+    jcl: &str,
+) -> Result<(), CorpusProblem> {
+    let headers = BTreeMap::from([
+        (
+            "authorization".into(),
+            format!(
+                "Basic {}",
+                base64::engine::general_purpose::STANDARD.encode("IBMUSER:TESTPASS")
+            ),
+        ),
+        ("x-csrf-zosmf-header".into(), "true".into()),
+    ]);
+    let (status, body) = terminal_http(
+        app,
+        Method::PUT,
+        "/zosmf/restjobs/jobs",
+        headers,
+        jcl.as_bytes().to_vec(),
+    )
+    .await?;
+    if status != StatusCode::CREATED {
+        return Err(CorpusProblem::new(
+            "carddemo.utility.job_failed",
+            format!(
+                "utility job returned {status}: {}",
+                String::from_utf8_lossy(&body)
+            ),
+        ));
+    }
+    let job: serde_json::Value = serde_json::from_slice(&body)
+        .map_err(|error| CorpusProblem::new("carddemo.utility.job_failed", error.to_string()))?;
+    if job["status"] != "OUTPUT" || job["retcode"] != "CC 0000" {
+        let detail = job["jobid"]
+            .as_str()
+            .and_then(|id| server.batch_service().spool(id, "JESMSGLG", 0, 64).ok())
+            .map(|(records, _)| records)
+            .unwrap_or_default();
+        return Err(CorpusProblem::new(
+            "carddemo.utility.job_failed",
+            format!("utility job did not complete: {job}; spool={detail:?}"),
+        ));
+    }
+    Ok(())
 }
 
 async fn exercise_base_online_smoke(
