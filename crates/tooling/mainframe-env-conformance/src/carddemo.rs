@@ -9,6 +9,7 @@ use mainframe_env_application::{
     InstallState, PackageEntry, ProgramArtifact, ProgramCatalog, ProgramFrame, ProgramFrames,
     package_identity, parse_bms, parse_csd,
 };
+use mainframe_env_batch::{JclBundle, JclLimits, StepCondition, parse_jcl};
 use mainframe_env_cics::{BmsFieldDefinition, BmsMapDefinition, CicsFileDefinition};
 use mainframe_env_compiler::{
     CobolCompiler, ControlEdgeKind, ControlRole, DataCategory, SemanticModel, StatementKind,
@@ -490,6 +491,33 @@ pub struct CardDemoBaseOnlineReceipt {
     pub resource_controls: usize,
     pub install_replay: bool,
     pub journey_shape_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoJclReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub jcl_files: usize,
+    pub procedures: usize,
+    pub parsed_files: usize,
+    pub accepted_unsupported_files: usize,
+    pub file_results: BTreeMap<String, String>,
+    pub jobs: usize,
+    pub steps: usize,
+    pub dds: usize,
+    pub continuation_lines: usize,
+    pub symbols: usize,
+    pub conditions: usize,
+    pub procedure_libraries: usize,
+    pub procedure_steps: usize,
+    pub procedure_overrides: usize,
+    pub dd_concatenations: usize,
+    pub instream_dds: usize,
+    pub instream_records: usize,
+    pub provenance_spans: usize,
+    pub negative_controls: usize,
+    pub jcl_shape_sha256: String,
 }
 
 struct BaseOnlineExercise {
@@ -3593,6 +3621,281 @@ pub fn verify_carddemo_base_online_from_env(
         install_replay: exercise.install_replay,
         journey_shape_sha256: format!("{:x}", shape.finalize()),
     })
+}
+
+pub fn verify_carddemo_jcl_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoJclReceipt, CorpusProblem> {
+    let corpus = verify_carddemo_corpus_from_env(inventory_path)?;
+    let corpus_dir = PathBuf::from(env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required",
+        )
+    })?);
+    let jcl_paths = collect_paths(
+        &corpus_dir,
+        &[
+            "app/jcl",
+            "app/app-authorization-ims-db2-mq/jcl",
+            "app/app-transaction-type-db2/jcl",
+        ],
+        "jcl",
+    )?;
+    let procedure_paths = collect_paths(&corpus_dir, &["app/proc"], "prc")?;
+    if jcl_paths.len() != 46 || procedure_paths.len() != 2 {
+        return Err(CorpusProblem::new(
+            "carddemo.jcl.corpus_count_drift",
+            format!(
+                "expected 46 JCL files and two procedures but found {} and {}",
+                jcl_paths.len(),
+                procedure_paths.len()
+            ),
+        ));
+    }
+    let procedures = procedure_paths
+        .iter()
+        .map(|relative| {
+            let name = Path::new(relative)
+                .file_stem()
+                .and_then(|value| value.to_str())
+                .ok_or_else(|| {
+                    CorpusProblem::new(
+                        "carddemo.jcl.path_invalid",
+                        "procedure name is not repository-relative UTF-8",
+                    )
+                })?
+                .to_ascii_uppercase();
+            let bytes = read_corpus_file(&corpus_dir, &corpus_dir.join(relative))?;
+            let source = String::from_utf8(bytes).map_err(|_| {
+                CorpusProblem::new(
+                    "carddemo.jcl.source_invalid",
+                    format!("procedure {relative} is not UTF-8"),
+                )
+            })?;
+            Ok((name, source))
+        })
+        .collect::<Result<BTreeMap<_, _>, CorpusProblem>>()?;
+    let limits = JclLimits::default();
+    let mut parsed_files = 0usize;
+    let mut accepted_unsupported_files = 0usize;
+    let mut file_results = BTreeMap::new();
+    let mut jobs = 0usize;
+    let mut steps = 0usize;
+    let mut dds = 0usize;
+    let mut continuation_lines = 0usize;
+    let mut symbols = 0usize;
+    let mut conditions = 0usize;
+    let mut procedure_libraries = 0usize;
+    let mut procedure_steps = 0usize;
+    let mut procedure_overrides = 0usize;
+    let mut dd_concatenations = 0usize;
+    let mut instream_dds = 0usize;
+    let mut instream_records = 0usize;
+    let mut provenance_spans = 0usize;
+    let mut shape = Sha256::new();
+    for relative in &jcl_paths {
+        let bytes = read_corpus_file(&corpus_dir, &corpus_dir.join(relative))?;
+        let source = String::from_utf8(bytes.clone()).map_err(|_| {
+            CorpusProblem::new(
+                "carddemo.jcl.source_invalid",
+                format!("JCL {relative} is not UTF-8"),
+            )
+        })?;
+        match parse_jcl(
+            &JclBundle {
+                primary: source.clone(),
+                cataloged_procedures: procedures.clone(),
+                ..Default::default()
+            },
+            limits,
+        ) {
+            Ok(plan) => {
+                if relative == "app/jcl/CREASTMT.JCL" {
+                    return Err(CorpusProblem::new(
+                        "carddemo.jcl.correction_drift",
+                        "CREASTMT unexpectedly parsed despite its pinned orphan continuation",
+                    ));
+                }
+                parsed_files += 1;
+                file_results.insert(relative.clone(), "parsed".into());
+                jobs += 1;
+                steps += plan.steps.len();
+                symbols += plan.symbols.len();
+                procedure_libraries += plan.procedure_libraries.len();
+                for pair in source.lines().collect::<Vec<_>>().windows(2) {
+                    let previous = pair[0].get(..72.min(pair[0].len())).unwrap_or(pair[0]);
+                    let current = pair[1].get(2..72.min(pair[1].len())).unwrap_or("");
+                    continuation_lines +=
+                        usize::from(previous.trim_end().ends_with(',') && current.starts_with(' '));
+                }
+                procedure_overrides += source
+                    .lines()
+                    .filter(|line| {
+                        line.starts_with("//")
+                            && line
+                                .get(2..72.min(line.len()))
+                                .filter(|line| !line.starts_with(char::is_whitespace))
+                                .and_then(|line| line.split_whitespace().next())
+                                .is_some_and(|name| name.contains('.'))
+                    })
+                    .count();
+                for step in &plan.steps {
+                    conditions += usize::from(step.condition != StepCondition::Always);
+                    procedure_steps += usize::from(step.procedure.is_some());
+                    provenance_spans += usize::from(
+                        step.source_line > 0 && step.source_end_line >= step.source_line,
+                    );
+                    provenance_spans += usize::from(step.invocation_line.is_some());
+                    for dd in &step.dds {
+                        dds += 1;
+                        dd_concatenations += usize::from(dd.concatenation);
+                        instream_dds += usize::from(!dd.inline_data.is_empty());
+                        instream_records += dd
+                            .inline_data
+                            .split(|byte| *byte == b'\n')
+                            .filter(|record| !record.is_empty())
+                            .count();
+                        provenance_spans += usize::from(
+                            dd.source_line > 0 && dd.source_end_line >= dd.source_line,
+                        );
+                    }
+                }
+                for dd in &plan.job_dds {
+                    dds += 1;
+                    dd_concatenations += usize::from(dd.concatenation);
+                    provenance_spans += usize::from(
+                        dd.source_line > 0 && dd.source_end_line >= dd.source_line,
+                    );
+                }
+                digest_field(&mut shape, relative.as_bytes());
+                digest_field(
+                    &mut shape,
+                    &serde_json::to_vec(&plan).map_err(|error| {
+                        CorpusProblem::new("carddemo.jcl.receipt_invalid", error.to_string())
+                    })?,
+                );
+            }
+            Err(mainframe_env_host_api::HostProblem::Unsupported)
+                if relative == "app/jcl/CREASTMT.JCL"
+                    && sha256(&bytes)
+                        == "d32627022d7686d1811ba253faa2c5d86295c8055428b2a610a27d8f84751950"
+                    && source.contains(
+                        "SPACE=(CYL,(1,1),RLSE), 00,RECFM=FB), ATA.VSAM.KSDS\n//         DSN=AWS.M2.CARDDEMO.STATEMNT.PS",
+                    ) =>
+            {
+                accepted_unsupported_files += 1;
+                file_results.insert(
+                    relative.clone(),
+                    "accepted_unsupported:pinned-orphan-dd-continuation".into(),
+                );
+                digest_field(&mut shape, relative.as_bytes());
+                digest_field(&mut shape, sha256(&bytes).as_bytes());
+                digest_field(&mut shape, b"pinned-orphan-dd-continuation");
+            }
+            Err(problem) => {
+                return Err(CorpusProblem::new(
+                    "carddemo.jcl.parse_failed",
+                    format!("JCL {relative} failed with {problem:?}"),
+                ));
+            }
+        }
+    }
+    let negative_controls = verify_jcl_negative_controls(limits)?;
+    if parsed_files != 45
+        || accepted_unsupported_files != 1
+        || file_results.len() != 46
+        || jobs != 45
+        || steps == 0
+        || dds == 0
+        || continuation_lines == 0
+        || symbols == 0
+        || conditions == 0
+        || procedure_libraries == 0
+        || procedure_steps == 0
+        || procedure_overrides == 0
+        || dd_concatenations == 0
+        || instream_dds == 0
+        || instream_records == 0
+        || provenance_spans < steps + dds + procedure_steps
+        || negative_controls != 4
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.jcl.coverage_drift",
+            "JCL parsing observations differ from the bounded corpus contract",
+        ));
+    }
+    Ok(CardDemoJclReceipt {
+        schema_version: "mainframe-env.carddemo-jcl-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit: corpus.commit,
+        jcl_files: jcl_paths.len(),
+        procedures: procedure_paths.len(),
+        parsed_files,
+        accepted_unsupported_files,
+        file_results,
+        jobs,
+        steps,
+        dds,
+        continuation_lines,
+        symbols,
+        conditions,
+        procedure_libraries,
+        procedure_steps,
+        procedure_overrides,
+        dd_concatenations,
+        instream_dds,
+        instream_records,
+        provenance_spans,
+        negative_controls,
+        jcl_shape_sha256: format!("{:x}", shape.finalize()),
+    })
+}
+
+fn verify_jcl_negative_controls(limits: JclLimits) -> Result<usize, CorpusProblem> {
+    let cases = [
+        (
+            JclBundle::default(),
+            limits,
+            mainframe_env_host_api::HostProblem::ResourceExhausted,
+        ),
+        (
+            JclBundle {
+                primary: "NOT JCL".into(),
+                ..Default::default()
+            },
+            limits,
+            mainframe_env_host_api::HostProblem::Malformed,
+        ),
+        (
+            JclBundle {
+                primary: "12345".into(),
+                ..Default::default()
+            },
+            JclLimits {
+                max_source_bytes: 4,
+                ..limits
+            },
+            mainframe_env_host_api::HostProblem::ResourceExhausted,
+        ),
+        (
+            JclBundle {
+                primary: "//J JOB CLASS=A\n//S EXEC PROC=MISSING\n".into(),
+                ..Default::default()
+            },
+            limits,
+            mainframe_env_host_api::HostProblem::NotFound,
+        ),
+    ];
+    for (bundle, limits, expected) in cases {
+        if parse_jcl(&bundle, limits) != Err(expected) {
+            return Err(CorpusProblem::new(
+                "carddemo.jcl.negative_control_failed",
+                "malformed, missing, or resource-bounded JCL did not fail stably",
+            ));
+        }
+    }
+    Ok(4)
 }
 
 async fn exercise_base_online_smoke(

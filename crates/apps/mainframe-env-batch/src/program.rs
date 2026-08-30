@@ -293,6 +293,7 @@ mod tests {
                 inline_data: bytes.to_vec(),
                 concatenation: false,
                 source_line: 1,
+                source_end_line: 1,
             }],
         }
     }

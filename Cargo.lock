@@ -1037,6 +1037,7 @@ dependencies = [
  "axum",
  "base64",
  "mainframe-env-application",
+ "mainframe-env-batch",
  "mainframe-env-cics",
  "mainframe-env-compiler",
  "mainframe-env-compiler-api",

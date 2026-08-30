@@ -59,6 +59,8 @@ pub struct DdPlan {
     pub inline_data: Vec<u8>,
     pub concatenation: bool,
     pub source_line: usize,
+    #[serde(default)]
+    pub source_end_line: usize,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -91,7 +93,11 @@ pub struct StepPlan {
     pub condition: StepCondition,
     pub dds: Vec<DdPlan>,
     pub source_line: usize,
+    #[serde(default)]
+    pub source_end_line: usize,
     pub procedure: Option<String>,
+    #[serde(default)]
+    pub invocation_line: Option<usize>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -100,6 +106,12 @@ pub struct JobPlan {
     pub class: char,
     pub priority: u8,
     pub restart_step: Option<String>,
+    #[serde(default)]
+    pub symbols: BTreeMap<String, String>,
+    #[serde(default)]
+    pub procedure_libraries: Vec<String>,
+    #[serde(default)]
+    pub job_dds: Vec<DdPlan>,
     pub steps: Vec<StepPlan>,
     pub source: String,
 }
@@ -111,6 +123,13 @@ struct Statement {
     operands: String,
     inline: Vec<u8>,
     line: usize,
+    end_line: usize,
+}
+
+#[derive(Clone, Debug)]
+struct ProcedureDefinition {
+    defaults: BTreeMap<String, String>,
+    body: Vec<Statement>,
 }
 
 pub fn parse_jcl(bundle: &JclBundle, limits: JclLimits) -> Result<JobPlan, HostProblem> {
@@ -165,8 +184,8 @@ fn build_plan(
         return Err(HostProblem::ResourceExhausted);
     }
     let mut symbols = BTreeMap::new();
-    let mut procedures: BTreeMap<String, Vec<Statement>> = BTreeMap::new();
-    let mut current_proc: Option<(String, Vec<Statement>)> = None;
+    let mut procedures: BTreeMap<String, ProcedureDefinition> = BTreeMap::new();
+    let mut current_proc: Option<(String, ProcedureDefinition)> = None;
     let mut retained = Vec::new();
     for statement in parsed_statements {
         match statement.operation.as_str() {
@@ -175,14 +194,20 @@ fn build_plan(
                     if symbols.len() >= limits.max_symbols {
                         return Err(HostProblem::ResourceExhausted);
                     }
-                    symbols.insert(name, value);
+                    symbols.insert(name, substitute(&value, &symbols)?);
                 }
             }
             "PROC" => {
                 if current_proc.is_some() {
                     return Err(HostProblem::Malformed);
                 }
-                current_proc = Some((statement.name.clone(), Vec::new()));
+                current_proc = Some((
+                    statement.name.clone(),
+                    ProcedureDefinition {
+                        defaults: assignments(&statement.operands),
+                        body: Vec::new(),
+                    },
+                ));
             }
             "PEND" => {
                 let (name, body) = current_proc.take().ok_or(HostProblem::Malformed)?;
@@ -192,7 +217,7 @@ fn build_plan(
                     return Err(HostProblem::ResourceExhausted);
                 }
             }
-            _ if current_proc.is_some() => current_proc.as_mut().unwrap().1.push(statement),
+            _ if current_proc.is_some() => current_proc.as_mut().unwrap().1.body.push(statement),
             _ => retained.push(statement),
         }
     }
@@ -201,14 +226,18 @@ fn build_plan(
     }
     for (name, body) in &bundle.cataloged_procedures {
         let parsed = statements(body, limits)?;
+        let (declared_name, definition) = cataloged_procedure(parsed)?;
         procedures
             .entry(name.to_ascii_uppercase())
-            .or_insert(parsed);
+            .or_insert_with(|| definition.clone());
+        procedures.entry(declared_name).or_insert(definition);
     }
     let mut job_name = None;
     let mut class = 'A';
     let mut priority = 0u8;
     let mut restart_step = None;
+    let mut procedure_libraries = Vec::new();
+    let mut job_dds = Vec::new();
     let mut steps = Vec::new();
     let mut active_if: Option<StepCondition> = None;
     for mut statement in retained {
@@ -233,6 +262,14 @@ fn build_plan(
             "IF" => active_if = Some(parse_if(&statement.operands)?),
             "ELSE" => active_if = active_if.take().map(invert_condition),
             "ENDIF" => active_if = None,
+            "JCLLIB" => {
+                procedure_libraries.extend(
+                    assignments(&statement.operands)
+                        .get("ORDER")
+                        .into_iter()
+                        .flat_map(|value| list_values(value)),
+                );
+            }
             "EXEC" => {
                 if steps.len() >= limits.max_steps {
                     return Err(HostProblem::ResourceExhausted);
@@ -251,7 +288,9 @@ fn build_plan(
                             .unwrap_or(StepCondition::Always),
                         dds: Vec::new(),
                         source_line: statement.line,
+                        source_end_line: statement.end_line,
                         procedure: None,
+                        invocation_line: None,
                     });
                 } else {
                     let proc_name = values
@@ -260,22 +299,41 @@ fn build_plan(
                         .or_else(|| first_operand(&statement.operands))
                         .ok_or(HostProblem::Malformed)?
                         .to_ascii_uppercase();
-                    let body = procedures.get(&proc_name).ok_or(HostProblem::NotFound)?;
-                    for nested in procedure_steps(body, &symbols, &proc_name, limits, depth + 1)? {
+                    let definition = procedures.get(&proc_name).ok_or(HostProblem::NotFound)?;
+                    let mut procedure_symbols = symbols.clone();
+                    procedure_symbols.extend(definition.defaults.clone());
+                    procedure_symbols.extend(
+                        values
+                            .into_iter()
+                            .filter(|(name, _)| !matches!(name.as_str(), "PGM" | "PROC")),
+                    );
+                    for mut nested in procedure_steps(
+                        &definition.body,
+                        &procedure_symbols,
+                        &proc_name,
+                        limits,
+                        depth + 1,
+                    )? {
                         if steps.len() >= limits.max_steps {
                             return Err(HostProblem::ResourceExhausted);
                         }
+                        nested.invocation_line = Some(statement.line);
                         steps.push(nested);
                     }
                 }
             }
             "DD" => {
-                let step = steps.last_mut().ok_or(HostProblem::Malformed)?;
-                if step.dds.len() >= limits.max_dds_per_step {
+                if override_procedure_dd(&mut steps, &statement, limits)? {
+                    continue;
+                }
+                let target = steps
+                    .last_mut()
+                    .map(|step| &mut step.dds)
+                    .unwrap_or(&mut job_dds);
+                if target.len() >= limits.max_dds_per_step {
                     return Err(HostProblem::ResourceExhausted);
                 }
-                step.dds
-                    .push(dd_plan(&statement, !step.dds.is_empty(), limits)?);
+                push_dd(target, &statement, limits)?;
             }
             "OUTPUT" => {}
             _ => return Err(HostProblem::Unsupported),
@@ -290,9 +348,75 @@ fn build_plan(
         class,
         priority,
         restart_step,
+        symbols,
+        procedure_libraries,
+        job_dds,
         steps,
         source: source.into(),
     })
+}
+
+fn cataloged_procedure(
+    statements: Vec<Statement>,
+) -> Result<(String, ProcedureDefinition), HostProblem> {
+    let mut current: Option<(String, ProcedureDefinition)> = None;
+    let mut completed = None;
+    for statement in statements {
+        match statement.operation.as_str() {
+            "PROC" => {
+                if current.is_some() || completed.is_some() {
+                    return Err(HostProblem::Malformed);
+                }
+                current = Some((
+                    statement.name,
+                    ProcedureDefinition {
+                        defaults: assignments(&statement.operands),
+                        body: Vec::new(),
+                    },
+                ));
+            }
+            "PEND" => {
+                completed = Some(current.take().ok_or(HostProblem::Malformed)?);
+            }
+            _ => current
+                .as_mut()
+                .ok_or(HostProblem::Malformed)?
+                .1
+                .body
+                .push(statement),
+        }
+    }
+    if current.is_some() {
+        return Err(HostProblem::Malformed);
+    }
+    completed.ok_or(HostProblem::Malformed)
+}
+
+fn override_procedure_dd(
+    steps: &mut [StepPlan],
+    statement: &Statement,
+    limits: JclLimits,
+) -> Result<bool, HostProblem> {
+    let Some((procedure_step, dd_name)) = statement.name.split_once('.') else {
+        return Ok(false);
+    };
+    let step = steps
+        .iter_mut()
+        .rev()
+        .find(|step| {
+            step.procedure.is_some()
+                && step
+                    .name
+                    .rsplit('.')
+                    .next()
+                    .is_some_and(|name| name.eq_ignore_ascii_case(procedure_step))
+        })
+        .ok_or(HostProblem::NotFound)?;
+    step.dds.retain(|dd| !dd.name.eq_ignore_ascii_case(dd_name));
+    let mut override_statement = statement.clone();
+    override_statement.name = dd_name.to_ascii_uppercase();
+    push_dd(&mut step.dds, &override_statement, limits)?;
+    Ok(true)
 }
 
 fn procedure_steps(
@@ -324,13 +448,17 @@ fn procedure_steps(
                         .unwrap_or(StepCondition::Always),
                     dds: Vec::new(),
                     source_line: statement.line,
+                    source_end_line: statement.end_line,
                     procedure: Some(procedure.into()),
+                    invocation_line: None,
                 });
             }
             "DD" => {
                 let step = steps.last_mut().ok_or(HostProblem::Malformed)?;
-                step.dds
-                    .push(dd_plan(&statement, !step.dds.is_empty(), limits)?);
+                if step.dds.len() >= limits.max_dds_per_step {
+                    return Err(HostProblem::ResourceExhausted);
+                }
+                push_dd(&mut step.dds, &statement, limits)?;
             }
             _ => return Err(HostProblem::Unsupported),
         }
@@ -355,6 +483,9 @@ fn statements(source: &str, limits: JclLimits) -> Result<Vec<Statement>, HostPro
         let content = line
             .get(2..72.min(line.len()))
             .ok_or(HostProblem::Malformed)?;
+        if content.trim().is_empty() {
+            break;
+        }
         let no_name = content.starts_with(char::is_whitespace);
         let parts = content
             .split_whitespace()
@@ -385,6 +516,7 @@ fn statements(source: &str, limits: JclLimits) -> Result<Vec<Statement>, HostPro
                 parts.get(2..).unwrap_or_default().join(" "),
             )
         };
+        let mut end_line = line_number;
         while operands.ends_with(',') && index < lines.len() {
             let continuation = lines[index];
             if !continuation.starts_with("//") {
@@ -397,14 +529,23 @@ fn statements(source: &str, limits: JclLimits) -> Result<Vec<Statement>, HostPro
                     .trim(),
             );
             index += 1;
+            end_line = index;
         }
         let mut inline = Vec::new();
-        if operation == "DD" && (operands == "*" || operands.starts_with("DATA")) {
+        let inline_operand = split_operands(&operands).into_iter().next();
+        if operation == "DD"
+            && inline_operand
+                .as_deref()
+                .is_some_and(|value| value == "*" || value.starts_with("DATA"))
+        {
             let delimiter = assignments(&operands)
                 .get("DLM")
                 .cloned()
                 .unwrap_or_else(|| "/*".into());
-            while index < lines.len() && lines[index] != delimiter {
+            while index < lines.len()
+                && jcl_control_columns(lines[index]).trim_end() != delimiter
+                && !(delimiter == "/*" && lines[index].starts_with("//"))
+            {
                 inline.extend_from_slice(lines[index].as_bytes());
                 inline.push(b'\n');
                 if inline.len() > limits.max_inline_bytes {
@@ -412,10 +553,9 @@ fn statements(source: &str, limits: JclLimits) -> Result<Vec<Statement>, HostPro
                 }
                 index += 1;
             }
-            if index >= lines.len() {
-                return Err(HostProblem::Malformed);
+            if index < lines.len() && jcl_control_columns(lines[index]).trim_end() == delimiter {
+                index += 1;
             }
-            index += 1;
         }
         if name.is_empty() || operation.is_empty() {
             return Err(HostProblem::Malformed);
@@ -426,6 +566,7 @@ fn statements(source: &str, limits: JclLimits) -> Result<Vec<Statement>, HostPro
             operands,
             inline,
             line: line_number,
+            end_line,
         });
         if out.len() > limits.max_lines {
             return Err(HostProblem::ResourceExhausted);
@@ -467,7 +608,38 @@ fn dd_plan(
         inline_data: statement.inline.clone(),
         concatenation,
         source_line: statement.line,
+        source_end_line: statement.end_line,
     })
+}
+
+fn push_dd(
+    target: &mut Vec<DdPlan>,
+    statement: &Statement,
+    limits: JclLimits,
+) -> Result<(), HostProblem> {
+    let concatenation = statement.name == "*";
+    let mut plan = dd_plan(statement, concatenation, limits)?;
+    if concatenation {
+        plan.name = target
+            .last()
+            .map(|previous| previous.name.clone())
+            .ok_or(HostProblem::Malformed)?;
+    }
+    target.push(plan);
+    Ok(())
+}
+
+fn jcl_control_columns(line: &str) -> &str {
+    line.get(..72.min(line.len())).unwrap_or(line)
+}
+
+fn list_values(value: &str) -> Vec<String> {
+    value
+        .trim_matches(|ch| matches!(ch, '(' | ')'))
+        .split(',')
+        .map(|item| item.trim().trim_matches(['\'', '"']).to_string())
+        .filter(|item| !item.is_empty())
+        .collect()
 }
 
 fn disposition(value: &str) -> Result<Disposition, HostProblem> {
@@ -543,9 +715,6 @@ fn substitute(value: &str, symbols: &BTreeMap<String, String>) -> Result<String,
         output = output.replace(&format!("&{name}."), replacement);
         output = output.replace(&format!("&{name}"), replacement);
     }
-    if output.contains('&') {
-        return Err(HostProblem::NotFound);
-    }
     Ok(output)
 }
 
@@ -568,7 +737,8 @@ fn parse_cond(value: &str) -> Result<StepCondition, HostProblem> {
 }
 
 fn parse_if(value: &str) -> Result<StepCondition, HostProblem> {
-    let words = value.split_whitespace().collect::<Vec<_>>();
+    let normalized = value.replace(['(', ')'], " ");
+    let words = normalized.split_whitespace().collect::<Vec<_>>();
     let position = words
         .iter()
         .position(|word| word.eq_ignore_ascii_case("RC"))
@@ -690,5 +860,94 @@ mod tests {
             ),
             Err(HostProblem::ResourceExhausted)
         );
+    }
+
+    #[test]
+    fn fixed_width_instream_delimiter_ignores_record_padding() {
+        let source = "//CARDJOB JOB CLASS=A                                                       \n//COPY EXEC PGM=IEBGENER                                                   \n//SYSUT1 DD *                                                              \nHELLO                                                                       \n/*                                                                          \n//SYSUT2 DD SYSOUT=*                                                        \n";
+        let plan = parse_jcl(
+            &JclBundle {
+                primary: source.into(),
+                ..Default::default()
+            },
+            JclLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            plan.steps[0].dds[0].inline_data,
+            b"HELLO                                                                       \n"
+        );
+        assert_eq!(plan.steps[0].dds[1].name, "SYSUT2");
+    }
+
+    #[test]
+    fn cataloged_procedure_symbols_overrides_and_concatenations_keep_provenance() {
+        let plan = parse_jcl(
+            &JclBundle {
+                primary: "//J JOB CLASS=A\n// SET ROOT=AWS\n// SET HLQ=&ROOT..DEMO\n//JOBLIB DD DSN=ONE\n// DD DSN=TWO\n//RUN EXEC PROC=REPROC,\n// CNTLLIB=&HLQ..CNTL\n//P.IN DD DSN=&HLQ..INPUT\n".into(),
+                cataloged_procedures: BTreeMap::from([(
+                    "REPROC".into(),
+                    "//REPROC PROC CNTLLIB=NULL\n//P EXEC PGM=IDCAMS\n//IN DD DSN=&CNTLLIB\n// PEND\n".into(),
+                )]),
+                ..Default::default()
+            },
+            JclLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(plan.symbols["HLQ"], "AWS.DEMO");
+        assert_eq!(plan.job_dds.len(), 2);
+        assert_eq!(plan.job_dds[1].name, "JOBLIB");
+        assert!(plan.job_dds[1].concatenation);
+        assert_eq!(plan.steps[0].procedure.as_deref(), Some("REPROC"));
+        assert_eq!(plan.steps[0].invocation_line, Some(6));
+        assert_eq!(plan.steps[0].source_line, 2);
+        assert_eq!(plan.steps[0].dds.len(), 1);
+        assert_eq!(
+            plan.steps[0].dds[0].dataset.as_deref(),
+            Some("AWS.DEMO.INPUT")
+        );
+        assert_eq!(plan.steps[0].dds[0].source_line, 8);
+        assert_eq!(plan.steps[0].source_end_line, 2);
+    }
+
+    #[test]
+    fn if_else_conditions_keep_each_selected_step_line() {
+        let plan = parse_jcl(
+            &JclBundle {
+                primary: "//J JOB CLASS=A\n// IF (RC = 0) THEN\n//YES EXEC PGM=IEFBR14\n// ELSE\n//NO EXEC PGM=IDCAMS\n// ENDIF\n".into(),
+                ..Default::default()
+            },
+            JclLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            plan.steps[0].condition,
+            StepCondition::RunIfMaxRc {
+                operator: "=".into(),
+                code: 0
+            }
+        );
+        assert_eq!(
+            plan.steps[1].condition,
+            StepCondition::SkipIfMaxRc {
+                operator: "=".into(),
+                code: 0
+            }
+        );
+        assert_eq!(plan.steps[0].source_line, 3);
+        assert_eq!(plan.steps[1].source_line, 5);
+    }
+
+    #[test]
+    fn prior_job_plan_json_defaults_new_provenance_fields() {
+        let plan: JobPlan = serde_json::from_str(
+            r#"{"name":"J","class":"A","priority":0,"restart_step":null,"steps":[{"name":"S","program":"IEFBR14","parameter":null,"condition":"Always","dds":[],"source_line":2,"procedure":null}],"source":"//J JOB CLASS=A\n//S EXEC PGM=IEFBR14\n"}"#,
+        )
+        .unwrap();
+        assert!(plan.symbols.is_empty());
+        assert!(plan.procedure_libraries.is_empty());
+        assert!(plan.job_dds.is_empty());
+        assert_eq!(plan.steps[0].source_end_line, 0);
+        assert_eq!(plan.steps[0].invocation_line, None);
     }
 }

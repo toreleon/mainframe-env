@@ -3,6 +3,7 @@
   "target_product": "0.1.1",
   "edges": [
     ["mainframe-env-cics", "mainframe-env-encoding"],
+    ["mainframe-env-conformance", "mainframe-env-batch"],
     ["mainframe-env-conformance", "mainframe-env-cics"],
     ["mainframe-env-conformance", "mainframe-env-server"],
     ["xtask", "mainframe-env-conformance"]

@@ -1,17 +1,17 @@
 # CardDemo-full 0.1.1 Program Status
 
-Current phase: **CD.C — Base CICS and terminal runtime**
-Current issue: **CD-019 — base online journey certification IN PROGRESS**
-Next issue: **CD-020 — actual CardDemo JCL and procedure parsing**
+Current phase: **CD.E — JCL/JES and base batch**
+Current issue: **CD-020 — actual CardDemo JCL and procedure parsing IN PROGRESS**
+Next issue: **CD-021 — DD and selected utility effects**
 Current product: **0.1.0-alpha.0**
 Target product: **0.1.1**
 CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Source identity
 
-- mainframe-env base commit: `ace7d325c3d44e50de2b7c555fd61736a9ea0269`
+- mainframe-env base commit: `da74f19c7147ae860631bf6c9aa4e21f5c1b5a8c`
 - current deterministic dirty-tree identity:
-  `sha256:8fc4b8de09935670d93dec82d929b8fb7f11e7da30d63d9eee975f31ffeb7fcf`
+  `sha256:4be2c032436b6821ec3c19ae86efe84ec77cc90da72aad212379c6cf6a4dcfd6`
 - dirty-tree algorithm: SHA-256 of the sorted `sha256sum` records for every
   repository file except `.git/`, `target/`, and the two persistent CardDemo
   status ledgers (which carry the identity).
@@ -365,6 +365,27 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   Idle sessions retain zero workers and disconnected/expired sessions release
   durable capacity.
 
+### CD-019 — base online user and administrator journey certification
+
+- State: **PASS**
+- Required commit subject: `Certify CardDemo base online journeys`
+- Completion commit identity:
+  `da74f19c7147ae860631bf6c9aa4e21f5c1b5a8c`.
+- Evidence: `conformance/0.1.1/evidence/issues/CD-019.json`
+- Evidence digest:
+  `sha256:fd5fd4437439071e27a2d74f30a26a145f842e292e0d4ecd14a4511340a29755`
+- CD.J01 through CD.J09 pass through the public application install and
+  authenticated terminal/session routes. All 17 installed base transactions
+  and maps have selected-route screen evidence.
+- Seven exact committed mutations cover account, card, transaction,
+  bill-payment, report-queue, and administrator user state. Rollback, denial,
+  suspended-session restart, concurrent isolation, and two resource-bound
+  controls pass.
+- Dynamic BMS attributes and FSET values remain durable and preserve protected
+  hidden fields without exposing them. Nested `PERFORM` endpoints, COMMAREA,
+  CICS compensation, and reached numeric/figurative semantics are explicitly
+  regression tested.
+
 ## Commands and exit codes
 
 - `cargo test -p mainframe-env-conformance --locked` — **0**; 19 passed,
@@ -550,13 +571,31 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 - Architecture, runtime architecture, profile, schema, and inventory gates —
   **0**.
 - Ordinary conformance, JSON, formatting, redaction, and diff checks — **0**.
+- Focused fixed-width instream-delimiter regression before repair — **101**;
+  a padded `/*` record was rejected as ordinary data.
+- Batch parser tests — **0**; 15 job-plan, procedure, symbol, condition,
+  concatenation, provenance, compatibility, execution, and bounds tests passed.
+- Batch, conformance, server, and xtask suites — **0**; 92 tests passed.
+- Affected-package Clippy with `-D warnings` — **0**.
+- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-jcl --check`
+  before evidence — **1**; the 46-file derived receipt passed and only the
+  required CD-020 evidence file was absent.
+- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-jcl --check`
+  — **0**; 45 parsed jobs and the single hash-pinned CREASTMT accepted
+  correction cover all 46 JCL paths and both procedures.
+- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-jcl --check` — **1**;
+  expected missing-environment failure.
+- Workspace all-target check — **0**.
+- Architecture, runtime architecture, profile, schema, inventory, evidence,
+  ordinary conformance, JSON, formatting, redaction, and diff gates — **0**.
 
 ## Implementation status
 
-- Issues passed: **18 / 27**
-- Journeys passed: **0 / 20**
-- Installed CardDemo resources: **0**
-- Executed CardDemo application journeys: **0**
+- Issues passed: **19 / 27**
+- Journeys passed: **9 / 20**
+- Installed CardDemo base-online resources: **18 programs, 17 transactions,
+  17 maps**
+- Executed CardDemo application journeys: **9**
 - Overall implementation: **IN PROGRESS**
 
 ## Open decisions and blockers
@@ -567,10 +606,11 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 2. The repository is still `0.1.0-alpha.0`. A 0.1.1 release cannot be cut until
    0.1.0 is finalized or an explicit version-line correction is accepted.
 
-Neither decision blocks CD-019. No CD-018 blocker remains.
+Neither decision blocks CD-020. No CD-019 blocker remains.
 
 ## Next smallest executable step
 
-Run CD.J01 through CD.J09 through the public install and terminal routes, prove
-all 17 base transaction/map paths, and record exact mutation, restart, denial,
-rollback, concurrency, and resource observations.
+Parse all 46 pinned JCL and procedure files into explicit parsed or accepted
+unsupported results with fixed-width delimiters, continuations, symbols,
+conditions, procedures, overrides, concatenations, instream data, provenance,
+and bounded malformed-input behavior.

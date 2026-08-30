@@ -592,6 +592,7 @@ mod tests {
                     inline_data: b"IDENTIFICATION DIVISION.\nPROGRAM-ID. BATCH.\nPROCEDURE DIVISION.\nDISPLAY 'BATCH COBOL'.\nSTOP RUN.\n".to_vec(),
                     concatenation: false,
                     source_line: 1,
+                    source_end_line: 1,
                 }],
             })
             .unwrap();
@@ -626,6 +627,7 @@ mod tests {
                             inline_data: b"       IDENTIFICATION DIVISION.\n       PROGRAM-ID. BATCHLIB.\n       DATA DIVISION.\n       WORKING-STORAGE SECTION.\n       COPY MESSAGE.\n       PROCEDURE DIVISION.\n       DISPLAY MESSAGE-TEXT.\n       STOP RUN.\n".to_vec(),
                             concatenation: false,
                             source_line: 1,
+                            source_end_line: 1,
                         },
                         DdPlan {
                             name: "SYSLIB".into(),
@@ -636,6 +638,7 @@ mod tests {
                             inline_data: b"       01 MESSAGE-TEXT PIC X(5) VALUE 'HELLO'.\n".to_vec(),
                             concatenation: false,
                             source_line: 9,
+                            source_end_line: 9,
                         },
                     ],
                 },
@@ -667,6 +670,7 @@ mod tests {
                     inline_data: b"IDENTIFICATION DIVISION.\nPROGRAM-ID. DURABLE.\nPROCEDURE DIVISION.\nDISPLAY 'DURABLE'.\nSTOP RUN.\n".to_vec(),
                     concatenation: false,
                     source_line: 1,
+                    source_end_line: 1,
                 }],
             })
             .unwrap();
