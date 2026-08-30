@@ -79,6 +79,18 @@ pub struct CicsFileDefinition {
     pub ccsid: Option<u16>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CicsFileStatus {
+    Open,
+    Closed,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct DurableFileStatus {
+    status: CicsFileStatus,
+    version: u64,
+}
+
 #[derive(Clone, Debug)]
 struct Session {
     rows: u16,
@@ -195,6 +207,7 @@ struct State {
     maps: BTreeMap<(String, String), BmsMapDefinition>,
     programs: BTreeSet<String>,
     file_aliases: BTreeMap<String, CicsFileDefinition>,
+    file_statuses: BTreeMap<String, DurableFileStatus>,
     continuations: BTreeMap<String, DurableContinuation>,
     transient: BTreeMap<String, TransientQueue>,
     transient_bytes: usize,
@@ -263,6 +276,22 @@ impl CicsService {
             let definition = decode_file_definition(&row.payload)?;
             file_aliases.insert(row.key, definition);
         }
+        let mut file_statuses = BTreeMap::new();
+        for row in store
+            .list_provider_state("cics-file-status", limits.max_file_aliases)
+            .map_err(store_error)?
+        {
+            if !file_aliases.contains_key(&row.key) {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            file_statuses.insert(
+                row.key,
+                DurableFileStatus {
+                    status: decode_file_status(&row.payload)?,
+                    version: row.version,
+                },
+            );
+        }
         let mut transient = BTreeMap::new();
         let mut transient_bytes = 0usize;
         for row in store
@@ -293,6 +322,7 @@ impl CicsService {
                 maps,
                 programs,
                 file_aliases,
+                file_statuses,
                 continuations,
                 transient,
                 transient_bytes,
@@ -1095,6 +1125,18 @@ impl CicsService {
         Ok(())
     }
 
+    pub fn file_status(&self, name: &str) -> Result<CicsFileStatus, HostProblem> {
+        let name = normalize_terminal_name(name, 16)?;
+        let state = self.lock()?;
+        if !state.file_aliases.contains_key(&name) {
+            return Err(HostProblem::NotFound);
+        }
+        Ok(state
+            .file_statuses
+            .get(&name)
+            .map_or(CicsFileStatus::Open, |record| record.status))
+    }
+
     pub fn submit_input(
         &self,
         session: &SessionId,
@@ -1298,6 +1340,7 @@ impl CicsService {
             CicsOperation::Inquire => self.inquire(run, &request),
             CicsOperation::SendMap | CicsOperation::SendText => self.send(run, &request),
             CicsOperation::ReceiveMap => self.receive(run),
+            CicsOperation::SetFileStatus => self.set_file_statuses(run, &request),
             CicsOperation::Retrieve => self.response(
                 run,
                 CicsDisposition::Complete,
@@ -1806,6 +1849,89 @@ impl CicsService {
         }
     }
 
+    fn set_file_statuses(
+        &self,
+        run: &mut Run,
+        request: &CicsRequest,
+    ) -> Result<CicsResponse, HostProblem> {
+        if request.arguments.is_empty() {
+            return Err(HostProblem::Malformed);
+        }
+        let mut requested = BTreeMap::new();
+        for (name, value) in &request.arguments {
+            let normalized = normalize_terminal_name(name, 16)?;
+            if value.schema() != "mainframe-env.cics.file-status@1" {
+                return Err(HostProblem::Malformed);
+            }
+            let status = match value.bytes() {
+                b"OPEN" => CicsFileStatus::Open,
+                b"CLOSED" => CicsFileStatus::Closed,
+                _ => return Err(HostProblem::Malformed),
+            };
+            if requested.insert(normalized, status).is_some() {
+                return Err(HostProblem::Malformed);
+            }
+        }
+        let mut state = self.lock()?;
+        if requested
+            .keys()
+            .any(|name| !state.file_aliases.contains_key(name))
+        {
+            return Err(HostProblem::NotFound);
+        }
+        let mut writes = Vec::new();
+        let mut changes = BTreeMap::new();
+        for (name, status) in &requested {
+            let current = state.file_statuses.get(name).copied();
+            if current.is_some_and(|current| current.status == *status)
+                || current.is_none() && *status == CicsFileStatus::Open
+            {
+                continue;
+            }
+            let version = current.map_or(Ok(1), |current| {
+                current
+                    .version
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)
+            })?;
+            writes.push(ProviderStateWrite {
+                record: ProviderStateRecord {
+                    namespace: "cics-file-status".into(),
+                    key: name.clone(),
+                    version,
+                    payload: encode_file_status(*status),
+                },
+                expected_version: current.map(|current| current.version),
+            });
+            changes.insert(
+                name.clone(),
+                DurableFileStatus {
+                    status: *status,
+                    version,
+                },
+            );
+        }
+        if !writes.is_empty() {
+            self.store
+                .put_provider_states_atomic(writes)
+                .map_err(store_error)?;
+        }
+        for (name, status) in changes {
+            state.file_statuses.insert(name, status);
+        }
+        drop(state);
+        self.response(
+            run,
+            CicsDisposition::Complete,
+            "NORMAL",
+            0,
+            0,
+            None,
+            None,
+            Vec::new(),
+        )
+    }
+
     fn file(&self, run: &mut Run, request: &CicsRequest) -> Result<CicsResponse, HostProblem> {
         let logical_name = argument_text(request, "DATASET")
             .or_else(|_| argument_text(request, "FILE"))?
@@ -1829,7 +1955,21 @@ impl CicsService {
                 });
             }
         }
-        let definition = self.lock()?.file_aliases.get(&logical_name).cloned();
+        let definition = {
+            let state = self.lock()?;
+            if state
+                .file_statuses
+                .get(&logical_name)
+                .is_some_and(|record| record.status == CicsFileStatus::Closed)
+            {
+                return Err(HostProblem::Condition {
+                    name: "DISABLED".into(),
+                    response: 84,
+                    response2: 0,
+                });
+            }
+            state.file_aliases.get(&logical_name).cloned()
+        };
         let ccsid = definition.as_ref().and_then(|definition| definition.ccsid);
         let name = definition
             .map(|definition| definition.dataset.as_str().to_string())
@@ -3299,6 +3439,21 @@ fn decode_file_definition(bytes: &[u8]) -> Result<CicsFileDefinition, HostProble
         dataset: DatasetName::new(target, 128).map_err(|_| HostProblem::InfrastructureFailure)?,
         ccsid: (ccsid != 0).then_some(ccsid),
     })
+}
+
+fn encode_file_status(status: CicsFileStatus) -> Vec<u8> {
+    match status {
+        CicsFileStatus::Open => b"OPEN".to_vec(),
+        CicsFileStatus::Closed => b"CLOSED".to_vec(),
+    }
+}
+
+fn decode_file_status(bytes: &[u8]) -> Result<CicsFileStatus, HostProblem> {
+    match bytes {
+        b"OPEN" => Ok(CicsFileStatus::Open),
+        b"CLOSED" => Ok(CicsFileStatus::Closed),
+        _ => Err(HostProblem::InfrastructureFailure),
+    }
 }
 
 fn encode_dataset_bytes(ccsid: Option<u16>, bytes: &[u8]) -> Result<Vec<u8>, HostProblem> {
@@ -4989,6 +5144,82 @@ mod tests {
             .unwrap();
         assert_eq!(transferred.disposition, CicsDisposition::Transfer);
         assert_eq!(transferred.target.as_deref(), Some("COCRDLIC"));
+    }
+
+    #[test]
+    fn file_control_is_atomic_durable_and_enforced_by_online_io() {
+        let memory = Arc::new(MemoryStore::new(Default::default()));
+        let store: Arc<dyn ProviderStateStore> = memory.clone();
+        let service = service(store.clone());
+        service
+            .register_file_aliases(&BTreeMap::from([
+                (
+                    "TRANSACT".into(),
+                    DatasetName::new("IBMUSER.TRANSACT", 128).unwrap(),
+                ),
+                (
+                    "ACCTDAT".into(),
+                    DatasetName::new("IBMUSER.ACCTDAT", 128).unwrap(),
+                ),
+            ]))
+            .unwrap();
+        let (invocation, _) = registered(&service);
+        let status = |value: &[u8]| {
+            BoundedPayload::new(
+                "mainframe-env.cics.file-status@1",
+                value.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let invalid = request(
+            CicsOperation::SetFileStatus,
+            BTreeMap::from([
+                ("TRANSACT".into(), status(b"CLOSED")),
+                ("UNKNOWN".into(), status(b"CLOSED")),
+            ]),
+            1,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 1),
+                invalid
+            ),
+            Err(HostProblem::NotFound)
+        );
+        assert_eq!(service.file_status("TRANSACT"), Ok(CicsFileStatus::Open));
+
+        let close = request(
+            CicsOperation::SetFileStatus,
+            BTreeMap::from([
+                ("TRANSACT".into(), status(b"CLOSED")),
+                ("ACCTDAT".into(), status(b"CLOSED")),
+            ]),
+            2,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, close.clone(), 2), close)
+            .unwrap();
+        assert_eq!(service.file_status("TRANSACT"), Ok(CicsFileStatus::Closed));
+        let read = request(
+            CicsOperation::Read,
+            BTreeMap::from([("FILE".into(), argument(b"TRANSACT"))]),
+            3,
+        );
+        assert_eq!(
+            service.invoke(&effect(&invocation.run_unit_id, read.clone(), 3), read),
+            Err(HostProblem::Condition {
+                name: "DISABLED".into(),
+                response: 84,
+                response2: 0,
+            })
+        );
+        drop(service);
+        let restarted = CicsService::open(authorities(), store, CicsLimits::default()).unwrap();
+        assert_eq!(
+            restarted.file_status("TRANSACT"),
+            Ok(CicsFileStatus::Closed)
+        );
     }
 
     #[test]

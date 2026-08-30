@@ -134,6 +134,10 @@ pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, 
                 Attribute::Text(file.assignment.clone()),
             ),
             (
+                "record_name".into(),
+                Attribute::Text(file.record_name.clone().unwrap_or_default()),
+            ),
+            (
                 "organization".into(),
                 Attribute::Text(file.organization.clone()),
             ),
@@ -144,6 +148,10 @@ pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, 
             (
                 "record_key".into(),
                 Attribute::Text(file.record_key.clone().unwrap_or_default()),
+            ),
+            (
+                "alternate_record_keys".into(),
+                Attribute::Text(file.alternate_record_keys.join("\u{1f}")),
             ),
             (
                 "relative_key".into(),

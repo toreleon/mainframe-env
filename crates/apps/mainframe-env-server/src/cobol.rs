@@ -22,7 +22,7 @@ use mainframe_env_source::{
     SourceLimits,
 };
 use mainframe_env_store::LocalArtifactStore;
-use mainframe_env_store_api::{ArtifactStore, PlatformStore};
+use mainframe_env_store_api::{ArtifactStore, PlatformStore, ProviderStateRecord};
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -119,6 +119,37 @@ pub fn default_program_router() -> Arc<DefaultProgramRouter> {
 #[must_use]
 pub const fn compatible_system_services() -> &'static [&'static str] {
     &["CEEDAYS", "COBDATFT", "MVSWAIT", "CEE3ABD"]
+}
+
+fn persist_batch_file_cursors(
+    store: &dyn PlatformStore,
+    key: &str,
+    cursors: &BTreeMap<String, String>,
+    current_version: Option<u64>,
+) -> Result<(), HostProblem> {
+    if cursors.is_empty() {
+        if let Some(version) = current_version {
+            store
+                .delete_provider_state("batch-file-cursor", key, version)
+                .map_err(|_| HostProblem::InfrastructureFailure)?;
+        }
+        return Ok(());
+    }
+    let version = current_version
+        .unwrap_or(0)
+        .checked_add(1)
+        .ok_or(HostProblem::ResourceExhausted)?;
+    store
+        .put_provider_state(
+            ProviderStateRecord {
+                namespace: "batch-file-cursor".into(),
+                key: key.into(),
+                version,
+                payload: serde_json::to_vec(cursors).map_err(|_| HostProblem::ProviderFailure)?,
+            },
+            current_version,
+        )
+        .map_err(|_| HostProblem::InfrastructureFailure)
 }
 
 struct CobolProgram {
@@ -233,11 +264,33 @@ impl CobolProgram {
             CodecLimits::default(),
         )
         .map_err(|_| HostProblem::ProviderFailure)?;
+        let cursor_key = format!("{}:{name}", parent.run_unit_id.as_str());
+        let cursor_record = store
+            .get_provider_state("batch-file-cursor", &cursor_key)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let cursor_version = cursor_record.as_ref().map(|record| record.version);
+        let loaded_cursors = cursor_record
+            .map(|record| {
+                serde_json::from_slice(&record.payload)
+                    .map_err(|_| HostProblem::InfrastructureFailure)
+            })
+            .transpose()?
+            .unwrap_or_default();
+        machine
+            .install_dataset_cursors(loaded_cursors)
+            .map_err(|_| HostProblem::ResourceExhausted)?;
         let coordinator = ExecutionCoordinator::with_host(
             Arc::clone(self.host.get().ok_or(HostProblem::InfrastructureFailure)?),
             CoordinatorLimits::default(),
         );
-        match coordinator.execute(&mut machine, &invocation, ExecutionControl::default()) {
+        let outcome = coordinator.execute(&mut machine, &invocation, ExecutionControl::default());
+        persist_batch_file_cursors(
+            store.as_ref(),
+            &cursor_key,
+            machine.dataset_cursors(),
+            cursor_version,
+        )?;
+        match outcome {
             ExecutionOutcome::Completed(_) => {
                 let mut values = machine
                     .linkage_values()
@@ -327,6 +380,17 @@ impl CobolProgram {
                     )
                     .map_err(|_| HostProblem::ResourceExhausted)?,
                 );
+                if let Some(ccsid) = dd.ccsid {
+                    bindings.insert(
+                        format!("cobol.dd.{}.ccsid", dd.name.to_ascii_uppercase()),
+                        BoundedPayload::new(
+                            "mainframe-env.ccsid@1",
+                            ccsid.to_string().into_bytes(),
+                            limits,
+                        )
+                        .map_err(|_| HostProblem::ResourceExhausted)?,
+                    );
+                }
             }
             if dd.name.eq_ignore_ascii_case("SYSIN") && !dd.inline_data.is_empty() {
                 bindings.insert(
@@ -445,8 +509,8 @@ impl CobolProgram {
                 response2: 0,
             }),
             ExecutionOutcome::InfrastructureFailure(_) => Err(HostProblem::InfrastructureFailure),
-            ExecutionOutcome::Rejected(_)
-            | ExecutionOutcome::Suspended(_)
+            ExecutionOutcome::Rejected(_) => Err(HostProblem::Unsupported),
+            ExecutionOutcome::Suspended(_)
             | ExecutionOutcome::Invoke(_)
             | ExecutionOutcome::Transfer(_) => Err(HostProblem::Unsupported),
         }
@@ -962,6 +1026,7 @@ mod tests {
                     organization: None,
                     record_format: None,
                     logical_record_length: None,
+                    ccsid: None,
                     temporary: false,
                     sysout: None,
                     disposition: Vec::new(),
@@ -1039,6 +1104,7 @@ mod tests {
                             organization: None,
                             record_format: None,
                             logical_record_length: None,
+                            ccsid: None,
                             temporary: false,
                             sysout: None,
                             disposition: Vec::new(),
@@ -1055,6 +1121,7 @@ mod tests {
                             organization: None,
                             record_format: None,
                             logical_record_length: None,
+                            ccsid: None,
                             temporary: false,
                             sysout: None,
                             disposition: Vec::new(),
@@ -1092,6 +1159,7 @@ mod tests {
                     organization: None,
                     record_format: None,
                     logical_record_length: None,
+                    ccsid: None,
                     temporary: false,
                     sysout: None,
                     disposition: Vec::new(),

@@ -13,7 +13,9 @@ use mainframe_env_batch::{
     JclBundle, JclLimits, JobPlan, JobState, StepCondition, UtilityDisposition, parse_jcl,
     utility_disposition, validate_idcams_control,
 };
-use mainframe_env_cics::{BmsFieldDefinition, BmsMapDefinition, CicsFileDefinition};
+use mainframe_env_cics::{
+    BmsFieldDefinition, BmsMapDefinition, CicsFileDefinition, CicsFileStatus,
+};
 use mainframe_env_compiler::{
     CobolCompiler, ControlEdgeKind, ControlRole, DataCategory, SemanticModel, StatementKind,
     StorageSection, compatibility_copybooks, owned_compatibility_library,
@@ -25,13 +27,14 @@ use mainframe_env_compiler_api::{
 use mainframe_env_dataset::{DatasetLimits, DatasetSeedObject, DatasetService};
 use mainframe_env_encoding::CodePage;
 use mainframe_env_execution_api::{
-    BoundedPayload, IdempotencyKey, InvocationLimits, Machine, MachineDrive, MachineResume,
-    PrincipalId, Quantum, RunUnitId,
+    ArtifactRef, BoundedPayload, CapabilityId, ExecutionId, IdempotencyKey, Invocation,
+    InvocationLimits, Machine, MachineDrive, MachineResume, Principal, PrincipalId, Quantum,
+    RequestId, ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
 };
 use mainframe_env_host_api::{
     AccessIntent, AuditEvent, CicsConditionPolicy, CicsOperation, CicsRequest, DatasetAttributes,
-    DatasetName, DatasetOrganization, DatasetRequest, DatasetResult, EffectRequest, MemberName,
-    Mutation, RecordFormat, ResourceName, SecretRef, SecurityDecision, SessionId,
+    DatasetName, DatasetOrganization, DatasetRequest, DatasetResult, EffectRequest, HostProblem,
+    MemberName, Mutation, RecordFormat, ResourceName, SecretRef, SecurityDecision, SessionId,
 };
 use mainframe_env_racf::{
     MemorySecretResolver, RacfManifest, RacfProfileDefinition, RacfService, RacfUserDefinition,
@@ -565,6 +568,24 @@ pub struct CardDemoBatchProgramReceipt {
     pub timeout_controls: usize,
     pub restart_routes: usize,
     pub program_shape_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoBaseBatchReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub journeys_passed: usize,
+    pub initialization_jobs: usize,
+    pub operational_jobs: usize,
+    pub cics_file_controls: usize,
+    pub internal_submissions: usize,
+    pub warm_restart_controls: usize,
+    pub rollback_controls: usize,
+    pub cancellation_controls: usize,
+    pub dataset_sha256: BTreeMap<String, String>,
+    pub spool_sha256: BTreeMap<String, String>,
+    pub journey_shape_sha256: String,
 }
 
 struct BaseOnlineExercise {
@@ -4196,65 +4217,11 @@ pub fn verify_carddemo_batch_programs_from_env(
         .chain(called_programs.iter())
         .cloned()
         .collect::<BTreeSet<_>>();
-    let mut definitions = Vec::new();
     let mut shape = Sha256::new();
-    for name in &needed {
-        let (path, bundle) = bundles.get(name).ok_or_else(|| {
-            CorpusProblem::new(
-                "carddemo.batch_program.source_missing",
-                format!("{name} source is missing"),
-            )
-        })?;
-        let result = compiler
-            .compile(CompilerRequest {
-                source: bundle.clone(),
-                mode: CompilationMode::Executable,
-                target: CompileTarget::new("reference").map_err(|error| {
-                    CorpusProblem::new("carddemo.batch_program.target_invalid", error.to_string())
-                })?,
-                options: CompileOptions::new(BTreeMap::new()).map_err(|error| {
-                    CorpusProblem::new("carddemo.batch_program.options_invalid", error.to_string())
-                })?,
-            })
-            .map_err(|error| {
-                CorpusProblem::new(
-                    "carddemo.batch_program.compile_failed",
-                    format!("{path}: {error}"),
-                )
-            })?;
-        let artifact = match result {
-            CompilerResult::Published { artifact, .. } => artifact,
-            CompilerResult::Analysis { diagnostics, .. }
-            | CompilerResult::Failed { diagnostics, .. } => {
-                return Err(CorpusProblem::new(
-                    "carddemo.batch_program.compile_failed",
-                    format!(
-                        "{path}: {}",
-                        diagnostics.first().map_or("no diagnostic", |diagnostic| {
-                            diagnostic.public_message()
-                        })
-                    ),
-                ));
-            }
-        };
-        let payload = artifact.payload().to_vec();
-        let reference = mainframe_env_execution_api::ArtifactRef::new(
-            format!("sha256:{:x}", Sha256::digest(&payload)),
-            InvocationLimits::default(),
-        )
-        .map_err(|_| {
-            CorpusProblem::new(
-                "carddemo.batch_program.artifact_invalid",
-                format!("{path} artifact identity is invalid"),
-            )
-        })?;
-        digest_field(&mut shape, name.as_bytes());
-        digest_field(&mut shape, reference.as_str().as_bytes());
-        definitions.push(BatchProgramDefinition {
-            name: name.clone(),
-            artifact: reference,
-            payload,
-        });
+    let definitions = compile_carddemo_batch_definitions(&bundles, &needed)?;
+    for definition in &definitions {
+        digest_field(&mut shape, definition.name.as_bytes());
+        digest_field(&mut shape, definition.artifact.as_str().as_bytes());
     }
     let wait_jcl = read_corpus_file(&corpus_dir, &corpus_dir.join("app/jcl/WAITSTEP.jcl"))?;
     let linkage_fixture = compile_free_batch_definition(
@@ -4311,6 +4278,1249 @@ pub fn verify_carddemo_batch_programs_from_env(
         restart_routes: exercise.restart_routes,
         program_shape_sha256: format!("{:x}", shape.finalize()),
     })
+}
+
+pub fn verify_carddemo_base_batch_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoBaseBatchReceipt, CorpusProblem> {
+    let batch = verify_carddemo_batch_programs_from_env(inventory_path)?;
+    let corpus_dir = PathBuf::from(env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required",
+        )
+    })?);
+    let bundles = explicit_carddemo_bundles(&corpus_dir)?
+        .into_iter()
+        .filter(|(path, _)| path.starts_with("app/cbl/"))
+        .map(|(path, bundle)| {
+            let name = Path::new(&path)
+                .file_stem()
+                .and_then(|value| value.to_str())
+                .ok_or_else(|| {
+                    CorpusProblem::new(
+                        "carddemo.base_batch.path_invalid",
+                        "program path is invalid",
+                    )
+                })?
+                .to_ascii_uppercase();
+            Ok((name, (path, bundle)))
+        })
+        .collect::<Result<BTreeMap<_, _>, CorpusProblem>>()?;
+    let needed = batch
+        .named_programs
+        .iter()
+        .chain(batch.called_programs.iter())
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let definitions = compile_carddemo_batch_definitions(&bundles, &needed)?;
+    let online = carddemo_base_online_definition(&corpus_dir)?;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| CorpusProblem::new("carddemo.base_batch.runtime", error.to_string()))?;
+    runtime.block_on(exercise_base_batch_routes(
+        &corpus_dir,
+        batch.corpus_commit,
+        online,
+        definitions,
+    ))
+}
+
+async fn exercise_base_batch_routes(
+    corpus_dir: &Path,
+    corpus_commit: String,
+    online: OnlineApplicationDefinition,
+    definitions: Vec<BatchProgramDefinition>,
+) -> Result<CardDemoBaseBatchReceipt, CorpusProblem> {
+    let artifact_root = env::temp_dir().join(format!(
+        "mainframe-env-carddemo-base-batch-{}",
+        std::process::id()
+    ));
+    let config = ServerConfig {
+        store_profile: StoreProfile::Memory,
+        artifact_root: artifact_root.clone(),
+        tls: TlsConfig {
+            enabled: false,
+            certificate_path: None,
+            private_key_reference: None,
+        },
+        ..ServerConfig::default()
+    };
+    let store = Arc::new(MemoryStore::new(Default::default()));
+    let secrets = Arc::new(MemorySecretResolver::default());
+    let server = ProductServer::open(
+        config.clone(),
+        store.clone(),
+        secrets.clone(),
+        default_program_router(),
+    )
+    .map_err(terminal_problem)?;
+    server
+        .bootstrap_user("IBMUSER", b"TESTPASS")
+        .map_err(terminal_problem)?;
+    install_base_online_authorities(&server, corpus_dir, &online)?;
+    server
+        .install_online_application(online)
+        .map_err(terminal_problem)?;
+    server
+        .install_batch_programs(definitions)
+        .map_err(terminal_problem)?;
+    let racf = server.racf_service();
+    for object in carddemo_base_seed_objects(corpus_dir)? {
+        racf.permit(
+            "DATASET",
+            object.dataset.as_str(),
+            "IBMUSER",
+            AccessIntent::Alter,
+        )
+        .map_err(terminal_problem)?;
+    }
+    let csd = String::from_utf8(read_corpus_file(
+        corpus_dir,
+        &corpus_dir.join("app/csd/CARDDEMO.CSD"),
+    )?)
+    .map_err(|_| CorpusProblem::new("carddemo.base_batch.csd_invalid", "CSD is not UTF-8"))?;
+    for dataset in parse_csd(&csd)
+        .map_err(package_problem)?
+        .into_iter()
+        .filter(|resource| resource.kind == "FILE")
+        .filter_map(|resource| resource.properties.get("DSNAME").cloned())
+    {
+        racf.permit("DATASET", &dataset, "IBMUSER", AccessIntent::Alter)
+            .map_err(terminal_problem)?;
+    }
+    racf.define_profile("DATASET", "AWS.M2.CARDDEMO.**", "IBMUSER", None)
+        .map_err(terminal_problem)?;
+    racf.permit(
+        "DATASET",
+        "AWS.M2.CARDDEMO.**",
+        "IBMUSER",
+        AccessIntent::Alter,
+    )
+    .map_err(terminal_problem)?;
+    racf.define_profile("DATASET", "AWS.M2.CARDEMO.**", "IBMUSER", None)
+        .map_err(terminal_problem)?;
+    racf.permit(
+        "DATASET",
+        "AWS.M2.CARDEMO.**",
+        "IBMUSER",
+        AccessIntent::Alter,
+    )
+    .map_err(terminal_problem)?;
+    let app = server.router();
+    install_base_batch_source_datasets(&server, corpus_dir)?;
+    let mut job_ids = BTreeMap::new();
+    for relative in [
+        "app/jcl/ACCTFILE.jcl",
+        "app/jcl/CARDFILE.jcl",
+        "app/jcl/CUSTFILE.jcl",
+        "app/jcl/XREFFILE.jcl",
+        "app/jcl/TCATBALF.jcl",
+        "app/jcl/TRANCATG.jcl",
+        "app/jcl/TRANTYPE.jcl",
+        "app/jcl/DISCGRP.jcl",
+        "app/jcl/DUSRSECJ.jcl",
+        "app/jcl/TRANFILE.jcl",
+    ] {
+        let jcl = String::from_utf8(read_corpus_file(corpus_dir, &corpus_dir.join(relative))?)
+            .map_err(|_| {
+                CorpusProblem::new(
+                    "carddemo.base_batch.jcl_invalid",
+                    format!("{relative} is not UTF-8"),
+                )
+            })?;
+        let id = submit_job_with_retcode(&server, &app, &jcl, "CC 0000")
+            .await
+            .map_err(|problem| {
+                CorpusProblem::new(
+                    "carddemo.base_batch.job_failed",
+                    format!("{relative}: {problem}"),
+                )
+            })?;
+        job_ids.insert(base_batch_job_label(relative)?, id);
+    }
+    for relative in ["app/jcl/DEFGDGB.jcl", "app/jcl/DALYREJS.jcl"] {
+        let jcl = String::from_utf8(read_corpus_file(corpus_dir, &corpus_dir.join(relative))?)
+            .map_err(|_| {
+                CorpusProblem::new(
+                    "carddemo.base_batch.jcl_invalid",
+                    format!("{relative} is not UTF-8"),
+                )
+            })?;
+        let id = submit_job_with_retcode(&server, &app, &jcl, "CC 0000")
+            .await
+            .map_err(|problem| {
+                CorpusProblem::new(
+                    "carddemo.base_batch.job_failed",
+                    format!("{relative}: {problem}"),
+                )
+            })?;
+        job_ids.insert(base_batch_job_label(relative)?, id);
+    }
+    let close_jcl = String::from_utf8(read_corpus_file(
+        corpus_dir,
+        &corpus_dir.join("app/jcl/CLOSEFIL.jcl"),
+    )?)
+    .map_err(|_| {
+        CorpusProblem::new(
+            "carddemo.base_batch.jcl_invalid",
+            "app/jcl/CLOSEFIL.jcl is not UTF-8",
+        )
+    })?;
+    let close_id = submit_job_with_retcode(&server, &app, &close_jcl, "CC 0000").await?;
+    job_ids.insert("CLOSEFIL".into(), close_id.clone());
+    for file in ["TRANSACT", "CCXREF", "ACCTDAT", "CXACAIX", "USRSEC"] {
+        if server
+            .cics_service()
+            .file_status(file)
+            .map_err(terminal_problem)?
+            != CicsFileStatus::Closed
+        {
+            return Err(CorpusProblem::new(
+                "carddemo.base_batch.cics_close_drift",
+                format!("{file} was not closed by CLOSEFIL"),
+            ));
+        }
+    }
+    if server
+        .batch_service()
+        .spool(&close_id, "CMDOUT", 0, 16)
+        .map_err(terminal_problem)?
+        .0
+        != [
+            "TRANSACT CLOSED",
+            "CCXREF CLOSED",
+            "ACCTDAT CLOSED",
+            "CXACAIX CLOSED",
+            "USRSEC CLOSED",
+        ]
+        .map(|record| record.as_bytes().to_vec())
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.base_batch.cics_close_drift",
+            "CLOSEFIL command output differs",
+        ));
+    }
+    for (relative, expected) in [
+        ("app/jcl/POSTTRAN.jcl", "CC 0004"),
+        ("app/jcl/INTCALC.jcl", "CC 0000"),
+        ("app/jcl/TRANBKP.jcl", "CC 0000"),
+        ("app/jcl/COMBTRAN.jcl", "CC 0000"),
+        ("app/jcl/TRANIDX.jcl", "CC 0000"),
+        ("app/jcl/TRANREPT.jcl", "CC 0000"),
+        ("app/jcl/PRTCATBL.jcl", "CC 0000"),
+    ] {
+        let jcl = String::from_utf8(read_corpus_file(corpus_dir, &corpus_dir.join(relative))?)
+            .map_err(|_| {
+                CorpusProblem::new(
+                    "carddemo.base_batch.jcl_invalid",
+                    format!("{relative} is not UTF-8"),
+                )
+            })?;
+        let id = submit_job_with_retcode(&server, &app, &jcl, expected)
+            .await
+            .map_err(|problem| {
+                CorpusProblem::new(
+                    "carddemo.base_batch.job_failed",
+                    format!("{relative}: {problem}"),
+                )
+            })?;
+        job_ids.insert(base_batch_job_label(relative)?, id);
+        if relative == "app/jcl/TRANBKP.jcl" {
+            utility_records(&server, "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS", None).map_err(
+                |problem| {
+                    CorpusProblem::new(
+                        "carddemo.base_batch.backup_drift",
+                        format!("TRANBKP did not recreate the transaction master: {problem}"),
+                    )
+                },
+            )?;
+        }
+    }
+    let post_id = job_ids
+        .get("POSTTRAN")
+        .ok_or_else(|| CorpusProblem::new("carddemo.base_batch.job_missing", "POSTTRAN missing"))?;
+    let post_text = base_batch_spool_text(&server, post_id)?;
+    let compact_post = post_text
+        .chars()
+        .filter(|character| !character.is_whitespace())
+        .collect::<String>();
+    if !compact_post.contains("TRANSACTIONSPROCESSED:000000300")
+        || !compact_post.contains("TRANSACTIONSREJECTED:000000038")
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.base_batch.posting_drift",
+            "POSTTRAN did not report 300 processed and 38 rejected transactions",
+        ));
+    }
+    let statement = corrected_creastmt(corpus_dir)?;
+    let statement_id = submit_job_with_retcode(&server, &app, &statement, "CC 0000")
+        .await
+        .map_err(|problem| {
+            CorpusProblem::new(
+                "carddemo.base_batch.job_failed",
+                format!("app/jcl/CREASTMT.JCL: {problem}"),
+            )
+        })?;
+    job_ids.insert("CREASTMT".into(), statement_id);
+    for name in [
+        "AWS.M2.CARDDEMO.TRXFL.SEQ",
+        "AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS",
+        "AWS.M2.CARDDEMO.STATEMNT.PS",
+        "AWS.M2.CARDDEMO.STATEMNT.HTML",
+        "AWS.M2.CARDDEMO.TCATBALF.REPT",
+    ] {
+        if utility_records(&server, name, None)?.is_empty() {
+            return Err(CorpusProblem::new(
+                "carddemo.base_batch.output_empty",
+                format!("{name} is empty"),
+            ));
+        }
+    }
+
+    let internal_jcl = String::from_utf8(read_corpus_file(
+        corpus_dir,
+        &corpus_dir.join("app/jcl/INTRDRJ1.JCL"),
+    )?)
+    .map_err(|_| {
+        CorpusProblem::new(
+            "carddemo.base_batch.jcl_invalid",
+            "app/jcl/INTRDRJ1.JCL is not UTF-8",
+        )
+    })?;
+    let internal_id = submit_job_with_retcode(&server, &app, &internal_jcl, "CC 0000").await?;
+    job_ids.insert("INTRDRJ1".into(), internal_id);
+    let principal =
+        PrincipalId::new("IBMUSER", InvocationLimits::default()).expect("static batch principal");
+    let (jobs, more) = server
+        .batch_service()
+        .list(Some(&principal), None, 128)
+        .map_err(terminal_problem)?;
+    if more {
+        return Err(CorpusProblem::new(
+            "carddemo.base_batch.job_limit",
+            "job list exceeded the base-cycle observation bound",
+        ));
+    }
+    let child = jobs
+        .iter()
+        .find(|job| job.name == "INTRDRJ2")
+        .ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.base_batch.internal_missing",
+                "INTRDRJ2 was not submitted",
+            )
+        })?;
+    if child.state != JobState::Completed || child.return_code != Some(0) {
+        return Err(CorpusProblem::new(
+            "carddemo.base_batch.internal_incomplete",
+            format!("INTRDRJ2 did not complete: {child:?}"),
+        ));
+    }
+    job_ids.insert("INTRDRJ2".into(), child.id.clone());
+    if utility_records(&server, "AWS.M2.CARDEMO.FTP.TEST.BKUP.INTRDR", None)?
+        != utility_records(&server, "AWS.M2.CARDEMO.FTP.TEST.BKUP", None)?
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.base_batch.internal_copy_drift",
+            "INTRDRJ2 did not reproduce the FTP backup exactly",
+        ));
+    }
+
+    let open_jcl = String::from_utf8(read_corpus_file(
+        corpus_dir,
+        &corpus_dir.join("app/jcl/OPENFIL.jcl"),
+    )?)
+    .map_err(|_| {
+        CorpusProblem::new(
+            "carddemo.base_batch.jcl_invalid",
+            "app/jcl/OPENFIL.jcl is not UTF-8",
+        )
+    })?;
+    let open_id = submit_job_with_retcode(&server, &app, &open_jcl, "CC 0000").await?;
+    job_ids.insert("OPENFIL".into(), open_id.clone());
+    for file in ["TRANSACT", "CCXREF", "ACCTDAT", "CXACAIX", "USRSEC"] {
+        if server
+            .cics_service()
+            .file_status(file)
+            .map_err(terminal_problem)?
+            != CicsFileStatus::Open
+        {
+            return Err(CorpusProblem::new(
+                "carddemo.base_batch.cics_open_drift",
+                format!("{file} was not opened by OPENFIL"),
+            ));
+        }
+    }
+    if server
+        .batch_service()
+        .spool(&open_id, "CMDOUT", 0, 16)
+        .map_err(terminal_problem)?
+        .0
+        != [
+            "TRANSACT OPEN",
+            "CCXREF OPEN",
+            "ACCTDAT OPEN",
+            "CXACAIX OPEN",
+            "USRSEC OPEN",
+        ]
+        .map(|record| record.as_bytes().to_vec())
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.base_batch.cics_open_drift",
+            "OPENFIL command output differs",
+        ));
+    }
+
+    let rollback_jcl = "//CD23ROLL JOB CLASS=A\n//FAIL EXEC PGM=NOTREAL\n//WORK DD DSN=AWS.M2.CARDDEMO.CD23.ROLLBACK,DISP=(NEW,KEEP,DELETE),\n// UNIT=SYSDA,DCB=(LRECL=80,RECFM=FB)\n";
+    let (rollback_status, rollback_body) = terminal_http(
+        &app,
+        Method::PUT,
+        "/zosmf/restjobs/jobs",
+        base_batch_job_headers(),
+        rollback_jcl.as_bytes().to_vec(),
+    )
+    .await?;
+    let rollback_job: serde_json::Value = serde_json::from_slice(&rollback_body)
+        .map_err(|error| CorpusProblem::new("carddemo.base_batch.rollback", error.to_string()))?;
+    if rollback_status != StatusCode::CREATED
+        || rollback_job["status"] != "OUTPUT"
+        || !rollback_job["retcode"].is_null()
+        || server.dataset_service().invoke(DatasetRequest::Attributes {
+            dataset: DatasetName::new(
+                "AWS.M2.CARDDEMO.CD23.ROLLBACK",
+                InvocationLimits::default().max_binding_bytes,
+            )
+            .expect("static rollback dataset"),
+        }) != Err(HostProblem::NotFound)
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.base_batch.rollback",
+            format!("abnormal allocation was not rolled back: {rollback_job}"),
+        ));
+    }
+    job_ids.insert(
+        "ROLLBACK-CONTROL".into(),
+        rollback_job["jobid"]
+            .as_str()
+            .ok_or_else(|| {
+                CorpusProblem::new("carddemo.base_batch.rollback", "rollback job ID is missing")
+            })?
+            .to_string(),
+    );
+
+    let control_invocation = base_batch_control_invocation()?;
+    let cancelled = server
+        .batch_service()
+        .submit(
+            &control_invocation,
+            &JclBundle {
+                primary: "//CD23CANC JOB CLASS=A\n//WAIT EXEC PGM=IEFBR14\n".into(),
+                ..Default::default()
+            },
+            &IdempotencyKey::new("carddemo-base-batch-cancel", InvocationLimits::default())
+                .expect("static cancellation idempotency key"),
+            true,
+        )
+        .map_err(terminal_problem)?;
+    let (cancel_status, _) = terminal_http(
+        &app,
+        Method::PUT,
+        &format!("/zosmf/restjobs/jobs/{}/{}", cancelled.name, cancelled.id),
+        base_batch_job_headers(),
+        Vec::new(),
+    )
+    .await?;
+    if cancel_status != StatusCode::NO_CONTENT
+        || server
+            .batch_service()
+            .get(&cancelled.id)
+            .map_err(terminal_problem)?
+            .state
+            != JobState::Cancelled
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.base_batch.cancellation",
+            "held job did not cancel through the public z/OSMF route",
+        ));
+    }
+    job_ids.insert("CANCEL-CONTROL".into(), cancelled.id);
+
+    let dataset_sha256 = base_batch_dataset_digests(&server)?;
+    let spool_sha256 = base_batch_spool_digests(&server, &job_ids)?;
+    drop(app);
+    if !server.graceful_shutdown().await {
+        return Err(CorpusProblem::new(
+            "carddemo.base_batch.shutdown_failed",
+            "base batch server did not shut down",
+        ));
+    }
+    drop(racf);
+    drop(server);
+    let restarted = ProductServer::open(config, store, secrets, default_program_router())
+        .map_err(terminal_problem)?;
+    if base_batch_dataset_digests(&restarted)? != dataset_sha256
+        || base_batch_spool_digests(&restarted, &job_ids)? != spool_sha256
+        || ["TRANSACT", "CCXREF", "ACCTDAT", "CXACAIX", "USRSEC"]
+            .into_iter()
+            .any(|file| restarted.cics_service().file_status(file) != Ok(CicsFileStatus::Open))
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.base_batch.restart_drift",
+            "dataset, spool, or CICS state changed across warm restart",
+        ));
+    }
+    if !restarted.graceful_shutdown().await {
+        return Err(CorpusProblem::new(
+            "carddemo.base_batch.shutdown_failed",
+            "restarted base batch server did not shut down",
+        ));
+    }
+    drop(restarted);
+
+    let journeys_passed = 3usize;
+    let initialization_jobs = 12usize;
+    let operational_jobs = 9usize;
+    let cics_file_controls = 2usize;
+    let internal_submissions = 1usize;
+    let warm_restart_controls = 1usize;
+    let rollback_controls = 1usize;
+    let cancellation_controls = 1usize;
+    let mut shape = Sha256::new();
+    digest_field(&mut shape, corpus_commit.as_bytes());
+    for value in [
+        journeys_passed,
+        initialization_jobs,
+        operational_jobs,
+        cics_file_controls,
+        internal_submissions,
+        warm_restart_controls,
+        rollback_controls,
+        cancellation_controls,
+    ] {
+        digest_field(&mut shape, &(value as u64).to_be_bytes());
+    }
+    for (name, digest) in &dataset_sha256 {
+        digest_field(&mut shape, name.as_bytes());
+        digest_field(&mut shape, digest.as_bytes());
+    }
+    for (name, digest) in &spool_sha256 {
+        digest_field(&mut shape, name.as_bytes());
+        digest_field(&mut shape, digest.as_bytes());
+    }
+    let _ = fs::remove_dir_all(&artifact_root);
+    Ok(CardDemoBaseBatchReceipt {
+        schema_version: "mainframe-env.carddemo-base-batch-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit,
+        journeys_passed,
+        initialization_jobs,
+        operational_jobs,
+        cics_file_controls,
+        internal_submissions,
+        warm_restart_controls,
+        rollback_controls,
+        cancellation_controls,
+        dataset_sha256,
+        spool_sha256,
+        journey_shape_sha256: format!("{:x}", shape.finalize()),
+    })
+}
+
+fn base_batch_job_label(relative: &str) -> Result<String, CorpusProblem> {
+    Path::new(relative)
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .map(str::to_ascii_uppercase)
+        .ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.base_batch.path_invalid",
+                format!("{relative} has no job label"),
+            )
+        })
+}
+
+fn base_batch_job_headers() -> BTreeMap<String, String> {
+    BTreeMap::from([
+        (
+            "authorization".into(),
+            format!(
+                "Basic {}",
+                base64::engine::general_purpose::STANDARD.encode("IBMUSER:TESTPASS")
+            ),
+        ),
+        ("x-csrf-zosmf-header".into(), "true".into()),
+    ])
+}
+
+fn base_batch_control_invocation() -> Result<Invocation, CorpusProblem> {
+    let limits = InvocationLimits::default();
+    let grants = ["host.security.authorize", "host.program.invoke"]
+        .into_iter()
+        .map(|capability| {
+            CapabilityId::new(capability, limits).map_err(|_| {
+                CorpusProblem::new(
+                    "carddemo.base_batch.control_invalid",
+                    "control capability is invalid",
+                )
+            })
+        })
+        .collect::<Result<BTreeSet<_>, _>>()?;
+    Invocation::new(
+        RequestId::new("carddemo-base-batch-control-request", limits)
+            .expect("static control request"),
+        ExecutionId::new("carddemo-base-batch-control-execution", limits)
+            .expect("static control execution"),
+        RunUnitId::new("carddemo-base-batch-control-run", limits).expect("static control run"),
+        None,
+        Selector::new("zosmf:job-control", limits).expect("static control selector"),
+        ArtifactRef::new("mainframe-env-batch@1", limits).expect("static control artifact"),
+        Principal::new(
+            PrincipalId::new("IBMUSER", limits).expect("static control principal"),
+            grants,
+            limits,
+        )
+        .expect("bounded control principal"),
+        ServiceClass::Batch,
+        0,
+        1_000_000,
+        TraceId::new("carddemo-base-batch-control-trace", limits).expect("static control trace"),
+        IdempotencyKey::new("carddemo-base-batch-control-invocation", limits)
+            .expect("static control invocation key"),
+        1,
+        ResourceLimits::default(),
+        BTreeMap::new(),
+        limits,
+    )
+    .map_err(|_| {
+        CorpusProblem::new(
+            "carddemo.base_batch.control_invalid",
+            "control invocation is invalid",
+        )
+    })
+}
+
+fn base_batch_spool_text(server: &ProductServer, id: &str) -> Result<String, CorpusProblem> {
+    let mut text = String::new();
+    for (_, name, records, _) in server
+        .batch_service()
+        .spool_files(id)
+        .map_err(terminal_problem)?
+    {
+        let (values, more) = server
+            .batch_service()
+            .spool(id, &name, 0, records.max(1))
+            .map_err(terminal_problem)?;
+        if more {
+            return Err(CorpusProblem::new(
+                "carddemo.base_batch.spool_limit",
+                format!("{id}/{name} exceeded its declared record count"),
+            ));
+        }
+        for value in values {
+            text.push_str(&String::from_utf8_lossy(&value));
+            text.push('\n');
+        }
+    }
+    Ok(text)
+}
+
+fn base_batch_dataset_digests(
+    server: &ProductServer,
+) -> Result<BTreeMap<String, String>, CorpusProblem> {
+    let DatasetResult::Listed { names, more } = server
+        .dataset_service()
+        .invoke(DatasetRequest::List {
+            pattern: "AWS.M2.CARD*".into(),
+            start: None,
+            max_items: 4_096,
+        })
+        .map_err(terminal_problem)?
+    else {
+        return Err(CorpusProblem::new(
+            "carddemo.base_batch.catalog_drift",
+            "dataset list returned the wrong result",
+        ));
+    };
+    if more {
+        return Err(CorpusProblem::new(
+            "carddemo.base_batch.catalog_limit",
+            "base-cycle catalog exceeded 4096 entries",
+        ));
+    }
+    let mut observations = BTreeMap::<String, String>::new();
+    let mut catalog = Sha256::new();
+    for name in &names {
+        digest_field(&mut catalog, name.as_str().as_bytes());
+    }
+    observations.insert("@CATALOG".into(), format!("{:x}", catalog.finalize()));
+    for name in names {
+        let attributes = match server.dataset_service().invoke(DatasetRequest::Attributes {
+            dataset: name.clone(),
+        }) {
+            Ok(DatasetResult::Attributes {
+                attributes,
+                version,
+            }) => (attributes, version),
+            Err(HostProblem::NotFound) => continue,
+            Ok(_) => {
+                return Err(CorpusProblem::new(
+                    "carddemo.base_batch.dataset_drift",
+                    format!("{} attributes returned the wrong result", name.as_str()),
+                ));
+            }
+            Err(problem) => return Err(terminal_problem(problem)),
+        };
+        let mut digest = Sha256::new();
+        digest_field(
+            &mut digest,
+            format!("{:?}", attributes.0.organization).as_bytes(),
+        );
+        digest_field(
+            &mut digest,
+            format!("{:?}", attributes.0.record_format).as_bytes(),
+        );
+        digest_field(
+            &mut digest,
+            &attributes.0.logical_record_length.to_be_bytes(),
+        );
+        digest_field(
+            &mut digest,
+            &attributes.0.key_offset.unwrap_or(u32::MAX).to_be_bytes(),
+        );
+        digest_field(
+            &mut digest,
+            &attributes.0.key_length.unwrap_or(u32::MAX).to_be_bytes(),
+        );
+        digest_field(
+            &mut digest,
+            &attributes.0.ccsid.unwrap_or(u16::MAX).to_be_bytes(),
+        );
+        digest_field(&mut digest, &attributes.1.to_be_bytes());
+        if attributes.0.organization == DatasetOrganization::Partitioned {
+            let DatasetResult::Members {
+                names: members,
+                more,
+            } = server
+                .dataset_service()
+                .invoke(DatasetRequest::ListMembers {
+                    dataset: name.clone(),
+                    start: None,
+                    max_items: 4_096,
+                })
+                .map_err(terminal_problem)?
+            else {
+                return Err(CorpusProblem::new(
+                    "carddemo.base_batch.member_drift",
+                    format!("{} member list returned the wrong result", name.as_str()),
+                ));
+            };
+            if more {
+                return Err(CorpusProblem::new(
+                    "carddemo.base_batch.member_limit",
+                    format!("{} exceeded 4096 members", name.as_str()),
+                ));
+            }
+            for member in members {
+                digest_field(&mut digest, member.as_str().as_bytes());
+                let DatasetResult::Records {
+                    records,
+                    identities,
+                    version,
+                } = server
+                    .dataset_service()
+                    .invoke(DatasetRequest::Read {
+                        dataset: name.clone(),
+                        member: Some(member),
+                        key: None,
+                        max_records: 4_096,
+                    })
+                    .map_err(terminal_problem)?
+                else {
+                    return Err(CorpusProblem::new(
+                        "carddemo.base_batch.member_drift",
+                        format!("{} member read returned the wrong result", name.as_str()),
+                    ));
+                };
+                digest_field(&mut digest, &version.to_be_bytes());
+                for record in records {
+                    digest_field(&mut digest, &record);
+                }
+                for identity in identities {
+                    digest_field(&mut digest, &identity);
+                }
+            }
+        } else {
+            let DatasetResult::Records {
+                records,
+                identities,
+                version,
+            } = server
+                .dataset_service()
+                .invoke(DatasetRequest::Read {
+                    dataset: name.clone(),
+                    member: None,
+                    key: None,
+                    max_records: 4_096,
+                })
+                .map_err(terminal_problem)?
+            else {
+                return Err(CorpusProblem::new(
+                    "carddemo.base_batch.dataset_drift",
+                    format!("{} read returned the wrong result", name.as_str()),
+                ));
+            };
+            digest_field(&mut digest, &version.to_be_bytes());
+            for record in records {
+                digest_field(&mut digest, &record);
+            }
+            for identity in identities {
+                digest_field(&mut digest, &identity);
+            }
+        }
+        observations.insert(name.as_str().into(), format!("{:x}", digest.finalize()));
+    }
+    for required in [
+        "AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS",
+        "AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH",
+        "AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH",
+        "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
+        "AWS.M2.CARDDEMO.TRXFL.SEQ",
+        "AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS",
+        "AWS.M2.CARDDEMO.STATEMNT.PS",
+        "AWS.M2.CARDDEMO.STATEMNT.HTML",
+        "AWS.M2.CARDDEMO.TCATBALF.REPT",
+        "AWS.M2.CARDEMO.FTP.TEST.BKUP.INTRDR",
+    ] {
+        if !observations.contains_key(required) {
+            return Err(CorpusProblem::new(
+                "carddemo.base_batch.dataset_missing",
+                format!("{required} is missing from exact observations"),
+            ));
+        }
+    }
+    for base in [
+        "AWS.M2.CARDDEMO.DALYREJS.G",
+        "AWS.M2.CARDDEMO.SYSTRAN.G",
+        "AWS.M2.CARDDEMO.TRANSACT.BKUP.G",
+        "AWS.M2.CARDDEMO.TRANSACT.COMBINED.G",
+        "AWS.M2.CARDDEMO.TRANSACT.DALY.G",
+        "AWS.M2.CARDDEMO.TRANREPT.G",
+        "AWS.M2.CARDDEMO.TCATBALF.BKUP.G",
+    ] {
+        if !observations.keys().any(|name| name.starts_with(base)) {
+            return Err(CorpusProblem::new(
+                "carddemo.base_batch.gdg_missing",
+                format!("{base} generation is missing"),
+            ));
+        }
+    }
+    Ok(observations)
+}
+
+fn base_batch_spool_digests(
+    server: &ProductServer,
+    job_ids: &BTreeMap<String, String>,
+) -> Result<BTreeMap<String, String>, CorpusProblem> {
+    let mut observations = BTreeMap::new();
+    for (label, id) in job_ids {
+        let job = server.batch_service().get(id).map_err(terminal_problem)?;
+        if !matches!(
+            job.state,
+            JobState::Completed | JobState::Failed | JobState::Cancelled
+        ) {
+            return Err(CorpusProblem::new(
+                "carddemo.base_batch.job_incomplete",
+                format!("{label}/{id} is not terminal"),
+            ));
+        }
+        let mut digest = Sha256::new();
+        digest_field(&mut digest, label.as_bytes());
+        digest_field(&mut digest, id.as_bytes());
+        digest_field(&mut digest, format!("{:?}", job.state).as_bytes());
+        digest_field(
+            &mut digest,
+            &job.return_code.unwrap_or(i32::MIN).to_be_bytes(),
+        );
+        digest_field(
+            &mut digest,
+            job.abend_code.as_deref().unwrap_or("").as_bytes(),
+        );
+        for (_, name, records, _) in server
+            .batch_service()
+            .spool_files(id)
+            .map_err(terminal_problem)?
+        {
+            digest_field(&mut digest, name.as_bytes());
+            let (values, more) = server
+                .batch_service()
+                .spool(id, &name, 0, records.max(1))
+                .map_err(terminal_problem)?;
+            if more {
+                return Err(CorpusProblem::new(
+                    "carddemo.base_batch.spool_limit",
+                    format!("{label}/{name} exceeded its declared record count"),
+                ));
+            }
+            for value in values {
+                digest_field(&mut digest, &value);
+            }
+        }
+        observations.insert(label.clone(), format!("{:x}", digest.finalize()));
+    }
+    Ok(observations)
+}
+
+fn corrected_creastmt(corpus_dir: &Path) -> Result<String, CorpusProblem> {
+    let source = String::from_utf8(read_corpus_file(
+        corpus_dir,
+        &corpus_dir.join("app/jcl/CREASTMT.JCL"),
+    )?)
+    .map_err(|_| {
+        CorpusProblem::new(
+            "carddemo.base_batch.jcl_invalid",
+            "CREASTMT.JCL is not UTF-8",
+        )
+    })?;
+    let orphan = "//         SPACE=(CYL,(1,1),RLSE), 00,RECFM=FB), ATA.VSAM.KSDS";
+    if source.matches(orphan).count() != 1 {
+        return Err(CorpusProblem::new(
+            "carddemo.base_batch.correction_drift",
+            "CREASTMT orphan DD continuation differs from the accepted correction",
+        ));
+    }
+    Ok(source
+        .lines()
+        .filter(|line| !line.starts_with(orphan))
+        .collect::<Vec<_>>()
+        .join("\n")
+        + "\n")
+}
+
+fn install_base_batch_source_datasets(
+    server: &ProductServer,
+    corpus_dir: &Path,
+) -> Result<usize, CorpusProblem> {
+    let mut sequence = 20_000u64;
+    let mut installed = 0usize;
+    for object in carddemo_base_seed_objects(corpus_dir)? {
+        let source = Path::new(&object.source_id)
+            .file_name()
+            .and_then(|value| value.to_str())
+            .ok_or_else(|| {
+                CorpusProblem::new(
+                    "carddemo.base_batch.seed_invalid",
+                    "seed source dataset name is invalid",
+                )
+            })?;
+        let dataset = DatasetName::new(source, 128).map_err(|_| {
+            CorpusProblem::new(
+                "carddemo.base_batch.seed_invalid",
+                "seed source dataset name is invalid",
+            )
+        })?;
+        if server
+            .dataset_service()
+            .invoke(DatasetRequest::Attributes {
+                dataset: dataset.clone(),
+            })
+            .is_ok()
+        {
+            continue;
+        }
+        let mutation = |sequence: u64, suffix: &str| Mutation {
+            sequence,
+            idempotency_key: IdempotencyKey::new(
+                format!("carddemo-base-batch-{suffix}-{sequence}"),
+                InvocationLimits::default(),
+            )
+            .expect("bounded source seed mutation"),
+            transaction: Some("CD-023-SEED".into()),
+        };
+        let created = server
+            .dataset_service()
+            .invoke(DatasetRequest::Create {
+                dataset: dataset.clone(),
+                attributes: DatasetAttributes {
+                    organization: DatasetOrganization::Sequential,
+                    record_format: RecordFormat::Fixed,
+                    logical_record_length: object.record_length,
+                    key_offset: None,
+                    key_length: None,
+                    ccsid: Some(37),
+                },
+                mutation: mutation(sequence, "create"),
+            })
+            .map_err(terminal_problem)?;
+        sequence += 1;
+        let DatasetResult::Created { version } = created else {
+            return Err(CorpusProblem::new(
+                "carddemo.base_batch.seed_invalid",
+                "seed source create returned the wrong result",
+            ));
+        };
+        server
+            .dataset_service()
+            .invoke(DatasetRequest::Write {
+                dataset,
+                member: None,
+                records: object
+                    .bytes
+                    .chunks_exact(object.record_length as usize)
+                    .map(<[u8]>::to_vec)
+                    .collect(),
+                expected_version: Some(version),
+                mutation: mutation(sequence, "write"),
+            })
+            .map_err(terminal_problem)?;
+        sequence += 1;
+        installed += 1;
+    }
+    let procedure_library =
+        DatasetName::new("AWS.M2.CARDDEMO.PROC", 128).expect("static procedure library");
+    let created = server
+        .dataset_service()
+        .invoke(DatasetRequest::Create {
+            dataset: procedure_library.clone(),
+            attributes: DatasetAttributes {
+                organization: DatasetOrganization::Partitioned,
+                record_format: RecordFormat::Fixed,
+                logical_record_length: 80,
+                key_offset: None,
+                key_length: None,
+                ccsid: Some(37),
+            },
+            mutation: Mutation {
+                sequence,
+                idempotency_key: IdempotencyKey::new(
+                    format!("carddemo-base-batch-proc-create-{sequence}"),
+                    InvocationLimits::default(),
+                )
+                .expect("bounded procedure mutation"),
+                transaction: Some("CD-023-SEED".into()),
+            },
+        })
+        .map_err(terminal_problem)?;
+    sequence += 1;
+    let DatasetResult::Created { mut version } = created else {
+        return Err(CorpusProblem::new(
+            "carddemo.base_batch.seed_invalid",
+            "procedure library create returned the wrong result",
+        ));
+    };
+    for relative in ["app/proc/REPROC.prc", "app/proc/TRANREPT.prc"] {
+        let source = String::from_utf8(read_corpus_file(corpus_dir, &corpus_dir.join(relative))?)
+            .map_err(|_| {
+            CorpusProblem::new(
+                "carddemo.base_batch.seed_invalid",
+                format!("{relative} is not UTF-8"),
+            )
+        })?;
+        let records = source
+            .lines()
+            .map(|line| {
+                let mut record = CodePage::Cp037.encode(line, 320).map_err(|_| {
+                    CorpusProblem::new(
+                        "carddemo.base_batch.seed_invalid",
+                        format!("{relative} cannot be encoded as CP037"),
+                    )
+                })?;
+                if record.len() > 80 {
+                    return Err(CorpusProblem::new(
+                        "carddemo.base_batch.seed_invalid",
+                        format!("{relative} contains a line longer than 80 bytes"),
+                    ));
+                }
+                record.resize(80, 0x40);
+                Ok(record)
+            })
+            .collect::<Result<Vec<_>, CorpusProblem>>()?;
+        let member = Path::new(relative)
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .ok_or_else(|| {
+                CorpusProblem::new(
+                    "carddemo.base_batch.seed_invalid",
+                    "procedure member name is invalid",
+                )
+            })?;
+        version = match server
+            .dataset_service()
+            .invoke(DatasetRequest::Write {
+                dataset: procedure_library.clone(),
+                member: Some(MemberName::new(member, 8).map_err(|_| {
+                    CorpusProblem::new(
+                        "carddemo.base_batch.seed_invalid",
+                        "procedure member name is invalid",
+                    )
+                })?),
+                records,
+                expected_version: Some(version),
+                mutation: Mutation {
+                    sequence,
+                    idempotency_key: IdempotencyKey::new(
+                        format!("carddemo-base-batch-proc-write-{sequence}"),
+                        InvocationLimits::default(),
+                    )
+                    .expect("bounded procedure mutation"),
+                    transaction: Some("CD-023-SEED".into()),
+                },
+            })
+            .map_err(terminal_problem)?
+        {
+            DatasetResult::Mutated { version } => version,
+            _ => {
+                return Err(CorpusProblem::new(
+                    "carddemo.base_batch.seed_invalid",
+                    "procedure member write returned the wrong result",
+                ));
+            }
+        };
+        sequence += 1;
+    }
+    installed += 1;
+    let fixed80 = |value: &[u8]| {
+        let mut record = value.to_vec();
+        record.resize(80, b' ');
+        record
+    };
+    utility_seed_dataset(
+        server,
+        "AWS.M2.CARDDEMO.CNTL",
+        DatasetOrganization::Partitioned,
+        RecordFormat::Fixed,
+        80,
+        None,
+        Vec::new(),
+        &mut sequence,
+    )?;
+    utility_write_dataset(
+        server,
+        "AWS.M2.CARDDEMO.CNTL",
+        Some("REPROCT"),
+        vec![fixed80(b" REPRO INFILE(FILEIN) OUTFILE(FILEOUT)")],
+        &mut sequence,
+    )?;
+    utility_seed_dataset(
+        server,
+        "AWS.M2.CARDDEMO.JCL",
+        DatasetOrganization::Partitioned,
+        RecordFormat::Fixed,
+        80,
+        None,
+        Vec::new(),
+        &mut sequence,
+    )?;
+    let child = String::from_utf8(read_corpus_file(
+        corpus_dir,
+        &corpus_dir.join("app/jcl/INTRDRJ2.JCL"),
+    )?)
+    .map_err(|_| CorpusProblem::new("carddemo.base_batch.seed_invalid", "INTRDRJ2 is not UTF-8"))?;
+    utility_write_dataset(
+        server,
+        "AWS.M2.CARDDEMO.JCL",
+        Some("INTRDRJ2"),
+        child.lines().map(|line| fixed80(line.as_bytes())).collect(),
+        &mut sequence,
+    )?;
+    for (name, records) in [
+        (
+            "AWS.M2.CARDEMO.FTP.TEST",
+            vec![fixed80(b"CARDDEMO INTERNAL READER")],
+        ),
+        ("AWS.M2.CARDEMO.FTP.TEST.BKUP", Vec::new()),
+        ("AWS.M2.CARDEMO.FTP.TEST.BKUP.INTRDR", Vec::new()),
+        (
+            "AWS.M2.CARDDEMO.DATEPARM",
+            vec![fixed80(b"2022-01-01 2022-07-06")],
+        ),
+    ] {
+        utility_seed_dataset(
+            server,
+            name,
+            DatasetOrganization::Sequential,
+            RecordFormat::Fixed,
+            80,
+            None,
+            records,
+            &mut sequence,
+        )?;
+    }
+    installed += 6;
+    Ok(installed)
+}
+
+fn compile_carddemo_batch_definitions(
+    bundles: &BTreeMap<String, (String, SourceBundle)>,
+    needed: &BTreeSet<String>,
+) -> Result<Vec<BatchProgramDefinition>, CorpusProblem> {
+    let compiler = CobolCompiler::default();
+    needed
+        .iter()
+        .map(|name| {
+            let (path, bundle) = bundles.get(name).ok_or_else(|| {
+                CorpusProblem::new(
+                    "carddemo.batch_program.source_missing",
+                    format!("{name} source is missing"),
+                )
+            })?;
+            let result = compiler
+                .compile(CompilerRequest {
+                    source: bundle.clone(),
+                    mode: CompilationMode::Executable,
+                    target: CompileTarget::new("reference").map_err(|error| {
+                        CorpusProblem::new(
+                            "carddemo.batch_program.target_invalid",
+                            error.to_string(),
+                        )
+                    })?,
+                    options: CompileOptions::new(BTreeMap::new()).map_err(|error| {
+                        CorpusProblem::new(
+                            "carddemo.batch_program.options_invalid",
+                            error.to_string(),
+                        )
+                    })?,
+                })
+                .map_err(|error| {
+                    CorpusProblem::new(
+                        "carddemo.batch_program.compile_failed",
+                        format!("{path}: {error}"),
+                    )
+                })?;
+            let artifact = match result {
+                CompilerResult::Published { artifact, .. } => artifact,
+                CompilerResult::Analysis { diagnostics, .. }
+                | CompilerResult::Failed { diagnostics, .. } => {
+                    return Err(CorpusProblem::new(
+                        "carddemo.batch_program.compile_failed",
+                        format!(
+                            "{path}: {}",
+                            diagnostics.first().map_or("no diagnostic", |diagnostic| {
+                                diagnostic.public_message()
+                            })
+                        ),
+                    ));
+                }
+            };
+            let payload = artifact.payload().to_vec();
+            let reference = mainframe_env_execution_api::ArtifactRef::new(
+                format!("sha256:{:x}", Sha256::digest(&payload)),
+                InvocationLimits::default(),
+            )
+            .map_err(|_| {
+                CorpusProblem::new(
+                    "carddemo.batch_program.artifact_invalid",
+                    format!("{path} artifact identity is invalid"),
+                )
+            })?;
+            Ok(BatchProgramDefinition {
+                name: name.clone(),
+                artifact: reference,
+                payload,
+            })
+        })
+        .collect()
 }
 
 fn compile_free_batch_definition(
@@ -4775,13 +5985,12 @@ async fn exercise_utility_routes() -> Result<UtilityExercise, CorpusProblem> {
         .batch_service()
         .list(Some(&principal), None, 64)
         .map_err(terminal_problem)?;
-    if !jobs
-        .iter()
-        .any(|job| job.name == "CHILD" && job.state == JobState::Queued)
-    {
+    if !jobs.iter().any(|job| {
+        job.name == "CHILD" && job.state == JobState::Completed && job.return_code == Some(0)
+    }) {
         return Err(CorpusProblem::new(
             "carddemo.utility.internal_reader_drift",
-            "internal reader did not submit the copied child job",
+            "internal reader child job did not complete",
         ));
     }
     let _ = fs::remove_dir_all(&artifact_root);
@@ -4964,6 +6173,17 @@ async fn submit_utility_job(
     app: &axum::Router,
     jcl: &str,
 ) -> Result<(), CorpusProblem> {
+    submit_job_with_retcode(server, app, jcl, "CC 0000")
+        .await
+        .map(|_| ())
+}
+
+async fn submit_job_with_retcode(
+    server: &ProductServer,
+    app: &axum::Router,
+    jcl: &str,
+    expected_retcode: &str,
+) -> Result<String, CorpusProblem> {
     let headers = BTreeMap::from([
         (
             "authorization".into(),
@@ -4993,18 +6213,38 @@ async fn submit_utility_job(
     }
     let job: serde_json::Value = serde_json::from_slice(&body)
         .map_err(|error| CorpusProblem::new("carddemo.utility.job_failed", error.to_string()))?;
-    if job["status"] != "OUTPUT" || job["retcode"] != "CC 0000" {
-        let detail = job["jobid"]
-            .as_str()
-            .and_then(|id| server.batch_service().spool(id, "JESMSGLG", 0, 64).ok())
-            .map(|(records, _)| records)
-            .unwrap_or_default();
+    if job["status"] != "OUTPUT" || job["retcode"] != expected_retcode {
+        let detail = job["jobid"].as_str().map_or_else(BTreeMap::new, |id| {
+            [
+                "JESMSGLG", "JOBLOG", "SYSPRINT", "SYSOUT", "CMDOUT", "ISFOUT",
+            ]
+            .into_iter()
+            .filter_map(|name| {
+                server
+                    .batch_service()
+                    .spool(id, name, 0, 4096)
+                    .ok()
+                    .map(|(records, _)| {
+                        (
+                            name.to_string(),
+                            records
+                                .into_iter()
+                                .map(|record| String::from_utf8_lossy(&record).into_owned())
+                                .collect::<Vec<_>>(),
+                        )
+                    })
+            })
+            .collect()
+        });
         return Err(CorpusProblem::new(
             "carddemo.utility.job_failed",
             format!("utility job did not complete: {job}; spool={detail:?}"),
         ));
     }
-    Ok(())
+    job["jobid"]
+        .as_str()
+        .map(str::to_string)
+        .ok_or_else(|| CorpusProblem::new("carddemo.utility.job_failed", "job ID is missing"))
 }
 
 async fn submit_expected_abend(

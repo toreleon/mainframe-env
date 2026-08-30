@@ -1,17 +1,17 @@
 # CardDemo-full 0.1.1 Program Status
 
 Current phase: **CD.E — JCL/JES and base batch**
-Current issue: **CD-022 — named CardDemo batch programs and services IN PROGRESS**
-Next issue: **CD-023 — complete base batch journey certification**
+Current issue: **CD-023 — complete base batch journey certification IN PROGRESS**
+Next issue: **CD-024 — reached static Db2 workflows**
 Current product: **0.1.0-alpha.0**
 Target product: **0.1.1**
 CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Source identity
 
-- mainframe-env base commit: `6b5bc675d5a2f93b6f7deee19caf7f4dd4049514`
+- mainframe-env base commit: `f63684682aeae1479eb4e79439c8a814dfecd22d`
 - current deterministic dirty-tree identity:
-  `sha256:05a0c1553265d4c35854527819b61c123c015c58ac3e881a0a0e75235a9b7314`
+  `sha256:8e42b37569ccf961b1af3bdd15316e117484f47ec0020ca5792989c9bff487fc`
 - dirty-tree algorithm: SHA-256 of the sorted `sha256sum` records for every
   repository file except `.git/`, `target/`, and the two persistent CardDemo
   status ledgers (which carry the identity).
@@ -425,6 +425,26 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   jobs through the public server. All completed `CC 0000`; Zowe observed exact
   dataset/GDG state and the queued INTRDRJ2 child.
 
+### CD-022 — named batch programs and compatible system services
+
+- State: **PASS**
+- Required commit subject: `Run CardDemo batch programs and system services`
+- Completion commit identity:
+  `f63684682aeae1479eb4e79439c8a814dfecd22d`.
+- Evidence: `conformance/0.1.1/evidence/issues/CD-022.json`
+- Evidence digest:
+  `sha256:0cdd22145f02539cc1cc2db317ff998b1f6238e451f5691c38af5b480513703c`
+- All 11 base named `PGM=` entries and called CBSTM03B compile to 12 legal,
+  content-addressed batch artifacts with atomic install, replay, and restart
+  validation. Named JES dispatch no longer depends on SYSIN source or native
+  load modules.
+- Owned CEEDAYS, COBDATFT, MVSWAIT, and CEE3ABD services implement their
+  reached ABI. The real CBSTM03B artifact executes exact linkage OPEN/READ/CLOSE
+  file operations, and CEE3ABD reaches JES as `ABEND U0999`.
+- The actual pinned WAITSTEP job completes `CC 0000` through Zowe. Persisted
+  request identities, checkpoint v4 file status, cancellation, timeout, warm
+  restart, return-code, and spool controls pass.
+
 ## Commands and exit codes
 
 - `cargo test -p mainframe-env-conformance --locked` — **0**; 19 passed,
@@ -669,10 +689,43 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   **1**; expected missing-environment failure.
 - Workspace all-target, architecture, runtime architecture, profile, schema,
   inventory, evidence, and ordinary conformance gates — **0**.
+- Exact `CLOSEFIL.jcl` through the local z/OSMF contract before repair — **1**;
+  JOB00001 reached OUTPUT with `FAILED Unsupported`, proving SDSF/CICS file
+  control was absent from the public route.
+- Zowe CLI 8.36.0 against the initialized ephemeral ProductServer — **0**:
+  exact `CLOSEFIL` and `OPENFIL` completed `CC 0000` with all five file states;
+  the corrected hash-pinned `CREASTMT` completed `CC 0000`; exact `INTRDRJ1`
+  completed `CC 0000`; and internally submitted `INTRDRJ2` reached OUTPUT
+  `CC 0000` with `IDCAMS REPRO` in JOBLOG.
+- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-base-batch --check`
+  before evidence — **1**; CD.J10 through CD.J12 and all controls passed, and
+  only the required CD-023 evidence file was absent.
+- Compiler, interpreter, JES, dataset, CICS, server, conformance, and xtask
+  suites — **0**; 175 tests passed.
+- Affected-package Clippy with `-D warnings` — **0**.
+- CD-021 utility compatibility gate — **0**; the internal-reader child now
+  drains to completed instead of remaining queued.
+- CD-022 batch-program compatibility gate — **0** after refreshing only its
+  derived program artifact shape/digest; the 12-artifact counts and acceptance
+  status did not change.
+- Workspace all-target check — **0**.
+- Architecture gate before declaring the newly reached shared-codec edges —
+  **1**; the undeclared interpreter-to-encoding edge failed closed. The
+  additive 0.1.1 dependency graph now explicitly declares batch, interpreter,
+  and server use of the foundation encoding authority.
+- Architecture, runtime architecture, profile, schema, inventory, evidence,
+  and ordinary conformance gates — **0**.
+- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-base-batch --check`
+  — **0**; three journeys, 12 initialization jobs, nine operational jobs, two
+  CICS file controls, one completed internal submission, 50 catalog/dataset
+  digests, 26 job-spool digests, and warm-restart, rollback, and cancellation
+  controls passed.
+- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-base-batch --check` — **1**;
+  expected missing-environment failure.
 
 ## Implementation status
 
-- Issues passed: **21 / 27**
+- Issues passed: **22 / 27**
 - Journeys passed: **9 / 20**
 - Installed CardDemo base-online resources: **18 programs, 17 transactions,
   17 maps**
@@ -687,11 +740,11 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 2. The repository is still `0.1.0-alpha.0`. A 0.1.1 release cannot be cut until
    0.1.0 is finalized or an explicit version-line correction is accepted.
 
-Neither decision blocks CD-022. No CD-021 blocker remains.
+Neither decision blocks CD-023. No CD-022 blocker remains.
 
 ## Next smallest executable step
 
-Resolve every reached base named batch `PGM=` entry to an installed artifact or
-explicit compatible system service. Execute COBDATFT, MVSWAIT, CEEDAYS,
-CEE3ABD, and CBSTM03A/CBSTM03B linkage with exact files, return codes, ABEND,
-spool, checkpoint, cancellation, timeout, and durable restart behavior.
+Execute CD.J10 through CD.J12 through public job and operator entry points:
+initialization/refresh, posting/interest, backup/combine/AIX, statement/report,
+CICS close/open, and internal-reader workflows. Compare exact dataset and spool
+digests and prove warm restart, rollback, and cancellation controls.

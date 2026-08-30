@@ -63,6 +63,8 @@ pub struct DdPlan {
     pub record_format: Option<String>,
     #[serde(default)]
     pub logical_record_length: Option<u32>,
+    #[serde(default)]
+    pub ccsid: Option<u16>,
     pub temporary: bool,
     pub sysout: Option<String>,
     pub disposition: Vec<Disposition>,
@@ -651,6 +653,7 @@ fn dd_plan(
         organization,
         record_format,
         logical_record_length,
+        ccsid: None,
         temporary,
         sysout,
         disposition,
@@ -800,7 +803,19 @@ fn parse_cond(value: &str) -> Result<StepCondition, HostProblem> {
     }
     Ok(StepCondition::SkipIfMaxRc {
         code: parts[0].parse().map_err(|_| HostProblem::Malformed)?,
-        operator: parts[1].to_ascii_uppercase(),
+        operator: reverse_cond_operator(parts[1])?.into(),
+    })
+}
+
+fn reverse_cond_operator(operator: &str) -> Result<&'static str, HostProblem> {
+    Ok(match operator.trim().to_ascii_uppercase().as_str() {
+        "EQ" | "=" => "EQ",
+        "NE" | "¬=" => "NE",
+        "GT" | ">" => "LT",
+        "GE" | ">=" => "LE",
+        "LT" | "<" => "GT",
+        "LE" | "<=" => "GE",
+        _ => return Err(HostProblem::Malformed),
     })
 }
 
@@ -886,6 +901,13 @@ mod tests {
         assert_eq!(plan.steps[0].program, "IEBGENER");
         assert_eq!(plan.steps[0].dds[0].inline_data, b"HELLO\n");
         assert!(!plan.steps[0].condition.should_run(4, false));
+    }
+
+    #[test]
+    fn cond_compares_the_literal_code_to_prior_maximum_rc() {
+        let condition = parse_cond("(4,LT)").unwrap();
+        assert!(condition.should_run(0, false));
+        assert!(!condition.should_run(8, false));
     }
 
     #[test]

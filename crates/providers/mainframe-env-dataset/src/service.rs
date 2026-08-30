@@ -878,6 +878,87 @@ impl DatasetService {
                 )?;
                 Ok(result)
             }
+            DatasetRequest::Append {
+                dataset,
+                member,
+                records,
+                expected_version,
+                mutation,
+            } => {
+                validate_records(records, &entry(state, dataset)?.attributes, self.limits)?;
+                let current = entry(state, dataset)?.clone();
+                if expected_version.is_some_and(|expected| expected != current.version) {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+                let mut next = current.clone();
+                next.version = next
+                    .version
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?;
+                if let Some(member) = member {
+                    if next.attributes.organization
+                        != mainframe_env_host_api::DatasetOrganization::Partitioned
+                    {
+                        return Err(HostProblem::Unsupported);
+                    }
+                    next.members
+                        .entry(member.as_str().into())
+                        .or_default()
+                        .extend(records.clone());
+                } else if matches!(
+                    next.attributes.organization,
+                    mainframe_env_host_api::DatasetOrganization::Sequential
+                        | mainframe_env_host_api::DatasetOrganization::EntrySequenced
+                ) {
+                    next.records.extend(records.clone());
+                } else {
+                    return Err(HostProblem::Unsupported);
+                }
+                let result = DatasetResult::Mutated {
+                    version: next.version,
+                };
+                self.persist_with_indexes(
+                    state,
+                    dataset.as_str(),
+                    &current,
+                    &next,
+                    mutation,
+                    request_digest(request),
+                    &result,
+                )?;
+                Ok(result)
+            }
+            DatasetRequest::Truncate {
+                dataset,
+                expected_version,
+                mutation,
+            } => {
+                let current = entry(state, dataset)?.clone();
+                if expected_version.is_some_and(|expected| expected != current.version) {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+                let mut next = current.clone();
+                next.version = next
+                    .version
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?;
+                next.records.clear();
+                next.members.clear();
+                next.relative_records.clear();
+                let result = DatasetResult::Mutated {
+                    version: next.version,
+                };
+                self.persist_with_indexes(
+                    state,
+                    dataset.as_str(),
+                    &current,
+                    &next,
+                    mutation,
+                    request_digest(request),
+                    &result,
+                )?;
+                Ok(result)
+            }
             DatasetRequest::RewriteRecord {
                 dataset,
                 key,
@@ -1121,6 +1202,59 @@ impl DatasetService {
                     .insert(mutation.idempotency_key.as_str().into(), replay);
                 Ok(result)
             }
+            DatasetRequest::DefinePath {
+                path,
+                index,
+                mutation,
+            } => {
+                if state.entries.contains_key(path.as_str())
+                    || state.alternate_indexes.contains_key(path.as_str())
+                {
+                    return Err(condition("DUPREC", 14));
+                }
+                let mut definition = state
+                    .alternate_indexes
+                    .get(index.as_str())
+                    .cloned()
+                    .ok_or(HostProblem::NotFound)?;
+                definition.version = 1;
+                let result = DatasetResult::Created { version: 1 };
+                let replay = Replay {
+                    request_digest: request_digest(request),
+                    result: Some(result.clone()),
+                };
+                self.commit_catalog_writes(
+                    vec![
+                        ProviderStateWrite {
+                            record: ProviderStateRecord {
+                                namespace: "dataset-aix".into(),
+                                key: path.as_str().into(),
+                                version: 1,
+                                payload: encode_alternate_index(&definition)?,
+                            },
+                            expected_version: None,
+                        },
+                        ProviderStateWrite {
+                            record: ProviderStateRecord {
+                                namespace: "dataset-replay".into(),
+                                key: mutation.idempotency_key.as_str().into(),
+                                version: 2,
+                                payload: encode_replay(&replay)?,
+                            },
+                            expected_version: Some(1),
+                        },
+                    ],
+                    mutation,
+                    &replay,
+                )?;
+                state
+                    .alternate_indexes
+                    .insert(path.as_str().into(), definition);
+                state
+                    .replay
+                    .insert(mutation.idempotency_key.as_str().into(), replay);
+                Ok(result)
+            }
             DatasetRequest::DefineGenerationGroup {
                 base,
                 limit,
@@ -1352,6 +1486,20 @@ impl DatasetService {
                 expected_version,
                 ..
             } => {
+                if member.is_none()
+                    && let Some(index) = state.alternate_indexes.get(dataset.as_str()).cloned()
+                {
+                    if expected_version.is_some_and(|expected| expected != index.version) {
+                        return Err(HostProblem::IdempotencyConflict);
+                    }
+                    self.store
+                        .delete_provider_state("dataset-aix", dataset.as_str(), index.version)
+                        .map_err(store_error)?;
+                    state.alternate_indexes.remove(dataset.as_str());
+                    return Ok(DatasetResult::Mutated {
+                        version: index.version.saturating_add(1),
+                    });
+                }
                 let current = entry(state, dataset)?.clone();
                 if expected_version.is_some_and(|expected| expected != current.version) {
                     return Err(HostProblem::IdempotencyConflict);
@@ -1368,16 +1516,23 @@ impl DatasetService {
                         version: next.version,
                     })
                 } else {
-                    if state
+                    let indexes = state
                         .alternate_indexes
-                        .values()
-                        .any(|index| index.base == dataset.as_str())
-                    {
-                        return Err(condition("INVREQ", 16));
+                        .iter()
+                        .filter(|(_, index)| index.base == dataset.as_str())
+                        .map(|(name, index)| (name.clone(), index.version))
+                        .collect::<Vec<_>>();
+                    for (name, version) in &indexes {
+                        self.store
+                            .delete_provider_state("dataset-aix", name, *version)
+                            .map_err(|_| HostProblem::UnknownOutcome)?;
                     }
                     self.store
                         .delete_provider_state("dataset", dataset.as_str(), current.version)
-                        .map_err(store_error)?;
+                        .map_err(|_| HostProblem::UnknownOutcome)?;
+                    for (name, _) in indexes {
+                        state.alternate_indexes.remove(&name);
+                    }
                     state.entries.remove(dataset.as_str());
                     Ok(DatasetResult::Mutated {
                         version: current.version + 1,
@@ -2332,9 +2487,12 @@ fn mutation(request: &DatasetRequest) -> Option<&mainframe_env_host_api::Mutatio
     match request {
         DatasetRequest::Create { mutation, .. }
         | DatasetRequest::Write { mutation, .. }
+        | DatasetRequest::Append { mutation, .. }
+        | DatasetRequest::Truncate { mutation, .. }
         | DatasetRequest::RewriteRecord { mutation, .. }
         | DatasetRequest::DeleteRecord { mutation, .. }
         | DatasetRequest::DefineAlternateIndex { mutation, .. }
+        | DatasetRequest::DefinePath { mutation, .. }
         | DatasetRequest::WriteRelative { mutation, .. }
         | DatasetRequest::DeleteRelative { mutation, .. }
         | DatasetRequest::DefineGenerationGroup { mutation, .. }
@@ -2349,9 +2507,12 @@ fn atomic_dataset_request(request: &DatasetRequest) -> bool {
     matches!(
         request,
         DatasetRequest::Write { .. }
+            | DatasetRequest::Append { .. }
+            | DatasetRequest::Truncate { .. }
             | DatasetRequest::RewriteRecord { .. }
             | DatasetRequest::DeleteRecord { .. }
             | DatasetRequest::DefineAlternateIndex { .. }
+            | DatasetRequest::DefinePath { .. }
             | DatasetRequest::WriteRelative { .. }
             | DatasetRequest::DeleteRelative { .. }
             | DatasetRequest::DefineGenerationGroup { .. }

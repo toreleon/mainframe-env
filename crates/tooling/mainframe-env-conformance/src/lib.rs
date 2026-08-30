@@ -22,18 +22,18 @@ use std::collections::{BTreeMap, BTreeSet};
 mod carddemo;
 
 pub use carddemo::{
-    CardDemoBaseOnlineReceipt, CardDemoBatchProgramReceipt, CardDemoCicsReceipt,
-    CardDemoCicsRuntimeReceipt, CardDemoClosureReceipt, CardDemoControlReceipt,
-    CardDemoCoreReceipt, CardDemoCorpusReceipt, CardDemoDatasetCatalogReceipt,
-    CardDemoFileCallReceipt, CardDemoHostReceipt, CardDemoJclReceipt, CardDemoLayoutReceipt,
-    CardDemoPackageReceipt, CardDemoProgramReceipt, CardDemoResourceReceipt,
-    CardDemoSecurityReceipt, CardDemoSeedReceipt, CardDemoSourceReceipt, CardDemoTerminalReceipt,
-    CardDemoUtilityReceipt, CardDemoVsamReceipt, CorpusProblem,
-    verify_carddemo_application_package_from_env, verify_carddemo_base_online_from_env,
-    verify_carddemo_batch_programs_from_env, verify_carddemo_cics_abi_from_env,
-    verify_carddemo_cics_runtime_from_env, verify_carddemo_control_flow_from_env,
-    verify_carddemo_core_semantics_from_env, verify_carddemo_corpus,
-    verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
+    CardDemoBaseBatchReceipt, CardDemoBaseOnlineReceipt, CardDemoBatchProgramReceipt,
+    CardDemoCicsReceipt, CardDemoCicsRuntimeReceipt, CardDemoClosureReceipt,
+    CardDemoControlReceipt, CardDemoCoreReceipt, CardDemoCorpusReceipt,
+    CardDemoDatasetCatalogReceipt, CardDemoFileCallReceipt, CardDemoHostReceipt,
+    CardDemoJclReceipt, CardDemoLayoutReceipt, CardDemoPackageReceipt, CardDemoProgramReceipt,
+    CardDemoResourceReceipt, CardDemoSecurityReceipt, CardDemoSeedReceipt, CardDemoSourceReceipt,
+    CardDemoTerminalReceipt, CardDemoUtilityReceipt, CardDemoVsamReceipt, CorpusProblem,
+    verify_carddemo_application_package_from_env, verify_carddemo_base_batch_from_env,
+    verify_carddemo_base_online_from_env, verify_carddemo_batch_programs_from_env,
+    verify_carddemo_cics_abi_from_env, verify_carddemo_cics_runtime_from_env,
+    verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
+    verify_carddemo_corpus, verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
     verify_carddemo_dataset_catalog_from_env, verify_carddemo_file_call_semantics_from_env,
     verify_carddemo_host_operands_from_env, verify_carddemo_jcl_from_env,
     verify_carddemo_program_routing_from_env, verify_carddemo_resources_from_env,
@@ -165,6 +165,61 @@ mod tests {
     fn deterministic_replay_is_byte_exact() {
         let artifact = compile(HELLO_SOURCE).unwrap();
         assert_eq!(execute(&artifact, 1024), execute(&artifact, 1024));
+    }
+    #[test]
+    fn binary_parent_condition_name_uses_numeric_value() {
+        let artifact = compile(
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. CONDITION.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 RESULT PIC S9(9) COMP.\n 88 RESULT-OK VALUE 0.\nPROCEDURE DIVISION.\nMOVE 0 TO RESULT.\nIF RESULT-OK\n DISPLAY 'OK'\nELSE\n DISPLAY 'BAD'\nEND-IF.\nSTOP RUN.\n",
+        )
+        .unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"OK\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn add_to_zero_giving_writes_the_giving_target() {
+        let artifact = compile(
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. ADDGIVE.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 RESULT PIC S9(9) COMP.\nPROCEDURE DIVISION.\nADD 8 TO ZERO GIVING RESULT.\nIF RESULT = 8 DISPLAY 'OK' ELSE DISPLAY 'BAD' END-IF.\nSTOP RUN.\n",
+        )
+        .unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"OK\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn set_address_of_has_a_bounded_virtual_pointer_route() {
+        let artifact = compile(
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. POINTERS.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PTR POINTER.\nLINKAGE SECTION.\n01 BLOCK PIC X.\nPROCEDURE DIVISION.\nSET ADDRESS OF BLOCK TO PTR.\nDISPLAY 'OK'.\nSTOP RUN.\n",
+        )
+        .unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"OK\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn nested_occurs_accepts_ordered_multidimensional_subscripts() {
+        let artifact = compile(
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. MULTIDIM.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 TABLE-A.\n 05 ROW-A OCCURS 2 TIMES.\n  10 CELL-A OCCURS 3 TIMES PIC X.\nPROCEDURE DIVISION.\nMOVE 'Z' TO CELL-A(2 3).\nIF CELL-A(2 3) = 'Z' DISPLAY 'OK' ELSE DISPLAY 'BAD' END-IF.\nSTOP RUN.\n",
+        )
+        .unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"OK\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn alter_redirects_dynamic_go_to_before_static_control_edges() {
+        let artifact = compile(
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. ALTERGO.\nPROCEDURE DIVISION.\nALTER DISPATCH TO PROCEED TO SECOND-PARA.\nGO TO DISPATCH.\nDISPATCH.\nGO TO FIRST-PARA.\nFIRST-PARA.\nDISPLAY 'BAD'.\nSTOP RUN.\nSECOND-PARA.\nDISPLAY 'OK'.\nSTOP RUN.\n",
+        )
+        .unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"OK\n"),
+            other => panic!("{other:?}"),
+        }
     }
     #[test]
     fn malformed_source_fails_without_artifact() {
@@ -549,7 +604,7 @@ mod tests {
         let checkpoint = first.checkpoint().unwrap();
         assert_eq!(
             checkpoint.schema(),
-            "mainframe-env.reference-machine-checkpoint@4"
+            "mainframe-env.reference-machine-checkpoint@6"
         );
         let mut restored =
             ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())

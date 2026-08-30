@@ -6,9 +6,9 @@
   "current_product": "0.1.0-alpha.0",
   "target_product": "0.1.1",
   "source_identity": {
-    "base_commit": "6b5bc675d5a2f93b6f7deee19caf7f4dd4049514",
+    "base_commit": "f63684682aeae1479eb4e79439c8a814dfecd22d",
     "dirty_tree_algorithm": "sha256 of sorted sha256sum records, excluding .git, target, docs/delivery/CARDEMO-0.1.1-STATUS.md, and conformance/0.1.1/evidence/program-status.json",
-    "dirty_tree_digest": "sha256:05a0c1553265d4c35854527819b61c123c015c58ac3e881a0a0e75235a9b7314"
+    "dirty_tree_digest": "sha256:8e42b37569ccf961b1af3bdd15316e117484f47ec0020ca5792989c9bff487fc"
   },
   "corpus": {
     "environment_key": "CARDEMO_CORPUS_DIR",
@@ -21,8 +21,8 @@
     "license": "Apache-2.0",
     "license_sha256": "09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b"
   },
-  "current_issue": "CD-022",
-  "issues": {"total":27,"completed":21,"in_progress":1,"open":5},
+  "current_issue": "CD-023",
+  "issues": {"total":27,"completed":22,"in_progress":1,"open":4},
   "journeys": {"total":20,"passed":9,"failed_or_not_run":11},
   "completed_issues": [
     {
@@ -192,6 +192,14 @@
       "commit_identity": "6b5bc675d5a2f93b6f7deee19caf7f4dd4049514",
       "evidence": "conformance/0.1.1/evidence/issues/CD-021.json",
       "evidence_digest": "sha256:56b95c75078ef21247446e6798939d11452dd45c5ddc8cb451ae2640664ff715"
+    },
+    {
+      "id": "CD-022",
+      "state": "pass",
+      "commit_subject": "Run CardDemo batch programs and system services",
+      "commit_identity": "f63684682aeae1479eb4e79439c8a814dfecd22d",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-022.json",
+      "evidence_digest": "sha256:110244e9ba24d1468498439f0937c28836719b1acae8bf1c289969dc0143a142"
     }
   ],
   "commands": [
@@ -318,6 +326,21 @@
     ,{"command":"env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-utilities --check","exit_code":1,"result":"expected carddemo.corpus.environment_missing control"}
     ,{"command":"cargo check --workspace --all-targets --locked","exit_code":0,"result":"pass"}
     ,{"command":"architecture, runtime architecture, profile, schema, inventory, evidence, and ordinary conformance gates","exit_code":0,"result":"pass"}
+    ,{"command":"initial exact CLOSEFIL through local z/OSMF contract","exit_code":1,"result":"focused public-route regression reached JOB00001 OUTPUT with FAILED Unsupported before typed SDSF/CICS file control"}
+    ,{"command":"Zowe CLI 8.36.0 submit exact CLOSEFIL and OPENFIL against ephemeral local ProductServer","exit_code":0,"result":"both jobs completed CC 0000 and exact CMDOUT reported all five files CLOSED then OPEN"}
+    ,{"command":"Zowe CLI 8.36.0 submit corrected pinned CREASTMT through stdin against ephemeral local ProductServer","exit_code":0,"result":"CREASTMT completed CC 0000 after exact INITIALIZE, linkage, ALTER, table, file, and statement output paths"}
+    ,{"command":"Zowe CLI 8.36.0 submit exact INTRDRJ1 and inspect INTRDRJ2 spool against ephemeral local ProductServer","exit_code":0,"result":"parent and internally submitted child both reached OUTPUT CC 0000; child JOBLOG reported IDCAMS REPRO"}
+    ,{"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-base-batch --check before evidence","exit_code":1,"result":"derived three-journey receipt passed and only CD-023 evidence was missing"}
+    ,{"command":"cargo test -p mainframe-env-compiler -p mainframe-env-interpreter -p mainframe-env-batch -p mainframe-env-dataset -p mainframe-env-cics -p mainframe-env-server -p mainframe-env-conformance -p xtask --locked","exit_code":0,"result":"175 affected tests passed"}
+    ,{"command":"affected-package cargo clippy --all-targets --locked -- -D warnings","exit_code":0,"result":"pass"}
+    ,{"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-utilities --check","exit_code":0,"result":"CD-021 compatibility receipt passed with the internal child now completed rather than left queued"}
+    ,{"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-batch-programs --check","exit_code":0,"result":"CD-022 compatibility gate passed after content-addressed artifact receipt refresh"}
+    ,{"command":"cargo check --workspace --all-targets --locked","exit_code":0,"result":"pass"}
+    ,{"command":"cargo xtask architecture --check before dependency declaration repair","exit_code":1,"result":"new interpreter-to-encoding edge was correctly rejected until declared in the 0.1.1 additive dependency graph"}
+    ,{"command":"architecture, runtime architecture, profile, schema, inventory, and evidence gates","exit_code":0,"result":"pass"}
+    ,{"command":"env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-base-batch --check","exit_code":1,"result":"expected carddemo.corpus.environment_missing control"}
+    ,{"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-base-batch --check","exit_code":0,"result":"CD.J10 through CD.J12, 50 catalog/dataset digests, 26 job-spool digests, and restart/rollback/cancellation controls passed"}
+    ,{"command":"env -u CARDEMO_CORPUS_DIR cargo xtask conformance --check","exit_code":0,"result":"pass"}
     ,{"command":"cargo test -p mainframe-env-server installed_cobswait_runs_by_named_jes_program_and_calls_mvswait -- --nocapture before repair","exit_code":101,"result":"installed named PGM reached OUTPUT with null retcode"}
     ,{"command":"Zowe CLI 8.36.0 submit actual WAITSTEP.jcl against ephemeral local ProductServer","exit_code":0,"result":"WAITSTEP completed CC 0000 and JOBLOG reported WAIT COBSWAIT RC=0000"}
     ,{"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-batch-programs --check before evidence","exit_code":1,"result":"derived receipt passed and only CD-022 evidence was missing"}
@@ -339,6 +362,6 @@
     "Resolve 0.1.0-alpha.0 release ordering before cutting 0.1.1."
   ],
   "blockers": [],
-  "next_issue": "CD-023",
-  "next_step": "Resolve every reached base named batch PGM entry to an installed artifact or explicit compatible system service; execute COBDATFT, MVSWAIT, CEEDAYS, CEE3ABD, and CBSTM03A/CBSTM03B linkage with exact file, return-code, ABEND, spool, checkpoint, cancellation, timeout, and durable restart behavior."
+  "next_issue": "CD-024",
+  "next_step": "Execute CD.J10 through CD.J12 through public job and operator entry points; compare exact initialization, posting, interest, backup, combine, AIX, statement, report, CICS close/open, internal-reader, restart, rollback, cancellation, dataset, and spool observations."
 }

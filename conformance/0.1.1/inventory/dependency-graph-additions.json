@@ -2,10 +2,13 @@
   "schema_version": "mainframe-env.carddemo-dependency-additions@1",
   "target_product": "0.1.1",
   "edges": [
+    ["mainframe-env-batch", "mainframe-env-encoding"],
     ["mainframe-env-cics", "mainframe-env-encoding"],
     ["mainframe-env-conformance", "mainframe-env-batch"],
     ["mainframe-env-conformance", "mainframe-env-cics"],
     ["mainframe-env-conformance", "mainframe-env-server"],
+    ["mainframe-env-interpreter", "mainframe-env-encoding"],
+    ["mainframe-env-server", "mainframe-env-encoding"],
     ["xtask", "mainframe-env-conformance"]
   ]
 }

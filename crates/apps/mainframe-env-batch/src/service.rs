@@ -6,9 +6,10 @@ use mainframe_env_execution_api::{
     BoundedPayload, IdempotencyKey, Invocation, InvocationLimits, PrincipalId,
 };
 use mainframe_env_host_api::{
-    AccessIntent, DatasetAttributes, DatasetName, DatasetOrganization, DatasetRequest,
-    DatasetResult, EffectRequest, HostProblem, HostRequest, HostResult, MemberName, Mutation,
-    ProgramName, ProgramRequest, RecordFormat, ResourceName, ScopedHostService, SecurityDecision,
+    AccessIntent, CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest,
+    DatasetAttributes, DatasetName, DatasetOrganization, DatasetRequest, DatasetResult,
+    EffectRequest, HostProblem, HostRequest, HostResult, MemberName, Mutation, ProgramName,
+    ProgramRequest, RecordFormat, ResourceName, ScopedHostService, SecurityDecision,
     SecurityRequest,
 };
 use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
@@ -298,7 +299,9 @@ impl BatchService {
             state
                 .jobs
                 .values()
-                .filter(|job| job.state == JobState::Queued)
+                .filter(|job| {
+                    job.state == JobState::Queued && job.owner == invocation.principal.id().as_str()
+                })
                 .max_by_key(|job| (job.priority, std::cmp::Reverse(job.id.clone())))
                 .map(|job| job.id.clone())
         };
@@ -334,6 +337,7 @@ impl BatchService {
         let mut state = self.lock()?;
         let current = state.jobs.get(&id).cloned().ok_or(HostProblem::NotFound)?;
         job.version = current.version + 1;
+        let terminal_step = job.active_step.clone();
         job.active_step = None;
         match outcome {
             Ok(return_code) => {
@@ -355,6 +359,14 @@ impl BatchService {
                 }
                 job.state = JobState::Failed;
                 job.events.push(format!("failed:{problem:?}"));
+                if let Some(step) = terminal_step {
+                    append_spool(
+                        &mut job,
+                        "JOBLOG",
+                        format!("{step} FAILED {problem:?}").into_bytes(),
+                        self.limits,
+                    )?;
+                }
                 append_spool(
                     &mut job,
                     "JESMSGLG",
@@ -367,6 +379,23 @@ impl BatchService {
         let result = snapshot(&job);
         state.jobs.insert(id, job);
         Ok(Some(result))
+    }
+
+    pub fn drain_queued(&self, invocation: &Invocation) -> Result<Vec<JobSnapshot>, HostProblem> {
+        let mut completed = Vec::new();
+        for _ in 0..self.limits.max_queued {
+            let Some(job) = self.run_next(invocation, false)? else {
+                return Ok(completed);
+            };
+            completed.push(job);
+        }
+        if self.lock()?.jobs.values().any(|job| {
+            job.state == JobState::Queued && job.owner == invocation.principal.id().as_str()
+        }) {
+            Err(HostProblem::ResourceExhausted)
+        } else {
+            Ok(completed)
+        }
     }
 
     fn execute(&self, invocation: &Invocation, job: &mut Job) -> Result<i32, HostProblem> {
@@ -400,81 +429,107 @@ impl BatchService {
                 continue;
             }
             job.active_step = Some(step.name.clone());
-            self.allocate_dds(
-                invocation,
-                job,
-                step,
-                &mut dataset_resolutions,
-                &mut effect_sequence,
-            )?;
-            let mut dds = step.dds.clone();
-            self.hydrate_dds(
-                invocation,
-                job,
-                &dataset_resolutions,
-                &mut dds,
-                &mut effect_sequence,
-            )?;
-            for dd in &mut dds {
-                if !is_program_library_dd(dd)
-                    && let Some(raw_name) = dd.dataset.clone()
-                {
-                    dd.dataset = Some(resolved_dataset(job, dd, &raw_name, &dataset_resolutions));
+            let step_result = (|| -> Result<crate::ProgramOutput, HostProblem> {
+                self.allocate_dds(
+                    invocation,
+                    job,
+                    step,
+                    &mut dataset_resolutions,
+                    &mut effect_sequence,
+                )?;
+                let mut dds = step.dds.clone();
+                self.hydrate_dds(
+                    invocation,
+                    job,
+                    &dataset_resolutions,
+                    &mut dds,
+                    &mut effect_sequence,
+                )?;
+                for dd in &mut dds {
+                    if !is_program_library_dd(dd)
+                        && let Some(raw_name) = dd.dataset.clone()
+                    {
+                        dd.dataset =
+                            Some(resolved_dataset(job, dd, &raw_name, &dataset_resolutions));
+                    }
                 }
-            }
-            let input = ProgramInput {
-                parameter: step.parameter.clone(),
-                dds,
-            };
-            if step.program.eq_ignore_ascii_case("IDCAMS") {
-                self.execute_idcams(
+                let input = ProgramInput {
+                    parameter: step.parameter.clone(),
+                    dds,
+                };
+                if step.program.eq_ignore_ascii_case("IDCAMS") {
+                    self.execute_idcams(
+                        invocation,
+                        job,
+                        step,
+                        &dataset_resolutions,
+                        &input,
+                        &mut effect_sequence,
+                    )?;
+                }
+                let output = if step.program.eq_ignore_ascii_case("SDSF") {
+                    self.execute_sdsf(invocation, job, step, &input, &mut effect_sequence)?
+                } else {
+                    let bytes =
+                        serde_json::to_vec(&input).map_err(|_| HostProblem::ProviderFailure)?;
+                    let payload = BoundedPayload::new(
+                        "mainframe-env.program.input@1",
+                        bytes,
+                        InvocationLimits::default(),
+                    )
+                    .map_err(|_| HostProblem::ResourceExhausted)?;
+                    if utility_disposition(&step.program)
+                        .is_some_and(|disposition| disposition != UtilityDisposition::Implemented)
+                    {
+                        return Err(HostProblem::Unsupported);
+                    }
+                    let program =
+                        ProgramName::new(&step.program, 128).map_err(|_| HostProblem::Malformed)?;
+                    let sequence = next_effect_sequence(invocation, &mut effect_sequence)?;
+                    let result = self.host.invoke(
+                        invocation,
+                        invocation.deadline_tick.saturating_sub(1),
+                        false,
+                        EffectRequest {
+                            run_unit: invocation.run_unit_id.clone(),
+                            sequence,
+                            deadline_tick: invocation.deadline_tick,
+                            idempotency_key: Some(effect_key(job, step, sequence)?),
+                            request: HostRequest::Program(ProgramRequest::Call {
+                                program,
+                                payload,
+                            }),
+                        },
+                    );
+                    match result.effect.outcome? {
+                        HostResult::Program(payload) => decode_program_output(&payload)?,
+                        _ => return Err(HostProblem::ProviderFailure),
+                    }
+                };
+                self.write_dd_outputs(
                     invocation,
                     job,
                     step,
                     &dataset_resolutions,
-                    &input,
+                    &output.dd_outputs,
                     &mut effect_sequence,
                 )?;
-            }
-            let bytes = serde_json::to_vec(&input).map_err(|_| HostProblem::ProviderFailure)?;
-            let payload = BoundedPayload::new(
-                "mainframe-env.program.input@1",
-                bytes,
-                InvocationLimits::default(),
-            )
-            .map_err(|_| HostProblem::ResourceExhausted)?;
-            if utility_disposition(&step.program)
-                .is_some_and(|disposition| disposition != UtilityDisposition::Implemented)
-            {
-                return Err(HostProblem::Unsupported);
-            }
-            let program =
-                ProgramName::new(&step.program, 128).map_err(|_| HostProblem::Malformed)?;
-            let sequence = next_effect_sequence(invocation, &mut effect_sequence)?;
-            let result = self.host.invoke(
-                invocation,
-                invocation.deadline_tick.saturating_sub(1),
-                false,
-                EffectRequest {
-                    run_unit: invocation.run_unit_id.clone(),
-                    sequence,
-                    deadline_tick: invocation.deadline_tick,
-                    idempotency_key: Some(effect_key(job, step, sequence)?),
-                    request: HostRequest::Program(ProgramRequest::Call { program, payload }),
-                },
-            );
-            let output = match result.effect.outcome? {
-                HostResult::Program(payload) => decode_program_output(&payload)?,
-                _ => return Err(HostProblem::ProviderFailure),
+                Ok(output)
+            })();
+            let output = match step_result {
+                Ok(output) => output,
+                Err(problem) => {
+                    self.dispose_dds(
+                        invocation,
+                        job,
+                        step,
+                        &dataset_resolutions,
+                        &mut effect_sequence,
+                        true,
+                    )?;
+                    return Err(problem);
+                }
             };
-            self.write_dd_outputs(
-                invocation,
-                job,
-                step,
-                &dataset_resolutions,
-                &output.dd_outputs,
-                &mut effect_sequence,
-            )?;
             max_rc = max_rc.max(output.return_code);
             for record in output.records {
                 append_spool(job, "SYSPRINT", record, self.limits)?;
@@ -503,6 +558,84 @@ impl BatchService {
             }
         }
         Ok(max_rc)
+    }
+
+    fn execute_sdsf(
+        &self,
+        invocation: &Invocation,
+        job: &Job,
+        step: &StepPlan,
+        input: &ProgramInput,
+        effect_sequence: &mut u64,
+    ) -> Result<crate::ProgramOutput, HostProblem> {
+        let controls = parse_sdsf_file_controls(&input_dd_text(input, "ISFIN")?)?;
+        let arguments = controls
+            .iter()
+            .map(|control| {
+                BoundedPayload::new(
+                    "mainframe-env.cics.file-status@1",
+                    control.status.as_bytes().to_vec(),
+                    InvocationLimits::default(),
+                )
+                .map(|payload| (control.file.clone(), payload))
+                .map_err(|_| HostProblem::ResourceExhausted)
+            })
+            .collect::<Result<BTreeMap<_, _>, _>>()?;
+        if arguments.len() != controls.len() {
+            return Err(HostProblem::Malformed);
+        }
+        let sequence = next_effect_sequence(invocation, effect_sequence)?;
+        let key = effect_key(job, step, sequence)?;
+        let result = self.host.invoke(
+            invocation,
+            invocation.deadline_tick.saturating_sub(1),
+            false,
+            EffectRequest {
+                run_unit: invocation.run_unit_id.clone(),
+                sequence,
+                deadline_tick: invocation.deadline_tick,
+                idempotency_key: Some(key.clone()),
+                request: HostRequest::Cics(CicsRequest {
+                    operation: CicsOperation::SetFileStatus,
+                    arguments,
+                    condition_policy: CicsConditionPolicy::Default,
+                    mutation: Some(Mutation {
+                        sequence,
+                        idempotency_key: key,
+                        transaction: Some(
+                            invocation
+                                .bindings
+                                .get("cics.transaction")
+                                .and_then(|value| std::str::from_utf8(value.bytes()).ok())
+                                .unwrap_or("DEFAULT")
+                                .to_ascii_uppercase(),
+                        ),
+                    }),
+                }),
+            },
+        );
+        match result.effect.outcome? {
+            HostResult::Cics(response)
+                if response.disposition == CicsDisposition::Complete
+                    && response.condition == "NORMAL" => {}
+            HostResult::Cics(_) => return Err(HostProblem::ProviderFailure),
+            _ => return Err(HostProblem::ProviderFailure),
+        }
+        let command_output = controls
+            .iter()
+            .map(|control| format!("{} {}", control.file, control.status).into_bytes())
+            .collect::<Vec<_>>();
+        Ok(crate::ProgramOutput {
+            return_code: 0,
+            records: vec![format!("SDSF CICS FILE CONTROL {}", controls.len()).into_bytes()],
+            dd_outputs: BTreeMap::from([
+                ("CMDOUT".into(), command_output),
+                (
+                    "ISFOUT".into(),
+                    vec![format!("{} COMMANDS COMPLETED", controls.len()).into_bytes()],
+                ),
+            ]),
+        })
     }
 
     fn execute_idcams(
@@ -630,12 +763,28 @@ impl BatchService {
         statement: &str,
         effect_sequence: &mut u64,
     ) -> Result<(), HostProblem> {
-        if statement.contains(" PATH ") || statement.starts_with("DEFINE PATH") {
-            return Ok(());
-        }
         let sequence = next_effect_sequence(invocation, effect_sequence)?;
         let key = effect_key(job, step, sequence)?;
-        let request = if statement.contains("GENERATIONDATAGROUP") {
+        let request = if statement.contains(" PATH ") || statement.starts_with("DEFINE PATH") {
+            DatasetRequest::DefinePath {
+                path: DatasetName::new(
+                    parenthesized_operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?,
+                    128,
+                )
+                .map_err(|_| HostProblem::Malformed)?,
+                index: DatasetName::new(
+                    parenthesized_operand(statement, &["PATHENTRY"])
+                        .ok_or(HostProblem::Malformed)?,
+                    128,
+                )
+                .map_err(|_| HostProblem::Malformed)?,
+                mutation: Mutation {
+                    sequence,
+                    idempotency_key: key.clone(),
+                    transaction: Some(job.id.clone()),
+                },
+            }
+        } else if statement.contains("GENERATIONDATAGROUP") {
             DatasetRequest::DefineGenerationGroup {
                 base: DatasetName::new(
                     parenthesized_operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?,
@@ -756,6 +905,9 @@ impl BatchService {
                 next_effect_sequence(invocation, effect_sequence)?,
             )?;
             if let Some(relative) = dd.generation {
+                if dataset_resolutions.contains_key(&dataset_resolution_key(dd, raw_name)) {
+                    continue;
+                }
                 let sequence = next_effect_sequence(invocation, effect_sequence)?;
                 let key = effect_key(job, step, sequence)?;
                 let base_name = DatasetName::new(raw_name.to_ascii_uppercase(), 128)
@@ -877,12 +1029,38 @@ impl BatchService {
             if is_program_library_dd(dd) {
                 continue;
             }
-            let Some(raw_name) = &dd.dataset else {
+            let Some(raw_name) = dd.dataset.clone() else {
                 continue;
             };
             if dd.disposition.contains(&Disposition::New) {
+                dd.ccsid = dataset_attributes_for_dd(dd)?.ccsid;
                 continue;
             }
+            let attribute_sequence = next_effect_sequence(invocation, effect_sequence)?;
+            let attributes = self.host.invoke(
+                invocation,
+                invocation.deadline_tick.saturating_sub(1),
+                false,
+                EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence: attribute_sequence,
+                    deadline_tick: invocation.deadline_tick,
+                    idempotency_key: None,
+                    request: HostRequest::Dataset(DatasetRequest::Attributes {
+                        dataset: DatasetName::new(
+                            resolved_dataset(job, dd, &raw_name, dataset_resolutions),
+                            128,
+                        )
+                        .map_err(|_| HostProblem::Malformed)?,
+                    }),
+                },
+            );
+            let HostResult::Dataset(DatasetResult::Attributes { attributes, .. }) =
+                attributes.effect.outcome?
+            else {
+                return Err(HostProblem::ProviderFailure);
+            };
+            dd.ccsid = attributes.ccsid;
             let sequence = next_effect_sequence(invocation, effect_sequence)?;
             let result = self.host.invoke(
                 invocation,
@@ -895,7 +1073,7 @@ impl BatchService {
                     idempotency_key: None,
                     request: HostRequest::Dataset(DatasetRequest::Read {
                         dataset: DatasetName::new(
-                            resolved_dataset(job, dd, raw_name, dataset_resolutions),
+                            resolved_dataset(job, dd, &raw_name, dataset_resolutions),
                             128,
                         )
                         .map_err(|_| HostProblem::Malformed)?,
@@ -1489,6 +1667,61 @@ fn input_dd_text(input: &ProgramInput, name: &str) -> Result<String, HostProblem
     .map_err(|_| HostProblem::Malformed)
 }
 
+struct SdsfFileControl {
+    file: String,
+    status: &'static str,
+}
+
+fn parse_sdsf_file_controls(control: &str) -> Result<Vec<SdsfFileControl>, HostProblem> {
+    let mut controls = Vec::new();
+    let mut region = None;
+    for line in control.lines().filter(|line| !line.trim().is_empty()) {
+        let command = line.trim();
+        let (target, cemt) = command
+            .strip_prefix("/F ")
+            .and_then(|command| command.split_once(",'"))
+            .ok_or(HostProblem::Malformed)?;
+        if target.is_empty()
+            || target.len() > 8
+            || !target.bytes().all(|byte| byte.is_ascii_alphanumeric())
+            || region
+                .as_ref()
+                .is_some_and(|existing: &String| existing != target)
+        {
+            return Err(HostProblem::Malformed);
+        }
+        region.get_or_insert_with(|| target.to_string());
+        let cemt = cemt.strip_suffix('\'').ok_or(HostProblem::Malformed)?;
+        let rest = cemt
+            .strip_prefix("CEMT SET FIL(")
+            .ok_or(HostProblem::Unsupported)?;
+        let (file, status) = rest.split_once(')').ok_or(HostProblem::Malformed)?;
+        let file = file.trim();
+        if file.is_empty()
+            || file.len() > 16
+            || !file
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        {
+            return Err(HostProblem::Malformed);
+        }
+        let status = match status.trim() {
+            "CLO" | "CLOSED" => "CLOSED",
+            "OPE" | "OPEN" => "OPEN",
+            _ => return Err(HostProblem::Unsupported),
+        };
+        controls.push(SdsfFileControl {
+            file: file.into(),
+            status,
+        });
+    }
+    if controls.is_empty() {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(controls)
+    }
+}
+
 fn idcams_statements(control: &str) -> Result<Vec<String>, HostProblem> {
     let mut statements = Vec::new();
     let mut current = String::new();
@@ -1520,6 +1753,7 @@ fn idcams_statements(control: &str) -> Result<Vec<String>, HostProblem> {
                     | "NONINDEXED"
                     | "NUMBERED"
                     | "VOLUMES"
+                    | "CYL"
                     | "CYLINDERS"
                     | "TRACKS"
                     | "KILOBYTES"
@@ -1700,8 +1934,8 @@ mod tests {
         Selector, ServiceClass, TraceId,
     };
     use mainframe_env_host_api::{
-        CapabilityDescriptor, DatasetResult, EffectResult, HostLimits, HostProvider,
-        RegistrySnapshot,
+        CapabilityDescriptor, CicsDisposition, CicsResponse, DatasetResult, EffectResult,
+        HostLimits, HostProvider, RegistrySnapshot,
     };
     use mainframe_env_store::{MemoryStore, SqliteStateStore};
     use std::collections::BTreeSet;
@@ -1715,6 +1949,54 @@ mod tests {
         descriptor: CapabilityDescriptor,
         records: Arc<Mutex<BTreeMap<String, Vec<Vec<u8>>>>>,
         generations: Arc<Mutex<BTreeMap<String, Vec<String>>>>,
+    }
+
+    struct CicsFileControlProvider {
+        descriptor: CapabilityDescriptor,
+        controls: Arc<Mutex<Vec<BTreeMap<String, BoundedPayload>>>>,
+    }
+
+    impl HostProvider for CicsFileControlProvider {
+        fn descriptor(&self) -> &CapabilityDescriptor {
+            &self.descriptor
+        }
+
+        fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
+            let outcome = match effect.request {
+                HostRequest::Cics(request) => self
+                    .controls
+                    .lock()
+                    .map_err(|_| HostProblem::InfrastructureFailure)
+                    .map(|mut controls| {
+                        controls.push(request.arguments);
+                        HostResult::Cics(CicsResponse {
+                            disposition: CicsDisposition::Complete,
+                            condition: "NORMAL".into(),
+                            response: 0,
+                            response2: 0,
+                            applid: "ME01".into(),
+                            sysid: "S001".into(),
+                            transaction: "DEFAULT".into(),
+                            aid: 0,
+                            target: None,
+                            next_transaction: None,
+                            payload: BoundedPayload::new(
+                                "mainframe-env.cics.payload@1",
+                                Vec::new(),
+                                InvocationLimits::default(),
+                            )
+                            .unwrap(),
+                            outputs: BTreeMap::new(),
+                            unit_of_work: None,
+                        })
+                    }),
+                _ => Err(HostProblem::Malformed),
+            };
+            EffectResult {
+                sequence: effect.sequence,
+                outcome,
+            }
+        }
     }
 
     impl HostProvider for DatasetProvider {
@@ -1866,6 +2148,18 @@ mod tests {
                         );
                         HostResult::Dataset(DatasetResult::Mutated { version: 1 })
                     }),
+                HostRequest::Dataset(DatasetRequest::DefinePath { path, index, .. }) => self
+                    .records
+                    .lock()
+                    .map_err(|_| HostProblem::InfrastructureFailure)
+                    .and_then(|mut state| {
+                        let records = state
+                            .get(index.as_str())
+                            .cloned()
+                            .ok_or(HostProblem::NotFound)?;
+                        state.insert(path.as_str().into(), records);
+                        Ok(HostResult::Dataset(DatasetResult::Mutated { version: 1 }))
+                    }),
                 HostRequest::Dataset(DatasetRequest::List { pattern, .. }) => self
                     .records
                     .lock()
@@ -1946,6 +2240,7 @@ mod tests {
             "host.program.invoke",
             "host.dataset.read",
             "host.dataset.write",
+            "host.cics.execute",
         ]
         .into_iter()
         .map(|name| CapabilityId::new(name, limits).unwrap())
@@ -2090,7 +2385,7 @@ mod tests {
     fn reached_external_utilities_fail_with_explicit_dispositions() {
         let service = service(Arc::new(MemoryStore::new(Default::default())), builtins());
         let invocation = invocation();
-        for (index, program) in ["SDSF", "FTP", "IKJEFT1B"].into_iter().enumerate() {
+        for (index, program) in ["FTP", "IKJEFT1B"].into_iter().enumerate() {
             let submitted = service
                 .submit(
                     &invocation,
@@ -2119,6 +2414,59 @@ mod tests {
     }
 
     #[test]
+    fn sdsf_applies_carddemo_cics_file_controls_as_one_typed_effect() {
+        let controls = Arc::new(Mutex::new(Vec::new()));
+        let limits = InvocationLimits::default();
+        let cics: Arc<dyn HostProvider> = Arc::new(CicsFileControlProvider {
+            descriptor: CapabilityDescriptor {
+                capability: CapabilityId::new("host.cics.execute", limits).unwrap(),
+                provider_id: "test-cics-file-control".into(),
+                generation: "1".into(),
+                request_schema: "cics@1".into(),
+                result_schema: "cics-result@1".into(),
+                max_request_bytes: 65536,
+                max_result_bytes: 65536,
+                ready: true,
+            },
+            controls: controls.clone(),
+        });
+        let service = BatchService::open(
+            host_with(builtins(), vec![cics]),
+            Arc::new(MemoryStore::new(Default::default())),
+            Default::default(),
+            Default::default(),
+        )
+        .unwrap();
+        let invocation = invocation();
+        let submitted = service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//CLOSEFIL JOB CLASS=A\n//CLCIFIL EXEC PGM=SDSF\n//ISFOUT DD SYSOUT=*\n//CMDOUT DD SYSOUT=*\n//ISFIN DD *\n /F CICSAWSA,'CEMT SET FIL(TRANSACT ) CLO'\n /F CICSAWSA,'CEMT SET FIL(CCXREF ) CLO'\n /F CICSAWSA,'CEMT SET FIL(ACCTDAT ) CLO'\n /F CICSAWSA,'CEMT SET FIL(CXACAIX ) CLO'\n /F CICSAWSA,'CEMT SET FIL(USRSEC ) CLO'\n/*\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("sdsf-cics-close", limits).unwrap(),
+                false,
+            )
+            .unwrap();
+        let completed = service.run_next(&invocation, false).unwrap().unwrap();
+        assert_eq!(completed.state, JobState::Completed);
+        assert_eq!(completed.return_code, Some(0));
+        let controls = controls.lock().unwrap();
+        assert_eq!(controls.len(), 1);
+        assert_eq!(controls[0].len(), 5);
+        assert!(controls[0].values().all(|value| value.bytes() == b"CLOSED"));
+        assert!(
+            service
+                .spool(&submitted.id, "CMDOUT", 0, 16)
+                .unwrap()
+                .0
+                .iter()
+                .any(|record| record == b"TRANSACT CLOSED")
+        );
+    }
+
+    #[test]
     fn iebgener_runs_through_jes_and_preserves_inline_record_bytes() {
         let service = service(Arc::new(MemoryStore::new(Default::default())), builtins());
         let invocation = invocation();
@@ -2138,6 +2486,10 @@ mod tests {
         assert_eq!(completed.state, JobState::Completed);
         assert_eq!(
             service.spool(&submitted.id, "SYSPRINT", 0, 10).unwrap().0,
+            vec![b"SYSUT2 RECORDS=2".to_vec()]
+        );
+        assert_eq!(
+            service.spool(&submitted.id, "SYSUT2", 0, 10).unwrap().0,
             vec![b"FIRST".to_vec(), b"SECOND".to_vec()]
         );
     }
@@ -2208,6 +2560,10 @@ mod tests {
             jobs.iter()
                 .any(|job| job.name == "CHILD" && job.state == JobState::Queued)
         );
+        let drained = service.drain_queued(&invocation).unwrap();
+        assert_eq!(drained.len(), 1);
+        assert_eq!(drained[0].name, "CHILD");
+        assert_eq!(drained[0].state, JobState::Completed);
     }
 
     #[test]
@@ -2231,6 +2587,29 @@ mod tests {
             JobState::Completed
         );
         assert!(records.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn abnormal_step_rolls_back_new_delete_allocation() {
+        let records = Arc::new(Mutex::new(BTreeMap::new()));
+        let service = service_with_datasets(records.clone());
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//ROLLJOB JOB CLASS=A\n//FAIL EXEC PGM=NOTREAL\n//WORK DD DSN=IBMUSER.ROLLBACK,DISP=(NEW,KEEP,DELETE)\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("abnormal-rollback", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Failed
+        );
+        assert!(!records.lock().unwrap().contains_key("IBMUSER.ROLLBACK"));
     }
 
     #[test]

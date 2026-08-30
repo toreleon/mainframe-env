@@ -7,7 +7,7 @@
   "target_product": "0.1.1",
   "current_product": "0.1.0-alpha.0",
   "digest_scope": "Recursively lexicographically key-sorted compact UTF-8 JSON serialization of batch_program_receipt, with no trailing newline, followed by SHA-256",
-  "evidence_digest": "sha256:0cdd22145f02539cc1cc2db317ff998b1f6238e451f5691c38af5b480513703c",
+  "evidence_digest": "sha256:110244e9ba24d1468498439f0937c28836719b1acae8bf1c289969dc0143a142",
   "batch_program_receipt": {
     "schema_version": "mainframe-env.carddemo-batch-program-receipt@1",
     "status": "pass",
@@ -45,7 +45,7 @@
     "cancellation_controls": 1,
     "timeout_controls": 1,
     "restart_routes": 1,
-    "program_shape_sha256": "e29138138ace26b3cf024ff179817d1776cf3b5916bd9408b42964b810c7c247"
+    "program_shape_sha256": "7dd75342ed24841c3579f830152b3d95a5e9cc12a6d4e1d548f1c38a92122500"
   },
   "acceptance_observations": [
     "All 11 source-backed base PGM entries, including the CBSTM03A entry recovered from the sole accepted-unsupported JCL file, compile into legal reference artifacts. CBSTM03B is derived from reached CALL targets, compiled with them, and all 12 artifacts install through the bounded content-addressed batch catalog with deterministic replay.",

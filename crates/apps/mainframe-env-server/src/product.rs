@@ -7,6 +7,7 @@ use mainframe_env_cics::{
     BmsMapDefinition, CicsService, CicsTerminalSnapshot, CicsTraceEntry, cics_provider,
 };
 use mainframe_env_dataset::{DatasetService, dataset_providers};
+use mainframe_env_encoding::CodePage;
 use mainframe_env_execution_api::{
     ArtifactRef, BoundedPayload, CapabilityId, ExecutionId, ExecutionOutcome, IdempotencyKey,
     Invocation, InvocationLimits, Machine, Principal, PrincipalId, RequestId, ResourceLimits,
@@ -1228,6 +1229,7 @@ impl ProductServer {
             }
             GatewayRequest::JobSubmit { jcl } => {
                 let capabilities = job_capabilities(&jcl);
+                let bundle = self.jcl_bundle(&principal, jcl)?;
                 let invocation = self
                     .invocation(
                         &principal,
@@ -1240,11 +1242,7 @@ impl ProductServer {
                     .batch
                     .submit(
                         &invocation,
-                        &JclBundle {
-                            primary: String::from_utf8(jcl)
-                                .map_err(|_| gateway_problem(HostProblem::Malformed))?,
-                            ..Default::default()
-                        },
+                        &bundle,
                         &self.idempotency("submit").map_err(gateway_problem)?,
                         false,
                     )
@@ -1295,19 +1293,25 @@ impl ProductServer {
                     .heartbeat(&work_id, &lease, 2, 10)
                     .map_err(store_error)
                     .map_err(gateway_problem)?;
-                let completed = match self.batch.run_next(&invocation, false) {
+                match self.batch.run_next(&invocation, false) {
                     Ok(result) => {
                         self.store
                             .complete(&work_id, &lease)
                             .map_err(store_error)
                             .map_err(gateway_problem)?;
-                        result.unwrap_or(snapshot)
+                        if result.is_none() {
+                            return Err(gateway_problem(HostProblem::InfrastructureFailure));
+                        }
                     }
                     Err(problem) => {
                         let _ = self.store.dead_letter(&work_id, &lease);
                         return Err(gateway_problem(problem));
                     }
-                };
+                }
+                self.batch
+                    .drain_queued(&invocation)
+                    .map_err(gateway_problem)?;
+                let completed = self.batch.get(&snapshot.id).map_err(gateway_problem)?;
                 Ok(GatewayResponse::json(
                     StatusCode::CREATED,
                     job_json(completed),
@@ -1687,6 +1691,8 @@ impl ProductServer {
             | DatasetRequest::ReadRelative { dataset, .. }
             | DatasetRequest::Create { dataset, .. }
             | DatasetRequest::Write { dataset, .. }
+            | DatasetRequest::Append { dataset, .. }
+            | DatasetRequest::Truncate { dataset, .. }
             | DatasetRequest::RewriteRecord { dataset, .. }
             | DatasetRequest::DeleteRecord { dataset, .. }
             | DatasetRequest::WriteRelative { dataset, .. }
@@ -1695,6 +1701,7 @@ impl ProductServer {
             | DatasetRequest::StartBrowse { dataset, .. }
             | DatasetRequest::ReadNext { dataset, .. }
             | DatasetRequest::EndBrowse { dataset, .. } => Some(dataset.as_str()),
+            DatasetRequest::DefinePath { path, .. } => Some(path.as_str()),
             DatasetRequest::DefineAlternateIndex { base, .. }
             | DatasetRequest::DefineGenerationGroup { base, .. }
             | DatasetRequest::CreateGeneration { base, .. }
@@ -1752,6 +1759,79 @@ impl ProductServer {
             HostResult::Dataset(result) => Ok(result),
             _ => Err(gateway_problem(HostProblem::ProviderFailure)),
         }
+    }
+
+    fn jcl_bundle(&self, principal: &str, jcl: Vec<u8>) -> Result<JclBundle, GatewayProblem> {
+        let primary =
+            String::from_utf8(jcl).map_err(|_| gateway_problem(HostProblem::Malformed))?;
+        let mut cataloged_procedures = BTreeMap::new();
+        for library in jcl_library_names(&primary).map_err(gateway_problem)? {
+            self.authorize_resource(principal, "DATASET", &library, AccessIntent::Read)?;
+            let dataset = DatasetName::new(library, 128)
+                .map_err(|_| gateway_problem(HostProblem::Malformed))?;
+            let (ccsid, members) = match (
+                self.dataset
+                    .invoke(DatasetRequest::Attributes {
+                        dataset: dataset.clone(),
+                    })
+                    .map_err(gateway_problem)?,
+                self.dataset
+                    .invoke(DatasetRequest::ListMembers {
+                        dataset: dataset.clone(),
+                        start: None,
+                        max_items: 4_096,
+                    })
+                    .map_err(gateway_problem)?,
+            ) {
+                (
+                    DatasetResult::Attributes { attributes, .. },
+                    DatasetResult::Members { names, more: false },
+                ) => (attributes.ccsid, names),
+                _ => return Err(gateway_problem(HostProblem::ProviderFailure)),
+            };
+            for member in members {
+                let records = match self
+                    .dataset
+                    .invoke(DatasetRequest::Read {
+                        dataset: dataset.clone(),
+                        member: Some(member.clone()),
+                        key: None,
+                        max_records: 4_096,
+                    })
+                    .map_err(gateway_problem)?
+                {
+                    DatasetResult::Records { records, .. } => records,
+                    _ => return Err(gateway_problem(HostProblem::ProviderFailure)),
+                };
+                let mut source = String::new();
+                for record in records {
+                    let mut line = match ccsid {
+                        None | Some(1208) => String::from_utf8(record)
+                            .map_err(|_| gateway_problem(HostProblem::Malformed))?,
+                        Some(37) => CodePage::Cp037
+                            .decode(&record, record.len().saturating_mul(4).max(1))
+                            .map_err(|_| gateway_problem(HostProblem::Malformed))?,
+                        Some(_) => return Err(gateway_problem(HostProblem::Unsupported)),
+                    };
+                    while line.ends_with(' ') {
+                        line.pop();
+                    }
+                    source.push_str(&line);
+                    source.push('\n');
+                }
+                if cataloged_procedures
+                    .insert(member.as_str().to_ascii_uppercase(), source)
+                    .is_some()
+                {
+                    return Err(gateway_problem(HostProblem::IdempotencyConflict));
+                }
+            }
+        }
+        Ok(JclBundle {
+            primary,
+            cataloged_procedures,
+            ..Default::default()
+        })
     }
 
     fn authorize_resource(
@@ -2610,7 +2690,7 @@ fn job_capabilities(jcl: &[u8]) -> Vec<&'static str> {
     if source.contains("DSN=") || source.contains("DISP=") || source.contains("PGM=IDCAMS") {
         capabilities.extend(["host.dataset.read", "host.dataset.write"]);
     }
-    if source.contains("EXEC CICS") {
+    if source.contains("EXEC CICS") || source.contains("PGM=SDSF") {
         capabilities.push("host.cics.execute");
     }
     if source.contains("ASKTIME") || source.contains("FORMATTIME") {
@@ -2620,6 +2700,32 @@ fn job_capabilities(jcl: &[u8]) -> Vec<&'static str> {
         capabilities.push("host.terminal");
     }
     capabilities
+}
+
+fn jcl_library_names(source: &str) -> Result<Vec<String>, HostProblem> {
+    let control = source
+        .lines()
+        .filter(|line| line.starts_with("//") && !line.starts_with("//*"))
+        .map(|line| line.get(..line.len().min(72)).unwrap_or(line))
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_uppercase();
+    let mut libraries = Vec::new();
+    let mut rest = control.as_str();
+    while let Some(start) = rest.find("JCLLIB ORDER=(") {
+        rest = &rest[start + "JCLLIB ORDER=(".len()..];
+        let end = rest.find(')').ok_or(HostProblem::Malformed)?;
+        for name in rest[..end].split(',') {
+            let name = name.trim().trim_matches(['\'', '"']);
+            DatasetName::new(name, 128).map_err(|_| HostProblem::Malformed)?;
+            if libraries.iter().any(|existing| existing == name) {
+                return Err(HostProblem::Malformed);
+            }
+            libraries.push(name.to_string());
+        }
+        rest = &rest[end + 1..];
+    }
+    Ok(libraries)
 }
 
 fn control_name(control: &str, keyword: &str) -> Option<String> {

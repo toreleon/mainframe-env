@@ -58,9 +58,11 @@ pub struct DataReference {
 pub struct CobolFileBinding {
     pub select_name: String,
     pub assignment: String,
+    pub record_name: Option<String>,
     pub organization: String,
     pub access_mode: String,
     pub record_key: Option<String>,
+    pub alternate_record_keys: Vec<String>,
     pub relative_key: Option<String>,
     pub file_status: Option<String>,
 }
@@ -235,6 +237,7 @@ fn file_bindings(source: &str) -> Result<Vec<CobolFileBinding>, SemanticProblem>
     let end = upper[start..]
         .find("DATA DIVISION")
         .map_or(source.len(), |offset| start + offset);
+    let record_names = file_record_names(source);
     let mut bindings = Vec::new();
     for sentence in source[start..end].split('.') {
         let words = words(sentence)
@@ -277,11 +280,25 @@ fn file_bindings(source: &str) -> Result<Vec<CobolFileBinding>, SemanticProblem>
             })
             .unwrap_or_else(|| "SEQUENTIAL".into());
         bindings.push(CobolFileBinding {
+            record_name: record_names.get(&select_name).cloned(),
             select_name,
             assignment,
             organization,
             access_mode,
             record_key: word_after_optional_is(&words, "KEY"),
+            alternate_record_keys: words
+                .windows(3)
+                .enumerate()
+                .filter(|(_, window)| {
+                    window[0] == "ALTERNATE" && window[1] == "RECORD" && window[2] == "KEY"
+                })
+                .filter_map(|(index, _)| {
+                    let value = index + 3;
+                    words
+                        .get(value + usize::from(words.get(value).is_some_and(|word| word == "IS")))
+                        .cloned()
+                })
+                .collect(),
             relative_key: words
                 .windows(2)
                 .position(|pair| pair[0] == "RELATIVE" && pair[1] == "KEY")
@@ -302,6 +319,44 @@ fn file_bindings(source: &str) -> Result<Vec<CobolFileBinding>, SemanticProblem>
     }
     bindings.sort_by(|left, right| left.select_name.cmp(&right.select_name));
     Ok(bindings)
+}
+
+fn file_record_names(source: &str) -> BTreeMap<String, String> {
+    let upper = source.to_ascii_uppercase();
+    let Some(start) = upper.find("FILE SECTION") else {
+        return BTreeMap::new();
+    };
+    let end = [
+        "WORKING-STORAGE SECTION",
+        "LOCAL-STORAGE SECTION",
+        "LINKAGE SECTION",
+    ]
+    .into_iter()
+    .filter_map(|marker| upper[start..].find(marker).map(|offset| start + offset))
+    .min()
+    .unwrap_or(source.len());
+    let mut current = None;
+    let mut records = BTreeMap::new();
+    for sentence in source[start..end].split('.') {
+        let words = words(sentence)
+            .into_iter()
+            .map(str::to_ascii_uppercase)
+            .collect::<Vec<_>>();
+        if let Some(index) = words
+            .iter()
+            .position(|word| matches!(word.as_str(), "FD" | "SD"))
+        {
+            current = words.get(index + 1).cloned();
+            continue;
+        }
+        if let Some(file) = current.take()
+            && let Some(index) = words.iter().position(|word| word == "01")
+            && let Some(record) = words.get(index + 1)
+        {
+            records.insert(file, record.clone());
+        }
+    }
+    records
 }
 
 fn word_after_optional_is(words: &[String], keyword: &str) -> Option<String> {
@@ -484,8 +539,14 @@ fn layout_siblings(
             return Err(SemanticProblem::StorageLimitExceeded);
         }
         let initial = if spec.children.is_empty() {
-            initial_value(&spec.sentence, &spec.words, element_length, category)
-                .repeat(spec.occurs_max)
+            if spec.section == StorageSection::Linkage
+                && keyword_index(&spec.sentence, "VALUE").is_none()
+            {
+                vec![0; element_length.saturating_mul(spec.occurs_max)]
+            } else {
+                initial_value(&spec.sentence, &spec.words, element_length, category)
+                    .repeat(spec.occurs_max)
+            }
         } else {
             group_initial(
                 *index,
@@ -1264,9 +1325,11 @@ mod tests {
         assert_eq!(model.files.len(), 2);
         assert_eq!(model.files[0].select_name, "INPUT-FILE");
         assert_eq!(model.files[0].assignment, "INPUTDD");
+        assert_eq!(model.files[0].record_name.as_deref(), Some("INPUT-RECORD"));
         assert_eq!(model.files[0].organization, "INDEXED");
         assert_eq!(model.files[0].access_mode, "RANDOM");
         assert_eq!(model.files[0].record_key.as_deref(), Some("INPUT-ID"));
+        assert!(model.files[0].alternate_record_keys.is_empty());
         assert_eq!(model.files[0].file_status.as_deref(), Some("FILE-STATUS"));
         assert_eq!(model.files[1].organization, "RELATIVE");
         assert_eq!(model.files[1].relative_key.as_deref(), Some("REL-NUM"));

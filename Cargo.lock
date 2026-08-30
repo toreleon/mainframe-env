@@ -972,6 +972,7 @@ dependencies = [
 name = "mainframe-env-batch"
 version = "0.1.0-alpha.0"
 dependencies = [
+ "mainframe-env-encoding",
  "mainframe-env-execution-api",
  "mainframe-env-host-api",
  "mainframe-env-store",
@@ -1104,6 +1105,7 @@ name = "mainframe-env-interpreter"
 version = "0.1.0-alpha.0"
 dependencies = [
  "mainframe-env-diagnostics",
+ "mainframe-env-encoding",
  "mainframe-env-execution-api",
  "mainframe-env-host-api",
  "mainframe-env-ir",
@@ -1145,6 +1147,7 @@ dependencies = [
  "mainframe-env-compiler",
  "mainframe-env-compiler-api",
  "mainframe-env-dataset",
+ "mainframe-env-encoding",
  "mainframe-env-execution-api",
  "mainframe-env-host-api",
  "mainframe-env-interpreter",

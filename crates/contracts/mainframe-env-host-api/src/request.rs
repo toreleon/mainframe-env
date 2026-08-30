@@ -171,6 +171,18 @@ pub enum DatasetRequest {
         expected_version: Option<u64>,
         mutation: Mutation,
     },
+    Append {
+        dataset: DatasetName,
+        member: Option<MemberName>,
+        records: Vec<Vec<u8>>,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
+    Truncate {
+        dataset: DatasetName,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
     RewriteRecord {
         dataset: DatasetName,
         key: Vec<u8>,
@@ -203,6 +215,11 @@ pub enum DatasetRequest {
         key_offset: u32,
         key_length: u32,
         allow_duplicates: bool,
+        mutation: Mutation,
+    },
+    DefinePath {
+        path: DatasetName,
+        index: DatasetName,
         mutation: Mutation,
     },
     DefineGenerationGroup {
@@ -464,6 +481,7 @@ pub enum CicsOperation {
     Rewrite,
     SendText,
     SendMap,
+    SetFileStatus,
     StartBrowse,
     Syncpoint,
     Write,
@@ -488,6 +506,7 @@ impl CicsOperation {
                 | Self::Return
                 | Self::Abend
                 | Self::Syncpoint
+                | Self::SetFileStatus
         )
     }
 
@@ -635,9 +654,12 @@ impl HostRequest {
             Self::Dataset(
                 DatasetRequest::Create { .. }
                     | DatasetRequest::Write { .. }
+                    | DatasetRequest::Append { .. }
+                    | DatasetRequest::Truncate { .. }
                     | DatasetRequest::RewriteRecord { .. }
                     | DatasetRequest::DeleteRecord { .. }
                     | DatasetRequest::DefineAlternateIndex { .. }
+                    | DatasetRequest::DefinePath { .. }
                     | DatasetRequest::WriteRelative { .. }
                     | DatasetRequest::DeleteRelative { .. }
                     | DatasetRequest::DefineGenerationGroup { .. }
@@ -665,9 +687,12 @@ impl HostRequest {
             Self::Dataset(
                 DatasetRequest::Create { mutation, .. }
                 | DatasetRequest::Write { mutation, .. }
+                | DatasetRequest::Append { mutation, .. }
+                | DatasetRequest::Truncate { mutation, .. }
                 | DatasetRequest::RewriteRecord { mutation, .. }
                 | DatasetRequest::DeleteRecord { mutation, .. }
                 | DatasetRequest::DefineAlternateIndex { mutation, .. }
+                | DatasetRequest::DefinePath { mutation, .. }
                 | DatasetRequest::WriteRelative { mutation, .. }
                 | DatasetRequest::DeleteRelative { mutation, .. }
                 | DatasetRequest::DefineGenerationGroup { mutation, .. }
@@ -951,6 +976,13 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
             validate_records(records, limits)?;
             mutation.validate(limits)
         }
+        DatasetRequest::Append {
+            records, mutation, ..
+        } => {
+            validate_records(records, limits)?;
+            mutation.validate(limits)
+        }
+        DatasetRequest::Truncate { mutation, .. } => mutation.validate(limits),
         DatasetRequest::RewriteRecord {
             key,
             record,
@@ -983,6 +1015,7 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
                 mutation.validate(limits)
             }
         }
+        DatasetRequest::DefinePath { mutation, .. } => mutation.validate(limits),
         DatasetRequest::WriteRelative {
             record_number,
             record,

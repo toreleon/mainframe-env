@@ -2,6 +2,7 @@ use crate::FixedValue;
 use mainframe_env_diagnostics::{
     DiagnosticCode, DiagnosticLimits, ExecutionProblem, FailureCategory, Phase,
 };
+use mainframe_env_encoding::CodePage;
 use mainframe_env_execution_api::{
     Abend, BoundedPayload, Completion, Condition, IdempotencyKey, Invocation, InvocationLimits,
     Machine, MachineDrive, MachineResume, Quantum, Selector, Suspension, Transfer,
@@ -69,9 +70,11 @@ struct ResolvedReference {
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct FileMetadata {
     assignment: String,
+    record_name: Option<String>,
     organization: String,
     access_mode: String,
     record_key: Option<String>,
+    alternate_record_keys: Vec<String>,
     relative_key: Option<String>,
     file_status: Option<String>,
 }
@@ -96,9 +99,11 @@ enum PendingKind {
     DatasetRead {
         target: Option<String>,
         status: Option<String>,
+        ccsid: Option<u16>,
     },
     DatasetStatus {
         status: Option<String>,
+        cursor: Option<DatasetCursorAction>,
     },
     ProgramCall {
         targets: Vec<String>,
@@ -116,6 +121,12 @@ enum PendingKind {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+enum DatasetCursorAction {
+    Start(String),
+    End(String),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct Pending {
     sequence: u64,
     kind: PendingKind,
@@ -126,6 +137,7 @@ pub struct MachineSnapshot {
     pub schema_version: u32,
     pub program_counter: usize,
     pub effect_sequence: u64,
+    pub executed_steps: u64,
     pub output: Vec<u8>,
     pub base_storage: Vec<Vec<u8>>,
     pub perform_stack: Vec<usize>,
@@ -133,6 +145,7 @@ pub struct MachineSnapshot {
     pub loop_reentry: BTreeSet<usize>,
     pub loop_counts: BTreeMap<usize, i128>,
     pub last_file_status: String,
+    pub dataset_cursors: BTreeMap<String, String>,
 }
 
 pub struct ReferenceMachine {
@@ -152,9 +165,11 @@ pub struct ReferenceMachine {
     loop_counts: BTreeMap<usize, i128>,
     altered: BTreeMap<String, String>,
     last_file_status: String,
+    dataset_cursors: BTreeMap<String, String>,
     pc: usize,
     output: Vec<u8>,
     effect_sequence: u64,
+    executed_steps: u64,
     pending: Option<Pending>,
     perform_stack: Vec<usize>,
     deferred_drive: Option<MachineDrive<EffectRequest>>,
@@ -311,9 +326,11 @@ impl ReferenceMachine {
             loop_counts: BTreeMap::new(),
             altered: BTreeMap::new(),
             last_file_status: "00".into(),
+            dataset_cursors: BTreeMap::new(),
             pc: 0,
             output: Vec::new(),
             effect_sequence: 0,
+            executed_steps: 0,
             pending: None,
             perform_stack: Vec::new(),
             deferred_drive: None,
@@ -346,9 +363,10 @@ impl ReferenceMachine {
     #[must_use]
     pub fn snapshot(&self) -> MachineSnapshot {
         MachineSnapshot {
-            schema_version: 4,
+            schema_version: 6,
             program_counter: self.pc,
             effect_sequence: self.effect_sequence,
+            executed_steps: self.executed_steps,
             output: self.output.clone(),
             base_storage: self.bases.clone(),
             perform_stack: self.perform_stack.clone(),
@@ -356,11 +374,12 @@ impl ReferenceMachine {
             loop_reentry: self.loop_reentry.clone(),
             loop_counts: self.loop_counts.clone(),
             last_file_status: self.last_file_status.clone(),
+            dataset_cursors: self.dataset_cursors.clone(),
         }
     }
 
     pub fn restore(&mut self, snapshot: MachineSnapshot) -> Result<(), MachineProblem> {
-        if !matches!(snapshot.schema_version, 1..=4)
+        if !matches!(snapshot.schema_version, 1..=6)
             || snapshot.program_counter > self.operations.len()
             || snapshot.base_storage.iter().map(Vec::len).sum::<usize>()
                 > self.invocation.limits.max_storage_bytes as usize
@@ -370,6 +389,11 @@ impl ReferenceMachine {
         }
         self.pc = snapshot.program_counter;
         self.effect_sequence = snapshot.effect_sequence;
+        self.executed_steps = if snapshot.schema_version < 6 {
+            0
+        } else {
+            snapshot.executed_steps
+        };
         self.output = snapshot.output;
         self.bases = snapshot.base_storage;
         self.perform_stack = if snapshot.schema_version < 3 {
@@ -389,6 +413,11 @@ impl ReferenceMachine {
         } else {
             snapshot.last_file_status
         };
+        self.dataset_cursors = if snapshot.schema_version < 5 {
+            BTreeMap::new()
+        } else {
+            snapshot.dataset_cursors
+        };
         self.pending = None;
         self.deferred_drive = None;
         Ok(())
@@ -401,6 +430,8 @@ impl ReferenceMachine {
                 | "mainframe-env.reference-machine-checkpoint@2"
                 | "mainframe-env.reference-machine-checkpoint@3"
                 | "mainframe-env.reference-machine-checkpoint@4"
+                | "mainframe-env.reference-machine-checkpoint@5"
+                | "mainframe-env.reference-machine-checkpoint@6"
         ) {
             return Err(MachineProblem::IncompatibleSnapshot);
         }
@@ -417,6 +448,24 @@ impl ReferenceMachine {
     #[must_use]
     pub fn output(&self) -> &[u8] {
         &self.output
+    }
+    #[must_use]
+    pub fn dataset_cursors(&self) -> &BTreeMap<String, String> {
+        &self.dataset_cursors
+    }
+    pub fn install_dataset_cursors(
+        &mut self,
+        cursors: BTreeMap<String, String>,
+    ) -> Result<(), MachineProblem> {
+        if cursors.len() > self.invocation.limits.max_frames as usize
+            || cursors.iter().any(|(dataset, cursor)| {
+                DatasetName::new(dataset, 128).is_err() || cursor.is_empty() || cursor.len() > 128
+            })
+        {
+            return Err(MachineProblem::ResourceExhausted);
+        }
+        self.dataset_cursors = cursors;
+        Ok(())
     }
     #[must_use]
     pub fn variable(&self, name: &str) -> Option<FixedValue> {
@@ -462,6 +511,20 @@ impl ReferenceMachine {
         result
             .validate(pending.sequence, HostLimits::default())
             .map_err(MachineProblem::Host)?;
+        if let Err(HostProblem::Condition { name, response, .. }) = &result.outcome
+            && let Some(status_target) = match &pending.kind {
+                PendingKind::DatasetRead { status, .. }
+                | PendingKind::DatasetStatus { status, .. } => Some(status.clone()),
+                _ => None,
+            }
+        {
+            let status = dataset_file_status(name, *response);
+            self.last_file_status.clone_from(&status);
+            if let Some(target) = status_target {
+                self.write(&target, status.as_bytes())?;
+            }
+            return Ok(());
+        }
         let outcome = result
             .outcome
             .map_err(|problem| match (&pending.kind, problem) {
@@ -485,6 +548,7 @@ impl ReferenceMachine {
                 PendingKind::DatasetRead {
                     target: Some(target),
                     status,
+                    ccsid,
                 },
                 HostResult::Dataset(mainframe_env_host_api::DatasetResult::Records {
                     records, ..
@@ -496,14 +560,64 @@ impl ReferenceMachine {
                     "00".into()
                 };
                 if let Some(record) = records.first() {
-                    self.write(&target, record)?;
+                    self.write(&target, &decode_dataset_record(ccsid, record)?)?;
                 }
                 if let Some(status) = status {
                     self.write(&status, if records.is_empty() { b"10" } else { b"00" })?;
                 }
             }
             (
-                PendingKind::DatasetRead { status, .. } | PendingKind::DatasetStatus { status },
+                PendingKind::DatasetRead {
+                    target,
+                    status,
+                    ccsid,
+                },
+                HostResult::Dataset(mainframe_env_host_api::DatasetResult::Browse {
+                    record, ..
+                }),
+            ) => {
+                self.last_file_status = if record.is_some() {
+                    "00".into()
+                } else {
+                    "10".into()
+                };
+                if let Some((target, record)) = target.zip(record.as_ref()) {
+                    self.write(&target, &decode_dataset_record(ccsid, record)?)?;
+                }
+                if let Some(status) = status {
+                    self.write(&status, if record.is_some() { b"00" } else { b"10" })?;
+                }
+            }
+            (
+                PendingKind::DatasetStatus {
+                    status,
+                    cursor: Some(DatasetCursorAction::Start(dataset)),
+                },
+                HostResult::Dataset(mainframe_env_host_api::DatasetResult::Browse {
+                    cursor, ..
+                }),
+            ) => {
+                self.dataset_cursors.insert(dataset, cursor);
+                self.last_file_status = "00".into();
+                if let Some(status) = status {
+                    self.write(&status, b"00")?;
+                }
+            }
+            (
+                PendingKind::DatasetStatus {
+                    status,
+                    cursor: Some(DatasetCursorAction::End(dataset)),
+                },
+                HostResult::Dataset(mainframe_env_host_api::DatasetResult::Browse { .. }),
+            ) => {
+                self.dataset_cursors.remove(&dataset);
+                self.last_file_status = "00".into();
+                if let Some(status) = status {
+                    self.write(&status, b"00")?;
+                }
+            }
+            (
+                PendingKind::DatasetRead { status, .. } | PendingKind::DatasetStatus { status, .. },
                 HostResult::Dataset(mainframe_env_host_api::DatasetResult::Condition {
                     status: condition_status,
                     ..
@@ -515,11 +629,25 @@ impl ReferenceMachine {
                 }
             }
             (PendingKind::DatasetRead { status, .. }, HostResult::Dataset(_))
-            | (PendingKind::DatasetStatus { status }, HostResult::Dataset(_)) => {
+            | (
+                PendingKind::DatasetStatus {
+                    status,
+                    cursor: None,
+                },
+                HostResult::Dataset(_),
+            ) => {
                 self.last_file_status = "00".into();
                 if let Some(status) = status {
                     self.write(&status, b"00")?;
                 }
+            }
+            (
+                PendingKind::DatasetStatus {
+                    cursor: Some(_), ..
+                },
+                HostResult::Dataset(_),
+            ) => {
+                return Err(MachineProblem::UnexpectedHostResult);
             }
             (PendingKind::ProgramCall { targets }, HostResult::Program(payload)) => {
                 if payload.schema() == "mainframe-env.program.abend@1" {
@@ -871,7 +999,10 @@ impl ReferenceMachine {
                     Ok(Some(Step::Next))
                 }
             }
-            "transfer" if name == "go_to" || name == "next_sentence" => Ok(Some(Step::Jump(
+            "transfer" if name == "go_to" => Ok(Some(Step::Jump(
+                self.label(args.last().ok_or(MachineProblem::InvalidOperation)?)?,
+            ))),
+            "transfer" if name == "next_sentence" => Ok(Some(Step::Jump(
                 self.control_target(operation, "edge_transfer")?,
             ))),
             _ if name == "control" => Ok(Some(Step::Next)),
@@ -1135,6 +1266,15 @@ impl ReferenceMachine {
         )
     }
     fn dataset_effect(&mut self, name: &str, args: &[String]) -> Result<Step, MachineProblem> {
+        let open_mode = (name == "open")
+            .then(|| {
+                args.iter()
+                    .find(|argument| {
+                        matches!(argument.as_str(), "INPUT" | "OUTPUT" | "I-O" | "EXTEND")
+                    })
+                    .map(String::as_str)
+            })
+            .flatten();
         let logical = if name == "open" {
             args.iter().find(|argument| {
                 !matches!(
@@ -1147,11 +1287,38 @@ impl ReferenceMachine {
         }
         .ok_or(MachineProblem::InvalidOperation)?
         .trim_matches(['\'', '"']);
-        let file = self.files.get(&normalize(logical)).cloned();
+        let logical_name = normalize(logical);
+        let file = self.files.get(&logical_name).cloned().or_else(|| {
+            self.files
+                .values()
+                .find(|file| file.record_name.as_deref() == Some(logical_name.as_str()))
+                .cloned()
+        });
+        let explicit_key = (name == "read")
+            .then(|| {
+                position(args, "KEY").and_then(|index| {
+                    args.get(
+                        index
+                            + usize::from(args.get(index + 1).is_some_and(|value| value == "IS"))
+                            + 1,
+                    )
+                    .cloned()
+                })
+            })
+            .flatten();
+        let alternate_dd = explicit_key.as_ref().and_then(|key| {
+            file.as_ref().and_then(|file| {
+                file.alternate_record_keys
+                    .iter()
+                    .position(|candidate| normalize(candidate) == normalize(key))
+                    .map(|index| alternate_dd_name(&file.assignment, index + 1))
+            })
+        });
+        let binding_name = alternate_dd.unwrap_or_else(|| normalize(logical));
         let dataset_name = self
             .invocation
             .bindings
-            .get(&format!("cobol.dd.{}", normalize(logical)))
+            .get(&format!("cobol.dd.{binding_name}"))
             .or_else(|| {
                 file.as_ref().and_then(|file| {
                     self.invocation
@@ -1173,27 +1340,63 @@ impl ReferenceMachine {
             .get(&format!("cobol.file-status.{}", normalize(logical)))
             .map(|payload| String::from_utf8_lossy(payload.bytes()).into_owned())
             .or_else(|| file.as_ref().and_then(|file| file.file_status.clone()));
+        let ccsid = self
+            .invocation
+            .bindings
+            .get(&format!("cobol.dd.{}.ccsid", normalize(logical)))
+            .or_else(|| {
+                file.as_ref().and_then(|file| {
+                    self.invocation
+                        .bindings
+                        .get(&format!("cobol.dd.{}.ccsid", normalize(&file.assignment)))
+                })
+            })
+            .map(|payload| {
+                std::str::from_utf8(payload.bytes())
+                    .map_err(|_| MachineProblem::InvalidOperation)?
+                    .parse::<u16>()
+                    .map_err(|_| MachineProblem::InvalidOperation)
+            })
+            .transpose()?;
         let default_key = file
             .as_ref()
             .filter(|file| file.access_mode == "RANDOM")
             .and_then(|file| file.record_key.as_ref().or(file.relative_key.as_ref()))
             .map(|key| self.resolve(key))
+            .transpose()?
+            .map(|key| encode_dataset_record(ccsid, &key))
             .transpose()?;
-        let request = match name {
-            "read" => DatasetRequest::Read {
-                dataset,
-                member: None,
-                key: position(args, "KEY")
-                    .and_then(|index| {
-                        args.get(
-                            index + usize::from(args.get(index + 1).is_some_and(|v| v == "IS")) + 1,
-                        )
-                    })
-                    .map(|key| self.resolve(key))
-                    .transpose()?
-                    .or(default_key),
-                max_records: 1,
-            },
+        let sequential = file
+            .as_ref()
+            .is_some_and(|file| file.access_mode == "SEQUENTIAL");
+        let sequential_organization = file
+            .as_ref()
+            .is_some_and(|file| file.organization == "SEQUENTIAL");
+        let current_cursor = self.dataset_cursors.get(&dataset_name).cloned();
+        let (request, cursor_action) = match name {
+            "read" if sequential && current_cursor.is_some() => (
+                DatasetRequest::ReadNext {
+                    dataset,
+                    cursor: current_cursor.ok_or(MachineProblem::InvalidOperation)?,
+                    reverse: false,
+                },
+                None,
+            ),
+            "read" => (
+                DatasetRequest::Read {
+                    dataset,
+                    member: None,
+                    key: explicit_key
+                        .as_ref()
+                        .map(|key| self.resolve(key))
+                        .transpose()?
+                        .map(|key| encode_dataset_record(ccsid, &key))
+                        .transpose()?
+                        .or(default_key),
+                    max_records: 1,
+                },
+                None,
+            ),
             "write" => {
                 let record = position(args, "FROM")
                     .and_then(|index| args.get(index + 1))
@@ -1201,13 +1404,27 @@ impl ReferenceMachine {
                     .map(|value| self.resolve(value))
                     .transpose()?
                     .unwrap_or_default();
-                DatasetRequest::Write {
-                    dataset,
-                    member: None,
-                    records: vec![record],
-                    expected_version: None,
-                    mutation: self.mutation()?,
-                }
+                let records = vec![encode_dataset_record(ccsid, &record)?];
+                (
+                    if sequential_organization {
+                        DatasetRequest::Append {
+                            dataset,
+                            member: None,
+                            records,
+                            expected_version: None,
+                            mutation: self.mutation()?,
+                        }
+                    } else {
+                        DatasetRequest::Write {
+                            dataset,
+                            member: None,
+                            records,
+                            expected_version: None,
+                            mutation: self.mutation()?,
+                        }
+                    },
+                    None,
+                )
             }
             "rewrite" => {
                 let record = position(args, "FROM")
@@ -1216,23 +1433,55 @@ impl ReferenceMachine {
                     .map(|value| self.resolve(value))
                     .transpose()?
                     .unwrap_or_default();
-                DatasetRequest::RewriteRecord {
+                (
+                    DatasetRequest::RewriteRecord {
+                        dataset,
+                        key: default_key.ok_or(MachineProblem::InvalidOperation)?,
+                        record: encode_dataset_record(ccsid, &record)?,
+                        expected_version: None,
+                        mutation: self.mutation()?,
+                    },
+                    None,
+                )
+            }
+            "open" if open_mode == Some("OUTPUT") => (
+                DatasetRequest::Truncate {
                     dataset,
-                    key: default_key.ok_or(MachineProblem::InvalidOperation)?,
-                    record,
                     expected_version: None,
                     mutation: self.mutation()?,
-                }
-            }
-            _ => DatasetRequest::Attributes { dataset },
+                },
+                None,
+            ),
+            "open" if sequential && matches!(open_mode, Some("INPUT" | "I-O")) => (
+                DatasetRequest::StartBrowse {
+                    dataset,
+                    key: Vec::new(),
+                },
+                Some(DatasetCursorAction::Start(dataset_name.clone())),
+            ),
+            "close" if current_cursor.is_some() => (
+                DatasetRequest::EndBrowse {
+                    dataset,
+                    cursor: current_cursor.ok_or(MachineProblem::InvalidOperation)?,
+                },
+                Some(DatasetCursorAction::End(dataset_name.clone())),
+            ),
+            _ => (DatasetRequest::Attributes { dataset }, None),
         };
         let target = (name == "read")
             .then(|| position(args, "INTO").and_then(|index| args.get(index + 1).cloned()))
             .flatten();
         let pending = if name == "read" {
-            PendingKind::DatasetRead { target, status }
+            PendingKind::DatasetRead {
+                target,
+                status,
+                ccsid,
+            }
         } else {
-            PendingKind::DatasetStatus { status }
+            PendingKind::DatasetStatus {
+                status,
+                cursor: cursor_action,
+            }
         };
         self.effect(HostRequest::Dataset(request), pending)
     }
@@ -1570,6 +1819,17 @@ impl ReferenceMachine {
     }
 
     fn set_op(&mut self, args: &[String]) -> Result<(), MachineProblem> {
+        if args.first().is_some_and(|argument| argument == "ADDRESS")
+            && args.get(1).is_some_and(|argument| argument == "OF")
+        {
+            let to = position(args, "TO").ok_or(MachineProblem::InvalidOperation)?;
+            if to != 3 || args.len() != 5 {
+                return Err(MachineProblem::InvalidOperation);
+            }
+            self.reference(&args[2..3])?;
+            let target = self.reference(&args[4..5])?;
+            return self.write_reference(&target, &vec![0; target.length]);
+        }
         if args.len() < 3 || args[1] != "TO" {
             return Err(MachineProblem::InvalidOperation);
         }
@@ -1625,13 +1885,17 @@ impl ReferenceMachine {
             }
             "add" => {
                 let pos = position(args, "TO").ok_or(MachineProblem::InvalidOperation)?;
-                let target = args
+                let receiver = args
                     .get(pos + 1)
                     .ok_or(MachineProblem::InvalidOperation)?
                     .clone();
+                let target = position(args, "GIVING")
+                    .and_then(|giving| args.get(giving + 1))
+                    .cloned()
+                    .unwrap_or_else(|| receiver.clone());
                 (
-                    target.clone(),
-                    decimal_add(self.decimal(&target)?, self.decimal(&args[0])?)?,
+                    target,
+                    decimal_add(self.decimal(&receiver)?, self.decimal(&args[0])?)?,
                 )
             }
             "subtract" => {
@@ -2462,7 +2726,11 @@ impl ReferenceMachine {
             Err(problem) => return Err(problem),
         };
         let actual = self.read_reference(&reference)?;
-        Ok(Some(condition_matches(&actual, &values)?))
+        Ok(Some(condition_matches(
+            &actual,
+            &values,
+            &reference.layout,
+        )?))
     }
 
     fn is_standalone_condition(&self, tokens: &[String]) -> Result<bool, MachineProblem> {
@@ -2546,6 +2814,12 @@ impl ReferenceMachine {
     }
 
     fn decimal(&self, token: &str) -> Result<Decimal, MachineProblem> {
+        if matches!(normalize(token).as_str(), "ZERO" | "ZEROS" | "ZEROES") {
+            return Ok(Decimal {
+                coefficient: 0,
+                scale: 0,
+            });
+        }
         if let Some(layout) = self.layout(token) {
             if !is_numeric(layout.category) {
                 return Err(MachineProblem::DataException);
@@ -2623,37 +2897,56 @@ impl ReferenceMachine {
                     .ok_or(MachineProblem::ReferenceModificationError)?;
                 length = requested;
             } else {
-                let index = match self.eval_value(contents)? {
-                    CobolValue::Decimal(value) if value.scale == 0 => {
-                        usize::try_from(value.coefficient)
-                            .map_err(|_| MachineProblem::SubscriptError)?
-                    }
-                    _ => return Err(MachineProblem::SubscriptError),
-                };
-                let inherited = std::iter::successors(layout.parent.as_ref(), |parent| {
+                let mut dimensions = std::iter::successors(layout.parent.as_ref(), |parent| {
                     self.layouts
                         .get(*parent)
                         .and_then(|layout| layout.parent.as_ref())
                 })
                 .filter_map(|parent| self.layouts.get(parent))
-                .find(|layout| layout.occurs > 1);
-                let (occurs, stride) = if layout.occurs > 1 {
-                    (layout.occurs, layout.element_length)
-                } else if let Some(parent) = inherited {
-                    (parent.occurs, parent.element_length)
+                .filter(|layout| layout.occurs > 1)
+                .map(|layout| (layout.occurs, layout.element_length))
+                .collect::<Vec<_>>();
+                dimensions.reverse();
+                if layout.occurs > 1 {
+                    dimensions.push((layout.occurs, layout.element_length));
+                }
+                if dimensions.is_empty() {
+                    return Err(MachineProblem::SubscriptError);
+                }
+                let index_tokens = if contents.len() == dimensions.len() {
+                    contents
+                        .iter()
+                        .map(std::slice::from_ref)
+                        .collect::<Vec<_>>()
+                } else if contents.len() == 1 {
+                    vec![contents]
                 } else {
                     return Err(MachineProblem::SubscriptError);
                 };
-                if index == 0 || index > occurs {
-                    return Err(MachineProblem::SubscriptError);
+                let dimensions = if index_tokens.len() == 1 {
+                    &dimensions[dimensions.len() - 1..]
+                } else {
+                    dimensions.as_slice()
+                };
+                for (tokens, (occurs, stride)) in index_tokens.into_iter().zip(dimensions) {
+                    let index = match self.eval_value(tokens)? {
+                        CobolValue::Decimal(value) if value.scale == 0 => {
+                            usize::try_from(value.coefficient)
+                                .map_err(|_| MachineProblem::SubscriptError)?
+                        }
+                        _ => return Err(MachineProblem::SubscriptError),
+                    };
+                    if index == 0 || index > *occurs {
+                        return Err(MachineProblem::SubscriptError);
+                    }
+                    offset = offset
+                        .checked_add(
+                            (index - 1)
+                                .checked_mul(*stride)
+                                .ok_or(MachineProblem::SubscriptError)?,
+                        )
+                        .ok_or(MachineProblem::SubscriptError)?;
                 }
-                offset = offset
-                    .checked_add(
-                        (index - 1)
-                            .checked_mul(stride)
-                            .ok_or(MachineProblem::SubscriptError)?,
-                    )
-                    .ok_or(MachineProblem::SubscriptError)?;
                 length = layout.element_length.min(layout.length);
             }
             cursor = if close + 1 == tokens.len() {
@@ -2982,11 +3275,17 @@ impl Machine for ReferenceMachine {
                 if self.pc >= self.operations.len() {
                     return Ok(MachineDrive::Completed(self.complete()?));
                 }
+                self.executed_steps = self
+                    .executed_steps
+                    .checked_add(1)
+                    .ok_or(MachineProblem::ResourceExhausted)?;
+                if self.executed_steps > self.invocation.limits.max_steps {
+                    return Err(MachineProblem::ResourceExhausted);
+                }
                 let operation = self.operations[self.pc].clone();
                 match self.execute(&operation).map_err(|problem| match problem {
-                    MachineProblem::Host(_)
-                    | MachineProblem::ResourceExhausted
-                    | MachineProblem::UnsupportedForm => problem,
+                    MachineProblem::Host(_) | MachineProblem::ResourceExhausted => problem,
+                    MachineProblem::UnsupportedForm => MachineProblem::UnsupportedForm,
                     problem => MachineProblem::InvalidArtifact(format!(
                         "operation {} {:?} failed: {problem:?}",
                         operation.identity.name(),
@@ -3027,7 +3326,7 @@ impl Machine for ReferenceMachine {
         }
         let bytes = encode_snapshot(&self.snapshot())?;
         BoundedPayload::new(
-            "mainframe-env.reference-machine-checkpoint@4",
+            "mainframe-env.reference-machine-checkpoint@6",
             bytes,
             InvocationLimits {
                 max_payload_bytes: usize::try_from(
@@ -3050,10 +3349,11 @@ impl Machine for ReferenceMachine {
 }
 
 fn encode_snapshot(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
-    let mut bytes = b"MECP0004".to_vec();
+    let mut bytes = b"MECP0006".to_vec();
     bytes.extend_from_slice(&snapshot.schema_version.to_be_bytes());
     bytes.extend_from_slice(&u64::try_from(snapshot.program_counter).ok()?.to_be_bytes());
     bytes.extend_from_slice(&snapshot.effect_sequence.to_be_bytes());
+    bytes.extend_from_slice(&snapshot.executed_steps.to_be_bytes());
     push_bytes(&mut bytes, &snapshot.output)?;
     bytes.extend_from_slice(
         &u32::try_from(snapshot.base_storage.len())
@@ -3098,6 +3398,15 @@ fn encode_snapshot(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
         bytes.extend_from_slice(&count.to_be_bytes());
     }
     push_bytes(&mut bytes, snapshot.last_file_status.as_bytes())?;
+    bytes.extend_from_slice(
+        &u32::try_from(snapshot.dataset_cursors.len())
+            .ok()?
+            .to_be_bytes(),
+    );
+    for (dataset, cursor) in &snapshot.dataset_cursors {
+        push_bytes(&mut bytes, dataset.as_bytes())?;
+        push_bytes(&mut bytes, cursor.as_bytes())?;
+    }
     Some(bytes)
 }
 
@@ -3120,6 +3429,8 @@ fn decode_snapshot(
         b"MECP0002" => 2,
         b"MECP0003" => 3,
         b"MECP0004" => 4,
+        b"MECP0005" => 5,
+        b"MECP0006" => 6,
         _ => return Err(MachineProblem::IncompatibleSnapshot),
     };
     let schema_version = input.u32()?;
@@ -3129,6 +3440,7 @@ fn decode_snapshot(
     let program_counter =
         usize::try_from(input.u64()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
     let effect_sequence = input.u64()?;
+    let executed_steps = if header_version >= 6 { input.u64()? } else { 0 };
     let output = input.bytes(max_output)?;
     let base_count =
         usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
@@ -3208,6 +3520,26 @@ fn decode_snapshot(
     } else {
         "00".into()
     };
+    let mut dataset_cursors = BTreeMap::new();
+    if header_version >= 5 {
+        let cursor_count =
+            usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+        if cursor_count > max_frames.saturating_mul(4) {
+            return Err(MachineProblem::IncompatibleSnapshot);
+        }
+        for _ in 0..cursor_count {
+            let dataset = String::from_utf8(input.bytes(128)?)
+                .map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+            let cursor = String::from_utf8(input.bytes(128)?)
+                .map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+            if dataset.is_empty()
+                || cursor.is_empty()
+                || dataset_cursors.insert(dataset, cursor).is_some()
+            {
+                return Err(MachineProblem::IncompatibleSnapshot);
+            }
+        }
+    }
     if !input.finished() {
         return Err(MachineProblem::IncompatibleSnapshot);
     }
@@ -3215,6 +3547,7 @@ fn decode_snapshot(
         schema_version,
         program_counter,
         effect_sequence,
+        executed_steps,
         output,
         base_storage,
         perform_stack,
@@ -3222,6 +3555,7 @@ fn decode_snapshot(
         loop_reentry,
         loop_counts,
         last_file_status,
+        dataset_cursors,
     })
 }
 
@@ -3618,9 +3952,15 @@ fn file_metadata(
         };
         let metadata = FileMetadata {
             assignment: text_attribute(operation, "assignment")?.to_ascii_uppercase(),
+            record_name: optional("record_name")?,
             organization: text_attribute(operation, "organization")?.to_ascii_uppercase(),
             access_mode: text_attribute(operation, "access_mode")?.to_ascii_uppercase(),
             record_key: optional("record_key")?,
+            alternate_record_keys: text_attribute(operation, "alternate_record_keys")?
+                .split('\u{1f}')
+                .filter(|value| !value.is_empty())
+                .map(str::to_ascii_uppercase)
+                .collect(),
             relative_key: optional("relative_key")?,
             file_status: optional("file_status")?,
         };
@@ -3696,6 +4036,14 @@ fn normalize(value: &str) -> String {
     value
         .trim_matches(['\'', '"', '.', ','])
         .to_ascii_uppercase()
+}
+
+fn alternate_dd_name(assignment: &str, ordinal: usize) -> String {
+    let suffix = ordinal.to_string();
+    let keep = 8usize.saturating_sub(suffix.len());
+    let mut name = normalize(assignment).chars().take(keep).collect::<String>();
+    name.push_str(&suffix);
+    name
 }
 
 fn control_tokens(text: &str) -> Vec<String> {
@@ -4197,24 +4545,46 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
     }
     let mut digit_index = 0usize;
     let mut output = Vec::with_capacity(layout.length);
-    for byte in layout.picture.bytes() {
-        match byte.to_ascii_uppercase() {
+    let mut suppressing = true;
+    for byte in expanded_picture(&layout.picture, layout.length.saturating_add(layout.digits))? {
+        match byte {
             b'9' => {
                 output.push(*digits.as_bytes().get(digit_index).unwrap_or(&b'0'));
                 digit_index += 1;
+                suppressing = false;
             }
             b'Z' => {
                 let digit = *digits.as_bytes().get(digit_index).unwrap_or(&b'0');
-                output.push(if digit == b'0' && digit_index + 1 < layout.digits {
-                    b' '
-                } else {
-                    digit
-                });
+                output.push(
+                    if suppressing && digit == b'0' && digit_index + 1 < layout.digits {
+                        b' '
+                    } else {
+                        suppressing = false;
+                        digit
+                    },
+                );
+                digit_index += 1;
+            }
+            b'*' => {
+                let digit = *digits.as_bytes().get(digit_index).unwrap_or(&b'0');
+                output.push(
+                    if suppressing && digit == b'0' && digit_index + 1 < layout.digits {
+                        b'*'
+                    } else {
+                        suppressing = false;
+                        digit
+                    },
+                );
                 digit_index += 1;
             }
             b'+' => output.push(if value.coefficient < 0 { b'-' } else { b'+' }),
             b'-' => output.push(if value.coefficient < 0 { b'-' } else { b' ' }),
-            b'V' | b'S' => {}
+            b'V' | b'S' | b'P' => {}
+            b'B' => output.push(b' '),
+            b'.' => {
+                output.push(b'.');
+                suppressing = false;
+            }
             other => output.push(other),
         }
     }
@@ -4224,7 +4594,79 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
     Ok(output)
 }
 
-fn condition_matches(actual: &[u8], values: &[String]) -> Result<bool, MachineProblem> {
+fn expanded_picture(picture: &str, limit: usize) -> Result<Vec<u8>, MachineProblem> {
+    let bytes = picture.as_bytes();
+    let mut output = Vec::new();
+    let mut index = 0usize;
+    while index < bytes.len() {
+        let symbol = bytes[index].to_ascii_uppercase();
+        index += 1;
+        let repeat = if bytes.get(index) == Some(&b'(') {
+            let close = bytes[index + 1..]
+                .iter()
+                .position(|byte| *byte == b')')
+                .ok_or(MachineProblem::UnsupportedForm)?
+                + index
+                + 1;
+            let count = std::str::from_utf8(&bytes[index + 1..close])
+                .ok()
+                .and_then(|value| value.parse::<usize>().ok())
+                .filter(|value| *value > 0)
+                .ok_or(MachineProblem::UnsupportedForm)?;
+            index = close + 1;
+            count
+        } else {
+            1
+        };
+        if output.len().saturating_add(repeat) > limit.saturating_add(32) {
+            return Err(MachineProblem::ResourceExhausted);
+        }
+        output.extend(std::iter::repeat_n(symbol, repeat));
+    }
+    Ok(output)
+}
+
+fn condition_matches(
+    actual: &[u8],
+    values: &[String],
+    layout: &LayoutMetadata,
+) -> Result<bool, MachineProblem> {
+    if is_numeric(layout.category) && actual.len() == layout.length {
+        let actual = decode_decimal(layout, actual)?;
+        let mut index = 0usize;
+        while index < values.len() {
+            let start = values[index].trim_matches(['\'', '"']);
+            let Some(start) = decimal_text(start) else {
+                break;
+            };
+            if values
+                .get(index + 1)
+                .is_some_and(|value| value == "THRU" || value == "THROUGH")
+            {
+                let end = values
+                    .get(index + 2)
+                    .and_then(|value| decimal_text(value.trim_matches(['\'', '"'])))
+                    .ok_or(MachineProblem::InvalidOperation)?;
+                let (actual_start, start) = decimal_aligned(actual, start)?;
+                let (actual_end, end) = decimal_aligned(actual, end)?;
+                if actual_start.coefficient >= start.coefficient
+                    && actual_end.coefficient <= end.coefficient
+                {
+                    return Ok(true);
+                }
+                index += 3;
+            } else {
+                let (actual, expected) = decimal_aligned(actual, start)?;
+                if actual.coefficient == expected.coefficient {
+                    return Ok(true);
+                }
+                index += 1;
+            }
+        }
+        if index == values.len() {
+            return Ok(false);
+        }
+    }
     let actual_text = String::from_utf8_lossy(actual).trim().to_string();
     let mut index = 0usize;
     while index < values.len() {
@@ -4272,6 +4714,42 @@ fn condition_matches(actual: &[u8], values: &[String]) -> Result<bool, MachinePr
         }
     }
     Ok(false)
+}
+
+fn encode_dataset_record(ccsid: Option<u16>, record: &[u8]) -> Result<Vec<u8>, MachineProblem> {
+    match ccsid {
+        None | Some(1208) => Ok(record.to_vec()),
+        Some(37) => CodePage::Cp037
+            .encode(
+                std::str::from_utf8(record).map_err(|_| MachineProblem::DataException)?,
+                record.len().saturating_mul(4).max(1),
+            )
+            .map_err(|_| MachineProblem::DataException),
+        Some(_) => Err(MachineProblem::UnsupportedForm),
+    }
+}
+
+fn decode_dataset_record(ccsid: Option<u16>, record: &[u8]) -> Result<Vec<u8>, MachineProblem> {
+    match ccsid {
+        None | Some(1208) => Ok(record.to_vec()),
+        Some(37) => CodePage::Cp037
+            .decode(record, record.len().saturating_mul(4).max(1))
+            .map(String::into_bytes)
+            .map_err(|_| MachineProblem::DataException),
+        Some(_) => Err(MachineProblem::UnsupportedForm),
+    }
+}
+
+fn dataset_file_status(name: &str, response: i32) -> String {
+    match (name, response) {
+        ("NOTFND", _) => "23",
+        ("DUPREC" | "DUPKEY", _) => "22",
+        ("ENDFILE", _) => "10",
+        ("LENGERR", _) => "44",
+        ("INVREQ", _) => "39",
+        _ => "30",
+    }
+    .into()
 }
 
 fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
@@ -4697,6 +5175,20 @@ mod tests {
         ));
     }
     #[test]
+    fn cumulative_step_limit_survives_quantum_boundaries() {
+        let mut i = invocation();
+        i.limits.max_steps = 1;
+        let mut m = ReferenceMachine::from_binary(&binary(), i, CodecLimits::default()).unwrap();
+        assert_eq!(
+            m.drive(MachineResume::Start, Quantum::new(1, 1024).unwrap()),
+            MachineDrive::Continue
+        );
+        assert!(matches!(
+            m.drive(MachineResume::Start, Quantum::new(1, 1024).unwrap()),
+            MachineDrive::Failed(_)
+        ));
+    }
+    #[test]
     fn checkpoint_roundtrip_restores_exact_machine_state_and_rejects_corruption() {
         let invocation = invocation();
         let mut first =
@@ -4707,15 +5199,20 @@ mod tests {
             MachineDrive::Continue
         );
         first.last_file_status = "10".into();
+        first
+            .dataset_cursors
+            .insert("IBMUSER.INPUT".into(), "CURSOR-1".into());
         let checkpoint = first.checkpoint().unwrap();
         assert_eq!(
             checkpoint.schema(),
-            "mainframe-env.reference-machine-checkpoint@4"
+            "mainframe-env.reference-machine-checkpoint@6"
         );
         let mut restored =
             ReferenceMachine::from_binary(&binary(), invocation, CodecLimits::default()).unwrap();
         restored.restore_checkpoint(&checkpoint).unwrap();
         assert_eq!(restored.last_file_status, "10");
+        assert_eq!(restored.dataset_cursors, first.dataset_cursors);
+        assert_eq!(restored.executed_steps, first.executed_steps);
         let first_done = first.drive(MachineResume::Start, Quantum::new(100, 1024).unwrap());
         let restored_done = restored.drive(MachineResume::Start, Quantum::new(100, 1024).unwrap());
         assert_eq!(first_done, restored_done);
@@ -4747,5 +5244,37 @@ mod tests {
         assert_eq!(arguments["MAP"].bytes(), b"MENU");
         assert!(arguments.contains_key("OPTION.ERASE"));
         assert!(arguments.keys().all(|name| !name.starts_with("arg_")));
+    }
+
+    #[test]
+    fn numeric_edited_picture_expands_repetition_before_encoding() {
+        let layout = LayoutMetadata {
+            name: "AMOUNT".into(),
+            simple_name: "AMOUNT".into(),
+            category: LayoutCategory::NumericEdited,
+            picture: "9(9).99-".into(),
+            digits: 11,
+            scale: 2,
+            signed: true,
+            sign_separate: false,
+            justified_right: false,
+            linkage: false,
+            offset: 0,
+            length: 13,
+            element_length: 13,
+            occurs: 1,
+            parent: None,
+            condition_values: Vec::new(),
+        };
+        assert_eq!(
+            encode_edited(
+                &layout,
+                Decimal {
+                    coefficient: 12345,
+                    scale: 2,
+                }
+            ),
+            Ok(b"000000123.45 ".to_vec())
+        );
     }
 }
