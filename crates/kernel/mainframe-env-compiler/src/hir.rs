@@ -522,10 +522,28 @@ impl ProcedureParser {
         for node_index in 0..self.nodes.len() {
             if self.nodes[node_index].role == ControlRole::Label {
                 let name = self.nodes[node_index].text.to_ascii_uppercase();
-                if labels.contains_key(&name) {
+                if let Some(previous) = labels.get(&name).copied() {
                     self.nodes[node_index].role = ControlRole::Recovered;
                     if let Some(statement) = self.nodes[node_index].statement {
-                        self.statements[statement].kind = StatementKind::DuplicateLabel;
+                        let previous_index = self
+                            .nodes
+                            .iter()
+                            .position(|node| node.id == previous)
+                            .expect("recorded label node exists");
+                        let between = self.nodes[previous_index + 1..node_index]
+                            .iter()
+                            .filter_map(|node| node.statement)
+                            .collect::<BTreeSet<_>>();
+                        let redundant_exit = between.len() == 1
+                            && between
+                                .iter()
+                                .all(|index| self.statements[*index].kind == StatementKind::Exit);
+                        if redundant_exit {
+                            self.statements[statement].kind = StatementKind::Continue;
+                            self.statements[statement].arguments.clear();
+                        } else {
+                            self.statements[statement].kind = StatementKind::DuplicateLabel;
+                        }
                     }
                 } else {
                     labels.insert(name.clone(), self.nodes[node_index].id);
@@ -1325,10 +1343,30 @@ fn inline_scope_end(upper: &str) -> Option<ControlScope> {
 }
 
 fn is_terminator(upper: &str) -> bool {
-    upper
-        .split_whitespace()
-        .next()
-        .is_some_and(|word| word.starts_with("END-"))
+    upper.split_whitespace().next().is_some_and(|word| {
+        matches!(
+            word,
+            "END-ACCEPT"
+                | "END-ADD"
+                | "END-CALL"
+                | "END-COMPUTE"
+                | "END-DELETE"
+                | "END-DISPLAY"
+                | "END-DIVIDE"
+                | "END-INVOKE"
+                | "END-MULTIPLY"
+                | "END-READ"
+                | "END-RECEIVE"
+                | "END-RETURN"
+                | "END-REWRITE"
+                | "END-START"
+                | "END-STRING"
+                | "END-SUBTRACT"
+                | "END-UNSTRING"
+                | "END-WRITE"
+                | "END-XML"
+        )
+    })
 }
 
 fn is_conditional_branch(upper: &str) -> bool {
@@ -1585,7 +1623,15 @@ mod tests {
             HirProblem::UnterminatedExec
         );
 
-        let recovered = parse_procedure("DUP. EXIT. DUP. EXIT.", 16).unwrap();
+        let redundant = parse_procedure("DUP. EXIT. DUP. EXIT.", 16).unwrap();
+        assert!(
+            redundant
+                .statements
+                .iter()
+                .all(|statement| statement.kind != StatementKind::DuplicateLabel)
+        );
+
+        let recovered = parse_procedure("DUP. DISPLAY 'A'. DUP. EXIT.", 16).unwrap();
         assert!(
             recovered
                 .nodes

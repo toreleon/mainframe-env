@@ -984,6 +984,7 @@ dependencies = [
 name = "mainframe-env-cics"
 version = "0.1.0-alpha.0"
 dependencies = [
+ "mainframe-env-encoding",
  "mainframe-env-execution-api",
  "mainframe-env-host-api",
  "mainframe-env-racf",

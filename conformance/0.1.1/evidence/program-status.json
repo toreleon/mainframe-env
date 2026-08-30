@@ -6,9 +6,9 @@
   "current_product": "0.1.0-alpha.0",
   "target_product": "0.1.1",
   "source_identity": {
-    "base_commit": "a23f9e8373f92ce8ba8c0ea5ccaebc90e7f344a6",
+    "base_commit": "ace7d325c3d44e50de2b7c555fd61736a9ea0269",
     "dirty_tree_algorithm": "sha256 of sorted sha256sum records, excluding .git, target, docs/delivery/CARDEMO-0.1.1-STATUS.md, and conformance/0.1.1/evidence/program-status.json",
-    "dirty_tree_digest": "sha256:de65775c88c4f4346e91642a59861cda1cd301021b730c2feb524f1d7cf8c4be"
+    "dirty_tree_digest": "sha256:8fc4b8de09935670d93dec82d929b8fb7f11e7da30d63d9eee975f31ffeb7fcf"
   },
   "corpus": {
     "environment_key": "CARDEMO_CORPUS_DIR",
@@ -21,8 +21,8 @@
     "license": "Apache-2.0",
     "license_sha256": "09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b"
   },
-  "current_issue": "CD-018",
-  "issues": {"total":27,"completed":17,"in_progress":1,"open":9},
+  "current_issue": "CD-019",
+  "issues": {"total":27,"completed":18,"in_progress":1,"open":8},
   "journeys": {"total":20,"passed":0,"failed_or_not_run":20},
   "completed_issues": [
     {
@@ -160,6 +160,14 @@
       "commit_identity": "a23f9e8373f92ce8ba8c0ea5ccaebc90e7f344a6",
       "evidence": "conformance/0.1.1/evidence/issues/CD-017.json",
       "evidence_digest": "sha256:55f704aafb446c37e1c47ec20096b5a78bd1b661d0c4bb78f52fb0ee83896c38"
+    },
+    {
+      "id": "CD-018",
+      "state": "pass",
+      "commit_subject": "Expose CardDemo CICS terminal sessions",
+      "commit_identity": "ace7d325c3d44e50de2b7c555fd61736a9ea0269",
+      "evidence": "conformance/0.1.1/evidence/issues/CD-018.json",
+      "evidence_digest": "sha256:aad1b054a1b39aba7fb537ff2562915e9ec17fe724bc5ace930ea688ce3ce5b7"
     }
   ],
   "commands": [
@@ -257,6 +265,16 @@
     ,{"command":"cargo check --workspace --all-targets --locked","exit_code":0,"result":"pass"}
     ,{"command":"all cumulative CardDemo gates through carddemo-terminal","exit_code":0,"result":"18 corpus-derived gates passed"}
     ,{"command":"ordinary conformance, JSON, formatting, redaction, and diff checks","exit_code":0,"result":"pass"}
+    ,{"command":"cargo test -p mainframe-env-conformance nested_performs_preserve_the_outer_same_paragraph_endpoint -- --nocapture before repair","exit_code":101,"result":"focused regression proved an inner PERFORM in the final outer-paragraph statement escaped the outer endpoint"}
+    ,{"command":"focused PERFORM, EVALUATE, CICS rollback, dynamic BMS protection, and hidden FSET tests","exit_code":0,"result":"pass"}
+    ,{"command":"cargo test -p mainframe-env-compiler -p mainframe-env-interpreter -p mainframe-env-cics -p mainframe-env-server -p mainframe-env-conformance --locked","exit_code":0,"result":"121 tests passed"}
+    ,{"command":"affected-package cargo clippy --all-targets --locked -- -D warnings","exit_code":0,"result":"pass"}
+    ,{"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-base-online --check before evidence","exit_code":1,"result":"derived nine-journey receipt passed and only CD-019 evidence was missing"}
+    ,{"command":"CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-base-online --check","exit_code":0,"result":"nine journeys, 18 programs, 17 transaction/map paths, 111 reads, seven mutations, and all control cohorts passed"}
+    ,{"command":"env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-base-online --check","exit_code":1,"result":"expected carddemo.corpus.environment_missing control"}
+    ,{"command":"cargo check --workspace --all-targets --locked","exit_code":0,"result":"pass"}
+    ,{"command":"architecture, runtime architecture, profile, schema, and inventory gates","exit_code":0,"result":"pass"}
+    ,{"command":"ordinary conformance, JSON, formatting, redaction, and diff checks","exit_code":0,"result":"pass"}
   ],
   "decisions": [
     "0.1.1 uses additive CardDemo profiles and preserves core-server compatibility.",
@@ -269,6 +287,6 @@
     "Resolve 0.1.0-alpha.0 release ordering before cutting 0.1.1."
   ],
   "blockers": [],
-  "next_issue": "CD-019",
-  "next_step": "Implement CD-018 public durable CICS session APIs and bounded TN3270 compatibility over the same authority, with authentication, disconnect, timeout, restart, malformed-input, and overload controls."
+  "next_issue": "CD-020",
+  "next_step": "Certify CD-019 journeys CD.J01 through CD.J09 through public install and terminal routes with all 17 base transaction/map paths and exact mutation, restart, denial, rollback, concurrency, and resource observations."
 }

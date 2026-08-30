@@ -322,7 +322,7 @@ mod tests {
     }
     #[test]
     fn recovered_duplicate_paragraph_never_publishes() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DUPTEST. PROCEDURE DIVISION. DUP. EXIT. DUP. EXIT. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DUPTEST. PROCEDURE DIVISION. DUP. DISPLAY 'A'. DUP. EXIT. STOP RUN.";
         let analysis = CobolCompiler::default().analyze(&bundle(source));
         assert!(analysis.hir.as_ref().is_some_and(|hir| {
             hir.statements

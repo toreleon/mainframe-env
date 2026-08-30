@@ -81,6 +81,22 @@ pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, 
                 "sign_separate".into(),
                 Attribute::Integer(i64::from(layout.sign_separate)),
             ),
+            (
+                "justified_right".into(),
+                Attribute::Integer(i64::from(layout.justified_right)),
+            ),
+            (
+                "section".into(),
+                Attribute::Text(
+                    match layout.section {
+                        crate::StorageSection::File => "file",
+                        crate::StorageSection::Working => "working",
+                        crate::StorageSection::Local => "local",
+                        crate::StorageSection::Linkage => "linkage",
+                    }
+                    .into(),
+                ),
+            ),
             ("offset".into(), Attribute::Integer(layout.offset as i64)),
             ("length".into(), Attribute::Integer(layout.length as i64)),
             (
@@ -164,7 +180,10 @@ pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, 
                 "name".into(),
                 Attribute::Text(layout.qualified_name.clone()),
             ),
-            ("initial".into(), Attribute::Bytes(layout.initial.clone())),
+            (
+                "initial".into(),
+                Attribute::Bytes(runtime_root_initial(layout, &hir.layouts)),
+            ),
             ("offset".into(), Attribute::Integer(layout.offset as i64)),
             ("length".into(), Attribute::Integer(layout.length as i64)),
         ]);
@@ -245,6 +264,27 @@ fn lower_structured(
                 "edge_branch_false".into(),
                 Attribute::Integer(false_target as i64),
             );
+            if node
+                .text
+                .trim_start()
+                .to_ascii_uppercase()
+                .starts_with("WHEN ")
+                && hir.control_nodes.get(node.id + 1).is_some_and(|candidate| {
+                    candidate.parent == node.parent && candidate.role == ControlRole::Branch
+                })
+                && let Some(true_target) =
+                    hir.control_nodes
+                        .iter()
+                        .skip(node.id + 1)
+                        .find(|candidate| {
+                            candidate.parent != node.parent || candidate.role != ControlRole::Branch
+                        })
+            {
+                control.insert(
+                    "edge_branch_true".into(),
+                    Attribute::Integer(true_target.id as i64),
+                );
+            }
         }
         if let Some(statement) = node.statement.and_then(|index| hir.statements.get(index)) {
             lower_statement(statement, hir, builder, block, storage, control)?;
@@ -276,6 +316,28 @@ fn lower_structured(
         )
         .map_err(|_| LowerProblem::LimitExceeded)?;
     Ok(())
+}
+
+fn runtime_root_initial(root: &crate::CobolLayout, layouts: &[crate::CobolLayout]) -> Vec<u8> {
+    if root.category != DataCategory::Group {
+        return root.initial.clone();
+    }
+    let mut element = vec![b' '; root.element_length];
+    for child in layouts.iter().filter(|layout| {
+        layout.parent.as_deref() == Some(root.qualified_name.as_str())
+            && layout.alias_of.is_none()
+            && layout.length > 0
+    }) {
+        let Some(relative) = child.offset.checked_sub(root.offset) else {
+            continue;
+        };
+        if relative >= element.len() {
+            continue;
+        }
+        let copy = child.initial.len().min(element.len() - relative);
+        element[relative..relative + copy].copy_from_slice(&child.initial[..copy]);
+    }
+    element.repeat(root.occurs)
 }
 
 fn lower_statement(

@@ -1,17 +1,17 @@
 # CardDemo-full 0.1.1 Program Status
 
 Current phase: **CD.C — Base CICS and terminal runtime**
-Current issue: **CD-018 — durable public CICS sessions and terminal compatibility IN PROGRESS**
-Next issue: **CD-019 — base online journey certification**
+Current issue: **CD-019 — base online journey certification IN PROGRESS**
+Next issue: **CD-020 — actual CardDemo JCL and procedure parsing**
 Current product: **0.1.0-alpha.0**
 Target product: **0.1.1**
 CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Source identity
 
-- mainframe-env base commit: `a23f9e8373f92ce8ba8c0ea5ccaebc90e7f344a6`
+- mainframe-env base commit: `ace7d325c3d44e50de2b7c555fd61736a9ea0269`
 - current deterministic dirty-tree identity:
-  `sha256:de65775c88c4f4346e91642a59861cda1cd301021b730c2feb524f1d7cf8c4be`
+  `sha256:8fc4b8de09935670d93dec82d929b8fb7f11e7da30d63d9eee975f31ffeb7fcf`
 - dirty-tree algorithm: SHA-256 of the sorted `sha256sum` records for every
   repository file except `.git/`, `target/`, and the two persistent CardDemo
   status ledgers (which carry the identity).
@@ -348,6 +348,23 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   redacted before durable storage; queue writes now authorize their exact
   resource before mutation.
 
+### CD-018 — durable public CICS sessions and terminal compatibility
+
+- State: **PASS**
+- Required commit subject: `Expose CardDemo CICS terminal sessions`
+- Completion commit identity:
+  `ace7d325c3d44e50de2b7c555fd61736a9ea0269`.
+- Evidence: `conformance/0.1.1/evidence/issues/CD-018.json`
+- Evidence digest:
+  `sha256:aad1b054a1b39aba7fb537ff2562915e9ec17fe724bc5ace930ea688ce3ce5b7`
+- Seven authenticated public routes launch CC00, fetch JSON or TN3270 screens,
+  submit AID/fields, resume after restart, and disconnect through one durable
+  authority. All 17 base maps and 441 named fields install durably.
+- Principal ownership, per-session CSRF, protected/secret fields, malformed
+  streams, timeout, capacity, concurrent isolation, and restart fail closed.
+  Idle sessions retain zero workers and disconnected/expired sessions release
+  durable capacity.
+
 ## Commands and exit codes
 
 - `cargo test -p mainframe-env-conformance --locked` — **0**; 19 passed,
@@ -511,10 +528,32 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   expected missing-environment failure.
 - Workspace all-target check, all 18 cumulative CardDemo issue gates, ordinary
   conformance, JSON, formatting, redaction, and diff checks — **0**.
+- Focused nested same-paragraph `PERFORM` regression before repair — **101**;
+  an inner `PERFORM` in the outer paragraph's final statement escaped the
+  outer endpoint.
+- Focused same-paragraph, nested endpoint, multiline condition, first-match
+  `EVALUATE`, CICS rollback, dynamic BMS protection, and hidden FSET tests —
+  **0**.
+- Compiler, interpreter, CICS, server, and conformance suites — **0**; 121
+  tests passed.
+- Affected-package Clippy with `-D warnings` — **0**.
+- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-base-online --check`
+  before evidence — **1**; the derived nine-journey receipt passed and only
+  the required CD-019 evidence file was absent.
+- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-base-online --check`
+  — **0**; nine journeys, 18 installed programs, all 17 transaction/map paths,
+  111 dataset reads, seven committed mutations, and rollback, denial, restart,
+  concurrency, and resource controls passed.
+- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-base-online --check` — **1**;
+  expected missing-environment failure.
+- Workspace all-target check — **0**.
+- Architecture, runtime architecture, profile, schema, and inventory gates —
+  **0**.
+- Ordinary conformance, JSON, formatting, redaction, and diff checks — **0**.
 
 ## Implementation status
 
-- Issues passed: **17 / 27**
+- Issues passed: **18 / 27**
 - Journeys passed: **0 / 20**
 - Installed CardDemo resources: **0**
 - Executed CardDemo application journeys: **0**
@@ -528,10 +567,10 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 2. The repository is still `0.1.0-alpha.0`. A 0.1.1 release cannot be cut until
    0.1.0 is finalized or an explicit version-line correction is accepted.
 
-Neither decision blocks CD-018. No CD-017 blocker remains.
+Neither decision blocks CD-019. No CD-018 blocker remains.
 
 ## Next smallest executable step
 
-Expose public, durable protocol-neutral CICS session APIs and a bounded TN3270
-adapter over the same authority, including authentication, disconnect, timeout,
-restart, malformed-input, and overload behavior.
+Run CD.J01 through CD.J09 through the public install and terminal routes, prove
+all 17 base transaction/map paths, and record exact mutation, restart, denial,
+rollback, concurrency, and resource observations.

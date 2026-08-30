@@ -49,6 +49,8 @@ struct LayoutMetadata {
     scale: u32,
     signed: bool,
     sign_separate: bool,
+    justified_right: bool,
+    linkage: bool,
     offset: usize,
     length: usize,
     element_length: usize,
@@ -102,6 +104,8 @@ enum PendingKind {
         targets: Vec<String>,
     },
     Cics {
+        operation: CicsOperation,
+        argument_summary: String,
         into: Option<String>,
         outputs: BTreeMap<String, String>,
         response: Option<String>,
@@ -137,6 +141,7 @@ pub struct ReferenceMachine {
     views: BTreeMap<String, StorageView>,
     views_by_id: BTreeMap<StorageId, StorageView>,
     entry_initials: BTreeMap<StorageId, Vec<u8>>,
+    implicit: BTreeMap<String, CobolValue>,
     layouts: BTreeMap<String, LayoutMetadata>,
     simple_layouts: BTreeMap<String, Vec<String>>,
     files: BTreeMap<String, FileMetadata>,
@@ -164,6 +169,57 @@ impl ReferenceMachine {
         validate_module(&module)?;
         let (bases, views, views_by_id) = storage(&module, invocation.limits.max_storage_bytes)?;
         let mut entry_initials = BTreeMap::new();
+        let entry_commarea_len = invocation
+            .bindings
+            .get("cics.commarea")
+            .map(|value| value.bytes().len());
+        let entry_aid = invocation
+            .bindings
+            .get("cics.aid")
+            .and_then(|value| value.bytes().first().copied());
+        let entry_transaction = invocation
+            .bindings
+            .get("cics.transaction")
+            .map(|value| value.bytes().to_vec());
+        let mut implicit = BTreeMap::from([
+            (
+                "EIBRESP".into(),
+                CobolValue::Decimal(Decimal {
+                    coefficient: 0,
+                    scale: 0,
+                }),
+            ),
+            (
+                "EIBRESP2".into(),
+                CobolValue::Decimal(Decimal {
+                    coefficient: 0,
+                    scale: 0,
+                }),
+            ),
+            (
+                "EIBCALEN".into(),
+                CobolValue::Decimal(Decimal {
+                    coefficient: i128::try_from(entry_commarea_len.unwrap_or(0))
+                        .map_err(|_| MachineProblem::InvalidOperation)?,
+                    scale: 0,
+                }),
+            ),
+            (
+                "EIBAID".into(),
+                CobolValue::Bytes(vec![entry_aid.unwrap_or(0)]),
+            ),
+            (
+                "EIBTRNID".into(),
+                CobolValue::Bytes(entry_transaction.clone().unwrap_or_default()),
+            ),
+            (
+                "RETURN-CODE".into(),
+                CobolValue::Decimal(Decimal {
+                    coefficient: 0,
+                    scale: 0,
+                }),
+            ),
+        ]);
         if let Some(commarea) = invocation.bindings.get("cics.commarea")
             && let Some(storage) = module
                 .storage()
@@ -183,6 +239,30 @@ impl ReferenceMachine {
             .cloned()
             .collect();
         let (layouts, simple_layouts) = layout_metadata(&operations)?;
+        if let Some(call) = invocation.bindings.get("cobol.call.arguments") {
+            let values = decode_call_arguments(call)?;
+            let mut linkage = layouts
+                .values()
+                .filter(|layout| layout.linkage && layout.parent.is_none() && layout.length > 0)
+                .collect::<Vec<_>>();
+            linkage.sort_by_key(|layout| layout.offset);
+            if linkage.len() < values.len() {
+                return Err(MachineProblem::InvalidOperation);
+            }
+            for (layout, value) in linkage.into_iter().zip(values) {
+                let storage = module
+                    .storage()
+                    .iter()
+                    .find(|storage| storage.name.eq_ignore_ascii_case(&layout.name))
+                    .ok_or(MachineProblem::UnknownStorage)?;
+                entry_initials.insert(
+                    storage.id,
+                    FixedValue::fit(&value, layout.length, false)
+                        .bytes()
+                        .to_vec(),
+                );
+            }
+        }
         let files = file_metadata(&operations)?;
         let labels = operations
             .iter()
@@ -212,13 +292,14 @@ impl ReferenceMachine {
                     .map(|node| (node, index))
             })
             .collect();
-        Ok(Self {
+        let mut machine = Self {
             invocation,
             operations,
             bases,
             views,
             views_by_id,
             entry_initials,
+            implicit: std::mem::take(&mut implicit),
             layouts,
             simple_layouts,
             files,
@@ -233,13 +314,36 @@ impl ReferenceMachine {
             pending: None,
             perform_stack: Vec::new(),
             deferred_drive: None,
-        })
+        };
+        if let Some(entry_commarea_len) = entry_commarea_len
+            && machine.layout("EIBCALEN").is_some()
+        {
+            machine.write_decimal(
+                "EIBCALEN",
+                Decimal {
+                    coefficient: i128::try_from(entry_commarea_len)
+                        .map_err(|_| MachineProblem::InvalidOperation)?,
+                    scale: 0,
+                },
+            )?;
+        }
+        if let Some(aid) = entry_aid
+            && machine.layout("EIBAID").is_some()
+        {
+            machine.write("EIBAID", &[aid])?;
+        }
+        if let Some(transaction) = entry_transaction
+            && machine.layout("EIBTRNID").is_some()
+        {
+            machine.write("EIBTRNID", &transaction)?;
+        }
+        Ok(machine)
     }
 
     #[must_use]
     pub fn snapshot(&self) -> MachineSnapshot {
         MachineSnapshot {
-            schema_version: 2,
+            schema_version: 3,
             program_counter: self.pc,
             effect_sequence: self.effect_sequence,
             output: self.output.clone(),
@@ -252,7 +356,7 @@ impl ReferenceMachine {
     }
 
     pub fn restore(&mut self, snapshot: MachineSnapshot) -> Result<(), MachineProblem> {
-        if !matches!(snapshot.schema_version, 1 | 2)
+        if !matches!(snapshot.schema_version, 1..=3)
             || snapshot.program_counter > self.operations.len()
             || snapshot.base_storage.iter().map(Vec::len).sum::<usize>()
                 > self.invocation.limits.max_storage_bytes as usize
@@ -263,7 +367,15 @@ impl ReferenceMachine {
         self.effect_sequence = snapshot.effect_sequence;
         self.output = snapshot.output;
         self.bases = snapshot.base_storage;
-        self.perform_stack = snapshot.perform_stack;
+        self.perform_stack = if snapshot.schema_version < 3 {
+            snapshot
+                .perform_stack
+                .into_iter()
+                .map(|return_pc| return_pc.saturating_sub(1))
+                .collect()
+        } else {
+            snapshot.perform_stack
+        };
         self.altered = snapshot.altered_targets;
         self.loop_reentry = snapshot.loop_reentry;
         self.loop_counts = snapshot.loop_counts;
@@ -277,6 +389,7 @@ impl ReferenceMachine {
             payload.schema(),
             "mainframe-env.reference-machine-checkpoint@1"
                 | "mainframe-env.reference-machine-checkpoint@2"
+                | "mainframe-env.reference-machine-checkpoint@3"
         ) {
             return Err(MachineProblem::IncompatibleSnapshot);
         }
@@ -286,7 +399,8 @@ impl ReferenceMachine {
             self.invocation.limits.max_output_bytes as usize,
             self.invocation.limits.max_frames as usize,
         )?;
-        self.restore(snapshot)
+        self.restore(snapshot)?;
+        self.reapply_entry_context()
     }
 
     #[must_use]
@@ -298,6 +412,37 @@ impl ReferenceMachine {
         self.read(name).ok().map(FixedValue::new)
     }
 
+    pub fn linkage_values(&self) -> Result<Vec<Vec<u8>>, MachineProblem> {
+        let mut linkage = self
+            .layouts
+            .values()
+            .filter(|layout| layout.linkage && layout.parent.is_none() && layout.length > 0)
+            .collect::<Vec<_>>();
+        linkage.sort_by_key(|layout| layout.offset);
+        linkage
+            .into_iter()
+            .map(|layout| self.read(&layout.name))
+            .collect()
+    }
+
+    #[must_use]
+    pub fn position_summary(&self) -> String {
+        self.operations.get(self.pc).map_or_else(
+            || format!("pc={} completed", self.pc),
+            |operation| {
+                format!(
+                    "pc={} {} {:?} role={:?} scope={:?} text={:?}",
+                    self.pc,
+                    operation.identity.name(),
+                    arguments(operation),
+                    optional_text_attribute(operation, "control_role"),
+                    optional_text_attribute(operation, "control_scope"),
+                    optional_text_attribute(operation, "control_text")
+                )
+            },
+        )
+    }
+
     fn resume_host(&mut self, result: EffectResult) -> Result<(), MachineProblem> {
         let pending = self
             .pending
@@ -306,7 +451,21 @@ impl ReferenceMachine {
         result
             .validate(pending.sequence, HostLimits::default())
             .map_err(MachineProblem::Host)?;
-        let outcome = result.outcome.map_err(MachineProblem::Host)?;
+        let outcome = result
+            .outcome
+            .map_err(|problem| match (&pending.kind, problem) {
+                (
+                    PendingKind::Cics {
+                        operation,
+                        argument_summary,
+                        ..
+                    },
+                    problem,
+                ) => MachineProblem::InvalidArtifact(format!(
+                    "CICS {operation:?} {argument_summary} host call failed: {problem:?}"
+                )),
+                (_, problem) => MachineProblem::Host(problem),
+            })?;
         match (pending.kind, outcome) {
             (PendingKind::Accept { target }, HostResult::Terminal(payload)) => {
                 self.write(&target, payload.bytes())?
@@ -355,6 +514,8 @@ impl ReferenceMachine {
             }
             (
                 PendingKind::Cics {
+                    operation,
+                    argument_summary: _,
                     into,
                     outputs,
                     response: response_target,
@@ -394,6 +555,29 @@ impl ReferenceMachine {
                     )?;
                 }
                 for (name, value) in &response.outputs {
+                    if let Some(field) = name.strip_prefix("BMS.") {
+                        if let Some(field) = field.strip_suffix(".LENGTH") {
+                            let target = format!("{field}L");
+                            if self.layout(&target).is_some() {
+                                let coefficient = String::from_utf8_lossy(value.bytes())
+                                    .parse::<i128>()
+                                    .map_err(|_| MachineProblem::UnexpectedHostResult)?;
+                                self.write_decimal(
+                                    &target,
+                                    Decimal {
+                                        coefficient,
+                                        scale: 0,
+                                    },
+                                )?;
+                            }
+                        } else {
+                            let target = format!("{field}I");
+                            if self.layout(&target).is_some() {
+                                self.write(&target, value.bytes())?;
+                            }
+                        }
+                        continue;
+                    }
                     let Some(target) = outputs.get(name) else {
                         continue;
                     };
@@ -412,7 +596,7 @@ impl ReferenceMachine {
                         self.write_cics_value(target, &CobolValue::Bytes(value.bytes().to_vec()))?;
                     }
                 }
-                self.write_cics_context(&response)?;
+                self.write_cics_context(operation, &response)?;
                 self.deferred_drive = match response.disposition {
                     CicsDisposition::Complete => (response.response != 0 && !responded).then_some(
                         MachineDrive::Condition(Condition {
@@ -422,14 +606,17 @@ impl ReferenceMachine {
                             handled: false,
                         }),
                     ),
-                    CicsDisposition::Suspended => Some(MachineDrive::Suspended(Suspension {
-                        kind: "cics-terminal".into(),
-                        resume_token: format!(
-                            "{}:{}",
-                            self.invocation.run_unit_id, self.effect_sequence
-                        ),
-                        state_bytes: response.payload.bytes().len() as u64,
-                    })),
+                    CicsDisposition::Suspended => {
+                        self.pc = self.pc.saturating_sub(1);
+                        Some(MachineDrive::Suspended(Suspension {
+                            kind: "cics-terminal".into(),
+                            resume_token: format!(
+                                "{}:{}",
+                                self.invocation.run_unit_id, self.effect_sequence
+                            ),
+                            state_bytes: response.payload.bytes().len() as u64,
+                        }))
+                    }
                     CicsDisposition::Transfer => {
                         let target = response
                             .target
@@ -494,6 +681,7 @@ impl ReferenceMachine {
                     .cloned()
                     .unwrap_or(bytes_attribute(operation, "initial")?.to_vec());
                 self.write_storage(reference.storage, &bytes)?;
+                self.reapply_entry_context()?;
             }
             "display" => {
                 let mut line = Vec::new();
@@ -558,13 +746,12 @@ impl ReferenceMachine {
             }
             "perform" => {
                 let target = args.first().ok_or(MachineProblem::InvalidOperation)?;
-                self.perform_stack.push(self.pc + 1);
+                self.perform_stack.push(self.pc);
                 return Ok(Step::Jump(self.label(target)?));
             }
             "exit" => {
-                if let Some(return_pc) = self.perform_stack.pop() {
-                    return Ok(Step::Jump(return_pc));
-                }
+                // A paragraph EXIT is a no-op; the active PERFORM frame returns
+                // at the exact paragraph endpoint in the machine driver.
             }
             "entry" | "label" | "continue" => {}
             "accept" => return self.accept_effect(&args),
@@ -578,11 +765,6 @@ impl ReferenceMachine {
         }
         if optional_integer_attribute(operation, "edge_loop").is_some() {
             return self.perform_control_end(operation);
-        }
-        if optional_integer_attribute(operation, "edge_return").is_some()
-            && let Some(return_pc) = self.perform_stack.pop()
-        {
-            return Ok(Step::Jump(return_pc));
         }
         if optional_integer_attribute(operation, "edge_fallthrough").is_some() {
             let target = self.control_target(operation, "edge_fallthrough")?;
@@ -619,15 +801,47 @@ impl ReferenceMachine {
             }
             "branch" => {
                 if self.control_branch(operation)? {
-                    Ok(Some(Step::Next))
+                    if optional_integer_attribute(operation, "edge_branch_true").is_some() {
+                        Ok(Some(Step::Jump(
+                            self.control_target(operation, "edge_branch_true")?,
+                        )))
+                    } else {
+                        Ok(Some(Step::Next))
+                    }
                 } else {
                     Ok(Some(Step::Jump(
                         self.control_target(operation, "edge_branch_false")?,
                     )))
                 }
             }
-            "block_end" if scope == "perform" => Ok(Some(Step::Next)),
-            "block_end" | "terminator" => Ok(Some(Step::Next)),
+            "block_end" => {
+                if optional_integer_attribute(operation, "edge_loop").is_some() {
+                    self.perform_control_end(operation).map(Some)
+                } else if optional_integer_attribute(operation, "edge_fallthrough").is_some() {
+                    let target = self.control_target(operation, "edge_fallthrough")?;
+                    Ok(Some(if target == self.pc.saturating_add(1) {
+                        Step::Next
+                    } else {
+                        Step::Jump(target)
+                    }))
+                } else {
+                    Ok(Some(Step::Next))
+                }
+            }
+            "terminator" => {
+                if self.at_perform_endpoint() {
+                    Ok(Some(Step::Next))
+                } else if optional_integer_attribute(operation, "edge_fallthrough").is_some() {
+                    let target = self.control_target(operation, "edge_fallthrough")?;
+                    Ok(Some(if target == self.pc.saturating_add(1) {
+                        Step::Next
+                    } else {
+                        Step::Jump(target)
+                    }))
+                } else {
+                    Ok(Some(Step::Next))
+                }
+            }
             "transfer" if name == "go_to" || name == "next_sentence" => Ok(Some(Step::Jump(
                 self.control_target(operation, "edge_transfer")?,
             ))),
@@ -666,8 +880,16 @@ impl ReferenceMachine {
             if subject.first().is_some_and(|token| token == "TRUE") {
                 self.eval_condition(condition)
             } else {
-                let left = self.eval_value(&subject)?;
-                let right = self.eval_value(condition)?;
+                let left = self.eval_value(&subject).map_err(|problem| {
+                    MachineProblem::InvalidArtifact(format!(
+                        "evaluate subject {subject:?}: {problem:?}"
+                    ))
+                })?;
+                let right = self.eval_value(condition).map_err(|problem| {
+                    MachineProblem::InvalidArtifact(format!(
+                        "evaluate condition {condition:?}: {problem:?}"
+                    ))
+                })?;
                 Ok(match (left, right) {
                     (CobolValue::Decimal(left), CobolValue::Decimal(right)) => {
                         let (left, right) = decimal_aligned(left, right)?;
@@ -700,10 +922,14 @@ impl ReferenceMachine {
                 .get(varying + 1)
                 .ok_or(MachineProblem::InvalidOperation)?;
             if !reentry {
-                let from = position(args, "FROM")
-                    .and_then(|index| args.get(index + 1))
-                    .ok_or(MachineProblem::InvalidOperation)?;
-                let value = self.eval_value(std::slice::from_ref(from))?;
+                let from = position(args, "FROM").ok_or(MachineProblem::InvalidOperation)? + 1;
+                let end = position(args, "BY")
+                    .or_else(|| position(args, "UNTIL"))
+                    .unwrap_or(args.len());
+                if from >= end {
+                    return Err(MachineProblem::InvalidOperation);
+                }
+                let value = self.eval_value(&args[from..end])?;
                 self.write_value(variable, &value)?;
             }
         } else if let Some(times) = position(args, "TIMES") {
@@ -734,7 +960,7 @@ impl ReferenceMachine {
 
     fn perform_control_end(&mut self, operation: &Operation) -> Result<Step, MachineProblem> {
         let parent = usize::try_from(
-            optional_integer_attribute(operation, "control_parent")
+            optional_integer_attribute(operation, "edge_loop")
                 .ok_or(MachineProblem::InvalidOperation)?,
         )
         .map_err(|_| MachineProblem::InvalidOperation)?;
@@ -763,6 +989,66 @@ impl ReferenceMachine {
         }
         self.loop_reentry.insert(parent);
         Ok(Step::Jump(self.control_target(operation, "edge_loop")?))
+    }
+
+    fn at_perform_endpoint(&self) -> bool {
+        let Some(call_pc) = self.perform_stack.last().copied() else {
+            return false;
+        };
+        self.perform_endpoint(call_pc) == Some(self.pc)
+    }
+
+    fn perform_endpoint(&self, call_pc: usize) -> Option<usize> {
+        let call = self.operations.get(call_pc)?;
+        let args = arguments(call);
+        let target = position(&args, "THRU")
+            .or_else(|| position(&args, "THROUGH"))
+            .and_then(|index| args.get(index + 1))
+            .or_else(|| args.first());
+        let start = target.and_then(|target| self.labels.get(&normalize(target)).copied())?;
+        Some(
+            self.labels
+                .values()
+                .copied()
+                .filter(|label| *label > start)
+                .min()
+                .unwrap_or_else(|| {
+                    if self
+                        .operations
+                        .last()
+                        .is_some_and(|operation| operation.identity.name() == "halt")
+                    {
+                        self.operations.len().saturating_sub(1)
+                    } else {
+                        self.operations.len()
+                    }
+                })
+                .saturating_sub(1),
+        )
+    }
+
+    fn perform_return_pc(&self, call_pc: usize) -> usize {
+        self.operations
+            .get(call_pc)
+            .and_then(|operation| self.control_target(operation, "edge_fallthrough").ok())
+            .unwrap_or(call_pc.saturating_add(1))
+    }
+
+    fn finish_perform(&mut self) -> Result<usize, MachineProblem> {
+        let mut completed_pc = self
+            .perform_stack
+            .pop()
+            .ok_or(MachineProblem::InvalidOperation)?;
+        let mut return_pc = self.perform_return_pc(completed_pc);
+        while let Some(outer_call_pc) = self.perform_stack.last().copied() {
+            if self.perform_endpoint(outer_call_pc) != Some(completed_pc) {
+                break;
+            }
+            self.perform_stack.pop();
+            completed_pc = outer_call_pc;
+            return_pc = self.perform_return_pc(completed_pc);
+        }
+        Ok(return_pc)
     }
 
     fn accept_effect(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
@@ -910,6 +1196,7 @@ impl ReferenceMachine {
         let absolute_time = cics_destination(&arguments, "ABSTIME");
         for key in [
             "FROM", "COMMAREA", "RIDFLD", "LENGTH", "QUEUE", "MAP", "MAPSET", "TRANSID", "PROGRAM",
+            "DATASET", "FILE", "MEMBER", "VERSION",
         ] {
             if outputs.contains_key(key) {
                 continue;
@@ -917,6 +1204,9 @@ impl ReferenceMachine {
             let Some(argument) = arguments.get(key) else {
                 continue;
             };
+            if argument.schema() == "mainframe-env.cics.literal@1" {
+                continue;
+            }
             let token = String::from_utf8_lossy(argument.bytes()).into_owned();
             let reference_tokens = token
                 .split_whitespace()
@@ -986,6 +1276,21 @@ impl ReferenceMachine {
                     .unwrap_or_else(|| "DEFAULT".into()),
             );
         }
+        let argument_summary = arguments
+            .iter()
+            .map(|(name, value)| {
+                if matches!(name.as_str(), "MAP" | "MAPSET" | "TRANSID" | "PROGRAM") {
+                    format!(
+                        "{name}={:?}/{}",
+                        String::from_utf8_lossy(value.bytes()),
+                        value.schema()
+                    )
+                } else {
+                    format!("{name}=<{} bytes>/{}", value.bytes().len(), value.schema())
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(",");
         self.effect(
             HostRequest::Cics(CicsRequest {
                 operation,
@@ -994,6 +1299,8 @@ impl ReferenceMachine {
                 mutation,
             }),
             PendingKind::Cics {
+                operation,
+                argument_summary,
                 into,
                 outputs,
                 response: response_target,
@@ -1003,28 +1310,27 @@ impl ReferenceMachine {
         )
     }
 
-    fn write_cics_context(&mut self, response: &CicsResponse) -> Result<(), MachineProblem> {
+    fn write_cics_context(
+        &mut self,
+        operation: CicsOperation,
+        response: &CicsResponse,
+    ) -> Result<(), MachineProblem> {
         for (name, value) in [
             ("EIBRESP", i128::from(response.response)),
             ("EIBRESP2", i128::from(response.response2)),
-            ("EIBCALEN", response.payload.bytes().len() as i128),
         ] {
-            if self.layout(name).is_some() {
-                self.write_decimal(
-                    name,
-                    Decimal {
-                        coefficient: value,
-                        scale: 0,
-                    },
-                )?;
-            }
+            self.write_decimal(
+                name,
+                Decimal {
+                    coefficient: value,
+                    scale: 0,
+                },
+            )?;
         }
-        if self.layout("EIBAID").is_some() {
+        if operation == CicsOperation::ReceiveMap {
             self.write("EIBAID", &[response.aid])?;
         }
-        if self.layout("EIBTRNID").is_some() {
-            self.write("EIBTRNID", response.transaction.as_bytes())?;
-        }
+        self.write("EIBTRNID", response.transaction.as_bytes())?;
         Ok(())
     }
 
@@ -1134,14 +1440,60 @@ impl ReferenceMachine {
             return Err(MachineProblem::InvalidOperation);
         }
         let value = self.eval_value(&args[..to])?;
-        if args[to + 1..].iter().any(|token| token == "(") {
-            return self.write_reference_value(&args[to + 1..], &value);
-        }
-        for target in args[to + 1..]
+        let figurative =
+            (to == 1)
+                .then(|| normalize(&args[0]))
+                .and_then(|name| match name.as_str() {
+                    "SPACE" | "SPACES" => Some(b' '),
+                    "ZERO" | "ZEROS" | "ZEROES" => Some(b'0'),
+                    "LOW-VALUE" | "LOW-VALUES" => Some(0),
+                    "HIGH-VALUE" | "HIGH-VALUES" => Some(0xff),
+                    _ => None,
+                });
+        let source_display = self
+            .reference(&args[..to])
+            .ok()
+            .filter(|reference| {
+                matches!(
+                    reference.layout.category,
+                    LayoutCategory::NumericDisplay | LayoutCategory::NumericEdited
+                )
+            })
+            .and_then(|reference| self.read_reference(&reference).ok());
+        let targets = &args[to + 1..];
+        let control = targets
             .iter()
-            .take_while(|target| !matches!(target.as_str(), "ROUNDED" | "ON" | "NOT" | "END-MOVE"))
-        {
-            self.write_value(target, &value)?;
+            .position(|target| matches!(target.as_str(), "ROUNDED" | "ON" | "NOT" | "END-MOVE"))
+            .unwrap_or(targets.len());
+        let mut at = 0usize;
+        while at < control {
+            if self.implicit.contains_key(&normalize(&targets[at])) {
+                self.write_value(&targets[at], &value)?;
+                at += 1;
+                continue;
+            }
+            let end = (at + 1..=control)
+                .rev()
+                .find(|end| self.reference(&targets[at..*end]).is_ok())
+                .ok_or(MachineProblem::UnknownStorage)?;
+            let target = self.reference(&targets[at..end])?;
+            let value = if figurative == Some(b'0') && is_numeric(target.layout.category) {
+                CobolValue::Decimal(Decimal {
+                    coefficient: 0,
+                    scale: target.layout.scale,
+                })
+            } else if let Some(byte) = figurative {
+                CobolValue::Bytes(vec![byte; target.length])
+            } else if matches!(&value, CobolValue::Decimal(_))
+                && !is_numeric(target.layout.category)
+                && let Some(source_display) = &source_display
+            {
+                CobolValue::Bytes(source_display.clone())
+            } else {
+                value.clone()
+            };
+            self.write_reference_value(&targets[at..end], &value)?;
+            at = end;
         }
         Ok(())
     }
@@ -1161,8 +1513,29 @@ impl ReferenceMachine {
                 .condition_values
                 .first()
                 .ok_or(MachineProblem::InvalidOperation)?;
-            let value = value.trim_matches(['\'', '"']).as_bytes().to_vec();
-            return self.write(&parent, &value);
+            let parent_layout = self
+                .layouts
+                .get(&parent)
+                .cloned()
+                .ok_or(MachineProblem::UnknownStorage)?;
+            let normalized = normalize(value);
+            let value = match normalized.as_str() {
+                "SPACE" | "SPACES" => CobolValue::Bytes(vec![b' '; parent_layout.length]),
+                "LOW-VALUE" | "LOW-VALUES" => CobolValue::Bytes(vec![0; parent_layout.length]),
+                "HIGH-VALUE" | "HIGH-VALUES" => CobolValue::Bytes(vec![0xff; parent_layout.length]),
+                "ZERO" | "ZEROS" | "ZEROES" if is_numeric(parent_layout.category) => {
+                    CobolValue::Decimal(Decimal {
+                        coefficient: 0,
+                        scale: parent_layout.scale,
+                    })
+                }
+                "ZERO" | "ZEROS" | "ZEROES" => CobolValue::Bytes(vec![b'0'; parent_layout.length]),
+                _ if is_numeric(parent_layout.category) => {
+                    CobolValue::Decimal(decimal_text(value).ok_or(MachineProblem::DataException)?)
+                }
+                _ => CobolValue::Bytes(value.trim_matches(['\'', '"']).as_bytes().to_vec()),
+            };
+            return self.write_reference_value(&[parent], &value);
         }
         let value = self.eval_value(&args[2..3])?;
         self.write_value(&args[0], &value)
@@ -1322,7 +1695,21 @@ impl ReferenceMachine {
             return Ok(value);
         }
         let start = *position;
-        if token == "FUNCTION" {
+        if token == "LENGTH" && args.get(start + 1).is_some_and(|token| token == "OF") {
+            let reference_start = start + 2;
+            let reference_name = args
+                .get(reference_start)
+                .ok_or(MachineProblem::InvalidOperation)?;
+            *position = reference_start + 1;
+            if args.get(*position).is_some_and(|token| token == "(") {
+                *position = matching_close(args, *position)
+                    .ok_or(MachineProblem::InvalidOperation)?
+                    .saturating_add(1);
+            }
+            if reference_name.is_empty() {
+                return Err(MachineProblem::InvalidOperation);
+            }
+        } else if token == "FUNCTION" {
             let open = args[start..]
                 .iter()
                 .position(|token| token == "(")
@@ -1448,8 +1835,38 @@ impl ReferenceMachine {
         if args.is_empty() {
             return Err(MachineProblem::InvalidOperation);
         }
-        let source = self.read(&args[0])?;
-        if let Some(replacing) = position(args, "REPLACING") {
+        let control = ["CONVERTING", "REPLACING", "TALLYING"]
+            .into_iter()
+            .filter_map(|keyword| position(args, keyword))
+            .min()
+            .unwrap_or(args.len());
+        let reference = self.reference(&args[..control])?;
+        let source = self.read_reference(&reference)?;
+        if let Some(converting) = position(args, "CONVERTING") {
+            if args.get(converting + 2).is_none_or(|token| token != "TO") {
+                return Err(MachineProblem::InvalidOperation);
+            }
+            let from = self.resolve(
+                args.get(converting + 1)
+                    .ok_or(MachineProblem::InvalidOperation)?,
+            )?;
+            let to = self.resolve(
+                args.get(converting + 3)
+                    .ok_or(MachineProblem::InvalidOperation)?,
+            )?;
+            if from.is_empty() || from.len() != to.len() {
+                return Err(MachineProblem::DataException);
+            }
+            let converted = source
+                .iter()
+                .map(|byte| {
+                    from.iter()
+                        .position(|candidate| candidate == byte)
+                        .map_or(*byte, |index| to[index])
+                })
+                .collect::<Vec<_>>();
+            self.write_reference(&reference, &converted)?;
+        } else if let Some(replacing) = position(args, "REPLACING") {
             if args.get(replacing + 1).is_none_or(|token| token != "ALL")
                 || args.get(replacing + 3).is_none_or(|token| token != "BY")
             {
@@ -1464,7 +1881,7 @@ impl ReferenceMachine {
                     .ok_or(MachineProblem::InvalidOperation)?,
             )?;
             let replaced = replace_bytes(&source, &from, &to)?;
-            self.write(&args[0], &replaced)?;
+            self.write_reference(&reference, &replaced)?;
         } else if let Some(tallying) = position(args, "TALLYING") {
             let target = args
                 .get(tallying + 1)
@@ -1490,14 +1907,18 @@ impl ReferenceMachine {
     }
 
     fn initialize_op(&mut self, args: &[String]) -> Result<(), MachineProblem> {
-        for target in args
+        let control = args
             .iter()
-            .take_while(|target| !matches!(target.as_str(), "REPLACING" | "WITH"))
-        {
-            let layout = self
-                .layout(target)
-                .cloned()
+            .position(|target| matches!(target.as_str(), "REPLACING" | "WITH"))
+            .unwrap_or(args.len());
+        let mut at = 0usize;
+        while at < control {
+            let end = (at + 1..=control)
+                .rev()
+                .find(|end| self.reference(&args[at..*end]).is_ok())
                 .ok_or(MachineProblem::UnknownStorage)?;
+            let reference = self.reference(&args[at..end])?;
+            let layout = reference.layout.clone();
             let targets = if layout.category == LayoutCategory::Group {
                 self.layouts
                     .values()
@@ -1528,6 +1949,7 @@ impl ReferenceMachine {
                     self.write_raw(&target.name, &vec![b' '; target.length])?;
                 }
             }
+            at = end;
         }
         Ok(())
     }
@@ -1581,22 +2003,73 @@ impl ReferenceMachine {
         if tokens.is_empty() {
             return Err(MachineProblem::InvalidOperation);
         }
+        if tokens.len() == 4 && tokens[0] == "DFHRESP" && tokens[1] == "(" && tokens[3] == ")" {
+            let coefficient = match tokens[2].as_str() {
+                "NORMAL" => 0,
+                "NOTFND" => 13,
+                "DUPREC" => 14,
+                "DUPKEY" => 15,
+                "ENDFILE" => 20,
+                _ => return Err(MachineProblem::UnsupportedForm),
+            };
+            return Ok(CobolValue::Decimal(Decimal {
+                coefficient,
+                scale: 0,
+            }));
+        }
         if tokens[0] == "FUNCTION" {
             return self.eval_function(tokens);
         }
-        if let Ok(reference) = self.reference(tokens) {
-            let bytes = self.read_reference(&reference)?;
-            if is_numeric(reference.layout.category) && reference.length == reference.layout.length
-            {
-                return Ok(CobolValue::Decimal(decode_decimal(
-                    &reference.layout,
-                    &bytes,
-                )?));
+        if tokens.first().is_some_and(|token| token == "LENGTH")
+            && tokens.get(1).is_some_and(|token| token == "OF")
+        {
+            let reference = self.reference(&tokens[2..])?;
+            return Ok(CobolValue::Decimal(Decimal {
+                coefficient: i128::try_from(reference.length)
+                    .map_err(|_| MachineProblem::ResourceExhausted)?,
+                scale: 0,
+            }));
+        }
+        if tokens.len() == 1
+            && self.layout(&tokens[0]).is_none()
+            && let Some(value) = self.implicit.get(&normalize(&tokens[0]))
+        {
+            return Ok(value.clone());
+        }
+        match self.reference(tokens) {
+            Ok(reference) => {
+                let bytes = self.read_reference(&reference)?;
+                if is_numeric(reference.layout.category)
+                    && reference.length == reference.layout.length
+                {
+                    return match decode_decimal(&reference.layout, &bytes) {
+                        Ok(value) => Ok(CobolValue::Decimal(value)),
+                        Err(MachineProblem::DataException)
+                            if matches!(
+                                reference.layout.category,
+                                LayoutCategory::NumericDisplay | LayoutCategory::NumericEdited
+                            ) =>
+                        {
+                            Ok(CobolValue::Bytes(bytes))
+                        }
+                        Err(problem) => Err(problem),
+                    };
+                }
+                return Ok(CobolValue::Bytes(bytes));
             }
-            return Ok(CobolValue::Bytes(bytes));
+            Err(problem)
+                if tokens.len() > 1
+                    && tokens
+                        .iter()
+                        .any(|token| matches!(token.as_str(), "(" | "OF" | "IN")) =>
+            {
+                return Err(problem);
+            }
+            Err(_) => {}
         }
         if tokens.len() == 1
             && let Some(value) = decimal_text(&tokens[0])
+            && !matches!(tokens[0].as_bytes().first(), Some(b'\'' | b'"'))
         {
             return Ok(CobolValue::Decimal(value));
         }
@@ -1724,31 +2197,39 @@ impl ReferenceMachine {
     }
 
     fn eval_condition(&self, tokens: &[String]) -> Result<bool, MachineProblem> {
+        let normalized;
+        let tokens = if tokens.windows(2).any(comparison_pair) {
+            normalized = normalize_comparison_tokens(tokens);
+            normalized.as_slice()
+        } else {
+            tokens
+        };
         let tokens = strip_condition_parentheses(tokens);
         if let Some(or) = top_level_position(tokens, "OR") {
-            return Ok(
-                self.eval_condition(&tokens[..or])? || self.eval_condition(&tokens[or + 1..])?
-            );
+            let left = &tokens[..or];
+            let right_tokens = &tokens[or + 1..];
+            let right = if self.is_standalone_condition(right_tokens)? {
+                right_tokens.to_vec()
+            } else {
+                abbreviated_condition(left, right_tokens)
+            };
+            return Ok(self.eval_condition(left)? || self.eval_condition(&right)?);
         }
         if let Some(and) = top_level_position(tokens, "AND") {
-            return Ok(
-                self.eval_condition(&tokens[..and])? && self.eval_condition(&tokens[and + 1..])?
-            );
+            let left = &tokens[..and];
+            let right_tokens = &tokens[and + 1..];
+            let right = if self.is_standalone_condition(right_tokens)? {
+                right_tokens.to_vec()
+            } else {
+                abbreviated_condition(left, right_tokens)
+            };
+            return Ok(self.eval_condition(left)? && self.eval_condition(&right)?);
         }
         if tokens.first().is_some_and(|token| token == "NOT") {
             return Ok(!self.eval_condition(&tokens[1..])?);
         }
-        if tokens.len() == 1 {
-            let condition = self
-                .layout(&tokens[0])
-                .filter(|layout| layout.category == LayoutCategory::Condition)
-                .ok_or(MachineProblem::UnsupportedForm)?;
-            let parent = condition
-                .parent
-                .as_deref()
-                .ok_or(MachineProblem::InvalidOperation)?;
-            let actual = self.read(parent)?;
-            return condition_matches(&actual, &condition.condition_values);
+        if let Some(matched) = self.condition_name_matches(tokens)? {
+            return Ok(matched);
         }
         if tokens.len() >= 2 {
             let class = tokens.last().map(String::as_str).unwrap_or_default();
@@ -1763,7 +2244,9 @@ impl ReferenceMachine {
                 let negate = tokens[..tokens.len() - 1]
                     .iter()
                     .any(|token| token == "NOT");
-                let value = self.eval_value(&tokens[..is])?;
+                let value_end =
+                    is - usize::from(tokens[..is].last().is_some_and(|token| token == "NOT"));
+                let value = self.eval_value(&tokens[..value_end])?;
                 let matched = match class {
                     "NUMERIC" => match value {
                         CobolValue::Decimal(_) => true,
@@ -1820,7 +2303,17 @@ impl ReferenceMachine {
             }
         }
         let left = self.eval_value(&tokens[..left_end])?;
-        let right = self.eval_value(&tokens[right_start..])?;
+        let right = if matches!(left, CobolValue::Decimal(_))
+            && tokens[right_start..].len() == 1
+            && matches!(tokens[right_start].as_str(), "ZERO" | "ZEROS" | "ZEROES")
+        {
+            CobolValue::Decimal(Decimal {
+                coefficient: 0,
+                scale: 0,
+            })
+        } else {
+            self.eval_value(&tokens[right_start..])?
+        };
         match (left, right) {
             (CobolValue::Decimal(left), CobolValue::Decimal(right)) => {
                 let (left, right) = decimal_aligned(left, right)?;
@@ -1839,8 +2332,74 @@ impl ReferenceMachine {
                 };
                 Ok(matched != negate)
             }
+            (CobolValue::Decimal(left), CobolValue::Bytes(right))
+                if matches!(operator, "=" | "<>") =>
+            {
+                let left = self
+                    .reference(&tokens[..left_end])
+                    .and_then(|reference| self.read_reference(&reference))
+                    .unwrap_or_else(|_| decimal_string(left).into_bytes());
+                let (left, right) = padded_bytes(left, right);
+                Ok((if operator == "=" {
+                    left == right
+                } else {
+                    left != right
+                }) != negate)
+            }
+            (CobolValue::Bytes(left), CobolValue::Decimal(right))
+                if matches!(operator, "=" | "<>") =>
+            {
+                let right = self
+                    .reference(&tokens[right_start..])
+                    .and_then(|reference| self.read_reference(&reference))
+                    .unwrap_or_else(|_| decimal_string(right).into_bytes());
+                let (left, right) = padded_bytes(left, right);
+                Ok((if operator == "=" {
+                    left == right
+                } else {
+                    left != right
+                }) != negate)
+            }
             _ => Err(MachineProblem::DataException),
         }
+    }
+
+    fn condition_name_matches(&self, tokens: &[String]) -> Result<Option<bool>, MachineProblem> {
+        let open = tokens.iter().position(|token| token == "(");
+        if open.is_some_and(|open| matching_close(tokens, open) != Some(tokens.len() - 1)) {
+            return Ok(None);
+        }
+        let name_end = open.unwrap_or(tokens.len());
+        let Some(condition) = self
+            .layout_qualified(&tokens[..name_end])
+            .filter(|layout| layout.category == LayoutCategory::Condition)
+        else {
+            return Ok(None);
+        };
+        let parent = condition
+            .parent
+            .clone()
+            .ok_or(MachineProblem::InvalidOperation)?;
+        let values = condition.condition_values.clone();
+        let mut parent_reference = vec![parent];
+        if let Some(open) = open {
+            parent_reference.extend_from_slice(&tokens[open..]);
+        }
+        let reference = match self.reference(&parent_reference) {
+            Ok(reference) => reference,
+            Err(MachineProblem::SubscriptError) => return Ok(Some(false)),
+            Err(problem) => return Err(problem),
+        };
+        let actual = self.read_reference(&reference)?;
+        Ok(Some(condition_matches(&actual, &values)?))
+    }
+
+    fn is_standalone_condition(&self, tokens: &[String]) -> Result<bool, MachineProblem> {
+        if self.condition_name_matches(tokens)?.is_some() {
+            return Ok(true);
+        }
+        Ok(tokens.first().is_some_and(|token| token == "NOT")
+            && self.condition_name_matches(&tokens[1..])?.is_some())
     }
 
     fn write_value(&mut self, target: &str, value: &CobolValue) -> Result<(), MachineProblem> {
@@ -1863,6 +2422,26 @@ impl ReferenceMachine {
         }
     }
 
+    fn reapply_entry_context(&mut self) -> Result<(), MachineProblem> {
+        let entry_initials = self
+            .entry_initials
+            .iter()
+            .map(|(storage, value)| (*storage, value.clone()))
+            .collect::<Vec<_>>();
+        for (storage, value) in entry_initials {
+            self.write_storage(storage, &value)?;
+        }
+        if let Some(CobolValue::Decimal(value)) = self.implicit.get("EIBCALEN").cloned() {
+            self.write_decimal("EIBCALEN", value)?;
+        }
+        for name in ["EIBAID", "EIBTRNID"] {
+            if let Some(CobolValue::Bytes(value)) = self.implicit.get(name).cloned() {
+                self.write(name, &value)?;
+            }
+        }
+        Ok(())
+    }
+
     fn write_reference_value(
         &mut self,
         target: &[String],
@@ -1870,9 +2449,13 @@ impl ReferenceMachine {
     ) -> Result<(), MachineProblem> {
         let reference = self.reference(target)?;
         let bytes = match value {
-            CobolValue::Bytes(bytes) => FixedValue::fit(bytes, reference.length, false)
-                .bytes()
-                .to_vec(),
+            CobolValue::Bytes(bytes) => FixedValue::fit(
+                bytes,
+                reference.length,
+                reference.length == reference.layout.length && reference.layout.justified_right,
+            )
+            .bytes()
+            .to_vec(),
             CobolValue::Decimal(value)
                 if reference.length == reference.layout.length
                     && is_numeric(reference.layout.category) =>
@@ -1911,6 +2494,13 @@ impl ReferenceMachine {
         value: Decimal,
         rounded: bool,
     ) -> Result<(), MachineProblem> {
+        let implicit = normalize(target);
+        if let Some(slot) = self.implicit.get_mut(&implicit) {
+            *slot = CobolValue::Decimal(value);
+            if self.layout(target).is_none() {
+                return Ok(());
+            }
+        }
         let layout = self
             .layout(target)
             .cloned()
@@ -1936,26 +2526,30 @@ impl ReferenceMachine {
             .ok_or(MachineProblem::UnknownStorage)?;
         let mut offset = 0usize;
         let mut length = layout.length;
-        if let Some(open) = open {
+        let mut cursor = open;
+        while let Some(open) = cursor {
             let close = matching_close(tokens, open).ok_or(MachineProblem::InvalidOperation)?;
-            if close + 1 != tokens.len() {
-                return Err(MachineProblem::InvalidOperation);
-            }
             let contents = &tokens[open + 1..close];
-            if contents.len() == 1 && contents[0].contains(':') {
-                let (start, requested) = contents[0]
-                    .split_once(':')
-                    .ok_or(MachineProblem::ReferenceModificationError)?;
-                let start = start
-                    .parse::<usize>()
-                    .map_err(|_| MachineProblem::ReferenceModificationError)?;
-                let requested = requested
-                    .parse::<usize>()
-                    .map_err(|_| MachineProblem::ReferenceModificationError)?;
+            if contents.iter().any(|token| token.contains(':')) {
+                let (start, requested) = split_reference_modification(contents)?;
+                let resolve_bound = |tokens: &[String]| -> Result<usize, MachineProblem> {
+                    let value = self
+                        .eval_expression(tokens)
+                        .map_err(|_| MachineProblem::ReferenceModificationError)?;
+                    if value.scale != 0 || value.coefficient < 0 {
+                        return Err(MachineProblem::ReferenceModificationError);
+                    }
+                    usize::try_from(value.coefficient)
+                        .map_err(|_| MachineProblem::ReferenceModificationError)
+                };
+                let start = resolve_bound(&start)?;
+                let requested = resolve_bound(&requested)?;
                 if start == 0 || requested == 0 || start - 1 + requested > length {
                     return Err(MachineProblem::ReferenceModificationError);
                 }
-                offset = start - 1;
+                offset = offset
+                    .checked_add(start - 1)
+                    .ok_or(MachineProblem::ReferenceModificationError)?;
                 length = requested;
             } else {
                 let index = match self.eval_value(contents)? {
@@ -1965,14 +2559,39 @@ impl ReferenceMachine {
                     }
                     _ => return Err(MachineProblem::SubscriptError),
                 };
-                if layout.occurs <= 1 || index == 0 || index > layout.occurs {
+                let inherited = std::iter::successors(layout.parent.as_ref(), |parent| {
+                    self.layouts
+                        .get(*parent)
+                        .and_then(|layout| layout.parent.as_ref())
+                })
+                .filter_map(|parent| self.layouts.get(parent))
+                .find(|layout| layout.occurs > 1);
+                let (occurs, stride) = if layout.occurs > 1 {
+                    (layout.occurs, layout.element_length)
+                } else if let Some(parent) = inherited {
+                    (parent.occurs, parent.element_length)
+                } else {
+                    return Err(MachineProblem::SubscriptError);
+                };
+                if index == 0 || index > occurs {
                     return Err(MachineProblem::SubscriptError);
                 }
-                offset = (index - 1)
-                    .checked_mul(layout.element_length)
+                offset = offset
+                    .checked_add(
+                        (index - 1)
+                            .checked_mul(stride)
+                            .ok_or(MachineProblem::SubscriptError)?,
+                    )
                     .ok_or(MachineProblem::SubscriptError)?;
-                length = layout.element_length;
+                length = layout.element_length.min(layout.length);
             }
+            cursor = if close + 1 == tokens.len() {
+                None
+            } else if tokens.get(close + 1).is_some_and(|token| token == "(") {
+                Some(close + 1)
+            } else {
+                return Err(MachineProblem::InvalidOperation);
+            };
         }
         Ok(ResolvedReference {
             layout,
@@ -1998,11 +2617,17 @@ impl ReferenceMachine {
             .filter_map(|name| self.layouts.get(name))
             .find(|layout| {
                 let ancestors = layout.name.split('.').rev().skip(1).collect::<Vec<_>>();
-                qualifiers.len() <= ancestors.len()
-                    && qualifiers
+                let mut at = 0usize;
+                for qualifier in &qualifiers {
+                    let Some(found) = ancestors[at..]
                         .iter()
-                        .zip(ancestors)
-                        .all(|(qualifier, ancestor)| qualifier == ancestor)
+                        .position(|ancestor| qualifier == ancestor)
+                    else {
+                        return false;
+                    };
+                    at += found + 1;
+                }
+                true
             })
     }
 
@@ -2063,6 +2688,11 @@ impl ReferenceMachine {
             "HIGH-VALUE" | "HIGH-VALUES" => return Ok(vec![0xff]),
             _ => {}
         }
+        if self.layout(token).is_none()
+            && let Some(value) = self.implicit.get(&normalize(token))
+        {
+            return value_bytes(value.clone());
+        }
         if self.layout(token).is_some() || self.views.contains_key(&normalize(token)) {
             self.read(token)
         } else {
@@ -2078,6 +2708,11 @@ impl ReferenceMachine {
         self.write_reference_value(&tokens, value)
     }
     fn read(&self, name: &str) -> Result<Vec<u8>, MachineProblem> {
+        if self.layout(name).is_none()
+            && let Some(value) = self.implicit.get(&normalize(name))
+        {
+            return value_bytes(value.clone());
+        }
         let resolved = self
             .layout(name)
             .map(|layout| layout.name.clone())
@@ -2089,6 +2724,20 @@ impl ReferenceMachine {
         Ok(self.bases[view.base][view.offset..view.offset + view.length].to_vec())
     }
     fn write(&mut self, name: &str, value: &[u8]) -> Result<(), MachineProblem> {
+        let implicit = normalize(name);
+        if let Some(current) = self.implicit.get(&implicit) {
+            let next = match current {
+                CobolValue::Decimal(_) => CobolValue::Decimal(
+                    decimal_text(&String::from_utf8_lossy(value))
+                        .ok_or(MachineProblem::DataException)?,
+                ),
+                CobolValue::Bytes(_) => CobolValue::Bytes(value.to_vec()),
+            };
+            self.implicit.insert(implicit, next);
+            if self.layout(name).is_none() {
+                return Ok(());
+            }
+        }
         let resolved = self
             .layout(name)
             .map(|layout| layout.name.clone())
@@ -2097,6 +2746,10 @@ impl ReferenceMachine {
     }
 
     fn write_raw(&mut self, name: &str, value: &[u8]) -> Result<(), MachineProblem> {
+        let justified_right = self
+            .layouts
+            .get(&normalize(name))
+            .is_some_and(|layout| layout.justified_right);
         let view = self
             .views
             .get(&normalize(name))
@@ -2113,7 +2766,7 @@ impl ReferenceMachine {
             fitted[view.length - copy..].copy_from_slice(&value[value.len() - copy..]);
             self.bases[view.base][view.offset..view.offset + view.length].copy_from_slice(&fitted);
         } else {
-            let fitted = FixedValue::fit(value, view.length, false);
+            let fitted = FixedValue::fit(value, view.length, justified_right);
             self.bases[view.base][view.offset..view.offset + view.length]
                 .copy_from_slice(fitted.bytes());
         }
@@ -2132,6 +2785,15 @@ impl ReferenceMachine {
         let candidates = self.simple_layouts.get(simple)?;
         match candidates.as_slice() {
             [name] => self.layouts.get(name),
+            names
+                if names.iter().all(|name| {
+                    self.layouts
+                        .get(name)
+                        .is_some_and(|layout| layout.category == LayoutCategory::Condition)
+                }) =>
+            {
+                names.first().and_then(|name| self.layouts.get(name))
+            }
             _ => None,
         }
     }
@@ -2172,11 +2834,40 @@ impl ReferenceMachine {
             ..InvocationLimits::default()
         };
         Ok(Completion {
-            return_code: 0,
+            return_code: match self.implicit.get("RETURN-CODE") {
+                Some(CobolValue::Decimal(value)) if value.scale == 0 => {
+                    i32::try_from(value.coefficient).map_err(|_| MachineProblem::SizeError)?
+                }
+                _ => 0,
+            },
             output: BoundedPayload::new("mainframe-env.output@1", self.output.clone(), limits)
                 .map_err(|_| MachineProblem::ResourceExhausted)?,
         })
     }
+}
+
+fn abbreviated_condition(left: &[String], right: &[String]) -> Vec<String> {
+    if right.iter().any(|token| {
+        matches!(
+            token.as_str(),
+            "=" | "<>" | ">" | "<" | ">=" | "<=" | "EQUAL" | "GREATER" | "LESS"
+        )
+    }) {
+        return right.to_vec();
+    }
+    let Some(operator) = left.iter().position(|token| {
+        matches!(
+            token.as_str(),
+            "=" | "<>" | ">" | "<" | ">=" | "<=" | "EQUAL" | "GREATER" | "LESS"
+        )
+    }) else {
+        return right.to_vec();
+    };
+    left[..=operator]
+        .iter()
+        .cloned()
+        .chain(right.iter().cloned())
+        .collect()
 }
 
 enum Step {
@@ -2221,11 +2912,30 @@ impl Machine for ReferenceMachine {
                     return Ok(MachineDrive::Completed(self.complete()?));
                 }
                 let operation = self.operations[self.pc].clone();
-                match self.execute(&operation)? {
-                    Step::Next => self.pc += 1,
+                match self.execute(&operation).map_err(|problem| match problem {
+                    MachineProblem::Host(_)
+                    | MachineProblem::ResourceExhausted
+                    | MachineProblem::UnsupportedForm => problem,
+                    problem => MachineProblem::InvalidArtifact(format!(
+                        "operation {} {:?} failed: {problem:?}",
+                        operation.identity.name(),
+                        arguments(&operation)
+                    )),
+                })? {
+                    Step::Next => {
+                        if self.at_perform_endpoint() {
+                            self.pc = self.finish_perform()?;
+                        } else {
+                            self.pc += 1;
+                        }
+                    }
                     Step::Jump(target) => self.pc = target,
                     Step::Effect(effect) => {
-                        self.pc += 1;
+                        self.pc = if self.at_perform_endpoint() {
+                            self.finish_perform()?
+                        } else {
+                            self.pc + 1
+                        };
                         return Ok(MachineDrive::HostCall(*effect));
                     }
                     Step::Complete => return Ok(MachineDrive::Completed(self.complete()?)),
@@ -2246,7 +2956,7 @@ impl Machine for ReferenceMachine {
         }
         let bytes = encode_snapshot(&self.snapshot())?;
         BoundedPayload::new(
-            "mainframe-env.reference-machine-checkpoint@2",
+            "mainframe-env.reference-machine-checkpoint@3",
             bytes,
             InvocationLimits {
                 max_payload_bytes: usize::try_from(
@@ -2269,7 +2979,7 @@ impl Machine for ReferenceMachine {
 }
 
 fn encode_snapshot(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
-    let mut bytes = b"MECP0002".to_vec();
+    let mut bytes = b"MECP0003".to_vec();
     bytes.extend_from_slice(&snapshot.schema_version.to_be_bytes());
     bytes.extend_from_slice(&u64::try_from(snapshot.program_counter).ok()?.to_be_bytes());
     bytes.extend_from_slice(&snapshot.effect_sequence.to_be_bytes());
@@ -2333,12 +3043,14 @@ fn decode_snapshot(
 ) -> Result<MachineSnapshot, MachineProblem> {
     let mut input = SnapshotInput::new(bytes);
     let header = input.take(8)?;
-    let legacy = header == b"MECP0001";
-    if !legacy && header != b"MECP0002" {
-        return Err(MachineProblem::IncompatibleSnapshot);
-    }
+    let header_version = match header {
+        b"MECP0001" => 1,
+        b"MECP0002" => 2,
+        b"MECP0003" => 3,
+        _ => return Err(MachineProblem::IncompatibleSnapshot),
+    };
     let schema_version = input.u32()?;
-    if (legacy && schema_version != 1) || (!legacy && schema_version != 2) {
+    if schema_version != header_version {
         return Err(MachineProblem::IncompatibleSnapshot);
     }
     let program_counter =
@@ -2386,7 +3098,7 @@ fn decode_snapshot(
     }
     let mut loop_reentry = BTreeSet::new();
     let mut loop_counts = BTreeMap::new();
-    if !legacy {
+    if header_version >= 2 {
         let reentry_count =
             usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
         if reentry_count > max_frames {
@@ -2508,7 +3220,27 @@ fn cics_arguments(tokens: &[String]) -> Result<BTreeMap<String, BoundedPayload>,
             )
         })
     {
+        let subcommand = tokens[index].to_ascii_uppercase();
         index += 1;
+        if tokens.get(index).is_some_and(|token| token == "(") {
+            let end = matching_close(tokens, index).ok_or(MachineProblem::InvalidOperation)?;
+            let raw = tokens[index + 1..end].join(" ");
+            let literal = raw.starts_with(['\'', '"']) && raw.ends_with(['\'', '"']);
+            arguments.insert(
+                subcommand,
+                BoundedPayload::new(
+                    if literal {
+                        "mainframe-env.cics.literal@1"
+                    } else {
+                        "mainframe-env.cics.argument@1"
+                    },
+                    raw.trim_matches(['\'', '"']).as_bytes().to_vec(),
+                    InvocationLimits::default(),
+                )
+                .map_err(|_| MachineProblem::ResourceExhausted)?,
+            );
+            index = end + 1;
+        }
     }
     while index < tokens.len() {
         let key = tokens[index].to_ascii_uppercase();
@@ -2517,14 +3249,17 @@ fn cics_arguments(tokens: &[String]) -> Result<BTreeMap<String, BoundedPayload>,
         }
         if tokens.get(index + 1).is_some_and(|token| token == "(") {
             let end = matching_close(tokens, index + 1).ok_or(MachineProblem::InvalidOperation)?;
-            let value = tokens[index + 2..end]
-                .join(" ")
-                .trim_matches(['\'', '"'])
-                .to_string();
+            let raw = tokens[index + 2..end].join(" ");
+            let literal = raw.starts_with(['\'', '"']) && raw.ends_with(['\'', '"']);
+            let value = raw.trim_matches(['\'', '"']).to_string();
             arguments.insert(
                 key,
                 BoundedPayload::new(
-                    "mainframe-env.cics.argument@1",
+                    if literal {
+                        "mainframe-env.cics.literal@1"
+                    } else {
+                        "mainframe-env.cics.argument@1"
+                    },
                     value.into_bytes(),
                     InvocationLimits::default(),
                 )
@@ -2756,6 +3491,10 @@ fn layout_metadata(operations: &[Operation]) -> Result<LayoutState, MachineProbl
                 .map_err(|_| MachineProblem::InvalidOperation)?,
             signed: integer_attribute(operation, "signed")? != 0,
             sign_separate: integer_attribute(operation, "sign_separate")? != 0,
+            justified_right: optional_integer_attribute(operation, "justified_right")
+                .unwrap_or_default()
+                != 0,
+            linkage: optional_text_attribute(operation, "section") == Some("linkage"),
             offset: usize_attribute(operation, "offset")?,
             length: usize_attribute(operation, "length")?,
             element_length: usize_attribute(operation, "element_length")?,
@@ -2948,6 +3687,35 @@ fn matching_close(tokens: &[String], open: usize) -> Option<usize> {
     None
 }
 
+fn split_reference_modification(
+    tokens: &[String],
+) -> Result<(Vec<String>, Vec<String>), MachineProblem> {
+    let mut start = Vec::new();
+    let mut requested = Vec::new();
+    let mut found = false;
+    for token in tokens {
+        if !found {
+            if let Some((before, after)) = token.split_once(':') {
+                if !before.is_empty() {
+                    start.push(before.to_string());
+                }
+                if !after.is_empty() {
+                    requested.push(after.to_string());
+                }
+                found = true;
+            } else {
+                start.push(token.clone());
+            }
+        } else {
+            requested.push(token.clone());
+        }
+    }
+    if !found || start.is_empty() || requested.is_empty() {
+        return Err(MachineProblem::ReferenceModificationError);
+    }
+    Ok((start, requested))
+}
+
 fn value_bytes(value: CobolValue) -> Result<Vec<u8>, MachineProblem> {
     match value {
         CobolValue::Bytes(bytes) => Ok(bytes),
@@ -2975,15 +3743,37 @@ fn strip_condition_parentheses(mut tokens: &[String]) -> &[String] {
 
 fn top_level_position(tokens: &[String], needle: &str) -> Option<usize> {
     let mut depth = 0usize;
+    let mut found = None;
     for (index, token) in tokens.iter().enumerate() {
         match token.as_str() {
             "(" => depth = depth.saturating_add(1),
             ")" => depth = depth.saturating_sub(1),
-            _ if depth == 0 && token == needle => return Some(index),
+            _ if depth == 0 && token == needle => found = Some(index),
             _ => {}
         }
     }
-    None
+    found
+}
+
+fn normalize_comparison_tokens(tokens: &[String]) -> Vec<String> {
+    let mut normalized = Vec::with_capacity(tokens.len());
+    let mut index = 0usize;
+    while index < tokens.len() {
+        if index + 1 < tokens.len() && comparison_pair(&tokens[index..index + 2]) {
+            normalized.push(format!("{}{}", tokens[index], tokens[index + 1]));
+            index += 2;
+        } else {
+            normalized.push(tokens[index].clone());
+            index += 1;
+        }
+    }
+    normalized
+}
+
+fn comparison_pair(pair: &[String]) -> bool {
+    pair.len() == 2
+        && ((pair[0] == ">" && pair[1] == "=")
+            || (pair[0] == "<" && matches!(pair[1].as_str(), "=" | ">")))
 }
 
 fn padded_bytes(mut left: Vec<u8>, mut right: Vec<u8>) -> (Vec<u8>, Vec<u8>) {
@@ -3194,6 +3984,12 @@ fn decode_display(bytes: &[u8], separate: bool) -> Result<i128, MachineProblem> 
         }
         let digit = if byte.is_ascii_digit() {
             byte - b'0'
+        } else if byte == 0 {
+            // CardDemo's transaction file is initialized with a low-values
+            // sentinel record. Enterprise COBOL's permissive zoned-decimal
+            // compatibility treats each low-value byte as the digit zero when
+            // that alphanumeric key is moved to a numeric-display receiver.
+            0
         } else if let Some(position) = b"}JKLMNOPQR".iter().position(|value| *value == byte) {
             negative = true;
             position as u8
@@ -3270,9 +4066,14 @@ fn encode_decimal(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Ma
             let copy = digits.len().min(output.len());
             let start = output.len() - copy;
             output[start..].copy_from_slice(&digits.as_bytes()[digits.len() - copy..]);
-            if layout.signed && !layout.sign_separate && value.coefficient < 0 {
+            if layout.signed && !layout.sign_separate {
                 let last = output.last_mut().ok_or(MachineProblem::SizeError)?;
-                *last = b"}JKLMNOPQR"[usize::from(*last - b'0')];
+                let overpunch = if value.coefficient < 0 {
+                    b"}JKLMNOPQR"
+                } else {
+                    b"{ABCDEFGHI"
+                };
+                *last = overpunch[usize::from(*last - b'0')];
             }
             if layout.sign_separate {
                 output.push(if value.coefficient < 0 { b'-' } else { b'+' });
@@ -3344,9 +4145,20 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
 }
 
 fn condition_matches(actual: &[u8], values: &[String]) -> Result<bool, MachineProblem> {
-    let actual = String::from_utf8_lossy(actual).trim().to_string();
+    let actual_text = String::from_utf8_lossy(actual).trim().to_string();
     let mut index = 0usize;
     while index < values.len() {
+        let normalized = normalize(&values[index]);
+        let figurative = match normalized.as_str() {
+            "SPACE" | "SPACES" => Some(b' '),
+            "ZERO" | "ZEROS" | "ZEROES" => Some(b'0'),
+            "LOW-VALUE" | "LOW-VALUES" => Some(0),
+            "HIGH-VALUE" | "HIGH-VALUES" => Some(0xff),
+            _ => None,
+        };
+        if figurative.is_some_and(|byte| actual.iter().all(|actual| *actual == byte)) {
+            return Ok(true);
+        }
         let start = values[index].trim_matches(['\'', '"']).to_string();
         if values
             .get(index + 1)
@@ -3356,12 +4168,24 @@ fn condition_matches(actual: &[u8], values: &[String]) -> Result<bool, MachinePr
                 .get(index + 2)
                 .ok_or(MachineProblem::InvalidOperation)?
                 .trim_matches(['\'', '"']);
-            if actual.as_str() >= start.as_str() && actual.as_str() <= end {
+            let matched = match (
+                decimal_text(&actual_text),
+                decimal_text(&start),
+                decimal_text(end),
+            ) {
+                (Some(actual), Some(start), Some(end)) => {
+                    let (actual, start) = decimal_aligned(actual, start)?;
+                    let (actual, end) = decimal_aligned(actual, end)?;
+                    actual.coefficient >= start.coefficient && actual.coefficient <= end.coefficient
+                }
+                _ => actual_text.as_str() >= start.as_str() && actual_text.as_str() <= end,
+            };
+            if matched {
                 return Ok(true);
             }
             index += 3;
         } else {
-            if actual == start {
+            if actual_text == start {
                 return Ok(true);
             }
             index += 1;
@@ -3520,6 +4344,45 @@ fn encode_call_values(
     .map_err(|_| MachineProblem::ResourceExhausted)
 }
 
+fn decode_call_arguments(payload: &BoundedPayload) -> Result<Vec<Vec<u8>>, MachineProblem> {
+    if payload.schema() != "mainframe-env.cobol.call@1" {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
+    let mut input = SnapshotInput::new(payload.bytes());
+    let count = usize::try_from(input.u32()?).map_err(|_| MachineProblem::ResourceExhausted)?;
+    if count > InvocationLimits::default().max_bindings {
+        return Err(MachineProblem::ResourceExhausted);
+    }
+    let mut values = Vec::with_capacity(count);
+    for _ in 0..count {
+        let _name = input.bytes(4096)?;
+        if input.take(1)? != [1] {
+            return Err(MachineProblem::UnexpectedHostResult);
+        }
+        values.push(input.bytes(InvocationLimits::default().max_payload_bytes)?);
+    }
+    if !input.finished() {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
+    Ok(values)
+}
+
+pub fn encode_cobol_call_result(values: &[Vec<u8>]) -> Result<BoundedPayload, MachineProblem> {
+    let mut bytes = u32::try_from(values.len())
+        .map_err(|_| MachineProblem::ResourceExhausted)?
+        .to_be_bytes()
+        .to_vec();
+    for value in values {
+        push_host_field(&mut bytes, value)?;
+    }
+    BoundedPayload::new(
+        "mainframe-env.cobol.call-result@1",
+        bytes,
+        InvocationLimits::default(),
+    )
+    .map_err(|_| MachineProblem::ResourceExhausted)
+}
+
 fn encode_embedded_operands(
     family: &str,
     opcode: &str,
@@ -3611,21 +4474,34 @@ impl MachineProblem {
         let (category, message) = match self {
             Self::ResourceExhausted => (
                 FailureCategory::ResourceExhausted,
-                "machine resource exhausted",
+                "machine resource exhausted".to_string(),
             ),
-            Self::Host(HostProblem::Unauthorized) => {
-                (FailureCategory::Unauthorized, "host authorization denied")
+            Self::Host(HostProblem::Unauthorized) => (
+                FailureCategory::Unauthorized,
+                "host authorization denied".into(),
+            ),
+            Self::Host(HostProblem::Cancelled) => {
+                (FailureCategory::Cancelled, "host cancelled".into())
             }
-            Self::Host(HostProblem::Cancelled) => (FailureCategory::Cancelled, "host cancelled"),
-            Self::Host(HostProblem::TimedOut) => (FailureCategory::TimedOut, "host timed out"),
-            Self::Host(HostProblem::UnknownOutcome) => {
-                (FailureCategory::UnknownOutcome, "host outcome unknown")
+            Self::Host(HostProblem::TimedOut) => {
+                (FailureCategory::TimedOut, "host timed out".into())
             }
-            Self::Host(_) => (FailureCategory::ProviderFailure, "host provider failed"),
-            Self::UnsupportedForm => (FailureCategory::Unsupported, "unsupported COBOL form"),
+            Self::Host(HostProblem::UnknownOutcome) => (
+                FailureCategory::UnknownOutcome,
+                "host outcome unknown".into(),
+            ),
+            Self::Host(problem) => (
+                FailureCategory::ProviderFailure,
+                format!("host provider failed: {problem:?}"),
+            ),
+            Self::UnsupportedForm => (
+                FailureCategory::Unsupported,
+                "unsupported COBOL form".into(),
+            ),
+            Self::InvalidArtifact(detail) => (FailureCategory::MalformedInput, detail.clone()),
             _ => (
                 FailureCategory::MalformedInput,
-                "invalid executable artifact or data",
+                "invalid executable artifact or data".into(),
             ),
         };
         ExecutionProblem::new(

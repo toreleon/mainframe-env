@@ -37,6 +37,7 @@ pub struct CobolLayout {
     pub scale: usize,
     pub signed: bool,
     pub sign_separate: bool,
+    pub justified_right: bool,
     pub initial: Vec<u8>,
     pub alias_of: Option<String>,
     pub occurs: usize,
@@ -518,6 +519,12 @@ fn layout_siblings(
             scale: usize::from(spec.children.is_empty()) * picture.scale,
             signed: spec.children.is_empty() && picture.signed,
             sign_separate: spec.children.is_empty() && picture.sign_separate,
+            justified_right: spec.children.is_empty()
+                && (spec.sentence.to_ascii_uppercase().contains("JUST RIGHT")
+                    || spec
+                        .sentence
+                        .to_ascii_uppercase()
+                        .contains("JUSTIFIED RIGHT")),
             initial,
             alias_of: target.map(|(_, qualified)| qualified),
             occurs: spec.occurs_max,
@@ -585,6 +592,7 @@ fn layout_specials(
                 scale: 0,
                 signed: false,
                 sign_separate: false,
+                justified_right: false,
                 initial: Vec::new(),
                 alias_of: Some(target.qualified_name.clone()),
                 occurs: 1,
@@ -622,6 +630,7 @@ fn layout_specials(
                 scale: 0,
                 signed: false,
                 sign_separate: false,
+                justified_right: false,
                 initial: Vec::new(),
                 alias_of: Some(start.qualified_name.clone()),
                 occurs: 1,
@@ -646,6 +655,7 @@ fn layout_specials(
                 scale: 0,
                 signed: false,
                 sign_separate: false,
+                justified_right: false,
                 initial: Vec::new(),
                 alias_of: None,
                 occurs: 1,
@@ -1007,6 +1017,11 @@ fn initial_value(
     if upper_tail.starts_with("HIGH-VALUE") {
         return vec![0xff; length];
     }
+    if let Some(hex) = hexadecimal_literal(tail) {
+        let copy = hex.len().min(result.len());
+        result[..copy].copy_from_slice(&hex[..copy]);
+        return result;
+    }
     let (clean, repeat_all) = if upper_tail.starts_with("ALL ") {
         (quoted_or_word(tail[4..].trim(), words), true)
     } else {
@@ -1038,6 +1053,42 @@ fn initial_value(
             result[..copy].copy_from_slice(&bytes[..copy]);
             result
         }
+    }
+}
+
+fn hexadecimal_literal(value: &str) -> Option<Vec<u8>> {
+    let value = value.trim();
+    let bytes = value.as_bytes();
+    if bytes.len() < 3 || !matches!(bytes[0], b'X' | b'x') || !matches!(bytes[1], b'\'' | b'"') {
+        return None;
+    }
+    let quote = bytes[1];
+    let end = bytes[2..].iter().position(|byte| *byte == quote)? + 2;
+    let digits = &bytes[2..end];
+    if digits.is_empty()
+        || !digits.len().is_multiple_of(2)
+        || !digits.iter().all(u8::is_ascii_hexdigit)
+    {
+        return None;
+    }
+    digits
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|pair| {
+            let high = hex_nibble(pair[0])?;
+            let low = hex_nibble(pair[1])?;
+            Some((high << 4) | low)
+        })
+        .collect()
+}
+
+const fn hex_nibble(value: u8) -> Option<u8> {
+    match value {
+        b'0'..=b'9' => Some(value - b'0'),
+        b'a'..=b'f' => Some(value - b'a' + 10),
+        b'A'..=b'F' => Some(value - b'A' + 10),
+        _ => None,
     }
 }
 

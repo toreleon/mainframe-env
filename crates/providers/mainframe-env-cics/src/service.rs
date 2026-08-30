@@ -1,3 +1,4 @@
+use mainframe_env_encoding::CodePage;
 use mainframe_env_execution_api::{
     BoundedPayload, CapabilityId, IdempotencyKey, Invocation, InvocationLimits, PrincipalId,
     RunUnitId,
@@ -13,7 +14,7 @@ use mainframe_env_store_api::{
     ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
 };
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -21,6 +22,7 @@ pub struct CicsLimits {
     pub max_sessions: usize,
     pub max_runs: usize,
     pub max_maps: usize,
+    pub max_programs: usize,
     pub max_file_aliases: usize,
     pub max_fields: usize,
     pub max_screen_bytes: usize,
@@ -34,6 +36,7 @@ impl Default for CicsLimits {
             max_sessions: 4096,
             max_runs: 4096,
             max_maps: 1024,
+            max_programs: 4096,
             max_file_aliases: 1024,
             max_fields: 512,
             max_screen_bytes: 4 * 1024 * 1024,
@@ -54,6 +57,11 @@ pub struct BmsFieldDefinition {
     pub highlight: Option<String>,
     pub protected: bool,
     pub secret: bool,
+    pub fset: bool,
+    pub justify_right: bool,
+    pub fill_zero: bool,
+    pub output_offset: Option<u32>,
+    pub attribute_offset: Option<u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -63,6 +71,12 @@ pub struct BmsMapDefinition {
     pub rows: u16,
     pub columns: u16,
     pub fields: Vec<BmsFieldDefinition>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CicsFileDefinition {
+    pub dataset: DatasetName,
+    pub ccsid: Option<u16>,
 }
 
 #[derive(Clone, Debug)]
@@ -82,6 +96,9 @@ struct Session {
     suspended: bool,
     mapset: Option<String>,
     map: Option<String>,
+    field_protection: BTreeMap<String, bool>,
+    field_modified: BTreeMap<String, bool>,
+    field_values: BTreeMap<String, Vec<u8>>,
     version: u64,
 }
 
@@ -95,10 +112,20 @@ pub struct CicsTerminalSnapshot {
     pub columns: u16,
     pub aid: u8,
     pub screen: Vec<u8>,
+    pub mapset: Option<String>,
+    pub map: Option<String>,
     pub suspended: bool,
     pub connected: bool,
     pub expires_at_tick: u64,
     pub version: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CicsTerminalExecution {
+    pub invocation: Invocation,
+    pub transaction: String,
+    pub commarea: Vec<u8>,
+    pub aid: u8,
 }
 
 #[derive(Clone)]
@@ -113,7 +140,32 @@ struct Run {
     abend_handler: Option<String>,
     retrieve: Vec<u8>,
     current_records: BTreeMap<String, Vec<u8>>,
+    current_record_values: BTreeMap<String, Vec<u8>>,
+    undo: Vec<DatasetUndo>,
     browses: BTreeMap<String, String>,
+    trace: Vec<CicsTraceEntry>,
+}
+
+#[derive(Clone, Debug)]
+enum DatasetUndo {
+    Restore {
+        dataset: DatasetName,
+        key: Vec<u8>,
+        record: Vec<u8>,
+    },
+    Delete {
+        dataset: DatasetName,
+        key: Vec<u8>,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CicsTraceEntry {
+    pub operation: CicsOperation,
+    pub outcome: String,
+    pub response: i32,
+    pub response2: i32,
+    pub payload_bytes: usize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -141,10 +193,13 @@ struct State {
     sessions: BTreeMap<String, Session>,
     runs: BTreeMap<RunUnitId, Run>,
     maps: BTreeMap<(String, String), BmsMapDefinition>,
-    file_aliases: BTreeMap<String, DatasetName>,
+    programs: BTreeSet<String>,
+    file_aliases: BTreeMap<String, CicsFileDefinition>,
     continuations: BTreeMap<String, DurableContinuation>,
     transient: BTreeMap<String, TransientQueue>,
     transient_bytes: usize,
+    #[cfg(feature = "fault-injection")]
+    file_failure: Option<(CicsOperation, String)>,
 }
 
 pub struct CicsService {
@@ -188,16 +243,25 @@ impl CicsService {
                 return Err(HostProblem::InfrastructureFailure);
             }
         }
+        let mut programs = BTreeSet::new();
+        for row in store
+            .list_provider_state("cics-program", limits.max_programs)
+            .map_err(store_error)?
+        {
+            if !row.payload.is_empty()
+                || normalize_terminal_name(&row.key, 128).is_err()
+                || !programs.insert(row.key)
+            {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+        }
         let mut file_aliases = BTreeMap::new();
         for row in store
             .list_provider_state("cics-file-alias", limits.max_file_aliases)
             .map_err(store_error)?
         {
-            let target =
-                String::from_utf8(row.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
-            let dataset =
-                DatasetName::new(target, 128).map_err(|_| HostProblem::InfrastructureFailure)?;
-            file_aliases.insert(row.key, dataset);
+            let definition = decode_file_definition(&row.payload)?;
+            file_aliases.insert(row.key, definition);
         }
         let mut transient = BTreeMap::new();
         let mut transient_bytes = 0usize;
@@ -227,12 +291,42 @@ impl CicsService {
                 sessions,
                 runs: BTreeMap::new(),
                 maps,
+                programs,
                 file_aliases,
                 continuations,
                 transient,
                 transient_bytes,
+                #[cfg(feature = "fault-injection")]
+                file_failure: None,
             }),
         }))
+    }
+
+    #[cfg(feature = "fault-injection")]
+    pub fn inject_file_failure_once(
+        &self,
+        operation: CicsOperation,
+        file: &str,
+    ) -> Result<(), HostProblem> {
+        if !matches!(
+            operation,
+            CicsOperation::Read
+                | CicsOperation::Write
+                | CicsOperation::Rewrite
+                | CicsOperation::Delete
+                | CicsOperation::StartBrowse
+                | CicsOperation::ReadNext
+                | CicsOperation::ReadPrev
+                | CicsOperation::EndBrowse
+        ) {
+            return Err(HostProblem::Malformed);
+        }
+        let file = normalize_terminal_name(file, 16)?;
+        let mut state = self.lock()?;
+        if state.file_failure.replace((operation, file)).is_some() {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        Ok(())
     }
 
     pub fn create_session(
@@ -266,6 +360,9 @@ impl CicsService {
             suspended: false,
             mapset: None,
             map: None,
+            field_protection: BTreeMap::new(),
+            field_modified: BTreeMap::new(),
+            field_values: BTreeMap::new(),
             version: 1,
         };
         let mut state = self.lock()?;
@@ -323,6 +420,9 @@ impl CicsService {
             suspended: false,
             mapset: None,
             map: None,
+            field_protection: BTreeMap::new(),
+            field_modified: BTreeMap::new(),
+            field_values: BTreeMap::new(),
             version: 1,
         };
         let run = run_for(
@@ -361,6 +461,93 @@ impl CicsService {
             .map(|value| terminal_snapshot(session.as_str(), &value))
     }
 
+    pub fn terminal_field_protected(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        field: &str,
+        now_tick: u64,
+    ) -> Result<bool, HostProblem> {
+        let current = self.public_session(session, principal, None, now_tick)?;
+        let state = self.lock()?;
+        let (mapset, map) = current
+            .mapset
+            .as_ref()
+            .zip(current.map.as_ref())
+            .ok_or(HostProblem::NotFound)?;
+        let definition = state
+            .maps
+            .get(&(mapset.clone(), map.clone()))
+            .and_then(|map| {
+                map.fields
+                    .iter()
+                    .find(|definition| definition.name.eq_ignore_ascii_case(field))
+            })
+            .ok_or(HostProblem::NotFound)?;
+        Ok(current
+            .field_protection
+            .get(&definition.name.to_ascii_uppercase())
+            .copied()
+            .unwrap_or(definition.protected))
+    }
+
+    pub fn terminal_execution(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        now_tick: u64,
+    ) -> Result<CicsTerminalExecution, HostProblem> {
+        let current = self.public_session(session, principal, None, now_tick)?;
+        let run_id = RunUnitId::new(&current.run_unit, InvocationLimits::default())
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let state = self.lock()?;
+        let run = state.runs.get(&run_id).ok_or(HostProblem::NotFound)?;
+        if run.session != session.as_str()
+            || run.invocation.principal.id() != principal
+            || run.transaction != current.transaction
+        {
+            return Err(HostProblem::Unauthorized);
+        }
+        Ok(CicsTerminalExecution {
+            invocation: run.invocation.clone(),
+            transaction: run.transaction.clone(),
+            commarea: run.retrieve.clone(),
+            aid: current.aid,
+        })
+    }
+
+    pub fn complete_terminal_run(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        now_tick: u64,
+    ) -> Result<(), HostProblem> {
+        let current = self.public_session(session, principal, None, now_tick)?;
+        let run_id = RunUnitId::new(&current.run_unit, InvocationLimits::default())
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let mut state = self.lock()?;
+        let run = state.runs.get(&run_id).ok_or(HostProblem::NotFound)?;
+        if run.session != session.as_str() || run.invocation.principal.id() != principal {
+            return Err(HostProblem::Unauthorized);
+        }
+        if let Some(current) = state.continuations.get(session.as_str()).cloned()
+            && current.claimed_by.as_deref() == Some(run_id.as_str())
+        {
+            let mut released = current.clone();
+            released.version = released
+                .version
+                .checked_add(1)
+                .ok_or(HostProblem::ResourceExhausted)?;
+            released.claimed_by = None;
+            self.persist_continuation(session.as_str(), &released, Some(current.version))?;
+            state
+                .continuations
+                .insert(session.as_str().into(), released);
+        }
+        state.runs.remove(&run_id);
+        Ok(())
+    }
+
     pub fn submit_terminal_input(
         &self,
         session: &SessionId,
@@ -387,13 +574,24 @@ impl CicsService {
                 .maps
                 .get(&(mapset.clone(), map.clone()))
                 .ok_or(HostProblem::InfrastructureFailure)?;
+            let displayed = decode_map_payload(&current.screen, self.limits)?;
             for (name, value) in fields {
                 let definition = definition
                     .fields
                     .iter()
                     .find(|field| field.name.eq_ignore_ascii_case(name))
                     .ok_or(HostProblem::Malformed)?;
-                if definition.protected || value.len() > usize::from(definition.length) {
+                let protected = current
+                    .field_protection
+                    .get(&definition.name.to_ascii_uppercase())
+                    .copied()
+                    .unwrap_or(definition.protected);
+                let unchanged = displayed
+                    .get(&definition.name.to_ascii_uppercase())
+                    .is_some_and(|displayed| terminal_values_equal(displayed, value));
+                if (protected && (definition.secret || !unchanged))
+                    || value.len() > usize::from(definition.length)
+                {
                     return Err(HostProblem::Unauthorized);
                 }
                 if normalized
@@ -402,6 +600,24 @@ impl CicsService {
                 {
                     return Err(HostProblem::Malformed);
                 }
+            }
+            for field_definition in &definition.fields {
+                let name = field_definition.name.to_ascii_uppercase();
+                if current.field_modified.get(&name).copied().unwrap_or(false)
+                    && !normalized.contains_key(&name)
+                {
+                    let value = current
+                        .field_values
+                        .get(&name)
+                        .ok_or(HostProblem::InfrastructureFailure)?;
+                    if value.len() > usize::from(field_definition.length) {
+                        return Err(HostProblem::InfrastructureFailure);
+                    }
+                    normalized.insert(name, value.clone());
+                }
+            }
+            if normalized.len() > self.limits.max_fields {
+                return Err(HostProblem::ResourceExhausted);
             }
         }
         for (name, value) in &normalized {
@@ -610,7 +826,10 @@ impl CicsService {
                 abend_handler: None,
                 retrieve,
                 current_records: BTreeMap::new(),
+                current_record_values: BTreeMap::new(),
+                undo: Vec::new(),
                 browses: BTreeMap::new(),
+                trace: Vec::new(),
             },
         );
         Ok(())
@@ -683,7 +902,10 @@ impl CicsService {
                 abend_handler: None,
                 retrieve: Vec::new(),
                 current_records: BTreeMap::new(),
+                current_record_values: BTreeMap::new(),
+                undo: Vec::new(),
                 browses: BTreeMap::new(),
+                trace: Vec::new(),
             },
         );
         Ok(continuation)
@@ -753,9 +975,72 @@ impl CicsService {
         Ok(())
     }
 
+    pub fn register_programs(&self, programs: &BTreeSet<String>) -> Result<(), HostProblem> {
+        let normalized = programs
+            .iter()
+            .map(|program| normalize_terminal_name(program, 128))
+            .collect::<Result<BTreeSet<_>, _>>()?;
+        if normalized.len() != programs.len() {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        let mut state = self.lock()?;
+        let additions = normalized
+            .iter()
+            .filter(|program| !state.programs.contains(*program))
+            .count();
+        if state
+            .programs
+            .len()
+            .checked_add(additions)
+            .is_none_or(|total| total > self.limits.max_programs)
+        {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let writes = normalized
+            .iter()
+            .filter(|program| !state.programs.contains(*program))
+            .map(|program| ProviderStateWrite {
+                record: ProviderStateRecord {
+                    namespace: "cics-program".into(),
+                    key: program.clone(),
+                    version: 1,
+                    payload: Vec::new(),
+                },
+                expected_version: None,
+            })
+            .collect::<Vec<_>>();
+        if !writes.is_empty() {
+            self.store
+                .put_provider_states_atomic(writes)
+                .map_err(store_error)?;
+        }
+        state.programs.extend(normalized);
+        Ok(())
+    }
+
     pub fn register_file_aliases(
         &self,
         aliases: &BTreeMap<String, DatasetName>,
+    ) -> Result<(), HostProblem> {
+        self.register_file_definitions(
+            &aliases
+                .iter()
+                .map(|(name, dataset)| {
+                    (
+                        name.clone(),
+                        CicsFileDefinition {
+                            dataset: dataset.clone(),
+                            ccsid: None,
+                        },
+                    )
+                })
+                .collect(),
+        )
+    }
+
+    pub fn register_file_definitions(
+        &self,
+        aliases: &BTreeMap<String, CicsFileDefinition>,
     ) -> Result<(), HostProblem> {
         let mut state = self.lock()?;
         let new_aliases = aliases
@@ -771,7 +1056,7 @@ impl CicsService {
             return Err(HostProblem::ResourceExhausted);
         }
         let mut writes = Vec::new();
-        for (name, dataset) in aliases {
+        for (name, definition) in aliases {
             let name = name.trim().to_ascii_uppercase();
             if name.is_empty()
                 || name.len() > 16
@@ -782,7 +1067,7 @@ impl CicsService {
                 return Err(HostProblem::Malformed);
             }
             if let Some(existing) = state.file_aliases.get(&name) {
-                if existing != dataset {
+                if existing != definition {
                     return Err(HostProblem::IdempotencyConflict);
                 }
                 continue;
@@ -792,7 +1077,7 @@ impl CicsService {
                     namespace: "cics-file-alias".into(),
                     key: name,
                     version: 1,
-                    payload: dataset.as_str().as_bytes().to_vec(),
+                    payload: encode_file_definition(definition)?,
                 },
                 expected_version: None,
             });
@@ -802,10 +1087,10 @@ impl CicsService {
                 .put_provider_states_atomic(writes)
                 .map_err(store_error)?;
         }
-        for (name, dataset) in aliases {
+        for (name, definition) in aliases {
             state
                 .file_aliases
-                .insert(name.trim().to_ascii_uppercase(), dataset.clone());
+                .insert(name.trim().to_ascii_uppercase(), definition.clone());
         }
         Ok(())
     }
@@ -871,9 +1156,59 @@ impl CicsService {
             .runs
             .remove(&effect.run_unit)
             .ok_or(HostProblem::Unauthorized)?;
+        let operation = request.operation;
         let result = self.invoke_run(&mut run, request);
+        if run.trace.len() < 4096 {
+            run.trace.push(match &result {
+                Ok(response) => CicsTraceEntry {
+                    operation,
+                    outcome: response.condition.clone(),
+                    response: response.response,
+                    response2: response.response2,
+                    payload_bytes: response.payload.bytes().len(),
+                },
+                Err(problem) => CicsTraceEntry {
+                    operation,
+                    outcome: format!("{problem:?}"),
+                    response: -1,
+                    response2: 0,
+                    payload_bytes: 0,
+                },
+            });
+        }
         self.lock()?.runs.insert(effect.run_unit.clone(), run);
         result
+    }
+
+    pub fn terminal_run_trace(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        now_tick: u64,
+    ) -> Result<Vec<CicsTraceEntry>, HostProblem> {
+        let current = self.public_session(session, principal, None, now_tick)?;
+        let run_id = RunUnitId::new(&current.run_unit, InvocationLimits::default())
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let state = self.lock()?;
+        let run = state.runs.get(&run_id).ok_or(HostProblem::NotFound)?;
+        if run.session != session.as_str() || run.invocation.principal.id() != principal {
+            return Err(HostProblem::Unauthorized);
+        }
+        Ok(run.trace.clone())
+    }
+
+    pub fn terminal_continuation_ready(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        now_tick: u64,
+    ) -> Result<bool, HostProblem> {
+        self.public_session(session, principal, None, now_tick)?;
+        Ok(self
+            .lock()?
+            .continuations
+            .get(session.as_str())
+            .is_some_and(|continuation| continuation.claimed_by.is_none()))
     }
 
     fn invoke_run(&self, run: &mut Run, request: CicsRequest) -> Result<CicsResponse, HostProblem> {
@@ -1008,6 +1343,9 @@ impl CicsService {
         let mut payload = argument_bytes(request, "FROM")
             .or_else(|| argument_bytes(request, "DATA"))
             .unwrap_or_default();
+        let mut field_protection = None;
+        let mut field_modified = None;
+        let mut field_values = None;
         if request.operation == CicsOperation::SendMap {
             let mapset = argument_text(request, "MAPSET")?;
             let map = argument_text(request, "MAP")?;
@@ -1015,11 +1353,27 @@ impl CicsService {
                 .maps
                 .get(&(mapset.to_ascii_uppercase(), map.to_ascii_uppercase()))
                 .ok_or(HostProblem::NotFound)?;
+            field_protection = Some(symbolic_map_protection(definition, &payload));
+            field_modified = Some(symbolic_map_modified(definition, &payload));
             if payload.is_empty() {
+                let mut values = BTreeMap::new();
                 for item in &definition.fields {
                     field(&mut payload, item.name.as_bytes())?;
                     field(&mut payload, &item.initial)?;
+                    values.insert(item.name.to_ascii_uppercase(), item.initial.clone());
                 }
+                field_values = Some(values);
+            } else if definition
+                .fields
+                .iter()
+                .all(|field| field.output_offset.is_some())
+            {
+                field_values = Some(symbolic_map_values(definition, &payload)?);
+                payload = encode_symbolic_map_output(definition, &payload)?;
+            } else if definition.fields.iter().any(|field| field.secret) {
+                return Err(HostProblem::Unsupported);
+            } else {
+                field_values = Some(decode_map_payload(&payload, self.limits)?);
             }
         }
         if payload.len() > self.limits.max_screen_bytes {
@@ -1036,6 +1390,9 @@ impl CicsService {
         if request.operation == CicsOperation::SendMap {
             next.mapset = Some(argument_text(request, "MAPSET")?.to_ascii_uppercase());
             next.map = Some(argument_text(request, "MAP")?.to_ascii_uppercase());
+            next.field_protection = field_protection.unwrap_or_default();
+            next.field_modified = field_modified.unwrap_or_default();
+            next.field_values = field_values.unwrap_or_default();
         }
         self.persist_session(&run.session, &next, Some(current.version))?;
         state.sessions.insert(run.session.clone(), next);
@@ -1060,16 +1417,40 @@ impl CicsService {
             .ok_or(HostProblem::NotFound)?;
         let mut next = current.clone();
         next.version += 1;
-        let (disposition, payload) = if let Some(input) = next.input.take() {
-            (CicsDisposition::Complete, input)
+        let (disposition, payload, fields) = if let Some(input) = next.input.take() {
+            let fields = decode_map_payload(&input, self.limits)?;
+            (CicsDisposition::Complete, input, fields)
         } else {
             next.suspended = true;
-            (CicsDisposition::Suspended, Vec::new())
+            (CicsDisposition::Suspended, Vec::new(), BTreeMap::new())
         };
         self.persist_session(&run.session, &next, Some(current.version))?;
         state.sessions.insert(run.session.clone(), next);
         let mut response = self.response(run, disposition, "NORMAL", 0, 0, None, None, payload)?;
         response.aid = current.aid;
+        for (name, value) in fields {
+            let input_length = value.len();
+            let value = current
+                .mapset
+                .as_ref()
+                .zip(current.map.as_ref())
+                .and_then(|(mapset, map)| state.maps.get(&(mapset.clone(), map.clone())))
+                .and_then(|map| {
+                    map.fields
+                        .iter()
+                        .find(|field| field.name.eq_ignore_ascii_case(&name))
+                })
+                .map_or(value.clone(), |field| normalize_bms_input(field, &value));
+            response
+                .outputs
+                .insert(format!("BMS.{name}"), bounded(value.clone())?);
+            response.outputs.insert(
+                format!("BMS.{name}.LENGTH"),
+                decimal_payload(
+                    i64::try_from(input_length).map_err(|_| HostProblem::ResourceExhausted)?,
+                )?,
+            );
+        }
         Ok(response)
     }
 
@@ -1145,6 +1526,18 @@ impl CicsService {
             &format!("CICS.PROGRAM.{target}"),
             AccessIntent::Execute,
         )?;
+        if self.lock()?.programs.contains(&target) {
+            return self.response(
+                run,
+                CicsDisposition::Complete,
+                "NORMAL",
+                0,
+                0,
+                None,
+                None,
+                Vec::new(),
+            );
+        }
         let program = ProgramName::new(target, 128).map_err(|_| HostProblem::Malformed)?;
         let result = self.nested(
             run,
@@ -1249,7 +1642,7 @@ impl CicsService {
         )
     }
 
-    fn syncpoint(&self, run: &Run, request: &CicsRequest) -> Result<CicsResponse, HostProblem> {
+    fn syncpoint(&self, run: &mut Run, request: &CicsRequest) -> Result<CicsResponse, HostProblem> {
         let mutation = request
             .mutation
             .as_ref()
@@ -1294,6 +1687,11 @@ impl CicsService {
                 None,
             )
             .map_err(store_error)?;
+        if outcome == CicsUnitOfWorkOutcome::RolledBack {
+            self.rollback_run(run)?;
+        } else {
+            run.undo.clear();
+        }
         if self
             .store
             .put_provider_state(
@@ -1314,6 +1712,43 @@ impl CicsService {
             return Err(HostProblem::UnknownOutcome);
         }
         self.uow_response(run, outcome)
+    }
+
+    fn rollback_run(&self, run: &mut Run) -> Result<(), HostProblem> {
+        let undo = std::mem::take(&mut run.undo);
+        for operation in undo.into_iter().rev() {
+            let sequence = run
+                .host_sequence
+                .checked_add(1)
+                .ok_or(HostProblem::ResourceExhausted)?;
+            let mutation = nested_mutation(run, sequence)?;
+            let request = match operation {
+                DatasetUndo::Restore {
+                    dataset,
+                    key,
+                    record,
+                } => DatasetRequest::RewriteRecord {
+                    dataset,
+                    key,
+                    record,
+                    expected_version: None,
+                    mutation,
+                },
+                DatasetUndo::Delete { dataset, key } => DatasetRequest::DeleteRecord {
+                    dataset,
+                    key,
+                    expected_version: None,
+                    mutation,
+                },
+            };
+            match self.nested(run, HostRequest::Dataset(request))? {
+                HostResult::Dataset(DatasetResult::Mutated { .. }) => {}
+                _ => return Err(HostProblem::ProviderFailure),
+            }
+        }
+        run.current_records.clear();
+        run.current_record_values.clear();
+        Ok(())
     }
 
     fn uow_response(
@@ -1376,11 +1811,28 @@ impl CicsService {
             .or_else(|_| argument_text(request, "FILE"))?
             .trim()
             .to_ascii_uppercase();
-        let name = self
-            .lock()?
-            .file_aliases
-            .get(&logical_name)
-            .map(|dataset| dataset.as_str().to_string())
+        #[cfg(feature = "fault-injection")]
+        {
+            let mut state = self.lock()?;
+            if state
+                .file_failure
+                .as_ref()
+                .is_some_and(|(operation, file)| {
+                    *operation == request.operation && file == &logical_name
+                })
+            {
+                state.file_failure = None;
+                return Err(HostProblem::Condition {
+                    name: "IOERR".into(),
+                    response: 17,
+                    response2: 1,
+                });
+            }
+        }
+        let definition = self.lock()?.file_aliases.get(&logical_name).cloned();
+        let ccsid = definition.as_ref().and_then(|definition| definition.ccsid);
+        let name = definition
+            .map(|definition| definition.dataset.as_str().to_string())
             .unwrap_or(logical_name);
         let dataset = DatasetName::new(name, 128).map_err(|_| HostProblem::Malformed)?;
         let dataset_key = dataset.as_str().to_string();
@@ -1393,11 +1845,41 @@ impl CicsService {
         let member = argument_optional(request, "MEMBER")
             .map(|name| MemberName::new(name, 8).map_err(|_| HostProblem::Malformed))
             .transpose()?;
+        let pending_undo = match request.operation {
+            CicsOperation::Write => argument_bytes(request, "RIDFLD")
+                .map(|key| encode_dataset_bytes(ccsid, &key))
+                .transpose()?
+                .map(|key| DatasetUndo::Delete {
+                    dataset: dataset.clone(),
+                    key,
+                }),
+            CicsOperation::Rewrite | CicsOperation::Delete => {
+                let key = argument_bytes(request, "RIDFLD")
+                    .map(|value| encode_dataset_bytes(ccsid, &value))
+                    .transpose()?
+                    .or_else(|| run.current_records.get(&dataset_key).cloned());
+                key.zip(run.current_record_values.get(&dataset_key).cloned())
+                    .map(|(key, record)| DatasetUndo::Restore {
+                        dataset: dataset.clone(),
+                        key,
+                        record,
+                    })
+            }
+            _ => None,
+        };
+        let mutated_record = matches!(
+            request.operation,
+            CicsOperation::Write | CicsOperation::Rewrite
+        )
+        .then(|| encode_dataset_bytes(ccsid, &argument_bytes(request, "FROM").unwrap_or_default()))
+        .transpose()?;
         let host_request = match request.operation {
             CicsOperation::Read => DatasetRequest::Read {
                 dataset: dataset.clone(),
                 member,
-                key: argument_bytes(request, "RIDFLD"),
+                key: argument_bytes(request, "RIDFLD")
+                    .map(|value| encode_dataset_bytes(ccsid, &value))
+                    .transpose()?,
                 max_records: 1,
             },
             CicsOperation::Write => {
@@ -1409,7 +1891,10 @@ impl CicsService {
                 DatasetRequest::Write {
                     dataset: dataset.clone(),
                     member,
-                    records: vec![argument_bytes(request, "FROM").unwrap_or_default()],
+                    records: vec![encode_dataset_bytes(
+                        ccsid,
+                        &argument_bytes(request, "FROM").unwrap_or_default(),
+                    )?],
                     expected_version: argument_optional(request, "VERSION")
                         .map(|value| value.parse().map_err(|_| HostProblem::Malformed))
                         .transpose()?,
@@ -1423,6 +1908,8 @@ impl CicsService {
                     .ok_or(HostProblem::ResourceExhausted)?;
                 let mutation = nested_mutation(run, sequence)?;
                 let key = argument_bytes(request, "RIDFLD")
+                    .map(|value| encode_dataset_bytes(ccsid, &value))
+                    .transpose()?
                     .or_else(|| run.current_records.get(&dataset_key).cloned())
                     .ok_or_else(|| HostProblem::Condition {
                         name: "INVREQ".into(),
@@ -1432,7 +1919,10 @@ impl CicsService {
                 DatasetRequest::RewriteRecord {
                     dataset: dataset.clone(),
                     key,
-                    record: argument_bytes(request, "FROM").unwrap_or_default(),
+                    record: encode_dataset_bytes(
+                        ccsid,
+                        &argument_bytes(request, "FROM").unwrap_or_default(),
+                    )?,
                     expected_version: argument_optional(request, "VERSION")
                         .map(|value| value.parse().map_err(|_| HostProblem::Malformed))
                         .transpose()?,
@@ -1446,6 +1936,8 @@ impl CicsService {
                     .ok_or(HostProblem::ResourceExhausted)?;
                 let mutation = nested_mutation(run, sequence)?;
                 let key = argument_bytes(request, "RIDFLD")
+                    .map(|value| encode_dataset_bytes(ccsid, &value))
+                    .transpose()?
                     .or_else(|| run.current_records.get(&dataset_key).cloned())
                     .ok_or_else(|| HostProblem::Condition {
                         name: "INVREQ".into(),
@@ -1463,7 +1955,10 @@ impl CicsService {
             }
             CicsOperation::StartBrowse => DatasetRequest::StartBrowse {
                 dataset: dataset.clone(),
-                key: argument_bytes(request, "RIDFLD").unwrap_or_default(),
+                key: encode_dataset_bytes(
+                    ccsid,
+                    &argument_bytes(request, "RIDFLD").unwrap_or_default(),
+                )?,
             },
             CicsOperation::ReadNext | CicsOperation::ReadPrev => DatasetRequest::ReadNext {
                 dataset: dataset.clone(),
@@ -1501,7 +1996,10 @@ impl CicsService {
                     run.current_records
                         .insert(dataset_key.clone(), identity.clone());
                 }
-                records.into_iter().next().unwrap_or_default()
+                let record = records.into_iter().next().unwrap_or_default();
+                run.current_record_values
+                    .insert(dataset_key.clone(), record.clone());
+                decode_dataset_bytes(ccsid, &record)?
             }
             HostResult::Dataset(DatasetResult::Browse {
                 cursor,
@@ -1518,7 +2016,9 @@ impl CicsService {
                 if let Some(identity) = identity {
                     run.current_records.insert(dataset_key.clone(), identity);
                 }
-                browse_key = key;
+                browse_key = key
+                    .map(|key| decode_dataset_bytes(ccsid, &key))
+                    .transpose()?;
                 if matches!(operation, CicsOperation::ReadNext | CicsOperation::ReadPrev)
                     && record.is_none()
                 {
@@ -1528,17 +2028,30 @@ impl CicsService {
                         response2: 0,
                     });
                 }
-                record.unwrap_or_default()
+                let record = record.unwrap_or_default();
+                if !record.is_empty() {
+                    run.current_record_values
+                        .insert(dataset_key.clone(), record.clone());
+                }
+                decode_dataset_bytes(ccsid, &record)?
             }
             HostResult::Dataset(_) => Vec::new(),
             _ => return Err(HostProblem::ProviderFailure),
         };
         if operation == CicsOperation::Delete {
             run.current_records.remove(&dataset_key);
+            run.current_record_values.remove(&dataset_key);
         } else if operation == CicsOperation::Write
             && let Some(identity) = argument_bytes(request, "RIDFLD")
         {
-            run.current_records.insert(dataset_key, identity);
+            run.current_records
+                .insert(dataset_key.clone(), encode_dataset_bytes(ccsid, &identity)?);
+        }
+        if let Some(record) = mutated_record {
+            run.current_record_values.insert(dataset_key, record);
+        }
+        if let Some(undo) = pending_undo {
+            run.undo.push(undo);
         }
         let mut response = self.response(
             run,
@@ -1568,6 +2081,18 @@ impl CicsService {
         )?;
         let program = ProgramName::new(target.clone(), 128).map_err(|_| HostProblem::Malformed)?;
         let payload = bounded(argument_bytes(request, "COMMAREA").unwrap_or_default())?;
+        if request.operation == CicsOperation::Xctl && self.lock()?.programs.contains(&target) {
+            return self.response(
+                run,
+                CicsDisposition::Transfer,
+                "NORMAL",
+                0,
+                0,
+                Some(target),
+                None,
+                payload.bytes().to_vec(),
+            );
+        }
         let host_request = if request.operation == CicsOperation::Link {
             HostRequest::Program(ProgramRequest::Link { program, payload })
         } else {
@@ -2012,7 +2537,10 @@ fn run_for(
         abend_handler: None,
         retrieve,
         current_records: BTreeMap::new(),
+        current_record_values: BTreeMap::new(),
+        undo: Vec::new(),
         browses: BTreeMap::new(),
+        trace: Vec::new(),
     }
 }
 
@@ -2026,6 +2554,8 @@ fn terminal_snapshot(session: &str, value: &Session) -> CicsTerminalSnapshot {
         columns: value.columns,
         aid: value.aid,
         screen: value.screen.clone(),
+        mapset: value.mapset.clone(),
+        map: value.map.clone(),
         suspended: value.suspended,
         connected: value.connected,
         expires_at_tick: value.expires_at_tick,
@@ -2050,11 +2580,118 @@ fn validate_terminal_identity(value: &str, max: usize) -> Result<(), HostProblem
     }
 }
 
+fn normalize_terminal_name(value: &str, max: usize) -> Result<String, HostProblem> {
+    let normalized = value.trim().to_ascii_uppercase();
+    if normalized.is_empty()
+        || normalized.len() > max
+        || !normalized.bytes().all(|byte| byte.is_ascii_alphanumeric())
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(normalized)
+    }
+}
+
 const fn valid_aid(aid: u8) -> bool {
     matches!(
         aid,
         0x6b..=0x6e | 0x7d | 0xc1..=0xc9 | 0x4a..=0x4c | 0xf1..=0xfc
     )
+}
+
+fn normalize_bms_input(field: &BmsFieldDefinition, value: &[u8]) -> Vec<u8> {
+    if !field.justify_right || value.len() >= usize::from(field.length) {
+        return value.to_vec();
+    }
+    let mut normalized =
+        vec![if field.fill_zero { b'0' } else { b' ' }; usize::from(field.length) - value.len()];
+    normalized.extend_from_slice(value);
+    normalized
+}
+
+fn terminal_values_equal(left: &[u8], right: &[u8]) -> bool {
+    trim_terminal_value(left) == trim_terminal_value(right)
+}
+
+fn trim_terminal_value(mut value: &[u8]) -> &[u8] {
+    while value.last().is_some_and(|byte| matches!(*byte, 0 | b' ')) {
+        value = &value[..value.len() - 1];
+    }
+    value
+}
+
+fn symbolic_map_protection(map: &BmsMapDefinition, symbolic: &[u8]) -> BTreeMap<String, bool> {
+    map.fields
+        .iter()
+        .map(|definition| {
+            let protected = definition
+                .attribute_offset
+                .and_then(|offset| usize::try_from(offset).ok())
+                .and_then(|offset| symbolic.get(offset).copied())
+                .map(|attribute| match attribute {
+                    0xc0 | 0xc1 | 0xc8 | 0xcc => false,
+                    0xf0 | 0xf1 | 0xf8 => true,
+                    _ => definition.protected,
+                })
+                .unwrap_or(definition.protected);
+            (definition.name.to_ascii_uppercase(), protected)
+        })
+        .collect()
+}
+
+fn symbolic_map_modified(map: &BmsMapDefinition, symbolic: &[u8]) -> BTreeMap<String, bool> {
+    map.fields
+        .iter()
+        .map(|definition| {
+            let modified = definition
+                .attribute_offset
+                .and_then(|offset| usize::try_from(offset).ok())
+                .and_then(|offset| symbolic.get(offset).copied())
+                .and_then(|attribute| {
+                    matches!(attribute, 0xc0 | 0xc1 | 0xc8 | 0xcc | 0xf0 | 0xf1 | 0xf8)
+                        .then_some(attribute & 0x01 != 0)
+                })
+                .unwrap_or(definition.fset);
+            (definition.name.to_ascii_uppercase(), modified)
+        })
+        .collect()
+}
+
+fn symbolic_map_values(
+    map: &BmsMapDefinition,
+    symbolic: &[u8],
+) -> Result<BTreeMap<String, Vec<u8>>, HostProblem> {
+    map.fields
+        .iter()
+        .map(|definition| {
+            let start = usize::try_from(definition.output_offset.ok_or(HostProblem::Unsupported)?)
+                .map_err(|_| HostProblem::ResourceExhausted)?;
+            let end = start
+                .checked_add(usize::from(definition.length))
+                .ok_or(HostProblem::ResourceExhausted)?;
+            let value = symbolic
+                .get(start..end)
+                .ok_or(HostProblem::Malformed)?
+                .to_vec();
+            Ok((definition.name.to_ascii_uppercase(), value))
+        })
+        .collect()
+}
+
+fn encode_symbolic_map_output(
+    map: &BmsMapDefinition,
+    symbolic: &[u8],
+) -> Result<Vec<u8>, HostProblem> {
+    let mut encoded = Vec::new();
+    let values = symbolic_map_values(map, symbolic)?;
+    for definition in &map.fields {
+        let value = values
+            .get(&definition.name.to_ascii_uppercase())
+            .ok_or(HostProblem::Malformed)?;
+        field(&mut encoded, definition.name.as_bytes())?;
+        field(&mut encoded, if definition.secret { &[] } else { value })?;
+    }
+    Ok(encoded)
 }
 
 fn encode_tn3270_screen(
@@ -2071,7 +2708,12 @@ fn encode_tn3270_screen(
         out.push(0x11);
         out.extend_from_slice(&encode_terminal_address(address)?);
         out.push(0x1d);
-        out.push(if definition.protected { 0x20 } else { 0x00 });
+        let protected = session
+            .field_protection
+            .get(&definition.name.to_ascii_uppercase())
+            .copied()
+            .unwrap_or(definition.protected);
+        out.push(if protected { 0x20 } else { 0x00 });
         let value = if definition.secret {
             Vec::new()
         } else {
@@ -2624,8 +3266,67 @@ fn map_key(mapset: &str, map: &str) -> String {
     format!("{mapset}/{map}")
 }
 
+fn encode_file_definition(definition: &CicsFileDefinition) -> Result<Vec<u8>, HostProblem> {
+    let mut out = b"MEFA1".to_vec();
+    field(&mut out, definition.dataset.as_str().as_bytes())?;
+    out.extend_from_slice(&definition.ccsid.unwrap_or(0).to_be_bytes());
+    Ok(out)
+}
+
+fn decode_file_definition(bytes: &[u8]) -> Result<CicsFileDefinition, HostProblem> {
+    if !bytes.starts_with(b"MEFA1") {
+        let target =
+            String::from_utf8(bytes.to_vec()).map_err(|_| HostProblem::InfrastructureFailure)?;
+        return Ok(CicsFileDefinition {
+            dataset: DatasetName::new(target, 128)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            ccsid: None,
+        });
+    }
+    let mut reader = Reader { bytes, at: 5 };
+    let target =
+        String::from_utf8(reader.field(128)?).map_err(|_| HostProblem::InfrastructureFailure)?;
+    let ccsid = u16::from_be_bytes(
+        reader
+            .take(2)?
+            .try_into()
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+    );
+    if reader.at != bytes.len() {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(CicsFileDefinition {
+        dataset: DatasetName::new(target, 128).map_err(|_| HostProblem::InfrastructureFailure)?,
+        ccsid: (ccsid != 0).then_some(ccsid),
+    })
+}
+
+fn encode_dataset_bytes(ccsid: Option<u16>, bytes: &[u8]) -> Result<Vec<u8>, HostProblem> {
+    match ccsid {
+        None | Some(1208) => Ok(bytes.to_vec()),
+        Some(37) => match std::str::from_utf8(bytes) {
+            Ok(text) => CodePage::Cp037
+                .encode(text, bytes.len().saturating_mul(4).max(1))
+                .map_err(|_| HostProblem::Malformed),
+            Err(_) => Ok(bytes.to_vec()),
+        },
+        Some(_) => Err(HostProblem::Unsupported),
+    }
+}
+
+fn decode_dataset_bytes(ccsid: Option<u16>, bytes: &[u8]) -> Result<Vec<u8>, HostProblem> {
+    match ccsid {
+        None | Some(1208) => Ok(bytes.to_vec()),
+        Some(37) => CodePage::Cp037
+            .decode(bytes, bytes.len().saturating_mul(4).max(1))
+            .map(String::into_bytes)
+            .map_err(|_| HostProblem::Malformed),
+        Some(_) => Err(HostProblem::Unsupported),
+    }
+}
+
 fn encode_map(map: &BmsMapDefinition) -> Result<Vec<u8>, HostProblem> {
-    let mut out = b"MECM1".to_vec();
+    let mut out = b"MECM5".to_vec();
     field(&mut out, map.mapset.as_bytes())?;
     field(&mut out, map.map.as_bytes())?;
     out.extend_from_slice(&map.rows.to_be_bytes());
@@ -2651,15 +3352,37 @@ fn encode_map(map: &BmsMapDefinition) -> Result<Vec<u8>, HostProblem> {
         )?;
         out.push(u8::from(definition.protected));
         out.push(u8::from(definition.secret));
+        out.push(u8::from(definition.fset));
+        out.push(u8::from(definition.justify_right));
+        out.push(u8::from(definition.fill_zero));
+        match definition.output_offset {
+            Some(offset) => {
+                out.push(1);
+                out.extend_from_slice(&offset.to_be_bytes());
+            }
+            None => out.push(0),
+        }
+        match definition.attribute_offset {
+            Some(offset) => {
+                out.push(1);
+                out.extend_from_slice(&offset.to_be_bytes());
+            }
+            None => out.push(0),
+        }
     }
     Ok(out)
 }
 
 fn decode_map(bytes: &[u8], limits: CicsLimits) -> Result<BmsMapDefinition, HostProblem> {
     let mut reader = Reader { bytes, at: 0 };
-    if reader.take(5)? != b"MECM1" {
-        return Err(HostProblem::InfrastructureFailure);
-    }
+    let version = match reader.take(5)? {
+        b"MECM1" => 1,
+        b"MECM2" => 2,
+        b"MECM3" => 3,
+        b"MECM4" => 4,
+        b"MECM5" => 5,
+        _ => return Err(HostProblem::InfrastructureFailure),
+    };
     let mapset =
         String::from_utf8(reader.field(16)?).map_err(|_| HostProblem::InfrastructureFailure)?;
     let map =
@@ -2723,6 +3446,58 @@ fn decode_map(bytes: &[u8], limits: CicsLimits) -> Result<BmsMapDefinition, Host
             1 => true,
             _ => return Err(HostProblem::InfrastructureFailure),
         };
+        let fset = if version >= 5 {
+            match reader.take(1)?[0] {
+                0 => false,
+                1 => true,
+                _ => return Err(HostProblem::InfrastructureFailure),
+            }
+        } else {
+            false
+        };
+        let (justify_right, fill_zero) = if version >= 2 {
+            let justify_right = match reader.take(1)?[0] {
+                0 => false,
+                1 => true,
+                _ => return Err(HostProblem::InfrastructureFailure),
+            };
+            let fill_zero = match reader.take(1)?[0] {
+                0 => false,
+                1 => true,
+                _ => return Err(HostProblem::InfrastructureFailure),
+            };
+            (justify_right, fill_zero)
+        } else {
+            (false, false)
+        };
+        let output_offset = if version >= 3 {
+            match reader.take(1)?[0] {
+                0 => None,
+                1 => Some(u32::from_be_bytes(
+                    reader
+                        .take(4)?
+                        .try_into()
+                        .map_err(|_| HostProblem::InfrastructureFailure)?,
+                )),
+                _ => return Err(HostProblem::InfrastructureFailure),
+            }
+        } else {
+            None
+        };
+        let attribute_offset = if version >= 4 {
+            match reader.take(1)?[0] {
+                0 => None,
+                1 => Some(u32::from_be_bytes(
+                    reader
+                        .take(4)?
+                        .try_into()
+                        .map_err(|_| HostProblem::InfrastructureFailure)?,
+                )),
+                _ => return Err(HostProblem::InfrastructureFailure),
+            }
+        } else {
+            None
+        };
         fields.push(BmsFieldDefinition {
             name,
             row,
@@ -2733,6 +3508,11 @@ fn decode_map(bytes: &[u8], limits: CicsLimits) -> Result<BmsMapDefinition, Host
             highlight: (!highlight.is_empty()).then_some(highlight),
             protected,
             secret,
+            fset,
+            justify_right,
+            fill_zero,
+            output_offset,
+            attribute_offset,
         });
     }
     if reader.at != bytes.len() {
@@ -2750,7 +3530,7 @@ fn decode_map(bytes: &[u8], limits: CicsLimits) -> Result<BmsMapDefinition, Host
 }
 
 fn encode_session(session: &Session) -> Result<Vec<u8>, HostProblem> {
-    let mut out = b"MECS2".to_vec();
+    let mut out = b"MECS4".to_vec();
     out.extend_from_slice(&session.rows.to_be_bytes());
     out.extend_from_slice(&session.columns.to_be_bytes());
     field(&mut out, session.principal.as_bytes())?;
@@ -2764,6 +3544,33 @@ fn encode_session(session: &Session) -> Result<Vec<u8>, HostProblem> {
     out.push(u8::from(session.suspended));
     field(&mut out, session.mapset.as_deref().unwrap_or("").as_bytes())?;
     field(&mut out, session.map.as_deref().unwrap_or("").as_bytes())?;
+    out.extend_from_slice(
+        &u32::try_from(session.field_protection.len())
+            .map_err(|_| HostProblem::ResourceExhausted)?
+            .to_be_bytes(),
+    );
+    for (name, protected) in &session.field_protection {
+        field(&mut out, name.as_bytes())?;
+        out.push(u8::from(*protected));
+    }
+    out.extend_from_slice(
+        &u32::try_from(session.field_modified.len())
+            .map_err(|_| HostProblem::ResourceExhausted)?
+            .to_be_bytes(),
+    );
+    for (name, modified) in &session.field_modified {
+        field(&mut out, name.as_bytes())?;
+        out.push(u8::from(*modified));
+    }
+    out.extend_from_slice(
+        &u32::try_from(session.field_values.len())
+            .map_err(|_| HostProblem::ResourceExhausted)?
+            .to_be_bytes(),
+    );
+    for (name, value) in &session.field_values {
+        field(&mut out, name.as_bytes())?;
+        field(&mut out, value)?;
+    }
     field(&mut out, &session.screen)?;
     match &session.input {
         Some(input) => {
@@ -2778,7 +3585,7 @@ fn encode_session(session: &Session) -> Result<Vec<u8>, HostProblem> {
 fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Session, HostProblem> {
     let mut reader = Reader { bytes, at: 0 };
     let schema = reader.take(5)?;
-    if schema != b"MECS1" && schema != b"MECS2" {
+    if !matches!(schema, b"MECS1" | b"MECS2" | b"MECS3" | b"MECS4") {
         return Err(HostProblem::InfrastructureFailure);
     }
     let rows = u16::from_be_bytes(
@@ -2801,7 +3608,7 @@ fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Sess
         idle_timeout_ticks,
         expires_at_tick,
         connected,
-    ) = if schema == b"MECS2" {
+    ) = if matches!(schema, b"MECS2" | b"MECS3" | b"MECS4") {
         let principal = String::from_utf8(reader.field(128)?)
             .map_err(|_| HostProblem::InfrastructureFailure)?;
         let transaction =
@@ -2867,7 +3674,7 @@ fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Sess
         1 => true,
         _ => return Err(HostProblem::InfrastructureFailure),
     };
-    let (mapset, map) = if schema == b"MECS2" {
+    let (mapset, map) = if matches!(schema, b"MECS2" | b"MECS3" | b"MECS4") {
         let mapset =
             String::from_utf8(reader.field(16)?).map_err(|_| HostProblem::InfrastructureFailure)?;
         let map =
@@ -2878,6 +3685,63 @@ fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Sess
         )
     } else {
         (None, None)
+    };
+    let field_protection = if matches!(schema, b"MECS3" | b"MECS4") {
+        let count = usize::try_from(u32::from_be_bytes(
+            reader
+                .take(4)?
+                .try_into()
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+        ))
+        .map_err(|_| HostProblem::ResourceExhausted)?;
+        if count > limits.max_fields {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let mut values = BTreeMap::new();
+        for _ in 0..count {
+            let name = String::from_utf8(reader.field(32)?)
+                .map_err(|_| HostProblem::InfrastructureFailure)?;
+            let protected = match reader.take(1)?[0] {
+                0 => false,
+                1 => true,
+                _ => return Err(HostProblem::InfrastructureFailure),
+            };
+            if values.insert(name, protected).is_some() {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+        }
+        values
+    } else {
+        BTreeMap::new()
+    };
+    let field_modified = if schema == b"MECS4" {
+        decode_session_flags(&mut reader, limits)?
+    } else {
+        BTreeMap::new()
+    };
+    let field_values = if schema == b"MECS4" {
+        let count = usize::try_from(u32::from_be_bytes(
+            reader
+                .take(4)?
+                .try_into()
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+        ))
+        .map_err(|_| HostProblem::ResourceExhausted)?;
+        if count > limits.max_fields {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let mut values = BTreeMap::new();
+        for _ in 0..count {
+            let name = String::from_utf8(reader.field(32)?)
+                .map_err(|_| HostProblem::InfrastructureFailure)?;
+            let value = reader.field(limits.max_screen_bytes)?;
+            if values.insert(name, value).is_some() {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+        }
+        values
+    } else {
+        BTreeMap::new()
     };
     let screen = reader.field(limits.max_screen_bytes)?;
     let input = match reader.take(1)?[0] {
@@ -2904,8 +3768,41 @@ fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Sess
         suspended,
         mapset,
         map,
+        field_protection,
+        field_modified,
+        field_values,
         version,
     })
+}
+
+fn decode_session_flags(
+    reader: &mut Reader<'_>,
+    limits: CicsLimits,
+) -> Result<BTreeMap<String, bool>, HostProblem> {
+    let count = usize::try_from(u32::from_be_bytes(
+        reader
+            .take(4)?
+            .try_into()
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+    ))
+    .map_err(|_| HostProblem::ResourceExhausted)?;
+    if count > limits.max_fields {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let mut values = BTreeMap::new();
+    for _ in 0..count {
+        let name =
+            String::from_utf8(reader.field(32)?).map_err(|_| HostProblem::InfrastructureFailure)?;
+        let value = match reader.take(1)?[0] {
+            0 => false,
+            1 => true,
+            _ => return Err(HostProblem::InfrastructureFailure),
+        };
+        if values.insert(name, value).is_some() {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+    }
+    Ok(values)
 }
 
 fn field(out: &mut Vec<u8>, value: &[u8]) -> Result<(), HostProblem> {
@@ -3054,6 +3951,14 @@ mod tests {
                 HostRequest::Dataset(request) => {
                     self.trace.requests.lock().unwrap().push(request.clone());
                     match request {
+                        DatasetRequest::Read { key, .. } => {
+                            let identity = key.unwrap_or_else(|| b"AA".to_vec());
+                            Ok(HostResult::Dataset(DatasetResult::Records {
+                                records: vec![b"AA11".to_vec()],
+                                identities: vec![identity],
+                                version: 1,
+                            }))
+                        }
                         DatasetRequest::StartBrowse { .. } => {
                             Ok(HostResult::Dataset(DatasetResult::Browse {
                                 cursor: "CURSOR-1".into(),
@@ -3741,6 +4646,11 @@ mod tests {
                         highlight: None,
                         protected: false,
                         secret: false,
+                        fset: false,
+                        justify_right: false,
+                        fill_zero: false,
+                        output_offset: None,
+                        attribute_offset: None,
                     },
                     BmsFieldDefinition {
                         name: "LOCKED".into(),
@@ -3752,6 +4662,11 @@ mod tests {
                         highlight: None,
                         protected: true,
                         secret: true,
+                        fset: true,
+                        justify_right: false,
+                        fill_zero: false,
+                        output_offset: None,
+                        attribute_offset: None,
                     },
                 ],
             })
@@ -3787,6 +4702,11 @@ mod tests {
         let wire = initial.tn3270_screen(&session, principal, 11).unwrap();
         assert_eq!(wire[..2], [0xf5, 0xc3]);
         assert!(!wire.windows(7).any(|value| value == b"PRIVATE"));
+        drop(initial);
+        let initial = service(store.clone());
+        initial
+            .register_run(invocation.clone(), &session, "CC00", "MEAPPL", "MESYS")
+            .unwrap();
         assert_eq!(
             initial.submit_terminal_input(
                 &session,
@@ -3832,6 +4752,13 @@ mod tests {
                 .bytes()
                 .windows(4)
                 .any(|value| value == b"USER")
+        );
+        assert!(
+            input
+                .payload
+                .bytes()
+                .windows(7)
+                .any(|value| value == b"PRIVATE")
         );
         assert_eq!(initial.active_worker_count(), 0);
 
@@ -3925,6 +4852,76 @@ mod tests {
     }
 
     #[test]
+    fn dynamic_bms_protection_survives_session_restart() {
+        let memory = Arc::new(MemoryStore::new(Default::default()));
+        let store: Arc<dyn ProviderStateStore> = memory.clone();
+        let initial = service(store.clone());
+        initial
+            .register_map(BmsMapDefinition {
+                mapset: "DYNAMIC".into(),
+                map: "DYNMAP".into(),
+                rows: 24,
+                columns: 80,
+                fields: vec![BmsFieldDefinition {
+                    name: "SELECT".into(),
+                    row: 1,
+                    column: 1,
+                    length: 1,
+                    initial: Vec::new(),
+                    color: None,
+                    highlight: None,
+                    protected: true,
+                    secret: false,
+                    fset: false,
+                    justify_right: false,
+                    fill_zero: false,
+                    output_offset: Some(0),
+                    attribute_offset: Some(1),
+                }],
+            })
+            .unwrap();
+        let invocation = invocation_for("dynamic-run", BTreeMap::new());
+        let session = SessionId::new("dynamic-session", 64).unwrap();
+        initial
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "CC00",
+                24,
+                80,
+                "dynamic-csrf",
+                10,
+                100,
+            )
+            .unwrap();
+        let mut send = request(
+            CicsOperation::SendMap,
+            BTreeMap::from([
+                ("MAPSET".into(), argument(b"DYNAMIC")),
+                ("MAP".into(), argument(b"DYNMAP")),
+                ("FROM".into(), argument(&[b'A', 0xc1])),
+            ]),
+            1,
+        );
+        send.mutation.as_mut().unwrap().transaction = Some("CC00".into());
+        initial
+            .invoke(&effect(&invocation.run_unit_id, send.clone(), 1), send)
+            .unwrap();
+        drop(initial);
+        let restarted = service(store);
+        restarted
+            .submit_terminal_input(
+                &session,
+                invocation.principal.id(),
+                "dynamic-csrf",
+                0x7d,
+                &BTreeMap::from([("SELECT".into(), b"U".to_vec())]),
+                11,
+            )
+            .unwrap();
+    }
+
+    #[test]
     fn bms_send_file_read_and_program_transfer_are_typed() {
         let service = service(Arc::new(MemoryStore::new(Default::default())));
         let (invocation, _) = registered(&service);
@@ -3944,6 +4941,11 @@ mod tests {
                     highlight: None,
                     protected: true,
                     secret: false,
+                    fset: false,
+                    justify_right: false,
+                    fill_zero: false,
+                    output_offset: None,
+                    attribute_offset: None,
                 }],
             })
             .unwrap();
@@ -4081,6 +5083,74 @@ mod tests {
     }
 
     #[test]
+    fn syncpoint_rollback_compensates_reached_dataset_rewrite() {
+        let trace = Arc::new(DatasetTrace::default());
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service =
+            CicsService::open(traced_authorities(trace.clone()), store, Default::default())
+                .unwrap();
+        let (invocation, _) = registered(&service);
+        service
+            .register_file_aliases(&BTreeMap::from([(
+                "ACCTDAT".into(),
+                DatasetName::new("CARDDEMO.ACCTDAT", 128).unwrap(),
+            )]))
+            .unwrap();
+        let read = request(
+            CicsOperation::Read,
+            BTreeMap::from([
+                ("DATASET".into(), argument(b"ACCTDAT")),
+                ("RIDFLD".into(), argument(b"AA")),
+            ]),
+            1,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, read.clone(), 1), read)
+            .unwrap();
+        let rewrite = request(
+            CicsOperation::Rewrite,
+            BTreeMap::from([
+                ("DATASET".into(), argument(b"ACCTDAT")),
+                ("FROM".into(), argument(b"AA22")),
+            ]),
+            2,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, rewrite.clone(), 2),
+                rewrite,
+            )
+            .unwrap();
+        let rollback = request(
+            CicsOperation::Syncpoint,
+            BTreeMap::from([("OPTION.ROLLBACK".into(), argument(b""))]),
+            3,
+        );
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, rollback.clone(), 3),
+                    rollback,
+                )
+                .unwrap()
+                .unit_of_work,
+            Some(CicsUnitOfWorkOutcome::RolledBack)
+        );
+        let requests = trace.requests.lock().unwrap();
+        assert!(matches!(
+            requests.as_slice(),
+            [
+                DatasetRequest::Read { .. },
+                DatasetRequest::RewriteRecord { record, .. },
+                DatasetRequest::RewriteRecord {
+                    record: restored,
+                    ..
+                }
+            ] if record == b"AA22" && restored == b"AA11"
+        ));
+    }
+
+    #[test]
     fn outer_registry_selects_cics_provider_for_clocked_operations() {
         let service = service(Arc::new(MemoryStore::new(Default::default())));
         let (invocation, _) = registered(&service);
@@ -4188,6 +5258,11 @@ mod tests {
                 highlight: None,
                 protected: false,
                 secret: true,
+                fset: false,
+                justify_right: false,
+                fill_zero: false,
+                output_offset: None,
+                attribute_offset: None,
             }],
         };
         assert_eq!(service.register_map(invalid), Err(HostProblem::Malformed));

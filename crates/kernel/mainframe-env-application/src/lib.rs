@@ -92,6 +92,7 @@ pub struct BmsField {
     pub length: Option<usize>,
     pub position: Option<(usize, usize)>,
     pub attributes: Vec<String>,
+    pub justify: Vec<String>,
     pub initial: Option<String>,
 }
 
@@ -353,6 +354,7 @@ pub fn parse_bms(source: &str) -> Result<BmsMap, InstallProblem> {
                 length: scalar_property(&upper, "LENGTH"),
                 position: pair_property(&upper, "POS"),
                 attributes: list_property(&upper, "ATTRB"),
+                justify: list_property(&upper, "JUSTIFY"),
                 initial: quoted_property(&statement, "INITIAL"),
             });
         }
@@ -757,6 +759,7 @@ mod tests {
         assert_eq!(map.size, Some((24, 80)));
         assert_eq!(map.fields[0].position, Some((2, 3)));
         assert_eq!(map.fields[0].attributes, ["UNPROT", "FSET"]);
+        assert!(map.fields[0].justify.is_empty());
         let csd = parse_csd(
             "DEFINE PROGRAM(PROGA) GROUP(APP) LANGUAGE(COBOL)\nDEFINE TRANSACTION(T001) GROUP(APP) PROGRAM(PROGA)",
         )

@@ -3,22 +3,31 @@ use axum::http::StatusCode;
 use base64::Engine;
 use mainframe_env_application::ApplicationInstaller;
 use mainframe_env_batch::{BatchService, JclBundle};
-use mainframe_env_cics::{CicsService, CicsTerminalSnapshot, cics_provider};
+use mainframe_env_cics::{
+    BmsMapDefinition, CicsService, CicsTerminalSnapshot, CicsTraceEntry, cics_provider,
+};
 use mainframe_env_dataset::{DatasetService, dataset_providers};
 use mainframe_env_execution_api::{
-    ArtifactRef, CapabilityId, ExecutionId, IdempotencyKey, Invocation, InvocationLimits,
-    Principal, PrincipalId, RequestId, ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
+    ArtifactRef, BoundedPayload, CapabilityId, ExecutionId, ExecutionOutcome, IdempotencyKey,
+    Invocation, InvocationLimits, Machine, Principal, PrincipalId, RequestId, ResourceLimits,
+    RunUnitId, Selector, ServiceClass, TraceId,
 };
 use mainframe_env_host_api::{
-    AccessIntent, CapabilityDescriptor, ClockRequest, DatasetAttributes, DatasetName,
-    DatasetOrganization, DatasetRequest, DatasetResult, EffectRequest, EffectResult, HostLimits,
-    HostProblem, HostProvider, HostRequest, HostResult, MemberName, Mutation, RecordFormat,
-    RegistrySnapshot, ResourceName, ScopedHostService, SecretRef, SecurityDecision, SessionId,
+    AccessIntent, CapabilityDescriptor, CicsOperation, ClockRequest, DatasetAttributes,
+    DatasetName, DatasetOrganization, DatasetRequest, DatasetResult, EffectRequest, EffectResult,
+    HostLimits, HostProblem, HostProvider, HostRequest, HostResult, MemberName, Mutation,
+    RecordFormat, RegistrySnapshot, ResourceName, ScopedHostService, SecretRef, SecurityDecision,
+    SessionId,
 };
+use mainframe_env_interpreter::{
+    CoordinatorLimits, ExecutionControl, ExecutionCoordinator, ReferenceMachine,
+};
+use mainframe_env_ir::CodecLimits;
 use mainframe_env_racf::{MemorySecretResolver, RacfService, racf_providers};
 use mainframe_env_store::{LocalArtifactStore, MemoryStore};
 use mainframe_env_store_api::{
-    PlatformStore, ProviderStateRecord, ProviderStateStore, StoreError, WorkRecord, WorkState,
+    ArtifactRecord, ArtifactStore, PlatformStore, ProviderStateRecord, ProviderStateStore,
+    ProviderStateWrite, StoreError, WorkRecord, WorkState,
 };
 use mainframe_env_zosmf::{
     Authentication, GatewayProblem, GatewayRequest, GatewayResponse, ZosmfBackend, ZosmfLimits,
@@ -26,6 +35,7 @@ use mainframe_env_zosmf::{
 use ring::rand::{SecureRandom, SystemRandom};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -41,6 +51,35 @@ pub struct ProductMetrics {
     pub console_messages: usize,
     pub outbox_pending: usize,
     pub outbox_delivered: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OnlineProgramDefinition {
+    pub name: String,
+    pub artifact: ArtifactRef,
+    pub payload: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OnlineApplicationDefinition {
+    pub programs: Vec<OnlineProgramDefinition>,
+    pub transactions: BTreeMap<String, String>,
+    pub maps: Vec<BmsMapDefinition>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OnlineInstallReceipt {
+    pub programs: usize,
+    pub transactions: usize,
+    pub maps: usize,
+    pub identity: String,
+    pub replayed: bool,
+}
+
+struct OnlineMachineContinuation {
+    program: String,
+    checkpoint: BoundedPayload,
+    version: u64,
 }
 
 struct AuthSession {
@@ -60,10 +99,14 @@ pub struct ProductServer {
     secrets: Arc<MemorySecretResolver>,
     racf: Arc<RacfService>,
     cics: Arc<CicsService>,
+    dataset: Arc<DatasetService>,
     batch: Arc<BatchService>,
     artifacts: LocalArtifactStore,
     host: Arc<ScopedHostService>,
     applications: ApplicationInstaller,
+    online_programs: Mutex<BTreeMap<String, ArtifactRef>>,
+    online_transactions: Mutex<BTreeMap<String, String>>,
+    online_traces: Mutex<BTreeMap<String, Vec<CicsTraceEntry>>>,
     sessions: Mutex<BTreeMap<String, AuthSession>>,
     console: Mutex<Vec<ConsoleMessage>>,
     sequence: AtomicU64,
@@ -98,7 +141,7 @@ impl ProductServer {
             true,
             Some(cics_provider(cics.clone(), InvocationLimits::default())),
         )?;
-        program.bind_runtime(host.clone(), store.clone())?;
+        program.bind_runtime(host.clone(), store.clone(), &config.artifact_root)?;
         let batch = BatchService::open(
             host.clone(),
             provider_store,
@@ -139,16 +182,53 @@ impl ProductServer {
                 text: text.to_vec(),
             });
         }
+        let mut online_programs = BTreeMap::new();
+        for row in store
+            .list_provider_state("online-program", 4096)
+            .map_err(store_error)?
+        {
+            let artifact = ArtifactRef::new(
+                String::from_utf8(row.payload).map_err(|_| HostProblem::InfrastructureFailure)?,
+                InvocationLimits::default(),
+            )
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+            if artifacts
+                .get_artifact(&artifact)
+                .map_err(store_error)?
+                .is_none()
+                || online_programs.insert(row.key, artifact).is_some()
+            {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+        }
+        let mut online_transactions = BTreeMap::new();
+        for row in store
+            .list_provider_state("online-transaction", 4096)
+            .map_err(store_error)?
+        {
+            let program =
+                String::from_utf8(row.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
+            if !online_programs.contains_key(&program)
+                || online_transactions.insert(row.key, program).is_some()
+            {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+        }
+        cics.register_programs(&online_programs.keys().cloned().collect())?;
         let product = Arc::new(Self {
             config,
             store,
             secrets,
             racf,
             cics,
+            dataset,
             batch,
             artifacts,
             host,
             applications: ApplicationInstaller::new("0.1.1"),
+            online_programs: Mutex::new(online_programs),
+            online_transactions: Mutex::new(online_transactions),
+            online_traces: Mutex::new(BTreeMap::new()),
             sessions: Mutex::new(sessions),
             console: Mutex::new(console),
             sequence: AtomicU64::new(1),
@@ -179,15 +259,407 @@ impl ProductServer {
         self.cics.clone()
     }
 
-    pub fn bootstrap_user(&self, user: &str, secret: &[u8]) -> Result<(), HostProblem> {
-        let reference = format!("bootstrap:{user}");
-        self.secrets.insert(&reference, secret.to_vec());
-        let result = self.racf.add_user(
-            user,
-            &SecretRef::new(reference.clone(), HostLimits::default())?,
+    #[must_use]
+    pub fn dataset_service(&self) -> Arc<DatasetService> {
+        self.dataset.clone()
+    }
+
+    #[must_use]
+    pub fn racf_service(&self) -> Arc<RacfService> {
+        self.racf.clone()
+    }
+
+    pub fn online_trace(&self, session: &str) -> Result<Vec<CicsTraceEntry>, HostProblem> {
+        Ok(self
+            .online_traces
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .get(session)
+            .cloned()
+            .unwrap_or_default())
+    }
+
+    pub fn online_operation_count(&self, operation: CicsOperation) -> Result<usize, HostProblem> {
+        Ok(self
+            .online_traces
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .values()
+            .flatten()
+            .filter(|entry| entry.operation == operation)
+            .count())
+    }
+
+    pub fn install_online_application(
+        &self,
+        definition: OnlineApplicationDefinition,
+    ) -> Result<OnlineInstallReceipt, HostProblem> {
+        if definition.programs.is_empty()
+            || definition.transactions.is_empty()
+            || definition.maps.is_empty()
+            || definition.programs.len() > 4096
+            || definition.transactions.len() > 4096
+        {
+            return Err(HostProblem::Malformed);
+        }
+        let mut programs = BTreeMap::new();
+        let mut identity = Sha256::new();
+        for definition in &definition.programs {
+            let name = normalize_online_name(&definition.name, 128)?;
+            let digest: [u8; 32] = Sha256::digest(&definition.payload).into();
+            if definition.artifact.as_str() != format!("sha256:{}", hex_digest(&digest))
+                || programs
+                    .insert(name.clone(), definition.artifact.clone())
+                    .is_some()
+            {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            self.artifacts
+                .put_artifact(ArtifactRecord {
+                    artifact: definition.artifact.clone(),
+                    media_type: "application/vnd.mainframe-env.core-mir".into(),
+                    payload_digest: digest,
+                    payload: definition.payload.clone(),
+                })
+                .map_err(store_error)?;
+            digest_online_field(&mut identity, name.as_bytes());
+            digest_online_field(&mut identity, definition.artifact.as_str().as_bytes());
+        }
+        let mut transactions = BTreeMap::new();
+        for (transaction, program) in &definition.transactions {
+            let transaction = normalize_online_name(transaction, 16)?;
+            let program = normalize_online_name(program, 128)?;
+            if !programs.contains_key(&program)
+                || transactions
+                    .insert(transaction.clone(), program.clone())
+                    .is_some()
+            {
+                return Err(HostProblem::NotFound);
+            }
+            digest_online_field(&mut identity, transaction.as_bytes());
+            digest_online_field(&mut identity, program.as_bytes());
+        }
+        let program_names = programs.keys().cloned().collect::<BTreeSet<_>>();
+        self.cics.register_programs(&program_names)?;
+        for map in &definition.maps {
+            self.cics.register_map(map.clone())?;
+            digest_online_field(&mut identity, map.mapset.as_bytes());
+            digest_online_field(&mut identity, map.map.as_bytes());
+            digest_online_field(&mut identity, &(map.fields.len() as u64).to_be_bytes());
+        }
+        let mut current_programs = self
+            .online_programs
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let mut current_transactions = self
+            .online_transactions
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let mut writes = Vec::new();
+        for (name, artifact) in &programs {
+            if let Some(existing) = current_programs.get(name) {
+                if existing != artifact {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+            } else {
+                writes.push(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: "online-program".into(),
+                        key: name.clone(),
+                        version: 1,
+                        payload: artifact.as_str().as_bytes().to_vec(),
+                    },
+                    expected_version: None,
+                });
+            }
+        }
+        for (transaction, program) in &transactions {
+            if let Some(existing) = current_transactions.get(transaction) {
+                if existing != program {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+            } else {
+                writes.push(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: "online-transaction".into(),
+                        key: transaction.clone(),
+                        version: 1,
+                        payload: program.as_bytes().to_vec(),
+                    },
+                    expected_version: None,
+                });
+            }
+        }
+        let replayed = writes.is_empty();
+        if !replayed {
+            self.store
+                .put_provider_states_atomic(writes)
+                .map_err(store_error)?;
+        }
+        current_programs.extend(programs);
+        current_transactions.extend(transactions);
+        Ok(OnlineInstallReceipt {
+            programs: definition.programs.len(),
+            transactions: definition.transactions.len(),
+            maps: definition.maps.len(),
+            identity: format!("sha256:{:x}", identity.finalize()),
+            replayed,
+        })
+    }
+
+    fn online_machine_continuation(
+        &self,
+        session: &SessionId,
+    ) -> Result<Option<OnlineMachineContinuation>, HostProblem> {
+        self.store
+            .get_provider_state("online-machine-continuation", session.as_str())
+            .map_err(store_error)?
+            .map(|record| decode_online_machine_continuation(&record))
+            .transpose()
+    }
+
+    fn persist_online_machine_continuation(
+        &self,
+        session: &SessionId,
+        program: &str,
+        checkpoint: &BoundedPayload,
+        current_version: Option<u64>,
+    ) -> Result<u64, HostProblem> {
+        let version = current_version
+            .unwrap_or_default()
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "online-machine-continuation".into(),
+                    key: session.as_str().into(),
+                    version,
+                    payload: encode_online_machine_continuation(program, checkpoint)?,
+                },
+                current_version,
+            )
+            .map_err(store_error)?;
+        Ok(version)
+    }
+
+    fn clear_online_machine_continuation(
+        &self,
+        session: &SessionId,
+        version: Option<u64>,
+    ) -> Result<(), HostProblem> {
+        if let Some(version) = version {
+            self.store
+                .delete_provider_state("online-machine-continuation", session.as_str(), version)
+                .map_err(store_error)?;
+        }
+        Ok(())
+    }
+
+    fn finish_online_machine_run(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        now_tick: u64,
+    ) -> Result<(), HostProblem> {
+        let trace = self.cics.terminal_run_trace(session, principal, now_tick)?;
+        self.online_traces
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .entry(session.as_str().into())
+            .or_default()
+            .extend(trace);
+        self.cics
+            .complete_terminal_run(session, principal, now_tick)
+    }
+
+    fn run_online_exchange(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        program: &str,
+        now_tick: u64,
+    ) -> Result<(), HostProblem> {
+        let context = self.cics.terminal_execution(session, principal, now_tick)?;
+        let mut invocation = context.invocation;
+        invocation.bindings.insert(
+            "cics.commarea".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.commarea@1",
+                context.commarea,
+                InvocationLimits::default(),
+            )
+            .map_err(|_| HostProblem::ResourceExhausted)?,
         );
-        self.secrets.remove(&reference);
-        result?;
+        invocation.bindings.insert(
+            "cics.aid".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.aid@1",
+                vec![context.aid],
+                InvocationLimits::default(),
+            )
+            .map_err(|_| HostProblem::ResourceExhausted)?,
+        );
+        invocation.bindings.insert(
+            "cics.transaction".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.transaction@1",
+                context.transaction.into_bytes(),
+                InvocationLimits::default(),
+            )
+            .map_err(|_| HostProblem::ResourceExhausted)?,
+        );
+        let saved = self.online_machine_continuation(session)?;
+        let mut saved_version = saved.as_ref().map(|saved| saved.version);
+        let mut saved_checkpoint = saved.as_ref().map(|saved| saved.checkpoint.clone());
+        let mut current = normalize_online_name(
+            saved
+                .as_ref()
+                .map_or(program, |saved| saved.program.as_str()),
+            128,
+        )?;
+        let root_idempotency = invocation.idempotency_key.as_str().to_string();
+        for frame in 0..invocation.limits.max_frames {
+            let artifact = self
+                .online_programs
+                .lock()
+                .map_err(|_| HostProblem::InfrastructureFailure)?
+                .get(&current)
+                .cloned()
+                .ok_or(HostProblem::NotFound)?;
+            let record = self
+                .artifacts
+                .get_artifact(&artifact)
+                .map_err(store_error)?
+                .ok_or(HostProblem::NotFound)?;
+            invocation.selector =
+                Selector::new(format!("program:{current}"), InvocationLimits::default())
+                    .map_err(|_| HostProblem::InfrastructureFailure)?;
+            invocation.artifact = artifact;
+            invocation.idempotency_key = IdempotencyKey::new(
+                format!("{root_idempotency}:{frame}:{current}"),
+                InvocationLimits::default(),
+            )
+            .map_err(|_| HostProblem::ResourceExhausted)?;
+            let mut machine = ReferenceMachine::from_binary(
+                &record.payload,
+                invocation.clone(),
+                CodecLimits::default(),
+            )
+            .map_err(|_| HostProblem::ProviderFailure)?;
+            if let Some(checkpoint) = saved_checkpoint.take() {
+                machine
+                    .restore_checkpoint(&checkpoint)
+                    .map_err(|_| HostProblem::InfrastructureFailure)?;
+            }
+            let coordinator = ExecutionCoordinator::with_host(
+                self.host.clone(),
+                CoordinatorLimits {
+                    max_quanta: 100,
+                    ..CoordinatorLimits::default()
+                },
+            );
+            match coordinator.execute(&mut machine, &invocation, ExecutionControl::default()) {
+                ExecutionOutcome::Completed(_) => {
+                    self.clear_online_machine_continuation(session, saved_version)?;
+                    self.finish_online_machine_run(session, principal, now_tick)?;
+                    return Ok(());
+                }
+                ExecutionOutcome::Suspended(_) => {
+                    let checkpoint = machine.checkpoint().ok_or(HostProblem::ProviderFailure)?;
+                    let _ = self.persist_online_machine_continuation(
+                        session,
+                        &current,
+                        &checkpoint,
+                        saved_version,
+                    )?;
+                    self.finish_online_machine_run(session, principal, now_tick)?;
+                    return Ok(());
+                }
+                ExecutionOutcome::Transfer(transfer) if transfer.replace_frame => {
+                    self.clear_online_machine_continuation(session, saved_version)?;
+                    saved_version = None;
+                    self.online_traces
+                        .lock()
+                        .map_err(|_| HostProblem::InfrastructureFailure)?
+                        .entry(session.as_str().into())
+                        .or_default()
+                        .push(CicsTraceEntry {
+                            operation: mainframe_env_host_api::CicsOperation::Retrieve,
+                            outcome: format!("TRANSFER {}", transfer.selector.as_str()),
+                            response: 0,
+                            response2: 0,
+                            payload_bytes: 0,
+                        });
+                    current = normalize_online_name(transfer.selector.as_str(), 128)?;
+                    invocation.bindings.insert(
+                        "cics.commarea".into(),
+                        BoundedPayload::new(
+                            "mainframe-env.cics.commarea@1",
+                            transfer.payload.bytes().to_vec(),
+                            InvocationLimits::default(),
+                        )
+                        .map_err(|_| HostProblem::ResourceExhausted)?,
+                    );
+                }
+                ExecutionOutcome::Condition(condition) => {
+                    return Err(HostProblem::Condition {
+                        name: condition.name,
+                        response: condition.response,
+                        response2: condition.response2,
+                    });
+                }
+                ExecutionOutcome::Abend(abend) => {
+                    return Err(HostProblem::Condition {
+                        name: abend.code,
+                        response: -1,
+                        response2: 0,
+                    });
+                }
+                ExecutionOutcome::TimedOut => return Err(HostProblem::TimedOut),
+                ExecutionOutcome::Cancelled => return Err(HostProblem::Cancelled),
+                ExecutionOutcome::ResourceExhausted(problem) => {
+                    return Err(HostProblem::Condition {
+                        name: format!(
+                            "{} at {}",
+                            problem.public_message,
+                            machine.position_summary()
+                        ),
+                        response: -3,
+                        response2: 0,
+                    });
+                }
+                ExecutionOutcome::ProviderFailure(problem) => {
+                    return Err(HostProblem::Condition {
+                        name: problem.public_message,
+                        response: -4,
+                        response2: 0,
+                    });
+                }
+                ExecutionOutcome::InfrastructureFailure(_) => {
+                    return Err(HostProblem::InfrastructureFailure);
+                }
+                ExecutionOutcome::Rejected(problem) => {
+                    return Err(HostProblem::Condition {
+                        name: format!(
+                            "{} at {}",
+                            problem.public_message,
+                            machine.position_summary()
+                        ),
+                        response: -2,
+                        response2: 0,
+                    });
+                }
+                ExecutionOutcome::Invoke(_) | ExecutionOutcome::Transfer(_) => {
+                    return Err(HostProblem::Unsupported);
+                }
+            }
+        }
+        Err(HostProblem::ResourceExhausted)
+    }
+
+    pub fn bootstrap_user(&self, user: &str, secret: &[u8]) -> Result<(), HostProblem> {
+        self.bootstrap_identity(user, secret)?;
         for (class, pattern, access) in [
             (
                 "DATASET",
@@ -202,6 +674,17 @@ impl ProductServer {
             self.racf.permit(class, &pattern, user, access)?;
         }
         Ok(())
+    }
+
+    pub fn bootstrap_identity(&self, user: &str, secret: &[u8]) -> Result<(), HostProblem> {
+        let reference = format!("bootstrap:{user}");
+        self.secrets.insert(&reference, secret.to_vec());
+        let result = self.racf.add_user(
+            user,
+            &SecretRef::new(reference.clone(), HostLimits::default())?,
+        );
+        self.secrets.remove(&reference);
+        result
     }
 
     pub fn router(self: &Arc<Self>) -> axum::Router {
@@ -760,9 +1243,13 @@ impl ProductServer {
                     InvocationLimits::default().max_binding_bytes,
                 )
                 .map_err(|_| gateway_problem(HostProblem::InfrastructureFailure))?;
-                let invocation = self.cics_invocation(&principal, &transaction)?;
-                let snapshot = self
-                    .cics
+                let online = self.online_transaction(&transaction)?;
+                let invocation = self.cics_invocation(
+                    &principal,
+                    &transaction,
+                    online.as_ref().map(|(_, artifact)| artifact.clone()),
+                )?;
+                self.cics
                     .launch_terminal(
                         invocation,
                         &session,
@@ -773,6 +1260,19 @@ impl ProductServer {
                         current_tick()?,
                         15 * 60 * 1_000,
                     )
+                    .map_err(gateway_problem)?;
+                if let Some((program, _)) = online {
+                    self.run_online_exchange(
+                        &session,
+                        &terminal_principal(&principal)?,
+                        &program,
+                        current_tick()?,
+                    )
+                    .map_err(gateway_problem)?;
+                }
+                let snapshot = self
+                    .cics
+                    .terminal_snapshot(&session, &terminal_principal(&principal)?, current_tick()?)
                     .map_err(gateway_problem)?;
                 Ok(GatewayResponse::json(
                     StatusCode::CREATED,
@@ -856,10 +1356,19 @@ impl ProductServer {
                     .cics
                     .terminal_snapshot(&session, &principal_id, current_tick()?)
                     .map_err(gateway_problem)?;
-                let invocation = self.cics_invocation(&principal, &snapshot.transaction)?;
-                let snapshot = self
+                let invocation = self.cics_invocation(&principal, &snapshot.transaction, None)?;
+                let resumed = self
                     .cics
                     .resume_terminal(invocation, &session, &csrf_token, current_tick()?)
+                    .map_err(gateway_problem)?;
+                let online = self.online_transaction(&resumed.transaction)?;
+                if let Some((program, _)) = online {
+                    self.run_online_exchange(&session, &principal_id, &program, current_tick()?)
+                        .map_err(gateway_problem)?;
+                }
+                let snapshot = self
+                    .cics
+                    .terminal_snapshot(&session, &principal_id, current_tick()?)
                     .map_err(gateway_problem)?;
                 Ok(GatewayResponse::json(
                     StatusCode::OK,
@@ -1136,7 +1645,7 @@ impl ProductServer {
             .map_err(|_| HostProblem::InfrastructureFailure)?,
             service_class,
             0,
-            100,
+            u64::MAX,
             TraceId::new(format!("trace-{sequence}"), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
             IdempotencyKey::new(format!("request-{sequence}"), limits)
@@ -1180,21 +1689,51 @@ impl ProductServer {
         &self,
         principal: &str,
         transaction: &str,
+        artifact: Option<ArtifactRef>,
     ) -> Result<Invocation, GatewayProblem> {
-        self.invocation(
-            principal,
-            &format!("cics:{}", transaction.to_ascii_uppercase()),
-            ServiceClass::Interactive,
-            &[
-                "host.security.authorize",
-                "host.cics.execute",
-                "host.dataset.read",
-                "host.dataset.write",
-                "host.program.invoke",
-                "host.clock",
-            ],
-        )
-        .map_err(gateway_problem)
+        let mut invocation = self
+            .invocation(
+                principal,
+                &format!("cics:{}", transaction.to_ascii_uppercase()),
+                ServiceClass::Interactive,
+                &[
+                    "host.security.authorize",
+                    "host.cics.execute",
+                    "host.dataset.read",
+                    "host.dataset.write",
+                    "host.program.invoke",
+                    "host.clock",
+                ],
+            )
+            .map_err(gateway_problem)?;
+        if let Some(artifact) = artifact {
+            invocation.artifact = artifact;
+        }
+        Ok(invocation)
+    }
+
+    fn online_transaction(
+        &self,
+        transaction: &str,
+    ) -> Result<Option<(String, ArtifactRef)>, GatewayProblem> {
+        let transaction = normalize_online_name(transaction, 16).map_err(gateway_problem)?;
+        let Some(program) = self
+            .online_transactions
+            .lock()
+            .map_err(|_| gateway_problem(HostProblem::InfrastructureFailure))?
+            .get(&transaction)
+            .cloned()
+        else {
+            return Ok(None);
+        };
+        let artifact = self
+            .online_programs
+            .lock()
+            .map_err(|_| gateway_problem(HostProblem::InfrastructureFailure))?
+            .get(&program)
+            .cloned()
+            .ok_or_else(|| gateway_problem(HostProblem::InfrastructureFailure))?;
+        Ok(Some((program, artifact)))
     }
 
     fn ams(&self, principal: &str, control: &[u8]) -> Result<GatewayResponse, GatewayProblem> {
@@ -1560,6 +2099,8 @@ fn terminal_json(snapshot: &CicsTerminalSnapshot) -> Value {
         "columns":snapshot.columns,
         "aid":snapshot.aid,
         "screen_base64":base64::engine::general_purpose::STANDARD.encode(&snapshot.screen),
+        "mapset":snapshot.mapset,
+        "map":snapshot.map,
         "suspended":snapshot.suspended,
         "connected":snapshot.connected,
         "expires_at_tick":snapshot.expires_at_tick,
@@ -1576,6 +2117,103 @@ fn secure_random_token(kind: &str) -> Result<String, HostProblem> {
         "{kind}-{}",
         base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
     ))
+}
+
+fn normalize_online_name(value: &str, max: usize) -> Result<String, HostProblem> {
+    let normalized = value.trim().to_ascii_uppercase();
+    if normalized.is_empty()
+        || normalized.len() > max
+        || !normalized.bytes().all(|byte| byte.is_ascii_alphanumeric())
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(normalized)
+    }
+}
+
+fn encode_online_machine_continuation(
+    program: &str,
+    checkpoint: &BoundedPayload,
+) -> Result<Vec<u8>, HostProblem> {
+    let mut encoded = b"MEOM1".to_vec();
+    for value in [
+        program.as_bytes(),
+        checkpoint.schema().as_bytes(),
+        checkpoint.bytes(),
+    ] {
+        encoded.extend_from_slice(
+            &u32::try_from(value.len())
+                .map_err(|_| HostProblem::ResourceExhausted)?
+                .to_be_bytes(),
+        );
+        encoded.extend_from_slice(value);
+    }
+    Ok(encoded)
+}
+
+fn decode_online_machine_continuation(
+    record: &ProviderStateRecord,
+) -> Result<OnlineMachineContinuation, HostProblem> {
+    if !record.payload.starts_with(b"MEOM1") {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let mut at = 5usize;
+    let mut next = || -> Result<Vec<u8>, HostProblem> {
+        let length = usize::try_from(u32::from_be_bytes(
+            record
+                .payload
+                .get(at..at + 4)
+                .ok_or(HostProblem::InfrastructureFailure)?
+                .try_into()
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+        ))
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+        at += 4;
+        let end = at
+            .checked_add(length)
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let value = record
+            .payload
+            .get(at..end)
+            .ok_or(HostProblem::InfrastructureFailure)?
+            .to_vec();
+        at = end;
+        Ok(value)
+    };
+    let program = String::from_utf8(next()?).map_err(|_| HostProblem::InfrastructureFailure)?;
+    let schema = String::from_utf8(next()?).map_err(|_| HostProblem::InfrastructureFailure)?;
+    let bytes = next()?;
+    if at != record.payload.len() {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(OnlineMachineContinuation {
+        program: normalize_online_name(&program, 128)?,
+        checkpoint: BoundedPayload::new(
+            schema,
+            bytes,
+            InvocationLimits {
+                max_payload_bytes: 64 * 1024 * 1024,
+                ..InvocationLimits::default()
+            },
+        )
+        .map_err(|_| HostProblem::InfrastructureFailure)?,
+        version: record.version,
+    })
+}
+
+fn digest_online_field(digest: &mut Sha256, bytes: &[u8]) {
+    digest.update((bytes.len() as u64).to_be_bytes());
+    digest.update(bytes);
+}
+
+fn hex_digest(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        output.push(char::from(HEX[usize::from(byte >> 4)]));
+        output.push(char::from(HEX[usize::from(byte & 0x0f)]));
+    }
+    output
 }
 
 fn dataset_mutation(request: &DatasetRequest) -> Option<&Mutation> {
@@ -1797,6 +2435,14 @@ mod tests {
     use axum::body::{Body, to_bytes};
     use axum::http::{Method, Request};
     use base64::Engine;
+    use mainframe_env_compiler::CobolCompiler;
+    use mainframe_env_compiler_api::{
+        CompilationMode, CompileOptions, CompileTarget, CompilerRequest, CompilerResult,
+        CompilerService,
+    };
+    use mainframe_env_source::{
+        LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
+    };
     use mainframe_env_store::SqliteStateStore;
     use tower::ServiceExt;
 
@@ -2043,6 +2689,96 @@ mod tests {
             .unwrap();
         assert_eq!(disconnected.status(), StatusCode::NO_CONTENT);
         assert_eq!(server.metrics().active, 0);
+    }
+
+    #[tokio::test]
+    async fn installed_online_program_drives_public_terminal_screen() {
+        let limits = SourceLimits::default();
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. ONLINE.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 EIBCALEN PIC 9(4) VALUE 0.\n01 EIBAID PIC X VALUE SPACE.\n01 EIBTRNID PIC X(4) VALUE 'CC00'.\n01 MSG PIC X(5) VALUE 'HELLO'.\n01 STATE-DATA PIC X(5) VALUE 'STATE'.\nLINKAGE SECTION.\n01 DFHCOMMAREA PIC X(5).\nPROCEDURE DIVISION.\nEXEC CICS SEND TEXT FROM(MSG) END-EXEC.\nEXEC CICS RETURN TRANSID('CC00') COMMAREA(STATE-DATA) END-EXEC.\n";
+        let path = LogicalPath::new("ONLINE.cbl", limits.max_path_bytes).unwrap();
+        let bundle = SourceBundle::new(
+            &path,
+            vec![
+                SourceFile::input(
+                    "ONLINE.cbl",
+                    source.to_vec(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("online fixture did not publish");
+        };
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "ONLINE".into(),
+                    artifact: artifact_ref,
+                    payload: artifact.payload().to_vec(),
+                }],
+                transactions: BTreeMap::from([("CC00".into(), "ONLINE".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "ONLINE".into(),
+                    map: "ONLINE".into(),
+                    rows: 24,
+                    columns: 80,
+                    fields: vec![mainframe_env_cics::BmsFieldDefinition {
+                        name: "INPUT".into(),
+                        row: 1,
+                        column: 1,
+                        length: 8,
+                        initial: Vec::new(),
+                        color: None,
+                        highlight: None,
+                        protected: false,
+                        secret: false,
+                        fset: false,
+                        justify_right: false,
+                        fill_zero: false,
+                        output_offset: None,
+                        attribute_offset: None,
+                    }],
+                }],
+            })
+            .unwrap();
+        let response = call(
+            &server.router(),
+            Method::POST,
+            "/mainframe-env/cics/v1/sessions",
+            r#"{"transaction":"CC00"}"#,
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let body: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), 65536).await.unwrap()).unwrap();
+        assert_eq!(
+            base64::engine::general_purpose::STANDARD
+                .decode(body["terminal"]["screen_base64"].as_str().unwrap())
+                .unwrap(),
+            b"HELLO"
+        );
     }
 
     #[test]
