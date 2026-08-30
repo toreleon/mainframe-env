@@ -51,6 +51,9 @@ crates/
   providers/
     mainframe-env-dataset
     mainframe-env-cics
+    mainframe-env-db2
+    mainframe-env-ims
+    mainframe-env-mq
     mainframe-env-racf
 
   stores/
@@ -188,13 +191,33 @@ Owns identity, authentication, SAF authorization, profiles, audit decisions,
 and security conditions required by 0.1. Callers never access its database or
 locks directly.
 
+### `mainframe-env-db2`
+
+Owns the additive CardDemo static-SQL table, cursor, SQLCA, extraction, and
+durable unit-of-work boundary. Interactive mutations remain staged until typed
+commit or rollback; batch mutations use the same authority with batch commit
+policy.
+
+### `mainframe-env-ims`
+
+Owns the additive CardDemo HIDAM root/child hierarchy, PCB/PSB selection,
+secondary index, DLI navigation and mutation, checkpoint, load/unload, and
+durable commit/rollback boundary.
+
+### `mainframe-env-mq`
+
+Owns the additive CardDemo named queues, handles, trigger selection,
+message/correlation identifiers, wait/no-message conditions, syncpoint gets and
+puts, idempotent replay, unknown-outcome reconciliation, and restart state.
+
 ## Stores
 
 | Package | Purpose |
 |---|---|
 | `mainframe-env-store` | bounded memory, SQLite/PostgreSQL metadata/state, and immutable local artifact adapters behind separate owned interfaces |
 
-No messaging broker package is required for 0.1. Store state is authoritative;
+The MQ provider is an owned deterministic authority for the additive 0.1.1
+CardDemo profile, not an external broker adapter. Store state is authoritative;
 in-process notifications are bounded and reconstructible.
 
 ## Applications
@@ -230,7 +253,7 @@ No 0.1 package or feature is created for:
 
 ```text
 ADABAS, CLIST, crypto provider pack, deployment generator, DRDA,
-Easytrieve, FOCUS, Gym product, HLASM, IDMS, IMS, ISPF, MQ, MVS,
+Easytrieve, FOCUS, Gym product, HLASM, IDMS, ISPF, MVS,
 Natural, networking/TN3270, PL/I, program-management experiments,
 REXX, standalone SMF pack, symbolic execution, system commands,
 TSO product, TUI, USS, Wiki, WLM product policy, Wasm plugins,

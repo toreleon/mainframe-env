@@ -18,6 +18,7 @@
     {"name":"mainframe-env-cics","layer":"provider","phase":"ME.V4","justification":"Typed CICS provider and session authority"},
     {"name":"mainframe-env-db2","layer":"provider","phase":"ME.V4","justification":"Typed durable Db2 table, cursor, SQLCA, and unit-of-work authority for the additive CardDemo profile"},
     {"name":"mainframe-env-ims","layer":"provider","phase":"ME.V4","justification":"Typed durable IMS HIDAM hierarchy, PCB, DLI, secondary-index, and checkpoint authority for the additive CardDemo profile"},
+    {"name":"mainframe-env-mq","layer":"provider","phase":"ME.V4","justification":"Typed durable MQ queue, handle, trigger, correlation, syncpoint, replay, and restart authority for the additive CardDemo profile"},
     {"name":"mainframe-env-batch","layer":"application","phase":"ME.V5","justification":"JCL workflow and JES job/spool authority share one state boundary"},
     {"name":"mainframe-env-store","layer":"adapter","phase":"ME.V3","justification":"Bounded memory, SQLite/PostgreSQL, and immutable artifact adapters"},
     {"name":"mainframe-env-zosmf","layer":"gateway","phase":"ME.V6","justification":"Selected z/OSMF protocol DTO and route boundary"},

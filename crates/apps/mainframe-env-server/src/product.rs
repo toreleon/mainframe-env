@@ -26,6 +26,7 @@ use mainframe_env_interpreter::{
     CoordinatorLimits, ExecutionControl, ExecutionCoordinator, ReferenceMachine,
 };
 use mainframe_env_ir::CodecLimits;
+use mainframe_env_mq::{MqService, mq_providers};
 use mainframe_env_racf::{MemorySecretResolver, RacfService, racf_providers};
 use mainframe_env_store::{LocalArtifactStore, MemoryStore};
 use mainframe_env_store_api::{
@@ -124,6 +125,7 @@ pub struct ProductServer {
     dataset: Arc<DatasetService>,
     db2: Arc<Db2Service>,
     ims: Arc<ImsService>,
+    mq: Arc<MqService>,
     batch: Arc<BatchService>,
     artifacts: LocalArtifactStore,
     host: Arc<ScopedHostService>,
@@ -156,8 +158,10 @@ impl ProductServer {
         let dataset = DatasetService::open(provider_store.clone(), Default::default())?;
         let db2 = Db2Service::open(provider_store.clone(), Default::default())?;
         let ims = ImsService::open(provider_store.clone(), Default::default())?;
+        let mq = MqService::open(provider_store.clone(), Default::default())?;
         let mut enterprise_providers = db2_providers(db2.clone(), InvocationLimits::default());
         enterprise_providers.extend(ims_providers(ims.clone(), InvocationLimits::default()));
+        enterprise_providers.extend(mq_providers(mq.clone(), InvocationLimits::default()));
         let inner_program: Arc<dyn HostProvider> = program.clone();
         let inner = scoped_host(
             &racf,
@@ -171,6 +175,7 @@ impl ProductServer {
         let program_provider: Arc<dyn HostProvider> = program.clone();
         let mut enterprise_providers = db2_providers(db2.clone(), InvocationLimits::default());
         enterprise_providers.extend(ims_providers(ims.clone(), InvocationLimits::default()));
+        enterprise_providers.extend(mq_providers(mq.clone(), InvocationLimits::default()));
         let host = scoped_host(
             &racf,
             &dataset,
@@ -303,6 +308,7 @@ impl ProductServer {
             dataset,
             db2,
             ims,
+            mq,
             batch,
             artifacts,
             host,
@@ -358,6 +364,11 @@ impl ProductServer {
     #[must_use]
     pub fn ims_service(&self) -> Arc<ImsService> {
         self.ims.clone()
+    }
+
+    #[must_use]
+    pub fn mq_service(&self) -> Arc<MqService> {
+        self.mq.clone()
     }
 
     #[must_use]
@@ -869,6 +880,8 @@ impl ProductServer {
             && self.host.capability_ready("host.db2.write")
             && self.host.capability_ready("host.ims.read")
             && self.host.capability_ready("host.ims.write")
+            && self.host.capability_ready("host.mq.read")
+            && self.host.capability_ready("host.mq.write")
             && self.artifacts.is_ready()
     }
 
@@ -2040,6 +2053,8 @@ impl ProductServer {
                     "host.db2.write",
                     "host.ims.read",
                     "host.ims.write",
+                    "host.mq.read",
+                    "host.mq.write",
                     "host.program.invoke",
                     "host.clock",
                 ],

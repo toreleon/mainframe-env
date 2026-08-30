@@ -7,6 +7,7 @@
     ["mainframe-env-conformance", "mainframe-env-batch"],
     ["mainframe-env-conformance", "mainframe-env-cics"],
     ["mainframe-env-conformance", "mainframe-env-ims"],
+    ["mainframe-env-conformance", "mainframe-env-mq"],
     ["mainframe-env-conformance", "mainframe-env-server"],
     ["mainframe-env-db2", "mainframe-env-execution-api"],
     ["mainframe-env-db2", "mainframe-env-host-api"],
@@ -15,9 +16,13 @@
     ["mainframe-env-ims", "mainframe-env-execution-api"],
     ["mainframe-env-ims", "mainframe-env-host-api"],
     ["mainframe-env-ims", "mainframe-env-store-api"],
+    ["mainframe-env-mq", "mainframe-env-execution-api"],
+    ["mainframe-env-mq", "mainframe-env-host-api"],
+    ["mainframe-env-mq", "mainframe-env-store-api"],
     ["mainframe-env-server", "mainframe-env-db2"],
     ["mainframe-env-server", "mainframe-env-encoding"],
     ["mainframe-env-server", "mainframe-env-ims"],
+    ["mainframe-env-server", "mainframe-env-mq"],
     ["xtask", "mainframe-env-conformance"]
   ]
 }

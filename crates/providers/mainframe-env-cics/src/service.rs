@@ -7,8 +7,9 @@ use mainframe_env_host_api::{
     AccessIntent, CapabilityDescriptor, CicsConditionPolicy, CicsDisposition, CicsOperation,
     CicsRequest, CicsResponse, CicsUnitOfWorkOutcome, ClockRequest, DatasetName, DatasetRequest,
     DatasetResult, Db2Operation, Db2Request, EffectRequest, EffectResult, HostProblem,
-    HostProvider, HostRequest, HostResult, MemberName, Mutation, ProgramName, ProgramRequest,
-    ResourceName, ScopedHostService, SecurityDecision, SecurityRequest, SessionId,
+    HostProvider, HostRequest, HostResult, ImsOperation, ImsRequest, MemberName, MqOperation,
+    MqRequest, Mutation, ProgramName, ProgramRequest, ResourceName, ScopedHostService,
+    SecurityDecision, SecurityRequest, SessionId,
 };
 use mainframe_env_store_api::{
     ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
@@ -1731,6 +1732,8 @@ impl CicsService {
             )
             .map_err(store_error)?;
         self.syncpoint_db2(run, outcome)?;
+        self.syncpoint_ims(run, outcome)?;
+        self.syncpoint_mq(run, outcome)?;
         if outcome == CicsUnitOfWorkOutcome::RolledBack {
             self.rollback_run(run)?;
         } else {
@@ -1809,6 +1812,123 @@ impl CicsService {
                 name: format!("SQLCODE{}", result.sqlcode),
                 response: result.sqlcode,
                 response2: 0,
+            }),
+            _ => Err(HostProblem::ProviderFailure),
+        }
+    }
+
+    fn syncpoint_ims(
+        &self,
+        run: &mut Run,
+        outcome: CicsUnitOfWorkOutcome,
+    ) -> Result<(), HostProblem> {
+        let capability = CapabilityId::new("host.ims.write", InvocationLimits::default())
+            .expect("static IMS capability");
+        if !self.host.capability_ready(capability.as_str())
+            || !run.invocation.principal.has_grant(&capability)
+        {
+            return Ok(());
+        }
+        run.host_sequence = run
+            .host_sequence
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        let key = nested_key(run, run.host_sequence)?;
+        let result = self.host.invoke(
+            &run.invocation,
+            run.invocation.deadline_tick.saturating_sub(1),
+            false,
+            EffectRequest {
+                run_unit: run.invocation.run_unit_id.clone(),
+                sequence: run.host_sequence,
+                deadline_tick: run.invocation.deadline_tick,
+                idempotency_key: Some(key.clone()),
+                request: HostRequest::Ims(ImsRequest {
+                    operation: if outcome == CicsUnitOfWorkOutcome::RolledBack {
+                        ImsOperation::Rollback
+                    } else {
+                        ImsOperation::Commit
+                    },
+                    psb: None,
+                    pcb: 1,
+                    segments: Vec::new(),
+                    data: Vec::new(),
+                    qualifiers: Vec::new(),
+                    checkpoint_id: None,
+                    max_segments: 1,
+                    mutation: Some(Mutation {
+                        sequence: run.host_sequence,
+                        idempotency_key: key,
+                        transaction: Some(run.transaction.clone()),
+                    }),
+                }),
+            },
+        );
+        match result.effect.outcome? {
+            HostResult::Ims(result) if result.status.trim().is_empty() => Ok(()),
+            HostResult::Ims(result) => Err(HostProblem::Condition {
+                name: format!("IMS{}", result.status.trim()),
+                response: 1,
+                response2: 0,
+            }),
+            _ => Err(HostProblem::ProviderFailure),
+        }
+    }
+
+    fn syncpoint_mq(
+        &self,
+        run: &mut Run,
+        outcome: CicsUnitOfWorkOutcome,
+    ) -> Result<(), HostProblem> {
+        let capability = CapabilityId::new("host.mq.write", InvocationLimits::default())
+            .expect("static MQ capability");
+        if !self.host.capability_ready(capability.as_str())
+            || !run.invocation.principal.has_grant(&capability)
+        {
+            return Ok(());
+        }
+        run.host_sequence = run
+            .host_sequence
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        let key = nested_key(run, run.host_sequence)?;
+        let result = self.host.invoke(
+            &run.invocation,
+            run.invocation.deadline_tick.saturating_sub(1),
+            false,
+            EffectRequest {
+                run_unit: run.invocation.run_unit_id.clone(),
+                sequence: run.host_sequence,
+                deadline_tick: run.invocation.deadline_tick,
+                idempotency_key: Some(key.clone()),
+                request: HostRequest::Mq(MqRequest {
+                    operation: if outcome == CicsUnitOfWorkOutcome::RolledBack {
+                        MqOperation::Rollback
+                    } else {
+                        MqOperation::Commit
+                    },
+                    queue: None,
+                    handle: None,
+                    options: 0,
+                    message: Vec::new(),
+                    message_id: None,
+                    correlation_id: None,
+                    wait_ticks: 0,
+                    max_message_bytes: 1,
+                    mutation: Some(Mutation {
+                        sequence: run.host_sequence,
+                        idempotency_key: key,
+                        transaction: Some(run.transaction.clone()),
+                    }),
+                }),
+            },
+        );
+        match result.effect.outcome? {
+            HostResult::Mq(result) if result.completion_code == 0 => Ok(()),
+            HostResult::Mq(result) => Err(HostProblem::Condition {
+                name: format!("MQRC{}", result.reason_code),
+                response: result.completion_code,
+                response2: result.reason_code,
             }),
             _ => Err(HostProblem::ProviderFailure),
         }

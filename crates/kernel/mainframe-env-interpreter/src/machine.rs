@@ -11,7 +11,7 @@ use mainframe_env_host_api::{
     CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, DatasetName,
     DatasetRequest, Db2HostVariable, Db2Operation, Db2Request, EffectRequest, EffectResult,
     HostLimits, HostProblem, HostRequest, HostResult, ImsOperation, ImsQualifier, ImsRequest,
-    Mutation, ProgramName, ProgramRequest, TerminalRequest,
+    MqOperation, MqRequest, Mutation, ProgramName, ProgramRequest, TerminalRequest,
 };
 use mainframe_env_ir::{
     Attribute, CodecLimits, Module, Operation, OperationIdentity, StorageId, decode_binary,
@@ -114,6 +114,14 @@ enum PendingKind {
     },
     Ims {
         target: Option<String>,
+    },
+    Mq {
+        handle: Option<String>,
+        descriptor: Option<String>,
+        buffer: Option<String>,
+        data_length: Option<String>,
+        completion_code: Option<String>,
+        reason_code: Option<String>,
     },
     Cics {
         operation: CicsOperation,
@@ -723,6 +731,72 @@ impl ReferenceMachine {
                 }
             }
             (
+                PendingKind::Mq {
+                    handle,
+                    descriptor,
+                    buffer,
+                    data_length,
+                    completion_code,
+                    reason_code,
+                },
+                HostResult::Mq(result),
+            ) => {
+                if let Some((target, handle)) = handle.zip(result.handle) {
+                    self.write_decimal(
+                        &target,
+                        Decimal {
+                            coefficient: i128::from(handle),
+                            scale: 0,
+                        },
+                    )?;
+                }
+                if let Some(target) = buffer {
+                    self.write(&target, &result.message)?;
+                }
+                if let Some(target) = data_length {
+                    self.write_decimal(
+                        &target,
+                        Decimal {
+                            coefficient: i128::try_from(result.message.len())
+                                .map_err(|_| MachineProblem::ResourceExhausted)?,
+                            scale: 0,
+                        },
+                    )?;
+                }
+                if let Some(target) = completion_code {
+                    self.write_decimal(
+                        &target,
+                        Decimal {
+                            coefficient: i128::from(result.completion_code),
+                            scale: 0,
+                        },
+                    )?;
+                }
+                if let Some(target) = reason_code {
+                    self.write_decimal(
+                        &target,
+                        Decimal {
+                            coefficient: i128::from(result.reason_code),
+                            scale: 0,
+                        },
+                    )?;
+                }
+                if let Some(descriptor) = descriptor {
+                    if let Some((target, value)) = self
+                        .mq_descriptor_field(&descriptor, "MQMD-MSGID")
+                        .zip(result.message_id.as_ref())
+                    {
+                        self.write(&target, value)?;
+                    }
+                    if let Some((target, value)) = self
+                        .mq_descriptor_field(&descriptor, "MQMD-CORRELID")
+                        .zip(result.correlation_id.as_ref())
+                    {
+                        self.write(&target, value)?;
+                    }
+                }
+            }
+            (
                 PendingKind::Cics {
                     operation,
                     argument_summary: _,
@@ -865,6 +939,7 @@ impl ReferenceMachine {
                 | PendingKind::ProgramCall { .. }
                 | PendingKind::Db2 { .. }
                 | PendingKind::Ims { .. }
+                | PendingKind::Mq { .. }
                 | PendingKind::Cics { .. }
                 | PendingKind::Ignore,
                 _,
@@ -1302,6 +1377,16 @@ impl ReferenceMachine {
         self.effect(request, PendingKind::Accept { target })
     }
     fn program_effect(&mut self, name: &str, args: &[String]) -> Result<Step, MachineProblem> {
+        if name == "call"
+            && args.first().is_some_and(|program| {
+                matches!(
+                    normalize(program.trim_matches(['\'', '"'])).as_str(),
+                    "MQOPEN" | "MQGET" | "MQPUT" | "MQPUT1" | "MQCLOSE"
+                )
+            })
+        {
+            return self.mq_effect(args);
+        }
         let program = ProgramName::new(
             args.first()
                 .ok_or(MachineProblem::InvalidOperation)?
@@ -1330,6 +1415,163 @@ impl ReferenceMachine {
         self.effect(
             HostRequest::Program(ProgramRequest::Call { program, payload }),
             PendingKind::ProgramCall { targets },
+        )
+    }
+    fn mq_effect(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
+        let operation = match normalize(
+            args.first()
+                .ok_or(MachineProblem::InvalidOperation)?
+                .trim_matches(['\'', '"']),
+        )
+        .as_str()
+        {
+            "MQOPEN" => MqOperation::Open,
+            "MQGET" => MqOperation::Get,
+            "MQPUT" => MqOperation::Put,
+            "MQPUT1" => MqOperation::PutOne,
+            "MQCLOSE" => MqOperation::Close,
+            _ => return Err(MachineProblem::UnsupportedForm),
+        };
+        let using = position(args, "USING").ok_or(MachineProblem::InvalidOperation)?;
+        let parameters = args[using + 1..]
+            .iter()
+            .filter(|argument| {
+                !matches!(
+                    argument.as_str(),
+                    "BY" | "REFERENCE" | "CONTENT" | "VALUE" | "END-CALL"
+                )
+            })
+            .map(|argument| normalize(argument))
+            .collect::<Vec<_>>();
+        let parameter = |index: usize| {
+            parameters
+                .get(index)
+                .cloned()
+                .ok_or(MachineProblem::InvalidOperation)
+        };
+        let read_i32 = |machine: &Self, target: &str| -> Result<i32, MachineProblem> {
+            let value = machine.decimal(target)?;
+            if value.scale != 0 {
+                return Err(MachineProblem::DataException);
+            }
+            i32::try_from(value.coefficient).map_err(|_| MachineProblem::DataException)
+        };
+        let read_handle = |machine: &Self, target: &str| -> Result<u32, MachineProblem> {
+            let value = read_i32(machine, target)?;
+            u32::try_from(value).map_err(|_| MachineProblem::DataException)
+        };
+
+        let mut request = MqRequest {
+            operation,
+            queue: None,
+            handle: None,
+            options: 0,
+            message: Vec::new(),
+            message_id: None,
+            correlation_id: None,
+            wait_ticks: 0,
+            max_message_bytes: 1,
+            mutation: Some(self.mutation()?),
+        };
+        let mut descriptor = None;
+        let mut handle_target = None;
+        let mut buffer = None;
+        let mut data_length = None;
+        let (completion_code, reason_code) = match operation {
+            MqOperation::Open => {
+                let object_descriptor = parameter(1)?;
+                request.queue = Some(self.mq_queue_name(&object_descriptor)?);
+                request.options = read_i32(self, &parameter(2)?)?;
+                handle_target = Some(parameter(3)?);
+                (Some(parameter(4)?), Some(parameter(5)?))
+            }
+            MqOperation::Get => {
+                let target = parameter(1)?;
+                request.handle = Some(read_handle(self, &target)?);
+                let message_descriptor = parameter(2)?;
+                let get_options = parameter(3)?;
+                request.options = self
+                    .mq_descriptor_decimal(&get_options, "MQGMO-OPTIONS")
+                    .unwrap_or_else(|| read_i32(self, &get_options))?;
+                request.wait_ticks = self
+                    .mq_descriptor_decimal(&get_options, "MQGMO-WAITINTERVAL")
+                    .transpose()?
+                    .unwrap_or_default()
+                    .max(0) as u64;
+                let maximum = read_i32(self, &parameter(4)?)?.max(0);
+                request.max_message_bytes =
+                    u32::try_from(maximum).map_err(|_| MachineProblem::ResourceExhausted)?;
+                request.message_id = self.mq_descriptor_bytes(&message_descriptor, "MQMD-MSGID")?;
+                request.correlation_id =
+                    self.mq_descriptor_bytes(&message_descriptor, "MQMD-CORRELID")?;
+                descriptor = Some(message_descriptor);
+                buffer = Some(parameter(5)?);
+                data_length = Some(parameter(6)?);
+                (Some(parameter(7)?), Some(parameter(8)?))
+            }
+            MqOperation::Put => {
+                let target = parameter(1)?;
+                request.handle = Some(read_handle(self, &target)?);
+                let message_descriptor = parameter(2)?;
+                let put_options = parameter(3)?;
+                request.options = self
+                    .mq_descriptor_decimal(&put_options, "MQPMO-OPTIONS")
+                    .unwrap_or_else(|| read_i32(self, &put_options))?;
+                let length = read_i32(self, &parameter(4)?)?.max(0) as usize;
+                let target = parameter(5)?;
+                let mut message = self.read(&target)?;
+                message.truncate(length);
+                request.max_message_bytes =
+                    u32::try_from(length).map_err(|_| MachineProblem::ResourceExhausted)?;
+                request.message = message;
+                request.message_id = self.mq_descriptor_bytes(&message_descriptor, "MQMD-MSGID")?;
+                request.correlation_id =
+                    self.mq_descriptor_bytes(&message_descriptor, "MQMD-CORRELID")?;
+                descriptor = Some(message_descriptor);
+                (Some(parameter(6)?), Some(parameter(7)?))
+            }
+            MqOperation::PutOne => {
+                let object_descriptor = parameter(1)?;
+                request.queue = Some(self.mq_queue_name(&object_descriptor)?);
+                let message_descriptor = parameter(2)?;
+                let put_options = parameter(3)?;
+                request.options = self
+                    .mq_descriptor_decimal(&put_options, "MQPMO-OPTIONS")
+                    .unwrap_or_else(|| read_i32(self, &put_options))?;
+                let length = read_i32(self, &parameter(4)?)?.max(0) as usize;
+                let target = parameter(5)?;
+                let mut message = self.read(&target)?;
+                message.truncate(length);
+                request.max_message_bytes =
+                    u32::try_from(length).map_err(|_| MachineProblem::ResourceExhausted)?;
+                request.message = message;
+                request.message_id = self.mq_descriptor_bytes(&message_descriptor, "MQMD-MSGID")?;
+                request.correlation_id =
+                    self.mq_descriptor_bytes(&message_descriptor, "MQMD-CORRELID")?;
+                descriptor = Some(message_descriptor);
+                (Some(parameter(6)?), Some(parameter(7)?))
+            }
+            MqOperation::Close => {
+                let target = parameter(1)?;
+                request.handle = Some(read_handle(self, &target)?);
+                request.options = read_i32(self, &parameter(2)?)?;
+                handle_target = Some(target);
+                (Some(parameter(3)?), Some(parameter(4)?))
+            }
+            MqOperation::Commit | MqOperation::Rollback => {
+                return Err(MachineProblem::UnsupportedForm);
+            }
+        };
+        self.effect(
+            HostRequest::Mq(request),
+            PendingKind::Mq {
+                handle: handle_target,
+                descriptor,
+                buffer,
+                data_length,
+                completion_code,
+                reason_code,
+            },
         )
     }
     fn dataset_effect(&mut self, name: &str, args: &[String]) -> Result<Step, MachineProblem> {
@@ -3411,6 +3653,65 @@ impl ReferenceMachine {
                 names.first().and_then(|name| self.layouts.get(name))
             }
             _ => None,
+        }
+    }
+    fn mq_descriptor_field(&self, descriptor: &str, simple_name: &str) -> Option<String> {
+        let root = self.layout(descriptor)?.name.clone();
+        self.simple_layouts
+            .get(&normalize(simple_name))?
+            .iter()
+            .find(|candidate| {
+                let mut current = Some(candidate.as_str());
+                while let Some(name) = current {
+                    if name == root {
+                        return true;
+                    }
+                    current = self
+                        .layouts
+                        .get(name)
+                        .and_then(|layout| layout.parent.as_deref());
+                }
+                false
+            })
+            .cloned()
+    }
+    fn mq_descriptor_decimal(
+        &self,
+        descriptor: &str,
+        simple_name: &str,
+    ) -> Option<Result<i32, MachineProblem>> {
+        self.mq_descriptor_field(descriptor, simple_name)
+            .map(|target| {
+                let value = self.decimal(&target)?;
+                if value.scale != 0 {
+                    return Err(MachineProblem::DataException);
+                }
+                i32::try_from(value.coefficient).map_err(|_| MachineProblem::DataException)
+            })
+    }
+    fn mq_descriptor_bytes(
+        &self,
+        descriptor: &str,
+        simple_name: &str,
+    ) -> Result<Option<Vec<u8>>, MachineProblem> {
+        let Some(target) = self.mq_descriptor_field(descriptor, simple_name) else {
+            return Ok(None);
+        };
+        let value = self.read(&target)?;
+        Ok(value.iter().any(|byte| *byte != 0).then_some(value))
+    }
+    fn mq_queue_name(&self, descriptor: &str) -> Result<String, MachineProblem> {
+        let target = self
+            .mq_descriptor_field(descriptor, "MQOD-OBJECTNAME")
+            .ok_or(MachineProblem::UnknownStorage)?;
+        let value = self.read(&target)?;
+        let queue = String::from_utf8_lossy(&value)
+            .trim_matches([' ', '\0'])
+            .to_ascii_uppercase();
+        if queue.is_empty() {
+            Err(MachineProblem::DataException)
+        } else {
+            Ok(queue)
         }
     }
     fn write_storage(&mut self, id: StorageId, value: &[u8]) -> Result<(), MachineProblem> {

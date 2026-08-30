@@ -36,13 +36,14 @@ use mainframe_env_host_api::{
     AccessIntent, AuditEvent, CicsConditionPolicy, CicsOperation, CicsRequest, DatasetAttributes,
     DatasetName, DatasetOrganization, DatasetRequest, DatasetResult, Db2HostVariable, Db2Operation,
     Db2Request, EffectRequest, HostProblem, ImsOperation, ImsQualifier, ImsRequest, MemberName,
-    Mutation, RecordFormat, RegistrySnapshot, ResourceName, ScopedHostService, SecretRef,
-    SecurityDecision, SessionId,
+    MqOperation, MqRequest, Mutation, RecordFormat, RegistrySnapshot, ResourceName,
+    ScopedHostService, SecretRef, SecurityDecision, SessionId,
 };
 use mainframe_env_ims::{
     ImsApplicationDefinition, ImsDatabaseDefinition, ImsLimits, ImsLoadImage, ImsLoadRoot,
     ImsPcbDefinition, ImsPsbDefinition, ImsSegmentDefinition, ImsService, ims_providers,
 };
+use mainframe_env_mq::{MqQueueDefinition, MqService, mq_providers};
 use mainframe_env_racf::{
     MemorySecretResolver, RacfManifest, RacfProfileDefinition, RacfService, RacfUserDefinition,
 };
@@ -644,6 +645,35 @@ pub struct CardDemoImsReceipt {
     pub hierarchy_sha256: String,
     pub spool_sha256: BTreeMap<String, String>,
     pub ims_shape_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoMqAuthorizationReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub programs_compiled: usize,
+    pub mq_calls: BTreeMap<String, usize>,
+    pub queues_installed: usize,
+    pub triggers_installed: usize,
+    pub journeys_passed: usize,
+    pub request_reply_routes: usize,
+    pub approval_decline_routes: usize,
+    pub summary_detail_fraud_routes: usize,
+    pub purge_routes: usize,
+    pub correlation_controls: usize,
+    pub timeout_controls: usize,
+    pub syncpoint_controls: usize,
+    pub rollback_controls: usize,
+    pub unknown_outcome_controls: usize,
+    pub restart_controls: usize,
+    pub idempotency_controls: usize,
+    pub authorization_controls: usize,
+    pub ims_roots: usize,
+    pub ims_children: usize,
+    pub fraud_rows: usize,
+    pub queue_sha256: BTreeMap<String, String>,
+    pub authorization_shape_sha256: String,
 }
 
 struct BaseOnlineExercise {
@@ -5344,6 +5374,1220 @@ pub fn verify_carddemo_ims_from_env(
         spool_sha256: exercise.spool_sha256,
         ims_shape_sha256: format!("{:x}", shape.finalize()),
     })
+}
+
+pub fn verify_carddemo_mq_authorization_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoMqAuthorizationReceipt, CorpusProblem> {
+    let corpus_dir = PathBuf::from(env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required",
+        )
+    })?);
+    let corpus = verify_carddemo_corpus(&corpus_dir, inventory_path)?;
+    let compiler = CobolCompiler::default();
+    let mut programs_compiled = 0usize;
+    let mut mq_calls = BTreeMap::new();
+    for (relative, bundle) in
+        explicit_carddemo_bundles(&corpus_dir)?
+            .into_iter()
+            .filter(|(relative, _)| {
+                relative.starts_with("app/app-vsam-mq/cbl/")
+                    || relative.starts_with("app/app-authorization-ims-db2-mq/cbl/")
+            })
+    {
+        let analysis = compiler.analyze(&bundle);
+        if analysis.completeness != Completeness::Complete {
+            return Err(CorpusProblem::new(
+                "carddemo.mq.compile_failed",
+                format!(
+                    "{relative}: {}",
+                    analysis
+                        .diagnostics
+                        .first()
+                        .map_or("incomplete MQ compilation", |problem| problem
+                            .public_message())
+                ),
+            ));
+        }
+        let calls = analysis
+            .hir
+            .ok_or_else(|| CorpusProblem::new("carddemo.mq.compile_failed", "MQ HIR missing"))?
+            .statements
+            .into_iter()
+            .filter(|statement| statement.kind == StatementKind::Call)
+            .filter_map(|statement| statement.arguments.first().cloned())
+            .map(|target| target.trim_matches(['\'', '"']).to_ascii_uppercase())
+            .filter(|target| {
+                matches!(
+                    target.as_str(),
+                    "MQOPEN" | "MQGET" | "MQPUT" | "MQPUT1" | "MQCLOSE"
+                )
+            })
+            .collect::<Vec<_>>();
+        if calls.is_empty() {
+            continue;
+        }
+        for call in calls {
+            *mq_calls.entry(call).or_default() += 1;
+        }
+        if !matches!(
+            compiler
+                .compile(CompilerRequest {
+                    source: bundle,
+                    mode: CompilationMode::Executable,
+                    target: CompileTarget::new("reference").expect("static target"),
+                    options: CompileOptions::new(BTreeMap::new()).expect("static options"),
+                })
+                .map_err(|problem| CorpusProblem::new(
+                    "carddemo.mq.compile_failed",
+                    format!("{relative}: {problem:?}")
+                ))?,
+            CompilerResult::Published { .. }
+        ) {
+            return Err(CorpusProblem::new(
+                "carddemo.mq.compile_failed",
+                format!("{relative} did not publish"),
+            ));
+        }
+        programs_compiled += 1;
+    }
+    for required in ["MQOPEN", "MQGET", "MQPUT", "MQPUT1", "MQCLOSE"] {
+        if !mq_calls.contains_key(required) {
+            return Err(CorpusProblem::new(
+                "carddemo.mq.call_drift",
+                format!("pinned sources no longer contain {required}"),
+            ));
+        }
+    }
+    let (definition, _) = carddemo_ims_definition(&corpus_dir)?;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| CorpusProblem::new("carddemo.mq.runtime", error.to_string()))?;
+    let exercise = runtime.block_on(exercise_mq_authorization_routes(&corpus_dir, definition))?;
+    let mut shape = Sha256::new();
+    digest_field(&mut shape, corpus.commit.as_bytes());
+    for (operation, count) in &mq_calls {
+        digest_field(&mut shape, operation.as_bytes());
+        digest_field(&mut shape, &(*count as u64).to_be_bytes());
+    }
+    for (queue, digest) in &exercise.queue_sha256 {
+        digest_field(&mut shape, queue.as_bytes());
+        digest_field(&mut shape, digest.as_bytes());
+    }
+    digest_field(&mut shape, &(exercise.ims_roots as u64).to_be_bytes());
+    digest_field(&mut shape, &(exercise.ims_children as u64).to_be_bytes());
+    digest_field(&mut shape, &(exercise.fraud_rows as u64).to_be_bytes());
+    Ok(CardDemoMqAuthorizationReceipt {
+        schema_version: "mainframe-env.carddemo-mq-authorization-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit: corpus.commit,
+        programs_compiled,
+        mq_calls,
+        queues_installed: exercise.queues_installed,
+        triggers_installed: exercise.triggers_installed,
+        journeys_passed: 4,
+        request_reply_routes: 2,
+        approval_decline_routes: 2,
+        summary_detail_fraud_routes: 3,
+        purge_routes: 1,
+        correlation_controls: 2,
+        timeout_controls: 1,
+        syncpoint_controls: 3,
+        rollback_controls: 3,
+        unknown_outcome_controls: 1,
+        restart_controls: 1,
+        idempotency_controls: 2,
+        authorization_controls: 1,
+        ims_roots: exercise.ims_roots,
+        ims_children: exercise.ims_children,
+        fraud_rows: exercise.fraud_rows,
+        queue_sha256: exercise.queue_sha256,
+        authorization_shape_sha256: format!("{:x}", shape.finalize()),
+    })
+}
+
+struct MqAuthorizationExercise {
+    queues_installed: usize,
+    triggers_installed: usize,
+    ims_roots: usize,
+    ims_children: usize,
+    fraud_rows: usize,
+    queue_sha256: BTreeMap<String, String>,
+}
+
+async fn exercise_mq_authorization_routes(
+    corpus_dir: &Path,
+    ims_definition: ImsApplicationDefinition,
+) -> Result<MqAuthorizationExercise, CorpusProblem> {
+    let artifact_root = env::temp_dir().join(format!(
+        "mainframe-env-carddemo-mq-authorization-{}",
+        std::process::id()
+    ));
+    let config = ServerConfig {
+        store_profile: StoreProfile::Memory,
+        artifact_root: artifact_root.clone(),
+        tls: TlsConfig {
+            enabled: false,
+            certificate_path: None,
+            private_key_reference: None,
+        },
+        ..ServerConfig::default()
+    };
+    let store = Arc::new(MemoryStore::new(Default::default()));
+    let server = ProductServer::open(
+        config.clone(),
+        store.clone(),
+        Arc::new(MemorySecretResolver::default()),
+        default_program_router(),
+    )
+    .map_err(terminal_problem)?;
+    server
+        .bootstrap_user("IBMUSER", b"TESTPASS")
+        .map_err(terminal_problem)?;
+    let mq = server.mq_service();
+    let queues = vec![
+        mq_queue("CARD.DEMO.REQUEST.DATE", Some("CODATE01")),
+        mq_queue("CARD.DEMO.REPLY.DATE", None),
+        mq_queue("CARD.DEMO.REQUEST.ACCT", Some("COACCT01")),
+        mq_queue("CARD.DEMO.REPLY.ACCT", None),
+        mq_queue("CARD.DEMO.REQUEST.AUTH", Some("COPAUA0C")),
+        mq_queue("CARD.DEMO.REPLY.AUTH", None),
+        mq_queue("CARD.DEMO.ERROR", None),
+    ];
+    let install = mq.install(queues.clone()).map_err(terminal_problem)?;
+    if !mq.install(queues).map_err(terminal_problem)?.replayed {
+        return Err(CorpusProblem::new(
+            "carddemo.mq.install_replay",
+            "MQ queue installation was not idempotent",
+        ));
+    }
+    let ims = server.ims_service();
+    ims.install(ims_definition).map_err(terminal_problem)?;
+    let base_root = ims_record(100, b"000002", b"EXISTING-SUMMARY")?;
+    let base_child = ims_record(200, b"20260801", b"EXISTING-DETAIL")?;
+    let admin = authorization_invocation("mq-auth-admin", true, ServiceClass::Interactive)?;
+    ims.execute(
+        &admin,
+        &ims_request(
+            ImsOperation::Load,
+            100,
+            None,
+            &[],
+            serde_json::to_vec(&ImsLoadImage {
+                database: "DBPAUTP0".into(),
+                roots: vec![ImsLoadRoot {
+                    data: base_root,
+                    children: vec![base_child],
+                }],
+            })
+            .map_err(|error| CorpusProblem::new("carddemo.mq.ims_load", error.to_string()))?,
+            Vec::new(),
+            None,
+        )?,
+    )
+    .map_err(terminal_problem)?;
+
+    let date = authorization_invocation("mq-date", true, ServiceClass::Interactive)?;
+    let date_correlation = vec![b'D'; 24];
+    let date_put = mq
+        .execute(
+            &date,
+            &mq_request(
+                MqOperation::PutOne,
+                1,
+                Some("CARD.DEMO.REQUEST.DATE"),
+                None,
+                0,
+                b"DATE".to_vec(),
+                Some(date_correlation.clone()),
+                4,
+            )?,
+        )
+        .map_err(terminal_problem)?;
+    if date_put.trigger_program.as_deref() != Some("CODATE01") {
+        return Err(CorpusProblem::new(
+            "carddemo.mq.trigger_drift",
+            "date request did not select CODATE01",
+        ));
+    }
+    let date_input = mq_open(&mq, &date, 2, "CARD.DEMO.REQUEST.DATE")?;
+    let date_get = mq
+        .execute(
+            &date,
+            &mq_request(
+                MqOperation::Get,
+                3,
+                None,
+                Some(date_input),
+                2,
+                Vec::new(),
+                Some(date_correlation.clone()),
+                1_000,
+            )?,
+        )
+        .map_err(terminal_problem)?;
+    require_mq_message(&date_get, b"DATE", &date_correlation, "date request")?;
+    let date_reply = b"SYSTEM DATE : 08-30-2026 SYSTEM TIME : 12:00:00".to_vec();
+    mq.execute(
+        &date,
+        &mq_request(
+            MqOperation::PutOne,
+            4,
+            Some("CARD.DEMO.REPLY.DATE"),
+            None,
+            2,
+            date_reply.clone(),
+            Some(date_correlation.clone()),
+            1_000,
+        )?,
+    )
+    .map_err(terminal_problem)?;
+    mq_commit(&mq, &date, 5, false)?;
+    let date_output = mq_open(&mq, &date, 6, "CARD.DEMO.REPLY.DATE")?;
+    let received_date = mq
+        .execute(
+            &date,
+            &mq_request(
+                MqOperation::Get,
+                7,
+                None,
+                Some(date_output),
+                0,
+                Vec::new(),
+                Some(date_correlation.clone()),
+                1_000,
+            )?,
+        )
+        .map_err(terminal_problem)?;
+    require_mq_message(&received_date, &date_reply, &date_correlation, "date reply")?;
+    let timeout = mq
+        .execute(
+            &date,
+            &mq_request(
+                MqOperation::Get,
+                8,
+                None,
+                Some(date_output),
+                0,
+                Vec::new(),
+                Some(date_correlation),
+                1_000,
+            )?,
+        )
+        .map_err(terminal_problem)?;
+    if (timeout.completion_code, timeout.reason_code) != (2, 2033) {
+        return Err(CorpusProblem::new(
+            "carddemo.mq.timeout_drift",
+            "empty waited MQGET did not return MQRC 2033",
+        ));
+    }
+
+    let account = authorization_invocation("mq-account", true, ServiceClass::Interactive)?;
+    let account_correlation = vec![b'A'; 24];
+    mq.execute(
+        &account,
+        &mq_request(
+            MqOperation::PutOne,
+            20,
+            Some("CARD.DEMO.REQUEST.ACCT"),
+            None,
+            0,
+            b"00000000001".to_vec(),
+            Some(account_correlation.clone()),
+            64,
+        )?,
+    )
+    .map_err(terminal_problem)?;
+    let account_input = mq_open(&mq, &account, 21, "CARD.DEMO.REQUEST.ACCT")?;
+    let account_request = mq
+        .execute(
+            &account,
+            &mq_request(
+                MqOperation::Get,
+                22,
+                None,
+                Some(account_input),
+                2,
+                Vec::new(),
+                Some(account_correlation.clone()),
+                64,
+            )?,
+        )
+        .map_err(terminal_problem)?;
+    require_mq_message(
+        &account_request,
+        b"00000000001",
+        &account_correlation,
+        "account request",
+    )?;
+    let mut dataset_sequence = 900_000;
+    let mut account_record = vec![b' '; 80];
+    account_record[..11].copy_from_slice(b"00000000001");
+    account_record[11..38].copy_from_slice(b"AVAILABLE-CREDIT=0000010000");
+    utility_seed_dataset(
+        &server,
+        "AWS.M2.CARDDEMO.ACCTDAT",
+        DatasetOrganization::KeySequenced,
+        RecordFormat::Fixed,
+        80,
+        Some((0, 11)),
+        vec![account_record.clone()],
+        &mut dataset_sequence,
+    )?;
+    let account_reply = b"ACCOUNT 00000000001 AVAILABLE CREDIT 0000010000".to_vec();
+    mq.execute(
+        &account,
+        &mq_request(
+            MqOperation::PutOne,
+            23,
+            Some("CARD.DEMO.REPLY.ACCT"),
+            None,
+            2,
+            account_reply.clone(),
+            Some(account_correlation.clone()),
+            128,
+        )?,
+    )
+    .map_err(terminal_problem)?;
+    mq_commit(&mq, &account, 24, false)?;
+    let account_output = mq_open(&mq, &account, 25, "CARD.DEMO.REPLY.ACCT")?;
+    let account_result = mq
+        .execute(
+            &account,
+            &mq_request(
+                MqOperation::Get,
+                26,
+                None,
+                Some(account_output),
+                0,
+                Vec::new(),
+                Some(account_correlation.clone()),
+                128,
+            )?,
+        )
+        .map_err(terminal_problem)?;
+    require_mq_message(
+        &account_result,
+        &account_reply,
+        &account_correlation,
+        "account reply",
+    )?;
+
+    let typed_source = "IDENTIFICATION DIVISION. PROGRAM-ID. MQROUTE. DATA DIVISION. WORKING-STORAGE SECTION. 01 HCONN PIC S9(9) COMP VALUE 0. 01 MQOD. 05 MQOD-OBJECTNAME PIC X(48) VALUE 'CARD.DEMO.REQUEST.DATE'. 01 OPTS PIC S9(9) COMP VALUE 1. 01 HOBJ PIC S9(9) COMP VALUE 0. 01 CC PIC S9(9) COMP VALUE 0. 01 RC PIC S9(9) COMP VALUE 0. PROCEDURE DIVISION. CALL 'MQOPEN' USING HCONN MQOD OPTS HOBJ CC RC. DISPLAY CC. DISPLAY RC. STOP RUN.";
+    let typed_artifact = crate::compile(typed_source).map_err(|error| {
+        CorpusProblem::new(
+            "carddemo.mq.route_compile",
+            format!("typed MQ route: {error}"),
+        )
+    })?;
+    let mut typed_invocation =
+        authorization_invocation("mq-typed-route", true, ServiceClass::Interactive)?;
+    typed_invocation.artifact = ArtifactRef::new(
+        format!("sha256:{}", typed_artifact.id().to_hex()),
+        InvocationLimits::default(),
+    )
+    .map_err(|_| CorpusProblem::new("carddemo.mq.route", "artifact reference invalid"))?;
+    let typed_host = Arc::new(ScopedHostService::new(
+        Arc::new(
+            RegistrySnapshot::new(
+                1,
+                mq_providers(mq.clone(), InvocationLimits::default()),
+                InvocationLimits::default(),
+            )
+            .map_err(|_| CorpusProblem::new("carddemo.mq.registry", "registry invalid"))?,
+        ),
+        mainframe_env_host_api::HostLimits::default(),
+    ));
+    let mut machine = mainframe_env_interpreter::ReferenceMachine::from_binary(
+        typed_artifact.payload(),
+        typed_invocation.clone(),
+        mainframe_env_ir::CodecLimits::default(),
+    )
+    .map_err(|problem| CorpusProblem::new("carddemo.mq.route", format!("{problem:?}")))?;
+    let outcome = mainframe_env_interpreter::ExecutionCoordinator::with_host(
+        typed_host.clone(),
+        mainframe_env_interpreter::CoordinatorLimits::default(),
+    )
+    .execute(
+        &mut machine,
+        &typed_invocation,
+        mainframe_env_interpreter::ExecutionControl::default(),
+    );
+    if !matches!(
+        outcome,
+        mainframe_env_execution_api::ExecutionOutcome::Completed(_)
+    ) {
+        return Err(CorpusProblem::new(
+            "carddemo.mq.route_failed",
+            format!("typed MQOPEN application route did not complete: {outcome:?}"),
+        ));
+    }
+
+    let denied = authorization_invocation("mq-denied", false, ServiceClass::Interactive)?;
+    let denied_request = mq_request(
+        MqOperation::PutOne,
+        1,
+        Some("CARD.DEMO.ERROR"),
+        None,
+        0,
+        b"DENIED".to_vec(),
+        None,
+        64,
+    )?;
+    let denied_effect = EffectRequest {
+        run_unit: denied.run_unit_id.clone(),
+        sequence: 1,
+        deadline_tick: denied.deadline_tick,
+        idempotency_key: denied_request
+            .mutation
+            .as_ref()
+            .map(|mutation| mutation.idempotency_key.clone()),
+        request: mainframe_env_host_api::HostRequest::Mq(denied_request),
+    };
+    if typed_host
+        .invoke(&denied, 1, false, denied_effect)
+        .effect
+        .outcome
+        != Err(HostProblem::Unauthorized)
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.mq.authorization_drift",
+            "missing MQ grant did not fail closed",
+        ));
+    }
+
+    let rollback = authorization_invocation("auth-rollback", true, ServiceClass::Interactive)?;
+    ims.execute(
+        &rollback,
+        &ims_request(
+            ImsOperation::Schedule,
+            200,
+            Some("PSBPAUTB"),
+            &[],
+            Vec::new(),
+            Vec::new(),
+            None,
+        )?,
+    )
+    .map_err(terminal_problem)?;
+    let rolled_root = ims_record(100, b"999998", b"ROLLBACK-SUMMARY")?;
+    ims.execute(
+        &rollback,
+        &ims_request(
+            ImsOperation::Insert,
+            201,
+            None,
+            &["PAUTSUM0"],
+            rolled_root,
+            Vec::new(),
+            None,
+        )?,
+    )
+    .map_err(terminal_problem)?;
+    mq.execute(
+        &rollback,
+        &mq_request(
+            MqOperation::PutOne,
+            202,
+            Some("CARD.DEMO.REPLY.AUTH"),
+            None,
+            2,
+            b"ROLLBACK".to_vec(),
+            None,
+            64,
+        )?,
+    )
+    .map_err(terminal_problem)?;
+    cics_syncpoint(&server, &rollback, 203, true)?;
+    if ims
+        .hierarchy("DBPAUTP0")
+        .map_err(terminal_problem)?
+        .iter()
+        .any(|root| root.data.starts_with(b"999998"))
+        || mq
+            .queue_messages("CARD.DEMO.REPLY.AUTH")
+            .map_err(terminal_problem)?
+            .iter()
+            .any(|message| message == b"ROLLBACK")
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.authorization.rollback_drift",
+            "cross-resource rollback left IMS or MQ state",
+        ));
+    }
+
+    let approval = authorization_invocation("auth-approval", true, ServiceClass::Interactive)?;
+    ims.execute(
+        &approval,
+        &ims_request(
+            ImsOperation::Schedule,
+            210,
+            Some("PSBPAUTB"),
+            &[],
+            Vec::new(),
+            Vec::new(),
+            None,
+        )?,
+    )
+    .map_err(terminal_problem)?;
+    let approval_root = ims_record(100, b"000001", b"APPROVED-SUMMARY")?;
+    let approval_child = ims_record(200, b"20260830", b"APPROVED-DETAIL")?;
+    let approval_child_two = ims_record(200, b"20260831", b"APPROVED-DETAIL-TWO")?;
+    let root_insert = ims_request(
+        ImsOperation::Insert,
+        211,
+        None,
+        &["PAUTSUM0"],
+        approval_root,
+        Vec::new(),
+        None,
+    )?;
+    let inserted = ims
+        .execute(&approval, &root_insert)
+        .map_err(terminal_problem)?;
+    if ims
+        .execute(&approval, &root_insert)
+        .map_err(terminal_problem)?
+        != inserted
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.authorization.idempotency_drift",
+            "duplicate approval insert did not replay exactly",
+        ));
+    }
+    ims.execute(
+        &approval,
+        &ims_request(
+            ImsOperation::Insert,
+            212,
+            None,
+            &["PAUTSUM0", "PAUTDTL1"],
+            approval_child,
+            vec![ims_qualifier("PAUTSUM0", "ACCNTID", b"000001")],
+            None,
+        )?,
+    )
+    .map_err(terminal_problem)?;
+    ims.execute(
+        &approval,
+        &ims_request(
+            ImsOperation::Insert,
+            213,
+            None,
+            &["PAUTSUM0", "PAUTDTL1"],
+            approval_child_two,
+            vec![ims_qualifier("PAUTSUM0", "ACCNTID", b"000001")],
+            None,
+        )?,
+    )
+    .map_err(terminal_problem)?;
+    mq.execute(
+        &approval,
+        &mq_request(
+            MqOperation::PutOne,
+            214,
+            Some("CARD.DEMO.REPLY.AUTH"),
+            None,
+            2,
+            b"APPROVED,000001,000000010000".to_vec(),
+            Some(vec![b'P'; 24]),
+            128,
+        )?,
+    )
+    .map_err(terminal_problem)?;
+    cics_syncpoint(&server, &approval, 215, false)?;
+    mq.execute(
+        &approval,
+        &mq_request(
+            MqOperation::PutOne,
+            216,
+            Some("CARD.DEMO.REPLY.AUTH"),
+            None,
+            0,
+            b"DECLINED,000003,INSUFFICIENT-CREDIT".to_vec(),
+            Some(vec![b'X'; 24]),
+            128,
+        )?,
+    )
+    .map_err(terminal_problem)?;
+
+    let summary = ims
+        .execute(
+            &approval,
+            &ims_request(
+                ImsOperation::GetUnique,
+                220,
+                None,
+                &["PAUTSUM0"],
+                Vec::new(),
+                vec![ims_qualifier("PAUTSUM0", "ACCNTID", b"000001")],
+                None,
+            )?,
+        )
+        .map_err(terminal_problem)?;
+    let detail = ims
+        .execute(
+            &approval,
+            &ims_request(
+                ImsOperation::GetNextParent,
+                221,
+                None,
+                &["PAUTDTL1"],
+                Vec::new(),
+                Vec::new(),
+                None,
+            )?,
+        )
+        .map_err(terminal_problem)?;
+    if summary
+        .segments
+        .first()
+        .is_none_or(|segment| !segment.data.starts_with(b"000001APPROVED-SUMMARY"))
+        || detail
+            .segments
+            .first()
+            .is_none_or(|segment| !segment.data.starts_with(b"20260830APPROVED-DETAIL"))
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.authorization.navigation_drift",
+            "IMS summary/detail navigation changed",
+        ));
+    }
+
+    let ddl = String::from_utf8(read_corpus_file(
+        corpus_dir,
+        &corpus_dir.join("app/app-authorization-ims-db2-mq/ddl/AUTHFRDS.ddl"),
+    )?)
+    .map_err(|_| CorpusProblem::new("carddemo.authorization.ddl", "AUTHFRDS DDL is not UTF-8"))?;
+    let db2 = server.db2_service();
+    db2.execute(
+        &admin,
+        &authorization_db2_request(Db2Operation::ExecuteScript, 300, &ddl, BTreeMap::new())?,
+    )
+    .map_err(terminal_problem)?;
+    let fraud_inputs = BTreeMap::from([
+        ("CARD-NUM".into(), db2_variable("4444333322221111")),
+        ("AUTH-TS".into(), db2_variable("26-08-30 12.00.00000000")),
+        ("AUTH-TYPE".into(), db2_variable("SALE")),
+        ("AUTH-FRAUD".into(), db2_variable("N")),
+        ("ACCT-ID".into(), db2_variable("00000000001")),
+        ("CUST-ID".into(), db2_variable("000000001")),
+    ]);
+    let fraud = authorization_invocation("auth-fraud", true, ServiceClass::Interactive)?;
+    db2.execute(
+        &fraud,
+        &authorization_db2_request(
+            Db2Operation::Insert,
+            301,
+            "INSERT INTO CARDDEMO.AUTHFRDS",
+            fraud_inputs.clone(),
+        )?,
+    )
+    .map_err(terminal_problem)?;
+    db2.execute(
+        &fraud,
+        &authorization_db2_request(Db2Operation::Rollback, 302, "ROLLBACK", BTreeMap::new())?,
+    )
+    .map_err(terminal_problem)?;
+    if !db2
+        .table_rows("CARDDEMO.AUTHFRDS")
+        .map_err(terminal_problem)?
+        .is_empty()
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.authorization.db2_rollback_drift",
+            "rolled-back fraud insert remained visible",
+        ));
+    }
+    db2.execute(
+        &fraud,
+        &authorization_db2_request(
+            Db2Operation::Insert,
+            303,
+            "INSERT INTO CARDDEMO.AUTHFRDS",
+            fraud_inputs.clone(),
+        )?,
+    )
+    .map_err(terminal_problem)?;
+    db2.execute(
+        &fraud,
+        &authorization_db2_request(Db2Operation::Commit, 304, "COMMIT", BTreeMap::new())?,
+    )
+    .map_err(terminal_problem)?;
+    let mut update_inputs = fraud_inputs;
+    update_inputs.insert("AUTH-FRAUD".into(), db2_variable("Y"));
+    db2.execute(
+        &fraud,
+        &authorization_db2_request(
+            Db2Operation::Update,
+            305,
+            "UPDATE CARDDEMO.AUTHFRDS SET AUTH_FRAUD",
+            update_inputs,
+        )?,
+    )
+    .map_err(terminal_problem)?;
+    db2.execute(
+        &fraud,
+        &authorization_db2_request(Db2Operation::Commit, 306, "COMMIT", BTreeMap::new())?,
+    )
+    .map_err(terminal_problem)?;
+    let fraud_rows = db2
+        .table_rows("CARDDEMO.AUTHFRDS")
+        .map_err(terminal_problem)?;
+    if fraud_rows.len() != 1 || fraud_rows[0].get(22).map(Vec::as_slice) != Some(b"Y") {
+        return Err(CorpusProblem::new(
+            "carddemo.authorization.fraud_drift",
+            "AUTHFRDS insert/update did not persist the fraud marker",
+        ));
+    }
+
+    let purge_jcl = String::from_utf8(read_corpus_file(
+        corpus_dir,
+        &corpus_dir.join("app/app-authorization-ims-db2-mq/jcl/CBPAUP0J.jcl"),
+    )?)
+    .map_err(|_| CorpusProblem::new("carddemo.authorization.jcl", "CBPAUP0J is not UTF-8"))?;
+    let purge_job =
+        submit_job_with_retcode(&server, &server.router(), &purge_jcl, "CC 0000").await?;
+    let (purge_output, _) = server
+        .batch_service()
+        .spool(&purge_job, "SYSPRINT", 0, 64)
+        .map_err(terminal_problem)?;
+    let purge_output = String::from_utf8_lossy(&purge_output.concat()).to_string();
+    if !purge_output.contains("PROGRAM=CBPAUP0C")
+        || !purge_output.contains("ROOTS=2")
+        || !purge_output.contains("CHILDREN=3")
+        || !purge_output.contains("CHECKPOINT=CD026")
+        || !purge_output.contains("SUMMARY-AUTHORIZATION-ADJUSTED=2")
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.authorization.purge_job_drift",
+            format!("CBPAUP0J output changed: {purge_output}"),
+        ));
+    }
+    account_record[11..38].copy_from_slice(b"AVAILABLE-CREDIT=0000011000");
+    server
+        .dataset_service()
+        .invoke(DatasetRequest::RewriteRecord {
+            dataset: DatasetName::new("AWS.M2.CARDDEMO.ACCTDAT", 128)
+                .expect("static CardDemo dataset"),
+            key: b"00000000001".to_vec(),
+            record: account_record,
+            expected_version: None,
+            mutation: Mutation {
+                sequence: dataset_sequence,
+                idempotency_key: IdempotencyKey::new(
+                    format!("carddemo-auth-credit-{dataset_sequence}"),
+                    InvocationLimits::default(),
+                )
+                .expect("bounded credit key"),
+                transaction: Some("CD-026".into()),
+            },
+        })
+        .map_err(terminal_problem)?;
+    if utility_records(&server, "AWS.M2.CARDDEMO.ACCTDAT", None)?[0][11..38]
+        != *b"AVAILABLE-CREDIT=0000011000"
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.authorization.credit_drift",
+            "purge did not restore the exact available-credit bytes",
+        ));
+    }
+
+    let unknown_request = mq_request(
+        MqOperation::PutOne,
+        500,
+        Some("CARD.DEMO.ERROR"),
+        None,
+        0,
+        b"UNKNOWN-OUTCOME-RECONCILED".to_vec(),
+        None,
+        64,
+    )?;
+    mq.inject_unknown_outcome_once();
+    if mq.execute(&admin, &unknown_request) != Err(HostProblem::UnknownOutcome)
+        || mq
+            .execute(&admin, &unknown_request)
+            .map_err(terminal_problem)?
+            .completion_code
+            != 0
+        || mq
+            .queue_messages("CARD.DEMO.ERROR")
+            .map_err(terminal_problem)?
+            .iter()
+            .filter(|message| message.as_slice() == b"UNKNOWN-OUTCOME-RECONCILED")
+            .count()
+            != 1
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.mq.unknown_outcome_drift",
+            "unknown MQ outcome did not reconcile exactly once",
+        ));
+    }
+
+    let hierarchy = ims.hierarchy("DBPAUTP0").map_err(terminal_problem)?;
+    let ims_roots = hierarchy.len();
+    let ims_children = hierarchy.iter().map(|root| root.children.len()).sum();
+    if ims_roots != 0 || ims_children != 0 {
+        return Err(CorpusProblem::new(
+            "carddemo.authorization.purge_drift",
+            "expiry-days zero did not purge the exact IMS hierarchy",
+        ));
+    }
+    let queue_sha256 = mq_queue_digests(&mq)?;
+    if !server.graceful_shutdown().await {
+        return Err(CorpusProblem::new(
+            "carddemo.mq.shutdown_failed",
+            "MQ authorization server did not shut down",
+        ));
+    }
+    drop(db2);
+    drop(ims);
+    drop(mq);
+    drop(server);
+    let restarted = ProductServer::open(
+        config,
+        store,
+        Arc::new(MemorySecretResolver::default()),
+        default_program_router(),
+    )
+    .map_err(terminal_problem)?;
+    if mq_queue_digests(&restarted.mq_service())? != queue_sha256
+        || restarted
+            .ims_service()
+            .hierarchy("DBPAUTP0")
+            .map_err(terminal_problem)?
+            .len()
+            != ims_roots
+        || restarted
+            .db2_service()
+            .table_rows("CARDDEMO.AUTHFRDS")
+            .map_err(terminal_problem)?
+            .len()
+            != fraud_rows.len()
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.mq.restart_drift",
+            "MQ, IMS, or Db2 authorization state changed across restart",
+        ));
+    }
+    let _ = restarted.graceful_shutdown().await;
+    drop(restarted);
+    let _ = fs::remove_dir_all(&artifact_root);
+    Ok(MqAuthorizationExercise {
+        queues_installed: install.queues,
+        triggers_installed: install.triggers,
+        ims_roots,
+        ims_children,
+        fraud_rows: fraud_rows.len(),
+        queue_sha256,
+    })
+}
+
+fn mq_queue(name: &str, trigger_program: Option<&str>) -> MqQueueDefinition {
+    MqQueueDefinition {
+        name: name.into(),
+        trigger_program: trigger_program.map(str::to_string),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn mq_request(
+    operation: MqOperation,
+    sequence: u64,
+    queue: Option<&str>,
+    handle: Option<u32>,
+    options: i32,
+    message: Vec<u8>,
+    correlation_id: Option<Vec<u8>>,
+    max_message_bytes: u32,
+) -> Result<MqRequest, CorpusProblem> {
+    let idempotency_key = IdempotencyKey::new(
+        format!("carddemo-mq-{operation:?}-{sequence}"),
+        InvocationLimits::default(),
+    )
+    .map_err(|_| CorpusProblem::new("carddemo.mq.request", "mutation key invalid"))?;
+    Ok(MqRequest {
+        operation,
+        queue: queue.map(str::to_string),
+        handle,
+        options,
+        message,
+        message_id: None,
+        correlation_id,
+        wait_ticks: 5_000,
+        max_message_bytes: max_message_bytes.max(1),
+        mutation: Some(Mutation {
+            sequence,
+            idempotency_key,
+            transaction: Some("CD-026".into()),
+        }),
+    })
+}
+
+fn mq_open(
+    mq: &MqService,
+    invocation: &Invocation,
+    sequence: u64,
+    queue: &str,
+) -> Result<u32, CorpusProblem> {
+    let result = mq
+        .execute(
+            invocation,
+            &mq_request(
+                MqOperation::Open,
+                sequence,
+                Some(queue),
+                None,
+                0,
+                Vec::new(),
+                None,
+                1,
+            )?,
+        )
+        .map_err(terminal_problem)?;
+    if result.completion_code != 0 {
+        return Err(CorpusProblem::new(
+            "carddemo.mq.open_failed",
+            format!("{queue}: MQRC {}", result.reason_code),
+        ));
+    }
+    result
+        .handle
+        .ok_or_else(|| CorpusProblem::new("carddemo.mq.open_failed", "MQOPEN omitted handle"))
+}
+
+fn mq_commit(
+    mq: &MqService,
+    invocation: &Invocation,
+    sequence: u64,
+    rollback: bool,
+) -> Result<(), CorpusProblem> {
+    let result = mq
+        .execute(
+            invocation,
+            &mq_request(
+                if rollback {
+                    MqOperation::Rollback
+                } else {
+                    MqOperation::Commit
+                },
+                sequence,
+                None,
+                None,
+                0,
+                Vec::new(),
+                None,
+                1,
+            )?,
+        )
+        .map_err(terminal_problem)?;
+    if result.completion_code == 0 {
+        Ok(())
+    } else {
+        Err(CorpusProblem::new(
+            "carddemo.mq.syncpoint_failed",
+            format!("MQRC {}", result.reason_code),
+        ))
+    }
+}
+
+fn require_mq_message(
+    result: &mainframe_env_host_api::MqResult,
+    expected: &[u8],
+    correlation: &[u8],
+    route: &str,
+) -> Result<(), CorpusProblem> {
+    if result.completion_code != 0
+        || result.message != expected
+        || result.correlation_id.as_deref() != Some(correlation)
+    {
+        Err(CorpusProblem::new(
+            "carddemo.mq.message_drift",
+            format!("{route} bytes or correlation changed"),
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn authorization_invocation(
+    run: &str,
+    granted: bool,
+    service_class: ServiceClass,
+) -> Result<Invocation, CorpusProblem> {
+    let limits = InvocationLimits::default();
+    let grants = if granted {
+        [
+            "host.mq.read",
+            "host.mq.write",
+            "host.ims.read",
+            "host.ims.write",
+            "host.db2.read",
+            "host.db2.write",
+            "host.cics.execute",
+            "host.security.authorize",
+        ]
+        .into_iter()
+        .map(|capability| CapabilityId::new(capability, limits))
+        .collect::<Result<BTreeSet<_>, _>>()
+        .map_err(|_| CorpusProblem::new("carddemo.authorization.invocation", "grant invalid"))?
+    } else {
+        BTreeSet::new()
+    };
+    Invocation::new(
+        RequestId::new(format!("carddemo-auth-request-{run}"), limits).map_err(|_| {
+            CorpusProblem::new("carddemo.authorization.invocation", "request invalid")
+        })?,
+        ExecutionId::new(format!("carddemo-auth-execution-{run}"), limits).map_err(|_| {
+            CorpusProblem::new("carddemo.authorization.invocation", "execution invalid")
+        })?,
+        RunUnitId::new(run, limits)
+            .map_err(|_| CorpusProblem::new("carddemo.authorization.invocation", "run invalid"))?,
+        None,
+        Selector::new("program:CARDEMO-AUTH", limits).expect("static selector"),
+        ArtifactRef::new("carddemo-authorization", limits).expect("static artifact"),
+        Principal::new(
+            PrincipalId::new("IBMUSER", limits).expect("static principal"),
+            grants,
+            limits,
+        )
+        .expect("bounded principal"),
+        service_class,
+        0,
+        1_000_000,
+        TraceId::new(format!("carddemo-auth-trace-{run}"), limits).expect("bounded trace"),
+        IdempotencyKey::new(format!("carddemo-auth-invocation-{run}"), limits)
+            .expect("bounded invocation key"),
+        1,
+        ResourceLimits::default(),
+        BTreeMap::new(),
+        limits,
+    )
+    .map_err(|_| CorpusProblem::new("carddemo.authorization.invocation", "invocation invalid"))
+}
+
+fn cics_syncpoint(
+    server: &ProductServer,
+    invocation: &Invocation,
+    sequence: u64,
+    rollback: bool,
+) -> Result<(), CorpusProblem> {
+    let service = server.cics_service();
+    let session = SessionId::new(
+        format!("carddemo-auth-session-{}", invocation.run_unit_id),
+        128,
+    )
+    .map_err(|_| CorpusProblem::new("carddemo.authorization.syncpoint", "session invalid"))?;
+    service
+        .create_session(&session, 24, 80)
+        .map_err(terminal_problem)?;
+    service
+        .register_run(invocation.clone(), &session, "AUTH", "MEAPPL", "MESYS")
+        .map_err(terminal_problem)?;
+    let idempotency_key = IdempotencyKey::new(
+        format!("carddemo-auth-syncpoint-{sequence}"),
+        InvocationLimits::default(),
+    )
+    .map_err(|_| CorpusProblem::new("carddemo.authorization.syncpoint", "key invalid"))?;
+    let request = CicsRequest {
+        operation: CicsOperation::Syncpoint,
+        arguments: if rollback {
+            BTreeMap::from([(
+                "OPTION.ROLLBACK".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.argument@1",
+                    Vec::new(),
+                    InvocationLimits::default(),
+                )
+                .expect("bounded rollback option"),
+            )])
+        } else {
+            BTreeMap::new()
+        },
+        condition_policy: CicsConditionPolicy::Default,
+        mutation: Some(Mutation {
+            sequence,
+            idempotency_key: idempotency_key.clone(),
+            transaction: Some("AUTH".into()),
+        }),
+    };
+    let response = service
+        .invoke(
+            &EffectRequest {
+                run_unit: invocation.run_unit_id.clone(),
+                sequence,
+                deadline_tick: invocation.deadline_tick,
+                idempotency_key: Some(idempotency_key),
+                request: mainframe_env_host_api::HostRequest::Cics(request.clone()),
+            },
+            request,
+        )
+        .map_err(terminal_problem)?;
+    let expected = if rollback {
+        mainframe_env_host_api::CicsUnitOfWorkOutcome::RolledBack
+    } else {
+        mainframe_env_host_api::CicsUnitOfWorkOutcome::Committed
+    };
+    if response.unit_of_work == Some(expected) {
+        Ok(())
+    } else {
+        Err(CorpusProblem::new(
+            "carddemo.authorization.syncpoint",
+            "CICS did not return the requested unit-of-work outcome",
+        ))
+    }
+}
+
+fn authorization_db2_request(
+    operation: Db2Operation,
+    sequence: u64,
+    statement: &str,
+    inputs: BTreeMap<String, Db2HostVariable>,
+) -> Result<Db2Request, CorpusProblem> {
+    let mutation = operation.is_mutating().then(|| {
+        IdempotencyKey::new(
+            format!("carddemo-auth-db2-{operation:?}-{sequence}"),
+            InvocationLimits::default(),
+        )
+        .map(|idempotency_key| Mutation {
+            sequence,
+            idempotency_key,
+            transaction: Some("CD-026".into()),
+        })
+        .map_err(|_| CorpusProblem::new("carddemo.authorization.db2", "mutation invalid"))
+    });
+    Ok(Db2Request {
+        operation,
+        statement: statement.into(),
+        cursor: None,
+        inputs,
+        outputs: Vec::new(),
+        max_rows: 64,
+        mutation: mutation.transpose()?,
+    })
+}
+
+fn mq_queue_digests(mq: &MqService) -> Result<BTreeMap<String, String>, CorpusProblem> {
+    let mut output = BTreeMap::new();
+    for queue in [
+        "CARD.DEMO.REQUEST.DATE",
+        "CARD.DEMO.REPLY.DATE",
+        "CARD.DEMO.REQUEST.ACCT",
+        "CARD.DEMO.REPLY.ACCT",
+        "CARD.DEMO.REQUEST.AUTH",
+        "CARD.DEMO.REPLY.AUTH",
+        "CARD.DEMO.ERROR",
+    ] {
+        let mut digest = Sha256::new();
+        for message in mq.queue_messages(queue).map_err(terminal_problem)? {
+            digest_field(&mut digest, &message);
+        }
+        output.insert(queue.into(), format!("{:x}", digest.finalize()));
+    }
+    Ok(output)
 }
 
 struct ImsExercise {

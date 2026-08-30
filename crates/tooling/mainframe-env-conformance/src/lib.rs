@@ -27,9 +27,9 @@ pub use carddemo::{
     CardDemoControlReceipt, CardDemoCoreReceipt, CardDemoCorpusReceipt,
     CardDemoDatasetCatalogReceipt, CardDemoDb2Receipt, CardDemoFileCallReceipt,
     CardDemoHostReceipt, CardDemoImsReceipt, CardDemoJclReceipt, CardDemoLayoutReceipt,
-    CardDemoPackageReceipt, CardDemoProgramReceipt, CardDemoResourceReceipt,
-    CardDemoSecurityReceipt, CardDemoSeedReceipt, CardDemoSourceReceipt, CardDemoTerminalReceipt,
-    CardDemoUtilityReceipt, CardDemoVsamReceipt, CorpusProblem,
+    CardDemoMqAuthorizationReceipt, CardDemoPackageReceipt, CardDemoProgramReceipt,
+    CardDemoResourceReceipt, CardDemoSecurityReceipt, CardDemoSeedReceipt, CardDemoSourceReceipt,
+    CardDemoTerminalReceipt, CardDemoUtilityReceipt, CardDemoVsamReceipt, CorpusProblem,
     verify_carddemo_application_package_from_env, verify_carddemo_base_batch_from_env,
     verify_carddemo_base_online_from_env, verify_carddemo_batch_programs_from_env,
     verify_carddemo_cics_abi_from_env, verify_carddemo_cics_runtime_from_env,
@@ -38,11 +38,11 @@ pub use carddemo::{
     verify_carddemo_dataset_catalog_from_env, verify_carddemo_db2_from_env,
     verify_carddemo_file_call_semantics_from_env, verify_carddemo_host_operands_from_env,
     verify_carddemo_ims_from_env, verify_carddemo_jcl_from_env,
-    verify_carddemo_program_routing_from_env, verify_carddemo_resources_from_env,
-    verify_carddemo_security_from_env, verify_carddemo_seeds_from_env,
-    verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
-    verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
-    verify_carddemo_vsam_from_env,
+    verify_carddemo_mq_authorization_from_env, verify_carddemo_program_routing_from_env,
+    verify_carddemo_resources_from_env, verify_carddemo_security_from_env,
+    verify_carddemo_seeds_from_env, verify_carddemo_source_closures_from_env,
+    verify_carddemo_source_preprocessing_from_env, verify_carddemo_terminal_from_env,
+    verify_carddemo_utilities_from_env, verify_carddemo_vsam_from_env,
 };
 
 pub const HELLO_SOURCE: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. HELLO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MSG PIC X(12) VALUE 'HELLO WORLD!'.\nPROCEDURE DIVISION.\nDISPLAY MSG.\nSTOP RUN.\n";
@@ -990,9 +990,9 @@ mod tests {
 
     #[test]
     fn mq_call_parameter_list_carries_names_modes_and_values() {
-        use mainframe_env_host_api::{HostRequest, ProgramRequest};
+        use mainframe_env_host_api::{HostRequest, MqOperation};
 
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. MQABI. DATA DIVISION. WORKING-STORAGE SECTION. 01 HCONN PIC X(4) VALUE 'HC01'. 01 HOBJ PIC X(4) VALUE 'HO01'. 01 CC PIC 9(4) VALUE 0. 01 RC PIC 9(4) VALUE 0. PROCEDURE DIVISION. CALL 'MQOPEN' USING HCONN HOBJ CC RC. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. MQABI. DATA DIVISION. WORKING-STORAGE SECTION. 01 HCONN PIC S9(9) COMP VALUE 0. 01 MQOD. 05 MQOD-OBJECTNAME PIC X(48) VALUE 'CARD.DEMO.REQUEST'. 01 OPTS PIC S9(9) COMP VALUE 1. 01 HOBJ PIC S9(9) COMP VALUE 0. 01 CC PIC S9(9) COMP VALUE 0. 01 RC PIC S9(9) COMP VALUE 0. PROCEDURE DIVISION. CALL 'MQOPEN' USING HCONN MQOD OPTS HOBJ CC RC. STOP RUN.";
         let artifact = compile(source).unwrap();
         let mut machine = ReferenceMachine::from_binary(
             artifact.payload(),
@@ -1000,24 +1000,16 @@ mod tests {
             CodecLimits::default(),
         )
         .unwrap();
-        let MachineDrive::HostCall(effect) =
-            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
-        else {
-            panic!("MQ call did not call host");
+        let drive = machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap());
+        let MachineDrive::HostCall(effect) = drive else {
+            panic!("MQ call did not call host: {drive:?}");
         };
-        let HostRequest::Program(ProgramRequest::Call { program, payload }) = effect.request else {
-            panic!("unexpected MQ request");
+        let HostRequest::Mq(request) = effect.request else {
+            panic!("MQOPEN did not lower to the typed MQ request");
         };
-        assert_eq!(program.as_str(), "MQOPEN");
-        assert_eq!(payload.schema(), "mainframe-env.cobol.call@1");
-        for expected in [b"HCONN".as_slice(), b"HOBJ", b"CC", b"RC", b"HC01", b"HO01"] {
-            assert!(
-                payload
-                    .bytes()
-                    .windows(expected.len())
-                    .any(|window| window == expected)
-            );
-        }
+        assert_eq!(request.operation, MqOperation::Open);
+        assert_eq!(request.queue.as_deref(), Some("CARD.DEMO.REQUEST"));
+        assert_eq!(request.options, 1);
     }
 
     #[test]

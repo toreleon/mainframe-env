@@ -1050,6 +1050,7 @@ dependencies = [
  "mainframe-env-ims",
  "mainframe-env-interpreter",
  "mainframe-env-ir",
+ "mainframe-env-mq",
  "mainframe-env-racf",
  "mainframe-env-server",
  "mainframe-env-source",
@@ -1151,6 +1152,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "mainframe-env-mq"
+version = "0.1.0-alpha.0"
+dependencies = [
+ "mainframe-env-execution-api",
+ "mainframe-env-host-api",
+ "mainframe-env-store",
+ "mainframe-env-store-api",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "mainframe-env-racf"
 version = "0.1.0-alpha.0"
 dependencies = [
@@ -1181,6 +1195,7 @@ dependencies = [
  "mainframe-env-ims",
  "mainframe-env-interpreter",
  "mainframe-env-ir",
+ "mainframe-env-mq",
  "mainframe-env-racf",
  "mainframe-env-source",
  "mainframe-env-store",

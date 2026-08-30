@@ -23,6 +23,7 @@
         "mainframe-env-cics",
         "mainframe-env-db2",
         "mainframe-env-ims",
+        "mainframe-env-mq",
         "mainframe-env-store",
         "mainframe-env-zosmf",
         "mainframe-env-server"
@@ -50,6 +51,7 @@
         "mainframe-env-cics",
         "mainframe-env-db2",
         "mainframe-env-ims",
+        "mainframe-env-mq",
         "mainframe-env-store",
         "mainframe-env-zosmf",
         "mainframe-env-server",

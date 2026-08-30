@@ -271,6 +271,7 @@ fn execute_script(
     for (name, columns) in [
         ("CARDDEMO.TRANSACTION_TYPE", 2usize),
         ("CARDDEMO.TRANSACTION_TYPE_CATEGORY", 3usize),
+        ("CARDDEMO.AUTHFRDS", 26usize),
     ] {
         if upper.contains(&format!("CREATE TABLE {name}"))
             || upper.contains(&format!("CREATE TABLE  {name}"))
@@ -386,6 +387,13 @@ fn insert(
     request: &Db2Request,
     limits: Db2Limits,
 ) -> Result<Db2Result, HostProblem> {
+    if request
+        .statement
+        .to_ascii_uppercase()
+        .contains("CARDDEMO.AUTHFRDS")
+    {
+        return insert_authfrds(state, run, request, limits);
+    }
     let key = key_input(&request.inputs).ok_or(HostProblem::Malformed)?;
     let description = description_input(&request.inputs).ok_or(HostProblem::Malformed)?;
     let table = write_table(state, run, "CARDDEMO.TRANSACTION_TYPE", 2)?;
@@ -403,6 +411,13 @@ fn insert(
 }
 
 fn update(state: &mut State, run: &str, request: &Db2Request) -> Result<Db2Result, HostProblem> {
+    if request
+        .statement
+        .to_ascii_uppercase()
+        .contains("CARDDEMO.AUTHFRDS")
+    {
+        return update_authfrds(state, run, request);
+    }
     let key = key_input(&request.inputs).ok_or(HostProblem::Malformed)?;
     let description = description_input(&request.inputs).ok_or(HostProblem::Malformed)?;
     let table = write_table(state, run, "CARDDEMO.TRANSACTION_TYPE", 2)?;
@@ -411,6 +426,90 @@ fn update(state: &mut State, run: &str, request: &Db2Request) -> Result<Db2Resul
     };
     row[1] = description.into_bytes();
     Ok(success(1, "ROW UPDATED", Vec::new()))
+}
+
+const AUTHFRDS_COLUMNS: [&str; 26] = [
+    "CARD-NUM",
+    "AUTH-TS",
+    "AUTH-TYPE",
+    "CARD-EXPIRY-DATE",
+    "MESSAGE-TYPE",
+    "MESSAGE-SOURCE",
+    "AUTH-ID-CODE",
+    "AUTH-RESP-CODE",
+    "AUTH-RESP-REASON",
+    "PROCESSING-CODE",
+    "TRANSACTION-AMT",
+    "APPROVED-AMT",
+    "MERCHANT-CATAGORY-CODE",
+    "ACQR-COUNTRY-CODE",
+    "POS-ENTRY-MODE",
+    "MERCHANT-ID",
+    "MERCHANT-NAME",
+    "MERCHANT-CITY",
+    "MERCHANT-STATE",
+    "MERCHANT-ZIP",
+    "TRANSACTION-ID",
+    "MATCH-STATUS",
+    "AUTH-FRAUD",
+    "FRAUD-RPT-DATE",
+    "ACCT-ID",
+    "CUST-ID",
+];
+
+fn insert_authfrds(
+    state: &mut State,
+    run: &str,
+    request: &Db2Request,
+    limits: Db2Limits,
+) -> Result<Db2Result, HostProblem> {
+    let card = input_named(&request.inputs, "CARD-NUM")
+        .map(trimmed)
+        .ok_or(HostProblem::Malformed)?;
+    let timestamp = input_named(&request.inputs, "AUTH-TS")
+        .map(trimmed)
+        .ok_or(HostProblem::Malformed)?;
+    let key = format!("{card}|{timestamp}");
+    let table = write_table(state, run, "CARDDEMO.AUTHFRDS", AUTHFRDS_COLUMNS.len())?;
+    if table.rows.contains_key(&key) {
+        return Ok(sql_condition(-803, "23505", "DUPLICATE KEY"));
+    }
+    if table.rows.len() >= limits.max_rows_per_table {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let row = AUTHFRDS_COLUMNS
+        .iter()
+        .map(|column| {
+            input_named(&request.inputs, column)
+                .map(ToOwned::to_owned)
+                .unwrap_or_default()
+        })
+        .collect();
+    table.rows.insert(key, row);
+    Ok(success(1, "AUTHORIZATION ROW INSERTED", Vec::new()))
+}
+
+fn update_authfrds(
+    state: &mut State,
+    run: &str,
+    request: &Db2Request,
+) -> Result<Db2Result, HostProblem> {
+    let card = input_named(&request.inputs, "CARD-NUM")
+        .map(trimmed)
+        .ok_or(HostProblem::Malformed)?;
+    let timestamp = input_named(&request.inputs, "AUTH-TS")
+        .map(trimmed)
+        .ok_or(HostProblem::Malformed)?;
+    let fraud = input_named(&request.inputs, "AUTH-FRAUD")
+        .map(ToOwned::to_owned)
+        .ok_or(HostProblem::Malformed)?;
+    let table = write_table(state, run, "CARDDEMO.AUTHFRDS", AUTHFRDS_COLUMNS.len())?;
+    let Some(row) = table.rows.get_mut(&format!("{card}|{timestamp}")) else {
+        return Ok(sql_condition(100, "02000", "ROW NOT FOUND"));
+    };
+    row[22] = fraud;
+    row[23] = b"CURRENT DATE".to_vec();
+    Ok(success(1, "AUTHORIZATION FRAUD UPDATED", Vec::new()))
 }
 
 fn delete(state: &mut State, run: &str, request: &Db2Request) -> Result<Db2Result, HostProblem> {

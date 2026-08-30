@@ -1,4 +1,4 @@
-use mainframe_env_execution_api::{CapabilityId, Invocation, InvocationLimits};
+use mainframe_env_execution_api::{CapabilityId, Invocation, InvocationLimits, ServiceClass};
 use mainframe_env_host_api::{
     CapabilityDescriptor, EffectRequest, EffectResult, HostProblem, HostProvider, HostRequest,
     HostResult, ImsOperation, ImsRequest, ImsResult, ImsSegment,
@@ -188,6 +188,8 @@ struct State {
     sessions: BTreeMap<String, Session>,
     checkpoints: BTreeMap<String, Session>,
     replay: BTreeMap<String, RecordedResult>,
+    #[serde(default)]
+    pending_undo: BTreeMap<String, BTreeMap<String, DatabaseState>>,
 }
 
 struct DurableState {
@@ -279,6 +281,14 @@ impl ImsService {
             request,
             self.limits,
         )?;
+        if invocation.service_class == ServiceClass::Batch
+            && matches!(
+                request.operation,
+                ImsOperation::Insert | ImsOperation::Replace | ImsOperation::Delete
+            )
+        {
+            next.pending_undo.remove(invocation.run_unit_id.as_str());
+        }
         if request.operation.is_mutating() {
             let key = replay_key.ok_or(HostProblem::MissingIdempotency)?;
             if next.replay.len() >= self.limits.max_replays {
@@ -388,6 +398,16 @@ fn apply_request(
         ImsOperation::Checkpoint => checkpoint(state, run, request, limits),
         ImsOperation::Load => load(state, request, limits),
         ImsOperation::Unload => unload(state, run, request),
+        ImsOperation::Commit => {
+            state.pending_undo.remove(run);
+            Ok(status("  "))
+        }
+        ImsOperation::Rollback => {
+            if let Some(databases) = state.pending_undo.remove(run) {
+                state.databases = databases;
+            }
+            Ok(status("  "))
+        }
     }
 }
 
@@ -579,6 +599,7 @@ fn insert(
     request: &ImsRequest,
     limits: ImsLimits,
 ) -> Result<ImsResult, HostProblem> {
+    begin_unit(state, run);
     let (database_name, root_definition, child_definition) = context(state, run)?;
     let target = request
         .segments
@@ -651,6 +672,7 @@ fn insert(
 }
 
 fn replace(state: &mut State, run: &str, request: &ImsRequest) -> Result<ImsResult, HostProblem> {
+    begin_unit(state, run);
     let (database_name, root_definition, child_definition) = context(state, run)?;
     let location = state
         .sessions
@@ -688,6 +710,7 @@ fn replace(state: &mut State, run: &str, request: &ImsRequest) -> Result<ImsResu
 }
 
 fn delete(state: &mut State, run: &str) -> Result<ImsResult, HostProblem> {
+    begin_unit(state, run);
     let (database_name, _, _) = context(state, run)?;
     let location = state
         .sessions
@@ -698,22 +721,35 @@ fn delete(state: &mut State, run: &str) -> Result<ImsResult, HostProblem> {
         .databases
         .get_mut(&database_name)
         .ok_or(HostProblem::NotFound)?;
-    let removed = match location {
+    let (removed, next_location) = match location {
         SegmentLocation::Root { key } => {
             database.secondary_index.retain(|_, root| root != &key);
-            database.roots.remove(&key).is_some()
+            (database.roots.remove(&key).is_some(), None)
         }
-        SegmentLocation::Child { root_key, key } => database
-            .roots
-            .get_mut(&root_key)
-            .and_then(|root| root.children.remove(&key))
-            .is_some(),
+        SegmentLocation::Child { root_key, key } => (
+            database
+                .roots
+                .get_mut(&root_key)
+                .and_then(|root| root.children.remove(&key))
+                .is_some(),
+            Some(SegmentLocation::Root { key: root_key }),
+        ),
     };
     if !removed {
         return Ok(status("GE"));
     }
     if let Some(session) = state.sessions.get_mut(run) {
-        session.last = None;
+        match next_location {
+            Some(location) => {
+                session.child_position = session.child_position.saturating_sub(1);
+                session.last = Some(location);
+            }
+            None => {
+                session.root_position = session.root_position.saturating_sub(1);
+                session.current_root = None;
+                session.last = None;
+            }
+        }
     }
     Ok(affected(1))
 }
@@ -846,6 +882,14 @@ fn context(
     let database_name = normalize(&pcb.database);
     let (_, root, child) = database_definition(state, &database_name)?;
     Ok((database_name, root, child))
+}
+
+fn begin_unit(state: &mut State, run: &str) {
+    if !state.pending_undo.contains_key(run) {
+        state
+            .pending_undo
+            .insert(run.into(), state.databases.clone());
+    }
 }
 
 fn database_definition(
@@ -1036,6 +1080,7 @@ fn validate_state(state: &State, limits: ImsLimits) -> Result<(), HostProblem> {
     if state.sessions.len() > limits.max_sessions
         || state.checkpoints.len() > limits.max_checkpoints
         || state.replay.len() > limits.max_replays
+        || state.pending_undo.len() > limits.max_sessions
         || state.databases.len() > limits.max_databases
         || state.databases.values().any(|database| {
             database.roots.len() > limits.max_roots

@@ -1,0 +1,17 @@
+[package]
+name = "mainframe-env-mq"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+mainframe-env-execution-api.workspace = true
+mainframe-env-host-api.workspace = true
+mainframe-env-store-api.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+
+[dev-dependencies]
+mainframe-env-store.workspace = true

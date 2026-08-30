@@ -23,6 +23,7 @@ mainframe-env-dataset.workspace = true
 mainframe-env-racf.workspace = true
 mainframe-env-server.workspace = true
 mainframe-env-ims.workspace = true
+mainframe-env-mq.workspace = true
 mainframe-env-store.workspace = true
 axum.workspace = true
 base64.workspace = true

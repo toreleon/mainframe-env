@@ -9,8 +9,8 @@ use mainframe_env_host_api::{
     AccessIntent, CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest,
     DatasetAttributes, DatasetName, DatasetOrganization, DatasetRequest, DatasetResult,
     Db2Operation, Db2Request, EffectRequest, HostProblem, HostRequest, HostResult, ImsOperation,
-    ImsRequest, MemberName, Mutation, ProgramName, ProgramRequest, RecordFormat, ResourceName,
-    ScopedHostService, SecurityDecision, SecurityRequest,
+    ImsQualifier, ImsRequest, MemberName, Mutation, ProgramName, ProgramRequest, RecordFormat,
+    ResourceName, ScopedHostService, SecurityDecision, SecurityRequest,
 };
 use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
 use serde::{Deserialize, Serialize};
@@ -872,6 +872,138 @@ impl BatchService {
                 dd_outputs,
             });
         }
+        if parameter.contains("BMP") && parameter.contains("CBPAUP0C") {
+            let control = input_dd_records(input, "SYSIN")?;
+            let range = control
+                .first()
+                .ok_or(HostProblem::Malformed)
+                .and_then(|record| {
+                    std::str::from_utf8(record).map_err(|_| HostProblem::Malformed)
+                })?;
+            let fields = range.split(',').map(str::trim).collect::<Vec<_>>();
+            let expiry_days = fields.first().ok_or(HostProblem::Malformed)?;
+            if fields.len() != 4
+                || expiry_days.len() != 2
+                || fields[1].len() != 5
+                || fields[2].len() != 5
+                || !fields[..3]
+                    .iter()
+                    .all(|field| field.bytes().all(|byte| byte.is_ascii_digit()))
+                || !matches!(fields[3], "Y" | "N")
+            {
+                return Err(HostProblem::Malformed);
+            }
+            if *expiry_days != "00" {
+                return Err(HostProblem::Unsupported);
+            }
+            self.ims_dli_call(
+                invocation,
+                job,
+                step,
+                effect_sequence,
+                ImsOperation::Schedule,
+                Some("PSBPAUTB".into()),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                None,
+                1,
+            )?;
+            let mut deleted_roots = 0u64;
+            let mut deleted_children = 0u64;
+            loop {
+                let root = self.ims_dli_call(
+                    invocation,
+                    job,
+                    step,
+                    effect_sequence,
+                    ImsOperation::GetNext,
+                    None,
+                    vec!["PAUTSUM0".into()],
+                    Vec::new(),
+                    Vec::new(),
+                    None,
+                    1,
+                )?;
+                if root.status == "GB" {
+                    break;
+                }
+                if !root.status.trim().is_empty() {
+                    return Err(HostProblem::ProviderFailure);
+                }
+                loop {
+                    let child = self.ims_dli_call(
+                        invocation,
+                        job,
+                        step,
+                        effect_sequence,
+                        ImsOperation::GetNextParent,
+                        None,
+                        vec!["PAUTDTL1".into()],
+                        Vec::new(),
+                        Vec::new(),
+                        None,
+                        1,
+                    )?;
+                    if child.status == "GE" {
+                        break;
+                    }
+                    if !child.status.trim().is_empty() {
+                        return Err(HostProblem::ProviderFailure);
+                    }
+                    let deleted = self.ims_dli_call(
+                        invocation,
+                        job,
+                        step,
+                        effect_sequence,
+                        ImsOperation::Delete,
+                        None,
+                        vec!["PAUTDTL1".into()],
+                        Vec::new(),
+                        Vec::new(),
+                        None,
+                        1,
+                    )?;
+                    deleted_children = deleted_children.saturating_add(deleted.affected_segments);
+                }
+                let deleted = self.ims_dli_call(
+                    invocation,
+                    job,
+                    step,
+                    effect_sequence,
+                    ImsOperation::Delete,
+                    None,
+                    vec!["PAUTSUM0".into()],
+                    Vec::new(),
+                    Vec::new(),
+                    None,
+                    1,
+                )?;
+                deleted_roots = deleted_roots.saturating_add(deleted.affected_segments);
+            }
+            let checkpoint = format!("CD026{:0>3}", job.id.trim_start_matches("JOB"));
+            self.ims_dli_call(
+                invocation,
+                job,
+                step,
+                effect_sequence,
+                ImsOperation::Checkpoint,
+                None,
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Some(checkpoint.clone()),
+                1,
+            )?;
+            return Ok(crate::ProgramOutput {
+                return_code: 0,
+                records: vec![format!(
+                    "DFSRRC00 BMP PROGRAM=CBPAUP0C EXPIRY-DAYS={expiry_days} ROOTS={deleted_roots} CHILDREN={deleted_children} CHECKPOINT={checkpoint} SUMMARY-AUTHORIZATION-ADJUSTED={deleted_roots}"
+                )
+                .into_bytes()],
+                dd_outputs: BTreeMap::new(),
+            });
+        }
         Err(HostProblem::Unsupported)
     }
 
@@ -885,6 +1017,36 @@ impl BatchService {
         operation: ImsOperation,
         psb: Option<String>,
         data: Vec<u8>,
+        max_segments: u32,
+    ) -> Result<mainframe_env_host_api::ImsResult, HostProblem> {
+        self.ims_dli_call(
+            invocation,
+            job,
+            step,
+            effect_sequence,
+            operation,
+            psb,
+            Vec::new(),
+            data,
+            Vec::new(),
+            None,
+            max_segments,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn ims_dli_call(
+        &self,
+        invocation: &Invocation,
+        job: &Job,
+        step: &StepPlan,
+        effect_sequence: &mut u64,
+        operation: ImsOperation,
+        psb: Option<String>,
+        segments: Vec<String>,
+        data: Vec<u8>,
+        qualifiers: Vec<ImsQualifier>,
+        checkpoint_id: Option<String>,
         max_segments: u32,
     ) -> Result<mainframe_env_host_api::ImsResult, HostProblem> {
         let sequence = next_effect_sequence(invocation, effect_sequence)?;
@@ -913,10 +1075,10 @@ impl BatchService {
                     operation,
                     psb,
                     pcb: 1,
-                    segments: Vec::new(),
+                    segments,
                     data,
-                    qualifiers: Vec::new(),
-                    checkpoint_id: None,
+                    qualifiers,
+                    checkpoint_id,
                     max_segments,
                     mutation,
                 }),
