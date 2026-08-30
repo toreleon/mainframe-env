@@ -38,6 +38,7 @@ pub enum UtilityDisposition {
     NetworkFtp,
     ReportRexx,
     Db2Tso,
+    ImsController,
 }
 
 #[must_use]
@@ -48,6 +49,7 @@ pub fn utility_disposition(program: &str) -> Option<UtilityDisposition> {
         "FTP" => UtilityDisposition::NetworkFtp,
         "IKJEFT1B" => UtilityDisposition::ReportRexx,
         "IKJEFT01" => UtilityDisposition::Db2Tso,
+        "DFSRRC00" => UtilityDisposition::ImsController,
         _ => return None,
     })
 }

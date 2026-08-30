@@ -8,9 +8,9 @@ use mainframe_env_execution_api::{
 use mainframe_env_host_api::{
     AccessIntent, CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest,
     DatasetAttributes, DatasetName, DatasetOrganization, DatasetRequest, DatasetResult,
-    Db2Operation, Db2Request, EffectRequest, HostProblem, HostRequest, HostResult, MemberName,
-    Mutation, ProgramName, ProgramRequest, RecordFormat, ResourceName, ScopedHostService,
-    SecurityDecision, SecurityRequest,
+    Db2Operation, Db2Request, EffectRequest, HostProblem, HostRequest, HostResult, ImsOperation,
+    ImsRequest, MemberName, Mutation, ProgramName, ProgramRequest, RecordFormat, ResourceName,
+    ScopedHostService, SecurityDecision, SecurityRequest,
 };
 use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
 use serde::{Deserialize, Serialize};
@@ -471,6 +471,14 @@ impl BatchService {
                     self.execute_sdsf(invocation, job, step, &input, &mut effect_sequence)?
                 } else if step.program.eq_ignore_ascii_case("IKJEFT01") {
                     self.execute_db2_tso(invocation, job, step, &input, &mut effect_sequence)?
+                } else if step.program.eq_ignore_ascii_case("DFSRRC00") {
+                    self.execute_ims_controller(
+                        invocation,
+                        job,
+                        step,
+                        &input,
+                        &mut effect_sequence,
+                    )?
                 } else {
                     let bytes =
                         serde_json::to_vec(&input).map_err(|_| HostProblem::ProviderFailure)?;
@@ -759,6 +767,165 @@ impl BatchService {
             ],
             dd_outputs,
         })
+    }
+
+    fn execute_ims_controller(
+        &self,
+        invocation: &Invocation,
+        job: &Job,
+        step: &StepPlan,
+        input: &ProgramInput,
+        effect_sequence: &mut u64,
+    ) -> Result<crate::ProgramOutput, HostProblem> {
+        let parameter = input
+            .parameter
+            .as_deref()
+            .unwrap_or_default()
+            .trim_matches(['\'', '"'])
+            .to_ascii_uppercase();
+        if parameter.contains("PAUDBLOD") {
+            let roots = input_dd_records(input, "INFILE1")?;
+            let children = input_dd_records(input, "INFILE2")?;
+            let mut hierarchy = roots
+                .into_iter()
+                .map(|data| {
+                    if data.len() != 100 {
+                        return Err(HostProblem::Malformed);
+                    }
+                    Ok((data[..6].to_vec(), (data, Vec::<Vec<u8>>::new())))
+                })
+                .collect::<Result<BTreeMap<_, _>, _>>()?;
+            for record in children {
+                if record.len() != 206 {
+                    return Err(HostProblem::Malformed);
+                }
+                hierarchy
+                    .get_mut(&record[..6])
+                    .ok_or(HostProblem::Malformed)?
+                    .1
+                    .push(record[6..].to_vec());
+            }
+            let image = serde_json::json!({
+                "database":"DBPAUTP0",
+                "roots":hierarchy.into_values().map(|(data, children)| {
+                    serde_json::json!({"data":data,"children":children})
+                }).collect::<Vec<_>>()
+            });
+            let result = self.ims_call(
+                invocation,
+                job,
+                step,
+                effect_sequence,
+                ImsOperation::Load,
+                Some("DBPAUTP0".into()),
+                serde_json::to_vec(&image).map_err(|_| HostProblem::ProviderFailure)?,
+                1,
+            )?;
+            return Ok(crate::ProgramOutput {
+                return_code: i32::from(result.status != "  ") * 8,
+                records: vec![
+                    format!("DFSRRC00 LOAD SEGMENTS={}", result.affected_segments).into_bytes(),
+                ],
+                dd_outputs: BTreeMap::new(),
+            });
+        }
+        if parameter.contains("PAUDBUNL") || parameter.contains("DFSURGU0") {
+            let result = self.ims_call(
+                invocation,
+                job,
+                step,
+                effect_sequence,
+                ImsOperation::Unload,
+                Some("DBPAUTP0".into()),
+                Vec::new(),
+                4_096,
+            )?;
+            let mut roots = Vec::new();
+            let mut children = Vec::new();
+            for segment in &result.segments {
+                match segment.name.as_str() {
+                    "PAUTSUM0" => roots.push(segment.data.clone()),
+                    "PAUTDTL1" => {
+                        let mut record = segment
+                            .parent_key
+                            .clone()
+                            .ok_or(HostProblem::ProviderFailure)?;
+                        record.extend_from_slice(&segment.data);
+                        children.push(record);
+                    }
+                    _ => return Err(HostProblem::ProviderFailure),
+                }
+            }
+            let dd_outputs = if parameter.contains("PAUDBUNL") {
+                BTreeMap::from([("OUTFIL1".into(), roots), ("OUTFIL2".into(), children)])
+            } else {
+                BTreeMap::from([(
+                    "DFSURGU1".into(),
+                    roots.into_iter().chain(children).collect(),
+                )])
+            };
+            return Ok(crate::ProgramOutput {
+                return_code: i32::from(result.status != "  ") * 8,
+                records: vec![
+                    format!("DFSRRC00 UNLOAD SEGMENTS={}", result.segments.len()).into_bytes(),
+                ],
+                dd_outputs,
+            });
+        }
+        Err(HostProblem::Unsupported)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn ims_call(
+        &self,
+        invocation: &Invocation,
+        job: &Job,
+        step: &StepPlan,
+        effect_sequence: &mut u64,
+        operation: ImsOperation,
+        psb: Option<String>,
+        data: Vec<u8>,
+        max_segments: u32,
+    ) -> Result<mainframe_env_host_api::ImsResult, HostProblem> {
+        let sequence = next_effect_sequence(invocation, effect_sequence)?;
+        let mutation = if operation.is_mutating() {
+            let key = effect_key(job, step, sequence)?;
+            Some(Mutation {
+                sequence,
+                idempotency_key: key,
+                transaction: Some(job.id.clone()),
+            })
+        } else {
+            None
+        };
+        let result = self.host.invoke(
+            invocation,
+            invocation.deadline_tick.saturating_sub(1),
+            false,
+            EffectRequest {
+                run_unit: invocation.run_unit_id.clone(),
+                sequence,
+                deadline_tick: invocation.deadline_tick,
+                idempotency_key: mutation
+                    .as_ref()
+                    .map(|mutation| mutation.idempotency_key.clone()),
+                request: HostRequest::Ims(ImsRequest {
+                    operation,
+                    psb,
+                    pcb: 1,
+                    segments: Vec::new(),
+                    data,
+                    qualifiers: Vec::new(),
+                    checkpoint_id: None,
+                    max_segments,
+                    mutation,
+                }),
+            },
+        );
+        match result.effect.outcome? {
+            HostResult::Ims(result) => Ok(result),
+            _ => Err(HostProblem::ProviderFailure),
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1757,6 +1924,12 @@ fn is_program_library_dd(dd: &crate::DdPlan) -> bool {
     dd.name.eq_ignore_ascii_case("STEPLIB")
         || dd.name.eq_ignore_ascii_case("JOBLIB")
         || dd.name.eq_ignore_ascii_case("DBRMLIB")
+        || dd.name.eq_ignore_ascii_case("DFSRESLB")
+        || dd.name.eq_ignore_ascii_case("IMS")
+        || dd.name.eq_ignore_ascii_case("DFSVSAMP")
+        || dd.name.eq_ignore_ascii_case("PROCLIB")
+        || dd.name.eq_ignore_ascii_case("DFSSEL")
+        || dd.name.to_ascii_uppercase().starts_with("DDPAUT")
 }
 
 fn normalize_records(

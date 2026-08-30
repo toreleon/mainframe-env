@@ -517,6 +517,63 @@ pub struct Db2Result {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ImsOperation {
+    Schedule,
+    Terminate,
+    GetUnique,
+    GetNext,
+    GetNextParent,
+    Insert,
+    Replace,
+    Delete,
+    Checkpoint,
+    Load,
+    Unload,
+}
+
+impl ImsOperation {
+    #[must_use]
+    pub const fn is_mutating(self) -> bool {
+        !matches!(self, Self::Unload)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ImsQualifier {
+    pub segment: String,
+    pub field: String,
+    pub value: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ImsRequest {
+    pub operation: ImsOperation,
+    pub psb: Option<String>,
+    pub pcb: u16,
+    pub segments: Vec<String>,
+    pub data: Vec<u8>,
+    pub qualifiers: Vec<ImsQualifier>,
+    pub checkpoint_id: Option<String>,
+    pub max_segments: u32,
+    pub mutation: Option<Mutation>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ImsSegment {
+    pub name: String,
+    pub parent_key: Option<Vec<u8>>,
+    pub data: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ImsResult {
+    pub status: String,
+    pub segments: Vec<ImsSegment>,
+    pub checkpoint_id: Option<String>,
+    pub affected_segments: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CicsOperation {
     Abend,
     Asktime,
@@ -671,6 +728,7 @@ pub enum HostRequest {
     State(StateRequest),
     Cics(CicsRequest),
     Db2(Db2Request),
+    Ims(ImsRequest),
 }
 
 impl HostRequest {
@@ -702,6 +760,8 @@ impl HostRequest {
             Self::Cics(_) => "host.cics.execute",
             Self::Db2(request) if request.operation.is_mutating() => "host.db2.write",
             Self::Db2(_) => "host.db2.read",
+            Self::Ims(request) if request.operation.is_mutating() => "host.ims.write",
+            Self::Ims(_) => "host.ims.read",
         };
         CapabilityId::new(name, limits).expect("built-in capability identities are valid")
     }
@@ -739,6 +799,7 @@ impl HostRequest {
             ) | Self::State(StateRequest::Put { .. } | StateRequest::Delete { .. })
         ) || matches!(self, Self::Cics(CicsRequest { operation, .. }) if operation.is_mutating())
             || matches!(self, Self::Db2(request) if request.operation.is_mutating())
+            || matches!(self, Self::Ims(request) if request.operation.is_mutating())
     }
 
     #[must_use]
@@ -770,6 +831,7 @@ impl HostRequest {
             ) => Some(mutation),
             Self::Cics(request) => request.mutation.as_ref(),
             Self::Db2(request) => request.mutation.as_ref(),
+            Self::Ims(request) => request.mutation.as_ref(),
             _ => None,
         }
     }
@@ -847,6 +909,44 @@ impl HostRequest {
                 }
                 Ok(())
             }
+            Self::Ims(request) => {
+                if request.pcb == 0
+                    || request.segments.len() > limits.max_fields
+                    || request.data.len() > limits.max_record_bytes
+                    || request.qualifiers.len() > limits.max_fields
+                    || request.max_segments == 0
+                    || request.max_segments as usize > limits.max_records
+                    || request
+                        .psb
+                        .as_ref()
+                        .is_some_and(|name| name.is_empty() || name.len() > limits.max_name_bytes)
+                    || request
+                        .segments
+                        .iter()
+                        .any(|name| name.is_empty() || name.len() > limits.max_name_bytes)
+                    || request.qualifiers.iter().any(|qualifier| {
+                        qualifier.segment.is_empty()
+                            || qualifier.segment.len() > limits.max_name_bytes
+                            || qualifier.field.is_empty()
+                            || qualifier.field.len() > limits.max_name_bytes
+                            || qualifier.value.len() > limits.max_record_bytes
+                    })
+                    || request
+                        .checkpoint_id
+                        .as_ref()
+                        .is_some_and(|id| id.is_empty() || id.len() > limits.max_name_bytes)
+                {
+                    return Err(HostProblem::ResourceExhausted);
+                }
+                if request.operation.is_mutating() {
+                    request
+                        .mutation
+                        .as_ref()
+                        .ok_or(HostProblem::MissingIdempotency)?
+                        .validate(limits)?;
+                }
+                Ok(())
+            }
             _ => Ok(()),
         }
     }
@@ -866,6 +966,7 @@ pub enum HostResult {
     },
     Cics(CicsResponse),
     Db2(Db2Result),
+    Ims(ImsResult),
 }
 
 impl HostResult {
@@ -966,6 +1067,25 @@ impl HostResult {
                                 .columns
                                 .iter()
                                 .any(|column| column.len() > limits.max_record_bytes)
+                    }) =>
+            {
+                Err(HostProblem::ResourceExhausted)
+            }
+            Self::Ims(result)
+                if result.status.len() != 2
+                    || result.segments.len() > limits.max_records
+                    || result
+                        .checkpoint_id
+                        .as_ref()
+                        .is_some_and(|id| id.is_empty() || id.len() > limits.max_name_bytes)
+                    || result.segments.iter().any(|segment| {
+                        segment.name.is_empty()
+                            || segment.name.len() > limits.max_name_bytes
+                            || segment.data.len() > limits.max_record_bytes
+                            || segment
+                                .parent_key
+                                .as_ref()
+                                .is_some_and(|key| key.len() > limits.max_record_bytes)
                     }) =>
             {
                 Err(HostProblem::ResourceExhausted)

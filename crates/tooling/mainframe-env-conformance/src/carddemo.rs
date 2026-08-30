@@ -35,8 +35,13 @@ use mainframe_env_execution_api::{
 use mainframe_env_host_api::{
     AccessIntent, AuditEvent, CicsConditionPolicy, CicsOperation, CicsRequest, DatasetAttributes,
     DatasetName, DatasetOrganization, DatasetRequest, DatasetResult, Db2HostVariable, Db2Operation,
-    Db2Request, EffectRequest, HostProblem, MemberName, Mutation, RecordFormat, ResourceName,
-    SecretRef, SecurityDecision, SessionId,
+    Db2Request, EffectRequest, HostProblem, ImsOperation, ImsQualifier, ImsRequest, MemberName,
+    Mutation, RecordFormat, RegistrySnapshot, ResourceName, ScopedHostService, SecretRef,
+    SecurityDecision, SessionId,
+};
+use mainframe_env_ims::{
+    ImsApplicationDefinition, ImsDatabaseDefinition, ImsLimits, ImsLoadImage, ImsLoadRoot,
+    ImsPcbDefinition, ImsPsbDefinition, ImsSegmentDefinition, ImsService, ims_providers,
 };
 use mainframe_env_racf::{
     MemorySecretResolver, RacfManifest, RacfProfileDefinition, RacfService, RacfUserDefinition,
@@ -611,6 +616,34 @@ pub struct CardDemoDb2Receipt {
     pub dataset_sha256: BTreeMap<String, String>,
     pub spool_sha256: BTreeMap<String, String>,
     pub db2_shape_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoImsReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub definitions_checked: usize,
+    pub databases_installed: usize,
+    pub psbs_installed: usize,
+    pub pcbs_installed: usize,
+    pub programs_compiled: usize,
+    pub dli_operations: BTreeMap<String, usize>,
+    pub application_routes: usize,
+    pub selected_job_routes: usize,
+    pub roots: usize,
+    pub children: usize,
+    pub secondary_index_entries: usize,
+    pub load_unload_routes: usize,
+    pub checkpoint_controls: usize,
+    pub restart_controls: usize,
+    pub authorization_controls: usize,
+    pub malformed_controls: usize,
+    pub resource_controls: usize,
+    pub provider_failure_controls: usize,
+    pub hierarchy_sha256: String,
+    pub spool_sha256: BTreeMap<String, String>,
+    pub ims_shape_sha256: String,
 }
 
 struct BaseOnlineExercise {
@@ -5190,6 +5223,916 @@ async fn exercise_db2_routes(
         dataset_sha256,
         spool_sha256,
     })
+}
+
+pub fn verify_carddemo_ims_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoImsReceipt, CorpusProblem> {
+    let corpus_dir = PathBuf::from(env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required",
+        )
+    })?);
+    let corpus = verify_carddemo_corpus(&corpus_dir, inventory_path)?;
+    let (definition, definitions_checked) = carddemo_ims_definition(&corpus_dir)?;
+    let compiler = CobolCompiler::default();
+    let mut programs_compiled = 0usize;
+    let mut dli_operations = BTreeMap::new();
+    for (relative, bundle) in explicit_carddemo_bundles(&corpus_dir)?
+        .into_iter()
+        .filter(|(relative, _)| relative.starts_with("app/app-authorization-ims-db2-mq/cbl/"))
+    {
+        let analysis = compiler.analyze(&bundle);
+        if analysis.completeness != Completeness::Complete {
+            return Err(CorpusProblem::new(
+                "carddemo.ims.compile_failed",
+                format!(
+                    "{relative}: {}",
+                    analysis
+                        .diagnostics
+                        .first()
+                        .map_or("incomplete IMS compilation", |problem| problem
+                            .public_message())
+                ),
+            ));
+        }
+        let operations = analysis
+            .hir
+            .ok_or_else(|| CorpusProblem::new("carddemo.ims.compile_failed", "IMS HIR missing"))?
+            .statements
+            .into_iter()
+            .filter(|statement| statement.kind == StatementKind::ExecDli)
+            .filter_map(|statement| {
+                statement
+                    .arguments
+                    .into_iter()
+                    .find(|token| !matches!(token.as_str(), "DLI" | "END-EXEC"))
+            })
+            .collect::<Vec<_>>();
+        if operations.is_empty() {
+            continue;
+        }
+        for operation in operations {
+            *dli_operations.entry(operation).or_default() += 1;
+        }
+        let result = compiler
+            .compile(CompilerRequest {
+                source: bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").expect("static target"),
+                options: CompileOptions::new(BTreeMap::new()).expect("static options"),
+            })
+            .map_err(|problem| {
+                CorpusProblem::new(
+                    "carddemo.ims.compile_failed",
+                    format!("{relative}: {problem:?}"),
+                )
+            })?;
+        if !matches!(result, CompilerResult::Published { .. }) {
+            return Err(CorpusProblem::new(
+                "carddemo.ims.compile_failed",
+                format!("{relative} did not publish"),
+            ));
+        }
+        programs_compiled += 1;
+    }
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| CorpusProblem::new("carddemo.ims.runtime", error.to_string()))?;
+    let exercise = runtime.block_on(exercise_ims_routes(&corpus_dir, definition.clone()))?;
+    let mut shape = Sha256::new();
+    digest_field(&mut shape, corpus.commit.as_bytes());
+    digest_field(
+        &mut shape,
+        &serde_json::to_vec(&definition)
+            .map_err(|error| CorpusProblem::new("carddemo.ims.definition", error.to_string()))?,
+    );
+    for (operation, count) in &dli_operations {
+        digest_field(&mut shape, operation.as_bytes());
+        digest_field(&mut shape, &(*count as u64).to_be_bytes());
+    }
+    digest_field(&mut shape, exercise.hierarchy_sha256.as_bytes());
+    for (name, digest) in &exercise.spool_sha256 {
+        digest_field(&mut shape, name.as_bytes());
+        digest_field(&mut shape, digest.as_bytes());
+    }
+    Ok(CardDemoImsReceipt {
+        schema_version: "mainframe-env.carddemo-ims-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit: corpus.commit,
+        definitions_checked,
+        databases_installed: exercise.databases_installed,
+        psbs_installed: exercise.psbs_installed,
+        pcbs_installed: exercise.pcbs_installed,
+        programs_compiled,
+        dli_operations,
+        application_routes: exercise.selected_job_routes + 1,
+        selected_job_routes: exercise.selected_job_routes,
+        roots: exercise.roots,
+        children: exercise.children,
+        secondary_index_entries: exercise.secondary_index_entries,
+        load_unload_routes: 2,
+        checkpoint_controls: 1,
+        restart_controls: 1,
+        authorization_controls: 1,
+        malformed_controls: 1,
+        resource_controls: 1,
+        provider_failure_controls: 1,
+        hierarchy_sha256: exercise.hierarchy_sha256,
+        spool_sha256: exercise.spool_sha256,
+        ims_shape_sha256: format!("{:x}", shape.finalize()),
+    })
+}
+
+struct ImsExercise {
+    databases_installed: usize,
+    psbs_installed: usize,
+    pcbs_installed: usize,
+    roots: usize,
+    children: usize,
+    secondary_index_entries: usize,
+    hierarchy_sha256: String,
+    selected_job_routes: usize,
+    spool_sha256: BTreeMap<String, String>,
+}
+
+async fn exercise_ims_routes(
+    corpus_dir: &Path,
+    definition: ImsApplicationDefinition,
+) -> Result<ImsExercise, CorpusProblem> {
+    let artifact_root =
+        env::temp_dir().join(format!("mainframe-env-carddemo-ims-{}", std::process::id()));
+    let config = ServerConfig {
+        store_profile: StoreProfile::Memory,
+        artifact_root: artifact_root.clone(),
+        tls: TlsConfig {
+            enabled: false,
+            certificate_path: None,
+            private_key_reference: None,
+        },
+        ..ServerConfig::default()
+    };
+    let store = Arc::new(MemoryStore::new(Default::default()));
+    let server = ProductServer::open(
+        config.clone(),
+        store.clone(),
+        Arc::new(MemorySecretResolver::default()),
+        default_program_router(),
+    )
+    .map_err(terminal_problem)?;
+    let ims = server.ims_service();
+    let install = ims.install(definition.clone()).map_err(terminal_problem)?;
+    if !ims
+        .install(definition.clone())
+        .map_err(terminal_problem)?
+        .replayed
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.ims.install_replay",
+            "IMS definition replay was not idempotent",
+        ));
+    }
+    let root_one = ims_record(100, b"000001", b"ROOT-ONE")?;
+    let root_two = ims_record(100, b"000002", b"ROOT-TWO")?;
+    let child_one = ims_record(200, b"99900001", b"CHILD-ONE")?;
+    let child_two = ims_record(200, b"99900002", b"CHILD-TWO")?;
+    let image = ImsLoadImage {
+        database: "DBPAUTP0".into(),
+        roots: vec![
+            ImsLoadRoot {
+                data: root_one.clone(),
+                children: vec![child_one.clone()],
+            },
+            ImsLoadRoot {
+                data: root_two.clone(),
+                children: vec![child_two.clone()],
+            },
+        ],
+    };
+    server
+        .bootstrap_user("IBMUSER", b"TESTPASS")
+        .map_err(terminal_problem)?;
+    let racf = server.racf_service();
+    racf.define_profile("DATASET", "AWS.M2.CARDDEMO.**", "IBMUSER", None)
+        .map_err(terminal_problem)?;
+    racf.permit(
+        "DATASET",
+        "AWS.M2.CARDDEMO.**",
+        "IBMUSER",
+        AccessIntent::Alter,
+    )
+    .map_err(terminal_problem)?;
+    let mut sequence = 70_000u64;
+    utility_seed_dataset(
+        &server,
+        "AWS.M2.CARDDEMO.PAUTDB.ROOT.FILEO",
+        DatasetOrganization::Sequential,
+        RecordFormat::Fixed,
+        100,
+        None,
+        vec![root_one.clone(), root_two.clone()],
+        &mut sequence,
+    )?;
+    let child_records = [
+        (b"000001".as_slice(), &child_one),
+        (b"000002".as_slice(), &child_two),
+    ]
+    .into_iter()
+    .map(|(parent, child)| {
+        let mut record = parent.to_vec();
+        record.extend_from_slice(child);
+        record
+    })
+    .collect();
+    utility_seed_dataset(
+        &server,
+        "AWS.M2.CARDDEMO.PAUTDB.CHILD.FILEO",
+        DatasetOrganization::Sequential,
+        RecordFormat::Fixed,
+        206,
+        None,
+        child_records,
+        &mut sequence,
+    )?;
+    let app = server.router();
+    let load_jcl = String::from_utf8(read_corpus_file(
+        corpus_dir,
+        &corpus_dir.join("app/app-authorization-ims-db2-mq/jcl/LOADPADB.JCL"),
+    )?)
+    .map_err(|_| CorpusProblem::new("carddemo.ims.jcl_invalid", "LOADPADB is not UTF-8"))?;
+    let load_job = submit_job_with_retcode(&server, &app, &load_jcl, "CC 0000").await?;
+    let control = ims_invocation("ims-control", true, None)?;
+    ims.execute(
+        &control,
+        &ims_request(
+            ImsOperation::Schedule,
+            101,
+            Some("PSBPAUTB"),
+            &[],
+            Vec::new(),
+            Vec::new(),
+            None,
+        )?,
+    )
+    .map_err(terminal_problem)?;
+    let root = ims
+        .execute(
+            &control,
+            &ims_request(
+                ImsOperation::GetUnique,
+                2,
+                None,
+                &["PAUTSUM0"],
+                Vec::new(),
+                vec![ims_qualifier("PAUTSUM0", "ACCNTID", b"000001")],
+                None,
+            )?,
+        )
+        .map_err(terminal_problem)?;
+    if root.status != "  "
+        || root
+            .segments
+            .first()
+            .is_none_or(|segment| segment.data != root_one)
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.ims.gu_drift",
+            "GU did not return the qualified root segment",
+        ));
+    }
+    let child = ims
+        .execute(
+            &control,
+            &ims_request(
+                ImsOperation::GetNextParent,
+                4,
+                None,
+                &["PAUTDTL1"],
+                Vec::new(),
+                Vec::new(),
+                None,
+            )?,
+        )
+        .map_err(terminal_problem)?;
+    if child
+        .segments
+        .first()
+        .is_none_or(|segment| segment.data != child_one)
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.ims.gnp_drift",
+            "GNP did not preserve root/child hierarchy",
+        ));
+    }
+    let mut replaced_child = child_one.clone();
+    replaced_child[8..12].copy_from_slice(b"EDIT");
+    ims.execute(
+        &control,
+        &ims_request(
+            ImsOperation::Replace,
+            5,
+            None,
+            &["PAUTDTL1"],
+            replaced_child,
+            Vec::new(),
+            None,
+        )?,
+    )
+    .map_err(terminal_problem)?;
+    let transient_child = ims_record(200, b"99900003", b"TRANSIENT")?;
+    ims.execute(
+        &control,
+        &ims_request(
+            ImsOperation::Insert,
+            6,
+            None,
+            &["PAUTSUM0", "PAUTDTL1"],
+            transient_child,
+            vec![ims_qualifier("PAUTSUM0", "ACCNTID", b"000001")],
+            None,
+        )?,
+    )
+    .map_err(terminal_problem)?;
+    ims.execute(
+        &control,
+        &ims_request(
+            ImsOperation::GetUnique,
+            7,
+            None,
+            &["PAUTSUM0", "PAUTDTL1"],
+            Vec::new(),
+            vec![
+                ims_qualifier("PAUTSUM0", "ACCNTID", b"000001"),
+                ims_qualifier("PAUTDTL1", "PAUT9CTS", b"99900003"),
+            ],
+            None,
+        )?,
+    )
+    .map_err(terminal_problem)?;
+    ims.execute(
+        &control,
+        &ims_request(
+            ImsOperation::Delete,
+            8,
+            None,
+            &["PAUTDTL1"],
+            Vec::new(),
+            Vec::new(),
+            None,
+        )?,
+    )
+    .map_err(terminal_problem)?;
+    let next = ims
+        .execute(
+            &control,
+            &ims_request(
+                ImsOperation::GetNext,
+                9,
+                None,
+                &["PAUTSUM0"],
+                Vec::new(),
+                Vec::new(),
+                None,
+            )?,
+        )
+        .map_err(terminal_problem)?;
+    if next.status != "  " {
+        return Err(CorpusProblem::new(
+            "carddemo.ims.gn_drift",
+            "GN did not return a root",
+        ));
+    }
+    ims.execute(
+        &control,
+        &ims_request(
+            ImsOperation::Checkpoint,
+            10,
+            None,
+            &[],
+            Vec::new(),
+            Vec::new(),
+            Some("CD025001"),
+        )?,
+    )
+    .map_err(terminal_problem)?;
+    ims.execute(
+        &control,
+        &ims_request(
+            ImsOperation::Terminate,
+            11,
+            None,
+            &[],
+            Vec::new(),
+            Vec::new(),
+            None,
+        )?,
+    )
+    .map_err(terminal_problem)?;
+    let unload_jcl = String::from_utf8(read_corpus_file(
+        corpus_dir,
+        &corpus_dir.join("app/app-authorization-ims-db2-mq/jcl/UNLDPADB.JCL"),
+    )?)
+    .map_err(|_| CorpusProblem::new("carddemo.ims.jcl_invalid", "UNLDPADB is not UTF-8"))?;
+    let unload_job = submit_job_with_retcode(&server, &app, &unload_jcl, "CC 0000").await?;
+    let unloaded_roots = utility_records(&server, "AWS.M2.CARDDEMO.PAUTDB.ROOT.FILEO", None)?;
+    let unloaded_children = utility_records(&server, "AWS.M2.CARDDEMO.PAUTDB.CHILD.FILEO", None)?;
+    if unloaded_roots.len() != 2
+        || unloaded_children.len() != 2
+        || unloaded_roots.iter().any(|record| record.len() != 100)
+        || unloaded_children.iter().any(|record| record.len() != 206)
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.ims.unload_drift",
+            "IMS unload job did not write two roots and two qualified children",
+        ));
+    }
+
+    let route_source = "IDENTIFICATION DIVISION. PROGRAM-ID. IMSROUTE. DATA DIVISION. WORKING-STORAGE SECTION. 01 PSB-NAME PIC X(8) VALUE 'PSBPAUTB'. 01 PCB-N PIC S9(4) COMP VALUE 1. 01 ROOT-X PIC X(100). 01 ACCT-X PIC X(6) VALUE '000001'. PROCEDURE DIVISION. EXEC DLI SCHD PSB((PSB-NAME)) END-EXEC. EXEC DLI GU USING PCB(PCB-N) SEGMENT(PAUTSUM0) INTO(ROOT-X) WHERE(ACCNTID = ACCT-X) END-EXEC. DISPLAY ROOT-X. EXEC DLI TERM END-EXEC. STOP RUN.";
+    let artifact = crate::compile(route_source).map_err(|error| {
+        CorpusProblem::new("carddemo.ims.route_compile", format!("IMS route: {error}"))
+    })?;
+    let invocation = ims_artifact_invocation("ims-route", &artifact, true, None)?;
+    let host = Arc::new(ScopedHostService::new(
+        Arc::new(
+            RegistrySnapshot::new(
+                1,
+                ims_providers(ims.clone(), InvocationLimits::default()),
+                InvocationLimits::default(),
+            )
+            .map_err(|_| CorpusProblem::new("carddemo.ims.registry", "registry invalid"))?,
+        ),
+        mainframe_env_host_api::HostLimits::default(),
+    ));
+    let mut machine = mainframe_env_interpreter::ReferenceMachine::from_binary(
+        artifact.payload(),
+        invocation.clone(),
+        mainframe_env_ir::CodecLimits::default(),
+    )
+    .map_err(|problem| CorpusProblem::new("carddemo.ims.route", format!("{problem:?}")))?;
+    let coordinator = mainframe_env_interpreter::ExecutionCoordinator::with_host(
+        host.clone(),
+        mainframe_env_interpreter::CoordinatorLimits::default(),
+    );
+    let outcome = coordinator.execute(
+        &mut machine,
+        &invocation,
+        mainframe_env_interpreter::ExecutionControl::default(),
+    );
+    if !matches!(
+        outcome,
+        mainframe_env_execution_api::ExecutionOutcome::Completed(ref completion)
+            if completion.output.bytes().starts_with(b"000001")
+    ) {
+        return Err(CorpusProblem::new(
+            "carddemo.ims.route_failed",
+            format!("typed DLI application route did not complete: {outcome:?}"),
+        ));
+    }
+
+    let denied_invocation = ims_invocation("ims-denied", false, None)?;
+    let denied_request = ims_request(
+        ImsOperation::Schedule,
+        1,
+        Some("PSBPAUTB"),
+        &[],
+        Vec::new(),
+        Vec::new(),
+        None,
+    )?;
+    let denied_effect = EffectRequest {
+        run_unit: denied_invocation.run_unit_id.clone(),
+        sequence: 1,
+        deadline_tick: denied_invocation.deadline_tick,
+        idempotency_key: denied_request
+            .mutation
+            .as_ref()
+            .map(|mutation| mutation.idempotency_key.clone()),
+        request: mainframe_env_host_api::HostRequest::Ims(denied_request),
+    };
+    if host
+        .invoke(&denied_invocation, 1, false, denied_effect)
+        .effect
+        .outcome
+        != Err(HostProblem::Unauthorized)
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.ims.authorization_drift",
+            "missing IMS grant did not fail closed",
+        ));
+    }
+    let mismatch = ims_invocation(
+        "ims-generation-mismatch",
+        true,
+        Some(("host.ims.write", "wrong")),
+    )?;
+    let mismatch_request = ims_request(
+        ImsOperation::Schedule,
+        1,
+        Some("PSBPAUTB"),
+        &[],
+        Vec::new(),
+        Vec::new(),
+        None,
+    )?;
+    let mismatch_effect = EffectRequest {
+        run_unit: mismatch.run_unit_id.clone(),
+        sequence: 1,
+        deadline_tick: mismatch.deadline_tick,
+        idempotency_key: mismatch_request
+            .mutation
+            .as_ref()
+            .map(|mutation| mutation.idempotency_key.clone()),
+        request: mainframe_env_host_api::HostRequest::Ims(mismatch_request),
+    };
+    if host
+        .invoke(&mismatch, 1, false, mismatch_effect)
+        .effect
+        .outcome
+        != Err(HostProblem::ProviderFailure)
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.ims.provider_failure_drift",
+            "provider generation mismatch did not fail closed",
+        ));
+    }
+
+    let malformed = ims_invocation("ims-malformed", true, None)?;
+    ims.execute(
+        &malformed,
+        &ims_request(
+            ImsOperation::Schedule,
+            1,
+            Some("PSBPAUTB"),
+            &[],
+            Vec::new(),
+            Vec::new(),
+            None,
+        )?,
+    )
+    .map_err(terminal_problem)?;
+    let malformed_result = ims.execute(
+        &malformed,
+        &ims_request(
+            ImsOperation::Insert,
+            102,
+            None,
+            &["PAUTSUM0"],
+            vec![0],
+            Vec::new(),
+            None,
+        )?,
+    );
+    if malformed_result != Err(HostProblem::Malformed) {
+        return Err(CorpusProblem::new(
+            "carddemo.ims.malformed_drift",
+            format!("malformed segment length returned {malformed_result:?}"),
+        ));
+    }
+
+    let limited_store = Arc::new(MemoryStore::new(Default::default()));
+    let limited = ImsService::open(
+        limited_store,
+        ImsLimits {
+            max_roots: 1,
+            ..ImsLimits::default()
+        },
+    )
+    .map_err(terminal_problem)?;
+    limited.install(definition).map_err(terminal_problem)?;
+    let limited_result = limited.execute(
+        &ims_invocation("ims-limit", true, None)?,
+        &ims_request(
+            ImsOperation::Load,
+            1,
+            None,
+            &[],
+            serde_json::to_vec(&image)
+                .map_err(|error| CorpusProblem::new("carddemo.ims.load", error.to_string()))?,
+            Vec::new(),
+            None,
+        )?,
+    );
+    if limited_result != Err(HostProblem::ResourceExhausted) {
+        return Err(CorpusProblem::new(
+            "carddemo.ims.resource_drift",
+            "root limit did not fail closed",
+        ));
+    }
+
+    let hierarchy = ims.hierarchy("DBPAUTP0").map_err(terminal_problem)?;
+    let hierarchy_sha256 = ims_hierarchy_digest(&hierarchy);
+    let roots = hierarchy.len();
+    let children = hierarchy.iter().map(|root| root.children.len()).sum();
+    let secondary_index_entries = ims
+        .secondary_index_entries("DBPAUTP0")
+        .map_err(terminal_problem)?;
+    let spool_sha256 = base_batch_spool_digests(
+        &server,
+        &BTreeMap::from([
+            ("LOADPADB".into(), load_job),
+            ("UNLDPADB".into(), unload_job),
+        ]),
+    )?;
+    if !server.graceful_shutdown().await {
+        return Err(CorpusProblem::new(
+            "carddemo.ims.shutdown_failed",
+            "IMS server did not shut down",
+        ));
+    }
+    drop(ims);
+    drop(server);
+    let restarted = ProductServer::open(
+        config,
+        store,
+        Arc::new(MemorySecretResolver::default()),
+        default_program_router(),
+    )
+    .map_err(terminal_problem)?;
+    if ims_hierarchy_digest(
+        &restarted
+            .ims_service()
+            .hierarchy("DBPAUTP0")
+            .map_err(terminal_problem)?,
+    ) != hierarchy_sha256
+        || restarted
+            .ims_service()
+            .checkpoint_count()
+            .map_err(terminal_problem)?
+            != 1
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.ims.restart_drift",
+            "IMS hierarchy or checkpoint changed across restart",
+        ));
+    }
+    let _ = restarted.graceful_shutdown().await;
+    drop(restarted);
+    let _ = fs::remove_dir_all(&artifact_root);
+    Ok(ImsExercise {
+        databases_installed: install.databases,
+        psbs_installed: install.psbs,
+        pcbs_installed: install.pcbs,
+        roots,
+        children,
+        secondary_index_entries,
+        hierarchy_sha256,
+        selected_job_routes: 2,
+        spool_sha256,
+    })
+}
+
+fn carddemo_ims_definition(
+    corpus_dir: &Path,
+) -> Result<(ImsApplicationDefinition, usize), CorpusProblem> {
+    let files = [
+        "DBPAUTP0.dbd",
+        "DBPAUTX0.dbd",
+        "DLIGSAMP.PSB",
+        "PADFLDBD.DBD",
+        "PASFLDBD.DBD",
+        "PAUTBUNL.PSB",
+        "PSBPAUTB.psb",
+        "PSBPAUTL.psb",
+    ];
+    let mut sources = BTreeMap::new();
+    for file in files {
+        let path = corpus_dir
+            .join("app/app-authorization-ims-db2-mq/ims")
+            .join(file);
+        let source = String::from_utf8(read_corpus_file(corpus_dir, &path)?).map_err(|_| {
+            CorpusProblem::new(
+                "carddemo.ims.definition_invalid",
+                format!("{file} is not UTF-8"),
+            )
+        })?;
+        sources.insert(file, source.to_ascii_uppercase());
+    }
+    for (file, markers) in [
+        (
+            "DBPAUTP0.dbd",
+            &["ACCESS=(HIDAM,VSAM)", "PAUTSUM0", "PAUTDTL1"][..],
+        ),
+        (
+            "DBPAUTX0.dbd",
+            &["ACCESS=(INDEX,VSAM,PROT)", "PAUTINDX"][..],
+        ),
+        (
+            "PSBPAUTB.psb",
+            &["DBDNAME=DBPAUTP0", "PROCOPT=AP", "PSBNAME=PSBPAUTB"][..],
+        ),
+        (
+            "PSBPAUTL.psb",
+            &["DBDNAME=DBPAUTP0", "PROCOPT=L", "PSBNAME=PSBPAUTL"][..],
+        ),
+        (
+            "PAUTBUNL.PSB",
+            &["DBDNAME=DBPAUTP0", "PROCOPT=GOTP", "PSBNAME=PAUTBUNL"][..],
+        ),
+    ] {
+        if markers.iter().any(|marker| !sources[file].contains(marker)) {
+            return Err(CorpusProblem::new(
+                "carddemo.ims.definition_drift",
+                format!("{file} no longer contains its pinned IMS shape"),
+            ));
+        }
+    }
+    let primary_segments = vec![
+        ImsSegmentDefinition {
+            name: "PAUTSUM0".into(),
+            parent: None,
+            length: 100,
+            key_field: "ACCNTID".into(),
+            key_offset: 0,
+            key_length: 6,
+        },
+        ImsSegmentDefinition {
+            name: "PAUTDTL1".into(),
+            parent: Some("PAUTSUM0".into()),
+            length: 200,
+            key_field: "PAUT9CTS".into(),
+            key_offset: 0,
+            key_length: 8,
+        },
+    ];
+    let databases = vec![
+        ImsDatabaseDefinition {
+            name: "DBPAUTP0".into(),
+            access: "HIDAM".into(),
+            secondary_index: Some("DBPAUTX0".into()),
+            segments: primary_segments,
+        },
+        ImsDatabaseDefinition {
+            name: "DBPAUTX0".into(),
+            access: "INDEX".into(),
+            secondary_index: None,
+            segments: vec![ImsSegmentDefinition {
+                name: "PAUTINDX".into(),
+                parent: None,
+                length: 6,
+                key_field: "INDXSEQ".into(),
+                key_offset: 0,
+                key_length: 6,
+            }],
+        },
+    ];
+    let psbs = [("PSBPAUTB", "AP"), ("PSBPAUTL", "L"), ("PAUTBUNL", "GOTP")]
+        .into_iter()
+        .map(|(name, processing_options)| ImsPsbDefinition {
+            name: name.into(),
+            pcbs: vec![ImsPcbDefinition {
+                name: format!("{name}-PCB"),
+                database: "DBPAUTP0".into(),
+                processing_options: processing_options.into(),
+                segments: vec!["PAUTSUM0".into(), "PAUTDTL1".into()],
+            }],
+        })
+        .collect();
+    Ok((ImsApplicationDefinition { databases, psbs }, sources.len()))
+}
+
+fn ims_record(length: usize, key: &[u8], marker: &[u8]) -> Result<Vec<u8>, CorpusProblem> {
+    if key.len() > length || key.len() + marker.len() > length {
+        return Err(CorpusProblem::new(
+            "carddemo.ims.fixture_invalid",
+            "IMS fixture exceeds its segment length",
+        ));
+    }
+    let mut record = vec![b' '; length];
+    record[..key.len()].copy_from_slice(key);
+    record[key.len()..key.len() + marker.len()].copy_from_slice(marker);
+    Ok(record)
+}
+
+fn ims_qualifier(segment: &str, field: &str, value: &[u8]) -> ImsQualifier {
+    ImsQualifier {
+        segment: segment.into(),
+        field: field.into(),
+        value: value.to_vec(),
+    }
+}
+
+fn ims_request(
+    operation: ImsOperation,
+    sequence: u64,
+    psb: Option<&str>,
+    segments: &[&str],
+    data: Vec<u8>,
+    qualifiers: Vec<ImsQualifier>,
+    checkpoint_id: Option<&str>,
+) -> Result<ImsRequest, CorpusProblem> {
+    let mutation = operation.is_mutating().then(|| {
+        IdempotencyKey::new(
+            format!("carddemo-ims-{operation:?}-{sequence}"),
+            InvocationLimits::default(),
+        )
+        .map(|idempotency_key| Mutation {
+            sequence,
+            idempotency_key,
+            transaction: Some("CD-025".into()),
+        })
+        .map_err(|_| CorpusProblem::new("carddemo.ims.request", "mutation invalid"))
+    });
+    Ok(ImsRequest {
+        operation,
+        psb: psb.map(str::to_string),
+        pcb: 1,
+        segments: segments.iter().map(|value| (*value).into()).collect(),
+        data,
+        qualifiers,
+        checkpoint_id: checkpoint_id.map(str::to_string),
+        max_segments: 64,
+        mutation: mutation.transpose()?,
+    })
+}
+
+fn ims_invocation(
+    run: &str,
+    granted: bool,
+    generation: Option<(&str, &str)>,
+) -> Result<Invocation, CorpusProblem> {
+    let limits = InvocationLimits::default();
+    let grants = if granted {
+        ["host.ims.read", "host.ims.write"]
+            .into_iter()
+            .map(|capability| CapabilityId::new(capability, limits))
+            .collect::<Result<BTreeSet<_>, _>>()
+            .map_err(|_| CorpusProblem::new("carddemo.ims.invocation", "grant invalid"))?
+    } else {
+        BTreeSet::new()
+    };
+    let invocation = Invocation::new(
+        RequestId::new(format!("carddemo-ims-request-{run}"), limits)
+            .map_err(|_| CorpusProblem::new("carddemo.ims.invocation", "request invalid"))?,
+        ExecutionId::new(format!("carddemo-ims-execution-{run}"), limits)
+            .map_err(|_| CorpusProblem::new("carddemo.ims.invocation", "execution invalid"))?,
+        RunUnitId::new(run, limits)
+            .map_err(|_| CorpusProblem::new("carddemo.ims.invocation", "run invalid"))?,
+        None,
+        Selector::new("ims:carddemo", limits)
+            .map_err(|_| CorpusProblem::new("carddemo.ims.invocation", "selector invalid"))?,
+        ArtifactRef::new("ims:carddemo", limits)
+            .map_err(|_| CorpusProblem::new("carddemo.ims.invocation", "artifact invalid"))?,
+        Principal::new(
+            PrincipalId::new("IBMUSER", limits)
+                .map_err(|_| CorpusProblem::new("carddemo.ims.invocation", "principal invalid"))?,
+            grants,
+            limits,
+        )
+        .map_err(|_| CorpusProblem::new("carddemo.ims.invocation", "principal invalid"))?,
+        ServiceClass::Batch,
+        0,
+        100,
+        TraceId::new(format!("carddemo-ims-trace-{run}"), limits)
+            .map_err(|_| CorpusProblem::new("carddemo.ims.invocation", "trace invalid"))?,
+        IdempotencyKey::new(format!("carddemo-ims-invocation-{run}"), limits)
+            .map_err(|_| CorpusProblem::new("carddemo.ims.invocation", "key invalid"))?,
+        1,
+        ResourceLimits::default(),
+        BTreeMap::new(),
+        limits,
+    )
+    .map_err(|_| CorpusProblem::new("carddemo.ims.invocation", "invocation invalid"))?;
+    if let Some((capability, generation)) = generation {
+        invocation
+            .with_provider_generations(
+                BTreeMap::from([(
+                    CapabilityId::new(capability, limits).expect("static capability"),
+                    generation.into(),
+                )]),
+                limits,
+            )
+            .map_err(|_| CorpusProblem::new("carddemo.ims.invocation", "generation invalid"))
+    } else {
+        Ok(invocation)
+    }
+}
+
+fn ims_artifact_invocation(
+    run: &str,
+    artifact: &mainframe_env_compiler_api::PublishedArtifact,
+    granted: bool,
+    generation: Option<(&str, &str)>,
+) -> Result<Invocation, CorpusProblem> {
+    let mut invocation = ims_invocation(run, granted, generation)?;
+    invocation.artifact = ArtifactRef::new(
+        format!("sha256:{}", artifact.id().to_hex()),
+        InvocationLimits::default(),
+    )
+    .map_err(|_| CorpusProblem::new("carddemo.ims.invocation", "artifact invalid"))?;
+    Ok(invocation)
+}
+
+fn ims_hierarchy_digest(hierarchy: &[ImsLoadRoot]) -> String {
+    let mut digest = Sha256::new();
+    for root in hierarchy {
+        digest_field(&mut digest, &root.data);
+        for child in &root.children {
+            digest_field(&mut digest, child);
+        }
+    }
+    format!("{:x}", digest.finalize())
 }
 
 fn db2_control_invocation(run: &str) -> Result<Invocation, CorpusProblem> {

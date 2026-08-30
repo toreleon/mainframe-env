@@ -21,6 +21,7 @@ use mainframe_env_host_api::{
     RecordFormat, RegistrySnapshot, ResourceName, ScopedHostService, SecretRef, SecurityDecision,
     SessionId, TerminalRequest,
 };
+use mainframe_env_ims::{ImsService, ims_providers};
 use mainframe_env_interpreter::{
     CoordinatorLimits, ExecutionControl, ExecutionCoordinator, ReferenceMachine,
 };
@@ -122,6 +123,7 @@ pub struct ProductServer {
     cics: Arc<CicsService>,
     dataset: Arc<DatasetService>,
     db2: Arc<Db2Service>,
+    ims: Arc<ImsService>,
     batch: Arc<BatchService>,
     artifacts: LocalArtifactStore,
     host: Arc<ScopedHostService>,
@@ -153,22 +155,27 @@ impl ProductServer {
         let racf = RacfService::open(provider_store.clone(), secrets.clone(), Default::default())?;
         let dataset = DatasetService::open(provider_store.clone(), Default::default())?;
         let db2 = Db2Service::open(provider_store.clone(), Default::default())?;
+        let ims = ImsService::open(provider_store.clone(), Default::default())?;
+        let mut enterprise_providers = db2_providers(db2.clone(), InvocationLimits::default());
+        enterprise_providers.extend(ims_providers(ims.clone(), InvocationLimits::default()));
         let inner_program: Arc<dyn HostProvider> = program.clone();
         let inner = scoped_host(
             &racf,
             &dataset,
             inner_program,
-            db2_providers(db2.clone(), InvocationLimits::default()),
+            enterprise_providers,
             false,
             None,
         )?;
         let cics = CicsService::open(inner, provider_store.clone(), Default::default())?;
         let program_provider: Arc<dyn HostProvider> = program.clone();
+        let mut enterprise_providers = db2_providers(db2.clone(), InvocationLimits::default());
+        enterprise_providers.extend(ims_providers(ims.clone(), InvocationLimits::default()));
         let host = scoped_host(
             &racf,
             &dataset,
             program_provider,
-            db2_providers(db2.clone(), InvocationLimits::default()),
+            enterprise_providers,
             true,
             Some(cics_provider(cics.clone(), InvocationLimits::default())),
         )?;
@@ -295,6 +302,7 @@ impl ProductServer {
             cics,
             dataset,
             db2,
+            ims,
             batch,
             artifacts,
             host,
@@ -345,6 +353,11 @@ impl ProductServer {
     #[must_use]
     pub fn db2_service(&self) -> Arc<Db2Service> {
         self.db2.clone()
+    }
+
+    #[must_use]
+    pub fn ims_service(&self) -> Arc<ImsService> {
+        self.ims.clone()
     }
 
     #[must_use]
@@ -854,6 +867,8 @@ impl ProductServer {
             && self.host.capability_ready("host.cics.execute")
             && self.host.capability_ready("host.db2.read")
             && self.host.capability_ready("host.db2.write")
+            && self.host.capability_ready("host.ims.read")
+            && self.host.capability_ready("host.ims.write")
             && self.artifacts.is_ready()
     }
 
@@ -2023,6 +2038,8 @@ impl ProductServer {
                     "host.dataset.write",
                     "host.db2.read",
                     "host.db2.write",
+                    "host.ims.read",
+                    "host.ims.write",
                     "host.program.invoke",
                     "host.clock",
                 ],
@@ -2718,6 +2735,9 @@ fn job_capabilities(jcl: &[u8]) -> Vec<&'static str> {
     }
     if source.contains("EXEC SQL") || source.contains("PGM=IKJEFT01") {
         capabilities.extend(["host.db2.read", "host.db2.write"]);
+    }
+    if source.contains("EXEC DLI") || source.contains("PGM=DFSRRC00") {
+        capabilities.extend(["host.ims.read", "host.ims.write"]);
     }
     if source.contains("ASKTIME") || source.contains("FORMATTIME") {
         capabilities.push("host.clock");

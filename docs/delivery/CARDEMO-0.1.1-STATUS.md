@@ -1,17 +1,17 @@
 # CardDemo-full 0.1.1 Program Status
 
 Current phase: **CD.F — Db2, IMS, MQ, and cross-resource transactions**
-Current issue: **CD-024 — reached static Db2 workflows IN PROGRESS**
-Next issue: **CD-025 — reached VSAM/MQ date and account workflows**
+Current issue: **CD-025 — reached IMS HIDAM, PCB, and DLI workflows IN PROGRESS**
+Next issue: **CD-026 — reached MQ and cross-resource authorization workflows**
 Current product: **0.1.0-alpha.0**
 Target product: **0.1.1**
 CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Source identity
 
-- mainframe-env base commit: `60cd4ad57dad5d0dd65b7d5c957b8acc9b90ce32`
+- mainframe-env base commit: `3d1a55b1719e150042467e381fc5f8f609510dd6`
 - current deterministic dirty-tree identity:
-  `sha256:f77007a89706f9806d9cf4ae367eb337b0d245449126dfe88ffc30f2223559e8`
+  `sha256:b151a26a63175dfbb0bd5bb5912e92c594810378109e7a3244d873521e3bcf2f`
 - dirty-tree algorithm: SHA-256 of the sorted `sha256sum` records for every
   repository file except `.git/`, `target/`, and the two persistent CardDemo
   status ledgers (which carry the identity).
@@ -468,6 +468,31 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   ProductServer. Warm restart preserves all bytes and file states; abnormal
   allocation cleanup and public cancellation fail closed and remain durable.
 
+### CD-024 — reached static Db2 workflows
+
+- State: **PASS**
+- Required commit subject: `Implement CardDemo Db2 workflows`
+- Completion commit identity:
+  `3d1a55b1719e150042467e381fc5f8f609510dd6`.
+- Evidence: `conformance/0.1.1/evidence/issues/CD-024.json`
+- Evidence digest:
+  `sha256:f3462e5617f2b0a625058af59069bdbb8685d0b5ea4edc23baa95c51013f5b1d`
+- Three pinned Db2 COBOL closures compile with nine ordered SQL INCLUDE
+  expansions. Typed SQL lowering and the durable provider cover the reached
+  DDL, SELECT/COUNT, INSERT/UPDATE/DELETE, forward/backward cursor, SQLCA,
+  COMMIT, ROLLBACK, duplicate, referential, and conflict paths.
+- CD.J13 passes through the public administrator menu and CICS terminal route,
+  including authorization denial, exact list cursor behavior, and the full
+  CTTU lookup/create/insert, lookup/update/confirm, and
+  lookup/delete/confirm workflows. Cursor state resumes after restart.
+- CD.J14 passes through the public z/OSMF route. Zowe CLI 8.36.0 independently
+  observes CREADB21, MNTTRDB2, and TRANEXTR at OUTPUT `CC 0000`; MNTTRDB2
+  reports successful A98 add, U02 update, and D98 delete, while TRANEXTR
+  reports seven type and eighteen category rows of exactly 60 bytes.
+- Exact table, export-dataset, and job-spool digests remain stable across warm
+  restart. Rollback, duplicate `-803`, referential `-532`, concurrent `-911`,
+  authorization, and missing-environment controls fail closed.
+
 ## Commands and exit codes
 
 - `cargo test -p mainframe-env-conformance --locked` — **0**; 19 passed,
@@ -746,51 +771,49 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 - `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-base-batch --check` — **1**;
   expected missing-environment failure.
 
-## Current CD-024 verification
+## Current CD-025 verification
 
 - State: **PASS — completion commit pending**
-- Required commit subject: `Implement CardDemo Db2 workflows`
-- Evidence: `conformance/0.1.1/evidence/issues/CD-024.json`
+- Required commit subject: `Implement CardDemo IMS workflows`
+- Evidence: `conformance/0.1.1/evidence/issues/CD-025.json`
 - Evidence digest:
-  `sha256:f3462e5617f2b0a625058af59069bdbb8685d0b5ea4edc23baa95c51013f5b1d`
-- Three pinned Db2 COBOL closures compile with nine ordered SQL INCLUDE
-  expansions. Typed SQL lowering and the durable provider cover the reached
-  DDL, SELECT/COUNT, INSERT/UPDATE/DELETE, forward/backward cursor,
-  SQLCA, COMMIT, ROLLBACK, duplicate, referential, and conflict paths.
-- CD.J13 passes through the public administrator-menu and CICS terminal routes.
-  The regular principal is denied CTLI; the application performs its exact
-  CTTU lookup/create/insert, lookup/update/confirm, and
-  lookup/delete/confirm screens; list cursor state resumes after restart.
-- CD.J14 passes through the public z/OSMF job route. CREADB21, MNTTRDB2, and
-  TRANEXTR complete `CC 0000`; the final exact export contains seven type and
-  eighteen category records, each 60 bytes.
-- Zowe CLI 8.36.0 independently submitted those three pinned JCL files to the
-  ephemeral local ProductServer. MNTTRDB2 SYSPRINT reports successful A98 add,
-  U02 update, and D98 delete; TRANEXTR reports all five steps `RC=0000` and
-  DSNTIAUL `ROWS=7` plus `ROWS=18`.
-- Focused pre-repair compiler and execution regressions failed for SQL INCLUDE,
-  `SQLCODE = ZERO`, floating edited SQLCODE, explicit `THEN`, numeric SQL
-  receivers, zero-length reference modification, nested paragraph PERFORM at
-  an inline-loop tail, and inline `AT END` action text. Each now passes.
-- Affected contract/compiler/interpreter/JES/CICS/Db2/server/conformance/xtask
-  suites — **0**; 185 tests passed.
-- Affected-package Clippy with `-D warnings` and workspace all-target check —
-  **0**.
+  `sha256:9e66695c659f41ca04fff8bff2bad74bf7baf582a20c72191ef2c3bc17ad61e3`
+- All eight pinned IMS definition files are checked. DBPAUTP0/DBPAUTX0 and
+  PSBPAUTB/PSBPAUTL/PAUTBUNL install atomically as two DBDs, three PSBs, and
+  three PCBs with exact HIDAM hierarchy, secondary-index, segment, key, and
+  processing-option contracts.
+- Four pinned DLI programs compile with the exact reached SCHD, TERM, GU, GN,
+  GNP, ISRT, REPL, DLET, and CHKP surface. DLI now lowers to typed IMS requests
+  rather than the generic `MAINFRAME-DLI` program-call fallback.
+- The typed application route schedules PSBPAUTB, performs an SSA-qualified GU,
+  receives exact root bytes, and terminates. Provider controls cover ordered
+  root/child navigation, insert/replace/delete, checkpoint, load/unload,
+  hierarchy/index durability, replay, and warm restart.
+- Zowe CLI 8.36.0 submitted exact pinned LOADPADB and UNLDPADB to the ephemeral
+  local ProductServer. Both reached OUTPUT `CC 0000`; DFSRRC00 SYSPRINT reports
+  four loaded and four unloaded hierarchy segments.
+- Missing capability, generation mismatch, malformed segment length, root
+  limit, provider failure, and missing-environment controls fail closed without
+  changing the exact two-root/two-child hierarchy.
+- Affected contract/interpreter/IMS/JES/server/conformance/xtask suites — **0**;
+  140 tests passed. Affected-package Clippy with `-D warnings` and workspace
+  all-target check — **0**.
 - Architecture, runtime architecture, profile, schema, inventory, evidence,
   ordinary conformance, formatting, diff, JSON, and redaction gates — **0**.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-db2 --check`
-  — **0**; two online routes, three batch routes, 25 extracted records, and all
-  authorization, restart, rollback, conflict, and failure controls passed.
-- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-db2 --check` — **1**;
+- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-ims --check`
+  — **0**; eight definitions, four DLI programs, three selected routes, exact
+  hierarchy/index, load/unload, checkpoint/restart, and all negative controls
+  passed.
+- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-ims --check` — **1**;
   expected missing-environment failure.
 
 ## Implementation status
 
-- Issues passed: **23 / 27**
-- Journeys passed: **12 / 20**
+- Issues passed: **24 / 27**
+- Journeys passed: **14 / 20**
 - Installed CardDemo base-online resources: **18 programs, 17 transactions,
   17 maps**
-- Executed CardDemo application journeys: **12**
+- Executed CardDemo application journeys: **14**
 - Overall implementation: **IN PROGRESS**
 
 ## Open decisions and blockers
@@ -801,10 +824,10 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 2. The repository is still `0.1.0-alpha.0`. A 0.1.1 release cannot be cut until
    0.1.0 is finalized or an explicit version-line correction is accepted.
 
-Neither decision blocks CD-024. No CD-023 blocker remains.
+Neither decision blocks CD-025. No CD-024 blocker remains.
 
 ## Next smallest executable step
 
-Review the complete CD-024 diff, stage only the reached Db2 workflow
+Review the complete CD-025 diff, stage only the reached IMS workflow
 implementation and derived evidence, then create the required local completion
 commit.

@@ -26,22 +26,23 @@ pub use carddemo::{
     CardDemoCicsReceipt, CardDemoCicsRuntimeReceipt, CardDemoClosureReceipt,
     CardDemoControlReceipt, CardDemoCoreReceipt, CardDemoCorpusReceipt,
     CardDemoDatasetCatalogReceipt, CardDemoDb2Receipt, CardDemoFileCallReceipt,
-    CardDemoHostReceipt, CardDemoJclReceipt, CardDemoLayoutReceipt, CardDemoPackageReceipt,
-    CardDemoProgramReceipt, CardDemoResourceReceipt, CardDemoSecurityReceipt, CardDemoSeedReceipt,
-    CardDemoSourceReceipt, CardDemoTerminalReceipt, CardDemoUtilityReceipt, CardDemoVsamReceipt,
-    CorpusProblem, verify_carddemo_application_package_from_env,
-    verify_carddemo_base_batch_from_env, verify_carddemo_base_online_from_env,
-    verify_carddemo_batch_programs_from_env, verify_carddemo_cics_abi_from_env,
-    verify_carddemo_cics_runtime_from_env, verify_carddemo_control_flow_from_env,
-    verify_carddemo_core_semantics_from_env, verify_carddemo_corpus,
-    verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
+    CardDemoHostReceipt, CardDemoImsReceipt, CardDemoJclReceipt, CardDemoLayoutReceipt,
+    CardDemoPackageReceipt, CardDemoProgramReceipt, CardDemoResourceReceipt,
+    CardDemoSecurityReceipt, CardDemoSeedReceipt, CardDemoSourceReceipt, CardDemoTerminalReceipt,
+    CardDemoUtilityReceipt, CardDemoVsamReceipt, CorpusProblem,
+    verify_carddemo_application_package_from_env, verify_carddemo_base_batch_from_env,
+    verify_carddemo_base_online_from_env, verify_carddemo_batch_programs_from_env,
+    verify_carddemo_cics_abi_from_env, verify_carddemo_cics_runtime_from_env,
+    verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
+    verify_carddemo_corpus, verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
     verify_carddemo_dataset_catalog_from_env, verify_carddemo_db2_from_env,
     verify_carddemo_file_call_semantics_from_env, verify_carddemo_host_operands_from_env,
-    verify_carddemo_jcl_from_env, verify_carddemo_program_routing_from_env,
-    verify_carddemo_resources_from_env, verify_carddemo_security_from_env,
-    verify_carddemo_seeds_from_env, verify_carddemo_source_closures_from_env,
-    verify_carddemo_source_preprocessing_from_env, verify_carddemo_terminal_from_env,
-    verify_carddemo_utilities_from_env, verify_carddemo_vsam_from_env,
+    verify_carddemo_ims_from_env, verify_carddemo_jcl_from_env,
+    verify_carddemo_program_routing_from_env, verify_carddemo_resources_from_env,
+    verify_carddemo_security_from_env, verify_carddemo_seeds_from_env,
+    verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
+    verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
+    verify_carddemo_vsam_from_env,
 };
 
 pub const HELLO_SOURCE: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. HELLO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MSG PIC X(12) VALUE 'HELLO WORLD!'.\nPROCEDURE DIVISION.\nDISPLAY MSG.\nSTOP RUN.\n";
@@ -962,9 +963,9 @@ mod tests {
 
     #[test]
     fn dli_pcb_and_ssa_are_typed_read_write_operands() {
-        use mainframe_env_host_api::{HostRequest, ProgramRequest};
+        use mainframe_env_host_api::{HostRequest, ImsOperation};
 
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DLIABI. DATA DIVISION. WORKING-STORAGE SECTION. 01 PCB-X PIC X(4) VALUE 'PCB1'. 01 SSA-X PIC X(4) VALUE 'SSA1'. PROCEDURE DIVISION. EXEC DLI GU USING PCB-X SSA-X END-EXEC. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DLIABI. DATA DIVISION. WORKING-STORAGE SECTION. 01 PCB-N PIC S9(4) COMP VALUE 1. 01 ROOT-X PIC X(100). 01 ACCT-X PIC X(6) VALUE '000123'. PROCEDURE DIVISION. EXEC DLI GU USING PCB(PCB-N) SEGMENT(PAUTSUM0) INTO(ROOT-X) WHERE(ACCNTID = ACCT-X) END-EXEC. STOP RUN.";
         let artifact = compile(source).unwrap();
         let mut machine = ReferenceMachine::from_binary(
             artifact.payload(),
@@ -977,13 +978,14 @@ mod tests {
         else {
             panic!("DLI operation did not call host");
         };
-        let HostRequest::Program(ProgramRequest::Call { program, payload }) = effect.request else {
-            panic!("unexpected DLI request");
+        let HostRequest::Ims(request) = effect.request else {
+            panic!("DLI did not lower to the typed IMS request");
         };
-        assert_eq!(program.as_str(), "MAINFRAME-DLI");
-        assert_eq!(payload.schema(), "mainframe-env.embedded-host@1");
-        assert!(payload.bytes().windows(4).any(|window| window == b"PCB1"));
-        assert!(payload.bytes().windows(4).any(|window| window == b"SSA1"));
+        assert_eq!(request.operation, ImsOperation::GetUnique);
+        assert_eq!(request.pcb, 1);
+        assert_eq!(request.segments, ["PAUTSUM0"]);
+        assert_eq!(request.qualifiers[0].field, "ACCNTID");
+        assert_eq!(request.qualifiers[0].value, b"000123");
     }
 
     #[test]

@@ -16,6 +16,7 @@ members = [
     "crates/providers/mainframe-env-racf",
     "crates/providers/mainframe-env-cics",
     "crates/providers/mainframe-env-db2",
+    "crates/providers/mainframe-env-ims",
     "crates/apps/mainframe-env-batch",
     "crates/gateways/mainframe-env-zosmf",
     "crates/apps/mainframe-env-server",
@@ -69,6 +70,7 @@ mainframe-env-dataset = { path = "crates/providers/mainframe-env-dataset" }
 mainframe-env-racf = { path = "crates/providers/mainframe-env-racf" }
 mainframe-env-cics = { path = "crates/providers/mainframe-env-cics" }
 mainframe-env-db2 = { path = "crates/providers/mainframe-env-db2" }
+mainframe-env-ims = { path = "crates/providers/mainframe-env-ims" }
 mainframe-env-batch = { path = "crates/apps/mainframe-env-batch" }
 mainframe-env-zosmf = { path = "crates/gateways/mainframe-env-zosmf" }
 mainframe-env-server = { path = "crates/apps/mainframe-env-server" }

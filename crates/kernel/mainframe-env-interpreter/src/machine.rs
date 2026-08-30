@@ -10,8 +10,8 @@ use mainframe_env_execution_api::{
 use mainframe_env_host_api::{
     CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, DatasetName,
     DatasetRequest, Db2HostVariable, Db2Operation, Db2Request, EffectRequest, EffectResult,
-    HostLimits, HostProblem, HostRequest, HostResult, Mutation, ProgramName, ProgramRequest,
-    TerminalRequest,
+    HostLimits, HostProblem, HostRequest, HostResult, ImsOperation, ImsQualifier, ImsRequest,
+    Mutation, ProgramName, ProgramRequest, TerminalRequest,
 };
 use mainframe_env_ir::{
     Attribute, CodecLimits, Module, Operation, OperationIdentity, StorageId, decode_binary,
@@ -111,6 +111,9 @@ enum PendingKind {
     },
     Db2 {
         targets: Vec<String>,
+    },
+    Ims {
+        target: Option<String>,
     },
     Cics {
         operation: CicsOperation,
@@ -249,6 +252,7 @@ impl ReferenceMachine {
                 }),
             ),
             ("SQLSTATE".into(), CobolValue::Bytes(b"00000".to_vec())),
+            ("DIBSTAT".into(), CobolValue::Bytes(b"  ".to_vec())),
         ]);
         if let Some(commarea) = invocation.bindings.get("cics.commarea")
             && let Some(storage) = module
@@ -712,6 +716,12 @@ impl ReferenceMachine {
                     }
                 }
             }
+            (PendingKind::Ims { target }, HostResult::Ims(result)) => {
+                self.write("DIBSTAT", result.status.as_bytes())?;
+                if let Some((target, segment)) = target.zip(result.segments.first()) {
+                    self.write(&target, &segment.data)?;
+                }
+            }
             (
                 PendingKind::Cics {
                     operation,
@@ -854,6 +864,7 @@ impl ReferenceMachine {
                 | PendingKind::DatasetStatus { .. }
                 | PendingKind::ProgramCall { .. }
                 | PendingKind::Db2 { .. }
+                | PendingKind::Ims { .. }
                 | PendingKind::Cics { .. }
                 | PendingKind::Ignore,
                 _,
@@ -962,7 +973,7 @@ impl ReferenceMachine {
             }
             "exec_cics" => return self.cics_effect(&args),
             "exec_sql" => return self.sql_effect(&args),
-            "exec_dli" => return self.embedded_effect("DLI", &args),
+            "exec_dli" => return self.ims_effect(&args),
             "stop_run" | "go_back" | "halt" => return Ok(Step::Complete),
             _ => return Err(MachineProblem::InvalidOperation),
         }
@@ -1710,48 +1721,115 @@ impl ReferenceMachine {
         Ok(())
     }
 
-    fn embedded_effect(&mut self, family: &str, args: &[String]) -> Result<Step, MachineProblem> {
+    fn ims_effect(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
         let opcode = args
             .iter()
-            .find(|token| !matches!(token.as_str(), "SQL" | "DLI" | "END-EXEC"))
+            .find(|token| !matches!(token.as_str(), "DLI" | "END-EXEC"))
             .ok_or(MachineProblem::InvalidOperation)?
             .to_ascii_uppercase();
-        let mut operands = Vec::<(String, String, Vec<u8>)>::new();
-        let mut targets = Vec::new();
-        let into = position(args, "INTO");
-        let from = position(args, "FROM");
-        for (index, token) in args.iter().enumerate() {
-            if family == "SQL" && token.starts_with(':') {
-                for name in token.trim_start_matches(':').split(':') {
-                    let name = normalize(name);
-                    let write = matches!(opcode.as_str(), "SELECT" | "FETCH")
-                        && into.is_some_and(|into| index > into)
-                        && from.is_none_or(|from| index < from);
-                    let value = if write { Vec::new() } else { self.read(&name)? };
-                    operands.push((
-                        name.clone(),
-                        if write { "write" } else { "read" }.into(),
-                        value,
-                    ));
-                    if write {
-                        targets.push(name);
-                    }
+        let operation = match opcode.as_str() {
+            "SCHD" => ImsOperation::Schedule,
+            "TERM" => ImsOperation::Terminate,
+            "GU" => ImsOperation::GetUnique,
+            "GN" => ImsOperation::GetNext,
+            "GNP" => ImsOperation::GetNextParent,
+            "ISRT" => ImsOperation::Insert,
+            "REPL" => ImsOperation::Replace,
+            "DLET" => ImsOperation::Delete,
+            "CHKP" => ImsOperation::Checkpoint,
+            _ => return Err(MachineProblem::UnsupportedForm),
+        };
+        let groups = ims_option_groups(args)?;
+        let segments = groups
+            .iter()
+            .filter(|(name, _)| name == "SEGMENT")
+            .filter_map(|(_, values)| values.first())
+            .map(|name| normalize(name))
+            .collect::<Vec<_>>();
+        let operand_name = |keyword: &str| {
+            groups
+                .iter()
+                .find(|(name, _)| name == keyword)
+                .and_then(|(_, values)| {
+                    values
+                        .iter()
+                        .find(|value| self.layout(value).is_some())
+                        .or_else(|| values.first())
+                })
+                .map(|name| normalize(name))
+        };
+        let target = operand_name("INTO");
+        let data = operand_name("FROM")
+            .map(|name| self.read(&name))
+            .transpose()?
+            .unwrap_or_default();
+        let psb = operand_name("PSB")
+            .map(|name| {
+                if self.layout(&name).is_some() {
+                    self.read(&name)
+                        .map(|value| String::from_utf8_lossy(&value).trim().to_ascii_uppercase())
+                } else {
+                    Ok(name)
                 }
-            } else if family == "DLI"
-                && index > position(args, "USING").unwrap_or(args.len())
-                && self.layout(token).is_some()
-            {
-                let name = normalize(token);
-                operands.push((name.clone(), "read_write".into(), self.read(&name)?));
-                targets.push(name);
+            })
+            .transpose()?;
+        let pcb = operand_name("PCB")
+            .and_then(|name| self.decimal(&name).ok())
+            .and_then(|value| u16::try_from(value.coefficient).ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(1);
+        let mut qualifiers = Vec::new();
+        for (_, values) in groups.iter().filter(|(name, _)| name == "WHERE") {
+            let Some(equal) = values.iter().position(|token| token == "=") else {
+                return Err(MachineProblem::UnsupportedForm);
+            };
+            let field = values
+                .get(equal.saturating_sub(1))
+                .ok_or(MachineProblem::InvalidOperation)?;
+            let value_name = values
+                .get(equal + 1)
+                .ok_or(MachineProblem::InvalidOperation)?;
+            qualifiers.push(ImsQualifier {
+                segment: segments.last().cloned().unwrap_or_else(|| "ROOT".into()),
+                field: normalize(field),
+                value: self.resolve(value_name)?,
+            });
+        }
+        if qualifiers.is_empty()
+            && let Some(using) = position(args, "USING")
+        {
+            for token in args.iter().skip(using + 2) {
+                if self.layout(token).is_some() {
+                    qualifiers.push(ImsQualifier {
+                        segment: segments.last().cloned().unwrap_or_else(|| "ROOT".into()),
+                        field: normalize(token),
+                        value: self.read(token)?,
+                    });
+                }
             }
         }
-        let payload = encode_embedded_operands(family, &opcode, &operands)?;
-        let program = ProgramName::new(format!("MAINFRAME-{family}"), 128)
-            .map_err(|_| MachineProblem::InvalidOperation)?;
+        let checkpoint_id = operand_name("ID")
+            .map(|name| self.resolve(&name))
+            .transpose()?
+            .map(|value| String::from_utf8_lossy(&value).trim().to_string())
+            .filter(|value| !value.is_empty());
+        let mutation = operation
+            .is_mutating()
+            .then(|| self.mutation())
+            .transpose()?;
         self.effect(
-            HostRequest::Program(ProgramRequest::Call { program, payload }),
-            PendingKind::ProgramCall { targets },
+            HostRequest::Ims(ImsRequest {
+                operation,
+                psb,
+                pcb,
+                segments,
+                data,
+                qualifiers,
+                checkpoint_id,
+                max_segments: 1,
+                mutation,
+            }),
+            PendingKind::Ims { target },
         )
     }
 
@@ -5147,30 +5225,22 @@ pub fn encode_cobol_call_result(values: &[Vec<u8>]) -> Result<BoundedPayload, Ma
     .map_err(|_| MachineProblem::ResourceExhausted)
 }
 
-fn encode_embedded_operands(
-    family: &str,
-    opcode: &str,
-    operands: &[(String, String, Vec<u8>)],
-) -> Result<BoundedPayload, MachineProblem> {
-    let mut bytes = b"MEHOST01".to_vec();
-    push_host_field(&mut bytes, family.as_bytes())?;
-    push_host_field(&mut bytes, opcode.as_bytes())?;
-    bytes.extend_from_slice(
-        &u32::try_from(operands.len())
-            .map_err(|_| MachineProblem::ResourceExhausted)?
-            .to_be_bytes(),
-    );
-    for (name, mode, value) in operands {
-        push_host_field(&mut bytes, name.as_bytes())?;
-        push_host_field(&mut bytes, mode.as_bytes())?;
-        push_host_field(&mut bytes, value)?;
+fn ims_option_groups(args: &[String]) -> Result<Vec<(String, Vec<String>)>, MachineProblem> {
+    let mut groups = Vec::new();
+    for (index, token) in args.iter().enumerate().filter(|(_, token)| {
+        matches!(
+            token.as_str(),
+            "PCB" | "SEGMENT" | "INTO" | "FROM" | "WHERE" | "PSB" | "ID" | "SEGLENGTH"
+        )
+    }) {
+        let open = index + 1;
+        if args.get(open).is_none_or(|token| token != "(") {
+            continue;
+        }
+        let close = matching_close(args, open).ok_or(MachineProblem::InvalidOperation)?;
+        groups.push((token.clone(), args[open + 1..close].to_vec()));
     }
-    BoundedPayload::new(
-        "mainframe-env.embedded-host@1",
-        bytes,
-        InvocationLimits::default(),
-    )
-    .map_err(|_| MachineProblem::ResourceExhausted)
+    Ok(groups)
 }
 
 fn push_host_field(output: &mut Vec<u8>, value: &[u8]) -> Result<(), MachineProblem> {

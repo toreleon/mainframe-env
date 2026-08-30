@@ -1047,6 +1047,7 @@ dependencies = [
  "mainframe-env-encoding",
  "mainframe-env-execution-api",
  "mainframe-env-host-api",
+ "mainframe-env-ims",
  "mainframe-env-interpreter",
  "mainframe-env-ir",
  "mainframe-env-racf",
@@ -1114,6 +1115,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "mainframe-env-ims"
+version = "0.1.0-alpha.0"
+dependencies = [
+ "mainframe-env-execution-api",
+ "mainframe-env-host-api",
+ "mainframe-env-store",
+ "mainframe-env-store-api",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "mainframe-env-interpreter"
 version = "0.1.0-alpha.0"
 dependencies = [
@@ -1164,6 +1178,7 @@ dependencies = [
  "mainframe-env-encoding",
  "mainframe-env-execution-api",
  "mainframe-env-host-api",
+ "mainframe-env-ims",
  "mainframe-env-interpreter",
  "mainframe-env-ir",
  "mainframe-env-racf",
