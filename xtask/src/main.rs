@@ -9,13 +9,14 @@ use mainframe_env_conformance::{
     verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
     verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
     verify_carddemo_dataset_catalog_from_env, verify_carddemo_db2_from_env,
-    verify_carddemo_file_call_semantics_from_env, verify_carddemo_host_operands_from_env,
-    verify_carddemo_ims_from_env, verify_carddemo_jcl_from_env,
-    verify_carddemo_mq_authorization_from_env, verify_carddemo_program_routing_from_env,
-    verify_carddemo_resources_from_env, verify_carddemo_security_from_env,
-    verify_carddemo_seeds_from_env, verify_carddemo_source_closures_from_env,
-    verify_carddemo_source_preprocessing_from_env, verify_carddemo_terminal_from_env,
-    verify_carddemo_utilities_from_env, verify_carddemo_vsam_from_env,
+    verify_carddemo_file_call_semantics_from_env, verify_carddemo_full_from_env,
+    verify_carddemo_host_operands_from_env, verify_carddemo_ims_from_env,
+    verify_carddemo_jcl_from_env, verify_carddemo_mq_authorization_from_env,
+    verify_carddemo_program_routing_from_env, verify_carddemo_resources_from_env,
+    verify_carddemo_security_from_env, verify_carddemo_seeds_from_env,
+    verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
+    verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
+    verify_carddemo_vsam_from_env,
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -88,12 +89,17 @@ fn run() -> TaskResult {
         "carddemo-db2" => check_carddemo_db2(&root),
         "carddemo-ims" => check_carddemo_ims(&root),
         "carddemo-mq-authorization" => check_carddemo_mq_authorization(&root),
+        "carddemo-operator-install" => check_carddemo_operator_install(&root),
+        "carddemo-operator-compile" => check_carddemo_operator_compile(&root),
+        "carddemo-operator-submit" => check_carddemo_operator_submit(&root),
+        "carddemo-operator-reset" => check_carddemo_operator_reset(&root),
+        "carddemo-full" => check_carddemo_full(&root),
         "digest" => print_digest(&root),
         "release" if check => check_release_artifacts(&root),
         "release" => generate_release_artifacts(&root),
         "help" | "--help" | "-h" => {
             println!(
-                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|digest|release> --check"
+                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check"
             );
             Ok(())
         }
@@ -602,6 +608,146 @@ fn check_carddemo_mq_authorization(root: &Path) -> TaskResult {
     require(
         evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
         "CD-026 evidence digest differs",
+    )?;
+    Ok(())
+}
+
+fn check_carddemo_operator_install(root: &Path) -> TaskResult {
+    let inventory = root.join("conformance/0.1.1/inventory/carddemo-corpus.json");
+    let package = verify_carddemo_application_package_from_env(&inventory)
+        .map_err(|problem| problem.to_string())?;
+    let resources =
+        verify_carddemo_resources_from_env(&inventory).map_err(|problem| problem.to_string())?;
+    let catalog = verify_carddemo_dataset_catalog_from_env(&inventory)
+        .map_err(|problem| problem.to_string())?;
+    let seeds =
+        verify_carddemo_seeds_from_env(&inventory).map_err(|problem| problem.to_string())?;
+    require(
+        package.status == "pass"
+            && resources.status == "pass"
+            && catalog.status == "pass"
+            && seeds.status == "pass",
+        "CardDemo operator install did not derive ready state",
+    )?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&json!({
+            "schema_version":"mainframe-env.carddemo-operator-install@1",
+            "status":"pass",
+            "package_identity":package.package_identity,
+            "resources":resources.cross_references,
+            "datasets":catalog.runtime_definitions,
+            "seed_objects":seeds.seed_objects
+        }))
+        .map_err(|error| error.to_string())?
+    );
+    Ok(())
+}
+
+fn check_carddemo_operator_compile(root: &Path) -> TaskResult {
+    let inventory = root.join("conformance/0.1.1/inventory/carddemo-corpus.json");
+    let closure = verify_carddemo_source_closures_from_env(&inventory)
+        .map_err(|problem| problem.to_string())?;
+    let batch = verify_carddemo_batch_programs_from_env(&inventory)
+        .map_err(|problem| problem.to_string())?;
+    require(
+        closure.status == "pass" && batch.status == "pass",
+        "CardDemo operator compile did not publish its complete closure",
+    )?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&json!({
+            "schema_version":"mainframe-env.carddemo-operator-compile@1",
+            "status":"pass",
+            "programs":closure.programs_checked,
+            "batch_artifacts":batch.compiled_artifacts
+        }))
+        .map_err(|error| error.to_string())?
+    );
+    Ok(())
+}
+
+fn check_carddemo_operator_submit(root: &Path) -> TaskResult {
+    let receipt = verify_carddemo_base_batch_from_env(
+        &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
+    )
+    .map_err(|problem| problem.to_string())?;
+    require(
+        receipt.status == "pass" && receipt.journeys_passed == 3,
+        "CardDemo operator submit did not complete the declared job set",
+    )?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&json!({
+            "schema_version":"mainframe-env.carddemo-operator-submit@1",
+            "status":"pass",
+            "initialization_jobs":receipt.initialization_jobs,
+            "operational_jobs":receipt.operational_jobs,
+            "spool_digests":receipt.spool_sha256.len()
+        }))
+        .map_err(|error| error.to_string())?
+    );
+    Ok(())
+}
+
+fn check_carddemo_operator_reset(root: &Path) -> TaskResult {
+    let receipt = verify_carddemo_utilities_from_env(
+        &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
+    )
+    .map_err(|problem| problem.to_string())?;
+    require(
+        receipt.status == "pass" && receipt.selected_job_routes > 0,
+        "CardDemo operator reset did not execute public utility routes",
+    )?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&json!({
+            "schema_version":"mainframe-env.carddemo-operator-reset@1",
+            "status":"pass",
+            "public_routes":receipt.selected_job_routes,
+            "exact_mutations":receipt.exact_dataset_mutations
+        }))
+        .map_err(|error| error.to_string())?
+    );
+    Ok(())
+}
+
+fn check_carddemo_full(root: &Path) -> TaskResult {
+    let receipt = verify_carddemo_full_from_env(
+        &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
+    )
+    .map_err(|problem| problem.to_string())?;
+    let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
+    let receipt_digest = format!(
+        "sha256:{:x}",
+        Sha256::digest(serde_json::to_vec(&receipt_value).map_err(|error| error.to_string())?)
+    );
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
+    );
+    let evidence = json(&root.join("conformance/0.1.1/evidence/issues/CD-027.json"))?;
+    require(
+        receipt.status == "pass"
+            && receipt.issues_input_passed == 26
+            && receipt.journeys_passed == 20
+            && receipt.owned_commands.len() == 4
+            && receipt.mixed_requests_completed == receipt.mixed_requests_offered
+            && receipt.cdv1_disposition == "accepted-owned-source"
+            && receipt.cdv1_public_routes == 2
+            && !receipt.native_or_legacy_fallback_present
+            && evidence["issue"] == Value::String("CD-027".into())
+            && evidence["derived"] == Value::Bool(true)
+            && evidence["status"] == Value::String("pass".into()),
+        "CD-027 evidence is not a complete derived pass",
+    )?;
+    require(
+        evidence["full_receipt"] == receipt_value,
+        "CD-027 full receipt is stale",
+    )?;
+    require(
+        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
+        "CD-027 evidence digest differs",
     )?;
     Ok(())
 }

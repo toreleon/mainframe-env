@@ -1,0 +1,173 @@
+{
+  "schema_version": "mainframe-env.carddemo-issue-evidence@1",
+  "issue": "CD-027",
+  "title": "Complete operator compatibility and derived CardDemo-full certification",
+  "derived": true,
+  "status": "pass",
+  "target_product": "0.1.1",
+  "current_product": "0.1.0-alpha.0",
+  "digest_scope": "Recursively lexicographically key-sorted compact UTF-8 JSON serialization of full_receipt, with no trailing newline, followed by SHA-256",
+  "evidence_digest": "sha256:b1226f8e8905e326f094afd482d9b0fcf659bb8d48bd08085fd72b9ef10ff822",
+  "full_receipt": {
+    "schema_version": "mainframe-env.carddemo-full-receipt@1",
+    "status": "pass",
+    "corpus_commit": "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e",
+    "issues_input_passed": 26,
+    "journeys_passed": 20,
+    "profile_receipt_sha256": {
+      "application-package": "aebf2c87b6891e6018ee13652cfcc30609d5a2635634730338d52aba8c48c317",
+      "application-resources": "70d222dc4fe91e8d17e0a8227ec4e59f164e3360da16a0e6d13b3728f7c3a76a",
+      "carddemo-authorization": "16d7ae99a994386982d86314c4bfcf62167d636471cf6482f302cb19e01a28f8",
+      "carddemo-base": "6a1645a1771693029363857af993ccc1b64cbb94d53ff86934b2776040fc1398",
+      "carddemo-base-online": "fd5fd4437439071e27a2d74f30a26a145f842e292e0d4ecd14a4511340a29755",
+      "carddemo-db2": "f3462e5617f2b0a625058af59069bdbb8685d0b5ea4edc23baa95c51013f5b1d",
+      "carddemo-ims": "9e66695c659f41ca04fff8bff2bad74bf7baf582a20c72191ef2c3bc17ad61e3"
+    },
+    "operator_scripts_checked": 9,
+    "operator_jcl_submissions": 41,
+    "owned_commands": [
+      "cargo xtask carddemo-operator-install --check",
+      "cargo xtask carddemo-operator-compile --check",
+      "cargo xtask carddemo-operator-submit --check",
+      "cargo xtask carddemo-operator-reset --check"
+    ],
+    "ftp_jes_mappings": 2,
+    "public_operator_routes": 4,
+    "mixed_requests_offered": 16,
+    "mixed_requests_completed": 16,
+    "sqlite_backup_restore_controls": 1,
+    "postgres_restart_controls": 1,
+    "provider_failure_controls": 4,
+    "unknown_outcome_controls": 2,
+    "cancellation_controls": 1,
+    "cross_principal_controls": 2,
+    "cdv1_disposition": "accepted-owned-source",
+    "cdv1_correction_sha256": "3dd5edcd9efa2944eef032edbb5c18821431b8da6f57e122b5f8019179f6c181",
+    "cdv1_source_sha256": "426fa98b0ec89b65dd3269d79082db436ecb97a4152bbb2219478c6e1b109981",
+    "cdv1_artifact_sha256": "6625124e142d5ffd2967a2e544a9114b94cba52230b07ef0876ae17578a5c33a",
+    "cdv1_screen_sha256": "73a9d331c03a0c53be8d0932cbe84221f1f1aa3bd5e6f5bbc8ae8b1de39f31d8",
+    "cdv1_public_routes": 2,
+    "release_disposition": "implementation-complete; release-blocked-until-0.1.0-final-or-version-line-correction",
+    "native_or_legacy_fallback_present": false,
+    "operator_mapping_sha256": "a51ffb440df71530fe3e4803ae50926cf79aef9af86fd0ace08e0eedbf127844",
+    "full_shape_sha256": "daaf118f78e0e43a7652a9db092879b6275253511422922db6736be57e29fcd2"
+  },
+  "acceptance_observations": [
+    "The owned install, compile, submit, and reset commands derive exact package, resource, artifact, initialization, operational-job, and reset receipts from the clean pinned corpus. Nine operator scripts containing 41 JCL submissions map to four authenticated public routes; FTP JES submission maps to z/OSMF Jobs and the selected FTP dataset transfer maps to z/OSMF dataset content.",
+    "CD.J19 was independently replayed with Zowe CLI 8.36.0 against an ephemeral ProductServer. A pre-install exact ESDSRRDS submission failed at the missing AWS.M2.CARDDEMO.** RACF profile, while a continued DISP=(MOD,DELETE,DELETE) control on an authorized IBMUSER data set completed CC 0000. After installing the application profile, exact ESDSRRDS reached OUTPUT CC 0000 with PREDEL and STEP01 through STEP05 all RC 0000; Zowe downloaded byte-identical ESDS and RRDS results with SHA-256 291f6a244d703a9029ff5766dd1707216da3fb71769350fecc219480f1686076.",
+    "CD.J20 offers sixteen mixed public information and job requests to a server bounded at eight concurrent requests and completes all sixteen. Authentication denial, cross-principal job isolation, provider failures, unknown outcomes, cancellation, and 2x overload controls fail closed or reconcile exactly.",
+    "SQLite integrity, online backup, restored-server byte equality, and PostgreSQL 18 durable restart all pass through ProductServer compositions. The full receipt is derived by rerunning every lower application profile rather than reading status JSON.",
+    "The owner-approved CARDEMO-ORPHAN-CDV1 correction supplies hash-pinned owned COCRDSEC demo source because the pinned corpus and runtime oracles contain no original implementation. The source compiles to a content-addressed artifact; anonymous CDV1 launch is denied, authenticated launch displays the explicit unavailable-contract message, and the route does not read or mutate card data.",
+    "The repository remains 0.1.0-alpha.0. Implementation is complete, but release remains blocked until 0.1.0 is final or the version line is corrected; no version bump, tag, push, publish, or deploy is authorized or performed."
+  ],
+  "commands": [
+    {
+      "command": "cargo test -p mainframe-env-conformance accepted_cdv1_correction_compiles_and_runs_public_route --locked -- --nocapture",
+      "exit_code": 0,
+      "result": "accepted COCRDSEC source compiled and passed anonymous-denial plus authenticated public CDV1 route controls"
+    },
+    {
+      "command": "Zowe CLI 8.36.0 zosmf check status --<ephemeral-local-zosmf-connection>",
+      "exit_code": 0,
+      "result": "Zowe connected to the live mainframe-env z/OSMF compatibility server and observed datasets, jobs, security, and console capabilities"
+    },
+    {
+      "command": "Zowe CLI 8.36.0 zos-jobs submit local-file <redacted-local-checkout>/app/jcl/ESDSRRDS.jcl before application authority install",
+      "exit_code": 0,
+      "result": "transport succeeded and the job failed closed at PREDEL NotFound, isolating the missing AWS.M2.CARDDEMO.** application RACF profile"
+    },
+    {
+      "command": "Zowe CLI 8.36.0 continued DISP=(MOD,DELETE,DELETE) focused job --<ephemeral-local-zosmf-connection>",
+      "exit_code": 0,
+      "result": "JOB00002 reached OUTPUT CC 0000, proving MOD allocation was correct and the prior failure was authorization rather than DD semantics"
+    },
+    {
+      "command": "Zowe CLI 8.36.0 zos-jobs submit local-file <redacted-local-checkout>/app/jcl/ESDSRRDS.jcl after application authority install",
+      "exit_code": 0,
+      "result": "JOB00001 reached OUTPUT CC 0000; PREDEL and STEP01 through STEP05 all returned RC 0000"
+    },
+    {
+      "command": "Zowe CLI 8.36.0 zos-files download data-set for the selected ESDS and RRDS results",
+      "exit_code": 0,
+      "result": "both downloads succeeded and had identical SHA-256 291f6a244d703a9029ff5766dd1707216da3fb71769350fecc219480f1686076"
+    },
+    {
+      "command": "cargo xtask carddemo-operator-install --check && cargo xtask carddemo-operator-compile --check && cargo xtask carddemo-operator-submit --check && cargo xtask carddemo-operator-reset --check",
+      "exit_code": 0,
+      "result": "all four owned operator commands passed"
+    },
+    {
+      "command": "CARDEMO_CORPUS_DIR=<redacted-local-checkout> MAINFRAME_ENV_POSTGRES_TEST_URL=<redacted-disposable-postgres-18> cargo xtask carddemo-full --check before CD-027 evidence",
+      "exit_code": 1,
+      "result": "all 20 journeys and full controls derived a pass receipt; only the required CD-027 evidence file was absent"
+    },
+    {
+      "command": "cargo test -p mainframe-env-conformance -p xtask --locked",
+      "exit_code": 0,
+      "result": "focused conformance and owned-command gate suites passed; the explicit PostgreSQL-dependent control was also run against disposable PostgreSQL 18"
+    },
+    {
+      "command": "cargo clippy -p mainframe-env-conformance -p xtask --all-targets --locked -- -D warnings",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "CARDEMO_CORPUS_DIR=<redacted-local-checkout> MAINFRAME_ENV_POSTGRES_TEST_URL=<redacted-disposable-postgres-18> cargo xtask carddemo-full --check",
+      "exit_code": 0,
+      "result": "evidence-backed receipt reproduced exactly and all 20 journeys passed"
+    },
+    {
+      "command": "env -u CARDEMO_CORPUS_DIR -u MAINFRAME_ENV_POSTGRES_TEST_URL cargo xtask carddemo-full --check",
+      "exit_code": 1,
+      "result": "expected carddemo.corpus.environment_missing control"
+    },
+    {
+      "command": "cargo test --workspace --all-features --locked --no-fail-fast",
+      "exit_code": 0,
+      "result": "260 workspace tests passed; both PostgreSQL-dependent controls and the manual Zowe live harness were run explicitly"
+    },
+    {
+      "command": "MAINFRAME_ENV_POSTGRES_TEST_URL=<redacted-disposable-postgres-18> cargo test -p mainframe-env-conformance carddemo_full_memory_sqlite_and_postgres_controls --locked -- --ignored --nocapture",
+      "exit_code": 0,
+      "result": "memory overload, SQLite backup/restore, PostgreSQL restart, and cross-principal controls passed"
+    },
+    {
+      "command": "MAINFRAME_ENV_POSTGRES_TEST_URL=<redacted-disposable-postgres-18> cargo test -p mainframe-env-store postgres18_migration_and_durable_contracts --all-features --locked -- --ignored --nocapture",
+      "exit_code": 0,
+      "result": "PostgreSQL 18 migration, restart, idempotency, event, outbox, artifact, and cancellation contracts passed"
+    },
+    {
+      "command": "cargo fmt --all -- --check && git diff --check && cargo check --workspace --all-targets --locked",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "RUSTDOCFLAGS=-D warnings cargo doc --workspace --all-features --no-deps --locked",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "cargo xtask architecture --check && cargo xtask runtime-architecture --check && cargo xtask profiles --check && cargo xtask schemas --check && cargo xtask inventory --check && cargo xtask evidence --check && env -u CARDEMO_CORPUS_DIR cargo xtask conformance --check",
+      "exit_code": 0,
+      "result": "architecture, runtime architecture, profile, schema, inventory, evidence, and ordinary conformance gates passed"
+    },
+    {
+      "command": "cargo deny check",
+      "exit_code": 0,
+      "result": "advisories, bans, licenses, and sources passed"
+    },
+    {
+      "command": "cargo xtask release --check",
+      "exit_code": 1,
+      "result": "expected release-order stop: the current local binaries differ from the frozen 0.1.0-alpha.0 checksums; release artifacts were not regenerated"
+    }
+  ],
+  "absolute_local_paths_present": false,
+  "native_or_legacy_fallback_present": false,
+  "release_actions_performed": false
+}

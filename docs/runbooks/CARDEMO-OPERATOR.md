@@ -1,0 +1,53 @@
+# CardDemo operator compatibility
+
+These commands operate only on the clean corpus selected by
+`CARDEMO_CORPUS_DIR`. The full certification command also requires a disposable
+PostgreSQL 18 database in `MAINFRAME_ENV_POSTGRES_TEST_URL`. The accepted
+`CDV1` correction is pinned in the 0.1.1 conformance contract.
+
+## Owned commands
+
+| Intent | Command | Effect |
+|---|---|---|
+| install | `cargo xtask carddemo-operator-install --check` | validates and installs the content-addressed package, CICS resources, catalog, and exact seed generation through the owned application/provider authorities |
+| compile | `cargo xtask carddemo-operator-compile --check` | compiles all pinned source closures and installs the named online/batch artifacts with owned compatibility services |
+| submit | `cargo xtask carddemo-operator-submit --check` | executes the declared initialization and operational job set through authenticated public z/OSMF Jobs routes and verifies job IDs, return codes, spool, and dataset results |
+| reset | `cargo xtask carddemo-operator-reset --check` | recreates the declared disposable CardDemo data/catalog fixtures and verifies the reset result; do not aim it at an authority containing unretained operator data |
+| certify | `cargo xtask carddemo-full --check` | derives all 20 journeys from lower-profile application runs, then executes memory overload/isolation, SQLite backup/restore, and PostgreSQL restart controls |
+
+The commands are certification-safe substitutions for the pinned helper
+scripts; they do not invoke the scripts, native runtime archives, Micro Focus,
+UniKix, or a legacy compiler.
+
+## FTP/JES substitutions
+
+The repository scripts use `tnftp`, `SITE FILETYPE=JES`, and `PUT *.jcl` only
+as a transport for JES submission. The selected substitution is the public
+z/OSMF Jobs contract:
+
+```text
+FTP SITE FILETYPE=JES + PUT job.jcl
+  -> PUT /zosmf/restjobs/jobs
+  -> zowe zos-jobs submit local-file job.jcl
+```
+
+`FTPJCL.JCL` sends `AWS.M2.CARDEMO.FTP.TEST` to `welcome.txt`. The selected
+owned substitution is an authenticated dataset-content download through
+`GET /zosmf/restfiles/ds/AWS.M2.CARDEMO.FTP.TEST`; it preserves the dataset
+bytes without implementing arbitrary network FTP, credentials, directories,
+or remote hosts. Other FTP commands remain explicitly unsupported and cannot
+return generic success.
+
+## Full-certification decisions
+
+`CDV1` maps to `COCRDSEC`, but no original source or runtime object is present
+in the pinned corpus. The owner-approved correction supplies bounded owned demo
+source at `conformance/0.1.1/fixtures/carddemo/COCRDSEC.cbl`. It displays an
+explicit unavailable-contract message and returns without reading or mutating
+card data. `carddemo-full` verifies the correction contract, source digest,
+compiled artifact, anonymous denial, and authenticated public CICS route; no
+environment override can silently change the disposition.
+
+The repository remains `0.1.0-alpha.0`. A passing implementation receipt uses
+the disposition `release-blocked-until-0.1.0-final-or-version-line-correction`.
+It does not authorize a version bump, tag, push, publication, or deployment.

@@ -1,0 +1,16 @@
+{
+  "schema_version": "mainframe-env.carddemo-corrections@1",
+  "corpus_commit": "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e",
+  "corrections": [
+    {
+      "id": "CARDEMO-ORPHAN-CDV1",
+      "disposition": "accepted-owned-source",
+      "transaction": "CDV1",
+      "program": "COCRDSEC",
+      "source": "fixtures/carddemo/COCRDSEC.cbl",
+      "source_sha256": "426fa98b0ec89b65dd3269d79082db436ecb97a4152bbb2219478c6e1b109981",
+      "behavior": "The developer transaction displays an explicit unavailable-contract message and returns without reading or mutating card data.",
+      "basis": "Repository-owner approval for bounded demo source; the pinned corpus and runtime oracles contain no original COCRDSEC implementation."
+    }
+  ]
+}

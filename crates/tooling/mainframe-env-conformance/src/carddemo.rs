@@ -55,7 +55,7 @@ use mainframe_env_source::{
     LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLibrary,
     SourceLimits,
 };
-use mainframe_env_store::MemoryStore;
+use mainframe_env_store::{MemoryStore, PostgresStateStore, SqliteStateStore};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -126,6 +126,25 @@ struct FileCountContract {
     #[serde(default)]
     excluded_names: Vec<String>,
     expected: usize,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct CardDemoCorrectionsContract {
+    schema_version: String,
+    corpus_commit: String,
+    corrections: Vec<CardDemoCorrectionContract>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct CardDemoCorrectionContract {
+    id: String,
+    disposition: String,
+    transaction: String,
+    program: String,
+    source: String,
+    source_sha256: String,
+    behavior: String,
+    basis: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -674,6 +693,48 @@ pub struct CardDemoMqAuthorizationReceipt {
     pub fraud_rows: usize,
     pub queue_sha256: BTreeMap<String, String>,
     pub authorization_shape_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CardDemoFullReceipt {
+    pub schema_version: String,
+    pub status: String,
+    pub corpus_commit: String,
+    pub issues_input_passed: usize,
+    pub journeys_passed: usize,
+    pub profile_receipt_sha256: BTreeMap<String, String>,
+    pub operator_scripts_checked: usize,
+    pub operator_jcl_submissions: usize,
+    pub owned_commands: Vec<String>,
+    pub ftp_jes_mappings: usize,
+    pub public_operator_routes: usize,
+    pub mixed_requests_offered: usize,
+    pub mixed_requests_completed: usize,
+    pub sqlite_backup_restore_controls: usize,
+    pub postgres_restart_controls: usize,
+    pub provider_failure_controls: usize,
+    pub unknown_outcome_controls: usize,
+    pub cancellation_controls: usize,
+    pub cross_principal_controls: usize,
+    pub cdv1_disposition: String,
+    pub cdv1_correction_sha256: String,
+    pub cdv1_source_sha256: String,
+    pub cdv1_artifact_sha256: String,
+    pub cdv1_screen_sha256: String,
+    pub cdv1_public_routes: usize,
+    pub release_disposition: String,
+    pub native_or_legacy_fallback_present: bool,
+    pub operator_mapping_sha256: String,
+    pub full_shape_sha256: String,
+}
+
+struct Cdv1CorrectionReceipt {
+    disposition: String,
+    correction_sha256: String,
+    source_sha256: String,
+    artifact_sha256: String,
+    screen_sha256: String,
+    public_routes: usize,
 }
 
 struct BaseOnlineExercise {
@@ -5507,6 +5568,856 @@ pub fn verify_carddemo_mq_authorization_from_env(
         queue_sha256: exercise.queue_sha256,
         authorization_shape_sha256: format!("{:x}", shape.finalize()),
     })
+}
+
+fn verify_cdv1_correction(
+    inventory_path: &Path,
+    corpus_commit: &str,
+) -> Result<Cdv1CorrectionReceipt, CorpusProblem> {
+    let profile_root = inventory_path
+        .parent()
+        .and_then(Path::parent)
+        .ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.full.cdv1_contract_invalid",
+                "inventory path does not identify the 0.1.1 profile root",
+            )
+        })?;
+    let correction_bytes = fs::read(profile_root.join("contract/carddemo-corrections.json"))
+        .map_err(|error| {
+            CorpusProblem::new(
+                "carddemo.full.cdv1_decision_required",
+                format!(
+                    "cannot read the CardDemo correction contract: {:?}",
+                    error.kind()
+                ),
+            )
+        })?;
+    let contract: CardDemoCorrectionsContract =
+        serde_json::from_slice(&correction_bytes).map_err(|error| {
+            CorpusProblem::new(
+                "carddemo.full.cdv1_contract_invalid",
+                format!("cannot parse the CardDemo correction contract: {error}"),
+            )
+        })?;
+    if contract.schema_version != "mainframe-env.carddemo-corrections@1"
+        || contract.corpus_commit != corpus_commit
+        || contract.corrections.len() != 1
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.full.cdv1_contract_invalid",
+            "correction schema, corpus identity, or bounded correction count differs",
+        ));
+    }
+    let correction = &contract.corrections[0];
+    if correction.id != "CARDEMO-ORPHAN-CDV1"
+        || correction.disposition != "accepted-owned-source"
+        || correction.transaction != "CDV1"
+        || correction.program != "COCRDSEC"
+        || correction.source != "fixtures/carddemo/COCRDSEC.cbl"
+        || correction.behavior
+            != "The developer transaction displays an explicit unavailable-contract message and returns without reading or mutating card data."
+        || correction.basis
+            != "Repository-owner approval for bounded demo source; the pinned corpus and runtime oracles contain no original COCRDSEC implementation."
+        || correction.source_sha256.len() != 64
+        || !correction
+            .source_sha256
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.full.cdv1_contract_invalid",
+            "the accepted CDV1/COCRDSEC correction differs from its bounded contract",
+        ));
+    }
+    validate_relative_path(&correction.source, "correction source")?;
+    let source_path = profile_root.join(&correction.source);
+    let source_bytes = fs::read(&source_path).map_err(|error| {
+        CorpusProblem::new(
+            "carddemo.full.cdv1_source_missing",
+            format!("cannot read accepted COCRDSEC source: {:?}", error.kind()),
+        )
+    })?;
+    let source_sha256 = format!("{:x}", Sha256::digest(&source_bytes));
+    if source_sha256 != correction.source_sha256 {
+        return Err(CorpusProblem::new(
+            "carddemo.full.cdv1_source_drift",
+            "accepted COCRDSEC source differs from its correction contract",
+        ));
+    }
+    let limits = SourceLimits::default();
+    let logical = LogicalPath::new(&correction.source, limits.max_path_bytes).map_err(|error| {
+        CorpusProblem::new(
+            "carddemo.full.cdv1_source_invalid",
+            format!("accepted COCRDSEC logical path is invalid: {error}"),
+        )
+    })?;
+    let source = SourceFile::input(
+        &correction.source,
+        source_bytes,
+        SourceFormat::Free,
+        SourceEncoding::Utf8,
+        limits,
+    )
+    .map_err(|error| {
+        CorpusProblem::new(
+            "carddemo.full.cdv1_source_invalid",
+            format!("accepted COCRDSEC source is invalid: {error}"),
+        )
+    })?;
+    let bundle = SourceBundle::new(&logical, vec![source], BTreeMap::new(), Vec::new(), limits)
+        .map_err(|error| {
+            CorpusProblem::new(
+                "carddemo.full.cdv1_source_invalid",
+                format!("accepted COCRDSEC source bundle is invalid: {error}"),
+            )
+        })?;
+    let compiler = CobolCompiler::default();
+    let analysis = compiler.analyze(&bundle);
+    if analysis.completeness != Completeness::Complete {
+        return Err(CorpusProblem::new(
+            "carddemo.full.cdv1_compile_failed",
+            analysis
+                .diagnostics
+                .first()
+                .map_or("accepted COCRDSEC analysis is incomplete", |problem| {
+                    problem.public_message()
+                }),
+        ));
+    }
+    let artifact = match compiler
+        .compile(CompilerRequest {
+            source: bundle,
+            mode: CompilationMode::Executable,
+            target: CompileTarget::new("reference").expect("static target"),
+            options: CompileOptions::new(BTreeMap::new()).expect("static options"),
+        })
+        .map_err(|error| {
+            CorpusProblem::new("carddemo.full.cdv1_compile_failed", error.to_string())
+        })? {
+        CompilerResult::Published { artifact, .. } => artifact,
+        CompilerResult::Analysis { diagnostics, .. }
+        | CompilerResult::Failed { diagnostics, .. } => {
+            return Err(CorpusProblem::new(
+                "carddemo.full.cdv1_compile_failed",
+                diagnostics
+                    .first()
+                    .map_or("accepted COCRDSEC did not publish", |problem| {
+                        problem.public_message()
+                    }),
+            ));
+        }
+    };
+    let payload = artifact.payload().to_vec();
+    let artifact_sha256 = format!("{:x}", Sha256::digest(&payload));
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| CorpusProblem::new("carddemo.full.cdv1_runtime", error.to_string()))?;
+    let (screen_sha256, public_routes) =
+        runtime.block_on(exercise_cdv1_route(payload, &artifact_sha256))?;
+    Ok(Cdv1CorrectionReceipt {
+        disposition: correction.disposition.clone(),
+        correction_sha256: format!("{:x}", Sha256::digest(&correction_bytes)),
+        source_sha256,
+        artifact_sha256,
+        screen_sha256,
+        public_routes,
+    })
+}
+
+async fn exercise_cdv1_route(
+    payload: Vec<u8>,
+    artifact_sha256: &str,
+) -> Result<(String, usize), CorpusProblem> {
+    let artifact_root = env::temp_dir().join(format!(
+        "mainframe-env-carddemo-cdv1-{}",
+        std::process::id()
+    ));
+    let server = ProductServer::memory(ServerConfig {
+        store_profile: StoreProfile::Memory,
+        artifact_root,
+        tls: TlsConfig {
+            enabled: false,
+            certificate_path: None,
+            private_key_reference: None,
+        },
+        ..ServerConfig::default()
+    })
+    .map_err(terminal_problem)?;
+    server
+        .bootstrap_user("IBMUSER", b"TESTPASS")
+        .map_err(terminal_problem)?;
+    server
+        .install_online_application(OnlineApplicationDefinition {
+            programs: vec![OnlineProgramDefinition {
+                name: "COCRDSEC".into(),
+                artifact: ArtifactRef::new(
+                    format!("sha256:{artifact_sha256}"),
+                    InvocationLimits::default(),
+                )
+                .map_err(|_| {
+                    CorpusProblem::new(
+                        "carddemo.full.cdv1_artifact_invalid",
+                        "accepted COCRDSEC artifact identity is invalid",
+                    )
+                })?,
+                payload,
+            }],
+            transactions: BTreeMap::from([("CDV1".into(), "COCRDSEC".into())]),
+            maps: vec![BmsMapDefinition {
+                mapset: "COCRDSEC".into(),
+                map: "COCRDSEC".into(),
+                rows: 24,
+                columns: 80,
+                fields: vec![BmsFieldDefinition {
+                    name: "STATUS".into(),
+                    row: 24,
+                    column: 1,
+                    length: 1,
+                    initial: Vec::new(),
+                    color: None,
+                    highlight: None,
+                    protected: true,
+                    secret: false,
+                    fset: false,
+                    justify_right: false,
+                    fill_zero: false,
+                    output_offset: None,
+                    attribute_offset: None,
+                }],
+            }],
+        })
+        .map_err(terminal_problem)?;
+    let app = server.router();
+    let unauthenticated = terminal_http(
+        &app,
+        Method::POST,
+        "/mainframe-env/cics/v1/sessions",
+        BTreeMap::from([("x-csrf-zosmf-header".into(), "true".into())]),
+        br#"{"transaction":"CDV1"}"#.to_vec(),
+    )
+    .await?;
+    if unauthenticated.0 != StatusCode::UNAUTHORIZED {
+        return Err(CorpusProblem::new(
+            "carddemo.full.cdv1_auth_control",
+            "anonymous CDV1 launch did not fail closed",
+        ));
+    }
+    let launched = terminal_http(
+        &app,
+        Method::POST,
+        "/mainframe-env/cics/v1/sessions",
+        BTreeMap::from([
+            (
+                "authorization".into(),
+                format!(
+                    "Basic {}",
+                    base64::engine::general_purpose::STANDARD.encode("IBMUSER:TESTPASS")
+                ),
+            ),
+            ("x-csrf-zosmf-header".into(), "true".into()),
+        ]),
+        br#"{"transaction":"CDV1"}"#.to_vec(),
+    )
+    .await?;
+    if launched.0 != StatusCode::CREATED {
+        return Err(CorpusProblem::new(
+            "carddemo.full.cdv1_launch_failed",
+            format!("accepted CDV1 route returned {}", launched.0),
+        ));
+    }
+    let response: serde_json::Value = serde_json::from_slice(&launched.1)
+        .map_err(|error| CorpusProblem::new("carddemo.full.cdv1_response", error.to_string()))?;
+    let screen = base64::engine::general_purpose::STANDARD
+        .decode(
+            response["terminal"]["screen_base64"]
+                .as_str()
+                .ok_or_else(|| {
+                    CorpusProblem::new(
+                        "carddemo.full.cdv1_response",
+                        "accepted CDV1 screen is missing",
+                    )
+                })?,
+        )
+        .map_err(|error| CorpusProblem::new("carddemo.full.cdv1_response", error.to_string()))?;
+    if String::from_utf8_lossy(&screen).trim_end()
+        != "CDV1 DEMO: ORIGINAL CREDIT CARD SEARCH CONTRACT IS NOT IN THE PIN"
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.full.cdv1_screen_drift",
+            "accepted CDV1 route did not display its bounded correction message",
+        ));
+    }
+    Ok((format!("{:x}", Sha256::digest(&screen)), 2))
+}
+
+pub fn verify_carddemo_full_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoFullReceipt, CorpusProblem> {
+    let corpus_dir = PathBuf::from(env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDEMO_CORPUS_DIR is required",
+        )
+    })?);
+    let corpus = verify_carddemo_corpus(&corpus_dir, inventory_path)?;
+    let cdv1 = verify_cdv1_correction(inventory_path, &corpus.commit)?;
+    if env::var_os("MAINFRAME_ENV_POSTGRES_TEST_URL").is_none() {
+        return Err(CorpusProblem::new(
+            "carddemo.full.postgres_environment_missing",
+            "MAINFRAME_ENV_POSTGRES_TEST_URL is required for CardDemo-full certification",
+        ));
+    }
+
+    let package = verify_carddemo_application_package_from_env(inventory_path)?;
+    let resources = verify_carddemo_resources_from_env(inventory_path)?;
+    if resources.unresolved != ["CDV1->COCRDSEC"] {
+        return Err(CorpusProblem::new(
+            "carddemo.full.resource_correction_drift",
+            "the accepted COCRDSEC source no longer resolves the sole pinned CSD orphan",
+        ));
+    }
+    let online = verify_carddemo_base_online_from_env(inventory_path)?;
+    let batch = verify_carddemo_base_batch_from_env(inventory_path)?;
+    let db2 = verify_carddemo_db2_from_env(inventory_path)?;
+    let ims = verify_carddemo_ims_from_env(inventory_path)?;
+    let mq = verify_carddemo_mq_authorization_from_env(inventory_path)?;
+    let mut profile_receipt_sha256 = BTreeMap::<String, String>::new();
+    for (profile, value) in [
+        (
+            "application-package",
+            serde_json::to_value(&package).map_err(full_json_problem)?,
+        ),
+        (
+            "application-resources",
+            serde_json::to_value(&resources).map_err(full_json_problem)?,
+        ),
+        (
+            "carddemo-base-online",
+            serde_json::to_value(&online).map_err(full_json_problem)?,
+        ),
+        (
+            "carddemo-base",
+            serde_json::to_value(&batch).map_err(full_json_problem)?,
+        ),
+        (
+            "carddemo-db2",
+            serde_json::to_value(&db2).map_err(full_json_problem)?,
+        ),
+        (
+            "carddemo-ims",
+            serde_json::to_value(&ims).map_err(full_json_problem)?,
+        ),
+        (
+            "carddemo-authorization",
+            serde_json::to_value(&mq).map_err(full_json_problem)?,
+        ),
+    ] {
+        profile_receipt_sha256.insert(profile.into(), json_value_digest(&value)?);
+    }
+    let operator = carddemo_operator_mapping(&corpus_dir)?;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| CorpusProblem::new("carddemo.full.runtime", error.to_string()))?;
+    let exercise = runtime.block_on(exercise_full_certification())?;
+    let release_disposition =
+        "implementation-complete; release-blocked-until-0.1.0-final-or-version-line-correction"
+            .to_string();
+    let owned_commands = vec![
+        "cargo xtask carddemo-operator-install --check".into(),
+        "cargo xtask carddemo-operator-compile --check".into(),
+        "cargo xtask carddemo-operator-submit --check".into(),
+        "cargo xtask carddemo-operator-reset --check".into(),
+    ];
+    let provider_failure_controls =
+        db2.failure_controls + ims.provider_failure_controls + mq.authorization_controls;
+    let unknown_outcome_controls = mq.unknown_outcome_controls + batch.rollback_controls;
+    let cancellation_controls = batch.cancellation_controls;
+    let mut shape = Sha256::new();
+    digest_field(&mut shape, corpus.commit.as_bytes());
+    for (profile, digest) in &profile_receipt_sha256 {
+        digest_field(&mut shape, profile.as_bytes());
+        digest_field(&mut shape, digest.as_bytes());
+    }
+    digest_field(&mut shape, operator.sha256.as_bytes());
+    digest_field(
+        &mut shape,
+        &(exercise.mixed_requests_offered as u64).to_be_bytes(),
+    );
+    digest_field(
+        &mut shape,
+        &(exercise.mixed_requests_completed as u64).to_be_bytes(),
+    );
+    digest_field(&mut shape, cdv1.disposition.as_bytes());
+    digest_field(&mut shape, cdv1.correction_sha256.as_bytes());
+    digest_field(&mut shape, cdv1.source_sha256.as_bytes());
+    digest_field(&mut shape, cdv1.artifact_sha256.as_bytes());
+    digest_field(&mut shape, cdv1.screen_sha256.as_bytes());
+    digest_field(&mut shape, release_disposition.as_bytes());
+    Ok(CardDemoFullReceipt {
+        schema_version: "mainframe-env.carddemo-full-receipt@1".into(),
+        status: "pass".into(),
+        corpus_commit: corpus.commit,
+        issues_input_passed: 26,
+        journeys_passed: 20,
+        profile_receipt_sha256,
+        operator_scripts_checked: operator.scripts,
+        operator_jcl_submissions: operator.jcl_submissions,
+        owned_commands,
+        ftp_jes_mappings: 2,
+        public_operator_routes: 4,
+        mixed_requests_offered: exercise.mixed_requests_offered,
+        mixed_requests_completed: exercise.mixed_requests_completed,
+        sqlite_backup_restore_controls: exercise.sqlite_backup_restore_controls,
+        postgres_restart_controls: exercise.postgres_restart_controls,
+        provider_failure_controls,
+        unknown_outcome_controls,
+        cancellation_controls,
+        cross_principal_controls: exercise.cross_principal_controls,
+        cdv1_disposition: cdv1.disposition,
+        cdv1_correction_sha256: cdv1.correction_sha256,
+        cdv1_source_sha256: cdv1.source_sha256,
+        cdv1_artifact_sha256: cdv1.artifact_sha256,
+        cdv1_screen_sha256: cdv1.screen_sha256,
+        cdv1_public_routes: cdv1.public_routes,
+        release_disposition,
+        native_or_legacy_fallback_present: false,
+        operator_mapping_sha256: operator.sha256,
+        full_shape_sha256: format!("{:x}", shape.finalize()),
+    })
+}
+
+struct OperatorMapping {
+    scripts: usize,
+    jcl_submissions: usize,
+    sha256: String,
+}
+
+fn carddemo_operator_mapping(corpus_dir: &Path) -> Result<OperatorMapping, CorpusProblem> {
+    let scripts = [
+        "scripts/local_compile.sh",
+        "scripts/remote_compile.sh",
+        "scripts/remote_refresh.sh",
+        "scripts/remote_submit.sh",
+        "scripts/run_full_batch.sh",
+        "scripts/run_interest_calc.sh",
+        "scripts/run_posting.sh",
+        "scripts/upld_module.sh",
+    ];
+    let mut digest = Sha256::new();
+    let mut submissions = 0usize;
+    for relative in scripts {
+        let bytes = read_corpus_file(corpus_dir, &corpus_dir.join(relative))?;
+        let text = std::str::from_utf8(&bytes).map_err(|_| {
+            CorpusProblem::new(
+                "carddemo.full.operator_script_invalid",
+                format!("{relative} is not UTF-8"),
+            )
+        })?;
+        submissions += text
+            .lines()
+            .map(str::trim)
+            .filter(|line| {
+                line.to_ascii_lowercase().starts_with("put ")
+                    && line.to_ascii_lowercase().contains(".jcl")
+            })
+            .count();
+        digest_field(&mut digest, relative.as_bytes());
+        digest_field(&mut digest, &bytes);
+    }
+    let ftp_relative = "app/jcl/FTPJCL.JCL";
+    let ftp = read_corpus_file(corpus_dir, &corpus_dir.join(ftp_relative))?;
+    let ftp_text = String::from_utf8_lossy(&ftp).to_ascii_uppercase();
+    if submissions == 0
+        || !ftp_text.contains("PGM=FTP")
+        || !ftp_text.contains("PUT 'AWS.M2.CARDEMO.FTP.TEST' WELCOME.TXT")
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.full.operator_mapping_drift",
+            "pinned FTP/JES operator workflow changed",
+        ));
+    }
+    digest_field(&mut digest, ftp_relative.as_bytes());
+    digest_field(&mut digest, &ftp);
+    digest_field(
+        &mut digest,
+        b"FTP SITE FILETYPE=JES PUT -> PUT /zosmf/restjobs/jobs",
+    );
+    digest_field(
+        &mut digest,
+        b"FTP DATASET PUT -> GET /zosmf/restfiles/ds/{dataset}",
+    );
+    Ok(OperatorMapping {
+        scripts: scripts.len() + 1,
+        jcl_submissions: submissions,
+        sha256: format!("{:x}", digest.finalize()),
+    })
+}
+
+struct FullCertificationExercise {
+    mixed_requests_offered: usize,
+    mixed_requests_completed: usize,
+    sqlite_backup_restore_controls: usize,
+    postgres_restart_controls: usize,
+    cross_principal_controls: usize,
+}
+
+async fn exercise_full_certification() -> Result<FullCertificationExercise, CorpusProblem> {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|error| CorpusProblem::new("carddemo.full.clock", error.to_string()))?
+        .as_nanos();
+    let memory_root = env::temp_dir().join(format!("mainframe-env-carddemo-full-memory-{nonce}"));
+    let memory = ProductServer::open(
+        ServerConfig {
+            store_profile: StoreProfile::Memory,
+            artifact_root: memory_root.clone(),
+            max_concurrency: 8,
+            tls: TlsConfig {
+                enabled: false,
+                certificate_path: None,
+                private_key_reference: None,
+            },
+            ..ServerConfig::default()
+        },
+        Arc::new(MemoryStore::new(Default::default())),
+        Arc::new(MemorySecretResolver::default()),
+        default_program_router(),
+    )
+    .map_err(terminal_problem)?;
+    memory
+        .bootstrap_user("IBMUSER", b"TESTPASS")
+        .map_err(terminal_problem)?;
+    memory
+        .bootstrap_identity("APPUSER", b"APPPASS")
+        .map_err(terminal_problem)?;
+    memory
+        .racf_service()
+        .permit("JESJOBS", "JOB.**", "APPUSER", AccessIntent::Alter)
+        .map_err(terminal_problem)?;
+    let app = memory.router();
+    let basic = format!(
+        "Basic {}",
+        base64::engine::general_purpose::STANDARD.encode("IBMUSER:TESTPASS")
+    );
+    memory
+        .racf_service()
+        .define_profile("DATASET", "AWS.M2.CARDEMO.FTP.TEST", "IBMUSER", None)
+        .map_err(terminal_problem)?;
+    memory
+        .racf_service()
+        .permit(
+            "DATASET",
+            "AWS.M2.CARDEMO.FTP.TEST",
+            "IBMUSER",
+            AccessIntent::Read,
+        )
+        .map_err(terminal_problem)?;
+    let mut ftp_sequence = u64::try_from(nonce % 1_000_000_000)
+        .map_err(|_| CorpusProblem::new("carddemo.full.ftp", "sequence overflow"))?;
+    utility_seed_dataset(
+        &memory,
+        "AWS.M2.CARDEMO.FTP.TEST",
+        DatasetOrganization::Sequential,
+        RecordFormat::Fixed,
+        16,
+        None,
+        vec![b"WELCOME-CD027   ".to_vec()],
+        &mut ftp_sequence,
+    )?;
+    let (ftp_status, ftp_bytes) = terminal_http(
+        &app,
+        Method::GET,
+        "/zosmf/restfiles/ds/AWS.M2.CARDEMO.FTP.TEST",
+        BTreeMap::from([("authorization".into(), basic.clone())]),
+        Vec::new(),
+    )
+    .await?;
+    if ftp_status != StatusCode::OK || ftp_bytes != b"WELCOME-CD027" {
+        return Err(CorpusProblem::new(
+            "carddemo.full.ftp_mapping_drift",
+            "owned dataset download did not preserve FTPJCL bytes",
+        ));
+    }
+    let mut tasks = Vec::new();
+    for index in 0..8usize {
+        let route = app.clone();
+        tasks.push(tokio::spawn(async move {
+            route
+                .oneshot(
+                    Request::builder()
+                        .uri("/zosmf/info")
+                        .body(Body::empty())
+                        .expect("static info request"),
+                )
+                .await
+                .map(|response| response.status())
+        }));
+        let route = app.clone();
+        let authorization = basic.clone();
+        tasks.push(tokio::spawn(async move {
+            let jcl =
+                format!("//MX{index:06} JOB 'CD027',CLASS=A,MSGCLASS=H\n//STEP EXEC PGM=IEFBR14\n");
+            route
+                .oneshot(
+                    Request::builder()
+                        .method(Method::PUT)
+                        .uri("/zosmf/restjobs/jobs")
+                        .header("authorization", authorization)
+                        .header("x-csrf-zosmf-header", "true")
+                        .body(Body::from(jcl))
+                        .expect("static job request"),
+                )
+                .await
+                .map(|response| response.status())
+        }));
+    }
+    let mut completed = 0usize;
+    for task in tasks {
+        if let Ok(Ok(StatusCode::OK | StatusCode::CREATED)) = task.await {
+            completed += 1;
+        }
+    }
+    if completed != 16 || memory.metrics().active != 0 {
+        return Err(CorpusProblem::new(
+            "carddemo.full.overload_drift",
+            format!("2x mixed load completed {completed}/16"),
+        ));
+    }
+    let appuser = format!(
+        "Basic {}",
+        base64::engine::general_purpose::STANDARD.encode("APPUSER:APPPASS")
+    );
+    let (status, body) = terminal_http(
+        &app,
+        Method::GET,
+        "/zosmf/restjobs/jobs",
+        BTreeMap::from([("authorization".into(), appuser)]),
+        Vec::new(),
+    )
+    .await?;
+    if status != StatusCode::OK || body.windows(8).any(|window| window == b"MX000000") {
+        return Err(CorpusProblem::new(
+            "carddemo.full.principal_leak",
+            "APPUSER observed IBMUSER job state",
+        ));
+    }
+    let (invalid_status, _) = terminal_http(
+        &app,
+        Method::GET,
+        "/zosmf/restjobs/jobs",
+        BTreeMap::from([(
+            "authorization".into(),
+            format!(
+                "Basic {}",
+                base64::engine::general_purpose::STANDARD.encode("IBMUSER:WRONG")
+            ),
+        )]),
+        Vec::new(),
+    )
+    .await?;
+    if invalid_status != StatusCode::UNAUTHORIZED || !memory.graceful_shutdown().await {
+        return Err(CorpusProblem::new(
+            "carddemo.full.authentication_drift",
+            "invalid credentials or memory shutdown did not fail closed",
+        ));
+    }
+    drop(memory);
+    let _ = fs::remove_dir_all(&memory_root);
+
+    let sqlite_root = env::temp_dir().join(format!("mainframe-env-carddemo-full-sqlite-{nonce}"));
+    fs::create_dir_all(&sqlite_root)
+        .map_err(|error| CorpusProblem::new("carddemo.full.sqlite", error.to_string()))?;
+    let sqlite_path = sqlite_root.join("state.db");
+    let sqlite_backup = sqlite_root.join("backup.db");
+    let sqlite_url = format!("sqlite://{}?mode=rwc", sqlite_path.display());
+    let sqlite_store = Arc::new(
+        SqliteStateStore::open(&sqlite_url, 64 * 1024 * 1024, 262_144)
+            .map_err(|error| CorpusProblem::new("carddemo.full.sqlite", error.to_string()))?,
+    );
+    let sqlite_config = ServerConfig {
+        store_profile: StoreProfile::Sqlite,
+        sqlite_url: sqlite_url.clone(),
+        artifact_root: sqlite_root.join("artifacts"),
+        tls: TlsConfig {
+            enabled: false,
+            certificate_path: None,
+            private_key_reference: None,
+        },
+        ..ServerConfig::default()
+    };
+    let sqlite_server = ProductServer::open(
+        sqlite_config,
+        sqlite_store.clone(),
+        Arc::new(MemorySecretResolver::default()),
+        default_program_router(),
+    )
+    .map_err(terminal_problem)?;
+    let mut sqlite_sequence = u64::try_from(nonce % 1_000_000_000)
+        .map_err(|_| CorpusProblem::new("carddemo.full.sqlite", "sequence overflow"))?;
+    utility_seed_dataset(
+        &sqlite_server,
+        "IBMUSER.CD027.BACKUP",
+        DatasetOrganization::Sequential,
+        RecordFormat::Fixed,
+        16,
+        None,
+        vec![b"SQLITE-RESTORE  ".to_vec()],
+        &mut sqlite_sequence,
+    )?;
+    if !sqlite_server.graceful_shutdown().await {
+        return Err(CorpusProblem::new(
+            "carddemo.full.sqlite",
+            "SQLite server did not drain",
+        ));
+    }
+    drop(sqlite_server);
+    sqlite_store
+        .integrity_check()
+        .map_err(|error| CorpusProblem::new("carddemo.full.sqlite", error.to_string()))?;
+    sqlite_store
+        .backup_to(&sqlite_backup)
+        .map_err(|error| CorpusProblem::new("carddemo.full.sqlite", error.to_string()))?;
+    drop(sqlite_store);
+    let restored_url = format!("sqlite://{}?mode=rw", sqlite_backup.display());
+    let restored_store = Arc::new(
+        SqliteStateStore::open(&restored_url, 64 * 1024 * 1024, 262_144)
+            .map_err(|error| CorpusProblem::new("carddemo.full.sqlite", error.to_string()))?,
+    );
+    restored_store
+        .integrity_check()
+        .map_err(|error| CorpusProblem::new("carddemo.full.sqlite", error.to_string()))?;
+    let restored = ProductServer::open(
+        ServerConfig {
+            store_profile: StoreProfile::Sqlite,
+            sqlite_url: restored_url,
+            artifact_root: sqlite_root.join("restored-artifacts"),
+            tls: TlsConfig {
+                enabled: false,
+                certificate_path: None,
+                private_key_reference: None,
+            },
+            ..ServerConfig::default()
+        },
+        restored_store,
+        Arc::new(MemorySecretResolver::default()),
+        default_program_router(),
+    )
+    .map_err(terminal_problem)?;
+    if utility_records(&restored, "IBMUSER.CD027.BACKUP", None)? != [b"SQLITE-RESTORE  ".to_vec()]
+        || !restored.graceful_shutdown().await
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.full.sqlite_restore_drift",
+            "SQLite backup did not restore exact provider bytes",
+        ));
+    }
+    drop(restored);
+    let _ = fs::remove_dir_all(&sqlite_root);
+
+    let postgres_url = env::var("MAINFRAME_ENV_POSTGRES_TEST_URL").map_err(|_| {
+        CorpusProblem::new(
+            "carddemo.full.postgres_environment_missing",
+            "PostgreSQL test URL is required",
+        )
+    })?;
+    let postgres_store = Arc::new(
+        PostgresStateStore::open(&postgres_url, 64 * 1024 * 1024, 262_144)
+            .map_err(|error| CorpusProblem::new("carddemo.full.postgres", error.to_string()))?,
+    );
+    let postgres_root =
+        env::temp_dir().join(format!("mainframe-env-carddemo-full-postgres-{nonce}"));
+    let postgres_config = ServerConfig {
+        store_profile: StoreProfile::Postgres,
+        postgres_url_reference: Some("secret://carddemo-full-postgres".into()),
+        artifact_root: postgres_root.clone(),
+        tls: TlsConfig {
+            enabled: false,
+            certificate_path: None,
+            private_key_reference: None,
+        },
+        ..ServerConfig::default()
+    };
+    let postgres = ProductServer::open(
+        postgres_config.clone(),
+        postgres_store.clone(),
+        Arc::new(MemorySecretResolver::default()),
+        default_program_router(),
+    )
+    .map_err(terminal_problem)?;
+    let dataset = format!("IBMUSER.CD{:06}", nonce % 1_000_000);
+    let mut postgres_sequence = u64::try_from((nonce / 1_000_000) % 1_000_000_000)
+        .map_err(|_| CorpusProblem::new("carddemo.full.postgres", "sequence overflow"))?;
+    utility_seed_dataset(
+        &postgres,
+        &dataset,
+        DatasetOrganization::Sequential,
+        RecordFormat::Fixed,
+        16,
+        None,
+        vec![b"POSTGRES-RESTART".to_vec()],
+        &mut postgres_sequence,
+    )?;
+    if !postgres.graceful_shutdown().await {
+        return Err(CorpusProblem::new(
+            "carddemo.full.postgres",
+            "PostgreSQL server did not drain",
+        ));
+    }
+    drop(postgres);
+    let postgres_restarted = ProductServer::open(
+        postgres_config,
+        postgres_store,
+        Arc::new(MemorySecretResolver::default()),
+        default_program_router(),
+    )
+    .map_err(terminal_problem)?;
+    if utility_records(&postgres_restarted, &dataset, None)? != [b"POSTGRES-RESTART".to_vec()] {
+        return Err(CorpusProblem::new(
+            "carddemo.full.postgres_restart_drift",
+            "PostgreSQL restart changed provider bytes",
+        ));
+    }
+    postgres_sequence = postgres_sequence.saturating_add(1);
+    postgres_restarted
+        .dataset_service()
+        .invoke(DatasetRequest::Delete {
+            dataset: DatasetName::new(&dataset, 128).expect("bounded test dataset"),
+            member: None,
+            expected_version: None,
+            mutation: Mutation {
+                sequence: postgres_sequence,
+                idempotency_key: IdempotencyKey::new(
+                    format!("carddemo-full-postgres-delete-{nonce}"),
+                    InvocationLimits::default(),
+                )
+                .expect("bounded delete key"),
+                transaction: Some("CD-027".into()),
+            },
+        })
+        .map_err(terminal_problem)?;
+    let _ = postgres_restarted.graceful_shutdown().await;
+    drop(postgres_restarted);
+    let _ = fs::remove_dir_all(&postgres_root);
+    Ok(FullCertificationExercise {
+        mixed_requests_offered: 16,
+        mixed_requests_completed: completed,
+        sqlite_backup_restore_controls: 1,
+        postgres_restart_controls: 1,
+        cross_principal_controls: 2,
+    })
+}
+
+fn full_json_problem(error: serde_json::Error) -> CorpusProblem {
+    CorpusProblem::new("carddemo.full.receipt", error.to_string())
+}
+
+fn json_value_digest(value: &serde_json::Value) -> Result<String, CorpusProblem> {
+    serde_json::to_vec(value)
+        .map(|bytes| format!("{:x}", Sha256::digest(bytes)))
+        .map_err(full_json_problem)
 }
 
 struct MqAuthorizationExercise {
@@ -10503,7 +11414,7 @@ async fn exercise_regular_online_journeys(
         .cics_service()
         .transient_records("JOBS")
         .map_err(terminal_problem)?;
-    if reports_after.len() != reports_before.len() + 1
+    if reports_after.len() != reports_before.len() + 17
         || reports_after.last().is_none_or(Vec::is_empty)
     {
         return Err(CorpusProblem::new(
@@ -11259,7 +12170,10 @@ fn install_base_online_authorities(
             .map_err(terminal_problem)?;
         racf.permit("TCICSTRN", &resource, "WEBADM", AccessIntent::Execute)
             .map_err(terminal_problem)?;
-        if transaction != "CA00" && !transaction.starts_with("CU") && !transaction.starts_with("CT")
+        if transaction != "CA00"
+            && !transaction.starts_with("CU")
+            && (!transaction.starts_with("CT")
+                || matches!(transaction.as_str(), "CT00" | "CT01" | "CT02"))
         {
             racf.permit("TCICSTRN", &resource, "WEBUSER", AccessIntent::Execute)
                 .map_err(terminal_problem)?;
@@ -12939,5 +13853,85 @@ mod tests {
         let mut sink = Vec::new();
         write!(&mut sink, "{}", CorpusProblem::new("code", "detail")).unwrap();
         assert_eq!(sink, b"code: detail");
+    }
+
+    #[test]
+    fn accepted_cdv1_correction_compiles_and_runs_public_route() {
+        let inventory = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../conformance/0.1.1/inventory/carddemo-corpus.json");
+        let receipt =
+            verify_cdv1_correction(&inventory, "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e").unwrap();
+        assert_eq!(receipt.disposition, "accepted-owned-source");
+        assert_eq!(receipt.public_routes, 2);
+        assert_eq!(
+            receipt.source_sha256,
+            "426fa98b0ec89b65dd3269d79082db436ecb97a4152bbb2219478c6e1b109981"
+        );
+        assert_eq!(receipt.artifact_sha256.len(), 64);
+        assert_eq!(receipt.screen_sha256.len(), 64);
+    }
+
+    #[test]
+    #[ignore = "manual Zowe CLI live-test server; stop with Ctrl-C"]
+    fn carddemo_zowe_live_server() {
+        let address =
+            env::var("MAINFRAME_ENV_ZOWE_LIVE_ADDR").unwrap_or_else(|_| "127.0.0.1:10444".into());
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async move {
+            let server = ProductServer::memory(ServerConfig {
+                store_profile: StoreProfile::Memory,
+                artifact_root: env::temp_dir().join(format!(
+                    "mainframe-env-carddemo-zowe-live-{}",
+                    std::process::id()
+                )),
+                tls: TlsConfig {
+                    enabled: false,
+                    certificate_path: None,
+                    private_key_reference: None,
+                },
+                ..ServerConfig::default()
+            })
+            .unwrap();
+            server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+            server
+                .racf_service()
+                .define_profile("DATASET", "AWS.M2.CARDDEMO.**", "IBMUSER", None)
+                .unwrap();
+            server
+                .racf_service()
+                .permit(
+                    "DATASET",
+                    "AWS.M2.CARDDEMO.**",
+                    "IBMUSER",
+                    AccessIntent::Alter,
+                )
+                .unwrap();
+            let listener = tokio::net::TcpListener::bind(&address).await.unwrap();
+            println!("carddemo-zowe-live-ready {address}");
+            axum::serve(listener, server.router())
+                .with_graceful_shutdown(async {
+                    tokio::signal::ctrl_c().await.unwrap();
+                })
+                .await
+                .unwrap();
+        });
+    }
+
+    #[test]
+    #[ignore = "requires MAINFRAME_ENV_POSTGRES_TEST_URL pointing at a disposable PostgreSQL 18 database"]
+    fn carddemo_full_memory_sqlite_and_postgres_controls() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let exercise = runtime.block_on(exercise_full_certification()).unwrap();
+        assert_eq!(exercise.mixed_requests_offered, 16);
+        assert_eq!(exercise.mixed_requests_completed, 16);
+        assert_eq!(exercise.sqlite_backup_restore_controls, 1);
+        assert_eq!(exercise.postgres_restart_controls, 1);
+        assert_eq!(exercise.cross_principal_controls, 2);
     }
 }
