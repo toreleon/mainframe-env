@@ -13,6 +13,14 @@ idempotent; same-generation conflict, cross-application table collision, stale
 generation, malformed schema, missing reference, and non-quiescent install fail
 closed.
 
+Signed catalog JSON is decoded through streaming cardinality, text, nesting,
+duplicate, and aggregate bounds before the complete owned graph is constructed.
+Compatible in-place upgrades require full normalized semantic equality.
+Provenance distinguishes legacy tables from application-created tables, so
+rollback restores adopted legacy state while removing only newer
+application-owned tables and dependents. Raw predicates and cursors compare
+exact bytes; only declared VARCHAR columns use strict length-prefix decoding.
+
 The SQL route parses table, column, key, assignment, cursor, and DDL identities
 against the installed catalog. It contains no application table or host-variable
 dispatch. Non-goals are the complete Db2 13 SQL language, optimizer, utility,

@@ -1,4 +1,7 @@
+use base64::Engine;
+use mainframe_env_host_api::{HostProblem, SecretRef};
 use mainframe_env_racf::MemorySecretResolver;
+use mainframe_env_racf::{ResolvedSecret, SecretResolver};
 use mainframe_env_server::{
     ConfigOverrides, HmacSha256PackageTrust, ProductServer, ServerConfig, StoreProfile,
     default_program_router,
@@ -10,6 +13,28 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+
+struct EnvironmentSecretResolver;
+
+impl SecretResolver for EnvironmentSecretResolver {
+    fn resolve(&self, reference: &SecretRef) -> Result<ResolvedSecret, HostProblem> {
+        let name = reference
+            .as_str()
+            .strip_prefix("env-base64:")
+            .filter(|name| {
+                name.starts_with("MAINFRAME_ENV_SECRET_")
+                    && name.bytes().all(|byte| {
+                        byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'_'
+                    })
+            })
+            .ok_or(HostProblem::Malformed)?;
+        let encoded = std::env::var(name).map_err(|_| HostProblem::NotFound)?;
+        let value = base64::engine::general_purpose::STANDARD
+            .decode(encoded.as_bytes())
+            .map_err(|_| HostProblem::Malformed)?;
+        ResolvedSecret::new(value)
+    }
+}
 
 #[tokio::main]
 async fn main() {
@@ -25,7 +50,9 @@ async fn run() -> Result<(), String> {
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("config/mainframe-env.toml"));
     let environment = std::env::vars()
-        .filter(|(name, _)| name.starts_with("MAINFRAME_ENV_"))
+        .filter(|(name, _)| {
+            name.starts_with("MAINFRAME_ENV_") && !name.starts_with("MAINFRAME_ENV_SECRET_")
+        })
         .collect::<BTreeMap<_, _>>();
     let config =
         ServerConfig::from_sources(Some(&config_path), &environment, ConfigOverrides::default())
@@ -47,7 +74,7 @@ async fn run() -> Result<(), String> {
         }
     };
     let package_trust = Arc::new(
-        HmacSha256PackageTrust::from_environment(&environment)
+        HmacSha256PackageTrust::from_environment(&environment, Arc::new(EnvironmentSecretResolver))
             .map_err(|problem| problem.to_string())?,
     );
     let server = ProductServer::open_with_package_trust(

@@ -1105,6 +1105,7 @@ version = "0.2.0"
 dependencies = [
  "mainframe-env-execution-api",
  "mainframe-env-host-api",
+ "serde",
  "serde_json",
  "sha2 0.10.9",
 ]
@@ -1202,6 +1203,7 @@ dependencies = [
  "mainframe-env-source",
  "mainframe-env-store",
  "proptest",
+ "ring",
  "serde",
  "serde_json",
  "sha2 0.10.9",

@@ -80,3 +80,9 @@ mainframe-env-batch = { path = "crates/apps/mainframe-env-batch" }
 mainframe-env-zosmf = { path = "crates/gateways/mainframe-env-zosmf" }
 mainframe-env-server = { path = "crates/apps/mainframe-env-server" }
 mainframe-env-conformance = { path = "crates/tooling/mainframe-env-conformance" }
+
+[profile.release]
+codegen-units = 1
+debug = 0
+incremental = false
+strip = "symbols"

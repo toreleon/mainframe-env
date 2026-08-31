@@ -6,5 +6,5 @@ mod service;
 
 pub use service::{
     MemorySecretResolver, RacfInstallReceipt, RacfLimits, RacfManifest, RacfProfileDefinition,
-    RacfService, RacfUserDefinition, SecretResolver, racf_providers,
+    RacfService, RacfUserDefinition, ResolvedSecret, SecretResolver, racf_providers,
 };

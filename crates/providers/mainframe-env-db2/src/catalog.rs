@@ -3,6 +3,9 @@ use mainframe_env_host_api::{Db2HostVariable, HostProblem};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
+mod bounded_decode;
+pub use bounded_decode::decode_table_definitions_bounded;
+
 pub const DB2_APPLICATION_CATALOG_CONTRACT: &str = "mainframe-env.db2-application-catalog@1";
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -100,6 +103,8 @@ impl Db2CatalogGeneration {
                 || table.columns.is_empty()
                 || table.columns.len() > limits.max_columns
                 || table.primary_key.is_empty()
+                || table.primary_key.len() > limits.max_primary_key_columns
+                || table.foreign_keys.len() > limits.max_foreign_keys_per_table
             {
                 return Err(HostProblem::Malformed);
             }
@@ -123,6 +128,7 @@ impl Db2CatalogGeneration {
                 .any(|column| !columns.contains(&normalize_identifier(column)))
                 || table.extract.as_ref().is_some_and(|layout| {
                     layout.fields.is_empty()
+                        || layout.fields.len() > limits.max_extract_fields
                         || layout.trailer.len() > limits.max_column_bytes
                         || layout.fields.iter().any(|field| {
                             field.width == 0
@@ -141,6 +147,7 @@ impl Db2CatalogGeneration {
                     .get(&foreign_key.referenced_table.to_ascii_uppercase())
                     .ok_or(HostProblem::Malformed)?;
                 if foreign_key.columns.is_empty()
+                    || foreign_key.columns.len() > limits.max_foreign_key_columns
                     || foreign_key.columns.len() != foreign_key.referenced_columns.len()
                     || foreign_key
                         .columns

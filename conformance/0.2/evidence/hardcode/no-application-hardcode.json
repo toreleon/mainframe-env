@@ -11,7 +11,7 @@
   "after": {
     "production_h1_h3_lines": 0,
     "application_string_dispatch": 0,
-    "scanned_rust_files": 87,
+    "scanned_rust_files": 88,
     "forbidden_identity_hits": []
   },
   "allowed_locations": [

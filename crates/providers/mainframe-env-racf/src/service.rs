@@ -10,10 +10,43 @@ use mainframe_env_store_api::{
     ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
 };
 use std::collections::{BTreeMap, BTreeSet};
+use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 
 pub trait SecretResolver: Send + Sync {
-    fn resolve(&self, reference: &SecretRef) -> Result<Vec<u8>, HostProblem>;
+    fn resolve(&self, reference: &SecretRef) -> Result<ResolvedSecret, HostProblem>;
+}
+
+pub struct ResolvedSecret(Vec<u8>);
+
+impl ResolvedSecret {
+    pub fn new(value: Vec<u8>) -> Result<Self, HostProblem> {
+        if value.is_empty() || value.len() > 4_096 {
+            Err(HostProblem::Malformed)
+        } else {
+            Ok(Self(value))
+        }
+    }
+}
+
+impl Deref for ResolvedSecret {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for ResolvedSecret {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Drop for ResolvedSecret {
+    fn drop(&mut self) {
+        self.0.fill(0);
+    }
 }
 #[derive(Default)]
 pub struct MemorySecretResolver {
@@ -35,13 +68,15 @@ impl MemorySecretResolver {
     }
 }
 impl SecretResolver for MemorySecretResolver {
-    fn resolve(&self, reference: &SecretRef) -> Result<Vec<u8>, HostProblem> {
-        self.values
+    fn resolve(&self, reference: &SecretRef) -> Result<ResolvedSecret, HostProblem> {
+        let value = self
+            .values
             .lock()
             .map_err(|_| HostProblem::InfrastructureFailure)?
             .get(reference.as_str())
             .cloned()
-            .ok_or(HostProblem::NotFound)
+            .ok_or(HostProblem::NotFound)?;
+        ResolvedSecret::new(value)
     }
 }
 

@@ -8,7 +8,8 @@ license.workspace = true
 [dependencies]
 mainframe-env-execution-api.workspace = true
 mainframe-env-host-api.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 sha2.workspace = true
 
 [dev-dependencies]
-serde_json.workspace = true

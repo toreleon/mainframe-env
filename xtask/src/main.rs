@@ -71,6 +71,7 @@ fn run() -> TaskResult {
         "full-regression" => check_full_regression(&root),
         "review-repair" => check_review_repair(&root),
         "review-repair-round-2" => check_review_repair_round_2(&root),
+        "review-repair-round-3" => check_review_repair_round_3(&root),
         "semantic-identities" if check => check_semantic_identities(&root),
         "semantic-identities" => generate_semantic_identities(&root),
         "conformance" => {
@@ -91,7 +92,8 @@ fn run() -> TaskResult {
             check_migration_rollback_rollup(&root)?;
             check_full_regression(&root)?;
             check_review_repair(&root)?;
-            check_review_repair_round_2(&root)
+            check_review_repair_round_2(&root)?;
+            check_review_repair_round_3(&root)
         }
         "certification" => check_certification(&root),
         "carddemo-corpus" => check_carddemo_corpus(&root),
@@ -136,7 +138,7 @@ fn run() -> TaskResult {
         }
         "help" | "--help" | "-h" => {
             println!(
-                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|coverage|semantic-identities|application-packages|db2-catalog|batch-controllers|abi-libraries|program-registry|route-registries|dehardcoding|ledger-consistency|migration-rollback|full-regression|review-repair|review-repair-round-2|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check; release additionally requires --target <triple>"
+                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|coverage|semantic-identities|application-packages|db2-catalog|batch-controllers|abi-libraries|program-registry|route-registries|dehardcoding|ledger-consistency|migration-rollback|full-regression|review-repair|review-repair-round-2|review-repair-round-3|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check; release additionally requires --target <triple>"
             );
             Ok(())
         }
@@ -1719,6 +1721,7 @@ fn validate_0_2_schema_artifacts(root: &Path) -> TaskResult {
                 ("manifest.json", "release-manifest.schema.json"),
                 ("sbom.cdx.json", "release-sbom.schema.json"),
                 ("provenance.intoto.json", "release-provenance.schema.json"),
+                ("build-inputs.json", "release-build-inputs.schema.json"),
             ] {
                 let path = target.join(artifact);
                 let schema_path = schemas.join(schema);
@@ -1745,6 +1748,8 @@ fn schema_for_0_2_artifact(version: &str) -> Option<&'static str> {
         "mainframe-env.full-regression@1" => Some("full-regression.schema.json"),
         "mainframe-env.review-repair@1" => Some("review-repair.schema.json"),
         "mainframe-env.review-repair-round-2@1" => Some("review-repair-round-2.schema.json"),
+        "mainframe-env.review-repair-round-3@1" => Some("review-repair-round-3.schema.json"),
+        "mainframe-env.work-package-amendments@1" => Some("work-package-amendments.schema.json"),
         "mainframe-env.common-program-catalog@1" => Some("common-program-catalog.schema.json"),
         "mainframe-env.zosmf-official-route-bindings@1"
         | "mainframe-env.custom-route-catalog@1" => Some("route-registry.schema.json"),
@@ -2037,6 +2042,14 @@ fn check_application_packages(root: &Path) -> TaskResult {
             "security_resource_section",
             "mainframe-env.application.security-resources@1",
         ),
+        (
+            "application_installer_state",
+            "mainframe-env.application-installer@1",
+        ),
+        (
+            "application_publication_state",
+            "mainframe-env.application-publication@1",
+        ),
     ];
     for (name, identity) in expected {
         require(
@@ -2055,13 +2068,21 @@ fn check_application_packages(root: &Path) -> TaskResult {
                 == Value::String("mainframe-env.application-package@2".into())
             && migration["destructive"] == Value::Bool(false)
             && migration["old_reader_retained"] == Value::Bool(true)
-            && migration["provider_state_changed"] == Value::Bool(false)
+            && migration["provider_state_changed"] == Value::Bool(true)
             && migration["atomicity"]["validate_all_references_before_stage"] == Value::Bool(true)
             && migration["atomicity"]["staged_generation_selectable"] == Value::Bool(false)
             && migration["atomicity"]["ready_and_selection_same_critical_section"]
                 == Value::Bool(true)
             && migration["atomicity"]["production_trust_authority_injected"] == Value::Bool(true)
             && migration["atomicity"]["selected_handle_required_for_publication"]
+                == Value::Bool(true)
+            && migration["atomicity"]["retained_packages_persisted_and_reverified_on_open"]
+                == Value::Bool(true)
+            && migration["atomicity"]["publication_identity_bound_to_expected_generation"]
+                == Value::Bool(true)
+            && migration["atomicity"]["publication_sections_recover_from_explicit_durable_states"]
+                == Value::Bool(true)
+            && migration["atomicity"]["partial_publication_never_marks_generation_selected"]
                 == Value::Bool(true)
             && migration["atomicity"]["aggregate_and_retained_bytes_bounded_before_clone"]
                 == Value::Bool(true)
@@ -2072,6 +2093,8 @@ fn check_application_packages(root: &Path) -> TaskResult {
     for path in [
         "conformance/0.2/schemas/application-package-v2.schema.json",
         "conformance/0.2/schemas/application-install-generation.schema.json",
+        "conformance/0.2/schemas/application-installer-state.schema.json",
+        "conformance/0.2/schemas/application-publication-state.schema.json",
         "docs/architecture/APPLICATION-PACKAGES.md",
         "crates/kernel/mainframe-env-application/README.md",
     ] {
@@ -2108,9 +2131,13 @@ fn check_application_packages(root: &Path) -> TaskResult {
     let product = read(&root.join("crates/apps/mainframe-env-server/src/product.rs"))?;
     let production_product = product.split("#[cfg(test)]").next().unwrap_or(&product);
     for required in [
-        "applications_v2: ApplicationInstallerV2",
+        "applications_v2: Mutex<DurableApplicationsV2>",
         "pub fn open_with_package_trust",
         "HmacSha256PackageTrust",
+        "MAINFRAME_ENV_PACKAGE_HMAC_KEY_REFS",
+        "APPLICATION_PUBLICATION_CONTRACT",
+        "pub fn publish_application_generation",
+        "pub fn rollback_application_generation",
         "fn selected_application_v2",
     ] {
         require(
@@ -2269,8 +2296,9 @@ fn check_batch_controllers(root: &Path) -> TaskResult {
     let product = read(&root.join("crates/apps/mainframe-env-server/src/product.rs"))?;
     let production_product = product.split("#[cfg(test)]").next().unwrap_or(&product);
     require(
-        production_product.contains("pub fn install_application_batch_controllers")
+        production_product.contains("pub fn publish_application_generation")
             && production_product.contains("selected_application_v2")
+            && production_product.contains("apply_application_batch_controllers")
             && production_product.contains("BatchControllerProgram")
             && production_product.contains("decode_application_batch_controller")
             && !production_product.contains("selected_identity: &str"),
@@ -3409,17 +3437,33 @@ fn check_coverage_work_package_evidence(root: &Path) -> TaskResult {
             &format!("{} evidence digest is stale", path.display()),
         )?;
         let receipt = Value::Object(receipt.clone());
+        let subject = work_package_completion_subject(work_package)?;
+        let package_trailer = format!("{work_package}=pass");
+        let completion = find_completion_commit(
+            root,
+            subject,
+            &[
+                ("Work-Package", package_trailer.as_str()),
+                ("Target-Version", "0.2.0"),
+                ("Evidence-Digest", digest.as_str()),
+            ],
+        )?;
+        let parent = command_text(root, "git", &["rev-parse", &format!("{completion}^")])?;
+        verify_completion_parent(root, &completion, &parent)?;
         require(
             receipt["target_version"] == Value::String("0.2.0".into())
-                && receipt["source_identity"]
-                    .as_str()
-                    .is_some_and(|identity| identity.len() == 40)
+                && receipt["source_identity"].as_str() == Some(parent.as_str())
                 && receipt["commands"]
                     .as_array()
                     .is_some_and(|commands| !commands.is_empty())
                 && receipt["invariants"].is_object(),
             &format!("{} receipt is incomplete", path.display()),
         )?;
+        let relative_evidence = path
+            .strip_prefix(root)
+            .map_err(|error| error.to_string())?
+            .to_string_lossy();
+        verify_commit_bound_live_file(root, &completion, &relative_evidence, &path)?;
         for artifact in receipt["artifacts"]
             .as_array()
             .ok_or_else(|| format!("{} receipt artifacts are missing", path.display()))?
@@ -3432,12 +3476,96 @@ fn check_coverage_work_package_evidence(root: &Path) -> TaskResult {
             let expected = text(artifact, "sha256", &path)?;
             validate_sha256_identity(expected, "work-package artifact digest")?;
             require(
-                expected == format!("sha256:{}", file_digest(&root.join(artifact_path))?),
-                &format!("{} artifact {artifact_path} drifted", path.display()),
+                expected
+                    == format!(
+                        "sha256:{}",
+                        git_file_digest(root, &completion, artifact_path)?
+                    ),
+                &format!(
+                    "{} historical artifact {artifact_path} drifted",
+                    path.display()
+                ),
+            )?;
+        }
+    }
+    check_work_package_amendments(root)?;
+    Ok(())
+}
+
+fn check_work_package_amendments(root: &Path) -> TaskResult {
+    let path = root.join("conformance/0.2/evidence/work-package-amendments.json");
+    let evidence = json(&path)?;
+    require(
+        evidence["schema_version"]
+            == Value::String("mainframe-env.work-package-amendments@1".into())
+            && evidence["target_version"] == Value::String("0.2.0".into())
+            && evidence["status"] == Value::String("pass".into())
+            && evidence["historical_receipts_rewritten"] == Value::Bool(false),
+        "work-package amendment evidence header is invalid",
+    )?;
+    let amendments = array(&evidence, "amendments", &path)?;
+    require(
+        amendments.len() == 4
+            && amendments
+                .iter()
+                .map(|row| row["work_package"].as_str())
+                .eq([
+                    Some("CV-204"),
+                    Some("CV-205"),
+                    Some("CV-206"),
+                    Some("CV-209"),
+                ]),
+        "work-package amendments must cover CV-204/CV-205/CV-206/CV-209 exactly",
+    )?;
+    for amendment in amendments {
+        let work_package = text(amendment, "work_package", &path)?;
+        let historical = amendment
+            .get("historical")
+            .and_then(Value::as_object)
+            .ok_or_else(|| format!("{work_package} historical identity is missing"))?;
+        let historical = Value::Object(historical.clone());
+        let completion = text(&historical, "completion_commit", &path)?;
+        let receipt_path = text(&historical, "receipt_path", &path)?;
+        let receipt_digest = text(&historical, "evidence_digest", &path)?;
+        validate_sha256_identity(receipt_digest, "historical work-package evidence digest")?;
+        let live_receipt = json(&root.join(receipt_path))?;
+        require(
+            live_receipt["evidence_digest"].as_str() == Some(receipt_digest),
+            &format!("{work_package} historical evidence digest drifted"),
+        )?;
+        verify_commit_bound_live_file(root, completion, receipt_path, &root.join(receipt_path))?;
+        for artifact in amendment["repair_artifacts"]
+            .as_array()
+            .ok_or_else(|| format!("{work_package} repair artifacts are missing"))?
+        {
+            let relative = text(artifact, "path", &path)?;
+            let expected = text(artifact, "sha256", &path)?;
+            require(
+                !relative.contains("..")
+                    && !Path::new(relative).is_absolute()
+                    && expected == format!("sha256:{}", file_digest(&root.join(relative))?),
+                &format!("{work_package} repair artifact drifted: {relative}"),
             )?;
         }
     }
     Ok(())
+}
+
+fn work_package_completion_subject(work_package: &str) -> TaskResult<&'static str> {
+    match work_package {
+        "CV-201" => Ok("Complete CV-201 official coverage catalogs"),
+        "CV-202" => Ok("Complete CV-202 coverage evidence contracts"),
+        "CV-203" => Ok("Complete CV-203 generated semantic dispatch"),
+        "CV-204" => Ok("Complete CV-204 application package generations"),
+        "CV-205" => Ok("Complete CV-205 generic Db2 package catalog"),
+        "CV-206" => Ok("Complete CV-206 installed batch controllers"),
+        "CV-207" => Ok("Complete CV-207 subsystem ABI libraries"),
+        "CV-208" => Ok("Complete CV-208 generated dispatch registries"),
+        "CV-209" => Ok("Complete CV-209 evidence ledger closure"),
+        _ => Err(format!(
+            "unknown work-package completion subject: {work_package}"
+        )),
+    }
 }
 
 fn check_coverage_program_status(root: &Path) -> TaskResult {
@@ -3829,7 +3957,8 @@ fn check_full_regression(root: &Path) -> TaskResult {
         "cargo xtask certification --check",
         "cargo xtask carddemo-full --check",
         "Zowe CLI 8.36.0",
-        "cargo xtask release --check --target",
+        "cargo xtask release --check --target aarch64-apple-darwin",
+        "cargo xtask release --check --target x86_64-unknown-linux-gnu",
         "git diff --check",
     ] {
         require(
@@ -3856,32 +3985,22 @@ fn check_full_regression(root: &Path) -> TaskResult {
             && receipt["release"]["artifacts_verified"] == Value::Bool(true),
         "full regression workload, PostgreSQL, CardDemo, Zowe, or release result is incomplete",
     )?;
-    for (name, relative) in [
-        (
-            "manifest_sha256",
-            "release/0.2.0/targets/aarch64-apple-darwin/manifest.json",
-        ),
-        (
-            "sbom_sha256",
-            "release/0.2.0/targets/aarch64-apple-darwin/sbom.cdx.json",
-        ),
-        (
-            "provenance_sha256",
-            "release/0.2.0/targets/aarch64-apple-darwin/provenance.intoto.json",
-        ),
-        (
-            "checksums_sha256",
-            "release/0.2.0/targets/aarch64-apple-darwin/checksums.sha256",
-        ),
-        (
-            "licenses_sha256",
-            "release/0.2.0/targets/aarch64-apple-darwin/LICENSES.md",
-        ),
-    ] {
-        require(
-            receipt["release"][name].as_str() == Some(file_digest(&root.join(relative))?.as_str()),
-            &format!("full regression release artifact digest drifted: {relative}"),
-        )?;
+    for target in ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu"] {
+        for (name, file) in [
+            ("manifest_sha256", "manifest.json"),
+            ("sbom_sha256", "sbom.cdx.json"),
+            ("provenance_sha256", "provenance.intoto.json"),
+            ("checksums_sha256", "checksums.sha256"),
+            ("licenses_sha256", "LICENSES.md"),
+            ("build_inputs_sha256", "build-inputs.json"),
+        ] {
+            let relative = format!("release/0.2.0/targets/{target}/{file}");
+            require(
+                receipt["release"]["targets"][target][name].as_str()
+                    == Some(file_digest(&root.join(&relative))?.as_str()),
+                &format!("full regression release artifact digest drifted: {relative}"),
+            )?;
+        }
     }
     require(
         receipt["remote_actions"]["tagged"] == Value::Bool(false)
@@ -3909,12 +4028,6 @@ fn check_full_regression(root: &Path) -> TaskResult {
 }
 
 fn check_review_repair(root: &Path) -> TaskResult {
-    const REPAIR_COMMIT: &str = "77119bff9b1bef16ee28e94a2ea9ccdcccc22d6b";
-    const REPAIR_SOURCE_DIGEST: &str =
-        "sha256:4d287940960b1c645364d38605f975b3dc3302999c97f04cdfc0b69a4d4eb159";
-    check_application_packages(root)?;
-    check_db2_catalog(root)?;
-    check_batch_controllers(root)?;
     let path = root.join("conformance/0.2/evidence/review-repair.json");
     let evidence = json(&path)?;
     require(
@@ -3934,27 +4047,22 @@ fn check_review_repair(root: &Path) -> TaskResult {
         "review repair evidence digest is stale",
     )?;
     let receipt = Value::Object(receipt.clone());
+    let completion = find_completion_commit(
+        root,
+        "Repair 0.2.0 review findings",
+        &[
+            ("Review-Findings", "7=closed"),
+            ("Target-Version", "0.2.0"),
+            ("Evidence-Digest", digest.as_str()),
+        ],
+    )?;
+    let parent = command_text(root, "git", &["rev-parse", &format!("{completion}^")])?;
     require(
         receipt["target_version"] == Value::String("0.2.0".into())
-            && receipt["source_identity"]
-                == Value::String("cf834b8d57514f933d1ff6d439949ffb0b8065fa".into())
-            && receipt["candidate_source_digest"].as_str() == Some(REPAIR_SOURCE_DIGEST),
+            && receipt["source_identity"] == Value::String(parent)
+            && receipt["candidate_source_digest"].as_str()
+                == Some(repository_digest_at_commit(root, &completion)?.as_str()),
         "review repair candidate identity drifted",
-    )?;
-    require(
-        command_text(root, "git", &["rev-parse", &format!("{REPAIR_COMMIT}^")])?
-            == receipt["source_identity"]
-            && command_text(root, "git", &["show", "-s", "--format=%s", REPAIR_COMMIT])?
-                == "Repair 0.2.0 review findings",
-        "review repair history is not bound to its recorded completion commit",
-    )?;
-    let completion_message =
-        command_text(root, "git", &["show", "-s", "--format=%B", REPAIR_COMMIT])?;
-    require(
-        completion_message.contains("Review-Findings: 7=closed")
-            && completion_message.contains("Target-Version: 0.2.0")
-            && completion_message.contains(&format!("Evidence-Digest: {digest}")),
-        "review repair completion trailers drifted",
     )?;
     let findings = array(&receipt, "findings", &path)?;
     require(
@@ -4008,18 +4116,28 @@ fn check_review_repair(root: &Path) -> TaskResult {
         let relative = text(artifact, "path", &path)?;
         let expected = text(artifact, "sha256", &path)?;
         require(
-            expected == format!("sha256:{}", git_file_digest(root, REPAIR_COMMIT, relative)?),
+            expected == format!("sha256:{}", git_file_digest(root, &completion, relative)?),
             &format!("review repair historical artifact drifted: {relative}"),
         )?;
     }
-    let workflow = read(&root.join(".github/workflows/ci.yml"))?;
+    let workflow = String::from_utf8(git_file_bytes(
+        root,
+        &completion,
+        ".github/workflows/ci.yml",
+    )?)
+    .map_err(|error| error.to_string())?;
     require(
         workflow.contains("fetch-depth: 0")
             && workflow.contains("fetch-tags: true")
             && workflow.contains("cargo xtask release --check --target x86_64-unknown-linux-gnu"),
         "CI does not exercise full-history conformance and portable release verification",
     )?;
-    let manifest = json(&root.join("release/0.2.0/targets/aarch64-apple-darwin/manifest.json"))?;
+    let manifest: Value = serde_json::from_slice(&git_file_bytes(
+        root,
+        &completion,
+        "release/0.2.0/targets/aarch64-apple-darwin/manifest.json",
+    )?)
+    .map_err(|error| error.to_string())?;
     require(
         manifest["target"] == Value::String("aarch64-apple-darwin".into())
             && manifest["published"] == Value::Bool(false)
@@ -4032,9 +4150,6 @@ fn check_review_repair(root: &Path) -> TaskResult {
 }
 
 fn check_review_repair_round_2(root: &Path) -> TaskResult {
-    const SOURCE_COMMIT: &str = "77119bff9b1bef16ee28e94a2ea9ccdcccc22d6b";
-    const PREREQUISITE_SOURCE: &str = "d4b94362af56f2847bbd62d106867e6f0bb0648a";
-    const PREREQUISITE_COMMIT: &str = "ba1b78a";
     check_review_repair(root)?;
     let path = root.join("conformance/0.2/evidence/review-repair-round-2.json");
     let evidence = json(&path)?;
@@ -4055,29 +4170,37 @@ fn check_review_repair_round_2(root: &Path) -> TaskResult {
         "round-2 review repair evidence digest is stale",
     )?;
     let receipt = Value::Object(receipt.clone());
-    require(
-        receipt["target_version"] == Value::String("0.2.0".into())
-            && receipt["source_identity"] == Value::String(SOURCE_COMMIT.into())
-            && receipt["prerequisite_source"] == Value::String(PREREQUISITE_SOURCE.into())
-            && receipt["prerequisite_commit"]
-                .as_str()
-                .is_some_and(|commit| commit.starts_with(PREREQUISITE_COMMIT))
-            && receipt["candidate_source_digest"].as_str()
-                == Some(repository_digest(root)?.as_str()),
-        "round-2 review repair candidate identity drifted",
+    let completion = find_completion_commit(
+        root,
+        "Repair 0.2.0 follow-up review findings",
+        &[
+            ("Follow-Up-Findings", "10=closed"),
+            ("Target-Version", "0.2.0"),
+            ("Evidence-Digest", digest.as_str()),
+        ],
     )?;
     let prerequisite = text(&receipt, "prerequisite_commit", &path)?;
+    let source = text(&receipt, "source_identity", &path)?;
+    let prerequisite_source = text(&receipt, "prerequisite_source", &path)?;
     require(
-        command_text(root, "git", &["rev-parse", &format!("{prerequisite}^")])? == SOURCE_COMMIT
-            && command_text(root, "git", &["show", "-s", "--format=%s", prerequisite])?
-                == "Clarify coverage worker PR authorization"
-            && command_text(root, "git", &["rev-parse", PREREQUISITE_SOURCE])?
-                == PREREQUISITE_SOURCE,
+        receipt["target_version"] == Value::String("0.2.0".into())
+            && receipt["candidate_source_digest"].as_str()
+                == Some(repository_digest_at_commit(root, &completion)?.as_str())
+            && command_text(root, "git", &["rev-parse", &format!("{completion}^")])?
+                == prerequisite
+            && command_text(root, "git", &["rev-parse", &format!("{prerequisite}^")])? == source,
+        "round-2 review repair candidate identity drifted",
+    )?;
+    require(
+        command_text(root, "git", &["show", "-s", "--format=%s", prerequisite])?
+            == "Clarify coverage worker PR authorization"
+            && command_text(root, "git", &["rev-parse", prerequisite_source])?
+                == prerequisite_source,
         "round-2 prerequisite cherry-pick identity drifted",
     )?;
     let round_one = &receipt["round_one"];
     require(
-        round_one["completion_commit"] == Value::String(SOURCE_COMMIT.into())
+        round_one["completion_commit"] == Value::String(source.into())
             && round_one["evidence_path"]
                 == Value::String("conformance/0.2/evidence/review-repair.json".into())
             && round_one["evidence_digest"]
@@ -4157,18 +4280,28 @@ fn check_review_repair_round_2(root: &Path) -> TaskResult {
         )?;
         let expected = text(artifact, "sha256", &path)?;
         require(
-            expected == format!("sha256:{}", file_digest(&root.join(relative))?),
-            &format!("round-2 review repair artifact digest drifted: {relative}"),
+            expected == format!("sha256:{}", git_file_digest(root, &completion, relative)?),
+            &format!("round-2 historical artifact digest drifted: {relative}"),
         )?;
     }
-    let workflow = read(&root.join(".github/workflows/ci.yml"))?;
+    let workflow = String::from_utf8(git_file_bytes(
+        root,
+        &completion,
+        ".github/workflows/ci.yml",
+    )?)
+    .map_err(|error| error.to_string())?;
     require(
         workflow.contains("fetch-depth: 0")
             && workflow.contains("fetch-tags: true")
             && workflow.contains("cargo xtask release --check --target x86_64-unknown-linux-gnu"),
         "CI does not retain the round-2 Linux release gate",
     )?;
-    let manifest = json(&root.join("release/0.2.0/targets/aarch64-apple-darwin/manifest.json"))?;
+    let manifest: Value = serde_json::from_slice(&git_file_bytes(
+        root,
+        &completion,
+        "release/0.2.0/targets/aarch64-apple-darwin/manifest.json",
+    )?)
+    .map_err(|error| error.to_string())?;
     require(
         manifest["target"] == Value::String("aarch64-apple-darwin".into())
             && manifest["published"] == Value::Bool(false)
@@ -4177,6 +4310,225 @@ fn check_review_repair_round_2(root: &Path) -> TaskResult {
             && receipt["remote_actions"]["deployed"] == Value::Bool(false)
             && receipt["remote_actions"]["merged"] == Value::Bool(false),
         "round-2 review repair crossed the release boundary",
+    )
+}
+
+fn check_review_repair_round_3(root: &Path) -> TaskResult {
+    check_review_repair_round_2(root)?;
+    let path = root.join("conformance/0.2/evidence/review-repair-round-3.json");
+    let evidence = json(&path)?;
+    require(
+        evidence["schema_version"] == Value::String("mainframe-env.review-repair-round-3@1".into())
+            && evidence["derived"] == Value::Bool(true)
+            && evidence["status"] == Value::String("pass".into()),
+        "round-3 review repair evidence header is invalid",
+    )?;
+    let receipt = evidence
+        .get("receipt")
+        .and_then(Value::as_object)
+        .ok_or("round-3 review repair receipt is missing")?;
+    let canonical = serde_json::to_vec(receipt).map_err(|error| error.to_string())?;
+    let digest = format!("sha256:{:x}", Sha256::digest(canonical));
+    require(
+        evidence["evidence_digest"].as_str() == Some(digest.as_str()),
+        "round-3 review repair evidence digest is stale",
+    )?;
+    let receipt = Value::Object(receipt.clone());
+    let completion = find_completion_commit(
+        root,
+        "Repair 0.2.0 third review findings",
+        &[
+            ("Third-Review-Findings", "11=closed"),
+            ("Target-Version", "0.2.0"),
+            ("Evidence-Digest", digest.as_str()),
+        ],
+    )?;
+    let source = text(&receipt, "source_identity", &path)?;
+    let prerequisite_source = text(&receipt, "prerequisite_source", &path)?;
+    let prerequisite = text(&receipt, "prerequisite_commit", &path)?;
+    verify_completion_parent(root, &completion, prerequisite)?;
+    verify_completion_parent(root, prerequisite, source)?;
+    require(
+        receipt["target_version"] == Value::String("0.2.0".into())
+            && source == "2513e9e56f330369e4a5f4e9a06c043ca99a024a"
+            && prerequisite_source == "d4b94362af56f2847bbd62d106867e6f0bb0648a"
+            && command_text(root, "git", &["show", "-s", "--format=%s", prerequisite])?
+                == "Clarify coverage worker PR authorization"
+            && command_text(root, "git", &["rev-parse", prerequisite_source])?
+                == prerequisite_source
+            && receipt["candidate_source_digest"].as_str()
+                == Some(repository_digest_at_commit(root, &completion)?.as_str()),
+        "round-3 review repair source, prerequisite, or candidate identity drifted",
+    )?;
+    let historical = array(&receipt, "historical_repairs", &path)?;
+    require(
+        historical.len() == 2
+            && historical.iter().enumerate().all(|(index, row)| {
+                row["round"].as_u64() == Some((index + 1) as u64)
+                    && row["validation"] == Value::String("commit-bound".into())
+            }),
+        "round-3 repair must preserve rounds one and two as commit-bound evidence",
+    )?;
+    for (round, subject, trailer_name, trailer_value) in [
+        (
+            1_u64,
+            "Repair 0.2.0 review findings",
+            "Review-Findings",
+            "7=closed",
+        ),
+        (
+            2,
+            "Repair 0.2.0 follow-up review findings",
+            "Follow-Up-Findings",
+            "10=closed",
+        ),
+    ] {
+        let row = historical
+            .iter()
+            .find(|row| row["round"].as_u64() == Some(round))
+            .ok_or_else(|| format!("round-{round} historical repair identity is missing"))?;
+        let historical_digest = text(row, "evidence_digest", &path)?;
+        let historical_completion = find_completion_commit(
+            root,
+            subject,
+            &[
+                (trailer_name, trailer_value),
+                ("Target-Version", "0.2.0"),
+                ("Evidence-Digest", historical_digest),
+            ],
+        )?;
+        require(
+            row["completion_commit"].as_str() == Some(historical_completion.as_str()),
+            &format!("round-{round} historical completion identity drifted"),
+        )?;
+    }
+    let findings = array(&receipt, "findings", &path)?;
+    require(
+        findings.len() == 11
+            && findings.iter().enumerate().all(|(index, finding)| {
+                finding["id"].as_u64() == Some((index + 1) as u64)
+                    && finding["state"] == Value::String("closed".into())
+                    && finding["repair"]
+                        .as_str()
+                        .is_some_and(|repair| !repair.is_empty())
+                    && finding["regression"]
+                        .as_str()
+                        .is_some_and(|test| !test.is_empty())
+            }),
+        "round-3 review repair must close exactly findings 1 through 11",
+    )?;
+    let commands = array(&receipt, "commands", &path)?;
+    require(
+        commands.len() >= 25
+            && commands
+                .iter()
+                .all(|command| command["exit_code"].as_i64() == Some(0)),
+        "round-3 review repair validation matrix is incomplete or failed",
+    )?;
+    let command_texts = commands
+        .iter()
+        .filter_map(|command| command["command"].as_str())
+        .collect::<Vec<_>>();
+    for required in [
+        "cargo test --locked -p mainframe-env-application",
+        "cargo test --locked -p mainframe-env-db2",
+        "cargo test --locked -p mainframe-env-racf",
+        "cargo test --locked -p mainframe-env-server",
+        "cargo test -p xtask --locked",
+        "cargo fmt --all -- --check",
+        "cargo check --workspace --all-targets --all-features --locked",
+        "cargo test --workspace --all-features --locked --no-fail-fast",
+        "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings",
+        "cargo doc --workspace --all-features --no-deps --locked",
+        "cargo +1.95.0 check",
+        "cargo deny check",
+        "cargo xtask runtime-architecture --check",
+        "cargo xtask schemas --check",
+        "cargo xtask application-packages --check",
+        "cargo xtask db2-catalog --check",
+        "cargo xtask batch-controllers --check",
+        "cargo xtask migration-rollback --check",
+        "PostgreSQL 18",
+        "cargo xtask carddemo-full --check",
+        "Zowe CLI 8.36.0",
+        "cargo xtask release --check --target aarch64-apple-darwin",
+        "cargo xtask release --check --target x86_64-unknown-linux-gnu",
+        "cargo xtask conformance --check",
+        "cargo xtask certification --check",
+        "git diff --check",
+    ] {
+        require(
+            command_texts
+                .iter()
+                .any(|command| command.contains(required)),
+            &format!("round-3 review repair validation omits {required}"),
+        )?;
+    }
+    require(
+        receipt["toolchains"]["rust"] == Value::String("1.98.0".into())
+            && receipt["toolchains"]["msrv"] == Value::String("1.95.0".into())
+            && receipt["toolchains"]["zowe_cli"] == Value::String("8.36.0".into())
+            && receipt["toolchains"]["postgresql"] == Value::String("18".into())
+            && receipt["toolchains"]["targets"]
+                .as_array()
+                .is_some_and(|targets| {
+                    targets.as_slice()
+                        == [
+                            Value::String("aarch64-apple-darwin".into()),
+                            Value::String("x86_64-unknown-linux-gnu".into()),
+                        ]
+                })
+            && receipt["pull_request"]["number"].as_u64() == Some(1)
+            && receipt["pull_request"]["head"] == Value::String("impl/0.2.0".into())
+            && receipt["pull_request"]["base"] == Value::String("main".into())
+            && receipt["pull_request"]["check_identities"]
+                .as_array()
+                .is_some_and(|checks| checks.len() == 2),
+        "round-3 toolchain, target, PR, or check identities are incomplete",
+    )?;
+    for artifact in array(&receipt, "artifacts", &path)? {
+        let relative = text(artifact, "path", &path)?;
+        let expected = text(artifact, "sha256", &path)?;
+        require(
+            !relative.contains("..")
+                && !Path::new(relative).is_absolute()
+                && expected == format!("sha256:{}", git_file_digest(root, &completion, relative)?),
+            &format!("round-3 historical artifact digest drifted: {relative}"),
+        )?;
+    }
+    let workflow = String::from_utf8(git_file_bytes(
+        root,
+        &completion,
+        ".github/workflows/ci.yml",
+    )?)
+    .map_err(|error| error.to_string())?;
+    require(
+        workflow.contains("fetch-depth: 0")
+            && workflow.contains("fetch-tags: true")
+            && workflow.contains("rust:1.98.0-bookworm@sha256:")
+            && workflow.contains("cargo xtask release --check --target x86_64-unknown-linux-gnu"),
+        "CI does not retain the pinned round-3 Linux release gate",
+    )?;
+    for target in ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu"] {
+        let manifest_path = format!("release/0.2.0/targets/{target}/manifest.json");
+        let manifest: Value =
+            serde_json::from_slice(&git_file_bytes(root, &completion, &manifest_path)?)
+                .map_err(|error| error.to_string())?;
+        require(
+            manifest["target"] == Value::String(target.into())
+                && manifest["published"] == Value::Bool(false)
+                && manifest["artifacts"]
+                    .as_array()
+                    .is_some_and(|artifacts| artifacts.len() == 6),
+            &format!("round-3 {target} release evidence is incomplete"),
+        )?;
+    }
+    require(
+        receipt["remote_actions"]["tagged"] == Value::Bool(false)
+            && receipt["remote_actions"]["published"] == Value::Bool(false)
+            && receipt["remote_actions"]["deployed"] == Value::Bool(false)
+            && receipt["remote_actions"]["merged"] == Value::Bool(false),
+        "round-3 review repair crossed the release boundary",
     )
 }
 
@@ -4598,20 +4950,75 @@ fn repository_digest(root: &Path) -> TaskResult<String> {
     let mut digest = Sha256::new();
     for file in files {
         let relative = file.strip_prefix(root).map_err(|error| error.to_string())?;
-        let relative_text = relative.to_string_lossy();
+        if repository_digest_excluded(relative) {
+            continue;
+        }
+        let bytes = fs::read(&file).map_err(|error| format!("{}: {error}", file.display()))?;
+        let path = relative.to_string_lossy();
+        digest.update((path.len() as u64).to_be_bytes());
+        digest.update(path.as_bytes());
+        digest.update((bytes.len() as u64).to_be_bytes());
+        digest.update(bytes);
+    }
+    Ok(format!("sha256:{:x}", digest.finalize()))
+}
+
+fn repository_digest_at_commit(root: &Path, commit: &str) -> TaskResult<String> {
+    let listing = command_text(root, "git", &["ls-tree", "-r", "--name-only", commit])?;
+    let mut files = listing.lines().map(PathBuf::from).collect::<Vec<_>>();
+    files.sort();
+    let mut digest = Sha256::new();
+    for relative in files {
+        if repository_digest_excluded(&relative) {
+            continue;
+        }
+        let relative = relative.to_string_lossy();
+        let bytes = git_file_bytes(root, commit, &relative)?;
+        digest.update((relative.len() as u64).to_be_bytes());
+        digest.update(relative.as_bytes());
+        digest.update((bytes.len() as u64).to_be_bytes());
+        digest.update(bytes);
+    }
+    Ok(format!("sha256:{:x}", digest.finalize()))
+}
+
+fn repository_digest_excluded(relative: &Path) -> bool {
+    let relative_text = relative.to_string_lossy();
+    relative.starts_with(".git")
+        || relative.starts_with("target")
+        || relative.starts_with("conformance/0.1/evidence/raw")
+        || relative == Path::new("conformance/0.1/evidence/program-status.json")
+        || relative == Path::new("conformance/0.2/evidence/program-status.json")
+        || relative == Path::new("conformance/0.2/evidence/workload-ledger.json")
+        || relative == Path::new("conformance/0.2/evidence/full-regression.json")
+        || relative == Path::new("conformance/0.2/evidence/review-repair.json")
+        || relative == Path::new("conformance/0.2/evidence/review-repair-round-2.json")
+        || relative == Path::new("conformance/0.2/evidence/review-repair-round-3.json")
+        || relative == Path::new("conformance/0.2/evidence/work-packages/CV-209.json")
+        || relative == Path::new("docs/delivery/coverage-versions/status/0.2.0.md")
+        || (relative_text.starts_with("conformance/0.1/evidence/phase-v")
+            && relative.extension() == Some(OsStr::new("json")))
+}
+
+fn release_source_digest(root: &Path) -> TaskResult<String> {
+    let mut files = Vec::new();
+    collect_files(root, &mut files)?;
+    files.sort();
+    let mut digest = Sha256::new();
+    for file in files {
+        let relative = file.strip_prefix(root).map_err(|error| error.to_string())?;
         if relative.starts_with(".git")
             || relative.starts_with("target")
+            || relative.starts_with("release")
             || relative.starts_with("conformance/0.1/evidence/raw")
-            || relative == Path::new("conformance/0.1/evidence/program-status.json")
             || relative == Path::new("conformance/0.2/evidence/program-status.json")
             || relative == Path::new("conformance/0.2/evidence/workload-ledger.json")
             || relative == Path::new("conformance/0.2/evidence/full-regression.json")
             || relative == Path::new("conformance/0.2/evidence/review-repair.json")
             || relative == Path::new("conformance/0.2/evidence/review-repair-round-2.json")
+            || relative == Path::new("conformance/0.2/evidence/review-repair-round-3.json")
             || relative == Path::new("conformance/0.2/evidence/work-packages/CV-209.json")
             || relative == Path::new("docs/delivery/coverage-versions/status/0.2.0.md")
-            || (relative_text.starts_with("conformance/0.1/evidence/phase-v")
-                && relative.extension() == Some(OsStr::new("json")))
         {
             continue;
         }
@@ -4665,7 +5072,39 @@ fn host_target(root: &Path) -> TaskResult<String> {
 
 fn build_release_target(root: &Path, target: &str) -> TaskResult {
     validate_release_target(target)?;
-    let status = Command::new("cargo")
+    let mut rustflags = vec![format!(
+        "--remap-path-prefix={}=/workspace/mainframe-env",
+        root.display()
+    )];
+    let user_home = env::var_os("HOME").map(PathBuf::from);
+    for (path, replacement) in [
+        (
+            env::var_os("CARGO_HOME")
+                .map(PathBuf::from)
+                .or_else(|| user_home.as_ref().map(|home| home.join(".cargo"))),
+            "/cargo",
+        ),
+        (
+            env::var_os("RUSTUP_HOME")
+                .map(PathBuf::from)
+                .or_else(|| user_home.as_ref().map(|home| home.join(".rustup"))),
+            "/rustup",
+        ),
+    ] {
+        if let Some(path) = path {
+            rustflags.push(format!(
+                "--remap-path-prefix={}={replacement}",
+                path.display()
+            ));
+        }
+    }
+    if target.contains("apple-darwin") {
+        rustflags.push("-C link-arg=-Wl,-no_uuid".into());
+    } else if target.contains("linux-gnu") {
+        rustflags.push("-C link-arg=-Wl,--build-id=sha1".into());
+    }
+    let mut command = Command::new("cargo");
+    command
         .args([
             "build",
             "--release",
@@ -4678,7 +5117,18 @@ fn build_release_target(root: &Path, target: &str) -> TaskResult {
             "--target",
             target,
         ])
+        .env("CARGO_INCREMENTAL", "0")
+        .env("SOURCE_DATE_EPOCH", "0")
+        .env("ZERO_AR_DATE", "1")
+        .env("LC_ALL", "C")
+        .env("TZ", "UTC")
+        .env("RUSTFLAGS", rustflags.join(" "))
         .current_dir(root)
+        .env_remove("CARGO_ENCODED_RUSTFLAGS");
+    if target.contains("apple-darwin") {
+        command.env("MACOSX_DEPLOYMENT_TARGET", "15.0");
+    }
+    let status = command
         .status()
         .map_err(|error| format!("cargo release build for {target}: {error}"))?;
     require(
@@ -4702,28 +5152,68 @@ fn generate_release_artifacts(root: &Path, target: &str) -> TaskResult {
 }
 
 fn check_release_artifacts(root: &Path, target: &str) -> TaskResult {
+    let retained = retained_release_documents(root, target)?;
     build_release_target(root, target)?;
     let documents = release_documents(root, target)?;
     validate_release_documents(&documents, target)?;
-    let directory = root.join(format!(
-        "release/{}/targets/{target}",
-        read(&root.join("VERSION"))?.trim()
-    ));
-    if directory.is_dir() {
-        for (relative, expected) in documents {
-            let path = root.join(&relative);
-            let actual = fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?;
-            require(
-                actual == expected,
-                &format!(
-                    "{} is stale; run cargo xtask release --target {target}",
-                    relative.display()
-                ),
-            )?;
-        }
-    }
+    compare_release_documents(&retained, &documents)?;
     validate_checked_in_release_targets(root)?;
     Ok(())
+}
+
+fn compare_release_documents(
+    retained: &BTreeMap<PathBuf, Vec<u8>>,
+    generated: &BTreeMap<PathBuf, Vec<u8>>,
+) -> TaskResult {
+    require(
+        retained.keys().eq(generated.keys()),
+        "retained target evidence file set drifted",
+    )?;
+    for (relative, expected) in generated {
+        let actual = retained
+            .get(relative)
+            .ok_or_else(|| format!("retained target evidence omits {}", relative.display()))?;
+        require(
+            actual == expected,
+            &format!(
+                "{} is stale; regenerate target evidence independently",
+                relative.display()
+            ),
+        )?;
+    }
+    Ok(())
+}
+
+fn retained_release_documents(root: &Path, target: &str) -> TaskResult<BTreeMap<PathBuf, Vec<u8>>> {
+    validate_release_target(target)?;
+    let version = read(&root.join("VERSION"))?.trim().to_string();
+    let directory = root.join(format!("release/{version}/targets/{target}"));
+    require(
+        directory.is_dir(),
+        &format!("retained target evidence is missing for {target}"),
+    )?;
+    let mut documents = BTreeMap::new();
+    for name in [
+        "manifest.json",
+        "sbom.cdx.json",
+        "provenance.intoto.json",
+        "checksums.sha256",
+        "LICENSES.md",
+        "build-inputs.json",
+    ] {
+        let path = directory.join(name);
+        require(
+            path.is_file(),
+            &format!("retained target evidence omits {name} for {target}"),
+        )?;
+        documents.insert(
+            path.strip_prefix(root)
+                .map_err(|error| error.to_string())?
+                .to_path_buf(),
+            fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?,
+        );
+    }
+    Ok(documents)
 }
 
 fn validate_checked_in_release_targets(root: &Path) -> TaskResult {
@@ -4747,30 +5237,14 @@ fn validate_checked_in_release_targets(root: &Path) -> TaskResult {
             .and_then(OsStr::to_str)
             .ok_or("release receipt target is not UTF-8")?;
         validate_release_target(target)?;
-        let mut documents = BTreeMap::new();
-        for name in [
-            "manifest.json",
-            "sbom.cdx.json",
-            "provenance.intoto.json",
-            "checksums.sha256",
-            "LICENSES.md",
-        ] {
-            let document = path.join(name);
-            documents.insert(
-                document
-                    .strip_prefix(root)
-                    .map_err(|error| error.to_string())?
-                    .to_path_buf(),
-                fs::read(&document).map_err(|error| format!("{}: {error}", document.display()))?,
-            );
-        }
+        let documents = retained_release_documents(root, target)?;
         validate_release_documents(&documents, target)?;
     }
     Ok(())
 }
 
 fn validate_release_documents(documents: &BTreeMap<PathBuf, Vec<u8>>, target: &str) -> TaskResult {
-    require(documents.len() == 5, "target release receipt is incomplete")?;
+    require(documents.len() == 6, "target release receipt is incomplete")?;
     let document = |name: &str| {
         documents
             .iter()
@@ -4787,6 +5261,8 @@ fn validate_release_documents(documents: &BTreeMap<PathBuf, Vec<u8>>, target: &s
         .map_err(|error| format!("release checksums: {error}"))?;
     let licenses = std::str::from_utf8(document("LICENSES.md")?)
         .map_err(|error| format!("release licenses: {error}"))?;
+    let build_inputs: Value = serde_json::from_slice(document("build-inputs.json")?)
+        .map_err(|error| format!("release build inputs: {error}"))?;
     require(
         manifest["schema_version"] == Value::String("mainframe-env.release-manifest@1".into())
             && manifest["target"] == Value::String(target.into())
@@ -4797,6 +5273,16 @@ fn validate_release_documents(documents: &BTreeMap<PathBuf, Vec<u8>>, target: &s
                 == Value::String("https://slsa.dev/provenance/v1".into())
             && provenance["predicate"]["buildDefinition"]["externalParameters"]["target"]
                 == Value::String(target.into())
+            && build_inputs["schema_version"]
+                == Value::String("mainframe-env.release-build-inputs@1".into())
+            && build_inputs["target"] == Value::String(target.into())
+            && build_inputs["rustc_verbose"].as_str().is_some_and(|value| {
+                value.starts_with("rustc 1.98.0") && value.contains("release: 1.98.0")
+            })
+            && build_inputs["cargo_lock_sha256"].as_str().is_some()
+            && build_inputs["source_digest"].as_str().is_some()
+            && build_inputs["deterministic_environment"]["SOURCE_DATE_EPOCH"]
+                == Value::String("0".into())
             && licenses.starts_with("# License expressions\n"),
         "target release receipt metadata is inconsistent",
     )?;
@@ -4804,8 +5290,24 @@ fn validate_release_documents(documents: &BTreeMap<PathBuf, Vec<u8>>, target: &s
         .as_array()
         .ok_or("release manifest artifacts are missing")?;
     require(
-        artifacts.len() == 5,
+        artifacts.len() == 6,
         "release manifest artifact count drifted",
+    )?;
+    let build_inputs_digest = format!("{:x}", Sha256::digest(document("build-inputs.json")?));
+    require(
+        artifacts.iter().any(|artifact| {
+            artifact["path"].as_str() == Some("build-inputs.json")
+                && artifact["sha256"].as_str() == Some(build_inputs_digest.as_str())
+        }) && provenance["predicate"]["buildDefinition"]["resolvedDependencies"]
+            .as_array()
+            .is_some_and(|dependencies| {
+                dependencies.iter().any(|dependency| {
+                    dependency["uri"].as_str() == Some("build-inputs.json")
+                        && dependency["digest"]["sha256"].as_str()
+                            == Some(build_inputs_digest.as_str())
+                })
+            }),
+        "release build-input identity is not bound into manifest and provenance",
     )?;
     for artifact in artifacts {
         let path = artifact["path"]
@@ -4899,6 +5401,13 @@ fn release_documents(root: &Path, target: &str) -> TaskResult<BTreeMap<PathBuf, 
         &["log", "-1", "--format=%H", "--grep=^Complete ME.V6"],
     )?;
     let rustc = command_text(root, "rustc", &["--version"])?;
+    let rustc_verbose = command_text(root, "rustc", &["-vV"])?
+        .lines()
+        .filter(|line| !line.starts_with("host: "))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let cargo_version = command_text(root, "cargo", &["--version"])?;
+    let source_digest = release_source_digest(root)?;
     let metadata_output = Command::new("cargo")
         .args(["metadata", "--format-version", "1", "--locked"])
         .current_dir(root)
@@ -4961,6 +5470,33 @@ fn release_documents(root: &Path, target: &str) -> TaskResult<BTreeMap<PathBuf, 
         },
         "components":components
     });
+    let mut deterministic_environment = json!({
+        "CARGO_INCREMENTAL":"0",
+        "LC_ALL":"C",
+        "SOURCE_DATE_EPOCH":"0",
+        "TZ":"UTC",
+        "ZERO_AR_DATE":"1"
+    });
+    if target.contains("apple-darwin") {
+        deterministic_environment["MACOSX_DEPLOYMENT_TARGET"] = Value::String("15.0".into());
+    }
+    let build_inputs = json!({
+        "schema_version":"mainframe-env.release-build-inputs@1",
+        "target":target,
+        "rustc_verbose":rustc_verbose,
+        "cargo_version":cargo_version,
+        "profile":"release",
+        "profile_settings":{"codegen_units":1,"debug":0,"incremental":false,"strip":"symbols"},
+        "features":"all",
+        "locked":true,
+        "cargo_lock_sha256":lock_digest,
+        "source_digest":source_digest,
+        "path_remapping":{"repository":"/workspace/mainframe-env","cargo_home":"/cargo","rustup_home":"/rustup"},
+        "deterministic_environment":deterministic_environment,
+        "linker_determinism":if target.contains("apple-darwin") {"-Wl,-no_uuid"} else {"-Wl,--build-id=sha1"}
+    });
+    let build_inputs_bytes = pretty_json(&build_inputs)?;
+    let build_inputs_digest = format!("{:x}", Sha256::digest(&build_inputs_bytes));
     let manifest = json!({
         "schema_version":"mainframe-env.release-manifest@1",
         "product":"mainframe-env",
@@ -4977,7 +5513,8 @@ fn release_documents(root: &Path, target: &str) -> TaskResult<BTreeMap<PathBuf, 
             {"path":"bin/mainframe-env","sha256":cli_digest},
             {"path":"config/mainframe-env.toml","sha256":config_digest},
             {"path":"migrations/sqlite/0001-durable-state.sql","sha256":sqlite_migration},
-            {"path":"migrations/postgres/0001-durable-state.sql","sha256":postgres_migration}
+            {"path":"migrations/postgres/0001-durable-state.sql","sha256":postgres_migration},
+            {"path":"build-inputs.json","sha256":build_inputs_digest}
         ],
         "tag":format!("mainframe-env-v{version}"),
         "published":false
@@ -4993,7 +5530,11 @@ fn release_documents(root: &Path, target: &str) -> TaskResult<BTreeMap<PathBuf, 
             "buildDefinition":{
                 "buildType":"mainframe-env.cargo-release@1",
                 "externalParameters":{"profile":"release","locked":true,"all_features":true,"target":target},
-                "resolvedDependencies":[{"uri":"Cargo.lock","digest":{"sha256":lock_digest}}]
+                "resolvedDependencies":[
+                    {"uri":"Cargo.lock","digest":{"sha256":lock_digest}},
+                    {"uri":"build-inputs.json","digest":{"sha256":build_inputs_digest}},
+                    {"uri":"source-tree","digest":{"sha256":source_digest.trim_start_matches("sha256:")}}
+                ]
             },
             "runDetails":{"builder":{"id":format!("mainframe-env-cargo/{target}")},"metadata":{"invocationId":format!("mainframe-env-v{version}-{target}-local")}}
         }
@@ -5013,7 +5554,7 @@ fn release_documents(root: &Path, target: &str) -> TaskResult<BTreeMap<PathBuf, 
             .join("\n")
     );
     let checksums = format!(
-        "{server_digest}  bin/mainframe-env-server\n{cli_digest}  bin/mainframe-env\n{config_digest}  config/mainframe-env.toml\n{sqlite_migration}  migrations/sqlite/0001-durable-state.sql\n{postgres_migration}  migrations/postgres/0001-durable-state.sql\n"
+        "{server_digest}  bin/mainframe-env-server\n{cli_digest}  bin/mainframe-env\n{config_digest}  config/mainframe-env.toml\n{sqlite_migration}  migrations/sqlite/0001-durable-state.sql\n{postgres_migration}  migrations/postgres/0001-durable-state.sql\n{build_inputs_digest}  build-inputs.json\n"
     );
     Ok(BTreeMap::from([
         (directory.join("manifest.json"), pretty_json(&manifest)?),
@@ -5024,6 +5565,7 @@ fn release_documents(root: &Path, target: &str) -> TaskResult<BTreeMap<PathBuf, 
         ),
         (directory.join("checksums.sha256"), checksums.into_bytes()),
         (directory.join("LICENSES.md"), notices.into_bytes()),
+        (directory.join("build-inputs.json"), build_inputs_bytes),
     ]))
 }
 
@@ -5039,6 +5581,13 @@ fn file_digest(path: &Path) -> TaskResult<String> {
 }
 
 fn git_file_digest(root: &Path, commit: &str, relative: &str) -> TaskResult<String> {
+    Ok(format!(
+        "{:x}",
+        Sha256::digest(git_file_bytes(root, commit, relative)?)
+    ))
+}
+
+fn git_file_bytes(root: &Path, commit: &str, relative: &str) -> TaskResult<Vec<u8>> {
     require(
         !relative.contains("..") && !Path::new(relative).is_absolute(),
         "historical artifact path is unsafe",
@@ -5053,7 +5602,72 @@ fn git_file_digest(root: &Path, commit: &str, relative: &str) -> TaskResult<Stri
         output.status.success(),
         &format!("historical artifact is missing: {object}"),
     )?;
-    Ok(format!("{:x}", Sha256::digest(output.stdout)))
+    Ok(output.stdout)
+}
+
+fn verify_commit_bound_live_file(
+    root: &Path,
+    commit: &str,
+    relative: &str,
+    live_path: &Path,
+) -> TaskResult {
+    require(
+        git_file_bytes(root, commit, relative)?
+            == fs::read(live_path).map_err(|error| format!("{}: {error}", live_path.display()))?,
+        &format!(
+            "{} was rewritten or superseded without a recorded amendment after {commit}",
+            live_path.display()
+        ),
+    )
+}
+
+fn verify_completion_parent(root: &Path, completion: &str, expected_parent: &str) -> TaskResult {
+    require(
+        command_text(root, "git", &["rev-parse", &format!("{completion}^")])? == expected_parent,
+        &format!("completion {completion} does not descend from {expected_parent}"),
+    )
+}
+
+fn find_completion_commit(
+    root: &Path,
+    subject: &str,
+    trailers: &[(&str, &str)],
+) -> TaskResult<String> {
+    let output = Command::new("git")
+        .args(["log", "--format=%H%x1f%B%x1e", "HEAD"])
+        .current_dir(root)
+        .output()
+        .map_err(|error| format!("git log: {error}"))?;
+    require(output.status.success(), "git log failed")?;
+    let history = String::from_utf8(output.stdout).map_err(|error| error.to_string())?;
+    let matches = history
+        .split('\u{1e}')
+        .filter_map(|record| record.trim().split_once('\u{1f}'))
+        .filter(|(_, message)| completion_message_matches(message, subject, trailers))
+        .map(|(commit, _)| commit.trim().to_string())
+        .collect::<Vec<_>>();
+    require(
+        matches.len() == 1,
+        &format!(
+            "completion history for {subject:?} is missing or ambiguous ({})",
+            matches.len()
+        ),
+    )?;
+    Ok(matches[0].clone())
+}
+
+fn completion_message_matches(message: &str, subject: &str, trailers: &[(&str, &str)]) -> bool {
+    if message.lines().next() != Some(subject) {
+        return false;
+    }
+    trailers.iter().all(|(name, expected)| {
+        let prefix = format!("{name}:");
+        let values = message
+            .lines()
+            .filter(|line| line.starts_with(&prefix))
+            .collect::<Vec<_>>();
+        values.len() == 1 && values[0] == format!("{name}: {expected}")
+    })
 }
 
 fn command_text(root: &Path, program: &str, arguments: &[&str]) -> TaskResult<String> {
@@ -5147,6 +5761,53 @@ fn require(condition: bool, message: &str) -> TaskResult {
 mod tests {
     use super::*;
 
+    fn temporary_git_repository(name: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let path = env::temp_dir().join(format!(
+            "mainframe-env-xtask-{name}-{}-{nonce}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&path).expect("temporary repository");
+        for arguments in [
+            vec!["init", "--quiet"],
+            vec!["config", "user.email", "xtask@example.invalid"],
+            vec!["config", "user.name", "xtask"],
+        ] {
+            assert!(
+                Command::new("git")
+                    .args(arguments)
+                    .current_dir(&path)
+                    .status()
+                    .expect("git")
+                    .success()
+            );
+        }
+        path
+    }
+
+    fn commit_all(root: &Path, message: &str) -> String {
+        assert!(
+            Command::new("git")
+                .args(["add", "."])
+                .current_dir(root)
+                .status()
+                .expect("git add")
+                .success()
+        );
+        assert!(
+            Command::new("git")
+                .args(["commit", "--quiet", "-m", message])
+                .current_dir(root)
+                .status()
+                .expect("git commit")
+                .success()
+        );
+        command_text(root, "git", &["rev-parse", "HEAD"]).expect("commit identity")
+    }
+
     #[test]
     fn draft_2020_12_compilation_rejects_invalid_keyword_values() {
         let invalid = json!({
@@ -5196,6 +5857,171 @@ mod tests {
             .unwrap(),
             "x86_64-unknown-linux-gnu"
         );
+    }
+
+    #[test]
+    fn release_verification_rejects_missing_binary_toolchain_flag_and_target_drift() {
+        let documents = |target: &str, binary: &[u8], inputs: &[u8]| {
+            let root = PathBuf::from(format!("release/0.2.0/targets/{target}"));
+            BTreeMap::from([
+                (root.join("manifest.json"), binary.to_vec()),
+                (root.join("build-inputs.json"), inputs.to_vec()),
+            ])
+        };
+        let generated = documents(
+            "aarch64-apple-darwin",
+            b"expected-binary-digest",
+            b"rust=1.98.0;codegen-units=1;incremental=false",
+        );
+        assert!(compare_release_documents(&BTreeMap::new(), &generated).is_err());
+        assert!(
+            compare_release_documents(
+                &documents(
+                    "aarch64-apple-darwin",
+                    b"changed-binary-digest",
+                    b"rust=1.98.0;codegen-units=1;incremental=false",
+                ),
+                &generated,
+            )
+            .is_err()
+        );
+        assert!(
+            compare_release_documents(
+                &documents(
+                    "aarch64-apple-darwin",
+                    b"expected-binary-digest",
+                    b"rust=1.97.0;codegen-units=1;incremental=false",
+                ),
+                &generated,
+            )
+            .is_err()
+        );
+        assert!(
+            compare_release_documents(
+                &documents(
+                    "aarch64-apple-darwin",
+                    b"expected-binary-digest",
+                    b"rust=1.98.0;codegen-units=16;incremental=true",
+                ),
+                &generated,
+            )
+            .is_err()
+        );
+        assert!(
+            compare_release_documents(
+                &documents(
+                    "x86_64-unknown-linux-gnu",
+                    b"expected-binary-digest",
+                    b"rust=1.98.0;codegen-units=1;incremental=false",
+                ),
+                &generated,
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn completion_discovery_rejects_wrong_duplicate_and_missing_trailers() {
+        let subject = "Repair 0.2.0 third review findings";
+        let expected = [
+            ("Third-Review-Findings", "11=closed"),
+            ("Target-Version", "0.2.0"),
+            (
+                "Evidence-Digest",
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            ),
+        ];
+        let valid = format!(
+            "{subject}\n\nThird-Review-Findings: 11=closed\nTarget-Version: 0.2.0\nEvidence-Digest: sha256:{}\n",
+            "a".repeat(64)
+        );
+        assert!(completion_message_matches(&valid, subject, &expected));
+        assert!(!completion_message_matches(
+            &valid.replace("11=closed", "10=closed"),
+            subject,
+            &expected
+        ));
+        assert!(!completion_message_matches(
+            &valid.replace("Target-Version: 0.2.0\n", ""),
+            subject,
+            &expected
+        ));
+        assert!(!completion_message_matches(
+            &format!("{valid}Target-Version: 0.2.0\n"),
+            subject,
+            &expected
+        ));
+
+        let root = temporary_git_repository("ambiguous-completion");
+        fs::write(root.join("source"), b"one").expect("source");
+        commit_all(&root, &valid);
+        fs::write(root.join("source"), b"two").expect("source");
+        commit_all(&root, &valid);
+        assert!(find_completion_commit(&root, subject, &expected).is_err());
+        fs::remove_dir_all(root).expect("temporary repository cleanup");
+    }
+
+    #[test]
+    fn commit_bound_evidence_survives_later_source_and_rejects_substitution() {
+        let root = temporary_git_repository("commit-bound-evidence");
+        fs::write(root.join("source.txt"), b"accepted source\n").expect("source");
+        let source = commit_all(&root, "Source");
+        let receipt = json!({"receipt":{"source_identity":source,"result":"pass"}});
+        fs::write(
+            root.join("receipt.json"),
+            pretty_json(&receipt).expect("receipt bytes"),
+        )
+        .expect("receipt");
+        let completion = commit_all(&root, "Completion");
+        let bound_digest = repository_digest_at_commit(&root, &completion).expect("bound digest");
+        assert!(verify_completion_parent(&root, &completion, &source).is_ok());
+        assert!(verify_completion_parent(&root, &completion, &completion).is_err());
+        assert!(
+            verify_commit_bound_live_file(
+                &root,
+                &completion,
+                "receipt.json",
+                &root.join("receipt.json")
+            )
+            .is_ok()
+        );
+
+        fs::write(root.join("later.txt"), b"unrelated later source\n").expect("later source");
+        commit_all(&root, "Later unrelated source");
+        assert_eq!(
+            repository_digest_at_commit(&root, &completion).expect("stable historical digest"),
+            bound_digest
+        );
+        assert_ne!(repository_digest(&root).expect("live digest"), bound_digest);
+
+        let original = git_file_bytes(&root, &completion, "receipt.json").expect("Git receipt");
+        fs::write(
+            root.join("receipt.json"),
+            pretty_json(&json!({"receipt":{"source_identity":source,"result":"rewritten"}}))
+                .expect("rewritten receipt"),
+        )
+        .expect("live substitution");
+        assert!(
+            verify_commit_bound_live_file(
+                &root,
+                &completion,
+                "receipt.json",
+                &root.join("receipt.json")
+            )
+            .is_err()
+        );
+        assert_ne!(
+            fs::read(root.join("receipt.json")).expect("live receipt"),
+            original
+        );
+        assert_ne!(
+            format!("sha256:{:x}", Sha256::digest(&original)),
+            format!(
+                "sha256:{:x}",
+                Sha256::digest(fs::read(root.join("receipt.json")).expect("rewritten receipt"))
+            )
+        );
+        fs::remove_dir_all(root).expect("temporary repository cleanup");
     }
 
     #[test]

@@ -3,7 +3,7 @@
   "target_version": "0.2.0",
   "status": "pass",
   "candidate": {
-    "source_digest": "sha256:cf745ecbfd6a0d8dac3e824174dd1c2a184e8c563fa1004d27809aec9827c6cc",
+    "source_digest": "sha256:c0c21dd8274dc14bf1233890ada32271bcbde7b64559e1f0ef13f504b2bc5d24",
     "work_package_base_commit": "edb4558c987a56ee9f0c96438f756d663199942f",
     "accepted_release_commit": "44f3081eb2fdf22d09e1a97725f5a4163431ca70",
     "accepted_release_tree": "3d504ece02f1c09e124606ded695b00ba984d104",
@@ -23,7 +23,7 @@
   "results": [
     {"command": "cargo fmt --all -- --check", "exit_code": 0, "result": "pass"},
     {"command": "cargo check --workspace --all-targets --all-features --locked", "exit_code": 0, "result": "pass"},
-    {"command": "MAINFRAME_ENV_POSTGRES_TEST_URL=<disposable> cargo test --workspace --all-features --locked --no-fail-fast", "exit_code": 0, "result": "299 passed, 3 explicitly ignored"},
+    {"command": "MAINFRAME_ENV_POSTGRES_TEST_URL=<disposable> cargo test --workspace --all-features --locked --no-fail-fast", "exit_code": 0, "result": "315 passed, 3 explicitly ignored"},
     {"command": "MAINFRAME_ENV_POSTGRES_TEST_URL=<disposable> cargo test -p mainframe-env-store durable::tests::postgres18_migration_and_durable_contracts --all-features --locked -- --ignored --exact", "exit_code": 0, "result": "PostgreSQL 18 migration, execution, provider-state, replay, and restart controls passed"},
     {"command": "MAINFRAME_ENV_POSTGRES_TEST_URL=<disposable> cargo test -p mainframe-env-conformance carddemo::tests::carddemo_full_memory_sqlite_and_postgres_controls --all-features --locked -- --ignored --exact", "exit_code": 0, "result": "memory, SQLite backup/restore, PostgreSQL restart, overload, and principal-isolation controls passed"},
     {"command": "CARDDEMO_CORPUS_DIR=<clean-pin> MAINFRAME_ENV_POSTGRES_TEST_URL=<disposable> cargo xtask carddemo-full --check", "exit_code": 0, "result": "20/20 journeys; full shape sha256:d4701b06593307c36c2355f9a06c21e79a0969588816bdecf522ee7b0033bed3"},
@@ -36,12 +36,13 @@
     {"command": "cargo xtask architecture --check && cargo xtask profiles --check && cargo xtask schemas --check && cargo xtask inventory --check && cargo xtask evidence --check && cargo xtask coverage --check", "exit_code": 0, "result": "Draft 2020-12 schemas compiled, every bound 0.2/release JSON artifact validated, and all structural gates passed"},
     {"command": "cargo xtask conformance --check", "exit_code": 0, "result": "all 0.1 historical and 0.2 catalog, registry, dehardcoding, ledger, migration, and regression gates pass"},
     {"command": "cargo xtask certification --check", "exit_code": 0, "result": "release-mode smoke, workspace tests, package/authority closure, and release artifacts pass"},
-    {"command": "cargo xtask release --check --target aarch64-apple-darwin", "exit_code": 0, "result": "target-specific local 0.2.0 manifest, SBOM, provenance, checksums, and licenses reproduce after an explicit-target build"},
+    {"command": "clean checkout at a second path: cargo xtask release --check --target aarch64-apple-darwin", "exit_code": 0, "result": "six retained macOS documents, build inputs, and both binary identities reproduced byte-for-byte"},
+    {"command": "clean pinned Bookworm checkout at a second path: cargo xtask release --check --target x86_64-unknown-linux-gnu", "exit_code": 0, "result": "six retained Linux documents, build inputs, and both x86_64 binary identities reproduced byte-for-byte"},
     {"command": "git diff --check", "exit_code": 0, "result": "pass"}
   ],
   "workspace": {
     "test_floor": 260,
-    "tests_passed": 299,
+    "tests_passed": 315,
     "tests_ignored_in_workspace_command": 3,
     "failures": 0,
     "strict_clippy": true,
@@ -77,12 +78,24 @@
   "release": {
     "artifacts_verified": true,
     "version": "0.2.0",
-    "target": "aarch64-apple-darwin",
-    "manifest_sha256": "3e0051817af934856f1b9edd6ed2118d7d39caa515ad0c0965537afd50805841",
-    "sbom_sha256": "b182a2cc0693cca393db721fa6aee1d69e9772fb80b44edd7cd84780cf0f8ff8",
-    "provenance_sha256": "41e998c53ab82988671301f369794af79b20b42965f13f2d87c22d2229188469",
-    "checksums_sha256": "6bb89c22d3a7eb62b54c437d7efa7a27c60d0e6f1bdd11d7eedab8e8b2d41167",
-    "licenses_sha256": "127803aadf60cd9d34c1b177f70ee0a32cdf701247053dbcbdd50b24b49acadb",
+    "targets": {
+      "aarch64-apple-darwin": {
+        "manifest_sha256": "80febb17713b86e749964299a22cfad0bce08522a6bedea96e9152d75220a201",
+        "sbom_sha256": "f1dc66d80400fb4d0141e9a6d903c31ba62f81b2c5cd90fa8f32863aabd67a4c",
+        "provenance_sha256": "bf11b26ebef5d3a47b441b39270c44bf8eaba7955699b2c27e71b1f7116b1f0b",
+        "checksums_sha256": "c5e45a3a72fc3ff0ede5f4916c8117d793a6021f8c1f007b6a94a50cd79126d9",
+        "licenses_sha256": "127803aadf60cd9d34c1b177f70ee0a32cdf701247053dbcbdd50b24b49acadb",
+        "build_inputs_sha256": "8821898a36d3da7a935d6f2925ce69381ae8db1733c30fac077476edf97e34a7"
+      },
+      "x86_64-unknown-linux-gnu": {
+        "manifest_sha256": "fb874881699516e1444c2de76ab90f372e85217f3e6e2835949a95abc7f9f7c1",
+        "sbom_sha256": "f1dc66d80400fb4d0141e9a6d903c31ba62f81b2c5cd90fa8f32863aabd67a4c",
+        "provenance_sha256": "9b1401c0aee27dfe87ff4466df019c30640d8a32c002cd9228571e7881faf317",
+        "checksums_sha256": "d6c2264a99bc0c509c765ec7a9449087fc4fcaa1f3638bd7f807d1ded0898897",
+        "licenses_sha256": "127803aadf60cd9d34c1b177f70ee0a32cdf701247053dbcbdd50b24b49acadb",
+        "build_inputs_sha256": "38ce95b2db921b6bce2f7dc5821b1a7c39ed9024796ef13d771e25bc7685f78e"
+      }
+    },
     "published": false
   },
   "candidate_unchanged": true,

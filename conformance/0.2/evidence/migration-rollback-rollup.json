@@ -10,7 +10,7 @@
     {
       "id": "application-package-v1-to-v2",
       "path": "conformance/0.2/migrations/application-package-v1-to-v2.json",
-      "sha256": "sha256:c4e72e06d2abd5f58c21c4324f8de28cad157d97c9d6c165502ab419df47b0c0",
+      "sha256": "sha256:0a3d2177e041b31fb429d2bf100d139c2437432bfcec82401ec87232442f80a6",
       "destructive": false,
       "rollback_supported": true,
       "partial_state_selected": false,

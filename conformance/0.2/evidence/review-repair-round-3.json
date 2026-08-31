@@ -1,0 +1,124 @@
+{
+  "schema_version": "mainframe-env.review-repair-round-3@1",
+  "derived": true,
+  "status": "pass",
+  "evidence_digest": "sha256:bc89e54756b11557bb5828357a1de8661e9d821f7fa9d481129be92994fdbbf9",
+  "receipt": {
+    "target_version": "0.2.0",
+    "source_identity": "2513e9e56f330369e4a5f4e9a06c043ca99a024a",
+    "prerequisite_source": "d4b94362af56f2847bbd62d106867e6f0bb0648a",
+    "prerequisite_commit": "670821968514a57dd40ef01ba570fa6567b5c759",
+    "candidate_source_digest": "sha256:c0c21dd8274dc14bf1233890ada32271bcbde7b64559e1f0ef13f504b2bc5d24",
+    "historical_repairs": [
+      {
+        "round": 1,
+        "completion_commit": "77119bff9b1bef16ee28e94a2ea9ccdcccc22d6b",
+        "evidence_path": "conformance/0.2/evidence/review-repair.json",
+        "evidence_digest": "sha256:0c9fe6171576d7730ff69b7dc271a87ca5021df7cca1264c03b32b73eb8d03b8",
+        "validation": "commit-bound"
+      },
+      {
+        "round": 2,
+        "completion_commit": "2513e9e56f330369e4a5f4e9a06c043ca99a024a",
+        "evidence_path": "conformance/0.2/evidence/review-repair-round-2.json",
+        "evidence_digest": "sha256:53062b99ff83860d78642f1afcae5b64fb058f8c6993b845f503b981a7b1ed5b",
+        "validation": "commit-bound"
+      }
+    ],
+    "findings": [
+      {"id": 1, "state": "closed", "repair": "Every blob-bearing subsystem reference is restricted to the signed, digest-and-size-verified manifest closure.", "regression": "every_section_blob_reference_is_inside_the_verified_manifest_closure"},
+      {"id": 2, "state": "closed", "repair": "Db2 records legacy/application table provenance and restores pre-adoption legacy schema and rows while removing newer owned dependents.", "regression": "rollback_restores_adopted_legacy_data_but_removes_new_owned_dependents"},
+      {"id": 3, "state": "closed", "repair": "Release generation is deterministic, checks require retained evidence, and six complete documents are retained for macOS and pinned Linux.", "regression": "release_verification_rejects_missing_binary_toolchain_flag_and_target_drift; clean second-path macOS and Linux release checks"},
+      {"id": 4, "state": "closed", "repair": "CV-204/CV-205/CV-206/CV-209 receipts are restored byte-for-byte and current repairs live in a separate commit-bound amendment overlay.", "regression": "completion_discovery_rejects_wrong_duplicate_and_missing_trailers; commit_bound_evidence_survives_later_source_and_rejects_substitution"},
+      {"id": 5, "state": "closed", "repair": "Raw predicates, ranges, mutations, ordering, and cursor positions compare exact bytes; VARCHAR uses strict prefix or explicit fixed-host normalization.", "regression": "raw_predicates_and_cursor_positions_are_byte_exact"},
+      {"id": 6, "state": "closed", "repair": "A bounded streaming visitor rejects signed Db2 catalogs at table/nested/text/aggregate/duplicate limits before full graph allocation or provider mutation.", "regression": "hostile_catalog_counts_nesting_duplicates_and_aggregates_fail_preflight; duplicate_members_and_single_oversized_text_fail_streaming_preflight; signed_hostile_db2_catalog_is_bounded_before_provider_mutation"},
+      {"id": 7, "state": "closed", "repair": "Every top-level package section count is checked in the first allocation-free aggregate preflight.", "regression": "every_top_level_section_count_fails_in_allocation_free_preflight"},
+      {"id": 8, "state": "closed", "repair": "Round-one, round-two, work-package, and round-three evidence discover unique trailer-bound commits and validate Git object bytes with canonical PathBuf ordering.", "regression": "completion_discovery_rejects_wrong_duplicate_and_missing_trailers; commit_bound_evidence_survives_later_source_and_rejects_substitution"},
+      {"id": 9, "state": "closed", "repair": "Db2 in-place compatibility covers every normalized semantic field; DDL preserves only the non-SQL extract projection after full SQL equality.", "regression": "schema_compatibility_covers_every_semantic_field; ddl_redeclaration_preserves_extract_only_after_full_sql_semantic_match"},
+      {"id": 10, "state": "closed", "repair": "Retained packages and selection are durable and signature-revalidated; one identity-bound publication state machine recovers explicit partial controller/Db2 states.", "regression": "verified_package_selection_survives_restart_before_publication_retry; partial_publication_recovers_without_mixed_generation_and_rollback_is_durable"},
+      {"id": 11, "state": "closed", "repair": "Production package trust stores SecretRef values, resolves non-cloneable zeroizing secrets per verification, and exposes no signing operation.", "regression": "package_trust_resolves_verification_only_secrets_with_rotation_and_revocation"}
+    ],
+    "commands": [
+      {"command": "cargo test --locked -p mainframe-env-application", "exit_code": 0, "result": "14 passed"},
+      {"command": "cargo test --locked -p mainframe-env-db2", "exit_code": 0, "result": "13 passed"},
+      {"command": "cargo test --locked -p mainframe-env-racf", "exit_code": 0, "result": "6 passed"},
+      {"command": "cargo test --locked -p mainframe-env-server", "exit_code": 0, "result": "22 passed"},
+      {"command": "cargo test -p xtask --locked", "exit_code": 0, "result": "12 passed, including commit-bound and release negative controls"},
+      {"command": "cargo fmt --all -- --check", "exit_code": 0, "result": "pass"},
+      {"command": "cargo check --workspace --all-targets --all-features --locked", "exit_code": 0, "result": "pass"},
+      {"command": "cargo test --workspace --all-features --locked --no-fail-fast", "exit_code": 0, "result": "315 passed, 3 explicitly ignored"},
+      {"command": "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings", "exit_code": 0, "result": "pass"},
+      {"command": "RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --locked", "exit_code": 0, "result": "pass"},
+      {"command": "cargo +1.95.0 check --locked -p mainframe-env-source -p mainframe-env-diagnostics -p mainframe-env-encoding -p mainframe-env-ir -p mainframe-env-compiler-api -p mainframe-env-execution-api -p mainframe-env-host-api -p mainframe-env-store-api -p mainframe-env-coverage", "exit_code": 0, "result": "contract and foundation MSRV pass"},
+      {"command": "cargo deny check", "exit_code": 0, "result": "advisories, bans, licenses, and sources pass"},
+      {"command": "cargo xtask versions --check && cargo xtask architecture --check && cargo xtask profiles --check && cargo xtask inventory --check", "exit_code": 0, "result": "pass"},
+      {"command": "cargo xtask schemas --check", "exit_code": 0, "result": "all Draft 2020-12 schemas and bound JSON artifacts pass"},
+      {"command": "cargo xtask coverage --check", "exit_code": 0, "result": "immutable work packages, amendment overlay, program status, and workload ledger pass"},
+      {"command": "cargo xtask application-packages --check", "exit_code": 0, "result": "pass"},
+      {"command": "cargo xtask db2-catalog --check", "exit_code": 0, "result": "pass"},
+      {"command": "cargo xtask batch-controllers --check", "exit_code": 0, "result": "pass"},
+      {"command": "cargo xtask abi-libraries --check && cargo xtask program-registry --check && cargo xtask route-registries --check", "exit_code": 0, "result": "pass"},
+      {"command": "cargo xtask dehardcoding --check && cargo xtask ledger-consistency --check", "exit_code": 0, "result": "zero application hardcode/string dispatch and consistent ledgers pass"},
+      {"command": "cargo xtask migration-rollback --check", "exit_code": 0, "result": "five additive rollback-capable migrations pass"},
+      {"command": "cargo xtask runtime-architecture --check", "exit_code": 0, "result": "release server build and live SQLite smoke pass"},
+      {"command": "PostgreSQL 18.6: MAINFRAME_ENV_POSTGRES_TEST_URL=<disposable> cargo test -p mainframe-env-store durable::tests::postgres18_migration_and_durable_contracts --all-features --locked -- --ignored --exact", "exit_code": 0, "result": "migration, durable state, replay, and restart controls pass"},
+      {"command": "PostgreSQL 18.6: MAINFRAME_ENV_POSTGRES_TEST_URL=<disposable> cargo test -p mainframe-env-conformance carddemo::tests::carddemo_full_memory_sqlite_and_postgres_controls --all-features --locked -- --ignored --exact", "exit_code": 0, "result": "memory, SQLite backup/restore, PostgreSQL restart, overload, and isolation controls pass"},
+      {"command": "CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-db2 --check", "exit_code": 0, "result": "3 programs, 25 extraction records, full schema equality, restart, rollback, conflict, and failure controls pass"},
+      {"command": "CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-ims --check", "exit_code": 0, "result": "application and selected batch routes plus package-verified restart pass"},
+      {"command": "CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-mq-authorization --check", "exit_code": 0, "result": "4 journeys, exact AUTHFRDS DDL equality, and package-verified restart pass"},
+      {"command": "CARDDEMO_CORPUS_DIR=<clean-pin> MAINFRAME_ENV_POSTGRES_TEST_URL=<fresh-disposable> cargo xtask carddemo-full --check", "exit_code": 0, "result": "20/20 journeys, 16/16 mixed requests, SQLite backup/restore, and PostgreSQL restart pass; shape sha256:d4701b06593307c36c2355f9a06c21e79a0969588816bdecf522ee7b0033bed3"},
+      {"command": "Zowe CLI 8.36.0 live ESDSRRDS flow against ephemeral ProductServer", "exit_code": 0, "result": "status, exact JCL submission, JOB00001 OUTPUT CC 0000, and two identical 10-record downloads at sha256:291f6a244d703a9029ff5766dd1707216da3fb71769350fecc219480f1686076"},
+      {"command": "clean second-path cargo xtask release --check --target aarch64-apple-darwin", "exit_code": 0, "result": "six retained documents and binaries reproduce byte-for-byte with Rust 1.98.0"},
+      {"command": "clean second-path pinned Bookworm cargo xtask release --check --target x86_64-unknown-linux-gnu", "exit_code": 0, "result": "six retained documents and x86_64 binaries reproduce byte-for-byte with Rust 1.98.0"},
+      {"command": "cargo xtask review-repair --check && cargo xtask review-repair-round-2 --check", "exit_code": 0, "result": "both historical repairs pass from Git object content"},
+      {"command": "cargo xtask full-regression --check", "exit_code": 0, "result": "unchanged candidate, 315 tests, PostgreSQL, CardDemo, Zowe, and both release targets pass"},
+      {"command": "cargo xtask certification --check", "exit_code": 0, "result": "workspace, release-mode smoke, history, and release evidence pass"},
+      {"command": "cargo xtask conformance --check && cargo xtask review-repair-round-3 --check", "exit_code": 0, "result": "post-completion commit-bound historical and round-three evidence pass"},
+      {"command": "git diff --check", "exit_code": 0, "result": "pass"}
+    ],
+    "toolchains": {
+      "rust": "1.98.0",
+      "cargo": "1.98.0",
+      "msrv": "1.95.0",
+      "zowe_cli": "8.36.0",
+      "postgresql": "18",
+      "targets": ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu"]
+    },
+    "pull_request": {
+      "number": 1,
+      "head": "impl/0.2.0",
+      "base": "main",
+      "check_identities": [
+        {"workflow": "mainframe-env", "job": "v0-foundation", "source_run_id": 33392200393, "source_check_run_id": 99488233424, "source_conclusion": "SUCCESS"},
+        {"workflow": "mainframe-env", "job": "contract-msrv", "source_run_id": 33392200393, "source_check_run_id": 99488233236, "source_conclusion": "SUCCESS"}
+      ]
+    },
+    "artifacts": [
+      {"path": ".github/workflows/ci.yml", "sha256": "sha256:856cd0c281cc17d297adc73fd7dfaeab298d2989fbd1126e3d064d51b0d6c0ca"},
+      {"path": "Cargo.lock", "sha256": "sha256:8bcd476ddc76eba134bbd9f965a3dcd21b88cc0800e62495485c38b679de10fb"},
+      {"path": "Cargo.toml", "sha256": "sha256:9dd896ce7864c1e678c9b1d82a69bcce3eb574a36ffa3c871ba0c8daa641acba"},
+      {"path": "xtask/src/main.rs", "sha256": "sha256:8e3f41f9d82d9132ccb490301118287f624b37743c814e57843b9978981dd519"},
+      {"path": "crates/kernel/mainframe-env-application/src/package_v2.rs", "sha256": "sha256:aa6ac65258b4f8f114038db1c9fe660f61b57fcb77d279cdd357b4ae9523f5da"},
+      {"path": "crates/apps/mainframe-env-server/src/main.rs", "sha256": "sha256:5ff724bff729c2dfbc1046bb0afdf826e55f781167d951cf31b27d22c7484583"},
+      {"path": "crates/apps/mainframe-env-server/src/product.rs", "sha256": "sha256:e40af8d5b5171aca9f6fef649456e37f32614e1ec3a47736a8e87fcd742ac50f"},
+      {"path": "crates/providers/mainframe-env-racf/src/service.rs", "sha256": "sha256:6ef0c2b4648d0e26f286606bc58e548e61874c381a4a38529c485a9da0f19962"},
+      {"path": "crates/providers/mainframe-env-db2/src/catalog/bounded_decode.rs", "sha256": "sha256:d2d2a9de56b4b7e55eb9300d344a25500221827b02a769c3c11757a07e2e7cc9"},
+      {"path": "crates/providers/mainframe-env-db2/src/service.rs", "sha256": "sha256:d95b3316ae816631a681b57d6c1a72b2af0afd45b7284ad1f946ec623f33e683"},
+      {"path": "crates/tooling/mainframe-env-conformance/src/carddemo.rs", "sha256": "sha256:96eae85d3ae5f38d31d1508e877ad64a751c8ed55de3c841f7b93233b36f33a1"},
+      {"path": "conformance/0.2/evidence/work-package-amendments.json", "sha256": "sha256:c46f5cecb62fc4e860a02fd4925e2ac59b22e9fcc3b7e947cc3a78d9c6c3d827"},
+      {"path": "conformance/0.2/evidence/full-regression.json", "sha256": "sha256:84fe49aa2164272c178da5906c9042c419789bd680c1c1b814b54056e33fe0cc"},
+      {"path": "conformance/0.2/schemas/review-repair-round-3.schema.json", "sha256": "sha256:3ed64a55b21e50873f86eab01624a9399a7f38cd5ca484bc3aca5292acb6b37c"},
+      {"path": "conformance/0.2/schemas/release-build-inputs.schema.json", "sha256": "sha256:affa33cf04ac16bfe0878dc71257b71ec74dcde358753171a01e56f2417f9413"},
+      {"path": "release/0.2.0/targets/aarch64-apple-darwin/manifest.json", "sha256": "sha256:80febb17713b86e749964299a22cfad0bce08522a6bedea96e9152d75220a201"},
+      {"path": "release/0.2.0/targets/aarch64-apple-darwin/build-inputs.json", "sha256": "sha256:8821898a36d3da7a935d6f2925ce69381ae8db1733c30fac077476edf97e34a7"},
+      {"path": "release/0.2.0/targets/x86_64-unknown-linux-gnu/manifest.json", "sha256": "sha256:fb874881699516e1444c2de76ab90f372e85217f3e6e2835949a95abc7f9f7c1"},
+      {"path": "release/0.2.0/targets/x86_64-unknown-linux-gnu/build-inputs.json", "sha256": "sha256:38ce95b2db921b6bce2f7dc5821b1a7c39ed9024796ef13d771e25bc7685f78e"}
+    ],
+    "remote_actions": {
+      "tagged": false,
+      "published": false,
+      "deployed": false,
+      "merged": false
+    }
+  }
+}

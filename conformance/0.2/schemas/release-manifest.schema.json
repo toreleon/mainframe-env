@@ -18,8 +18,8 @@
     "migration_head": {"type": "string"},
     "artifacts": {
       "type": "array",
-      "minItems": 5,
-      "maxItems": 5,
+      "minItems": 6,
+      "maxItems": 6,
       "items": {
         "type": "object",
         "additionalProperties": false,

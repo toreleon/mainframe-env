@@ -2,6 +2,7 @@ use super::{
     ApplicationPackage, EntryKind, InstallProblem, InstallState, digest_field, package_identity,
     validate_package, validate_sha256, validate_text,
 };
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
@@ -14,8 +15,9 @@ pub const SECURITY_RESOURCE_SECTION_CONTRACT: &str =
 pub const IMS_SECTION_CONTRACT: &str = "mainframe-env.application.ims@1";
 pub const MQ_SECTION_CONTRACT: &str = "mainframe-env.application.mq@1";
 pub const BATCH_CONTROLLER_SECTION_CONTRACT: &str = "mainframe-env.application.batch-controllers@1";
+pub const APPLICATION_INSTALLER_STATE_CONTRACT: &str = "mainframe-env.application-installer@1";
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum HostSubsystem {
     Cics,
     Db2,
@@ -34,13 +36,13 @@ impl HostSubsystem {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AbiMember {
     pub name: String,
     pub blob_sha256: String,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AbiLibrary {
     pub id: String,
     pub subsystem: HostSubsystem,
@@ -48,39 +50,39 @@ pub struct AbiLibrary {
     pub members: Vec<AbiMember>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SqlColumn {
     pub name: String,
     pub nullable: bool,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SqlTable {
     pub name: String,
     pub columns: Vec<SqlColumn>,
     pub primary_key: Vec<String>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SqlSeedRow {
     pub table: String,
     pub values: BTreeMap<String, String>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ImsDefinition {
     pub name: String,
     pub segments: BTreeSet<String>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ImsSeedRow {
     pub definition: String,
     pub segment: String,
     pub values: BTreeMap<String, String>,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum MqResourceKind {
     Queue,
     Process,
@@ -97,7 +99,7 @@ impl MqResourceKind {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct MqResource {
     pub name: String,
     pub kind: MqResourceKind,
@@ -105,7 +107,7 @@ pub struct MqResource {
     pub controller: Option<String>,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum BatchControllerKind {
     CobolProgram,
     ImsMessageProcessing,
@@ -122,7 +124,7 @@ impl BatchControllerKind {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BatchController {
     pub name: String,
     pub program: String,
@@ -130,14 +132,14 @@ pub struct BatchController {
     pub properties: BTreeMap<String, String>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SecurityResource {
     pub class: String,
     pub profile: String,
     pub owner: String,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ApplicationSections {
     pub schema_version: String,
     pub host_abi_libraries: Vec<AbiLibrary>,
@@ -150,14 +152,14 @@ pub struct ApplicationSections {
     pub security_resources: Vec<SecurityResource>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct PackageSignature {
     pub algorithm: String,
     pub key_id: String,
     pub value: String,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ApplicationPackageV2 {
     pub base: ApplicationPackage,
     pub generation: u64,
@@ -224,7 +226,7 @@ impl Default for PackageLimits {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ApplicationGenerationRecord {
     pub package: String,
     pub version: String,
@@ -258,6 +260,25 @@ struct InstalledApplication {
     packages: BTreeMap<u64, Arc<ApplicationPackageV2>>,
     retained_bytes: usize,
     retained_items: usize,
+}
+
+#[derive(Deserialize, Serialize)]
+struct ApplicationInstallerState {
+    schema_version: String,
+    applications: Vec<RetainedApplication>,
+}
+
+#[derive(Deserialize, Serialize)]
+struct RetainedApplication {
+    application: String,
+    selected: Option<u64>,
+    generations: Vec<RetainedPackage>,
+}
+
+#[derive(Deserialize, Serialize)]
+struct RetainedPackage {
+    package: ApplicationPackageV2,
+    state: InstallState,
 }
 
 #[derive(Clone)]
@@ -483,6 +504,148 @@ impl ApplicationInstallerV2 {
             .ok_or(InstallProblem::UnknownStage)?;
         Ok(Some(SelectedApplicationGeneration { record, package }))
     }
+
+    pub fn retained_generation(
+        &self,
+        package: &str,
+        generation: u64,
+        identity: &str,
+    ) -> Result<Option<SelectedApplicationGeneration>, InstallProblem> {
+        let applications = self
+            .applications
+            .lock()
+            .map_err(|_| InstallProblem::Poisoned)?;
+        let Some(installed) = applications.get(&package.to_ascii_uppercase()) else {
+            return Ok(None);
+        };
+        let Some(record) = installed
+            .generations
+            .get(&generation)
+            .filter(|record| record.state == InstallState::Ready && record.identity == identity)
+            .cloned()
+        else {
+            return Ok(None);
+        };
+        let package = installed
+            .packages
+            .get(&generation)
+            .cloned()
+            .ok_or(InstallProblem::UnknownStage)?;
+        Ok(Some(SelectedApplicationGeneration { record, package }))
+    }
+
+    pub fn generation(
+        &self,
+        package: &str,
+        generation: u64,
+        identity: &str,
+    ) -> Result<Option<SelectedApplicationGeneration>, InstallProblem> {
+        let applications = self
+            .applications
+            .lock()
+            .map_err(|_| InstallProblem::Poisoned)?;
+        let Some(installed) = applications.get(&package.to_ascii_uppercase()) else {
+            return Ok(None);
+        };
+        let Some(record) = installed
+            .generations
+            .get(&generation)
+            .filter(|record| record.identity == identity)
+            .cloned()
+        else {
+            return Ok(None);
+        };
+        let package = installed
+            .packages
+            .get(&generation)
+            .cloned()
+            .ok_or(InstallProblem::UnknownStage)?;
+        Ok(Some(SelectedApplicationGeneration { record, package }))
+    }
+
+    pub fn state_payload(&self) -> Result<Vec<u8>, InstallProblem> {
+        let applications = self
+            .applications
+            .lock()
+            .map_err(|_| InstallProblem::Poisoned)?;
+        let applications = applications
+            .iter()
+            .map(|(application, installed)| {
+                let generations = installed
+                    .packages
+                    .iter()
+                    .map(|(generation, package)| {
+                        let state = installed
+                            .generations
+                            .get(generation)
+                            .map(|record| record.state)
+                            .ok_or(InstallProblem::UnknownStage)?;
+                        Ok(RetainedPackage {
+                            package: package.as_ref().clone(),
+                            state,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(RetainedApplication {
+                    application: application.clone(),
+                    selected: installed.selected,
+                    generations,
+                })
+            })
+            .collect::<Result<Vec<_>, InstallProblem>>()?;
+        let payload = serde_json::to_vec(&ApplicationInstallerState {
+            schema_version: APPLICATION_INSTALLER_STATE_CONTRACT.into(),
+            applications,
+        })
+        .map_err(|_| InstallProblem::InvalidIdentity)?;
+        if payload.len() > self.limits.max_total_retained_package_bytes {
+            Err(InstallProblem::LimitExceeded)
+        } else {
+            Ok(payload)
+        }
+    }
+
+    pub fn from_state_payload(
+        product: impl Into<String>,
+        limits: PackageLimits,
+        verifier: Arc<dyn PackageSignatureVerifier>,
+        payload: &[u8],
+    ) -> Result<Self, InstallProblem> {
+        if payload.len() > limits.max_total_retained_package_bytes {
+            return Err(InstallProblem::LimitExceeded);
+        }
+        let state: ApplicationInstallerState =
+            serde_json::from_slice(payload).map_err(|_| InstallProblem::InvalidIdentity)?;
+        if state.schema_version != APPLICATION_INSTALLER_STATE_CONTRACT
+            || state.applications.len() > limits.max_applications
+        {
+            return Err(InstallProblem::InvalidIdentity);
+        }
+        let installer = Self::new(product, limits, verifier);
+        let mut names = BTreeSet::new();
+        for application in state.applications {
+            let normalized = application.application.to_ascii_uppercase();
+            if application.generations.len() > limits.max_retained_generations
+                || normalized != application.application
+                || !names.insert(normalized.clone())
+            {
+                return Err(InstallProblem::LimitExceeded);
+            }
+            for retained in application.generations {
+                if retained.package.base.manifest.name.to_ascii_uppercase() != normalized {
+                    return Err(InstallProblem::InvalidIdentity);
+                }
+                installer.stage(&retained.package)?;
+                if retained.state == InstallState::Ready {
+                    installer.commit(&retained.package)?;
+                }
+            }
+            if let Some(selected) = application.selected {
+                installer.rollback(&normalized, selected)?;
+            }
+        }
+        Ok(installer)
+    }
 }
 
 pub fn package_v2_identity(package: &ApplicationPackageV2) -> Result<String, InstallProblem> {
@@ -635,6 +798,24 @@ fn validate_aggregate_bounds(
     package: &ApplicationPackageV2,
     limits: PackageLimits,
 ) -> Result<PackageFootprint, InstallProblem> {
+    let sections = &package.sections;
+    let section_counts = [
+        sections.host_abi_libraries.len(),
+        sections.sql_tables.len(),
+        sections.sql_rows.len(),
+        sections.ims_definitions.len(),
+        sections.ims_rows.len(),
+        sections.mq_resources.len(),
+        sections.batch_controllers.len(),
+        sections.security_resources.len(),
+    ];
+    if section_counts
+        .iter()
+        .any(|count| *count > limits.max_items_per_section)
+        || bounded_sum(section_counts, limits.max_total_nested_items).is_err()
+    {
+        return Err(InstallProblem::LimitExceeded);
+    }
     if package.base.manifest.entries.len() > limits.max_manifest_entries
         || package.base.blobs.len() > limits.max_manifest_entries
         || package
@@ -655,7 +836,6 @@ fn validate_aggregate_bounds(
         package.base.blobs.values().map(Vec::len),
         limits.max_total_blob_bytes,
     )?;
-    let sections = &package.sections;
     if sections
         .host_abi_libraries
         .iter()
@@ -937,20 +1117,6 @@ fn validate_sections(
     limits: PackageLimits,
 ) -> Result<(), InstallProblem> {
     let sections = &package.sections;
-    for count in [
-        sections.host_abi_libraries.len(),
-        sections.sql_tables.len(),
-        sections.sql_rows.len(),
-        sections.ims_definitions.len(),
-        sections.ims_rows.len(),
-        sections.mq_resources.len(),
-        sections.batch_controllers.len(),
-        sections.security_resources.len(),
-    ] {
-        if count > limits.max_items_per_section {
-            return Err(InstallProblem::LimitExceeded);
-        }
-    }
     let program_paths = package
         .base
         .manifest
@@ -958,6 +1124,13 @@ fn validate_sections(
         .iter()
         .filter(|entry| entry.kind == EntryKind::Program)
         .map(|entry| entry.path.as_str())
+        .collect::<BTreeSet<_>>();
+    let manifest_blobs = package
+        .base
+        .manifest
+        .entries
+        .iter()
+        .map(|entry| entry.sha256.as_str())
         .collect::<BTreeSet<_>>();
     let mut abi_ids = BTreeSet::new();
     for library in &sections.host_abi_libraries {
@@ -971,7 +1144,7 @@ fn validate_sections(
             validate_text(&member.name)?;
             validate_sha256(&member.blob_sha256)?;
             if !members.insert(member.name.to_ascii_uppercase())
-                || !package.base.blobs.contains_key(&member.blob_sha256)
+                || !manifest_blobs.contains(member.blob_sha256.as_str())
             {
                 return Err(InstallProblem::MissingReference);
             }
@@ -1293,6 +1466,47 @@ mod tests {
     }
 
     #[test]
+    fn every_section_blob_reference_is_inside_the_verified_manifest_closure() {
+        let installer =
+            ApplicationInstallerV2::new("0.2.0", PackageLimits::default(), Arc::new(TestVerifier));
+        let mut malicious = package(1);
+        let original = b"unsigned-abi-original".to_vec();
+        let digest = sha256(&original);
+        malicious.base.blobs.insert(digest.clone(), original);
+        malicious.sections.host_abi_libraries[0].members[0].blob_sha256 = digest.clone();
+        resign(&mut malicious);
+        malicious
+            .base
+            .blobs
+            .insert(digest, b"changed-after-signing".to_vec());
+
+        assert_eq!(
+            installer.stage(&malicious),
+            Err(InstallProblem::MissingReference)
+        );
+        assert_eq!(installer.selected("DEMO").unwrap(), None);
+
+        for kind in [EntryKind::Program, EntryKind::Data] {
+            let mut tampered = package(1);
+            let entry = tampered
+                .base
+                .manifest
+                .entries
+                .iter()
+                .find(|entry| entry.kind == kind)
+                .unwrap();
+            tampered
+                .base
+                .blobs
+                .insert(entry.sha256.clone(), b"changed-under-signed-key".to_vec());
+            assert_eq!(
+                installer.stage(&tampered),
+                Err(InstallProblem::ContentMismatch)
+            );
+        }
+    }
+
+    #[test]
     fn staged_or_corrupt_generations_are_never_selected_and_retry_is_atomic() {
         let installer =
             ApplicationInstallerV2::new("0.2.0", PackageLimits::default(), Arc::new(TestVerifier));
@@ -1333,6 +1547,39 @@ mod tests {
                 .unwrap()
                 .generation,
             1
+        );
+    }
+
+    #[test]
+    fn retained_ready_packages_revalidate_and_recover_from_durable_state() {
+        let installer =
+            ApplicationInstallerV2::new("0.2.0", PackageLimits::default(), Arc::new(TestVerifier));
+        installer.install(&package(1)).unwrap();
+        installer.install(&package(2)).unwrap();
+        let payload = installer.state_payload().unwrap();
+
+        let recovered = ApplicationInstallerV2::from_state_payload(
+            "0.2.0",
+            PackageLimits::default(),
+            Arc::new(TestVerifier),
+            &payload,
+        )
+        .unwrap();
+        assert_eq!(recovered.selected("DEMO").unwrap().unwrap().generation, 2);
+        recovered.rollback("DEMO", 1).unwrap();
+        assert_eq!(recovered.selected("DEMO").unwrap().unwrap().generation, 1);
+
+        let mut corrupt: serde_json::Value = serde_json::from_slice(&payload).unwrap();
+        corrupt["applications"][0]["generations"][0]["package"]["signature"]["value"] =
+            serde_json::Value::String("forged".into());
+        assert!(
+            ApplicationInstallerV2::from_state_payload(
+                "0.2.0",
+                PackageLimits::default(),
+                Arc::new(TestVerifier),
+                &serde_json::to_vec(&corrupt).unwrap(),
+            )
+            .is_err()
         );
     }
 
@@ -1404,6 +1651,100 @@ mod tests {
         let mut oversized_name = package(1);
         oversized_name.sections.sql_rows[0].table = "X".repeat(1024 * 1024);
         assert_limit(&oversized_name, PackageLimits::default());
+    }
+
+    #[test]
+    fn every_top_level_section_count_fails_in_allocation_free_preflight() {
+        let baseline = package(1);
+        let limits = PackageLimits {
+            max_items_per_section: 1,
+            ..PackageLimits::default()
+        };
+        let mut hostile = Vec::new();
+
+        let mut candidate = baseline.clone();
+        candidate
+            .sections
+            .host_abi_libraries
+            .push(candidate.sections.host_abi_libraries[0].clone());
+        hostile.push(candidate);
+        let mut candidate = baseline.clone();
+        candidate
+            .sections
+            .sql_tables
+            .push(candidate.sections.sql_tables[0].clone());
+        hostile.push(candidate);
+        let mut candidate = baseline.clone();
+        candidate
+            .sections
+            .sql_rows
+            .push(candidate.sections.sql_rows[0].clone());
+        hostile.push(candidate);
+        let mut candidate = baseline.clone();
+        candidate
+            .sections
+            .ims_definitions
+            .push(candidate.sections.ims_definitions[0].clone());
+        hostile.push(candidate);
+        let mut candidate = baseline.clone();
+        candidate
+            .sections
+            .ims_rows
+            .push(candidate.sections.ims_rows[0].clone());
+        hostile.push(candidate);
+        let mut candidate = baseline.clone();
+        candidate
+            .sections
+            .mq_resources
+            .push(candidate.sections.mq_resources[0].clone());
+        hostile.push(candidate);
+        let mut candidate = baseline.clone();
+        candidate
+            .sections
+            .batch_controllers
+            .push(candidate.sections.batch_controllers[0].clone());
+        hostile.push(candidate);
+        let mut candidate = baseline;
+        candidate
+            .sections
+            .security_resources
+            .push(candidate.sections.security_resources[0].clone());
+        hostile.push(candidate);
+
+        for candidate in hostile {
+            assert_eq!(
+                validate_aggregate_bounds(&candidate, limits),
+                Err(InstallProblem::LimitExceeded)
+            );
+        }
+
+        let high_cardinality_limits = PackageLimits {
+            max_items_per_section: 1_024,
+            ..PackageLimits::default()
+        };
+        let mut sql = package(1);
+        sql.sections.sql_rows = (0..=1_024)
+            .map(|index| SqlSeedRow {
+                table: format!("APP.TABLE{index}"),
+                values: BTreeMap::new(),
+            })
+            .collect();
+        assert_eq!(
+            validate_aggregate_bounds(&sql, high_cardinality_limits),
+            Err(InstallProblem::LimitExceeded)
+        );
+        let mut ims = package(1);
+        ims.sections.ims_rows = (0..=1_024)
+            .map(|index| ImsSeedRow {
+                definition: format!("APPDB{index}"),
+                segment: "ROOT".into(),
+                values: BTreeMap::new(),
+            })
+            .collect();
+        assert_eq!(
+            validate_aggregate_bounds(&ims, high_cardinality_limits),
+            Err(InstallProblem::LimitExceeded)
+        );
     }
 
     #[test]

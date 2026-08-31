@@ -4,6 +4,7 @@
 
 use mainframe_env_execution_api::Invocation;
 use mainframe_env_host_api::{DatasetAttributes, DatasetOrganization, HostLimits, RecordFormat};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
@@ -11,8 +12,9 @@ use std::sync::{Arc, Mutex};
 mod package_v2;
 
 pub use package_v2::{
-    ABI_LIBRARY_SECTION_CONTRACT, APPLICATION_PACKAGE_V2_CONTRACT, AbiLibrary, AbiMember,
-    ApplicationGenerationRecord, ApplicationInstallerV2, ApplicationPackageV2, ApplicationSections,
+    ABI_LIBRARY_SECTION_CONTRACT, APPLICATION_INSTALLER_STATE_CONTRACT,
+    APPLICATION_PACKAGE_V2_CONTRACT, AbiLibrary, AbiMember, ApplicationGenerationRecord,
+    ApplicationInstallerV2, ApplicationPackageV2, ApplicationSections,
     BATCH_CONTROLLER_SECTION_CONTRACT, BatchController, BatchControllerKind, HostSubsystem,
     IMS_SECTION_CONTRACT, ImsDefinition, ImsSeedRow, MQ_SECTION_CONTRACT, MqResource,
     MqResourceKind, PackageLimits, PackageSignature, PackageSignatureVerifier,
@@ -22,7 +24,7 @@ pub use package_v2::{
 
 pub const APPLICATION_PACKAGE_CONTRACT: &str = "mainframe-env.application-package@1";
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum EntryKind {
     Source,
     Resource,
@@ -45,7 +47,7 @@ impl EntryKind {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct PackageEntry {
     pub path: String,
     pub kind: EntryKind,
@@ -54,7 +56,7 @@ pub struct PackageEntry {
     pub depends_on: Vec<String>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ApplicationManifest {
     pub name: String,
     pub version: String,
@@ -62,13 +64,13 @@ pub struct ApplicationManifest {
     pub entries: Vec<PackageEntry>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ApplicationPackage {
     pub manifest: ApplicationManifest,
     pub blobs: BTreeMap<String, Vec<u8>>,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum InstallState {
     Staged,
     Ready,

@@ -2,11 +2,11 @@
   "artifacts": [
     {
       "path": "bin/mainframe-env-server",
-      "sha256": "f1aa1a807735fe764d2339a416a647b37bf3d72ae4c9a8d813e844b3149b4a0a"
+      "sha256": "1e5b968b1eadd497851c1206b41c102b5b77f7de871dd6ce8a3f0050bebec62f"
     },
     {
       "path": "bin/mainframe-env",
-      "sha256": "32f477a7c8e12287415188ba4a349d61f84f1776842845cd9f6b14bd6ba77ece"
+      "sha256": "0a515dbebb8a70b444272856948b1f1091f70fdf877219c260af6c25a49b5dd9"
     },
     {
       "path": "config/mainframe-env.toml",
@@ -22,7 +22,7 @@
     },
     {
       "path": "build-inputs.json",
-      "sha256": "8821898a36d3da7a935d6f2925ce69381ae8db1733c30fac077476edf97e34a7"
+      "sha256": "38ce95b2db921b6bce2f7dc5821b1a7c39ed9024796ef13d771e25bc7685f78e"
     }
   ],
   "channel": "stable",
@@ -34,7 +34,7 @@
   "published": false,
   "schema_version": "mainframe-env.release-manifest@1",
   "tag": "mainframe-env-v0.2.0",
-  "target": "aarch64-apple-darwin",
+  "target": "x86_64-unknown-linux-gnu",
   "toolchain": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
   "version": "0.2.0"
 }

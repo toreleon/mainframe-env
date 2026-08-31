@@ -64,6 +64,7 @@ use mainframe_env_source::{
     materialize_host_abi_libraries,
 };
 use mainframe_env_store::{MemoryStore, PostgresStateStore, SqliteStateStore};
+use ring::hmac;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -4661,12 +4662,28 @@ pub fn verify_carddemo_db2_from_env(
 }
 
 fn carddemo_package_trust() -> Result<Arc<HmacSha256PackageTrust>, CorpusProblem> {
-    HmacSha256PackageTrust::new(BTreeMap::from([(
-        "carddemo-conformance-key".into(),
+    let resolver = Arc::new(MemorySecretResolver::default());
+    resolver.insert(
+        "secret:carddemo-package-key",
         b"carddemo-conformance-hmac-key-0001".to_vec(),
-    )]))
+    );
+    HmacSha256PackageTrust::new(
+        BTreeMap::from([(
+            "carddemo-conformance-key".into(),
+            SecretRef::new("secret:carddemo-package-key", Default::default())
+                .map_err(terminal_problem)?,
+        )]),
+        resolver,
+    )
     .map(Arc::new)
     .map_err(terminal_problem)
+}
+
+fn sign_carddemo_package_identity(identity: &str) -> String {
+    base64::engine::general_purpose::STANDARD_NO_PAD.encode(hmac::sign(
+        &hmac::Key::new(hmac::HMAC_SHA256, b"carddemo-conformance-hmac-key-0001"),
+        identity.as_bytes(),
+    ))
 }
 
 fn carddemo_db2_column(
@@ -4680,7 +4697,7 @@ fn carddemo_db2_column(
         nullable,
         max_bytes,
         result_encoding,
-        default_value: nullable.then(Vec::new),
+        default_value: None,
     }
 }
 
@@ -4689,7 +4706,7 @@ fn carddemo_db2_definitions() -> Vec<Db2TableDefinition> {
         name: "CARDDEMO.TRANSACTION_TYPE".into(),
         columns: vec![
             carddemo_db2_column("TR_TYPE", false, 2, Db2ResultEncoding::Raw),
-            carddemo_db2_column("TR_DESCRIPTION", true, 50, Db2ResultEncoding::Varchar),
+            carddemo_db2_column("TR_DESCRIPTION", false, 50, Db2ResultEncoding::Varchar),
         ],
         primary_key: vec!["TR_TYPE".into()],
         foreign_keys: Vec::new(),
@@ -4712,7 +4729,7 @@ fn carddemo_db2_definitions() -> Vec<Db2TableDefinition> {
         columns: vec![
             carddemo_db2_column("TRC_TYPE_CODE", false, 2, Db2ResultEncoding::Raw),
             carddemo_db2_column("TRC_TYPE_CATEGORY", false, 4, Db2ResultEncoding::Raw),
-            carddemo_db2_column("TRC_CAT_DATA", true, 50, Db2ResultEncoding::Raw),
+            carddemo_db2_column("TRC_CAT_DATA", false, 50, Db2ResultEncoding::Varchar),
         ],
         primary_key: vec!["TRC_TYPE_CODE".into(), "TRC_TYPE_CATEGORY".into()],
         foreign_keys: vec![Db2ForeignKeyDefinition {
@@ -4739,44 +4756,44 @@ fn carddemo_db2_definitions() -> Vec<Db2TableDefinition> {
             trailer: b"0000".to_vec(),
         }),
     };
-    let authorization_names = [
-        "CARD_NUM",
-        "AUTH_TS",
-        "AUTH_TYPE",
-        "CARD_EXPIRY_DATE",
-        "MESSAGE_TYPE",
-        "MESSAGE_SOURCE",
-        "AUTH_ID_CODE",
-        "AUTH_RESP_CODE",
-        "AUTH_RESP_REASON",
-        "PROCESSING_CODE",
-        "TRANSACTION_AMT",
-        "APPROVED_AMT",
-        "MERCHANT_CATAGORY_CODE",
-        "ACQR_COUNTRY_CODE",
-        "POS_ENTRY_MODE",
-        "MERCHANT_ID",
-        "MERCHANT_NAME",
-        "MERCHANT_CITY",
-        "MERCHANT_STATE",
-        "MERCHANT_ZIP",
-        "TRANSACTION_ID",
-        "MATCH_STATUS",
-        "AUTH_FRAUD",
-        "FRAUD_RPT_DATE",
-        "ACCT_ID",
-        "CUST_ID",
+    let authorization_columns = [
+        ("CARD_NUM", 16, Db2ResultEncoding::Raw),
+        ("AUTH_TS", 256, Db2ResultEncoding::Raw),
+        ("AUTH_TYPE", 4, Db2ResultEncoding::Raw),
+        ("CARD_EXPIRY_DATE", 4, Db2ResultEncoding::Raw),
+        ("MESSAGE_TYPE", 6, Db2ResultEncoding::Raw),
+        ("MESSAGE_SOURCE", 6, Db2ResultEncoding::Raw),
+        ("AUTH_ID_CODE", 6, Db2ResultEncoding::Raw),
+        ("AUTH_RESP_CODE", 2, Db2ResultEncoding::Raw),
+        ("AUTH_RESP_REASON", 4, Db2ResultEncoding::Raw),
+        ("PROCESSING_CODE", 6, Db2ResultEncoding::Raw),
+        ("TRANSACTION_AMT", 12, Db2ResultEncoding::Raw),
+        ("APPROVED_AMT", 12, Db2ResultEncoding::Raw),
+        ("MERCHANT_CATAGORY_CODE", 4, Db2ResultEncoding::Raw),
+        ("ACQR_COUNTRY_CODE", 3, Db2ResultEncoding::Raw),
+        ("POS_ENTRY_MODE", 256, Db2ResultEncoding::Raw),
+        ("MERCHANT_ID", 15, Db2ResultEncoding::Raw),
+        ("MERCHANT_NAME", 22, Db2ResultEncoding::Varchar),
+        ("MERCHANT_CITY", 13, Db2ResultEncoding::Raw),
+        ("MERCHANT_STATE", 2, Db2ResultEncoding::Raw),
+        ("MERCHANT_ZIP", 9, Db2ResultEncoding::Raw),
+        ("TRANSACTION_ID", 15, Db2ResultEncoding::Raw),
+        ("MATCH_STATUS", 1, Db2ResultEncoding::Raw),
+        ("AUTH_FRAUD", 1, Db2ResultEncoding::Raw),
+        ("FRAUD_RPT_DATE", 256, Db2ResultEncoding::Raw),
+        ("ACCT_ID", 11, Db2ResultEncoding::Raw),
+        ("CUST_ID", 9, Db2ResultEncoding::Raw),
     ];
     let authorization = Db2TableDefinition {
         name: "CARDDEMO.AUTHFRDS".into(),
-        columns: authorization_names
+        columns: authorization_columns
             .into_iter()
-            .map(|name| {
+            .map(|(name, max_bytes, encoding)| {
                 carddemo_db2_column(
                     name,
                     !matches!(name, "CARD_NUM" | "AUTH_TS"),
-                    512,
-                    Db2ResultEncoding::Raw,
+                    max_bytes,
+                    encoding,
                 )
             })
             .collect(),
@@ -4997,17 +5014,13 @@ fn install_carddemo_db2_package(
         },
     };
     let identity = package_v2_identity(&package).map_err(package_problem)?;
-    package.signature.value = carddemo_package_trust()?
-        .sign_identity("carddemo-conformance-key", &identity)
-        .map_err(terminal_problem)?;
-    server
+    package.signature.value = sign_carddemo_package_identity(&identity);
+    let installed = server
         .install_application_package_v2(&package)
         .map_err(terminal_problem)?;
     server
-        .install_application_batch_controllers("AWS-CARDDEMO")
-        .map_err(terminal_problem)?;
-    server
-        .install_application_db2_catalog("AWS-CARDDEMO")
+        .publish_application_generation(&installed)
+        .map(|_| ())
         .map_err(terminal_problem)
 }
 
@@ -5359,7 +5372,13 @@ async fn exercise_db2_routes(
         0x7d,
         BTreeMap::from([("OPTION".into(), "6".into())]),
     )
-    .await?;
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.maintenance_failed",
+            format!("edit launch: {}", problem.detail),
+        )
+    })?;
     require_online_mapset(&edit_screen, "COTRTUP", "Db2 update route")?;
     let selected = carddemo_terminal_exchange(
         &app,
@@ -5368,7 +5387,13 @@ async fn exercise_db2_routes(
         0x7d,
         BTreeMap::from([("TRTYPCD".into(), "99".into())]),
     )
-    .await?;
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.maintenance_failed",
+            format!("edit lookup: {}", problem.detail),
+        )
+    })?;
     require_online_mapset(&selected, "COTRTUP", "Db2 update lookup")?;
     let reviewed = carddemo_terminal_exchange(
         &app,
@@ -5377,7 +5402,13 @@ async fn exercise_db2_routes(
         0x7d,
         BTreeMap::from([("TRTYDSC".into(), "ONLINE UPDATED".into())]),
     )
-    .await?;
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.maintenance_failed",
+            format!("edit validation: {}", problem.detail),
+        )
+    })?;
     require_online_mapset(&reviewed, "COTRTUP", "Db2 update validation")?;
     let updated = carddemo_terminal_exchange(
         &app,
@@ -5386,7 +5417,13 @@ async fn exercise_db2_routes(
         0xf5,
         BTreeMap::new(),
     )
-    .await?;
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.maintenance_failed",
+            format!("edit commit: {}", problem.detail),
+        )
+    })?;
     require_online_mapset(&updated, "COTRTUP", "Db2 online update")?;
     if !server
         .db2_service()
@@ -5423,7 +5460,13 @@ async fn exercise_db2_routes(
         0x7d,
         BTreeMap::from([("OPTION".into(), "6".into())]),
     )
-    .await?;
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.maintenance_failed",
+            format!("delete launch: {}", problem.detail),
+        )
+    })?;
     require_online_mapset(&delete_screen, "COTRTUP", "Db2 delete route")?;
     let selected = carddemo_terminal_exchange(
         &app,
@@ -5432,7 +5475,13 @@ async fn exercise_db2_routes(
         0x7d,
         BTreeMap::from([("TRTYPCD".into(), "99".into())]),
     )
-    .await?;
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.maintenance_failed",
+            format!("delete lookup: {}", problem.detail),
+        )
+    })?;
     require_online_mapset(&selected, "COTRTUP", "Db2 delete lookup")?;
     let confirmed = carddemo_terminal_exchange(
         &app,
@@ -5441,7 +5490,13 @@ async fn exercise_db2_routes(
         0xf4,
         BTreeMap::new(),
     )
-    .await?;
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.maintenance_failed",
+            format!("delete confirmation: {}", problem.detail),
+        )
+    })?;
     require_online_mapset(&confirmed, "COTRTUP", "Db2 delete confirmation")?;
     let deleted = carddemo_terminal_exchange(
         &app,
@@ -5450,7 +5505,13 @@ async fn exercise_db2_routes(
         0xf4,
         BTreeMap::new(),
     )
-    .await?;
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.maintenance_failed",
+            format!("delete commit: {}", problem.detail),
+        )
+    })?;
     require_online_mapset(&deleted, "COTRTUP", "Db2 online delete")?;
     if server
         .db2_service()
@@ -5475,7 +5536,10 @@ async fn exercise_db2_routes(
                 50_001,
                 BTreeMap::from([
                     ("DCL-TR-TYPE".into(), db2_variable("97")),
-                    ("DCL-TR-DESCRIPTION".into(), db2_variable("ROLLBACK")),
+                    (
+                        "DCL-TR-DESCRIPTION".into(),
+                        db2_varchar_variable("ROLLBACK"),
+                    ),
                 ]),
             )?,
         )
@@ -5512,7 +5576,10 @@ async fn exercise_db2_routes(
                     sequence,
                     BTreeMap::from([
                         ("DCL-TR-TYPE".into(), db2_variable("02")),
-                        ("DCL-TR-DESCRIPTION".into(), db2_variable(description)),
+                        (
+                            "DCL-TR-DESCRIPTION".into(),
+                            db2_varchar_variable(description),
+                        ),
                     ]),
                 )?,
             )
@@ -5548,7 +5615,10 @@ async fn exercise_db2_routes(
                 50_007,
                 BTreeMap::from([
                     ("DCL-TR-TYPE".into(), db2_variable("01")),
-                    ("DCL-TR-DESCRIPTION".into(), db2_variable("DUPLICATE")),
+                    (
+                        "DCL-TR-DESCRIPTION".into(),
+                        db2_varchar_variable("DUPLICATE"),
+                    ),
                 ]),
             )?,
         )
@@ -5648,8 +5718,19 @@ async fn exercise_db2_routes(
     }
     drop(racf);
     drop(server);
-    let restarted = ProductServer::open(config, store, secrets, default_program_router())
-        .map_err(terminal_problem)?;
+    let restarted = ProductServer::open_with_package_trust(
+        config,
+        store,
+        secrets,
+        default_program_router(),
+        carddemo_package_trust()?,
+    )
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.restart_open",
+            format!("package-verified reopen failed: {problem}"),
+        )
+    })?;
     if db2_table_digests(&restarted)? != table_sha256
         || db2_dataset_digests(&restarted)? != dataset_sha256
         || base_batch_spool_digests(&restarted, &job_ids)? != spool_sha256
@@ -5667,7 +5748,13 @@ async fn exercise_db2_routes(
         0xf8,
         BTreeMap::new(),
     )
-    .await?;
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.restart_failed",
+            format!("cursor resume: {}", problem.detail),
+        )
+    })?;
     require_online_mapset(&resumed, "COTRTLI", "Db2 cursor restart")?;
     let _ = restarted.graceful_shutdown().await;
     drop(restarted);
@@ -7530,13 +7617,19 @@ async fn exercise_mq_authorization_routes(
     drop(ims);
     drop(mq);
     drop(server);
-    let restarted = ProductServer::open(
+    let restarted = ProductServer::open_with_package_trust(
         config,
         store,
         Arc::new(MemorySecretResolver::default()),
         default_program_router(),
+        carddemo_package_trust()?,
     )
-    .map_err(terminal_problem)?;
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.mq.restart_open",
+            format!("package-verified reopen failed: {problem}"),
+        )
+    })?;
     if mq_queue_digests(&restarted.mq_service())? != queue_sha256
         || restarted
             .ims_service()
@@ -8372,11 +8465,12 @@ async fn exercise_ims_routes(
     }
     drop(ims);
     drop(server);
-    let restarted = ProductServer::open(
+    let restarted = ProductServer::open_with_package_trust(
         config,
         store,
         Arc::new(MemorySecretResolver::default()),
         default_program_router(),
+        carddemo_package_trust()?,
     )
     .map_err(terminal_problem)?;
     if ims_hierarchy_digest(
@@ -8709,6 +8803,18 @@ fn db2_control_invocation(run: &str) -> Result<Invocation, CorpusProblem> {
 fn db2_variable(value: &str) -> Db2HostVariable {
     Db2HostVariable {
         value: value.as_bytes().to_vec(),
+        indicator: None,
+    }
+}
+
+fn db2_varchar_variable(value: &str) -> Db2HostVariable {
+    let mut bytes = u16::try_from(value.len())
+        .expect("CardDemo VARCHAR control is bounded")
+        .to_be_bytes()
+        .to_vec();
+    bytes.extend_from_slice(value.as_bytes());
+    Db2HostVariable {
+        value: bytes,
         indicator: None,
     }
 }

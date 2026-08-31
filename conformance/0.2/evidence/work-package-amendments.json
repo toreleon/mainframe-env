@@ -1,0 +1,77 @@
+{
+  "schema_version": "mainframe-env.work-package-amendments@1",
+  "target_version": "0.2.0",
+  "status": "pass",
+  "historical_receipts_rewritten": false,
+  "amendments": [
+    {
+      "work_package": "CV-204",
+      "reason": "Round-three repairs bind all referenced blobs, preflight every section count, persist and revalidate retained packages, recover generation-bound multi-provider publication, and resolve verifier-only trust keys through SecretRef.",
+      "historical": {
+        "completion_commit": "7111308ef3e187e1e32cfbdc4c85b5a644f9846d",
+        "receipt_path": "conformance/0.2/evidence/work-packages/CV-204.json",
+        "evidence_digest": "sha256:6a75a4924da64db04f16100739c7b1e96a64d096418d901ba675a8406ab86c65",
+        "validation": "git-object-content"
+      },
+      "repair_artifacts": [
+        {"path": "crates/kernel/mainframe-env-application/src/package_v2.rs", "sha256": "sha256:aa6ac65258b4f8f114038db1c9fe660f61b57fcb77d279cdd357b4ae9523f5da"},
+        {"path": "crates/apps/mainframe-env-server/src/product.rs", "sha256": "sha256:e40af8d5b5171aca9f6fef649456e37f32614e1ec3a47736a8e87fcd742ac50f"},
+        {"path": "crates/tooling/mainframe-env-conformance/src/carddemo.rs", "sha256": "sha256:96eae85d3ae5f38d31d1508e877ad64a751c8ed55de3c841f7b93233b36f33a1"},
+        {"path": "crates/apps/mainframe-env-server/src/main.rs", "sha256": "sha256:5ff724bff729c2dfbc1046bb0afdf826e55f781167d951cf31b27d22c7484583"},
+        {"path": "crates/providers/mainframe-env-racf/src/service.rs", "sha256": "sha256:6ef0c2b4648d0e26f286606bc58e548e61874c381a4a38529c485a9da0f19962"},
+        {"path": "conformance/0.2/migrations/application-package-v1-to-v2.json", "sha256": "sha256:0a3d2177e041b31fb429d2bf100d139c2437432bfcec82401ec87232442f80a6"},
+        {"path": "conformance/0.2/schemas/application-installer-state.schema.json", "sha256": "sha256:57a188d58e0fb9ec5caeed92064b7605b2282f5265b8280078dfc5fb38dc4935"},
+        {"path": "conformance/0.2/schemas/application-publication-state.schema.json", "sha256": "sha256:d38bb8cf031384b67f7a9232dbc3a52a0419350845c2900b3f4de9b4512acd31"},
+        {"path": "docs/architecture/APPLICATION-PACKAGES.md", "sha256": "sha256:4c89e3450bc8585748d555b3be917a1f474e46fa2482f1cbb4de810067e1475a"}
+      ]
+    },
+    {
+      "work_package": "CV-205",
+      "reason": "Round-three repairs preserve adopted legacy state, enforce byte-exact raw predicates and cursors, stream signed catalog bounds, and require full semantic schema equality.",
+      "historical": {
+        "completion_commit": "7f97bd8f26270827dc4f03aba0b8e64666a16334",
+        "receipt_path": "conformance/0.2/evidence/work-packages/CV-205.json",
+        "evidence_digest": "sha256:f1960dde919ba8a09c7838794a5b71b2c97253137041d67e3993d738bb0be31b",
+        "validation": "git-object-content"
+      },
+      "repair_artifacts": [
+        {"path": "crates/providers/mainframe-env-db2/src/service.rs", "sha256": "sha256:d95b3316ae816631a681b57d6c1a72b2af0afd45b7284ad1f946ec623f33e683"},
+        {"path": "crates/providers/mainframe-env-db2/src/catalog/bounded_decode.rs", "sha256": "sha256:d2d2a9de56b4b7e55eb9300d344a25500221827b02a769c3c11757a07e2e7cc9"},
+        {"path": "crates/apps/mainframe-env-server/src/product.rs", "sha256": "sha256:e40af8d5b5171aca9f6fef649456e37f32614e1ec3a47736a8e87fcd742ac50f"},
+        {"path": "crates/tooling/mainframe-env-conformance/src/carddemo.rs", "sha256": "sha256:96eae85d3ae5f38d31d1508e877ad64a751c8ed55de3c841f7b93233b36f33a1"},
+        {"path": "docs/architecture/DB2-APPLICATION-CATALOG.md", "sha256": "sha256:711fbca8a3ba6d898c7364dae93f2b112a08618d8104791cdc84e9dd1da9e03e"}
+      ]
+    },
+    {
+      "work_package": "CV-206",
+      "reason": "Round-three publication recovery binds installed controllers to the expected durable package generation and never selects a partially published generation.",
+      "historical": {
+        "completion_commit": "97591b790ba84520fd79d4c36632a7bba672f95e",
+        "receipt_path": "conformance/0.2/evidence/work-packages/CV-206.json",
+        "evidence_digest": "sha256:deb9c87b73f5f975c85f02648e1d6fc8ab493f128b0f9228db70a28f131ab111",
+        "validation": "git-object-content"
+      },
+      "repair_artifacts": [
+        {"path": "crates/apps/mainframe-env-server/src/product.rs", "sha256": "sha256:e40af8d5b5171aca9f6fef649456e37f32614e1ec3a47736a8e87fcd742ac50f"},
+        {"path": "conformance/0.2/migrations/application-package-v1-to-v2.json", "sha256": "sha256:0a3d2177e041b31fb429d2bf100d139c2437432bfcec82401ec87232442f80a6"}
+      ]
+    },
+    {
+      "work_package": "CV-209",
+      "reason": "Round-three evidence discovers completion commits and validates Git object content; target release checks compare retained macOS and pinned Linux evidence instead of self-comparing fresh output.",
+      "historical": {
+        "completion_commit": "cf834b8d57514f933d1ff6d439949ffb0b8065fa",
+        "receipt_path": "conformance/0.2/evidence/work-packages/CV-209.json",
+        "evidence_digest": "sha256:4ad28e157b3b7d3eff94c673c0201920ff3920cecfa64f9dcd9821a2d4152a94",
+        "validation": "git-object-content"
+      },
+      "repair_artifacts": [
+        {"path": "xtask/src/main.rs", "sha256": "sha256:8e3f41f9d82d9132ccb490301118287f624b37743c814e57843b9978981dd519"},
+        {"path": ".github/workflows/ci.yml", "sha256": "sha256:856cd0c281cc17d297adc73fd7dfaeab298d2989fbd1126e3d064d51b0d6c0ca"},
+        {"path": "conformance/0.2/schemas/review-repair-round-3.schema.json", "sha256": "sha256:3ed64a55b21e50873f86eab01624a9399a7f38cd5ca484bc3aca5292acb6b37c"},
+        {"path": "conformance/0.2/schemas/release-build-inputs.schema.json", "sha256": "sha256:affa33cf04ac16bfe0878dc71257b71ec74dcde358753171a01e56f2417f9413"},
+        {"path": "docs/releases/0.2.md", "sha256": "sha256:6968428f3f95ffed3f739f75c671d075d292d069caf3541a728f1bec9b356052"}
+      ]
+    }
+  ]
+}
