@@ -2,9 +2,15 @@
 
 #![forbid(unsafe_code)]
 
+mod controller;
 mod jcl;
 mod program;
 mod service;
+
+pub use controller::{
+    BATCH_CONTROLLER_REGISTRY_CONTRACT, BatchControllerDefinition, BatchControllerGeneration,
+    BatchControllerInstallReceipt, BatchControllerPlan, BatchControllerSelector,
+};
 
 pub use jcl::{
     DdPlan, Disposition, JclBundle, JclLimits, JobPlan, StepCondition, StepPlan, parse_jcl,

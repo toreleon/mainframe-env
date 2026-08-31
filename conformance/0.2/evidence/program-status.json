@@ -31,15 +31,15 @@
     "official_baselines": 9,
     "official_mandatory_rows": 1506
   },
-  "current_work_package": "CV-206",
+  "current_work_package": "CV-207",
   "work_packages": [
     {"id": "CV-201", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-201.json"},
     {"id": "CV-202", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-202.json"},
     {"id": "CV-203", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-203.json"},
     {"id": "CV-204", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-204.json"},
     {"id": "CV-205", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-205.json"},
-    {"id": "CV-206", "state": "in-progress", "evidence": null},
-    {"id": "CV-207", "state": "pending", "evidence": null},
+    {"id": "CV-206", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-206.json"},
+    {"id": "CV-207", "state": "in-progress", "evidence": null},
     {"id": "CV-208", "state": "pending", "evidence": null},
     {"id": "CV-209", "state": "pending", "evidence": null}
   ],
@@ -113,6 +113,11 @@
       "command": "CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-db2 --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-mq-authorization --check",
       "exit_code": 0,
       "result": "Db2 and authorization receipts passed with unchanged historical digests through selected package catalog data"
+    },
+    {
+      "command": "cargo xtask batch-controllers --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-db2 --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-ims --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-mq-authorization --check",
+      "exit_code": 0,
+      "result": "CV-206 typed package-installed controllers passed the three-to-zero production scan and all reached pinned workload routes with unchanged digests"
     }
   ],
   "evidence_paths": [
@@ -124,16 +129,18 @@
     "conformance/0.2/evidence/work-packages/CV-203.json",
     "conformance/0.2/evidence/work-packages/CV-204.json",
     "conformance/0.2/evidence/work-packages/CV-205.json",
+    "conformance/0.2/evidence/work-packages/CV-206.json",
     "conformance/0.2/evidence/hardcode/CV-205-db2.json",
+    "conformance/0.2/evidence/hardcode/CV-206-batch.json",
     "conformance/0.2/evidence/coverage-ledger.json",
     "conformance/0.2/generated/semantic-identities.json",
     "conformance/0.2/generated/subsystem-handlers.json"
   ],
   "dirty_tree_identity": {
     "algorithm": "cargo xtask digest; length-delimited path and content over the repository excluding Git, target, raw historical evidence, phase/status ledgers, and this status ledger",
-    "digest": "sha256:983c4315a8f34748de6b36ee23b9bb5c2a40b52bad363d8eb2e2474ecbd6b6ef"
+    "digest": "sha256:17017684eabb35d0d83fad4104a7f9921a0276729d5beae1b5dc2513270b580d"
   },
   "open_decisions": [],
   "blockers": [],
-  "next_smallest_executable_step": "Implement CV-206 installed typed batch controllers and remove the three COBTUPDT/CBPAUP0C production branches."
+  "next_smallest_executable_step": "Implement CV-207 subsystem-owned DFHAID, DFHBMSCA, SQLCA, and MQ ABI source libraries and remove compiler ownership."
 }

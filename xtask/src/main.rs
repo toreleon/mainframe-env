@@ -57,6 +57,7 @@ fn run() -> TaskResult {
         "coverage" => check_coverage(&root),
         "application-packages" => check_application_packages(&root),
         "db2-catalog" => check_db2_catalog(&root),
+        "batch-controllers" => check_batch_controllers(&root),
         "semantic-identities" if check => check_semantic_identities(&root),
         "semantic-identities" => generate_semantic_identities(&root),
         "conformance" => {
@@ -69,7 +70,8 @@ fn run() -> TaskResult {
             check_coverage(&root)?;
             check_semantic_identities(&root)?;
             check_application_packages(&root)?;
-            check_db2_catalog(&root)
+            check_db2_catalog(&root)?;
+            check_batch_controllers(&root)
         }
         "certification" => check_certification(&root),
         "carddemo-corpus" => check_carddemo_corpus(&root),
@@ -108,7 +110,7 @@ fn run() -> TaskResult {
         "release" => generate_release_artifacts(&root),
         "help" | "--help" | "-h" => {
             println!(
-                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|coverage|semantic-identities|application-packages|db2-catalog|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check"
+                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|coverage|semantic-identities|application-packages|db2-catalog|batch-controllers|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check"
             );
             Ok(())
         }
@@ -2029,6 +2031,111 @@ fn check_db2_catalog(root: &Path) -> TaskResult {
         require(
             root.join(path).is_file(),
             &format!("Db2 catalog artifact is missing: {path}"),
+        )?;
+    }
+    Ok(())
+}
+
+fn check_batch_controllers(root: &Path) -> TaskResult {
+    let service_path = root.join("crates/apps/mainframe-env-batch/src/service.rs");
+    let controller_path = root.join("crates/apps/mainframe-env-batch/src/controller.rs");
+    let service = read(&service_path)?;
+    let controller = read(&controller_path)?;
+    let production_service = service.split("#[cfg(test)]").next().unwrap_or(&service);
+    let production_controller = controller
+        .split("#[cfg(test)]")
+        .next()
+        .unwrap_or(&controller);
+    let production = format!("{production_service}\n{production_controller}").to_ascii_uppercase();
+    for forbidden in [
+        "COBTUPDT",
+        "CBPAUP0C",
+        "PAUDBLOD",
+        "PAUDBUNL",
+        "DBPAUTP0",
+        "PSBPAUTB",
+        "PAUTSUM0",
+        "PAUTDTL1",
+        "AUTHORIZATION-ADJUSTED",
+    ] {
+        require(
+            !production.contains(forbidden),
+            &format!("batch production source contains application identity {forbidden}"),
+        )?;
+    }
+    for required in [
+        "BatchControllerRegistry",
+        "BatchControllerGeneration",
+        "BatchControllerSelector",
+        "BatchControllerPlan",
+        "pub(crate) fn install",
+        "pub(crate) fn resolve",
+        "Publish only after the full generation validates",
+    ] {
+        require(
+            production_controller.contains(required),
+            &format!("batch controller registry omits {required}"),
+        )?;
+    }
+    for required in [
+        "pub fn install_controllers",
+        "ims_controller_selector",
+        "resolve_controller",
+        "execute_program_controller",
+    ] {
+        require(
+            production_service.contains(required),
+            &format!("batch controller service integration omits {required}"),
+        )?;
+    }
+    let product = read(&root.join("crates/apps/mainframe-env-server/src/product.rs"))?;
+    require(
+        product.contains("pub fn install_application_batch_controllers")
+            && product.contains("package_v2_identity")
+            && product.contains("decode_application_batch_controller"),
+        "composition does not derive controllers from an identity-equal selected package",
+    )?;
+    let contracts_path = root.join("conformance/0.2/inventory/contracts.json");
+    let contracts = json(&contracts_path)?;
+    require(
+        contracts["contracts"]["batch_controller_registry"]
+            == Value::String("mainframe-env.batch-controller-registry@1".into()),
+        "batch controller registry contract is not frozen",
+    )?;
+    let migration_path = root.join("conformance/0.2/migrations/batch-controller-v0-to-v1.json");
+    let migration = json(&migration_path)?;
+    require(
+        migration["schema_version"]
+            == Value::String("mainframe-env.batch-controller-migration@1".into())
+            && migration["destructive"] == Value::Bool(false)
+            && migration["production_branch_fallback_retained"] == Value::Bool(false)
+            && migration["installation"]["bounded"] == Value::Bool(true)
+            && migration["installation"]["validate_complete_generation_before_publish"]
+                == Value::Bool(true)
+            && migration["installation"]["selector_conflicts_fail_closed"] == Value::Bool(true)
+            && migration["rollback"]["supported"] == Value::Bool(true)
+            && migration["rollback"]["partial_generation_selected"] == Value::Bool(false)
+            && migration["rollback"]["unseen_older_generation_accepted"] == Value::Bool(false),
+        "batch controller migration or rollback contract is unsafe",
+    )?;
+    let scan_path = root.join("conformance/0.2/evidence/hardcode/CV-206-batch.json");
+    let scan = json(&scan_path)?;
+    require(
+        scan["before"]["h1_h3_lines"].as_u64() == Some(3)
+            && scan["after"]["h1_h3_lines"].as_u64() == Some(0)
+            && scan["after"]["application_program_identifiers"].as_u64() == Some(0)
+            && scan["after"]["application_data_identifiers"].as_u64() == Some(0)
+            && scan["after"]["application_string_dispatch"].as_u64() == Some(0),
+        "batch hardcode scan receipt does not prove three to zero",
+    )?;
+    for path in [
+        "conformance/0.2/schemas/batch-controller-registry.schema.json",
+        "docs/architecture/BATCH-CONTROLLER-REGISTRY.md",
+        "crates/apps/mainframe-env-batch/README.md",
+    ] {
+        require(
+            root.join(path).is_file(),
+            &format!("batch controller artifact is missing: {path}"),
         )?;
     }
     Ok(())

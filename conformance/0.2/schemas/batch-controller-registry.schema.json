@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/batch-controller-registry@1",
+  "title": "mainframe-env installed batch-controller generation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "application", "generation", "identity", "controllers"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.batch-controller-registry@1"},
+    "application": {"type": "string", "minLength": 1, "maxLength": 128},
+    "generation": {"type": "integer", "minimum": 1},
+    "identity": {"type": "string", "pattern": "^sha256:[0-9a-fA-F]{64}$"},
+    "controllers": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4096,
+      "items": {"$ref": "#/$defs/controller"}
+    }
+  },
+  "$defs": {
+    "controller": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "selector", "plan"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 128},
+        "selector": {"$ref": "#/$defs/selector"},
+        "plan": {"$ref": "#/$defs/plan"}
+      }
+    },
+    "selector": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["launcher", "program"],
+          "properties": {
+            "launcher": {"const": "tso-run"},
+            "program": {"type": "string", "minLength": 1, "maxLength": 128}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["launcher", "mode", "program", "qualifier"],
+          "properties": {
+            "launcher": {"const": "ims-controller"},
+            "mode": {"type": "string", "minLength": 1, "maxLength": 16},
+            "program": {"type": "string", "minLength": 1, "maxLength": 128},
+            "qualifier": {"type": ["string", "null"], "maxLength": 128}
+          }
+        }
+      ]
+    },
+    "plan": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["behavior"],
+          "properties": {"behavior": {"const": "program-call"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["behavior", "database", "root_dd", "child_dd", "root_record_bytes", "child_record_bytes", "parent_key_bytes"],
+          "properties": {
+            "behavior": {"const": "ims-load"},
+            "database": {"$ref": "#/$defs/host_name"},
+            "root_dd": {"$ref": "#/$defs/dd_name"},
+            "child_dd": {"$ref": "#/$defs/dd_name"},
+            "root_record_bytes": {"type": "integer", "minimum": 1, "maximum": 1048576},
+            "child_record_bytes": {"type": "integer", "minimum": 1, "maximum": 1048576},
+            "parent_key_bytes": {"type": "integer", "minimum": 1, "maximum": 1048575}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["behavior", "database", "root_segment", "child_segment", "root_output_dd", "child_output_dd", "combined_output_dd"],
+          "properties": {
+            "behavior": {"const": "ims-unload"},
+            "database": {"$ref": "#/$defs/host_name"},
+            "root_segment": {"$ref": "#/$defs/host_name"},
+            "child_segment": {"$ref": "#/$defs/host_name"},
+            "root_output_dd": {"oneOf": [{"$ref": "#/$defs/dd_name"}, {"type": "null"}]},
+            "child_output_dd": {"oneOf": [{"$ref": "#/$defs/dd_name"}, {"type": "null"}]},
+            "combined_output_dd": {"oneOf": [{"$ref": "#/$defs/dd_name"}, {"type": "null"}]}
+          },
+          "oneOf": [
+            {"required": ["root_output_dd", "child_output_dd"], "properties": {"combined_output_dd": {"type": "null"}, "root_output_dd": {"type": "string"}, "child_output_dd": {"type": "string"}}},
+            {"properties": {"root_output_dd": {"type": "null"}, "child_output_dd": {"type": "null"}, "combined_output_dd": {"type": "string"}}}
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["behavior", "psb", "root_segment", "child_segment", "control_dd", "required_expiry_days", "checkpoint_prefix", "summary_field"],
+          "properties": {
+            "behavior": {"const": "ims-purge"},
+            "psb": {"$ref": "#/$defs/host_name"},
+            "root_segment": {"$ref": "#/$defs/host_name"},
+            "child_segment": {"$ref": "#/$defs/host_name"},
+            "control_dd": {"$ref": "#/$defs/dd_name"},
+            "required_expiry_days": {"type": "string", "minLength": 1, "maxLength": 16},
+            "checkpoint_prefix": {"type": "string", "minLength": 1, "maxLength": 16},
+            "summary_field": {"type": "string", "minLength": 1, "maxLength": 128}
+          }
+        }
+      ]
+    },
+    "host_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Z0-9.$@#_-]+$"
+    },
+    "dd_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8,
+      "pattern": "^[A-Z0-9$@#_-]+$"
+    }
+  }
+}

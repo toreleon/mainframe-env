@@ -158,6 +158,13 @@ Owns job lifecycle, admission, job/step identity, spool/SYSOUT, cancellation,
 purge, status, and JES-facing host operations. JCL describes workflow; JES owns
 job execution state.
 
+### `mainframe-env-batch::controller`
+
+Owns the bounded typed selector/plan contract and atomic installed-generation
+registry. The server composition maps only a verified selected application
+package's batch-controller section into this contract; JES never selects
+application behavior by inspecting a workload name.
+
 ## Provider packages
 
 ### `mainframe-env-dataset`

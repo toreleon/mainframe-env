@@ -1,6 +1,8 @@
+use crate::controller::{BatchControllerRegistry, ResolvedBatchController};
 use crate::{
-    Disposition, JclBundle, JclLimits, JobPlan, ProgramInput, StepPlan, UtilityDisposition,
-    decode_program_output, parse_jcl, utility_disposition,
+    BatchControllerGeneration, BatchControllerInstallReceipt, BatchControllerPlan,
+    BatchControllerSelector, Disposition, JclBundle, JclLimits, JobPlan, ProgramInput, StepPlan,
+    UtilityDisposition, decode_program_output, parse_jcl, utility_disposition,
 };
 use mainframe_env_execution_api::{
     BoundedPayload, IdempotencyKey, Invocation, InvocationLimits, PrincipalId,
@@ -101,6 +103,7 @@ pub struct BatchService {
     store: Arc<dyn ProviderStateStore>,
     jcl_limits: JclLimits,
     limits: BatchLimits,
+    controllers: Mutex<BatchControllerRegistry>,
     state: Mutex<State>,
 }
 
@@ -159,12 +162,23 @@ impl BatchService {
             store,
             jcl_limits,
             limits,
+            controllers: Mutex::new(BatchControllerRegistry::default()),
             state: Mutex::new(State {
                 jobs,
                 replay,
                 next_id,
             }),
         }))
+    }
+
+    pub fn install_controllers(
+        &self,
+        generation: BatchControllerGeneration,
+    ) -> Result<BatchControllerInstallReceipt, HostProblem> {
+        self.controllers
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .install(generation)
     }
 
     pub fn submit(
@@ -676,33 +690,17 @@ impl BatchService {
             });
         }
         let program = tso_run_program(&control)?;
-        if program == "COBTUPDT" {
-            let payload = BoundedPayload::new(
-                "mainframe-env.program.input@1",
-                serde_json::to_vec(input).map_err(|_| HostProblem::ProviderFailure)?,
-                InvocationLimits::default(),
-            )
-            .map_err(|_| HostProblem::ResourceExhausted)?;
-            let sequence = next_effect_sequence(invocation, effect_sequence)?;
-            let key = effect_key(job, step, sequence)?;
-            let result = self.host.invoke(
-                invocation,
-                invocation.deadline_tick.saturating_sub(1),
-                false,
-                EffectRequest {
-                    run_unit: invocation.run_unit_id.clone(),
-                    sequence,
-                    deadline_tick: invocation.deadline_tick,
-                    idempotency_key: Some(key),
-                    request: HostRequest::Program(ProgramRequest::Call {
-                        program: ProgramName::new(program, 128)
-                            .map_err(|_| HostProblem::Malformed)?,
-                        payload,
-                    }),
-                },
-            );
-            return match result.effect.outcome? {
-                HostResult::Program(payload) => decode_program_output(&payload),
+        let selector = BatchControllerSelector::tso(&program)?;
+        if let Some(controller) = self.resolve_controller(&selector)? {
+            return match controller.plan {
+                BatchControllerPlan::ProgramCall => self.execute_program_controller(
+                    invocation,
+                    job,
+                    step,
+                    input,
+                    effect_sequence,
+                    controller.selector.program(),
+                ),
                 _ => Err(HostProblem::ProviderFailure),
             };
         }
@@ -769,6 +767,54 @@ impl BatchService {
         })
     }
 
+    fn resolve_controller(
+        &self,
+        selector: &BatchControllerSelector,
+    ) -> Result<Option<ResolvedBatchController>, HostProblem> {
+        self.controllers
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)
+            .map(|registry| registry.resolve(selector))
+    }
+
+    fn execute_program_controller(
+        &self,
+        invocation: &Invocation,
+        job: &Job,
+        step: &StepPlan,
+        input: &ProgramInput,
+        effect_sequence: &mut u64,
+        program: &str,
+    ) -> Result<crate::ProgramOutput, HostProblem> {
+        let payload = BoundedPayload::new(
+            "mainframe-env.program.input@1",
+            serde_json::to_vec(input).map_err(|_| HostProblem::ProviderFailure)?,
+            InvocationLimits::default(),
+        )
+        .map_err(|_| HostProblem::ResourceExhausted)?;
+        let sequence = next_effect_sequence(invocation, effect_sequence)?;
+        let key = effect_key(job, step, sequence)?;
+        let result = self.host.invoke(
+            invocation,
+            invocation.deadline_tick.saturating_sub(1),
+            false,
+            EffectRequest {
+                run_unit: invocation.run_unit_id.clone(),
+                sequence,
+                deadline_tick: invocation.deadline_tick,
+                idempotency_key: Some(key),
+                request: HostRequest::Program(ProgramRequest::Call {
+                    program: ProgramName::new(program, 128).map_err(|_| HostProblem::Malformed)?,
+                    payload,
+                }),
+            },
+        );
+        match result.effect.outcome? {
+            HostResult::Program(payload) => decode_program_output(&payload),
+            _ => Err(HostProblem::ProviderFailure),
+        }
+    }
+
     fn execute_ims_controller(
         &self,
         invocation: &Invocation,
@@ -777,179 +823,225 @@ impl BatchService {
         input: &ProgramInput,
         effect_sequence: &mut u64,
     ) -> Result<crate::ProgramOutput, HostProblem> {
-        let parameter = input
-            .parameter
-            .as_deref()
-            .unwrap_or_default()
-            .trim_matches(['\'', '"'])
-            .to_ascii_uppercase();
-        if parameter.contains("PAUDBLOD") {
-            let roots = input_dd_records(input, "INFILE1")?;
-            let children = input_dd_records(input, "INFILE2")?;
-            let mut hierarchy = roots
-                .into_iter()
-                .map(|data| {
-                    if data.len() != 100 {
+        let selector = ims_controller_selector(input.parameter.as_deref().unwrap_or_default())?;
+        let controller = self
+            .resolve_controller(&selector)?
+            .ok_or(HostProblem::Unsupported)?;
+        let program = controller.selector.program().to_string();
+        let mode = controller.selector.mode().unwrap_or_default().to_string();
+        match controller.plan {
+            BatchControllerPlan::ProgramCall => Err(HostProblem::ProviderFailure),
+            BatchControllerPlan::ImsLoad {
+                database,
+                root_dd,
+                child_dd,
+                root_record_bytes,
+                child_record_bytes,
+                parent_key_bytes,
+            } => {
+                let roots = input_dd_records(input, &root_dd)?;
+                let children = input_dd_records(input, &child_dd)?;
+                let mut hierarchy = roots
+                    .into_iter()
+                    .map(|data| {
+                        if data.len() != root_record_bytes || data.len() < parent_key_bytes {
+                            return Err(HostProblem::Malformed);
+                        }
+                        Ok((
+                            data[..parent_key_bytes].to_vec(),
+                            (data, Vec::<Vec<u8>>::new()),
+                        ))
+                    })
+                    .collect::<Result<BTreeMap<_, _>, _>>()?;
+                for record in children {
+                    if record.len() != child_record_bytes || record.len() < parent_key_bytes {
                         return Err(HostProblem::Malformed);
                     }
-                    Ok((data[..6].to_vec(), (data, Vec::<Vec<u8>>::new())))
-                })
-                .collect::<Result<BTreeMap<_, _>, _>>()?;
-            for record in children {
-                if record.len() != 206 {
-                    return Err(HostProblem::Malformed);
+                    hierarchy
+                        .get_mut(&record[..parent_key_bytes])
+                        .ok_or(HostProblem::Malformed)?
+                        .1
+                        .push(record[parent_key_bytes..].to_vec());
                 }
-                hierarchy
-                    .get_mut(&record[..6])
-                    .ok_or(HostProblem::Malformed)?
-                    .1
-                    .push(record[6..].to_vec());
+                let image = serde_json::json!({
+                    "database": database,
+                    "roots": hierarchy.into_values().map(|(data, children)| {
+                        serde_json::json!({"data": data, "children": children})
+                    }).collect::<Vec<_>>()
+                });
+                let result = self.ims_call(
+                    invocation,
+                    job,
+                    step,
+                    effect_sequence,
+                    ImsOperation::Load,
+                    Some(database),
+                    serde_json::to_vec(&image).map_err(|_| HostProblem::ProviderFailure)?,
+                    1,
+                )?;
+                Ok(crate::ProgramOutput {
+                    return_code: i32::from(result.status != "  ") * 8,
+                    records: vec![
+                        format!("DFSRRC00 LOAD SEGMENTS={}", result.affected_segments).into_bytes(),
+                    ],
+                    dd_outputs: BTreeMap::new(),
+                })
             }
-            let image = serde_json::json!({
-                "database":"DBPAUTP0",
-                "roots":hierarchy.into_values().map(|(data, children)| {
-                    serde_json::json!({"data":data,"children":children})
-                }).collect::<Vec<_>>()
-            });
-            let result = self.ims_call(
-                invocation,
-                job,
-                step,
-                effect_sequence,
-                ImsOperation::Load,
-                Some("DBPAUTP0".into()),
-                serde_json::to_vec(&image).map_err(|_| HostProblem::ProviderFailure)?,
-                1,
-            )?;
-            return Ok(crate::ProgramOutput {
-                return_code: i32::from(result.status != "  ") * 8,
-                records: vec![
-                    format!("DFSRRC00 LOAD SEGMENTS={}", result.affected_segments).into_bytes(),
-                ],
-                dd_outputs: BTreeMap::new(),
-            });
-        }
-        if parameter.contains("PAUDBUNL") || parameter.contains("DFSURGU0") {
-            let result = self.ims_call(
-                invocation,
-                job,
-                step,
-                effect_sequence,
-                ImsOperation::Unload,
-                Some("DBPAUTP0".into()),
-                Vec::new(),
-                4_096,
-            )?;
-            let mut roots = Vec::new();
-            let mut children = Vec::new();
-            for segment in &result.segments {
-                match segment.name.as_str() {
-                    "PAUTSUM0" => roots.push(segment.data.clone()),
-                    "PAUTDTL1" => {
+            BatchControllerPlan::ImsUnload {
+                database,
+                root_segment,
+                child_segment,
+                root_output_dd,
+                child_output_dd,
+                combined_output_dd,
+            } => {
+                let result = self.ims_call(
+                    invocation,
+                    job,
+                    step,
+                    effect_sequence,
+                    ImsOperation::Unload,
+                    Some(database),
+                    Vec::new(),
+                    4_096,
+                )?;
+                let mut roots = Vec::new();
+                let mut children = Vec::new();
+                for segment in &result.segments {
+                    if segment.name == root_segment {
+                        roots.push(segment.data.clone());
+                    } else if segment.name == child_segment {
                         let mut record = segment
                             .parent_key
                             .clone()
                             .ok_or(HostProblem::ProviderFailure)?;
                         record.extend_from_slice(&segment.data);
                         children.push(record);
+                    } else {
+                        return Err(HostProblem::ProviderFailure);
                     }
-                    _ => return Err(HostProblem::ProviderFailure),
                 }
+                let dd_outputs = if let Some(combined) = combined_output_dd {
+                    BTreeMap::from([(combined, roots.into_iter().chain(children).collect())])
+                } else {
+                    BTreeMap::from([
+                        (root_output_dd.ok_or(HostProblem::ProviderFailure)?, roots),
+                        (
+                            child_output_dd.ok_or(HostProblem::ProviderFailure)?,
+                            children,
+                        ),
+                    ])
+                };
+                Ok(crate::ProgramOutput {
+                    return_code: i32::from(result.status != "  ") * 8,
+                    records: vec![
+                        format!("DFSRRC00 UNLOAD SEGMENTS={}", result.segments.len()).into_bytes(),
+                    ],
+                    dd_outputs,
+                })
             }
-            let dd_outputs = if parameter.contains("PAUDBUNL") {
-                BTreeMap::from([("OUTFIL1".into(), roots), ("OUTFIL2".into(), children)])
-            } else {
-                BTreeMap::from([(
-                    "DFSURGU1".into(),
-                    roots.into_iter().chain(children).collect(),
-                )])
-            };
-            return Ok(crate::ProgramOutput {
-                return_code: i32::from(result.status != "  ") * 8,
-                records: vec![
-                    format!("DFSRRC00 UNLOAD SEGMENTS={}", result.segments.len()).into_bytes(),
-                ],
-                dd_outputs,
-            });
-        }
-        if parameter.contains("BMP") && parameter.contains("CBPAUP0C") {
-            let control = input_dd_records(input, "SYSIN")?;
-            let range = control
-                .first()
-                .ok_or(HostProblem::Malformed)
-                .and_then(|record| {
-                    std::str::from_utf8(record).map_err(|_| HostProblem::Malformed)
-                })?;
-            let fields = range.split(',').map(str::trim).collect::<Vec<_>>();
-            let expiry_days = fields.first().ok_or(HostProblem::Malformed)?;
-            if fields.len() != 4
-                || expiry_days.len() != 2
-                || fields[1].len() != 5
-                || fields[2].len() != 5
-                || !fields[..3]
-                    .iter()
-                    .all(|field| field.bytes().all(|byte| byte.is_ascii_digit()))
-                || !matches!(fields[3], "Y" | "N")
-            {
-                return Err(HostProblem::Malformed);
-            }
-            if *expiry_days != "00" {
-                return Err(HostProblem::Unsupported);
-            }
-            self.ims_dli_call(
-                invocation,
-                job,
-                step,
-                effect_sequence,
-                ImsOperation::Schedule,
-                Some("PSBPAUTB".into()),
-                Vec::new(),
-                Vec::new(),
-                Vec::new(),
-                None,
-                1,
-            )?;
-            let mut deleted_roots = 0u64;
-            let mut deleted_children = 0u64;
-            loop {
-                let root = self.ims_dli_call(
+            BatchControllerPlan::ImsPurge {
+                psb,
+                root_segment,
+                child_segment,
+                control_dd,
+                required_expiry_days,
+                checkpoint_prefix,
+                summary_field,
+            } => {
+                let control = input_dd_records(input, &control_dd)?;
+                let range = control
+                    .first()
+                    .ok_or(HostProblem::Malformed)
+                    .and_then(|record| {
+                        std::str::from_utf8(record).map_err(|_| HostProblem::Malformed)
+                    })?;
+                let fields = range.split(',').map(str::trim).collect::<Vec<_>>();
+                let expiry_days = fields.first().ok_or(HostProblem::Malformed)?;
+                if fields.len() != 4
+                    || expiry_days.len() != 2
+                    || fields[1].len() != 5
+                    || fields[2].len() != 5
+                    || !fields[..3]
+                        .iter()
+                        .all(|field| field.bytes().all(|byte| byte.is_ascii_digit()))
+                    || !matches!(fields[3], "Y" | "N")
+                {
+                    return Err(HostProblem::Malformed);
+                }
+                if *expiry_days != required_expiry_days {
+                    return Err(HostProblem::Unsupported);
+                }
+                self.ims_dli_call(
                     invocation,
                     job,
                     step,
                     effect_sequence,
-                    ImsOperation::GetNext,
-                    None,
-                    vec!["PAUTSUM0".into()],
+                    ImsOperation::Schedule,
+                    Some(psb),
+                    Vec::new(),
                     Vec::new(),
                     Vec::new(),
                     None,
                     1,
                 )?;
-                if root.status == "GB" {
-                    break;
-                }
-                if !root.status.trim().is_empty() {
-                    return Err(HostProblem::ProviderFailure);
-                }
+                let mut deleted_roots = 0u64;
+                let mut deleted_children = 0u64;
                 loop {
-                    let child = self.ims_dli_call(
+                    let root = self.ims_dli_call(
                         invocation,
                         job,
                         step,
                         effect_sequence,
-                        ImsOperation::GetNextParent,
+                        ImsOperation::GetNext,
                         None,
-                        vec!["PAUTDTL1".into()],
+                        vec![root_segment.clone()],
                         Vec::new(),
                         Vec::new(),
                         None,
                         1,
                     )?;
-                    if child.status == "GE" {
+                    if root.status == "GB" {
                         break;
                     }
-                    if !child.status.trim().is_empty() {
+                    if !root.status.trim().is_empty() {
                         return Err(HostProblem::ProviderFailure);
+                    }
+                    loop {
+                        let child = self.ims_dli_call(
+                            invocation,
+                            job,
+                            step,
+                            effect_sequence,
+                            ImsOperation::GetNextParent,
+                            None,
+                            vec![child_segment.clone()],
+                            Vec::new(),
+                            Vec::new(),
+                            None,
+                            1,
+                        )?;
+                        if child.status == "GE" {
+                            break;
+                        }
+                        if !child.status.trim().is_empty() {
+                            return Err(HostProblem::ProviderFailure);
+                        }
+                        let deleted = self.ims_dli_call(
+                            invocation,
+                            job,
+                            step,
+                            effect_sequence,
+                            ImsOperation::Delete,
+                            None,
+                            vec![child_segment.clone()],
+                            Vec::new(),
+                            Vec::new(),
+                            None,
+                            1,
+                        )?;
+                        deleted_children =
+                            deleted_children.saturating_add(deleted.affected_segments);
                     }
                     let deleted = self.ims_dli_call(
                         invocation,
@@ -958,53 +1050,41 @@ impl BatchService {
                         effect_sequence,
                         ImsOperation::Delete,
                         None,
-                        vec!["PAUTDTL1".into()],
+                        vec![root_segment.clone()],
                         Vec::new(),
                         Vec::new(),
                         None,
                         1,
                     )?;
-                    deleted_children = deleted_children.saturating_add(deleted.affected_segments);
+                    deleted_roots = deleted_roots.saturating_add(deleted.affected_segments);
                 }
-                let deleted = self.ims_dli_call(
+                let checkpoint = format!(
+                    "{checkpoint_prefix}{:0>3}",
+                    job.id.trim_start_matches("JOB")
+                );
+                self.ims_dli_call(
                     invocation,
                     job,
                     step,
                     effect_sequence,
-                    ImsOperation::Delete,
+                    ImsOperation::Checkpoint,
                     None,
-                    vec!["PAUTSUM0".into()],
                     Vec::new(),
                     Vec::new(),
-                    None,
+                    Vec::new(),
+                    Some(checkpoint.clone()),
                     1,
                 )?;
-                deleted_roots = deleted_roots.saturating_add(deleted.affected_segments);
+                Ok(crate::ProgramOutput {
+                    return_code: 0,
+                    records: vec![format!(
+                        "DFSRRC00 {mode} PROGRAM={program} EXPIRY-DAYS={expiry_days} ROOTS={deleted_roots} CHILDREN={deleted_children} CHECKPOINT={checkpoint} {summary_field}={deleted_roots}"
+                    )
+                    .into_bytes()],
+                    dd_outputs: BTreeMap::new(),
+                })
             }
-            let checkpoint = format!("CD026{:0>3}", job.id.trim_start_matches("JOB"));
-            self.ims_dli_call(
-                invocation,
-                job,
-                step,
-                effect_sequence,
-                ImsOperation::Checkpoint,
-                None,
-                Vec::new(),
-                Vec::new(),
-                Vec::new(),
-                Some(checkpoint.clone()),
-                1,
-            )?;
-            return Ok(crate::ProgramOutput {
-                return_code: 0,
-                records: vec![format!(
-                    "DFSRRC00 BMP PROGRAM=CBPAUP0C EXPIRY-DAYS={expiry_days} ROOTS={deleted_roots} CHILDREN={deleted_children} CHECKPOINT={checkpoint} SUMMARY-AUTHORIZATION-ADJUSTED={deleted_roots}"
-                )
-                .into_bytes()],
-                dd_outputs: BTreeMap::new(),
-            });
         }
-        Err(HostProblem::Unsupported)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -2193,6 +2273,17 @@ fn tso_run_program(control: &str) -> Result<String, HostProblem> {
     } else {
         Ok(program.into())
     }
+}
+
+fn ims_controller_selector(parameter: &str) -> Result<BatchControllerSelector, HostProblem> {
+    let normalized = parameter
+        .trim()
+        .trim_matches(|character| matches!(character, '\'' | '"' | '(' | ')'));
+    let fields = normalized.split(',').map(str::trim).collect::<Vec<_>>();
+    let mode = fields.first().copied().ok_or(HostProblem::Malformed)?;
+    let program = fields.get(1).copied().ok_or(HostProblem::Malformed)?;
+    let qualifier = fields.get(2).copied().filter(|value| !value.is_empty());
+    BatchControllerSelector::ims(mode, program, qualifier)
 }
 
 struct SdsfFileControl {

@@ -6,10 +6,11 @@ use base64::Engine;
 use mainframe_env_application::{
     APPLICATION_PACKAGE_V2_CONTRACT, ApplicationInstaller, ApplicationInstallerV2,
     ApplicationManifest, ApplicationPackage, ApplicationPackageV2, ApplicationSections,
-    DatasetCatalog, DatasetCatalogEntry, DatasetDefinition, EntryKind, GenerationGroupDefinition,
-    InstallProblem, InstallState, PackageEntry, PackageLimits, PackageSignature,
-    PackageSignatureVerifier, ProgramArtifact, ProgramCatalog, ProgramFrame, ProgramFrames,
-    SqlColumn, SqlTable, package_identity, package_v2_identity, parse_bms, parse_csd,
+    BatchController, BatchControllerKind, DatasetCatalog, DatasetCatalogEntry, DatasetDefinition,
+    EntryKind, GenerationGroupDefinition, InstallProblem, InstallState, PackageEntry,
+    PackageLimits, PackageSignature, PackageSignatureVerifier, ProgramArtifact, ProgramCatalog,
+    ProgramFrame, ProgramFrames, SqlColumn, SqlTable, package_identity, package_v2_identity,
+    parse_bms, parse_csd,
 };
 use mainframe_env_batch::{
     JclBundle, JclLimits, JobPlan, JobState, StepCondition, UtilityDisposition, parse_jcl,
@@ -4776,6 +4777,102 @@ fn carddemo_db2_definitions() -> Vec<Db2TableDefinition> {
     vec![transaction, category, authorization]
 }
 
+fn carddemo_batch_controller(
+    name: &str,
+    kind: BatchControllerKind,
+    properties: &[(&str, &str)],
+) -> BatchController {
+    BatchController {
+        name: name.into(),
+        program: "program/manifest".into(),
+        kind,
+        properties: properties
+            .iter()
+            .map(|(name, value)| ((*name).into(), (*value).into()))
+            .collect(),
+    }
+}
+
+fn carddemo_batch_controllers() -> Vec<BatchController> {
+    vec![
+        carddemo_batch_controller(
+            "TRANSACTION-TYPE-MAINTENANCE",
+            BatchControllerKind::CobolProgram,
+            &[
+                ("launcher", "tso-run"),
+                ("selector-program", "COBTUPDT"),
+                ("behavior", "program-call"),
+            ],
+        ),
+        carddemo_batch_controller(
+            "AUTHORIZATION-IMS-LOAD",
+            BatchControllerKind::ImsMessageProcessing,
+            &[
+                ("launcher", "ims-controller"),
+                ("selector-mode", "BMP"),
+                ("selector-program", "PAUDBLOD"),
+                ("selector-qualifier", "PSBPAUTB"),
+                ("behavior", "ims-load"),
+                ("database", "DBPAUTP0"),
+                ("root-dd", "INFILE1"),
+                ("child-dd", "INFILE2"),
+                ("root-record-bytes", "100"),
+                ("child-record-bytes", "206"),
+                ("parent-key-bytes", "6"),
+            ],
+        ),
+        carddemo_batch_controller(
+            "AUTHORIZATION-IMS-UNLOAD",
+            BatchControllerKind::ImsMessageProcessing,
+            &[
+                ("launcher", "ims-controller"),
+                ("selector-mode", "DLI"),
+                ("selector-program", "PAUDBUNL"),
+                ("selector-qualifier", "PAUTBUNL"),
+                ("behavior", "ims-unload"),
+                ("database", "DBPAUTP0"),
+                ("root-segment", "PAUTSUM0"),
+                ("child-segment", "PAUTDTL1"),
+                ("root-output-dd", "OUTFIL1"),
+                ("child-output-dd", "OUTFIL2"),
+            ],
+        ),
+        carddemo_batch_controller(
+            "AUTHORIZATION-EXPIRY-PURGE",
+            BatchControllerKind::ImsMessageProcessing,
+            &[
+                ("launcher", "ims-controller"),
+                ("selector-mode", "BMP"),
+                ("selector-program", "CBPAUP0C"),
+                ("selector-qualifier", "PSBPAUTB"),
+                ("behavior", "ims-purge"),
+                ("psb", "PSBPAUTB"),
+                ("root-segment", "PAUTSUM0"),
+                ("child-segment", "PAUTDTL1"),
+                ("control-dd", "SYSIN"),
+                ("required-expiry-days", "00"),
+                ("checkpoint-prefix", "CD026"),
+                ("summary-field", "SUMMARY-AUTHORIZATION-ADJUSTED"),
+            ],
+        ),
+        carddemo_batch_controller(
+            "AUTHORIZATION-IMS-IMAGE-UNLOAD",
+            BatchControllerKind::DeclarativeUtility,
+            &[
+                ("launcher", "ims-controller"),
+                ("selector-mode", "ULU"),
+                ("selector-program", "DFSURGU0"),
+                ("selector-qualifier", "DBPAUTP0"),
+                ("behavior", "ims-unload"),
+                ("database", "DBPAUTP0"),
+                ("root-segment", "PAUTSUM0"),
+                ("child-segment", "PAUTDTL1"),
+                ("combined-output-dd", "DFSURGU1"),
+            ],
+        ),
+    ]
+}
+
 fn install_carddemo_db2_package(server: &Arc<ProductServer>) -> Result<(), CorpusProblem> {
     let definitions = carddemo_db2_definitions();
     let catalog_bytes = serde_json::to_vec(&definitions)
@@ -4846,7 +4943,7 @@ fn install_carddemo_db2_package(server: &Arc<ProductServer>) -> Result<(), Corpu
             ims_definitions: Vec::new(),
             ims_rows: Vec::new(),
             mq_resources: Vec::new(),
-            batch_controllers: Vec::new(),
+            batch_controllers: carddemo_batch_controllers(),
             security_resources: Vec::new(),
         },
         signature: PackageSignature {
@@ -4895,6 +4992,9 @@ fn install_carddemo_db2_package(server: &Arc<ProductServer>) -> Result<(), Corpu
             "typed SQL section and selected catalog blob disagree",
         ));
     }
+    server
+        .install_application_batch_controllers(selected.as_ref(), &ready.identity)
+        .map_err(terminal_problem)?;
     server
         .db2_service()
         .install_catalog(Db2CatalogGeneration {
@@ -7803,6 +7903,7 @@ async fn exercise_ims_routes(
         default_program_router(),
     )
     .map_err(terminal_problem)?;
+    install_carddemo_db2_package(&server)?;
     let ims = server.ims_service();
     let install = ims.install(definition.clone()).map_err(terminal_problem)?;
     if !ims
