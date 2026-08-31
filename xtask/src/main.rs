@@ -65,6 +65,9 @@ fn run() -> TaskResult {
         "route-registries" if check => check_route_registries(&root),
         "route-registries" => generate_route_registries(&root),
         "dehardcoding" => check_dehardcoding(&root),
+        "ledger-consistency" => check_workload_ledger_consistency(&root),
+        "migration-rollback" => check_migration_rollback_rollup(&root),
+        "full-regression" => check_full_regression(&root),
         "semantic-identities" if check => check_semantic_identities(&root),
         "semantic-identities" => generate_semantic_identities(&root),
         "conformance" => {
@@ -81,7 +84,9 @@ fn run() -> TaskResult {
             check_batch_controllers(&root)?;
             check_host_abi_libraries(&root)?;
             check_program_registry(&root)?;
-            check_route_registries(&root)
+            check_route_registries(&root)?;
+            check_migration_rollback_rollup(&root)?;
+            check_full_regression(&root)
         }
         "certification" => check_certification(&root),
         "carddemo-corpus" => check_carddemo_corpus(&root),
@@ -120,7 +125,7 @@ fn run() -> TaskResult {
         "release" => generate_release_artifacts(&root),
         "help" | "--help" | "-h" => {
             println!(
-                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|coverage|semantic-identities|application-packages|db2-catalog|batch-controllers|abi-libraries|program-registry|route-registries|dehardcoding|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check"
+                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|coverage|semantic-identities|application-packages|db2-catalog|batch-controllers|abi-libraries|program-registry|route-registries|dehardcoding|ledger-consistency|migration-rollback|full-regression|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check"
             );
             Ok(())
         }
@@ -1218,8 +1223,8 @@ fn check_versions(root: &Path) -> TaskResult {
         .ok_or("release rust.pinned is missing")?;
 
     require(
-        version == "0.1.1",
-        "VERSION must identify the 0.1.1 release",
+        version == "0.2.0",
+        "VERSION must identify the 0.2.0 candidate",
     )?;
     require(
         cargo_version == version,
@@ -1229,7 +1234,7 @@ fn check_versions(root: &Path) -> TaskResult {
         release_version == version,
         "release.toml version differs from VERSION",
     )?;
-    require(release_line == "0.1", "release line must be 0.1")?;
+    require(release_line == "0.2", "release line must be 0.2")?;
     require(msrv == "1.95", "workspace MSRV must be 1.95")?;
     require(pinned == "1.98.0", "pinned Rust toolchain must be 1.98.0")?;
 
@@ -1254,14 +1259,14 @@ fn check_versions(root: &Path) -> TaskResult {
         )?;
     }
 
-    let inventory_path = root.join("conformance/0.1/inventory/versions.json");
+    let inventory_path = root.join("conformance/0.2/inventory/versions.json");
     let inventory = json(&inventory_path)?;
     require(
         text(&inventory, "product", &inventory_path)? == version,
         "machine version inventory differs from VERSION",
     )?;
 
-    let notes = read(&root.join("docs/releases/0.1.md"))?;
+    let notes = read(&root.join(format!("docs/releases/{release_line}.md")))?;
     require(
         notes.contains(&version),
         "release notes omit current version",
@@ -3081,7 +3086,8 @@ fn check_coverage(root: &Path) -> TaskResult {
         )?;
     }
     check_coverage_work_package_evidence(root)?;
-    check_coverage_program_status(root)
+    check_coverage_program_status(root)?;
+    check_workload_ledger_consistency(root)
 }
 
 fn check_coverage_ledger(root: &Path, index: &Value) -> TaskResult {
@@ -3363,6 +3369,357 @@ fn check_coverage_program_status(root: &Path) -> TaskResult {
                 .join("conformance/0.2/schemas/program-status.schema.json")
                 .is_file(),
         "0.2 program status documentation or schema is missing",
+    )
+}
+
+fn check_workload_ledger_consistency(root: &Path) -> TaskResult {
+    let workload_path = root.join("conformance/0.2/evidence/workload-ledger.json");
+    let status_path = root.join("conformance/0.2/evidence/program-status.json");
+    let workload = json(&workload_path)?;
+    let status = json(&status_path)?;
+    compare_workload_and_program_status(&workload, &status)?;
+    let work_packages = array(&workload, "work_packages", &workload_path)?;
+    require(
+        work_packages.len() == 9,
+        "workload ledger must contain exactly CV-201 through CV-209",
+    )?;
+    for (index, work_package) in work_packages.iter().enumerate() {
+        let expected_id = format!("CV-{:03}", index + 201);
+        let id = text(work_package, "id", &workload_path)?;
+        let state = text(work_package, "state", &workload_path)?;
+        require(
+            id == expected_id,
+            &format!("workload ledger work package {expected_id} is missing or out of order"),
+        )?;
+        if state == "pass" {
+            let evidence_path = text(work_package, "evidence", &workload_path)?;
+            let evidence = json(&root.join(evidence_path))?;
+            require(
+                evidence["work_package"].as_str() == Some(id)
+                    && work_package["evidence_digest"] == evidence["evidence_digest"],
+                &format!("workload ledger {id} evidence identity is stale"),
+            )?;
+        } else {
+            require(
+                work_package["evidence"].is_null() && work_package["evidence_digest"].is_null(),
+                &format!("incomplete workload ledger row {id} claims evidence"),
+            )?;
+        }
+    }
+    let exit_gates = array(&workload, "exit_gates", &workload_path)?;
+    let expected_exit_gates = BTreeSet::from([
+        "official-catalogs",
+        "coverage-contracts",
+        "dehardcoding",
+        "migration-rollback",
+        "workspace-test-floor",
+        "postgresql-controls",
+        "carddemo-full",
+        "live-zowe-route",
+        "release-checks",
+    ]);
+    let actual_exit_gates = exit_gates
+        .iter()
+        .map(|gate| text(gate, "id", &workload_path))
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        actual_exit_gates == expected_exit_gates && actual_exit_gates.len() == exit_gates.len(),
+        "workload ledger exit gates are missing or duplicated",
+    )?;
+    for gate in exit_gates {
+        let state = text(gate, "state", &workload_path)?;
+        require(
+            matches!(state, "pending" | "pass" | "blocked")
+                && (state == "pass") == gate["evidence"].is_string(),
+            &format!(
+                "workload ledger exit gate {} state/evidence contradict",
+                text(gate, "id", &workload_path)?
+            ),
+        )?;
+        if let Some(evidence) = gate["evidence"].as_str() {
+            require(
+                root.join(evidence).is_file(),
+                &format!("workload exit-gate evidence is missing: {evidence}"),
+            )?;
+        }
+    }
+    let coverage_path = root.join("conformance/0.2/evidence/coverage-ledger.json");
+    let coverage = json(&coverage_path)?;
+    let mandatory_rows = array(&coverage, "baselines", &coverage_path)?
+        .iter()
+        .map(|baseline| baseline["mandatory_rows"].as_u64().unwrap_or_default())
+        .sum::<u64>();
+    let complete_rows = array(&coverage, "baselines", &coverage_path)?
+        .iter()
+        .map(|baseline| baseline["complete_rows"].as_u64().unwrap_or_default())
+        .sum::<u64>();
+    require(
+        workload["coverage"]["official_baselines"].as_u64() == Some(9)
+            && workload["coverage"]["mandatory_rows"].as_u64() == Some(mandatory_rows)
+            && workload["coverage"]["complete_rows"].as_u64() == Some(complete_rows)
+            && workload["coverage"]["official_compatibility_numerator"]
+                == coverage["official_compatibility_numerator"]
+            && workload["coverage"]["generated_catalog_credit"]
+                == coverage["generated_catalog_credit"],
+        "workload and coverage ledgers contradict",
+    )?;
+    let markdown = read(&root.join("docs/delivery/coverage-versions/status/0.2.0.md"))?;
+    for work_package in work_packages {
+        let id = text(work_package, "id", &workload_path)?;
+        let state = text(work_package, "state", &workload_path)?;
+        let evidence = work_package["evidence"]
+            .as_str()
+            .map_or_else(|| "pending".to_string(), |path| format!("`{path}`"));
+        let markdown_state = state.replace('-', " ");
+        require(
+            markdown.contains(&format!("| {id} | {markdown_state} | {evidence} |")),
+            &format!("Markdown workload ledger contradicts {id}"),
+        )?;
+    }
+    let contracts = json(&root.join("conformance/0.2/inventory/contracts.json"))?;
+    require(
+        contracts["contracts"]["workload_ledger"]
+            == Value::String("mainframe-env.coverage-workload-ledger@1".into())
+            && root
+                .join("conformance/0.2/schemas/workload-ledger.schema.json")
+                .is_file(),
+        "workload ledger contract or schema is missing",
+    )
+}
+
+fn compare_workload_and_program_status(workload: &Value, status: &Value) -> TaskResult {
+    require(
+        workload["schema_version"]
+            == Value::String("mainframe-env.coverage-workload-ledger@1".into())
+            && status["schema_version"]
+                == Value::String("mainframe-env.coverage-program-status@1".into())
+            && workload["target_version"] == status["target_version"]
+            && workload["implementation_status"] == status["implementation_status"]
+            && workload["current_work_package"] == status["current_work_package"],
+        "workload and program-status ledger headers contradict",
+    )?;
+    let workload_rows = workload["work_packages"]
+        .as_array()
+        .ok_or("workload ledger rows are missing")?;
+    let status_rows = status["work_packages"]
+        .as_array()
+        .ok_or("program-status ledger rows are missing")?;
+    require(
+        workload_rows.len() == status_rows.len(),
+        "workload and program-status ledger lengths contradict",
+    )?;
+    for (workload_row, status_row) in workload_rows.iter().zip(status_rows) {
+        require(
+            workload_row["id"] == status_row["id"]
+                && workload_row["state"] == status_row["state"]
+                && workload_row["evidence"] == status_row["evidence"],
+            "workload and program-status work-package rows contradict",
+        )?;
+    }
+    let implementation = workload["implementation_status"]
+        .as_str()
+        .ok_or("workload implementation status is invalid")?;
+    let in_progress = workload_rows
+        .iter()
+        .filter(|row| row["state"] == "in-progress")
+        .collect::<Vec<_>>();
+    match implementation {
+        "complete" => require(
+            workload["current_work_package"].is_null()
+                && workload_rows.iter().all(|row| row["state"] == "pass")
+                && workload["exit_gates"]
+                    .as_array()
+                    .is_some_and(|gates| gates.iter().all(|gate| gate["state"] == "pass")),
+            "complete workload ledger contains incomplete work or exit gates",
+        ),
+        "in-progress" => require(
+            in_progress.len() == 1 && in_progress[0]["id"] == workload["current_work_package"],
+            "in-progress workload ledger does not identify exactly one current package",
+        ),
+        "blocked" => require(
+            workload_rows.iter().any(|row| row["state"] == "blocked"),
+            "blocked workload ledger contains no blocked work package",
+        ),
+        _ => Err("workload ledger implementation status is unknown".into()),
+    }
+}
+
+fn check_migration_rollback_rollup(root: &Path) -> TaskResult {
+    let rollup_path = root.join("conformance/0.2/evidence/migration-rollback-rollup.json");
+    let rollup = json(&rollup_path)?;
+    require(
+        rollup["schema_version"]
+            == Value::String("mainframe-env.migration-rollback-rollup@1".into())
+            && rollup["target_version"] == Value::String("0.2.0".into())
+            && rollup["status"] == Value::String("pass".into())
+            && rollup["migration_count"].as_u64() == Some(5)
+            && rollup["destructive_migrations"].as_u64() == Some(0)
+            && rollup["rollback_supported"].as_u64() == Some(5)
+            && rollup["destructive_action_performed"] == Value::Bool(false),
+        "migration/rollback rollup header is invalid",
+    )?;
+    let expected = BTreeSet::from([
+        "conformance/0.2/migrations/application-package-v1-to-v2.json",
+        "conformance/0.2/migrations/batch-controller-v0-to-v1.json",
+        "conformance/0.2/migrations/db2-catalog-v1-to-v2.json",
+        "conformance/0.2/migrations/host-abi-v0-to-v1.json",
+        "conformance/0.2/migrations/registry-v0-to-v1.json",
+    ]);
+    let migrations = array(&rollup, "migrations", &rollup_path)?;
+    let actual = migrations
+        .iter()
+        .map(|migration| text(migration, "path", &rollup_path))
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        actual == expected && actual.len() == migrations.len(),
+        "migration/rollback rollup paths are missing or duplicated",
+    )?;
+    for migration in migrations {
+        let relative = text(migration, "path", &rollup_path)?;
+        let path = root.join(relative);
+        let contract = json(&path)?;
+        require(
+            migration["sha256"] == Value::String(format!("sha256:{}", file_digest(&path)?))
+                && migration["destructive"] == Value::Bool(false)
+                && migration["rollback_supported"] == Value::Bool(true)
+                && migration["partial_state_selected"] == Value::Bool(false)
+                && contract["destructive"] == Value::Bool(false)
+                && contract["rollback"]["supported"] == Value::Bool(true),
+            &format!("migration/rollback rollup entry drifted: {relative}"),
+        )?;
+        let evidence = text(migration, "evidence", &rollup_path)?;
+        require(
+            root.join(evidence).is_file(),
+            &format!("migration evidence is missing: {evidence}"),
+        )?;
+    }
+    let contracts = json(&root.join("conformance/0.2/inventory/contracts.json"))?;
+    require(
+        contracts["contracts"]["migration_rollback_rollup"]
+            == Value::String("mainframe-env.migration-rollback-rollup@1".into())
+            && root
+                .join("conformance/0.2/schemas/migration-rollback-rollup.schema.json")
+                .is_file(),
+        "migration/rollback rollup contract or schema is missing",
+    )
+}
+
+fn check_full_regression(root: &Path) -> TaskResult {
+    let path = root.join("conformance/0.2/evidence/full-regression.json");
+    let receipt = json(&path)?;
+    require(
+        receipt["schema_version"] == Value::String("mainframe-env.full-regression@1".into())
+            && receipt["target_version"] == Value::String("0.2.0".into())
+            && receipt["status"] == Value::String("pass".into())
+            && receipt["candidate_unchanged"] == Value::Bool(true),
+        "full regression receipt header is invalid",
+    )?;
+    let candidate = &receipt["candidate"];
+    require(
+        candidate["source_digest"].as_str() == Some(repository_digest(root)?.as_str())
+            && candidate["work_package_base_commit"]
+                == Value::String("edb4558c987a56ee9f0c96438f756d663199942f".into())
+            && candidate["accepted_release_commit"]
+                == Value::String("44f3081eb2fdf22d09e1a97725f5a4163431ca70".into())
+            && candidate["accepted_release_tree"]
+                == Value::String("3d504ece02f1c09e124606ded695b00ba984d104".into())
+            && candidate["accepted_carddemo_commit"]
+                == Value::String("857115b907ce7098c965a51117a079048ea8182e".into())
+            && candidate["accepted_carddemo_tree"]
+                == Value::String("7e1fa73f4c808a89ddb4f98c0e3f7d0207f861ea".into()),
+        "full regression candidate identity drifted",
+    )?;
+    require(
+        command_text(root, "git", &["rev-parse", "mainframe-env-v0.1.1^{}"])?
+            == candidate["accepted_release_commit"],
+        "full regression accepted release tag moved",
+    )?;
+    let results = array(&receipt, "results", &path)?;
+    require(
+        results.len() >= 15
+            && results
+                .iter()
+                .all(|result| result["exit_code"].as_i64() == Some(0)),
+        "full regression result matrix is incomplete or failed",
+    )?;
+    let commands = results
+        .iter()
+        .filter_map(|result| result["command"].as_str())
+        .collect::<Vec<_>>();
+    for required in [
+        "cargo fmt --all -- --check",
+        "cargo check --workspace --all-targets --all-features --locked",
+        "cargo test --workspace --all-features --locked --no-fail-fast",
+        "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings",
+        "cargo doc --workspace --all-features --no-deps --locked",
+        "cargo +1.95.0 check",
+        "cargo deny check",
+        "cargo xtask runtime-architecture --check",
+        "cargo xtask conformance --check",
+        "cargo xtask certification --check",
+        "cargo xtask carddemo-full --check",
+        "Zowe CLI 8.36.0",
+        "cargo xtask release --check",
+        "git diff --check",
+    ] {
+        require(
+            commands.iter().any(|command| command.contains(required)),
+            &format!("full regression matrix omits {required}"),
+        )?;
+    }
+    require(
+        receipt["workspace"]["tests_passed"]
+            .as_u64()
+            .is_some_and(|count| count >= 260)
+            && receipt["workspace"]["test_floor"].as_u64() == Some(260)
+            && receipt["postgresql"]["version"].as_str() == Some("18")
+            && receipt["postgresql"]["controls_passed"]
+                .as_u64()
+                .is_some_and(|count| count >= 2)
+            && receipt["carddemo"]["journeys_passed"].as_u64() == Some(20)
+            && receipt["carddemo"]["corpus_commit"]
+                == Value::String("59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e".into())
+            && receipt["live_zowe"]["cli_version"].as_str() == Some("8.36.0")
+            && receipt["live_zowe"]["routes_passed"]
+                .as_u64()
+                .is_some_and(|count| count > 0)
+            && receipt["release"]["artifacts_verified"] == Value::Bool(true),
+        "full regression workload, PostgreSQL, CardDemo, Zowe, or release result is incomplete",
+    )?;
+    for (name, relative) in [
+        ("manifest_sha256", "release/0.2.0/manifest.json"),
+        ("sbom_sha256", "release/0.2.0/sbom.cdx.json"),
+        ("provenance_sha256", "release/0.2.0/provenance.intoto.json"),
+        ("checksums_sha256", "release/0.2.0/checksums.sha256"),
+        ("licenses_sha256", "release/0.2.0/LICENSES.md"),
+    ] {
+        require(
+            receipt["release"][name].as_str() == Some(file_digest(&root.join(relative))?.as_str()),
+            &format!("full regression release artifact digest drifted: {relative}"),
+        )?;
+    }
+    require(
+        receipt["remote_actions"]["tagged"] == Value::Bool(false)
+            && receipt["remote_actions"]["published"] == Value::Bool(false)
+            && receipt["remote_actions"]["deployed"] == Value::Bool(false)
+            && receipt["remote_actions"]["merged"] == Value::Bool(false),
+        "full regression receipt claims an unauthorized remote action",
+    )?;
+    let workload = json(&root.join("conformance/0.2/evidence/workload-ledger.json"))?;
+    let status = json(&root.join("conformance/0.2/evidence/program-status.json"))?;
+    require(
+        workload["implementation_status"] == Value::String("complete".into())
+            && status["implementation_status"] == Value::String("complete".into()),
+        "full regression passed before both ledgers reached complete",
+    )?;
+    let contracts = json(&root.join("conformance/0.2/inventory/contracts.json"))?;
+    require(
+        contracts["contracts"]["full_regression"]
+            == Value::String("mainframe-env.full-regression@1".into())
+            && root
+                .join("conformance/0.2/schemas/full-regression.schema.json")
+                .is_file(),
+        "full regression contract or schema is missing",
     )
 }
 
@@ -3790,6 +4147,9 @@ fn repository_digest(root: &Path) -> TaskResult<String> {
             || relative.starts_with("conformance/0.1/evidence/raw")
             || relative == Path::new("conformance/0.1/evidence/program-status.json")
             || relative == Path::new("conformance/0.2/evidence/program-status.json")
+            || relative == Path::new("conformance/0.2/evidence/workload-ledger.json")
+            || relative == Path::new("conformance/0.2/evidence/full-regression.json")
+            || relative == Path::new("conformance/0.2/evidence/work-packages/CV-209.json")
             || relative == Path::new("docs/delivery/coverage-versions/status/0.2.0.md")
             || (relative_text.starts_with("conformance/0.1/evidence/phase-v")
                 && relative.extension() == Some(OsStr::new("json")))
@@ -3930,7 +4290,7 @@ fn release_documents(root: &Path) -> TaskResult<BTreeMap<PathBuf, Vec<u8>>> {
         "toolchain":rustc,
         "target":format!("{}-{}",std::env::consts::ARCH,std::env::consts::OS),
         "profile":"release/core-server",
-        "contracts":"conformance/0.1/inventory/versions.json",
+        "contracts":"conformance/0.2/inventory/versions.json",
         "migration_head":"0001-durable-state",
         "artifacts":[
             {"path":"bin/mainframe-env-server","sha256":server_digest},
@@ -4126,5 +4486,36 @@ mod tests {
         let map = std::collections::BTreeMap::from([("b", 2), ("a", 1)]);
         let keys: Vec<_> = map.keys().copied().collect();
         assert_eq!(keys, ["a", "b"]);
+    }
+
+    #[test]
+    fn contradictory_workload_and_program_status_ledgers_are_rejected() {
+        let workload = json!({
+            "schema_version":"mainframe-env.coverage-workload-ledger@1",
+            "target_version":"0.2.0",
+            "implementation_status":"in-progress",
+            "current_work_package":"CV-209",
+            "work_packages":[{"id":"CV-209","state":"in-progress","evidence":null}],
+            "exit_gates":[]
+        });
+        let status = json!({
+            "schema_version":"mainframe-env.coverage-program-status@1",
+            "target_version":"0.2.0",
+            "implementation_status":"in-progress",
+            "current_work_package":"CV-209",
+            "work_packages":[{"id":"CV-209","state":"in-progress","evidence":null}]
+        });
+        assert!(compare_workload_and_program_status(&workload, &status).is_ok());
+        let mut contradiction = status.clone();
+        contradiction["work_packages"][0]["state"] = Value::String("pass".into());
+        assert!(compare_workload_and_program_status(&workload, &contradiction).is_err());
+
+        let mut false_complete = workload;
+        false_complete["implementation_status"] = Value::String("complete".into());
+        let mut false_complete_status = status;
+        false_complete_status["implementation_status"] = Value::String("complete".into());
+        assert!(
+            compare_workload_and_program_status(&false_complete, &false_complete_status).is_err()
+        );
     }
 }

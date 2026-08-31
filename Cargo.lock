@@ -960,7 +960,7 @@ checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
 
 [[package]]
 name = "mainframe-env-application"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "mainframe-env-execution-api",
  "mainframe-env-host-api",
@@ -970,7 +970,7 @@ dependencies = [
 
 [[package]]
 name = "mainframe-env-batch"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "mainframe-env-encoding",
  "mainframe-env-execution-api",
@@ -983,7 +983,7 @@ dependencies = [
 
 [[package]]
 name = "mainframe-env-cics"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "mainframe-env-encoding",
  "mainframe-env-execution-api",
@@ -997,7 +997,7 @@ dependencies = [
 
 [[package]]
 name = "mainframe-env-cli"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "clap",
  "mainframe-env-cics",
@@ -1014,7 +1014,7 @@ dependencies = [
 
 [[package]]
 name = "mainframe-env-compiler"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "mainframe-env-compiler-api",
  "mainframe-env-diagnostics",
@@ -1027,7 +1027,7 @@ dependencies = [
 
 [[package]]
 name = "mainframe-env-compiler-api"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "mainframe-env-diagnostics",
  "mainframe-env-ir",
@@ -1037,7 +1037,7 @@ dependencies = [
 
 [[package]]
 name = "mainframe-env-conformance"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "axum",
  "base64",
@@ -1070,14 +1070,14 @@ dependencies = [
 
 [[package]]
 name = "mainframe-env-coverage"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "sha2 0.10.9",
 ]
 
 [[package]]
 name = "mainframe-env-dataset"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "mainframe-env-execution-api",
  "mainframe-env-host-api",
@@ -1088,7 +1088,7 @@ dependencies = [
 
 [[package]]
 name = "mainframe-env-db2"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "mainframe-env-execution-api",
  "mainframe-env-host-api",
@@ -1102,35 +1102,35 @@ dependencies = [
 
 [[package]]
 name = "mainframe-env-diagnostics"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "mainframe-env-source",
 ]
 
 [[package]]
 name = "mainframe-env-encoding"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "proptest",
 ]
 
 [[package]]
 name = "mainframe-env-execution-api"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "mainframe-env-diagnostics",
 ]
 
 [[package]]
 name = "mainframe-env-host-api"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "mainframe-env-execution-api",
 ]
 
 [[package]]
 name = "mainframe-env-ims"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "mainframe-env-execution-api",
  "mainframe-env-host-api",
@@ -1143,7 +1143,7 @@ dependencies = [
 
 [[package]]
 name = "mainframe-env-interpreter"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "mainframe-env-diagnostics",
  "mainframe-env-encoding",
@@ -1156,7 +1156,7 @@ dependencies = [
 
 [[package]]
 name = "mainframe-env-ir"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "mainframe-env-diagnostics",
  "mainframe-env-source",
@@ -1166,7 +1166,7 @@ dependencies = [
 
 [[package]]
 name = "mainframe-env-mq"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "mainframe-env-execution-api",
  "mainframe-env-host-api",
@@ -1180,7 +1180,7 @@ dependencies = [
 
 [[package]]
 name = "mainframe-env-racf"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "argon2",
  "mainframe-env-execution-api",
@@ -1191,7 +1191,7 @@ dependencies = [
 
 [[package]]
 name = "mainframe-env-server"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "axum",
  "axum-server",
@@ -1228,14 +1228,14 @@ dependencies = [
 
 [[package]]
 name = "mainframe-env-source"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "sha2 0.10.9",
 ]
 
 [[package]]
 name = "mainframe-env-store"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "base64",
  "mainframe-env-execution-api",
@@ -1248,14 +1248,14 @@ dependencies = [
 
 [[package]]
 name = "mainframe-env-store-api"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "mainframe-env-execution-api",
 ]
 
 [[package]]
 name = "mainframe-env-zosmf"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "axum",
  "base64",
@@ -2511,7 +2511,7 @@ checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 
 [[package]]
 name = "xtask"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "mainframe-env-conformance",
  "serde_json",

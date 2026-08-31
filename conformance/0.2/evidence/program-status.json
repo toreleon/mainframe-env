@@ -1,7 +1,7 @@
 {
   "schema_version": "mainframe-env.coverage-program-status@1",
   "target_version": "0.2.0",
-  "implementation_status": "in-progress",
+  "implementation_status": "complete",
   "source_identity": {
     "accepted_release_tag": "mainframe-env-v0.1.1",
     "accepted_release_commit": "44f3081eb2fdf22d09e1a97725f5a4163431ca70",
@@ -31,7 +31,7 @@
     "official_baselines": 9,
     "official_mandatory_rows": 1506
   },
-  "current_work_package": "CV-209",
+  "current_work_package": null,
   "work_packages": [
     {"id": "CV-201", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-201.json"},
     {"id": "CV-202", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-202.json"},
@@ -41,7 +41,7 @@
     {"id": "CV-206", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-206.json"},
     {"id": "CV-207", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-207.json"},
     {"id": "CV-208", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-208.json"},
-    {"id": "CV-209", "state": "in-progress", "evidence": null}
+    {"id": "CV-209", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-209.json"}
   ],
   "commands": [
     {
@@ -128,6 +128,16 @@
       "command": "cargo xtask program-registry --check && cargo xtask route-registries --check && cargo xtask dehardcoding --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-utilities --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-base-batch --check",
       "exit_code": 0,
       "result": "CV-208 generated 21 typed program entries plus disjoint 23-official/7-custom routes and proved all production hardcode/string-dispatch targets zero with unchanged workload digests"
+    },
+    {
+      "command": "cargo test --workspace --all-features --locked --no-fail-fast && explicit PostgreSQL 18 controls && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-full --check && Zowe CLI 8.36.0 live flow",
+      "exit_code": 0,
+      "result": "280 tests, 3 PostgreSQL controls, 20/20 CardDemo journeys, and 4 live Zowe routes passed on candidate sha256:8e3bfbe245243522a265e5251725b6d1c5131e5b2ed6f6f4065c3928774b661a"
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings && cargo doc --workspace --all-features --no-deps --locked && cargo +1.95.0 check <contracts> && cargo deny check && cargo xtask runtime-architecture --check && cargo xtask certification --check && cargo xtask release --check",
+      "exit_code": 0,
+      "result": "strict quality, MSRV, dependency policy, release-mode smoke, certification, and local unpublished 0.2 artifacts passed"
     }
   ],
   "evidence_paths": [
@@ -142,20 +152,24 @@
     "conformance/0.2/evidence/work-packages/CV-206.json",
     "conformance/0.2/evidence/work-packages/CV-207.json",
     "conformance/0.2/evidence/work-packages/CV-208.json",
+    "conformance/0.2/evidence/work-packages/CV-209.json",
     "conformance/0.2/evidence/hardcode/CV-205-db2.json",
     "conformance/0.2/evidence/hardcode/CV-206-batch.json",
     "conformance/0.2/evidence/hardcode/CV-207-abi.json",
     "conformance/0.2/evidence/hardcode/no-application-hardcode.json",
     "conformance/0.2/evidence/hardcode/no-string-dispatch.json",
     "conformance/0.2/evidence/coverage-ledger.json",
+    "conformance/0.2/evidence/workload-ledger.json",
+    "conformance/0.2/evidence/migration-rollback-rollup.json",
+    "conformance/0.2/evidence/full-regression.json",
     "conformance/0.2/generated/semantic-identities.json",
     "conformance/0.2/generated/subsystem-handlers.json"
   ],
   "dirty_tree_identity": {
-    "algorithm": "cargo xtask digest; length-delimited path and content over the repository excluding Git, target, raw historical evidence, phase/status ledgers, and this status ledger",
-    "digest": "sha256:690bb48c73478b681b91c9174e38575d6b49ba381db7963ed978b41bd954eabd"
+    "algorithm": "cargo xtask digest; length-delimited path and content over the repository excluding Git, target, raw historical evidence, phase/status/workload/full-regression/CV-209 derived ledgers, and the Markdown status ledger",
+    "digest": "sha256:8e3bfbe245243522a265e5251725b6d1c5131e5b2ed6f6f4065c3928774b661a"
   },
   "open_decisions": [],
   "blockers": [],
-  "next_smallest_executable_step": "Implement CV-209 ledger consistency, migration/rollback aggregation, full profile closure, and complete 0.2.0 regression evidence."
+  "next_smallest_executable_step": "Verify the CV-209 completion commit, push only impl/0.2.0, and open the implementation pull request against main without merge, tag, publication, or deployment."
 }

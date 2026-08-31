@@ -1,0 +1,56 @@
+{
+  "schema_version": "mainframe-env.migration-rollback-rollup@1",
+  "target_version": "0.2.0",
+  "status": "pass",
+  "migration_count": 5,
+  "destructive_migrations": 0,
+  "rollback_supported": 5,
+  "destructive_action_performed": false,
+  "migrations": [
+    {
+      "id": "application-package-v1-to-v2",
+      "path": "conformance/0.2/migrations/application-package-v1-to-v2.json",
+      "sha256": "sha256:672526e70dda7c547aa7ec168b7d467f1945881cd4b9cddaf94903267743af48",
+      "destructive": false,
+      "rollback_supported": true,
+      "partial_state_selected": false,
+      "evidence": "conformance/0.2/evidence/work-packages/CV-204.json"
+    },
+    {
+      "id": "batch-controller-v0-to-v1",
+      "path": "conformance/0.2/migrations/batch-controller-v0-to-v1.json",
+      "sha256": "sha256:c2b026283741f93368c3b6fcd1ae753653c89d08c873c39eeeedf3c244462e9a",
+      "destructive": false,
+      "rollback_supported": true,
+      "partial_state_selected": false,
+      "evidence": "conformance/0.2/evidence/work-packages/CV-206.json"
+    },
+    {
+      "id": "db2-catalog-v1-to-v2",
+      "path": "conformance/0.2/migrations/db2-catalog-v1-to-v2.json",
+      "sha256": "sha256:c4e62f817c8c074d98dbd86ade1a711eaa7b57dc2f8b74589c417d54222e8e74",
+      "destructive": false,
+      "rollback_supported": true,
+      "partial_state_selected": false,
+      "evidence": "conformance/0.2/evidence/work-packages/CV-205.json"
+    },
+    {
+      "id": "host-abi-v0-to-v1",
+      "path": "conformance/0.2/migrations/host-abi-v0-to-v1.json",
+      "sha256": "sha256:cd85b521cc2578fdc2e383bc30e5b084636db1df71b4d36662dc0254b9795ad0",
+      "destructive": false,
+      "rollback_supported": true,
+      "partial_state_selected": false,
+      "evidence": "conformance/0.2/evidence/work-packages/CV-207.json"
+    },
+    {
+      "id": "program-and-route-registry-v0-to-v1",
+      "path": "conformance/0.2/migrations/registry-v0-to-v1.json",
+      "sha256": "sha256:b1f6770637fbb96180302e544534f9582e83342c4ccc671494a59e970bdd7b6b",
+      "destructive": false,
+      "rollback_supported": true,
+      "partial_state_selected": false,
+      "evidence": "conformance/0.2/evidence/work-packages/CV-208.json"
+    }
+  ]
+}
