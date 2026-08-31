@@ -8,6 +8,7 @@ members = [
     "crates/contracts/mainframe-env-execution-api",
     "crates/contracts/mainframe-env-host-api",
     "crates/contracts/mainframe-env-store-api",
+    "crates/contracts/mainframe-env-coverage",
     "crates/stores/mainframe-env-store",
     "crates/kernel/mainframe-env-compiler",
     "crates/kernel/mainframe-env-interpreter",
@@ -63,6 +64,7 @@ mainframe-env-compiler-api = { path = "crates/contracts/mainframe-env-compiler-a
 mainframe-env-execution-api = { path = "crates/contracts/mainframe-env-execution-api" }
 mainframe-env-host-api = { path = "crates/contracts/mainframe-env-host-api" }
 mainframe-env-store-api = { path = "crates/contracts/mainframe-env-store-api" }
+mainframe-env-coverage = { path = "crates/contracts/mainframe-env-coverage" }
 mainframe-env-store = { path = "crates/stores/mainframe-env-store" }
 mainframe-env-compiler = { path = "crates/kernel/mainframe-env-compiler" }
 mainframe-env-interpreter = { path = "crates/kernel/mainframe-env-interpreter" }

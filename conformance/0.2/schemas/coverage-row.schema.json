@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/coverage-row@1",
+  "title": "mainframe-env independent six-gate coverage row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "baseline_id", "unit_id", "row_id", "applicable_gates", "evidence_refs", "derived_state"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.coverage-row@1"},
+    "baseline_id": {"type": "string", "minLength": 8},
+    "unit_id": {"type": "string", "minLength": 1},
+    "row_id": {"type": "string", "minLength": 12},
+    "applicable_gates": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "uniqueItems": true,
+      "items": {"enum": ["recognized", "validated", "executed", "conditioned", "recovered", "differential"]}
+    },
+    "evidence_refs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "derived_state": {"enum": ["pending", "failed", "complete"]}
+  }
+}

@@ -1064,6 +1064,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "mainframe-env-coverage"
+version = "0.1.1"
+dependencies = [
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "mainframe-env-dataset"
 version = "0.1.1"
 dependencies = [

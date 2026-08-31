@@ -1,0 +1,19 @@
+{
+  "schema_version": "mainframe-env.coverage-contract-inventory@1",
+  "target_version": "0.2.0",
+  "contracts": {
+    "official_source_receipts": "mainframe-env.official-source-receipts@1",
+    "official_catalog": "mainframe-env.official-catalog@1",
+    "coverage_row": "mainframe-env.coverage-row@1",
+    "coverage_evidence": "mainframe-env.coverage-evidence@1",
+    "coverage_ledger": "mainframe-env.coverage-ledger@1",
+    "program_status": "mainframe-env.coverage-program-status@1",
+    "work_package_evidence": "mainframe-env.coverage-work-package-evidence@1"
+  },
+  "compatibility": {
+    "accepted_0_1_1_contracts_unchanged": true,
+    "writers_emit_current": true,
+    "unknown_gate_rejected": true,
+    "removed_gate_reuse_allowed": false
+  }
+}

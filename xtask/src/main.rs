@@ -1407,6 +1407,7 @@ fn check_dependency(package: &str, dependency: &str, excluded: &BTreeSet<String>
         || package.starts_with("mainframe-env-diagnostics")
         || package.starts_with("mainframe-env-encoding")
         || package.starts_with("mainframe-env-ir")
+        || package == "mainframe-env-coverage"
         || package.ends_with("-api");
     if core {
         require(
@@ -1431,7 +1432,7 @@ fn check_dependency(package: &str, dependency: &str, excluded: &BTreeSet<String>
 
 fn allowed_internal_dependency(package: &str, dependency: &str) -> bool {
     let allowed: &[&str] = match package {
-        "mainframe-env-source" | "mainframe-env-encoding" => &[],
+        "mainframe-env-source" | "mainframe-env-encoding" | "mainframe-env-coverage" => &[],
         "mainframe-env-diagnostics" => &["mainframe-env-source"],
         "mainframe-env-ir" => &["mainframe-env-source", "mainframe-env-diagnostics"],
         "mainframe-env-compiler-api" => &[
@@ -1898,6 +1899,7 @@ fn check_coverage(root: &Path) -> TaskResult {
         index["mandatory_rows"].as_u64() == Some(total_rows) && total_rows == 1_506,
         "official catalog global denominator must remain 1506",
     )?;
+    check_coverage_ledger(root, &index)?;
     for entry in fs::read_dir(root.join("conformance/0.2"))
         .map_err(|error| format!("conformance/0.2: {error}"))?
     {
@@ -1912,6 +1914,127 @@ fn check_coverage(root: &Path) -> TaskResult {
     }
     check_coverage_work_package_evidence(root)?;
     check_coverage_program_status(root)
+}
+
+fn check_coverage_ledger(root: &Path, index: &Value) -> TaskResult {
+    let path = root.join("conformance/0.2/evidence/coverage-ledger.json");
+    let ledger = json(&path)?;
+    require(
+        text(&ledger, "schema_version", &path)? == "mainframe-env.coverage-ledger@1"
+            && ledger["generation"].as_u64().is_some_and(|value| value > 0)
+            && ledger["catalog_index"]
+                == Value::String("conformance/0.2/catalogs/index.json".into()),
+        "coverage ledger identity is invalid",
+    )?;
+    let index_path = root.join("conformance/0.2/catalogs/index.json");
+    require(
+        ledger["catalog_index_sha256"]
+            == Value::String(format!("sha256:{}", file_digest(&index_path)?)),
+        "coverage ledger catalog index digest drifted",
+    )?;
+    require(
+        ledger["generated_catalog_credit"] == Value::from(0)
+            && ledger["official_compatibility_numerator"] == Value::from(0)
+            && ledger["evidence_records"]
+                .as_array()
+                .is_some_and(Vec::is_empty),
+        "catalog generation or empty evidence credited official compatibility",
+    )?;
+    let expected = array(index, "baselines", &index_path)?
+        .iter()
+        .map(|baseline| {
+            Ok((
+                text(baseline, "id", &index_path)?.to_string(),
+                (
+                    text(baseline, "catalog_sha256", &index_path)?.to_string(),
+                    baseline["mandatory_rows"]
+                        .as_u64()
+                        .ok_or("baseline mandatory row count is invalid")?,
+                ),
+            ))
+        })
+        .collect::<TaskResult<BTreeMap<_, _>>>()?;
+    let rows = array(&ledger, "baselines", &path)?;
+    require(
+        rows.len() == expected.len(),
+        "coverage ledger does not contain every official baseline",
+    )?;
+    let mut seen = BTreeSet::new();
+    for row in rows {
+        let id = text(row, "id", &path)?;
+        let (catalog_digest, denominator) = expected
+            .get(id)
+            .ok_or_else(|| format!("coverage ledger contains unknown baseline {id}"))?;
+        require(
+            seen.insert(id)
+                && row["catalog_sha256"].as_str() == Some(catalog_digest)
+                && row["mandatory_rows"].as_u64() == Some(*denominator)
+                && row["complete_rows"] == Value::from(0),
+            &format!("coverage ledger baseline {id} identity or denominator drifted"),
+        )?;
+        let gates = row["gates"]
+            .as_object()
+            .ok_or_else(|| format!("coverage ledger baseline {id} gates are missing"))?;
+        let gate_names = [
+            "recognized",
+            "validated",
+            "executed",
+            "conditioned",
+            "recovered",
+            "differential",
+        ];
+        require(
+            gates.len() == gate_names.len(),
+            &format!("coverage ledger baseline {id} does not contain six gates"),
+        )?;
+        for gate in gate_names {
+            require(
+                gates[gate]["numerator"] == Value::from(0)
+                    && gates[gate]["denominator"].as_u64() == Some(*denominator),
+                &format!("coverage ledger baseline {id}/{gate} credited generated coverage"),
+            )?;
+        }
+    }
+
+    let contracts_path = root.join("conformance/0.2/inventory/contracts.json");
+    let contracts = json(&contracts_path)?;
+    for contract in [
+        "mainframe-env.official-source-receipts@1",
+        "mainframe-env.official-catalog@1",
+        "mainframe-env.coverage-row@1",
+        "mainframe-env.coverage-evidence@1",
+        "mainframe-env.coverage-ledger@1",
+    ] {
+        require(
+            contracts["contracts"].as_object().is_some_and(|values| {
+                values
+                    .values()
+                    .any(|value| value.as_str() == Some(contract))
+            }),
+            &format!("coverage contract inventory omits {contract}"),
+        )?;
+    }
+    let additions_path = root.join("conformance/0.2/inventory/package-additions.json");
+    let additions = json(&additions_path)?;
+    require(
+        array(&additions, "packages", &additions_path)?
+            .iter()
+            .any(|package| {
+                package["name"] == Value::String("mainframe-env-coverage".into())
+                    && package["work_package"] == Value::String("CV-202".into())
+            })
+            && additions["production_profile_membership"] == Value::Bool(false),
+        "coverage contract package inventory is invalid",
+    )?;
+    let metadata = workspace_metadata(root)?;
+    require(
+        metadata["packages"].as_array().is_some_and(|packages| {
+            packages
+                .iter()
+                .any(|package| package["name"] == "mainframe-env-coverage")
+        }),
+        "coverage contract package is absent from the workspace",
+    )
 }
 
 fn check_coverage_work_package_evidence(root: &Path) -> TaskResult {
@@ -2283,10 +2406,20 @@ fn check_certification(root: &Path) -> TaskResult {
     let inventory = root.join("conformance/0.1/inventory");
     let packages_path = inventory.join("packages.json");
     let packages = json(&packages_path)?;
-    let package_names = array(&packages, "packages", &packages_path)?
+    let mut package_names = array(&packages, "packages", &packages_path)?
         .iter()
         .map(|row| text(row, "name", &packages_path).map(str::to_string))
         .collect::<TaskResult<BTreeSet<_>>>()?;
+    let additions_path = root.join("conformance/0.2/inventory/package-additions.json");
+    if additions_path.is_file() {
+        let additions = json(&additions_path)?;
+        for package in array(&additions, "packages", &additions_path)? {
+            require(
+                package_names.insert(text(package, "name", &additions_path)?.to_string()),
+                "0.2 package addition duplicates a historical package",
+            )?;
+        }
+    }
     let metadata_output = Command::new("cargo")
         .args(["metadata", "--no-deps", "--format-version", "1", "--locked"])
         .current_dir(root)

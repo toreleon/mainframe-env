@@ -1,0 +1,41 @@
+{
+  "schema_version": "mainframe-env.coverage-work-package-evidence@1",
+  "derived": true,
+  "status": "pass",
+  "work_package": "CV-202",
+  "evidence_digest": "sha256:f4197a58b19b9e1e5fa97458e62f378afb3b084d06d77015943d1db81feb032d",
+  "receipt": {
+    "target_version": "0.2.0",
+    "deliverable": "Independent six-gate coverage row, immutable evidence, and append-only denominator-bound store contracts",
+    "source_identity": "111c0cf0bf8fbe15e595fc48445c63ef6377c60e",
+    "commands": [
+      {"command": "cargo test -p mainframe-env-coverage --locked", "exit_code": 0, "result": "4 passed"},
+      {"command": "cargo clippy -p mainframe-env-coverage --all-targets --locked -- -D warnings", "exit_code": 0, "result": "pass"},
+      {"command": "cargo xtask architecture --check", "exit_code": 0, "result": "pass"},
+      {"command": "cargo xtask profiles --check", "exit_code": 0, "result": "pass"},
+      {"command": "cargo xtask schemas --check", "exit_code": 0, "result": "pass"},
+      {"command": "cargo xtask coverage --check", "exit_code": 0, "result": "pass"},
+      {"command": "cargo xtask conformance --check", "exit_code": 0, "result": "pass"},
+      {"command": "git diff --check", "exit_code": 0, "result": "pass"}
+    ],
+    "artifacts": [
+      {"path": "crates/contracts/mainframe-env-coverage/src/lib.rs", "sha256": "sha256:9f28e4d29d3a80ec94d5bbdbfc908337191d5899abe12d10af795b4c3b585621"},
+      {"path": "crates/contracts/mainframe-env-coverage/Cargo.toml", "sha256": "sha256:cd94580fa9d14b55a349903abc4fb4e8dd454ed1c1f20b6f012afc9f36ca4b87"},
+      {"path": "conformance/0.2/schemas/coverage-row.schema.json", "sha256": "sha256:aa21ff4a11188f851d87b6cfdad2ad1d7daf1e0d131a9903f65c4c30a63c2a63"},
+      {"path": "conformance/0.2/schemas/coverage-evidence.schema.json", "sha256": "sha256:7ff21037b0e5534b0a0de7cd3cb6590d3412f30977f3807cfcb3a3f6d3c6f8e7"},
+      {"path": "conformance/0.2/schemas/coverage-ledger.schema.json", "sha256": "sha256:e924a154fc6c1a3a0e3bca6e8ace2c6d98102ae08466ffcbe06319b0b2f41be0"},
+      {"path": "conformance/0.2/evidence/coverage-ledger.json", "sha256": "sha256:0b1842e325108495fabfc266f20b5d41d2e22e1586729018e82e14a4143492be"},
+      {"path": "docs/architecture/COVERAGE-AUTHORITY.md", "sha256": "sha256:d23b2f6663234a487e56e2653c2e0ce9ac1db625fd4fc629cb1f209088160e4f"}
+    ],
+    "invariants": {
+      "independent_gates": 6,
+      "complete_is_derived": true,
+      "failed_evidence_is_retained": true,
+      "differential_pass_requires_licensed_oracle": true,
+      "denominator_and_catalog_are_immutable": true,
+      "store_is_append_only": true,
+      "generated_catalog_credit": 0,
+      "official_compatibility_numerator": 0
+    }
+  }
+}

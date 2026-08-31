@@ -1,0 +1,14 @@
+{
+  "schema_version": "mainframe-env.coverage-package-additions@1",
+  "target_version": "0.2.0",
+  "packages": [
+    {
+      "name": "mainframe-env-coverage",
+      "layer": "contracts",
+      "work_package": "CV-202",
+      "justification": "Independent six-gate rows, immutable evidence, denominator-bound snapshots, and append-only coverage ledger generations"
+    }
+  ],
+  "dependency_edges": [],
+  "production_profile_membership": false
+}

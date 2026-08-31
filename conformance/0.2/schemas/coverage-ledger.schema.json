@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/coverage-ledger@1",
+  "title": "mainframe-env append-only coverage ledger generation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "generation", "catalog_index", "catalog_index_sha256", "evidence_records", "baselines", "official_compatibility_numerator", "generated_catalog_credit"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.coverage-ledger@1"},
+    "generation": {"type": "integer", "minimum": 1},
+    "catalog_index": {"const": "conformance/0.2/catalogs/index.json"},
+    "catalog_index_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "evidence_records": {"type": "array"},
+    "baselines": {"type": "array", "minItems": 9, "maxItems": 9},
+    "official_compatibility_numerator": {"type": "integer", "minimum": 0},
+    "generated_catalog_credit": {"const": 0}
+  }
+}

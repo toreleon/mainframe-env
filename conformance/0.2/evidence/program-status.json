@@ -31,11 +31,11 @@
     "official_baselines": 9,
     "official_mandatory_rows": 1506
   },
-  "current_work_package": "CV-202",
+  "current_work_package": "CV-203",
   "work_packages": [
     {"id": "CV-201", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-201.json"},
-    {"id": "CV-202", "state": "in-progress", "evidence": null},
-    {"id": "CV-203", "state": "pending", "evidence": null},
+    {"id": "CV-202", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-202.json"},
+    {"id": "CV-203", "state": "in-progress", "evidence": null},
     {"id": "CV-204", "state": "pending", "evidence": null},
     {"id": "CV-205", "state": "pending", "evidence": null},
     {"id": "CV-206", "state": "pending", "evidence": null},
@@ -68,19 +68,36 @@
       "command": "cargo xtask conformance --check",
       "exit_code": 0,
       "result": "versions, architecture, profiles, schemas, inventory, historical evidence, and 0.2 coverage passed"
+    },
+    {
+      "command": "cargo clippy -p mainframe-env-coverage --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "result": "initial CV-202 check found two double_must_use warnings; attributes were removed"
+    },
+    {
+      "command": "cargo test -p mainframe-env-coverage --locked && cargo clippy -p mainframe-env-coverage --all-targets --locked -- -D warnings",
+      "exit_code": 0,
+      "result": "4 coverage contract tests passed and strict Clippy passed after repair"
+    },
+    {
+      "command": "cargo xtask conformance --check",
+      "exit_code": 0,
+      "result": "CV-202 affected architecture, profile, schema, inventory, evidence, and coverage gates passed"
     }
   ],
   "evidence_paths": [
     "conformance/0.1.1/evidence/release-0.1.1.json",
     "conformance/0.1.1/evidence/issues/CD-027.json",
     "conformance/0.2/catalogs/index.json",
-    "conformance/0.2/evidence/work-packages/CV-201.json"
+    "conformance/0.2/evidence/work-packages/CV-201.json",
+    "conformance/0.2/evidence/work-packages/CV-202.json",
+    "conformance/0.2/evidence/coverage-ledger.json"
   ],
   "dirty_tree_identity": {
     "algorithm": "cargo xtask digest; length-delimited path and content over the repository excluding Git, target, raw historical evidence, phase/status ledgers, and this status ledger",
-    "digest": "sha256:34ea9613fcfab4408305e4cae4b946e84fbf3ca5a3afd060404c42e2b37cac2f"
+    "digest": "sha256:d06e92ab86a5c76d4eddaeae8563b113c0637f8c51b59c7e4eed9f89fbb6035b"
   },
   "open_decisions": [],
   "blockers": [],
-  "next_smallest_executable_step": "Define and test CV-202 six-gate coverage row, immutable evidence, and append-only store contracts."
+  "next_smallest_executable_step": "Implement CV-203 generated semantic identities and the typed SubsystemHandlerRegistry without granting coverage credit."
 }
