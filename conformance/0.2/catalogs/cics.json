@@ -1,0 +1,3455 @@
+{
+  "schema_version": "mainframe-env.official-catalog@1",
+  "baseline_id": "ibm-cics-ts-6x-2026-08-31",
+  "subsystem": "cics",
+  "mandatory_rows": 571,
+  "units": [
+    {
+      "id": "api-commands",
+      "denominator": 263,
+      "normalization": "normalized",
+      "rows": [
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0001",
+          "label": "ABEND",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0E0C;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0002",
+          "label": "ACQUIRE ACTIVITYID",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3410;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0003",
+          "label": "ACQUIRE PROCESS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:340E;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0004",
+          "label": "ADD SUBEVENT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3608;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0005",
+          "label": "ADDRESS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0202;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0006",
+          "label": "ADDRESS SET",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0210;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0007",
+          "label": "ALLOCATE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0420;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0008",
+          "label": "GDS ALLOCATE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:2402;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0009",
+          "label": "ASKTIME",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1002;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0010",
+          "label": "ASKTIME ABSTIME",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:4A02;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0011",
+          "label": "ASSIGN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0208;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0012",
+          "label": "GDS ASSIGN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:2404;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0013",
+          "label": "BIF DEEDIT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:2002;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0014",
+          "label": "BIF DIGEST",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:2020;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0015",
+          "label": "BUILD ATTACH",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0426;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0016",
+          "label": "CANCEL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:100C;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0017",
+          "label": "CANCEL ACQACTIVITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:342E;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0018",
+          "label": "CANCEL ACQPROCESS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:341E;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0019",
+          "label": "CANCEL ACTIVITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:341C;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0020",
+          "label": "CHANGE PASSWORD",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:7408;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0021",
+          "label": "CHANGE PHRASE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:740C;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0022",
+          "label": "CHANGE TASK",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:5E06;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0023",
+          "label": "CHECK ACQACTIVITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:343A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0024",
+          "label": "CHECK ACQPROCESS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3438;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0025",
+          "label": "CHECK ACTIVITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:341A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0026",
+          "label": "CHECK TIMER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3618;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0027",
+          "label": "CICSMESSAGE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:6C12;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0028",
+          "label": "CONNECT PROCESS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0432;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0029",
+          "label": "GDS CONNECT PROCESS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:240C;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0030",
+          "label": "CONVERSE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0406;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0031",
+          "label": "CONVERTTIME",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:4A06;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0032",
+          "label": "DEFINE ACTIVITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3402;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0033",
+          "label": "DEFINE COMPOSITE EVENT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3602;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0034",
+          "label": "DEFINE COUNTER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:2004;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0035",
+          "label": "DEFINE DCOUNTER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:2014;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0036",
+          "label": "DEFINE INPUT EVENT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3602;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0037",
+          "label": "DEFINE PROCESS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3404;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0038",
+          "label": "DEFINE TIMER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3614;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0039",
+          "label": "DELAY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1004;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0040",
+          "label": "DELETE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0608;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0041",
+          "label": "DELETE ACTIVITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3428;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0042",
+          "label": "DELETE CHANNEL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3458;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0043",
+          "label": "DELETE CONTAINER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3412;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0044",
+          "label": "DELETE COUNTER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:200A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0045",
+          "label": "DELETE DCOUNTER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:201A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0046",
+          "label": "DELETE EVENT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3604;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0047",
+          "label": "DELETE TIMER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3616;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0048",
+          "label": "DELETEQ TD",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0806;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0049",
+          "label": "DELETEQ TS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0A06;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0050",
+          "label": "DEQ",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1206;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0051",
+          "label": "DOCUMENT CREATE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3C02;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0052",
+          "label": "DOCUMENT DELETE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3C10;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0053",
+          "label": "DOCUMENT INSERT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3C04;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0054",
+          "label": "DOCUMENT RETRIEVE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3C06;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0055",
+          "label": "DOCUMENT SET",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3C08;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0056",
+          "label": "DUMP",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1C02;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0057",
+          "label": "DUMP TRANSACTION",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:7E02;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0058",
+          "label": "ENDBR",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0612;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0059",
+          "label": "ENDBROWSE ACTIVITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:9624;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0060",
+          "label": "ENDBROWSE CONTAINER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:962A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0061",
+          "label": "ENDBROWSE EVENT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:9630;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0062",
+          "label": "ENDBROWSE PROCESS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:9636;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0063",
+          "label": "ENDBROWSE TIMER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:963E;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0064",
+          "label": "ENQ",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1204;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0065",
+          "label": "ENTER TRACEID",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1A04;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0066",
+          "label": "ENTER TRACENUM",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:4802;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0067",
+          "label": "EXTRACT ATTACH",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0428;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0068",
+          "label": "EXTRACT ATTRIBUTES",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:043E;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0069",
+          "label": "GDS EXTRACT ATTRIBUTES",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:241C;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0070",
+          "label": "EXTRACT CERTIFICATE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3E10;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0071",
+          "label": "EXTRACT LOGONMSG",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:043C;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0072",
+          "label": "EXTRACT PROCESS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:042E;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0073",
+          "label": "GDS EXTRACT PROCESS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:2406;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0074",
+          "label": "EXTRACT TCPIP",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3E0E;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0075",
+          "label": "EXTRACT TCT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:042A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0076",
+          "label": "EXTRACT WEB",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3810;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0077",
+          "label": "FETCH ANY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3444;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0078",
+          "label": "FETCH CHILD",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3442;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0079",
+          "label": "FORCE TIMER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:361A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0080",
+          "label": "FORMATTIME",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:4A04;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0081",
+          "label": "FREE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0422;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0082",
+          "label": "GDS FREE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:2408;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0083",
+          "label": "FREE CHILD",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3446;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0084",
+          "label": "FREEMAIN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0C04;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0085",
+          "label": "FREEMAIN64",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0C14;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0086",
+          "label": "GET CONTAINER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3414;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0087",
+          "label": "GET COUNTER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:2006;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0088",
+          "label": "GET DCOUNTER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:2016;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0089",
+          "label": "GETNEXT ACTIVITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:9622;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0090",
+          "label": "GETNEXT CONTAINER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:9628;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0091",
+          "label": "GETNEXT EVENT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:962E;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0092",
+          "label": "GETNEXT PROCESS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:9634;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0093",
+          "label": "GETNEXT TIMER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:963C;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0094",
+          "label": "GETMAIN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0C02;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0095",
+          "label": "GETMAIN64",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0C12;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0096",
+          "label": "GET64 CONTAINER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3454;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0097",
+          "label": "HANDLE ABEND",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0E0E;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0098",
+          "label": "HANDLE AID",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0206;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0099",
+          "label": "HANDLE CONDITION",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0204;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0100",
+          "label": "IGNORE CONDITION",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:020A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0101",
+          "label": "INQUIRE ACTIVITYID",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:9612;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0102",
+          "label": "INQUIRE CONTAINER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:9614;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0103",
+          "label": "INQUIRE EVENT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:9616;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0104",
+          "label": "INQUIRE PROCESS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:9618;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0105",
+          "label": "INQUIRE TIMER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:9638;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0106",
+          "label": "INVOKE APPLICATION",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0E10;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0107",
+          "label": "INVOKE SERVICE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:C002;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0108",
+          "label": "ISSUE ABEND",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0430;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0109",
+          "label": "GDS ISSUE ABEND",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:240A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0110",
+          "label": "ISSUE ABORT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1E08;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0111",
+          "label": "ISSUE ADD",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1E02;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0112",
+          "label": "ISSUE CONFIRMATION",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0434;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0113",
+          "label": "GDS ISSUE CONFIRMATION",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:240E;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0114",
+          "label": "ISSUE COPY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:040A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0115",
+          "label": "ISSUE DISCONNECT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0414;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0116",
+          "label": "ISSUE END",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1E0C;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0117",
+          "label": "ISSUE ENDFILE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:041A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0118",
+          "label": "ISSUE ENDOUTPUT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0416;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0119",
+          "label": "ISSUE EODS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0408;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0120",
+          "label": "ISSUE ERASE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1E04;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0121",
+          "label": "ISSUE ERASEAUP",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0418;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0122",
+          "label": "ISSUE ERROR",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0436;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0123",
+          "label": "GDS ISSUE ERROR",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:2410;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0124",
+          "label": "ISSUE LOAD",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:040E;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0125",
+          "label": "ISSUE NOTE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1E10;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0126",
+          "label": "ISSUE PASS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:043A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0127",
+          "label": "ISSUE PREPARE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0438;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0128",
+          "label": "GDS ISSUE PREPARE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:241A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0129",
+          "label": "ISSUE PRINT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:041C;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0130",
+          "label": "ISSUE QUERY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1E0A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0131",
+          "label": "ISSUE RECEIVE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1E0E;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0132",
+          "label": "ISSUE REPLACE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1E06;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0133",
+          "label": "ISSUE RESET",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0412;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0134",
+          "label": "ISSUE SEND",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1E14;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0135",
+          "label": "GDS ISSUE SIGNAL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:2412;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0136",
+          "label": "ISSUE SIGNAL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:041E;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0137",
+          "label": "ISSUE WAIT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1E12;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0138",
+          "label": "LINK",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0E02;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0139",
+          "label": "LINK ACQACTIVITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3432;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0140",
+          "label": "LINK ACQPROCESS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:342A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0141",
+          "label": "LINK ACTIVITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:342C;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0142",
+          "label": "LOAD",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0E06;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0143",
+          "label": "MONITOR",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:4804;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0144",
+          "label": "MOVE CONTAINER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3440;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0145",
+          "label": "POINT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0424;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0146",
+          "label": "POP HANDLE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:020E;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0147",
+          "label": "POST",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1006;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0148",
+          "label": "PURGE MESSAGE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:180A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0149",
+          "label": "PUSH HANDLE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:020C;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0150",
+          "label": "PUT CONTAINER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3416;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0151",
+          "label": "PUT64 CONTAINER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3456;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0152",
+          "label": "QUERY CHANNEL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:345A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0153",
+          "label": "QUERY COUNTER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:200E;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0154",
+          "label": "QUERY DCOUNTER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:201E;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0155",
+          "label": "QUERY SECURITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:6A02;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0156",
+          "label": "READ",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0602;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0157",
+          "label": "READNEXT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:060E;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0158",
+          "label": "READPREV",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0610;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0159",
+          "label": "READQ TD",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0804;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0160",
+          "label": "READQ TS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0A04;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0161",
+          "label": "RECEIVE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0402;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0162",
+          "label": "GDS RECEIVE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:2414;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0163",
+          "label": "RECEIVE MAP",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1802;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0164",
+          "label": "RECEIVE PARTN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:180E;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0165",
+          "label": "RELEASE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0E0A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0166",
+          "label": "REMOVE SUBEVENT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:360A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0167",
+          "label": "REQUEST ENCRYPTPTKT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:7414;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0168",
+          "label": "REQUEST PASSTICKET",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:7410;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0169",
+          "label": "RESET ACQPROCESS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:343C;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0170",
+          "label": "RESET ACTIVITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3418;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0171",
+          "label": "RESETBR",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0614;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0172",
+          "label": "RESUME ACQACTIVITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3436;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0173",
+          "label": "RESUME ACQPROCESS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3426;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0174",
+          "label": "RESUME ACTIVITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3424;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0175",
+          "label": "RETRIEVE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:100A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0176",
+          "label": "RETRIEVE REATTACH EVENT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3610;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0177",
+          "label": "RETRIEVE SUBEVENT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3612;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0178",
+          "label": "RETURN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0E08;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0179",
+          "label": "REWIND COUNTER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:200C;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0180",
+          "label": "REWIND DCOUNTER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:201C;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0181",
+          "label": "REWRITE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0606;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0182",
+          "label": "ROUTE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:180C;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0183",
+          "label": "RUN ACQACTIVITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3430;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0184",
+          "label": "RUN ACQPROCESS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3408;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0185",
+          "label": "RUN ACTIVITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3406;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0186",
+          "label": "RUN TRANSID",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:343E;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0187",
+          "label": "SEND",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0404;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0188",
+          "label": "SEND CONTROL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1812;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0189",
+          "label": "SEND MAP",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1804;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0190",
+          "label": "SEND PAGE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1808;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0191",
+          "label": "SEND PARTNSET",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1810;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0192",
+          "label": "SEND TEXT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1806;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0193",
+          "label": "SET ASSOCIATION USERCORRDATA",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:C404;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0194",
+          "label": "SIGNAL EVENT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:2802;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0195",
+          "label": "SIGNOFF",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:7404;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0196",
+          "label": "SIGNON",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:7402;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0197",
+          "label": "SOAPFAULT ADD",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:C006;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0198",
+          "label": "SOAPFAULT CREATE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:C004;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0199",
+          "label": "SOAPFAULT DELETE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:C008;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0200",
+          "label": "SPOOLCLOSE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:5610;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0201",
+          "label": "SPOOLOPEN INPUT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:5602;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0202",
+          "label": "SPOOLOPEN OUTPUT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:5602;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0203",
+          "label": "SPOOLREAD",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:5604;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0204",
+          "label": "SPOOLWRITE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:5606;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0205",
+          "label": "START",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1008;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0206",
+          "label": "START ATTACH",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1008;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0207",
+          "label": "START BREXIT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1008;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0208",
+          "label": "STARTBR",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:060C;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0209",
+          "label": "STARTBROWSE ACTIVITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:9620;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0210",
+          "label": "STARTBROWSE CONTAINER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:9626;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0211",
+          "label": "STARTBROWSE EVENT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:962C;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0212",
+          "label": "STARTBROWSE PROCESS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:9632;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0213",
+          "label": "STARTBROWSE TIMER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:963A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0214",
+          "label": "SUSPEND",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1208;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0215",
+          "label": "SUSPEND ACQACTIVITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3434;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0216",
+          "label": "SUSPEND ACQPROCESS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3422;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0217",
+          "label": "SUSPEND ACTIVITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3420;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0218",
+          "label": "SYNCPOINT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1602;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0219",
+          "label": "TEST EVENT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:360E;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0220",
+          "label": "TRACE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1A02;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0221",
+          "label": "TRANSFORM DATATOJSON",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:2606;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0222",
+          "label": "TRANSFORM DATATOXML",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:2602;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0223",
+          "label": "TRANSFORM JSONTODATA",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:2608;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0224",
+          "label": "TRANSFORM XMLTODATA",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:2604;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0225",
+          "label": "UNLOCK",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:060A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0226",
+          "label": "UPDATE COUNTER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:2008;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0227",
+          "label": "UPDATE DCOUNTER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:2018;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0228",
+          "label": "VERIFY PASSWORD",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:7406;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0229",
+          "label": "VERIFY PHRASE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:740A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0230",
+          "label": "VERIFY TOKEN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:740E;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0231",
+          "label": "WAIT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:2418;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0232",
+          "label": "WAIT CONVID",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:042C;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0233",
+          "label": "WAIT EVENT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1202;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0234",
+          "label": "WAIT EXTERNAL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:5E22;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0235",
+          "label": "WAIT JOURNALNAME",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1408;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0236",
+          "label": "WAIT JOURNALNUM",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1404;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0237",
+          "label": "WAIT SIGNAL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0410;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0238",
+          "label": "WAIT TERMINAL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:040C;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0239",
+          "label": "WAITCICS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:5E32;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0240",
+          "label": "WEB CLOSE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:381A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0241",
+          "label": "WEB CONVERSE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:381C;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0242",
+          "label": "WEB ENDBROWSE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:380C;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0243",
+          "label": "WEB EXTRACT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3810;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0244",
+          "label": "WEB OPEN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3818;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0245",
+          "label": "WEB PARSE URL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3816;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0246",
+          "label": "WEB READ",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3806;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0247",
+          "label": "WEB READNEXT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:380A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0248",
+          "label": "WEB RECEIVE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3802;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0249",
+          "label": "WEB RETRIEVE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3814;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0250",
+          "label": "WEB SEND",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3804;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0251",
+          "label": "WEB STARTBROWSE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:3808;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0252",
+          "label": "WEB WRITE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:380E;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0253",
+          "label": "WRITE FILE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0604;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0254",
+          "label": "WRITE JOURNALNAME",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1406;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0255",
+          "label": "WRITE JOURNALNUM",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:1402;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0256",
+          "label": "WRITE OPERATOR",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:6C02;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0257",
+          "label": "WRITEQ TD",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0802;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0258",
+          "label": "WRITEQ TS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0A02;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0259",
+          "label": "WSACONTEXT BUILD",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:C00A;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0260",
+          "label": "WSACONTEXT DELETE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:C00D;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0261",
+          "label": "WSACONTEXT GET",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:C00C;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0262",
+          "label": "WSAEPR CREATE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:C010;family:API",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:api-commands:0263",
+          "label": "XCTL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_api;eibfn:0E04;family:API",
+          "mandatory": true
+        }
+      ]
+    },
+    {
+      "id": "spi-commands-unique",
+      "denominator": 269,
+      "normalization": "normalized",
+      "rows": [
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0001",
+          "label": "ACQUIRE TERMINAL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:8602;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0002",
+          "label": "COLLECT STATISTICS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:7008;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0003",
+          "label": "CREATE ATOMSERVICE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:3042;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0004",
+          "label": "CREATE BUNDLE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:3040;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0005",
+          "label": "CREATE CONNECTION",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:300E;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0006",
+          "label": "CREATE DB2CONN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:3020;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0007",
+          "label": "CREATE DB2ENTRY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:3022;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0008",
+          "label": "CREATE DB2TRAN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:3024;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0009",
+          "label": "CREATE DOCTEMPLATE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:302E;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0010",
+          "label": "CREATE DUMPCODE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:304A;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0011",
+          "label": "CREATE ENQMODEL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:302A;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0012",
+          "label": "CREATE FILE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:3014;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0013",
+          "label": "CREATE IPCONN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:303C;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0014",
+          "label": "CREATE JOURNALMODEL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:301E;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0015",
+          "label": "CREATE JVMSERVER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:3046;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0016",
+          "label": "CREATE LIBRARY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:303E;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0017",
+          "label": "CREATE LSRPOOL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:3016;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0018",
+          "label": "CREATE MAPSET",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:3004;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0019",
+          "label": "CREATE MQCONN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:3044;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0020",
+          "label": "CREATE MQMONITOR",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:3048;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0021",
+          "label": "CREATE PARTITIONSET",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:3006;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0022",
+          "label": "CREATE PARTNER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:3018;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0023",
+          "label": "CREATE PIPELINE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:3038;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0024",
+          "label": "CREATE PROCESSTYPE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:3026;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0025",
+          "label": "CREATE PROFILE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:300A;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0026",
+          "label": "CREATE PROGRAM",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:3002;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0027",
+          "label": "CREATE SESSIONS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:3012;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0028",
+          "label": "CREATE TCPIPSERVICE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:3030;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0029",
+          "label": "CREATE TDQUEUE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:301C;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0030",
+          "label": "CREATE TERMINAL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:3010;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0031",
+          "label": "CREATE TRANCLASS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:301A;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0032",
+          "label": "CREATE TRANSACTION",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:3008;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0033",
+          "label": "CREATE TSMODEL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:3028;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0034",
+          "label": "CREATE TYPETERM",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:300C;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0035",
+          "label": "CREATE URIMAP",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:3036;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0036",
+          "label": "CREATE WEBSERVICE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:303A;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0037",
+          "label": "CSD ADD",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A202;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0038",
+          "label": "CSD ALTER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A204;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0039",
+          "label": "CSD APPEND",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A206;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0040",
+          "label": "CSD COPY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A208;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0041",
+          "label": "CSD DEFINE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A20A;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0042",
+          "label": "CSD DELETE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A20C;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0043",
+          "label": "CSD DISCONNECT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A232;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0044",
+          "label": "CSD ENDBRGROUP",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A22C;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0045",
+          "label": "CSD ENDBRLIST",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A22E;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0046",
+          "label": "CSD ENDBRRSRCE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A230;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0047",
+          "label": "CSD GETNEXTGROUP",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A220;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0048",
+          "label": "CSD GETNEXTLIST",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A222;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0049",
+          "label": "CSD GETNEXTRSRCE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A224;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0050",
+          "label": "CSD INQUIREGROUP",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A21A;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0051",
+          "label": "CSD INQUIRELIST",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A21C;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0052",
+          "label": "CSD INQUIRERSRCE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A21E;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0053",
+          "label": "CSD INSTALL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A20E;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0054",
+          "label": "CSD LOCK",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A210;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0055",
+          "label": "CSD REMOVE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A212;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0056",
+          "label": "CSD RENAME",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A214;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0057",
+          "label": "CSD STARTBRGROUP",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A226;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0058",
+          "label": "CSD STARTBRLIST",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A228;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0059",
+          "label": "CSD STARTBRRSRCE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A22A;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0060",
+          "label": "CSD UNLOCK",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A216;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0061",
+          "label": "CSD USERDEFINE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:A218;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0062",
+          "label": "DISABLE PROGRAM",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:2204;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0063",
+          "label": "DISCARD ATOMSERVICE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CC10;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0064",
+          "label": "DISCARD AUTINSTMODEL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:4210;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0065",
+          "label": "DISCARD BUNDLE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:C810;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0066",
+          "label": "DISCARD CONNECTION",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5810;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0067",
+          "label": "DISCARD DB2CONN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9410;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0068",
+          "label": "DISCARD DB2ENTRY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9430;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0069",
+          "label": "DISCARD DB2TRAN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9450;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0070",
+          "label": "DISCARD DOCTEMPLATE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9E10;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0071",
+          "label": "DISCARD ENQMODEL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9090;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0072",
+          "label": "DISCARD FILE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:4C10;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0073",
+          "label": "DISCARD IPCONN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:C210;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0074",
+          "label": "DISCARD JOURNALMODEL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9210;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0075",
+          "label": "DISCARD JOURNALNAME",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6010;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0076",
+          "label": "DISCARD JVMSERVER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:B050;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0077",
+          "label": "DISCARD LIBRARY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:C610;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0078",
+          "label": "DISCARD MQCONN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CE10;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0079",
+          "label": "DISCARD MQMONITOR",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CE30;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0080",
+          "label": "DISCARD PARTNER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:4410;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0081",
+          "label": "DISCARD PIPELINE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:BC10;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0082",
+          "label": "DISCARD PROCESSTYPE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9610;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0083",
+          "label": "DISCARD PROFILE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:4610;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0084",
+          "label": "DISCARD PROGRAM",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:4E10;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0085",
+          "label": "DISCARD TCPIPSERVICE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9C10;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0086",
+          "label": "DISCARD TDQUEUE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5C10;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0087",
+          "label": "DISCARD TERMINAL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5210;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0088",
+          "label": "DISCARD TRANCLASS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5E18;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0089",
+          "label": "DISCARD TRANSACTION",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5010;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0090",
+          "label": "DISCARD TSMODEL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:8030;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0091",
+          "label": "DISCARD URIMAP",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:BE10;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0092",
+          "label": "DISCARD WEBSERVICE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:BC30;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0093",
+          "label": "ENABLE PROGRAM",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:2202;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0094",
+          "label": "EXTRACT EXIT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:2206;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0095",
+          "label": "EXTRACT STATISTICS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:7026;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0096",
+          "label": "INQUIRE ASSOCIATION",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:C402;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0097",
+          "label": "INQUIRE ATOMSERVICE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CC02;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0098",
+          "label": "INQUIRE AUTINSTMODEL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:4202;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0099",
+          "label": "INQUIRE AUTOINSTALL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6812;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0100",
+          "label": "INQUIRE BUNDLE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:C802;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0101",
+          "label": "INQUIRE BUNDLEPART",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:C812;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0102",
+          "label": "INQUIRE BRFACILITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:B402;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0103",
+          "label": "INQUIRE CAPDATAPRED",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CA2A;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0104",
+          "label": "INQUIRE CAPINFOSRCE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CA2C;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0105",
+          "label": "INQUIRE CAPOPTPRED",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CA28;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0106",
+          "label": "INQUIRE CAPTURESPEC",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CA22;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0107",
+          "label": "INQUIRE CFDTPOOL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9802;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0108",
+          "label": "INQUIRE CONNECTION",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5802;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0109",
+          "label": "INQUIRE DB2CONN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9402;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0110",
+          "label": "INQUIRE DB2ENTRY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9422;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0111",
+          "label": "INQUIRE DB2TRAN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9442;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0112",
+          "label": "INQUIRE DELETSHIPPED",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6822;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0113",
+          "label": "INQUIRE DISPATCHER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:B602;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0114",
+          "label": "INQUIRE DOCTEMPLATE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9E02;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0115",
+          "label": "INQUIRE DSNAME",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:7A02;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0116",
+          "label": "INQUIRE DUMPDS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6602;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0117",
+          "label": "INQUIRE ENQ",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9022;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0118",
+          "label": "INQUIRE ENQMODEL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9082;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0119",
+          "label": "INQUIRE EPADAPTER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CA42;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0120",
+          "label": "INQUIRE EPADAPTERSET",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CA32;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0121",
+          "label": "INQUIRE EPADAPTINSET",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CA52;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0122",
+          "label": "INQUIRE EVENTBINDING",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CA02;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0123",
+          "label": "INQUIRE EVENTPROCESS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CA12;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0124",
+          "label": "INQUIRE EXCI",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:7C02;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0125",
+          "label": "INQUIRE EXITPROGRAM",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:8802;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0126",
+          "label": "INQUIRE FEATUREKEY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:D202;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0127",
+          "label": "INQUIRE FILE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:4C02;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0128",
+          "label": "INQUIRE HOST",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:BE12;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0129",
+          "label": "INQUIRE IPCONN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:C202;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0130",
+          "label": "INQUIRE IPFACILITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:C212;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0131",
+          "label": "INQUIRE IRC",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6E02;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0132",
+          "label": "INQUIRE JOURNALMODEL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9202;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0133",
+          "label": "INQUIRE JOURNALNAME",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6012;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0134",
+          "label": "INQUIRE JOURNALNUM",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6002;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0135",
+          "label": "INQUIRE JVMENDPOINT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:B212;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0136",
+          "label": "INQUIRE JVMSERVER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:B042;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0137",
+          "label": "INQUIRE LIBRARY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:C602;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0138",
+          "label": "INQUIRE MODENAME",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5A02;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0139",
+          "label": "INQUIRE MONITOR",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:7012;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0140",
+          "label": "INQUIRE MQCONN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CE02;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0141",
+          "label": "INQUIRE MQINI",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CE12;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0142",
+          "label": "INQUIRE MQMONITOR",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CE22;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0143",
+          "label": "INQUIRE MVSTCB",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:B612;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0144",
+          "label": "INQUIRE NETNAME",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5216;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0145",
+          "label": "INQUIRE NODEJSAPP",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:B072;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0146",
+          "label": "INQUIRE OSGIBUNDLE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:B052;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0147",
+          "label": "INQUIRE OSGISERVICE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:B062;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0148",
+          "label": "6.3 and later INQUIRE OTEL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5E4A;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0149",
+          "label": "INQUIRE PARTNER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:4402;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0150",
+          "label": "INQUIRE PIPELINE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:BC02;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0151",
+          "label": "INQUIRE POLICY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CA62;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0152",
+          "label": "INQUIRE POLICYRULE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CA68;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0153",
+          "label": "INQUIRE PROCESSTYPE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9602;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0154",
+          "label": "INQUIRE PROFILE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:4602;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0155",
+          "label": "INQUIRE PROGRAM",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:4E02;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0156",
+          "label": "INQUIRE REQID",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:8A02;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0157",
+          "label": "INQUIRE RRMS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:3A02;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0158",
+          "label": "6.2 and later INQUIRE SECDISCOVERY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6432;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0159",
+          "label": "INQUIRE STATISTICS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:7002;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0160",
+          "label": "INQUIRE STORAGE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5E08;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0161",
+          "label": "INQUIRE STORAGE64",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5E52;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0162",
+          "label": "INQUIRE STREAMNAME",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9212;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0163",
+          "label": "INQUIRE SUBPOOL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5E42;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0164",
+          "label": "INQUIRE SYSDUMPCODE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6622;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0165",
+          "label": "INQUIRE SYSTEM",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5402;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0166",
+          "label": "INQUIRE TASK",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5E02;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0167",
+          "label": "INQUIRE TCLASS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5E12;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0168",
+          "label": "INQUIRE TCPIP",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9C12;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0169",
+          "label": "INQUIRE TCPIPSERVICE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9C02;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0170",
+          "label": "INQUIRE TDQUEUE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5C02;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0171",
+          "label": "INQUIRE TEMPSTORAGE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:8032;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0172",
+          "label": "INQUIRE TERMINAL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5202;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0173",
+          "label": "INQUIRE TRACEDEST",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:7802;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0174",
+          "label": "INQUIRE TRACEFLAG",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:7812;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0175",
+          "label": "INQUIRE TRACETYPE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:7822;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0176",
+          "label": "INQUIRE TRANCLASS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5E1A;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0177",
+          "label": "INQUIRE TRANDUMPCODE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6612;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0178",
+          "label": "INQUIRE TRANSACTION",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5002;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0179",
+          "label": "INQUIRE TSMODEL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:8022;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0180",
+          "label": "INQUIRE TSPOOL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:801A;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0181",
+          "label": "INQUIRE TSQNAME",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:8012;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0182",
+          "label": "INQUIRE TSQUEUE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:8002;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0183",
+          "label": "INQUIRE UOW",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9002;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0184",
+          "label": "INQUIRE UOWDSNFAIL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9062;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0185",
+          "label": "INQUIRE UOWENQ",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9022;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0186",
+          "label": "INQUIRE UOWLINK",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9042;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0187",
+          "label": "INQUIRE URIMAP",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:BE02;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0188",
+          "label": "INQUIRE VOLUME",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6202;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0189",
+          "label": "INQUIRE VTAM 1",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6802;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0190",
+          "label": "INQUIRE WEB",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9C22;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0191",
+          "label": "INQUIRE WEBSERVICE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:BC22;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0192",
+          "label": "INQUIRE WLMHEALTH",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:70 32;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0193",
+          "label": "INQUIRE XMLTRANSFORM",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:D002;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0194",
+          "label": "PERFORM DELETSHIPPED",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6826;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0195",
+          "label": "PERFORM DUMP",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:7E04;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0196",
+          "label": "PERFORM ENDAFFINITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5806;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0197",
+          "label": "PERFORM JVMSERVER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:B046;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0198",
+          "label": "PERFORM PIPELINE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:BC06;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0199",
+          "label": "PERFORM RESETTIME",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:7202;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0200",
+          "label": "6.2 and later PERFORM SECDISCOVERY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6436;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0201",
+          "label": "PERFORM SECURITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6402;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0202",
+          "label": "PERFORM SHUTDOWN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:7602;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0203",
+          "label": "PERFORM SSL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6412;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0204",
+          "label": "PERFORM STATISTICS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:7006;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0205",
+          "label": "RESYNC ENTRYNAME",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:1604;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0206",
+          "label": "SET ATOMSERVICE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CC04;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0207",
+          "label": "SET AUTOINSTALL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6814;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0208",
+          "label": "SET BUNDLE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:C804;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0209",
+          "label": "SET BRFACILITY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:B404;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0210",
+          "label": "SET CONNECTION",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5804;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0211",
+          "label": "SET DB2CONN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9404;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0212",
+          "label": "SET DB2ENTRY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9424;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0213",
+          "label": "SET DB2TRAN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9444;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0214",
+          "label": "SET DELETSHIPPED",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6824;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0215",
+          "label": "SET DISPATCHER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:B604;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0216",
+          "label": "SET DOCTEMPLATE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9E04;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0217",
+          "label": "SET DSNAME",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:7A04;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0218",
+          "label": "SET DUMPDS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6604;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0219",
+          "label": "SET ENQMODEL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9084;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0220",
+          "label": "SET EPADAPTER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CA44;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0221",
+          "label": "SET EPADAPTERSET",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CA34;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0222",
+          "label": "SET EVENTBINDING",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CA04;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0223",
+          "label": "SET EVENTPROCESS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CA14;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0224",
+          "label": "SET FILE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:4C04;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0225",
+          "label": "SET HOST",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:BE14;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0226",
+          "label": "SET IPCONN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:C204;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0227",
+          "label": "SET IRC",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6E04;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0228",
+          "label": "SET JOURNALNAME",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6014;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0229",
+          "label": "SET JOURNALNUM",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6004;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0230",
+          "label": "SET JVMENDPOINT",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:B214;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0231",
+          "label": "SET JVMSERVER",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:B044;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0232",
+          "label": "SET LIBRARY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:C604;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0233",
+          "label": "SET MODENAME",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5A04;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0234",
+          "label": "SET MONITOR",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:7014;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0235",
+          "label": "SET MQCONN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CE04;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0236",
+          "label": "SET MQMONITOR",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:CE24;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0237",
+          "label": "SET NETNAME",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5208;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0238",
+          "label": "6.3 and later SET OTEL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5E4C;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0239",
+          "label": "SET PIPELINE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:BC04;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0240",
+          "label": "SET PROCESSTYPE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9604;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0241",
+          "label": "SET PROGRAM",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:4E04;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0242",
+          "label": "6.2 and later SET SECDISCOVERY",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6434;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0243",
+          "label": "SET STATISTICS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:7004;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0244",
+          "label": "SET SYSDUMPCODE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6624;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0245",
+          "label": "SET SYSTEM",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5404;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0246",
+          "label": "SET TASK",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5E04;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0247",
+          "label": "SET TCLASS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5E14;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0248",
+          "label": "SET TCPIP",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9C14;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0249",
+          "label": "SET TCPIPSERVICE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9C04;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0250",
+          "label": "SET TDQUEUE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5C04;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0251",
+          "label": "SET TEMPSTORAGE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:8034;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0252",
+          "label": "SET TERMINAL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5204;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0253",
+          "label": "SET TRACEDEST",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:7804;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0254",
+          "label": "SET TRACEFLAG",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:7814;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0255",
+          "label": "SET TRACETYPE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:7824;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0256",
+          "label": "SET TRANCLASS",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5E1C;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0257",
+          "label": "SET TRANDUMPCODE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6614;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0258",
+          "label": "SET TRANSACTION",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:5004;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0259",
+          "label": "SET TSQNAME",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:8014;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0260",
+          "label": "SET TSQUEUE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:8004;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0261",
+          "label": "SET UOW",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9004;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0262",
+          "label": "SET UOWLINK",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9044;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0263",
+          "label": "SET URIMAP",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:BE04;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0264",
+          "label": "SET VOLUME",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6204;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0265",
+          "label": "SET VTAM 1",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:6804;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0266",
+          "label": "SET WEB",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:9C24;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0267",
+          "label": "SET WEBSERVICE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:BC24;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0268",
+          "label": "SET WLMHEALTH",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:7034;family:SPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0269",
+          "label": "SET XMLTRANSFORM",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_spi;eibfn:D004;family:SPI",
+          "mandatory": true
+        }
+      ]
+    },
+    {
+      "id": "fepi-commands",
+      "denominator": 39,
+      "normalization": "normalized",
+      "rows": [
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0001",
+          "label": "FEPI ADD POOL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:844A;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0002",
+          "label": "FEPI ALLOCATE PASSCONVID",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8210;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0003",
+          "label": "FEPI ALLOCATE POOL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8210;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0004",
+          "label": "FEPI AP NOOP",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:820E;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0005",
+          "label": "FEPI CONVERSE DATASTREAM",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8214;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0006",
+          "label": "FEPI CONVERSE FORMATTED",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8212;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0007",
+          "label": "FEPI DELETE POOL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:844C;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0008",
+          "label": "FEPI DISCARD NODELIST",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8450;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0009",
+          "label": "FEPI DISCARD POOL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8470;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0010",
+          "label": "FEPI DISCARD PROPERTYSET",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8430;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0011",
+          "label": "FEPI DISCARD TARGETLIST",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8490;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0012",
+          "label": "FEPI EXTRACT CONV",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8216;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0013",
+          "label": "FEPI EXTRACT FIELD",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8218;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0014",
+          "label": "FEPI EXTRACT STSN",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:821A;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0015",
+          "label": "FEPI FREE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:821C;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0016",
+          "label": "FEPI INQUIRE CONNECTION",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:84A2;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0017",
+          "label": "FEPI INQUIRE NODE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8442;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0018",
+          "label": "FEPI INQUIRE POOL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8462;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0019",
+          "label": "FEPI INQUIRE PROPERTYSET",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8422;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0020",
+          "label": "FEPI INSTALL NODELIST",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8448;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0021",
+          "label": "FEPI INSTALL POOL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8468;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0022",
+          "label": "FEPI INSTALL PROPERTYSET",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8428;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0023",
+          "label": "FEPI INQUIRE TARGET",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8482;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0024",
+          "label": "FEPI INSTALL TARGETLIST",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8488;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0025",
+          "label": "FEPI ISSUE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:821E;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0026",
+          "label": "FEPI RECEIVE DATASTREAM",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8222;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0027",
+          "label": "FEPI RECEIVE FORMATTED",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8220;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0028",
+          "label": "FEPI REQUEST PASSTICKET",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:820C;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0029",
+          "label": "FEPI SEND DATASTREAM",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8226;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0030",
+          "label": "FEPI SEND FORMATTED",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8224;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0031",
+          "label": "FEPI SET CONNECTION",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:84A4;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0032",
+          "label": "FEPI SET NODE",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8444;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0033",
+          "label": "FEPI SET NODELIST",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8444;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0034",
+          "label": "FEPI SET POOL",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8464;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0035",
+          "label": "FEPI SET POOLLIST",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8464;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0036",
+          "label": "FEPI SET TARGET",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8484;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0037",
+          "label": "FEPI SET TARGETLIST",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8484;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0038",
+          "label": "FEPI SP NOOP",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:840E;family:FEPI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0039",
+          "label": "FEPI START",
+          "source_locator": "html-table:dfha8mf__eibfn_table_cmds_fepi;eibfn:8228;family:FEPI",
+          "mandatory": true
+        }
+      ]
+    }
+  ]
+}

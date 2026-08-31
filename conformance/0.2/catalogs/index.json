@@ -1,0 +1,259 @@
+{
+  "schema_version": "mainframe-env.official-source-receipts@1",
+  "target_version": "0.2.0",
+  "catalog_contract": "mainframe-env.official-catalog@1",
+  "coverage_gates": [
+    "recognized",
+    "validated",
+    "executed",
+    "conditioned",
+    "recovered",
+    "differential"
+  ],
+  "claim_policy": {
+    "catalog_presence_counts_as_execution": false,
+    "generated_identity_counts_as_execution": false,
+    "partial_rows_round_up": false,
+    "licensed_ibm_oracle_required_for_differential_pass": true
+  },
+  "review": {
+    "status": "reviewed",
+    "reviewed_on": "2026-08-31",
+    "authority": "accepted repository research baseline",
+    "publication_bytes_redistributed": false
+  },
+  "baselines": [
+    {
+      "id": "ibm-enterprise-cobol-6.5-2026-05-31",
+      "subsystem": "cobol",
+      "product": "Enterprise COBOL for z/OS",
+      "version": "6.5",
+      "publication_identity": "SC27-8713-04; Enterprise COBOL for z/OS 6.5 Language Reference; 2026-05-31 edition",
+      "source": {
+        "url": "https://www.ibm.com/docs/en/SS6SG3_6.5/pdf/lrmvs.pdf",
+        "media_type": "application/pdf",
+        "sha256": "sha256:8b86cbd2d838d8f460dcbe8d1e74d2266799ce1534f4cfdbc08469c36748e85e",
+        "bytes": 4385427,
+        "pages": 916,
+        "snapshot_date": "2026-05-31",
+        "extraction_method": "reviewed PDF outline ranges for chapters 25, 26, 28, 31-112, 113, and 114",
+        "retained_in_repository": false
+      },
+      "catalog": "conformance/0.2/catalogs/cobol.json",
+      "catalog_sha256": "sha256:215e7f819d99420a63b47a04ff026ea594471ed22568e64734ac617da6ef2e0c",
+      "immutable_denominators": {
+        "procedure-statements": 44,
+        "intrinsic-functions": 82,
+        "compiler-directing-statements": 15,
+        "compiler-directive-groups": 5,
+        "file-description-clauses": 10,
+        "data-description-clauses": 17
+      },
+      "mandatory_rows": 173
+    },
+    {
+      "id": "ibm-cics-ts-6x-2026-08-31",
+      "subsystem": "cics",
+      "product": "CICS Transaction Server for z/OS",
+      "version": "6.x documentation snapshot",
+      "publication_identity": "Function codes of EXEC CICS commands; CICS TS 6.x snapshot 2026-08-31",
+      "source": {
+        "url": "https://www.ibm.com/docs/en/cics-ts/6.x?topic=codes-function-exec-cics-commands",
+        "media_type": "text/html",
+        "sha256": "sha256:cab6321d495098e133f92adeac154d643b022696967559d6c4485cad48fcb4b2",
+        "bytes": 264172,
+        "snapshot_date": "2026-08-31",
+        "extraction_method": "reviewed command tables; API rows retained, SPI command names deduplicated, FEPI rows retained",
+        "retained_in_repository": false
+      },
+      "catalog": "conformance/0.2/catalogs/cics.json",
+      "catalog_sha256": "sha256:fccd2a8e5cc24dd08aeb32754daf14ed80e9f1b20b5d9e762a1b0cfe429ceeba",
+      "immutable_denominators": {
+        "api-commands": 263,
+        "spi-commands-unique": 269,
+        "fepi-commands": 39
+      },
+      "mandatory_rows": 571
+    },
+    {
+      "id": "ibm-zos-3.2-jcl-jes2-2026-06",
+      "subsystem": "jcl-jes2",
+      "product": "z/OS MVS JCL and JES2",
+      "version": "3.2",
+      "publication_identity": "SA23-1385-70; z/OS MVS JCL Reference; 2026-06 edition",
+      "source": {
+        "url": "https://www.ibm.com/docs/en/SSLTBW_3.2.0/pdf/ieab600_v3r2.pdf",
+        "media_type": "application/pdf",
+        "sha256": "sha256:8bc97add9d69609f303ee96a1fa094d755c8bca254fcf574c15c3380fe877c9b",
+        "bytes": 3652434,
+        "pages": 758,
+        "snapshot_date": "2026-06",
+        "extraction_method": "reviewed statement tables and PDF outline parameter headings",
+        "retained_in_repository": false
+      },
+      "catalog": "conformance/0.2/catalogs/jcl-jes2.json",
+      "catalog_sha256": "sha256:640b6bf949b6feefa6ba2d762286500798d3157794c728c360f4a46fc260fba4",
+      "immutable_denominators": {
+        "jcl-statements": 20,
+        "jes2-jecl-statements": 13,
+        "dd-parameters": 74,
+        "exec-parameters": 19,
+        "job-parameters": 35,
+        "output-parameters": 76
+      },
+      "mandatory_rows": 237
+    },
+    {
+      "id": "ibm-zos-3.2-dfsms-ams-2026-06",
+      "subsystem": "dataset-vsam-ams",
+      "product": "z/OS DFSMS Access Method Services",
+      "version": "3.2",
+      "publication_identity": "SC23-6846-70; z/OS DFSMS Access Method Services Commands; 2026-06 edition",
+      "source": {
+        "url": "https://www.ibm.com/docs/en/SSLTBW_3.2.0/pdf/idai200_v3r2.pdf",
+        "media_type": "application/pdf",
+        "sha256": "sha256:2d0c6bb05bc9ead70575a41bdd786f1ea7ad3f0ed1855ba9a2ec041eaec83c67",
+        "bytes": 2857720,
+        "pages": 610,
+        "snapshot_date": "2026-06",
+        "extraction_method": "reviewed functional-command chapters and VSAM organization normalization",
+        "retained_in_repository": false
+      },
+      "catalog": "conformance/0.2/catalogs/dataset-vsam-ams.json",
+      "catalog_sha256": "sha256:fda011e3c0b3934f940a1adf9b1909f81f7059c4b75643e1cf7ddf9ade9de0d9",
+      "immutable_denominators": {
+        "ams-functional-commands": 31,
+        "vsam-primary-organizations": 5
+      },
+      "mandatory_rows": 36
+    },
+    {
+      "id": "ibm-zos-3.2-racf-saf-2026",
+      "subsystem": "racf-saf",
+      "product": "z/OS Security Server RACF and SAF",
+      "version": "3.2",
+      "publication_identity": "SA23-2292-70; z/OS Security Server RACF Command Language Reference; 2026 edition",
+      "source": {
+        "url": "https://www.ibm.com/docs/en/SSLTBW_3.2.0/pdf/icha400_v3r2.pdf",
+        "media_type": "application/pdf",
+        "sha256": "sha256:f4c8860aeb4d00b78f9257b28b2d880bd7571d74e2e00b2b1424b203801d5a46",
+        "bytes": 3735292,
+        "pages": 746,
+        "snapshot_date": "2026",
+        "extraction_method": "reviewed RACF command chapter headings plus the RACROUTE request matrix",
+        "retained_in_repository": false
+      },
+      "supporting_sources": [
+        {
+          "url": "https://www.ibm.com/docs/en/zos/3.2.0?topic=macros-racroute-router-interface",
+          "media_type": "text/html",
+          "sha256": "sha256:83e6eed67f5631268e03ad9459c5ac5fde03bd9d78152eb07403b70af3c4cf78",
+          "bytes": 159444,
+          "snapshot_date": "2026-08-31",
+          "retained_in_repository": false
+        }
+      ],
+      "catalog": "conformance/0.2/catalogs/racf-saf.json",
+      "catalog_sha256": "sha256:3360e3accb7a5471c1422c5a6a0b7f650636f65698793e0eb05a7d430a4badc3",
+      "immutable_denominators": {
+        "racf-command-families": 34,
+        "racroute-request-types": 14
+      },
+      "mandatory_rows": 48
+    },
+    {
+      "id": "ibm-zosmf-3.2-2026-07-27",
+      "subsystem": "zosmf",
+      "product": "IBM z/OS Management Facility",
+      "version": "3.2",
+      "publication_identity": "SC27-8430-70; IBM z/OSMF Programming Guide; 2026-07-27 edition",
+      "source": {
+        "url": "https://www.ibm.com/docs/en/SSLTBW_3.2.0/pdf/izua700_v3r2.pdf",
+        "media_type": "application/pdf",
+        "sha256": "sha256:2c3dde7bd5f4f7e43b58b6be34997d336af26f9f82975bc8573f26ab723e1ebd",
+        "bytes": 7025714,
+        "pages": 1478,
+        "snapshot_date": "2026-07-27",
+        "extraction_method": "reviewed REST family headings and the frozen 189 heading-level operation inventory; endpoint normalization remains a new-baseline action",
+        "retained_in_repository": false
+      },
+      "catalog": "conformance/0.2/catalogs/zosmf.json",
+      "catalog_sha256": "sha256:fe3fe657b5dddf29bd26ce9597b0d307db17455c8c1fccf398a446a636fa4457",
+      "immutable_denominators": {
+        "rest-service-families": 27,
+        "direct-guide-operation-headings": 189
+      },
+      "mandatory_rows": 216
+    },
+    {
+      "id": "ibm-db2-for-zos-13-2026-08-13",
+      "subsystem": "db2",
+      "product": "Db2 13 for z/OS",
+      "version": "13",
+      "publication_identity": "Db2 13 for z/OS SQL Reference; last updated 2026-08-13",
+      "source": {
+        "url": "https://www.ibm.com/docs/en/SSEPEK_13.0.0/pdf/db2z_13_sqlrefbook.pdf",
+        "media_type": "application/pdf",
+        "sha256": "sha256:34c575200ec4fcbe389364a375ef1ee2161ffdceb8a2dc6de90df0fe9377b212",
+        "bytes": 14051668,
+        "pages": 3186,
+        "snapshot_date": "2026-08-13",
+        "extraction_method": "reviewed Chapter 7 statement headings excluding three overview headings and normalized Chapter 8 SQL PL statement headings",
+        "retained_in_repository": false
+      },
+      "catalog": "conformance/0.2/catalogs/db2.json",
+      "catalog_sha256": "sha256:c622d3e991e8fc526d9db0665c0a0eba84cedbc064564013e8fe2b7928522fac",
+      "immutable_denominators": {
+        "sql-statements": 158,
+        "sql-pl-statements": 16
+      },
+      "mandatory_rows": 174
+    },
+    {
+      "id": "ibm-ims-15.6-dli-2026-08-31",
+      "subsystem": "ims",
+      "product": "IBM IMS",
+      "version": "15.6",
+      "publication_identity": "Comparing EXEC DLI commands and DL/I calls; IMS 15.6 snapshot 2026-08-31",
+      "source": {
+        "url": "https://www.ibm.com/docs/en/ims/15.6.0?topic=programs-comparing-exec-dli-commands-dli-calls",
+        "media_type": "text/html",
+        "sha256": "sha256:3a843a493ee4676fe8b0bbf4cf7e9b255ab56ea3dc3e1a7c269c90bd00f9b12e",
+        "bytes": 16814,
+        "snapshot_date": "2026-08-31",
+        "extraction_method": "reviewed call-level to command-level comparison table rows",
+        "retained_in_repository": false
+      },
+      "catalog": "conformance/0.2/catalogs/ims.json",
+      "catalog_sha256": "sha256:b488f67b4c5b4d71a93e97a8a1605b8eac21fcf73c802c264a7bff5dfa3ce319",
+      "immutable_denominators": {
+        "dli-call-families": 25
+      },
+      "mandatory_rows": 25
+    },
+    {
+      "id": "ibm-mq-9.4-mqi-2026-08-31",
+      "subsystem": "mq",
+      "product": "IBM MQ",
+      "version": "9.4",
+      "publication_identity": "IBM MQ 9.4 MQI call descriptions; snapshot 2026-08-31",
+      "source": {
+        "url": "https://www.ibm.com/docs/en/ibm-mq/9.4.x?topic=calls-call-descriptions",
+        "media_type": "text/html",
+        "sha256": "sha256:6b04a5194766eb9da79ddd33d57510db15baf7c085fe686ebdb6e372568bb9dc",
+        "bytes": 8698,
+        "snapshot_date": "2026-08-31",
+        "extraction_method": "reviewed MQI call links with the repeated MQMHBUF documentation row deduplicated",
+        "retained_in_repository": false
+      },
+      "catalog": "conformance/0.2/catalogs/mq.json",
+      "catalog_sha256": "sha256:62e70382c8d59e28234f249acde75faf3495acb78f8ac19829ff2d7e8290ebe7",
+      "immutable_denominators": {
+        "mqi-calls-unique": 26
+      },
+      "mandatory_rows": 26
+    }
+  ],
+  "baseline_count": 9,
+  "mandatory_rows": 1506
+}

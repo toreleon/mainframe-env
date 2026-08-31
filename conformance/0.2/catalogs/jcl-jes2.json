@@ -1,0 +1,1472 @@
+{
+  "schema_version": "mainframe-env.official-catalog@1",
+  "baseline_id": "ibm-zos-3.2-jcl-jes2-2026-06",
+  "subsystem": "jcl-jes2",
+  "mandatory_rows": 237,
+  "units": [
+    {
+      "id": "jcl-statements",
+      "denominator": 20,
+      "normalization": "normalized",
+      "rows": [
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0001",
+          "label": "JCL command",
+          "source_locator": "pdf-page:47;table:1",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0002",
+          "label": "COMMAND",
+          "source_locator": "pdf-page:47;table:1",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0003",
+          "label": "comment",
+          "source_locator": "pdf-page:47;table:1",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0004",
+          "label": "CNTL",
+          "source_locator": "pdf-page:47;table:1",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0005",
+          "label": "DD",
+          "source_locator": "pdf-page:47;table:1",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0006",
+          "label": "delimiter",
+          "source_locator": "pdf-page:47;table:1",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0007",
+          "label": "ENDCNTL",
+          "source_locator": "pdf-page:47;table:1",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0008",
+          "label": "EXEC",
+          "source_locator": "pdf-page:47;table:1",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0009",
+          "label": "EXPORT",
+          "source_locator": "pdf-page:47;table:1",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0010",
+          "label": "IF/THEN/ELSE/ENDIF",
+          "source_locator": "pdf-page:47;table:1",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0011",
+          "label": "INCLUDE",
+          "source_locator": "pdf-page:48;table:1",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0012",
+          "label": "JCLLIB",
+          "source_locator": "pdf-page:48;table:1",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0013",
+          "label": "JOB",
+          "source_locator": "pdf-page:48;table:1",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0014",
+          "label": "null",
+          "source_locator": "pdf-page:48;table:1",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0015",
+          "label": "OUTPUT JCL",
+          "source_locator": "pdf-page:48;table:1",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0016",
+          "label": "PEND",
+          "source_locator": "pdf-page:48;table:1",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0017",
+          "label": "PROC",
+          "source_locator": "pdf-page:48;table:1",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0018",
+          "label": "SCHEDULE",
+          "source_locator": "pdf-page:48;table:1",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0019",
+          "label": "SET",
+          "source_locator": "pdf-page:48;table:1",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0020",
+          "label": "XMIT",
+          "source_locator": "pdf-page:48;table:1",
+          "mandatory": true
+        }
+      ]
+    },
+    {
+      "id": "jes2-jecl-statements",
+      "denominator": 13,
+      "normalization": "normalized",
+      "rows": [
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0001",
+          "label": "JES2 command statement",
+          "source_locator": "pdf-page:643;outline:JES2 command statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0002",
+          "label": "/*JOBPARM statement",
+          "source_locator": "pdf-page:645;outline:/*JOBPARM statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0003",
+          "label": "/*MESSAGE statement",
+          "source_locator": "pdf-page:650;outline:/*MESSAGE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0004",
+          "label": "/*NETACCT statement",
+          "source_locator": "pdf-page:651;outline:/*NETACCT statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0005",
+          "label": "/*NOTIFY statement",
+          "source_locator": "pdf-page:652;outline:/*NOTIFY statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0006",
+          "label": "/*OUTPUT statement",
+          "source_locator": "pdf-page:653;outline:/*OUTPUT statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0007",
+          "label": "/*PRIORITY statement",
+          "source_locator": "pdf-page:660;outline:/*PRIORITY statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0008",
+          "label": "/*ROUTE statement",
+          "source_locator": "pdf-page:661;outline:/*ROUTE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0009",
+          "label": "/*SETUP statement",
+          "source_locator": "pdf-page:664;outline:/*SETUP statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0010",
+          "label": "/*SIGNOFF statement",
+          "source_locator": "pdf-page:665;outline:/*SIGNOFF statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0011",
+          "label": "/*SIGNON statement",
+          "source_locator": "pdf-page:666;outline:/*SIGNON statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0012",
+          "label": "/*XEQ statement",
+          "source_locator": "pdf-page:668;outline:/*XEQ statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0013",
+          "label": "/*XMIT statement",
+          "source_locator": "pdf-page:669;outline:/*XMIT statement",
+          "mandatory": true
+        }
+      ]
+    },
+    {
+      "id": "dd-parameters",
+      "denominator": 74,
+      "normalization": "normalized",
+      "rows": [
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0001",
+          "label": "* Parameter",
+          "source_locator": "pdf-page:141;outline:* Parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0002",
+          "label": "ACCODE parameter",
+          "source_locator": "pdf-page:144;outline:ACCODE parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0003",
+          "label": "AMP parameter",
+          "source_locator": "pdf-page:145;outline:AMP parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0004",
+          "label": "AVGREC parameter",
+          "source_locator": "pdf-page:152;outline:AVGREC parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0005",
+          "label": "BLKSIZE parameter",
+          "source_locator": "pdf-page:153;outline:BLKSIZE parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0006",
+          "label": "BLKSZLIM parameter",
+          "source_locator": "pdf-page:155;outline:BLKSZLIM parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0007",
+          "label": "BURST parameter",
+          "source_locator": "pdf-page:156;outline:BURST parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0008",
+          "label": "CCSID parameter",
+          "source_locator": "pdf-page:157;outline:CCSID parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0009",
+          "label": "CHARS parameter",
+          "source_locator": "pdf-page:160;outline:CHARS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0010",
+          "label": "CHKPT parameter",
+          "source_locator": "pdf-page:162;outline:CHKPT parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0011",
+          "label": "CNTL parameter",
+          "source_locator": "pdf-page:163;outline:CNTL parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0012",
+          "label": "COPIES parameter",
+          "source_locator": "pdf-page:164;outline:COPIES parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0013",
+          "label": "DATA parameter",
+          "source_locator": "pdf-page:167;outline:DATA parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0014",
+          "label": "DATACLAS parameter",
+          "source_locator": "pdf-page:169;outline:DATACLAS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0015",
+          "label": "DCB parameter",
+          "source_locator": "pdf-page:172;outline:DCB parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0016",
+          "label": "DDNAME parameter",
+          "source_locator": "pdf-page:185;outline:DDNAME parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0017",
+          "label": "DEST parameter",
+          "source_locator": "pdf-page:189;outline:DEST parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0018",
+          "label": "DISP parameter",
+          "source_locator": "pdf-page:193;outline:DISP parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0019",
+          "label": "DLM parameter",
+          "source_locator": "pdf-page:206;outline:DLM parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0020",
+          "label": "DSID Parameter",
+          "source_locator": "pdf-page:207;outline:DSID Parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0021",
+          "label": "DSKEYLBL parameter",
+          "source_locator": "pdf-page:209;outline:DSKEYLBL parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0022",
+          "label": "DSNAME parameter",
+          "source_locator": "pdf-page:210;outline:DSNAME parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0023",
+          "label": "DSNTYPE parameter",
+          "source_locator": "pdf-page:217;outline:DSNTYPE parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0024",
+          "label": "DUMMY parameter",
+          "source_locator": "pdf-page:221;outline:DUMMY parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0025",
+          "label": "DYNAM parameter",
+          "source_locator": "pdf-page:224;outline:DYNAM parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0026",
+          "label": "EATTR parameter",
+          "source_locator": "pdf-page:224;outline:EATTR parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0027",
+          "label": "EXPDT parameter",
+          "source_locator": "pdf-page:225;outline:EXPDT parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0028",
+          "label": "FCB parameter",
+          "source_locator": "pdf-page:227;outline:FCB parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0029",
+          "label": "FILEDATA parameter",
+          "source_locator": "pdf-page:230;outline:FILEDATA parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0030",
+          "label": "FLASH parameter",
+          "source_locator": "pdf-page:231;outline:FLASH parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0031",
+          "label": "FREE parameter",
+          "source_locator": "pdf-page:233;outline:FREE parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0032",
+          "label": "FREEVOL parameter",
+          "source_locator": "pdf-page:235;outline:FREEVOL parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0033",
+          "label": "GDGORDER parameter",
+          "source_locator": "pdf-page:236;outline:GDGORDER parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0034",
+          "label": "HOLD parameter",
+          "source_locator": "pdf-page:237;outline:HOLD parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0035",
+          "label": "KEYLABL1 parameter",
+          "source_locator": "pdf-page:240;outline:KEYLABL1 parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0036",
+          "label": "KEYLABL2 parameter",
+          "source_locator": "pdf-page:241;outline:KEYLABL2 parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0037",
+          "label": "KEYENCD1 parameter",
+          "source_locator": "pdf-page:242;outline:KEYENCD1 parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0038",
+          "label": "KEYENCD2 parameter",
+          "source_locator": "pdf-page:243;outline:KEYENCD2 parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0039",
+          "label": "KEYLEN parameter",
+          "source_locator": "pdf-page:244;outline:KEYLEN parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0040",
+          "label": "KEYOFF parameter",
+          "source_locator": "pdf-page:246;outline:KEYOFF parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0041",
+          "label": "LABEL parameter",
+          "source_locator": "pdf-page:247;outline:LABEL parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0042",
+          "label": "LGSTREAM parameter",
+          "source_locator": "pdf-page:252;outline:LGSTREAM parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0043",
+          "label": "LIKE parameter",
+          "source_locator": "pdf-page:254;outline:LIKE parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0044",
+          "label": "LRECL parameter",
+          "source_locator": "pdf-page:256;outline:LRECL parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0045",
+          "label": "MAXGENS parameter",
+          "source_locator": "pdf-page:258;outline:MAXGENS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0046",
+          "label": "MGMTCLAS parameter",
+          "source_locator": "pdf-page:258;outline:MGMTCLAS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0047",
+          "label": "MODIFY parameter",
+          "source_locator": "pdf-page:260;outline:MODIFY parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0048",
+          "label": "NULLOVRD parameter",
+          "source_locator": "pdf-page:262;outline:NULLOVRD parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0049",
+          "label": "OUTLIM parameter",
+          "source_locator": "pdf-page:262;outline:OUTLIM parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0050",
+          "label": "OUTPUT parameter",
+          "source_locator": "pdf-page:263;outline:OUTPUT parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0051",
+          "label": "PATH parameter",
+          "source_locator": "pdf-page:267;outline:PATH parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0052",
+          "label": "PATHDISP parameter",
+          "source_locator": "pdf-page:270;outline:PATHDISP parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0053",
+          "label": "PATHMODE parameter",
+          "source_locator": "pdf-page:271;outline:PATHMODE parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0054",
+          "label": "PATHOPTS parameter",
+          "source_locator": "pdf-page:275;outline:PATHOPTS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0055",
+          "label": "PROTECT parameter",
+          "source_locator": "pdf-page:281;outline:PROTECT parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0056",
+          "label": "RECFM parameter",
+          "source_locator": "pdf-page:283;outline:RECFM parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0057",
+          "label": "RECORG parameter",
+          "source_locator": "pdf-page:286;outline:RECORG parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0058",
+          "label": "REFDD parameter",
+          "source_locator": "pdf-page:287;outline:REFDD parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0059",
+          "label": "RETPD parameter",
+          "source_locator": "pdf-page:289;outline:RETPD parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0060",
+          "label": "RLS parameter",
+          "source_locator": "pdf-page:291;outline:RLS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0061",
+          "label": "ROACCESS parameter",
+          "source_locator": "pdf-page:293;outline:ROACCESS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0062",
+          "label": "SECMODEL parameter",
+          "source_locator": "pdf-page:294;outline:SECMODEL parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0063",
+          "label": "SEGMENT parameter",
+          "source_locator": "pdf-page:296;outline:SEGMENT parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0064",
+          "label": "SPACE parameter",
+          "source_locator": "pdf-page:297;outline:SPACE parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0065",
+          "label": "SPIN parameter",
+          "source_locator": "pdf-page:304;outline:SPIN parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0066",
+          "label": "STORCLAS parameter",
+          "source_locator": "pdf-page:307;outline:STORCLAS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0067",
+          "label": "SUBSYS parameter",
+          "source_locator": "pdf-page:309;outline:SUBSYS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0068",
+          "label": "SYMBOLS parameter",
+          "source_locator": "pdf-page:312;outline:SYMBOLS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0069",
+          "label": "SYMLIST parameter",
+          "source_locator": "pdf-page:313;outline:SYMLIST parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0070",
+          "label": "SYSOUT parameter",
+          "source_locator": "pdf-page:315;outline:SYSOUT parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0071",
+          "label": "TERM parameter",
+          "source_locator": "pdf-page:320;outline:TERM parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0072",
+          "label": "UCS parameter",
+          "source_locator": "pdf-page:321;outline:UCS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0073",
+          "label": "UNIT parameter",
+          "source_locator": "pdf-page:324;outline:UNIT parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0074",
+          "label": "VOLUME parameter",
+          "source_locator": "pdf-page:330;outline:VOLUME parameter",
+          "mandatory": true
+        }
+      ]
+    },
+    {
+      "id": "exec-parameters",
+      "denominator": 19,
+      "normalization": "normalized",
+      "rows": [
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0001",
+          "label": "ABDISPCC parameter",
+          "source_locator": "pdf-page:368;outline:ABDISPCC parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0002",
+          "label": "ACCT parameter",
+          "source_locator": "pdf-page:369;outline:ACCT parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0003",
+          "label": "ADDRSPC parameter",
+          "source_locator": "pdf-page:371;outline:ADDRSPC parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0004",
+          "label": "CCSID parameter",
+          "source_locator": "pdf-page:372;outline:CCSID parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0005",
+          "label": "COND parameter",
+          "source_locator": "pdf-page:373;outline:COND parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0006",
+          "label": "DYNAMNBR parameter",
+          "source_locator": "pdf-page:380;outline:DYNAMNBR parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0007",
+          "label": "MEMLIMIT parameter",
+          "source_locator": "pdf-page:381;outline:MEMLIMIT parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0008",
+          "label": "PARM parameter",
+          "source_locator": "pdf-page:382;outline:PARM parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0009",
+          "label": "PARMDD parameter",
+          "source_locator": "pdf-page:384;outline:PARMDD parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0010",
+          "label": "PERFORM parameter",
+          "source_locator": "pdf-page:386;outline:PERFORM parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0011",
+          "label": "PGM parameter",
+          "source_locator": "pdf-page:387;outline:PGM parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0012",
+          "label": "PROC and procedure name parameters",
+          "source_locator": "pdf-page:389;outline:PROC and procedure name parameters",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0013",
+          "label": "RD parameter",
+          "source_locator": "pdf-page:390;outline:RD parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0014",
+          "label": "REGION parameter",
+          "source_locator": "pdf-page:393;outline:REGION parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0015",
+          "label": "REGIONX parameter",
+          "source_locator": "pdf-page:396;outline:REGIONX parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0016",
+          "label": "RLSTMOUT parameter",
+          "source_locator": "pdf-page:398;outline:RLSTMOUT parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0017",
+          "label": "TIME parameter",
+          "source_locator": "pdf-page:399;outline:TIME parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0018",
+          "label": "TVSMSG parameter",
+          "source_locator": "pdf-page:402;outline:TVSMSG parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0019",
+          "label": "TVSAMCOM parameter",
+          "source_locator": "pdf-page:403;outline:TVSAMCOM parameter",
+          "mandatory": true
+        }
+      ]
+    },
+    {
+      "id": "job-parameters",
+      "denominator": 35,
+      "normalization": "normalized",
+      "rows": [
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0001",
+          "label": "Accounting information parameter",
+          "source_locator": "pdf-page:442;outline:Accounting information parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0002",
+          "label": "ADDRSPC parameter",
+          "source_locator": "pdf-page:444;outline:ADDRSPC parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0003",
+          "label": "BYTES parameter",
+          "source_locator": "pdf-page:445;outline:BYTES parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0004",
+          "label": "CARDS parameter",
+          "source_locator": "pdf-page:447;outline:CARDS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0005",
+          "label": "CCSID parameter",
+          "source_locator": "pdf-page:449;outline:CCSID parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0006",
+          "label": "CLASS parameter",
+          "source_locator": "pdf-page:450;outline:CLASS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0007",
+          "label": "COND parameter",
+          "source_locator": "pdf-page:451;outline:COND parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0008",
+          "label": "DSENQSHR parameter",
+          "source_locator": "pdf-page:453;outline:DSENQSHR parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0009",
+          "label": "EMAIL parameter",
+          "source_locator": "pdf-page:455;outline:EMAIL parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0010",
+          "label": "GDGBIAS parameter",
+          "source_locator": "pdf-page:455;outline:GDGBIAS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0011",
+          "label": "GROUP parameter",
+          "source_locator": "pdf-page:456;outline:GROUP parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0012",
+          "label": "JESLOG parameter",
+          "source_locator": "pdf-page:457;outline:JESLOG parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0013",
+          "label": "JOBRC parameter",
+          "source_locator": "pdf-page:459;outline:JOBRC parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0014",
+          "label": "LINES parameter",
+          "source_locator": "pdf-page:460;outline:LINES parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0015",
+          "label": "MEMLIMIT parameter",
+          "source_locator": "pdf-page:461;outline:MEMLIMIT parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0016",
+          "label": "MSGCLASS parameter",
+          "source_locator": "pdf-page:462;outline:MSGCLASS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0017",
+          "label": "MSGLEVEL parameter",
+          "source_locator": "pdf-page:464;outline:MSGLEVEL parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0018",
+          "label": "NOTIFY parameter",
+          "source_locator": "pdf-page:466;outline:NOTIFY parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0019",
+          "label": "PAGES parameter",
+          "source_locator": "pdf-page:467;outline:PAGES parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0020",
+          "label": "PASSWORD parameter",
+          "source_locator": "pdf-page:469;outline:PASSWORD parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0021",
+          "label": "PERFORM parameter",
+          "source_locator": "pdf-page:471;outline:PERFORM parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0022",
+          "label": "Programmer's name parameter",
+          "source_locator": "pdf-page:473;outline:Programmer's name parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0023",
+          "label": "PRTY parameter",
+          "source_locator": "pdf-page:474;outline:PRTY parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0024",
+          "label": "RD parameter",
+          "source_locator": "pdf-page:475;outline:RD parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0025",
+          "label": "REGION parameter",
+          "source_locator": "pdf-page:478;outline:REGION parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0026",
+          "label": "REGIONX parameter",
+          "source_locator": "pdf-page:480;outline:REGIONX parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0027",
+          "label": "RESTART parameter",
+          "source_locator": "pdf-page:483;outline:RESTART parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0028",
+          "label": "SECLABEL parameter",
+          "source_locator": "pdf-page:485;outline:SECLABEL parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0029",
+          "label": "SCHENV parameter",
+          "source_locator": "pdf-page:486;outline:SCHENV parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0030",
+          "label": "SYSAFF parameter",
+          "source_locator": "pdf-page:487;outline:SYSAFF parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0031",
+          "label": "SYSTEM parameter",
+          "source_locator": "pdf-page:489;outline:SYSTEM parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0032",
+          "label": "TIME parameter",
+          "source_locator": "pdf-page:490;outline:TIME parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0033",
+          "label": "TYPRUN parameter",
+          "source_locator": "pdf-page:493;outline:TYPRUN parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0034",
+          "label": "UJOBCORR parameter",
+          "source_locator": "pdf-page:495;outline:UJOBCORR parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0035",
+          "label": "USER parameter",
+          "source_locator": "pdf-page:496;outline:USER parameter",
+          "mandatory": true
+        }
+      ]
+    },
+    {
+      "id": "output-parameters",
+      "denominator": 76,
+      "normalization": "normalized",
+      "rows": [
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0001",
+          "label": "ADDRESS parameter",
+          "source_locator": "pdf-page:519;outline:ADDRESS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0002",
+          "label": "AFPPARMS parameter",
+          "source_locator": "pdf-page:520;outline:AFPPARMS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0003",
+          "label": "AFPSTATS parameter",
+          "source_locator": "pdf-page:521;outline:AFPSTATS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0004",
+          "label": "BUILDING parameter",
+          "source_locator": "pdf-page:522;outline:BUILDING parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0005",
+          "label": "BURST parameter",
+          "source_locator": "pdf-page:523;outline:BURST parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0006",
+          "label": "CHARS parameter",
+          "source_locator": "pdf-page:524;outline:CHARS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0007",
+          "label": "CKPTLINE parameter",
+          "source_locator": "pdf-page:525;outline:CKPTLINE parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0008",
+          "label": "CKPTPAGE parameter",
+          "source_locator": "pdf-page:526;outline:CKPTPAGE parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0009",
+          "label": "CKPTSEC parameter",
+          "source_locator": "pdf-page:527;outline:CKPTSEC parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0010",
+          "label": "CLASS parameter",
+          "source_locator": "pdf-page:527;outline:CLASS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0011",
+          "label": "COLORMAP parameter",
+          "source_locator": "pdf-page:529;outline:COLORMAP parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0012",
+          "label": "COMPACT parameter",
+          "source_locator": "pdf-page:530;outline:COMPACT parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0013",
+          "label": "COMSETUP parameter",
+          "source_locator": "pdf-page:530;outline:COMSETUP parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0014",
+          "label": "CONTROL parameter",
+          "source_locator": "pdf-page:531;outline:CONTROL parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0015",
+          "label": "COPIES parameter",
+          "source_locator": "pdf-page:532;outline:COPIES parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0016",
+          "label": "COPYCNT parameter",
+          "source_locator": "pdf-page:534;outline:COPYCNT parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0017",
+          "label": "DATACK parameter",
+          "source_locator": "pdf-page:534;outline:DATACK parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0018",
+          "label": "DDNAME parameter",
+          "source_locator": "pdf-page:536;outline:DDNAME parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0019",
+          "label": "DEFAULT parameter",
+          "source_locator": "pdf-page:536;outline:DEFAULT parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0020",
+          "label": "DEPT parameter",
+          "source_locator": "pdf-page:538;outline:DEPT parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0021",
+          "label": "DEST parameter",
+          "source_locator": "pdf-page:539;outline:DEST parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0022",
+          "label": "DPAGELBL parameter",
+          "source_locator": "pdf-page:542;outline:DPAGELBL parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0023",
+          "label": "DUPLEX parameter",
+          "source_locator": "pdf-page:543;outline:DUPLEX parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0024",
+          "label": "FCB parameter",
+          "source_locator": "pdf-page:544;outline:FCB parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0025",
+          "label": "FLASH parameter",
+          "source_locator": "pdf-page:546;outline:FLASH parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0026",
+          "label": "FORMDEF parameter",
+          "source_locator": "pdf-page:547;outline:FORMDEF parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0027",
+          "label": "FORMLEN parameter",
+          "source_locator": "pdf-page:548;outline:FORMLEN parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0028",
+          "label": "FORMS parameter",
+          "source_locator": "pdf-page:549;outline:FORMS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0029",
+          "label": "FSSDATA parameter",
+          "source_locator": "pdf-page:550;outline:FSSDATA parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0030",
+          "label": "GROUPID parameter",
+          "source_locator": "pdf-page:552;outline:GROUPID parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0031",
+          "label": "INDEX parameter",
+          "source_locator": "pdf-page:554;outline:INDEX parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0032",
+          "label": "INTRAY parameter",
+          "source_locator": "pdf-page:554;outline:INTRAY parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0033",
+          "label": "JESDS parameter",
+          "source_locator": "pdf-page:555;outline:JESDS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0034",
+          "label": "LINDEX parameter",
+          "source_locator": "pdf-page:557;outline:LINDEX parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0035",
+          "label": "LINECT parameter",
+          "source_locator": "pdf-page:557;outline:LINECT parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0036",
+          "label": "MAILBCC parameter",
+          "source_locator": "pdf-page:558;outline:MAILBCC parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0037",
+          "label": "MAILCC parameter",
+          "source_locator": "pdf-page:559;outline:MAILCC parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0038",
+          "label": "MAILFILE parameter",
+          "source_locator": "pdf-page:560;outline:MAILFILE parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0039",
+          "label": "MAILFROM parameter",
+          "source_locator": "pdf-page:561;outline:MAILFROM parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0040",
+          "label": "MAILTO parameter",
+          "source_locator": "pdf-page:561;outline:MAILTO parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0041",
+          "label": "MERGE parameter",
+          "source_locator": "pdf-page:562;outline:MERGE parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0042",
+          "label": "MODIFY parameter",
+          "source_locator": "pdf-page:563;outline:MODIFY parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0043",
+          "label": "NAME parameter",
+          "source_locator": "pdf-page:564;outline:NAME parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0044",
+          "label": "NOTIFY parameter",
+          "source_locator": "pdf-page:565;outline:NOTIFY parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0045",
+          "label": "OFFSETXB parameter",
+          "source_locator": "pdf-page:566;outline:OFFSETXB parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0046",
+          "label": "OFFSETXF parameter",
+          "source_locator": "pdf-page:566;outline:OFFSETXF parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0047",
+          "label": "OFFSETYB parameter",
+          "source_locator": "pdf-page:567;outline:OFFSETYB parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0048",
+          "label": "OFFSETYF parameter",
+          "source_locator": "pdf-page:567;outline:OFFSETYF parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0049",
+          "label": "OUTBIN parameter",
+          "source_locator": "pdf-page:567;outline:OUTBIN parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0050",
+          "label": "OUTDISP parameter",
+          "source_locator": "pdf-page:568;outline:OUTDISP parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0051",
+          "label": "OVERLAYB parameter",
+          "source_locator": "pdf-page:570;outline:OVERLAYB parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0052",
+          "label": "OVERLAYF parameter",
+          "source_locator": "pdf-page:570;outline:OVERLAYF parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0053",
+          "label": "OVFL parameter",
+          "source_locator": "pdf-page:570;outline:OVFL parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0054",
+          "label": "PAGEDEF parameter",
+          "source_locator": "pdf-page:571;outline:PAGEDEF parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0055",
+          "label": "PIMSG parameter",
+          "source_locator": "pdf-page:572;outline:PIMSG parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0056",
+          "label": "PORTNO parameter",
+          "source_locator": "pdf-page:573;outline:PORTNO parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0057",
+          "label": "PRMODE parameter",
+          "source_locator": "pdf-page:574;outline:PRMODE parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0058",
+          "label": "PRTATTRS parameter",
+          "source_locator": "pdf-page:575;outline:PRTATTRS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0059",
+          "label": "PRTERROR parameter",
+          "source_locator": "pdf-page:576;outline:PRTERROR parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0060",
+          "label": "PRTOPTNS parameter",
+          "source_locator": "pdf-page:577;outline:PRTOPTNS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0061",
+          "label": "PRTQUEUE parameter",
+          "source_locator": "pdf-page:577;outline:PRTQUEUE parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0062",
+          "label": "PRTY parameter",
+          "source_locator": "pdf-page:578;outline:PRTY parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0063",
+          "label": "REPLYTO parameter",
+          "source_locator": "pdf-page:579;outline:REPLYTO parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0064",
+          "label": "RESFMT parameter",
+          "source_locator": "pdf-page:579;outline:RESFMT parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0065",
+          "label": "RETAINS and RETAINF parameters",
+          "source_locator": "pdf-page:580;outline:RETAINS and RETAINF parameters",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0066",
+          "label": "RETRYL and RETRYT parameters",
+          "source_locator": "pdf-page:581;outline:RETRYL and RETRYT parameters",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0067",
+          "label": "ROOM parameter",
+          "source_locator": "pdf-page:582;outline:ROOM parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0068",
+          "label": "SYSAREA parameter",
+          "source_locator": "pdf-page:583;outline:SYSAREA parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0069",
+          "label": "THRESHLD parameter",
+          "source_locator": "pdf-page:584;outline:THRESHLD parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0070",
+          "label": "TITLE parameter",
+          "source_locator": "pdf-page:585;outline:TITLE parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0071",
+          "label": "TRC parameter",
+          "source_locator": "pdf-page:585;outline:TRC parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0072",
+          "label": "UCS parameter",
+          "source_locator": "pdf-page:586;outline:UCS parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0073",
+          "label": "USERDATA parameter",
+          "source_locator": "pdf-page:588;outline:USERDATA parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0074",
+          "label": "USERLIB parameter",
+          "source_locator": "pdf-page:591;outline:USERLIB parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0075",
+          "label": "USERPATH parameter",
+          "source_locator": "pdf-page:592;outline:USERPATH parameter",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0076",
+          "label": "WRITER parameter",
+          "source_locator": "pdf-page:593;outline:WRITER parameter",
+          "mandatory": true
+        }
+      ]
+    }
+  ]
+}

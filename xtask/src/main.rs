@@ -54,13 +54,15 @@ fn run() -> TaskResult {
         "schemas" => check_schemas(&root),
         "inventory" => check_inventory(&root),
         "evidence" => check_evidence(&root),
+        "coverage" => check_coverage(&root),
         "conformance" => {
             check_versions(&root)?;
             check_architecture(&root)?;
             check_profiles(&root)?;
             check_schemas(&root)?;
             check_inventory(&root)?;
-            check_evidence(&root)
+            check_evidence(&root)?;
+            check_coverage(&root)
         }
         "certification" => check_certification(&root),
         "carddemo-corpus" => check_carddemo_corpus(&root),
@@ -99,7 +101,7 @@ fn run() -> TaskResult {
         "release" => generate_release_artifacts(&root),
         "help" | "--help" | "-h" => {
             println!(
-                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check"
+                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|coverage|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check"
             );
             Ok(())
         }
@@ -1587,9 +1589,17 @@ fn check_profiles(root: &Path) -> TaskResult {
 }
 
 fn check_schemas(root: &Path) -> TaskResult {
-    let directory = root.join("conformance/0.1/schemas");
     let mut files = Vec::new();
-    collect_extension(&directory, OsStr::new("json"), &mut files)?;
+    collect_extension(
+        &root.join("conformance/0.1/schemas"),
+        OsStr::new("json"),
+        &mut files,
+    )?;
+    collect_extension(
+        &root.join("conformance/0.2/schemas"),
+        OsStr::new("json"),
+        &mut files,
+    )?;
     require(!files.is_empty(), "no evidence schemas found")?;
     for file in files {
         let value = json(&file)?;
@@ -1704,6 +1714,410 @@ fn check_inventory(root: &Path) -> TaskResult {
         "an oracle entry command failed",
     )?;
     Ok(())
+}
+
+fn check_coverage(root: &Path) -> TaskResult {
+    let index_path = root.join("conformance/0.2/catalogs/index.json");
+    let index = json(&index_path)?;
+    require(
+        text(&index, "schema_version", &index_path)? == "mainframe-env.official-source-receipts@1",
+        "official source receipt schema changed",
+    )?;
+    require(
+        text(&index, "target_version", &index_path)? == "0.2.0",
+        "official source receipts target the wrong product version",
+    )?;
+    require(
+        text(&index, "catalog_contract", &index_path)? == "mainframe-env.official-catalog@1",
+        "official catalog contract changed",
+    )?;
+    let gates = array(&index, "coverage_gates", &index_path)?;
+    let expected_gates = [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential",
+    ];
+    require(
+        gates.len() == expected_gates.len()
+            && gates
+                .iter()
+                .zip(expected_gates)
+                .all(|(actual, expected)| actual.as_str() == Some(expected)),
+        "coverage gates are not the six ordered independent gates",
+    )?;
+    for policy in [
+        "catalog_presence_counts_as_execution",
+        "generated_identity_counts_as_execution",
+        "partial_rows_round_up",
+    ] {
+        require(
+            index["claim_policy"][policy] == Value::Bool(false),
+            &format!("coverage claim policy {policy} must be false"),
+        )?;
+    }
+    require(
+        index["claim_policy"]["licensed_ibm_oracle_required_for_differential_pass"]
+            == Value::Bool(true),
+        "licensed IBM oracle policy must remain required",
+    )?;
+    require(
+        index["review"]["status"] == Value::String("reviewed".into())
+            && index["review"]["publication_bytes_redistributed"] == Value::Bool(false),
+        "official source review receipt is incomplete",
+    )?;
+
+    let expected = BTreeMap::from([
+        ("ibm-cics-ts-6x-2026-08-31", "cics"),
+        ("ibm-db2-for-zos-13-2026-08-13", "db2"),
+        ("ibm-enterprise-cobol-6.5-2026-05-31", "cobol"),
+        ("ibm-ims-15.6-dli-2026-08-31", "ims"),
+        ("ibm-mq-9.4-mqi-2026-08-31", "mq"),
+        ("ibm-zos-3.2-dfsms-ams-2026-06", "dataset-vsam-ams"),
+        ("ibm-zos-3.2-jcl-jes2-2026-06", "jcl-jes2"),
+        ("ibm-zos-3.2-racf-saf-2026", "racf-saf"),
+        ("ibm-zosmf-3.2-2026-07-27", "zosmf"),
+    ]);
+    let baselines = array(&index, "baselines", &index_path)?;
+    require(
+        baselines.len() == expected.len() && index["baseline_count"] == Value::from(expected.len()),
+        "official source receipt index must contain exactly nine baselines",
+    )?;
+    let mut baseline_ids = BTreeSet::new();
+    let mut subsystem_ids = BTreeSet::new();
+    let mut row_ids = BTreeSet::new();
+    let mut total_rows = 0_u64;
+    for baseline in baselines {
+        let id = text(baseline, "id", &index_path)?;
+        let subsystem = text(baseline, "subsystem", &index_path)?;
+        require(
+            expected.get(id).copied() == Some(subsystem),
+            &format!("unexpected official baseline {id}/{subsystem}"),
+        )?;
+        require(
+            baseline_ids.insert(id) && subsystem_ids.insert(subsystem),
+            &format!("duplicate official baseline or subsystem {id}/{subsystem}"),
+        )?;
+        for field in ["product", "version", "publication_identity"] {
+            require(
+                !text(baseline, field, &index_path)?.trim().is_empty(),
+                &format!("baseline {id} has no {field}"),
+            )?;
+        }
+        validate_official_source(&baseline["source"], &index_path, id)?;
+        if let Some(sources) = baseline.get("supporting_sources") {
+            for source in sources.as_array().ok_or_else(|| {
+                format!(
+                    "{} baseline {id} supporting_sources is not an array",
+                    index_path.display()
+                )
+            })? {
+                validate_official_source(source, &index_path, id)?;
+            }
+        }
+
+        let catalog_name = text(baseline, "catalog", &index_path)?;
+        require(
+            catalog_name.starts_with("conformance/0.2/catalogs/")
+                && catalog_name.ends_with(".json")
+                && !catalog_name.contains(".."),
+            &format!("baseline {id} has an unsafe catalog path"),
+        )?;
+        let catalog_path = root.join(catalog_name);
+        let expected_digest = text(baseline, "catalog_sha256", &index_path)?;
+        validate_sha256_identity(expected_digest, &format!("baseline {id} catalog digest"))?;
+        require(
+            expected_digest == format!("sha256:{}", file_digest(&catalog_path)?),
+            &format!("baseline {id} catalog digest drifted"),
+        )?;
+        let catalog = json(&catalog_path)?;
+        require(
+            text(&catalog, "schema_version", &catalog_path)? == "mainframe-env.official-catalog@1"
+                && text(&catalog, "baseline_id", &catalog_path)? == id
+                && text(&catalog, "subsystem", &catalog_path)? == subsystem,
+            &format!("baseline {id} catalog identity differs from its receipt"),
+        )?;
+        let denominators = baseline["immutable_denominators"]
+            .as_object()
+            .ok_or_else(|| format!("baseline {id} immutable_denominators is not an object"))?;
+        let mut unit_ids = BTreeSet::new();
+        let mut baseline_rows = 0_u64;
+        let units = array(&catalog, "units", &catalog_path)?;
+        require(
+            units.len() == denominators.len(),
+            &format!("baseline {id} unit count differs from immutable receipt"),
+        )?;
+        for unit in units {
+            let unit_id = text(unit, "id", &catalog_path)?;
+            require(
+                unit_ids.insert(unit_id),
+                &format!("baseline {id} repeats unit {unit_id}"),
+            )?;
+            require(
+                !text(unit, "normalization", &catalog_path)?.is_empty(),
+                &format!("baseline {id}/{unit_id} has no normalization state"),
+            )?;
+            let denominator = unit["denominator"]
+                .as_u64()
+                .ok_or_else(|| format!("baseline {id}/{unit_id} denominator is invalid"))?;
+            let immutable = denominators
+                .get(unit_id)
+                .and_then(Value::as_u64)
+                .ok_or_else(|| format!("baseline {id}/{unit_id} has no immutable denominator"))?;
+            let rows = array(unit, "rows", &catalog_path)?;
+            require(
+                denominator == immutable && rows.len() as u64 == denominator,
+                &format!("baseline {id}/{unit_id} denominator does not equal catalog rows"),
+            )?;
+            for row in rows {
+                let row_id = text(row, "id", &catalog_path)?;
+                require(
+                    row_id.starts_with(&format!("{id}:{unit_id}:"))
+                        && row_ids.insert(row_id.to_string()),
+                    &format!("invalid or duplicate official row {row_id}"),
+                )?;
+                require(
+                    row["mandatory"] == Value::Bool(true)
+                        && !text(row, "label", &catalog_path)?.is_empty()
+                        && !text(row, "source_locator", &catalog_path)?.is_empty(),
+                    &format!("official row {row_id} is incomplete or optional"),
+                )?;
+            }
+            baseline_rows += denominator;
+        }
+        require(
+            catalog["mandatory_rows"].as_u64() == Some(baseline_rows)
+                && baseline["mandatory_rows"].as_u64() == Some(baseline_rows),
+            &format!("baseline {id} total denominator drifted"),
+        )?;
+        total_rows += baseline_rows;
+    }
+    require(
+        index["mandatory_rows"].as_u64() == Some(total_rows) && total_rows == 1_506,
+        "official catalog global denominator must remain 1506",
+    )?;
+    for entry in fs::read_dir(root.join("conformance/0.2"))
+        .map_err(|error| format!("conformance/0.2: {error}"))?
+    {
+        let path = entry.map_err(|error| error.to_string())?.path();
+        require(
+            !matches!(
+                path.extension().and_then(OsStr::to_str),
+                Some("pdf" | "html")
+            ),
+            "official publication bytes must not be checked into conformance/0.2",
+        )?;
+    }
+    check_coverage_work_package_evidence(root)?;
+    check_coverage_program_status(root)
+}
+
+fn check_coverage_work_package_evidence(root: &Path) -> TaskResult {
+    let directory = root.join("conformance/0.2/evidence/work-packages");
+    let mut files = Vec::new();
+    collect_extension(&directory, OsStr::new("json"), &mut files)?;
+    require(!files.is_empty(), "0.2 has no work-package evidence")?;
+    files.sort();
+    for path in files {
+        let evidence = json(&path)?;
+        let work_package = text(&evidence, "work_package", &path)?;
+        require(
+            text(&evidence, "schema_version", &path)?
+                == "mainframe-env.coverage-work-package-evidence@1"
+                && evidence["derived"] == Value::Bool(true)
+                && evidence["status"] == Value::String("pass".into())
+                && path.file_stem().and_then(OsStr::to_str) == Some(work_package),
+            &format!("{} is not a derived work-package pass", path.display()),
+        )?;
+        let receipt = evidence
+            .get("receipt")
+            .and_then(Value::as_object)
+            .ok_or_else(|| format!("{} has no receipt object", path.display()))?;
+        let canonical = serde_json::to_vec(receipt).map_err(|error| error.to_string())?;
+        let digest = format!("sha256:{:x}", Sha256::digest(canonical));
+        require(
+            evidence["evidence_digest"].as_str() == Some(digest.as_str()),
+            &format!("{} evidence digest is stale", path.display()),
+        )?;
+        let receipt = Value::Object(receipt.clone());
+        require(
+            receipt["target_version"] == Value::String("0.2.0".into())
+                && receipt["source_identity"]
+                    .as_str()
+                    .is_some_and(|identity| identity.len() == 40)
+                && receipt["commands"]
+                    .as_array()
+                    .is_some_and(|commands| !commands.is_empty())
+                && receipt["invariants"].is_object(),
+            &format!("{} receipt is incomplete", path.display()),
+        )?;
+        for artifact in receipt["artifacts"]
+            .as_array()
+            .ok_or_else(|| format!("{} receipt artifacts are missing", path.display()))?
+        {
+            let artifact_path = text(artifact, "path", &path)?;
+            require(
+                !artifact_path.contains("..") && !Path::new(artifact_path).is_absolute(),
+                &format!("{} contains an unsafe artifact path", path.display()),
+            )?;
+            let expected = text(artifact, "sha256", &path)?;
+            validate_sha256_identity(expected, "work-package artifact digest")?;
+            require(
+                expected == format!("sha256:{}", file_digest(&root.join(artifact_path))?),
+                &format!("{} artifact {artifact_path} drifted", path.display()),
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn check_coverage_program_status(root: &Path) -> TaskResult {
+    let path = root.join("conformance/0.2/evidence/program-status.json");
+    let status = json(&path)?;
+    require(
+        text(&status, "schema_version", &path)? == "mainframe-env.coverage-program-status@1"
+            && text(&status, "target_version", &path)? == "0.2.0",
+        "0.2 program status identity is invalid",
+    )?;
+    let source = status["source_identity"]
+        .as_object()
+        .ok_or("0.2 program status source identity is not an object")?;
+    let expected_source = [
+        (
+            "accepted_release_commit",
+            "44f3081eb2fdf22d09e1a97725f5a4163431ca70",
+        ),
+        (
+            "accepted_release_tree",
+            "3d504ece02f1c09e124606ded695b00ba984d104",
+        ),
+        (
+            "accepted_carddemo_candidate_commit",
+            "857115b907ce7098c965a51117a079048ea8182e",
+        ),
+        (
+            "accepted_carddemo_candidate_tree",
+            "7e1fa73f4c808a89ddb4f98c0e3f7d0207f861ea",
+        ),
+        (
+            "implementation_start_commit",
+            "1afbf402c56c085a46cc3599c91b1b77002b1e16",
+        ),
+    ];
+    for (field, expected) in expected_source {
+        require(
+            source.get(field).and_then(Value::as_str) == Some(expected),
+            &format!("0.2 program status {field} drifted"),
+        )?;
+    }
+    require(
+        command_text(root, "git", &["rev-parse", "mainframe-env-v0.1.1^{}"])?
+            == source["accepted_release_commit"],
+        "accepted 0.1.1 release tag moved",
+    )?;
+    require(
+        command_text(root, "git", &["rev-parse", "mainframe-env-v0.1.1^{tree}"])?
+            == source["accepted_release_tree"],
+        "accepted 0.1.1 release tree moved",
+    )?;
+    let work_packages = array(&status, "work_packages", &path)?;
+    require(
+        work_packages.len() == 9,
+        "0.2 program status must track nine work packages",
+    )?;
+    for (index, work_package) in work_packages.iter().enumerate() {
+        let expected = format!("CV-{:03}", index + 201);
+        let state = text(work_package, "state", &path)?;
+        require(
+            text(work_package, "id", &path)? == expected
+                && matches!(state, "pending" | "in-progress" | "pass" | "blocked"),
+            &format!("0.2 program status work package {expected} is invalid"),
+        )?;
+        if state == "pass" {
+            let evidence = work_package["evidence"]
+                .as_str()
+                .ok_or_else(|| format!("0.2 program status {expected} pass has no evidence"))?;
+            require(
+                evidence == format!("conformance/0.2/evidence/work-packages/{expected}.json")
+                    && root.join(evidence).is_file(),
+                &format!("0.2 program status {expected} evidence is invalid"),
+            )?;
+        }
+    }
+    require(
+        !array(&status, "commands", &path)?.is_empty()
+            && status["dependency_receipts"]
+                .as_array()
+                .is_some_and(|receipts| !receipts.is_empty())
+            && status["blockers"].is_array()
+            && status["open_decisions"].is_array()
+            && status["next_smallest_executable_step"]
+                .as_str()
+                .is_some_and(|step| !step.is_empty()),
+        "0.2 program status is not resumable",
+    )?;
+    let recorded_digest = status["dirty_tree_identity"]["digest"]
+        .as_str()
+        .ok_or("0.2 program status dirty-tree digest is missing")?;
+    require(
+        recorded_digest == repository_digest(root)?,
+        "0.2 program status dirty-tree digest is stale",
+    )?;
+    require(
+        root.join("docs/delivery/coverage-versions/status/0.2.0.md")
+            .is_file()
+            && root
+                .join("conformance/0.2/schemas/program-status.schema.json")
+                .is_file(),
+        "0.2 program status documentation or schema is missing",
+    )
+}
+
+fn validate_official_source(source: &Value, path: &Path, baseline: &str) -> TaskResult {
+    let source = source.as_object().ok_or_else(|| {
+        format!(
+            "{} baseline {baseline} source is not an object",
+            path.display()
+        )
+    })?;
+    let url = source
+        .get("url")
+        .and_then(Value::as_str)
+        .ok_or_else(|| format!("baseline {baseline} source URL is missing"))?;
+    require(
+        url.starts_with("https://www.ibm.com/"),
+        &format!("baseline {baseline} source is not an official IBM HTTPS URL"),
+    )?;
+    let digest = source
+        .get("sha256")
+        .and_then(Value::as_str)
+        .ok_or_else(|| format!("baseline {baseline} source digest is missing"))?;
+    validate_sha256_identity(digest, &format!("baseline {baseline} source digest"))?;
+    require(
+        source
+            .get("bytes")
+            .and_then(Value::as_u64)
+            .is_some_and(|bytes| bytes > 0)
+            && source
+                .get("snapshot_date")
+                .and_then(Value::as_str)
+                .is_some_and(|date| date.len() >= 4)
+            && source.get("retained_in_repository") == Some(&Value::Bool(false)),
+        &format!("baseline {baseline} source provenance is incomplete"),
+    )
+}
+
+fn validate_sha256_identity(value: &str, field: &str) -> TaskResult {
+    require(
+        value.len() == 71
+            && value.starts_with("sha256:")
+            && value[7..]
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()),
+        &format!("{field} is not a lowercase SHA-256 identity"),
+    )
 }
 
 fn check_evidence(root: &Path) -> TaskResult {
@@ -2054,6 +2468,11 @@ fn check_certification(root: &Path) -> TaskResult {
 }
 
 fn print_digest(root: &Path) -> TaskResult {
+    println!("{}", repository_digest(root)?);
+    Ok(())
+}
+
+fn repository_digest(root: &Path) -> TaskResult<String> {
     let mut files = Vec::new();
     collect_files(root, &mut files)?;
     files.sort();
@@ -2065,6 +2484,8 @@ fn print_digest(root: &Path) -> TaskResult {
             || relative.starts_with("target")
             || relative.starts_with("conformance/0.1/evidence/raw")
             || relative == Path::new("conformance/0.1/evidence/program-status.json")
+            || relative == Path::new("conformance/0.2/evidence/program-status.json")
+            || relative == Path::new("docs/delivery/coverage-versions/status/0.2.0.md")
             || (relative_text.starts_with("conformance/0.1/evidence/phase-v")
                 && relative.extension() == Some(OsStr::new("json")))
         {
@@ -2077,8 +2498,7 @@ fn print_digest(root: &Path) -> TaskResult {
         digest.update((bytes.len() as u64).to_be_bytes());
         digest.update(bytes);
     }
-    println!("sha256:{:x}", digest.finalize());
-    Ok(())
+    Ok(format!("sha256:{:x}", digest.finalize()))
 }
 
 fn generate_release_artifacts(root: &Path) -> TaskResult {
