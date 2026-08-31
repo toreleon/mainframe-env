@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/application-package@2",
+  "title": "mainframe-env signed versioned application package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "generation", "base_manifest_identity", "sections", "signature"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.application-package@2"},
+    "generation": {"type": "integer", "minimum": 1},
+    "base_manifest_identity": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "sections": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "host_abi_libraries", "sql_tables", "sql_rows", "ims_definitions", "ims_rows", "mq_resources", "batch_controllers", "security_resources"],
+      "properties": {
+        "schema_version": {"const": "mainframe-env.application-package@2"},
+        "host_abi_libraries": {"type": "array", "items": {"$ref": "#/$defs/identified"}},
+        "sql_tables": {"type": "array", "items": {"$ref": "#/$defs/named"}},
+        "sql_rows": {"type": "array", "items": {"type": "object"}},
+        "ims_definitions": {"type": "array", "items": {"$ref": "#/$defs/named"}},
+        "ims_rows": {"type": "array", "items": {"type": "object"}},
+        "mq_resources": {"type": "array", "items": {"$ref": "#/$defs/named"}},
+        "batch_controllers": {"type": "array", "items": {"$ref": "#/$defs/named"}},
+        "security_resources": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "key_id", "value"],
+      "properties": {
+        "algorithm": {"type": "string", "minLength": 1},
+        "key_id": {"type": "string", "minLength": 1},
+        "value": {"type": "string", "minLength": 1}
+      }
+    }
+  },
+  "$defs": {
+    "named": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {"name": {"type": "string", "minLength": 1}}
+    },
+    "identified": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {"id": {"type": "string", "minLength": 1}}
+    }
+  }
+}

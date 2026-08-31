@@ -55,6 +55,7 @@ fn run() -> TaskResult {
         "inventory" => check_inventory(&root),
         "evidence" => check_evidence(&root),
         "coverage" => check_coverage(&root),
+        "application-packages" => check_application_packages(&root),
         "semantic-identities" if check => check_semantic_identities(&root),
         "semantic-identities" => generate_semantic_identities(&root),
         "conformance" => {
@@ -65,7 +66,8 @@ fn run() -> TaskResult {
             check_inventory(&root)?;
             check_evidence(&root)?;
             check_coverage(&root)?;
-            check_semantic_identities(&root)
+            check_semantic_identities(&root)?;
+            check_application_packages(&root)
         }
         "certification" => check_certification(&root),
         "carddemo-corpus" => check_carddemo_corpus(&root),
@@ -104,7 +106,7 @@ fn run() -> TaskResult {
         "release" => generate_release_artifacts(&root),
         "help" | "--help" | "-h" => {
             println!(
-                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|coverage|semantic-identities|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check"
+                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|coverage|semantic-identities|application-packages|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check"
             );
             Ok(())
         }
@@ -1859,6 +1861,93 @@ fn semantic_identity_documents(root: &Path) -> TaskResult<(Vec<u8>, Vec<u8>)> {
     Ok((source.into_bytes(), pretty_json(&manifest)?))
 }
 
+fn check_application_packages(root: &Path) -> TaskResult {
+    let contracts_path = root.join("conformance/0.2/inventory/contracts.json");
+    let contracts = json(&contracts_path)?;
+    let expected = [
+        (
+            "application_package_v2",
+            "mainframe-env.application-package@2",
+        ),
+        (
+            "application_install_generation",
+            "mainframe-env.application-install-generation@1",
+        ),
+        (
+            "host_abi_library_section",
+            "mainframe-env.application.host-abi-libraries@1",
+        ),
+        ("sql_section", "mainframe-env.application.sql@1"),
+        ("ims_section", "mainframe-env.application.ims@1"),
+        ("mq_section", "mainframe-env.application.mq@1"),
+        (
+            "batch_controller_section",
+            "mainframe-env.application.batch-controllers@1",
+        ),
+        (
+            "security_resource_section",
+            "mainframe-env.application.security-resources@1",
+        ),
+    ];
+    for (name, identity) in expected {
+        require(
+            contracts["contracts"][name].as_str() == Some(identity),
+            &format!("application package contract inventory omits {identity}"),
+        )?;
+    }
+    let migration_path = root.join("conformance/0.2/migrations/application-package-v1-to-v2.json");
+    let migration = json(&migration_path)?;
+    require(
+        migration["schema_version"]
+            == Value::String("mainframe-env.application-package-migration@1".into())
+            && migration["from_contract"]
+                == Value::String("mainframe-env.application-package@1".into())
+            && migration["to_contract"]
+                == Value::String("mainframe-env.application-package@2".into())
+            && migration["destructive"] == Value::Bool(false)
+            && migration["old_reader_retained"] == Value::Bool(true)
+            && migration["provider_state_changed"] == Value::Bool(false)
+            && migration["atomicity"]["validate_all_references_before_stage"] == Value::Bool(true)
+            && migration["atomicity"]["staged_generation_selectable"] == Value::Bool(false)
+            && migration["atomicity"]["ready_and_selection_same_critical_section"]
+                == Value::Bool(true)
+            && migration["rollback"]["supported"] == Value::Bool(true)
+            && migration["rollback"]["partial_generation_selected"] == Value::Bool(false),
+        "application package migration or rollback contract is unsafe",
+    )?;
+    for path in [
+        "conformance/0.2/schemas/application-package-v2.schema.json",
+        "conformance/0.2/schemas/application-install-generation.schema.json",
+        "docs/architecture/APPLICATION-PACKAGES.md",
+        "crates/kernel/mainframe-env-application/README.md",
+    ] {
+        require(
+            root.join(path).is_file(),
+            &format!("application package contract artifact is missing: {path}"),
+        )?;
+    }
+    let implementation =
+        read(&root.join("crates/kernel/mainframe-env-application/src/package_v2.rs"))?;
+    for required in [
+        "PackageSignatureVerifier",
+        "host_abi_libraries",
+        "sql_tables",
+        "ims_definitions",
+        "mq_resources",
+        "batch_controllers",
+        "security_resources",
+        "pub fn stage",
+        "pub fn commit",
+        "pub fn rollback",
+    ] {
+        require(
+            implementation.contains(required),
+            &format!("application package implementation omits {required}"),
+        )?;
+    }
+    Ok(())
+}
+
 fn check_coverage(root: &Path) -> TaskResult {
     let index_path = root.join("conformance/0.2/catalogs/index.json");
     let index = json(&index_path)?;
@@ -2546,6 +2635,7 @@ fn check_certification(root: &Path) -> TaskResult {
     check_evidence(root)?;
     check_coverage(root)?;
     check_semantic_identities(root)?;
+    check_application_packages(root)?;
     check_runtime_architecture(root)?;
 
     let inventory = root.join("conformance/0.1/inventory");

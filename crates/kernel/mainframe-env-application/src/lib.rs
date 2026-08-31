@@ -8,6 +8,18 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
 
+mod package_v2;
+
+pub use package_v2::{
+    ABI_LIBRARY_SECTION_CONTRACT, APPLICATION_PACKAGE_V2_CONTRACT, AbiLibrary, AbiMember,
+    ApplicationGenerationRecord, ApplicationInstallerV2, ApplicationPackageV2, ApplicationSections,
+    BATCH_CONTROLLER_SECTION_CONTRACT, BatchController, BatchControllerKind, HostSubsystem,
+    IMS_SECTION_CONTRACT, ImsDefinition, ImsSeedRow, MQ_SECTION_CONTRACT, MqResource,
+    MqResourceKind, PackageLimits, PackageSignature, PackageSignatureVerifier,
+    SECURITY_RESOURCE_SECTION_CONTRACT, SQL_SECTION_CONTRACT, SecurityResource, SqlColumn,
+    SqlSeedRow, SqlTable, package_v2_identity,
+};
+
 pub const APPLICATION_PACKAGE_CONTRACT: &str = "mainframe-env.application-package@1";
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -84,6 +96,10 @@ pub enum InstallProblem {
     IdentityConflict,
     UnknownStage,
     Poisoned,
+    InvalidSignature,
+    LimitExceeded,
+    MissingReference,
+    StaleGeneration,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
