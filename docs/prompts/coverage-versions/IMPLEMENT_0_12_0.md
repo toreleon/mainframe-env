@@ -33,6 +33,29 @@ evidence. Parser/catalog work may start after 0.2, but host integration requires
    property/metamorphic/failure/recovery/compatibility and licensed differential
    suites for the accepted common subset.
 
+## Reuse and architecture guardrails
+
+- Before DB2-1201 or DB2-1203 broad implementation, complete a checked-in
+  build-versus-buy spike for `sqlparser-rs` and Apache DataFusion using 30–50
+  representative pinned Db2 statements: common query/DML/DDL, host variables,
+  cursors, packages, SQL PL, decimal/character types, constraints, errors, and
+  negative forms. Record parse coverage, semantic gaps, bounds, MSRV/license,
+  dependency cost, extension/fork requirements, and the accept/reject decision.
+- Convert any third-party SQL AST immediately into an owned bounded Db2 AST.
+  Third-party AST, Arrow, DataFusion plans/types/errors, or storage handles may
+  not enter public contracts, semantic identity, checkpoints, durable catalogs,
+  SQLCA, coverage evidence, or application packages.
+- A reused parser/planner/executor may provide syntax and relational substrate
+  only for rows whose Db2 semantic-gap and licensed differential matrices pass.
+  Db2 types/lengths, CCSID/collation, nulls, privileges, SQLCA, packages/plans,
+  cursors, SQL PL, isolation, logging, recovery, and conditions remain owned.
+- Do not substitute SQLite, PostgreSQL, DuckDB, DataFusion, or another engine's
+  accepted syntax, transaction result, optimizer choice, or error for Db2
+  compatibility. Use the shared SQLx store only as durable infrastructure.
+- Reuse the shared catalog compiler, package runtime, SAF/principal, effect/UOW,
+  store/migration, dependency graph, and conformance harness. Do not create a
+  Db2-private transaction coordinator or evidence system.
+
 ## Version-specific invariants
 
 - Catalog and parse all 158 pinned SQL statement headings plus pinned SQL PL,

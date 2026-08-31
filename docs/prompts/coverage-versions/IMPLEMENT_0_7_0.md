@@ -33,6 +33,21 @@ runtime completion.
 5. Implement **JCL-706** malformed, boundary, recovery, scale, deterministic
    plan, compatibility, and licensed converter differential suites.
 
+## Reuse and architecture guardrails
+
+- Reuse the compiler's source-byte/provenance, Rowan-style syntax, diagnostics,
+  bounded arenas, generated identities, and contract compiler. Do not create a
+  second generic parser framework or source-position authority for JCL.
+- JCL columns, continuations, in-stream data, symbols, procedure search,
+  overrides, backward references, and JECL timing remain a JCL-owned converter.
+  Parser-combinator libraries may implement bounded local operand grammars only.
+- Use one reviewed graph/cycle utility for INCLUDE/procedure dependencies and
+  plan validation, but convert results to the owned immutable job-plan schema
+  with deterministic order and source provenance.
+- The generated statement/parameter inventory must also drive validation,
+  documentation, coverage rows, and planner-closure checks. Do not hand-code
+  parallel operand tables or accept parsed-but-ignored parameters.
+
 ## Version-specific invariants
 
 - Cover exactly 20 statement forms, 74 DD, 19 EXEC, 35 JOB, 76 OUTPUT

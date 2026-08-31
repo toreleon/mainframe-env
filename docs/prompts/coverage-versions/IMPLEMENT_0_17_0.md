@@ -40,6 +40,29 @@ not fabricate a pass.
 5. Produce **CER-1705/CER-1706** canonical evidence/provenance/SBOM/security
    closure and an independent, unchanged-source 1.0 release rehearsal.
 
+## Reuse and architecture guardrails
+
+- Drive licensed z/OS jobs, datasets, console, workflows, CICS, Db2, IMS, MQ,
+  and z/OSMF interactions through pinned Zowe CLI/SDK or supported IBM client
+  adapters where available. Do not hand-build duplicate transport clients,
+  credential stores, polling loops, or native wire protocols for certification.
+- Use established, pinned tools for fuzzing, concurrency/model checking,
+  dependency/advisory/license/source policy, SBOM generation, artifact signing,
+  provenance, and container/service fault injection. Prefer cargo-fuzz,
+  Cargo/RustSec policy tooling, CycloneDX/SPDX, and cosign/Sigstore-compatible
+  release verification over repository-private format implementations.
+- External tools and clients are harness components only. Their successful exit,
+  generated catalog, SBOM, signature, or connection does not increment IBM
+  semantic coverage without the normalized candidate-bound result evidence.
+- Pin tool binary/container identity, version, license, configuration, trust
+  roots, credentials-by-reference, environment, normalizer, timeout, and raw
+  outputs. Validate the final evidence and release artifacts independently from
+  the tool that generated them.
+- Reuse one cross-subsystem fixture manifest, transport adapter interface,
+  normalizer/comparator, mismatch taxonomy, artifact store, evidence schema, and
+  release orchestrator. Per-subsystem campaigns may add adapters and fixtures,
+  not fork the certification framework.
+
 ## Version-specific invariants
 
 - Every mandatory pinned row is complete at every applicable gate; there is no

@@ -33,6 +33,24 @@ effect, and recovery contracts before integration.
 5. Implement **SPI-1006** authorization, audit, malformed, bounds, concurrency,
    scale, restart and licensed differential suites.
 
+## Reuse and architecture guardrails
+
+- Extend the exact 0.9 CICS command, condition, resource, registry, package,
+  principal, effect/UOW, state, migration, and evidence authorities. Do not
+  create a separate SPI/FEPI dispatcher, resource database, response mapper, or
+  recovery engine.
+- Generate SPI and FEPI identities, option/resource schemas, audit effects,
+  handler closure, documentation, and coverage rows through the shared contract
+  compiler. A resource family may add handlers and typed state only behind the
+  common CICS authority.
+- Reuse reviewed HTTP, timer, tracing, bounded-channel, and transport libraries
+  at adapters. SPI lifecycle, quiesce, monitoring/statistics identity, FEPI
+  sessions, conversations, timeouts, conditions, and recovery remain owned
+  CICS-visible semantics.
+- External topology, terminal, workflow, or messaging systems may support test
+  adapters or optional providers only after a semantic-gap matrix; their names
+  and success states cannot select or prove product behavior.
+
 ## Version-specific invariants
 
 - Cover 269 unique SPI and 39 FEPI commands from reviewed catalogs; aliases or

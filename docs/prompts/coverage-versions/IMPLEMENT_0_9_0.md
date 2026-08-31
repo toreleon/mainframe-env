@@ -32,6 +32,23 @@ public integration.
 5. Implement **CIC-906** SAF, concurrency, syncpoint, cancellation, recovery,
    scale, malformed/limit, compatibility, and licensed differential suites.
 
+## Reuse and architecture guardrails
+
+- Build the 263-command application API on one shared CICS command runtime that
+  owns generated identities, option legality, resource keys, conditions,
+  EIB/RESP mapping, bounds, effect metadata, and exhaustive handler closure.
+  Later SPI/FEPI work must extend this runtime rather than fork it.
+- Reuse Tower/HTTP and reviewed transport libraries for web, sockets-facing,
+  timeout, limit, and tracing adapters. Convert immediately to typed CICS
+  requests; transport libraries never define CICS conditions or transaction
+  semantics.
+- Reuse the accepted dataset, SAF, program, session, checkpoint, UOW, migration,
+  package, and evidence authorities. TSQ/TDQ, file, journal, spool, and program
+  commands must not hide provider-private stores or retry policies.
+- APPC/MRO and distributed-link behavior remains a transport-neutral owned
+  protocol state machine. Do not substitute a message broker's delivery or
+  acknowledgement semantics for the pinned CICS contract.
+
 ## Version-specific invariants
 
 - Generate and exhaustively register all 263 commands; every accepted option

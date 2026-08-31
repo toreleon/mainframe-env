@@ -35,6 +35,23 @@ private adapters may proceed. Do not merge a public JES execution route.
 5. Implement **JES-806** restart, cancellation, overload, crash-point,
    backup/restore, migration and licensed differential suites.
 
+## Reuse and architecture guardrails
+
+- Extend the common execution/work stores, leases, outbox, scheduler lanes,
+  checkpoint envelope, cancellation protocol, artifact/object store, principal,
+  effect/UOW, migration, and evidence harness. JES must not create parallel
+  authorities for work ownership, retries, timers, idempotency, or blobs.
+- JES class/initiator selection, job/step state, DISP, return-code/abend,
+  restart, spool semantics, and operator outcomes remain owned deterministic
+  state machines. A background-job or durable-workflow framework may be an
+  adapter only after an ADR, license/maturity review, and semantic-gap matrix.
+- External queue/workflow claims such as exactly-once, automatic retry, or
+  durable timers never replace explicit intent/result, unknown-outcome,
+  cancellation, lease, and reconciliation evidence.
+- Utility implementations register through the shared program/catalog runtime
+  and typed host services. Do not add program-name routing or a private utility
+  plugin mechanism.
+
 ## Version-specific invariants
 
 - Every executable plan node routes to a typed handler with real effects and

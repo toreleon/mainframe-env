@@ -32,6 +32,24 @@ frozen before adding advanced semantics.
 5. Implement **DB2-1306** pinned distributed behavior, scale, malformed/limit,
    concurrency, compatibility and complete licensed differential suites.
 
+## Reuse and architecture guardrails
+
+- Continue the accepted and pinned 0.12 parser/planner/executor decision. Do not
+  introduce a second SQL parser, AST, relational IR, optimizer, expression
+  runtime, catalog, transaction authority, or compatibility path for advanced
+  statements.
+- Extend any accepted external SQL substrate only through owned Db2 adapters and
+  a new semantic-gap/differential row for each advanced family. Unsupported
+  third-party syntax or execution remains explicit and cannot be counted from
+  parser acceptance or generic engine success.
+- Reuse one owned dependency/cycle/invalidation graph for routines, triggers,
+  modules, views, packages/plans, aliases, privileges, and schema objects. A
+  graph library may implement algorithms internally but cannot define durable
+  identifiers, ordering, or error semantics.
+- Temporal, XML, LOB, array, analytic, isolation, lock, log, recovery, and
+  distributed behavior remain Db2-owned semantics over the shared UOW,
+  principal, store/migration, artifact, and evidence authorities.
+
 ## Version-specific invariants
 
 - All remaining rows extend the single 0.12 catalog/binder/relational execution

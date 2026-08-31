@@ -35,6 +35,24 @@ security and storage integration requires all listed dependencies.
 5. Implement **IMS-1406** SAF, malformed/boundary/limit, concurrency, scale,
    compatibility and licensed differential suites.
 
+## Reuse and architecture guardrails
+
+- Build IMS database organizations, indexes, paths, locking, logging, migration,
+  and backup/restore on the accepted 0.6 dataset/storage primitives and common
+  effect/UOW protocol. Do not create an IMS-private page manager, object store,
+  lock service, transaction coordinator, or migration runner.
+- Generate call/status identities, SSA grammar metadata, DBD/PSB/PCB schemas,
+  handler closure, documentation, and coverage rows through the shared contract
+  compiler and package runtime. Application metadata cannot become generated
+  production branches.
+- A graph or ordered-key/value library may provide internal algorithms or
+  physical storage only after a semantic-gap matrix. IMS hierarchy, positioning,
+  path calls, logical relationships, PCB status, concurrency, and recovery
+  remain owned observable semantics.
+- TM queues, conversations, scheduling, timeout, cancellation, principal, and
+  checkpoint behavior reuse the common runtime contracts. An external broker or
+  workflow engine cannot define IMS delivery, syncpoint, or restart results.
+
 ## Version-specific invariants
 
 - All 25 families share generated call/status identities and one generic

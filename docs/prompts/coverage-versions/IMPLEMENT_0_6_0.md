@@ -32,6 +32,23 @@ store receipts before exposing new public behavior.
 5. Implement **DAT-606** differential, scale, corruption, backup/restore,
    migration, retry, restart, and unknown-outcome suites.
 
+## Reuse and architecture guardrails
+
+- Dataset, VSAM, catalog, allocation, lock, RLS/TVS, and recovery semantics
+  remain provider-owned. Physical persistence is a replaceable adapter: reuse
+  SQLx transactions and the accepted artifact/object-store port rather than
+  building a page manager, WAL, cloud client, or filesystem protocol into the
+  semantic core.
+- Reuse one shared dependency/cycle graph utility for catalog aliases, GDGs,
+  base/AIX relations, migration ordering, and invalidation, while preserving
+  owned deterministic identifiers and ordering at the contract boundary.
+- AMS extends the shared catalog compiler, diagnostics, registry, principal,
+  effect/UOW, migration, and evidence authorities. It must not introduce a
+  second catalog database or bypass typed dataset operations.
+- Any external ordered-key/value or storage engine requires a semantic-gap and
+  crash/recovery matrix. Its transactions, locks, snapshots, or success codes
+  are not evidence of VSAM compatibility by themselves.
+
 ## Version-specific invariants
 
 - Dataset, catalog, allocation, lock, record, index, generation, and volume

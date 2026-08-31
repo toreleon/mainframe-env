@@ -35,6 +35,23 @@ allowed. Do not merge a new public compiler artifact format or claim coverage.
 4. Implement **CB-306** malformed, limit, recovery, deterministic-generation,
    and prior-artifact compatibility suites.
 
+## Reuse and architecture guardrails
+
+- Extend the accepted Rowan-style lossless syntax and shared source/provenance,
+  diagnostic, catalog-generation, and bounded-arena facilities. Do not create a
+  second source model, diagnostic model, catalog compiler, or durable AST codec.
+- COBOL fixed-column/contextual lexing, COPY/precompiler provenance, recovery,
+  typed AST, layout, and IBM dialect validation remain compiler-owned. A
+  Tree-sitter or parser-combinator frontend may support editor or bounded local
+  grammars only; it cannot be compiler or publication authority.
+- Evaluate an incremental-query framework only if an accepted consumer requires
+  incremental analysis. Keep it behind the compiler service, convert all values
+  to owned stages, and prove deterministic clean-build equivalence; otherwise do
+  not add it speculatively.
+- Generate function, statement, clause, directive, and special-register
+  identities from the shared contract compiler and close their registry against
+  explicit validators. Do not hand-maintain matching enums and lookup tables.
+
 ## Version-specific invariants
 
 - Cover 44 statement families, 82 intrinsic functions, 15 compiler-directing

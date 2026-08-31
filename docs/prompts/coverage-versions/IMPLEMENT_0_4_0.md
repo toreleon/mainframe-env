@@ -34,6 +34,23 @@ must rerun the affected 0.3 gate.
 5. Implement **CB-406** condition, resource, cancellation, restart, property,
    metamorphic, prior-artifact, and licensed differential suites.
 
+## Reuse and architecture guardrails
+
+- Before implementing decimal and floating arithmetic primitives, run a frozen
+  semantic-gap spike against reviewed general-decimal/IEEE libraries, including
+  precision, scale, rounding, traps/status, overflow, signed zero, NaN, and
+  determinism. Reuse a fitting primitive library; do not write big-number or
+  floating-point algorithms without a recorded rejection decision.
+- COBOL packed/zoned/binary representation, PICTURE behavior, intermediate
+  precision, compiler options, size-error conditions, aliasing, and IBM-visible
+  results remain owned semantic adapters and must pass licensed differentials.
+- Reuse the 0.2 host registry, effect protocol, checkpoint envelope, migration
+  runner, and evidence harness. LE and host extensions add typed catalog rows
+  and handlers rather than introducing a second invocation mechanism.
+- Locale, code-page, date/time, sort/merge, and file adapters may use reviewed
+  libraries internally, but normalize immediately to owned values and keep
+  source bytes, CCSID, conditions, and replay identity explicit.
+
 ## Version-specific invariants
 
 - All semantic execution is deterministic over explicit input/state/effects;

@@ -33,6 +33,23 @@ and accepted 0.4.0 and 0.5.0 evidence.
    boundary/limit, concurrency, overload, compatibility and licensed
    differential suites.
 
+## Reuse and architecture guardrails
+
+- MQI calls, structures, handles, completion/reason codes, object resolution,
+  syncpoint, delivery, backout, triggering, ordering, duplicate, and unknown
+  outcomes remain one owned queue-manager semantic authority.
+- Use the supported IBM MQ client/MQI through a bounded adapter for licensed
+  differential execution and an optional pass-through provider. Do not
+  reimplement IBM channel wire protocols or treat native IBM code as the
+  product execution fallback.
+- RabbitMQ, NATS, Kafka, Pulsar, or another broker may be evaluated as a
+  replaceable physical adapter only with a pinned semantic-gap/failure matrix.
+  Broker acknowledgements, transactions, retries, selectors, ordering, or
+  exactly-once claims do not prove MQI compatibility.
+- Reuse the shared catalog compiler, package runtime, principal/SAF, store,
+  artifact, effect/UOW, migration, cancellation, backpressure, and evidence
+  authorities. Do not add a provider-private job scheduler or durable log.
+
 ## Version-specific invariants
 
 - Use 26 unique MQI calls as the denominator; retain the 27 source-document rows

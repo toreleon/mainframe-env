@@ -35,6 +35,24 @@ lane, but no route may publish against a placeholder or incomplete backend.
 5. Implement **ZMF-1106** malformed, protocol, authn/authz, failure, timeout,
    cancellation, scale, bounds, restart and licensed differential suites.
 
+## Reuse and architecture guardrails
+
+- Keep the pinned IBM route/schema/error catalog as the normative authority.
+  Use reviewed OpenAPI 3.1 and Axum integration libraries to assemble and check
+  artifacts, but reject code-first drift: the generated OpenAPI document must
+  diff cleanly against the pinned catalog and candidate identity.
+- Compile request/response schemas with the shared Draft 2020-12 validator and
+  validate positive, negative, malformed, bounded, and content-negotiation
+  fixtures. Derive macros and generated Rust types do not replace runtime schema
+  or cross-field validation.
+- Reuse Axum, Tower, Tower HTTP, Rustls, the common principal/SAF authority,
+  execution/work stores, cancellation, audit, pagination/continuation identity,
+  route registry, and evidence harness. Do not hand-build HTTP parsing, TLS,
+  generic middleware, or another async-operation scheduler.
+- HTTP/OpenAPI framework types stop at the gateway. Exact z/OSMF statuses,
+  headers, media types, cookies/CSRF policy, errors, async outcomes, and route
+  separation remain owned compatibility DTOs and handlers.
+
 ## Version-specific invariants
 
 - The same reviewed catalog generates router registration, capability reports,

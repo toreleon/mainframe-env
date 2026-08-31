@@ -34,6 +34,22 @@ and evidence contracts before integrating public commands or SAF calls.
 5. Implement **SEC-506** audit/redaction, concurrency, restart, migration,
    recovery and licensed differential suites.
 
+## Reuse and architecture guardrails
+
+- RACF/SAF profile resolution, access decisions, return/reason codes, ACEE,
+  RACLIST, SETROPTS, cache, delegation, and audit semantics remain one owned
+  security authority. OPA, Cedar, Casbin, or another generic policy engine may
+  be an optional custom-policy adapter, never RACF compatibility authority.
+- Reuse reviewed password hashing, TLS, X.509, signature, secret-wrapper, and
+  zeroization libraries. Do not implement cryptographic algorithms, ASN.1/X.509
+  parsing, or secret-memory redaction formats in the provider.
+- Keep plaintext credentials, keys, certificates, and tokens inside bounded
+  provider scopes. Third-party secret/crypto types cannot enter checkpoints,
+  evidence, public DTOs, or logs; convert them to owned redacted outcomes.
+- Extend the shared schema/catalog compiler, store/migration runtime, principal
+  contract, audit envelope, and failure harness. Do not create separate security
+  schema, migration, transaction, or evidence engines.
+
 ## Version-specific invariants
 
 - Default deny at every protected entry point; unavailable policy or store state

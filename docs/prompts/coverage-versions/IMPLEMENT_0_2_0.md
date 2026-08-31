@@ -39,6 +39,29 @@ dependency, but no 0.1.1 behavior may regress.
 4. Implement **CV-209:** ledger consistency, migration/rollback, full profile
    closure, and regression evidence.
 
+## Reuse and architecture guardrails
+
+- CV-201/CV-202 must freeze the four shared authorities used by every later
+  minor: one contract/catalog compiler, one application-package trust/install
+  runtime, one store/migration/artifact adapter family, and one
+  conformance/oracle evidence harness. Do not leave each subsystem to recreate
+  these facilities.
+- Compile the normative Draft 2020-12 schemas with a reviewed validator and
+  validate every catalog, package, evidence, migration, profile, and release
+  artifact mapped by the schema gate. Handwritten top-level field checks are not
+  schema validation.
+- Use a standard signed-envelope representation such as COSE Sign1 with the
+  reviewed crypto provider. Mainframe-env owns the bounded package manifest,
+  semantic identity, reference closure, generation selection, rollback, and
+  trust policy; it does not own a new signature format or crypto primitive.
+- Keep immutable large-blob storage behind the artifact-store port and evaluate
+  a reviewed multi-backend object-store library rather than implementing local,
+  S3, Azure, or GCS clients. This minor need only ship the adapters required by
+  its accepted profiles.
+- Record dependency/license/MSRV and semantic-gap decisions in CV-201 evidence.
+  Generated DTOs, schema libraries, signature libraries, and storage adapters
+  remain replaceable and do not enter durable public contracts.
+
 ## Version-specific invariants
 
 - Eliminate all 29 audited Db2 and three batch production H1/H3 hits. CardDemo

@@ -102,6 +102,56 @@ at every continuation; never restart completed discovery after compaction.
 - Add migrations, backup/restore, restart, rollback, compatibility, and
   corruption/failure evidence whenever durable state or public schemas change.
 
+### Reuse and build-versus-buy discipline
+
+IBM-observable language, subsystem, return-code, condition, recovery, and
+failure semantics are product behavior and remain owned by mainframe-env.
+Commodity infrastructure and standards implementations are not product
+semantics. Before implementing either category, classify the boundary and
+record the decision in the target status ledger.
+
+- Reuse the accepted 0.2 authorities rather than creating subsystem-private
+  variants: the contract/catalog compiler, application-package trust and
+  generation runtime, store/migration/artifact adapters, and conformance/oracle
+  evidence harness. Extend their typed contracts through their owners.
+- One readable normative catalog or schema must generate all applicable Rust
+  identities/descriptors, registry tables, schema/OpenAPI artifacts, coverage
+  rows, documentation, and handler-closure inputs. Do not hand-maintain parallel
+  inventories or make generated Rust the only statement of the contract.
+- Compile every normative JSON Schema with a reviewed Draft 2020-12 validator
+  and validate every mapped artifact. A schema-to-Rust generator may reduce DTO
+  boilerplate, but generated types never replace semantic constructors, bounds,
+  cross-reference checks, or negative validation.
+- Use reviewed standards libraries at adapter boundaries for COSE/signatures,
+  decimal primitives, object storage, HTTP/OpenAPI, secret handling,
+  observability, model checking, fuzzing, SBOMs, and supply-chain verification
+  when they satisfy the pinned contract. Do not implement cryptographic
+  primitives, cloud object-store clients, OpenAPI models, or SBOM formats in
+  product code.
+- Third-party AST, query-plan, workflow, policy, telemetry, serializer, and
+  framework types must be converted immediately to owned bounded DTOs. They may
+  not enter stable contracts, semantic identities, durable state, checkpoints,
+  evidence schemas, or public compatibility claims.
+- An external SQL, broker, policy, workflow, storage, or scheduler engine may be
+  a replaceable substrate or oracle adapter only after a representative
+  semantic-gap matrix passes. It never receives implicit authority for Db2,
+  MQI, RACF/SAF, JES, CICS, IMS, COBOL, or cross-resource outcomes.
+- Do not add a second authority for routing, scheduling, transactions,
+  persistence, migrations, security, package selection, or evidence. If a
+  framework would own one of those concerns, integrate it behind the existing
+  port or record an ADR explaining why the authority boundary must change.
+- Before adding a production dependency or external runtime, record its exact
+  version, license, MSRV/platform support, maintenance status, enabled features,
+  transitive/build dependencies, failure model, deterministic-test strategy,
+  semantic gaps, and removal/fallback plan. Run the dependency, advisory,
+  license, and source gates. Do not add speculative dependencies.
+- Prefer a focused spike with frozen fixtures over a framework-wide adoption.
+  Reject the framework when the compatibility adapter is larger, less bounded,
+  less deterministic, or harder to validate than the owned implementation.
+- External tools may automate licensed differential execution, release
+  evidence, provenance, or transport. They do not contribute coverage by their
+  presence and may not become a native-code fallback for product execution.
+
 ### Validation and evidence
 
 For every work package, run focused package tests and affected architecture,

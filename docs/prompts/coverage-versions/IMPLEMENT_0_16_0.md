@@ -37,6 +37,29 @@ public mixed-state model cannot complete on partial or substituted providers.
 5. Implement **INT-1606** exhaustive mixed-resource commit/failure matrix, soak,
    chaos, concurrency, 2x overload, restart and differential journeys.
 
+## Reuse and architecture guardrails
+
+- The owned effect/UOW state machine and durable intent/result log remain the
+  semantic authority for prepare, commit, rollback, compensation, heuristic,
+  in-doubt, and unknown outcomes. Temporal, Restate, DBOS, Apalis, or another
+  workflow/job framework may be an optional scheduling adapter only after an
+  ADR, license/maturity/MSRV review, and mixed-provider semantic-gap matrix.
+- External workflow claims such as exactly-once execution, automatic retries,
+  durable timers, or serialized object access cannot replace explicit provider
+  reconciliation, idempotency, lease, cancellation, lock-order, and outcome
+  evidence. Framework histories and state types cannot enter public UOW or
+  checkpoint contracts.
+- Use OpenTelemetry-compatible libraries for trace/metric/log correlation at
+  adapter boundaries, not as audit or security authority. Validate and sanitize
+  incoming propagation; never place principal credentials, grants, secrets, or
+  compatibility decisions in telemetry baggage.
+- Add bounded model and concurrency tests with reviewed tools such as
+  Stateright, Loom, or Shuttle for the coordinator, lease, lock-order, retry,
+  cancellation, crash, and recovery state spaces. Preserve replayable schedules
+  and counterexamples as candidate-bound evidence.
+- Reuse one shared migration, backup/restore, artifact, principal, deadline,
+  cancellation, outbox, and evidence implementation across all providers.
+
 ## Version-specific invariants
 
 - Exactly one coordinator owns cross-provider UOW state; no provider-private
