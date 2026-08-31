@@ -16,7 +16,7 @@ use mainframe_env_conformance::{
     verify_carddemo_security_from_env, verify_carddemo_seeds_from_env,
     verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
     verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
-    verify_carddemo_vsam_from_env,
+    verify_carddemo_vsam_from_env, verify_host_abi_libraries,
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -58,6 +58,8 @@ fn run() -> TaskResult {
         "application-packages" => check_application_packages(&root),
         "db2-catalog" => check_db2_catalog(&root),
         "batch-controllers" => check_batch_controllers(&root),
+        "abi-libraries" if check => check_host_abi_libraries(&root),
+        "abi-libraries" => generate_host_abi_inventory(&root),
         "semantic-identities" if check => check_semantic_identities(&root),
         "semantic-identities" => generate_semantic_identities(&root),
         "conformance" => {
@@ -71,7 +73,8 @@ fn run() -> TaskResult {
             check_semantic_identities(&root)?;
             check_application_packages(&root)?;
             check_db2_catalog(&root)?;
-            check_batch_controllers(&root)
+            check_batch_controllers(&root)?;
+            check_host_abi_libraries(&root)
         }
         "certification" => check_certification(&root),
         "carddemo-corpus" => check_carddemo_corpus(&root),
@@ -110,7 +113,7 @@ fn run() -> TaskResult {
         "release" => generate_release_artifacts(&root),
         "help" | "--help" | "-h" => {
             println!(
-                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|coverage|semantic-identities|application-packages|db2-catalog|batch-controllers|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check"
+                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|coverage|semantic-identities|application-packages|db2-catalog|batch-controllers|abi-libraries|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check"
             );
             Ok(())
         }
@@ -2139,6 +2142,106 @@ fn check_batch_controllers(root: &Path) -> TaskResult {
         )?;
     }
     Ok(())
+}
+
+fn generate_host_abi_inventory(root: &Path) -> TaskResult {
+    let receipt = verify_host_abi_libraries()?;
+    let value = serde_json::to_value(receipt).map_err(|error| error.to_string())?;
+    let path = root.join("conformance/0.2/abi/libraries.json");
+    fs::create_dir_all(path.parent().ok_or("host ABI inventory has no parent")?)
+        .map_err(|error| error.to_string())?;
+    fs::write(&path, pretty_json(&value)?).map_err(|error| format!("{}: {error}", path.display()))
+}
+
+fn check_host_abi_libraries(root: &Path) -> TaskResult {
+    let receipt = verify_host_abi_libraries()?;
+    let expected = serde_json::to_value(receipt).map_err(|error| error.to_string())?;
+    let inventory_path = root.join("conformance/0.2/abi/libraries.json");
+    require(
+        json(&inventory_path)? == expected,
+        "subsystem ABI inventory is stale; run cargo xtask abi-libraries",
+    )?;
+    let mut compiler_files = Vec::new();
+    collect_extension(
+        &root.join("crates/kernel/mainframe-env-compiler/src"),
+        OsStr::new("rs"),
+        &mut compiler_files,
+    )?;
+    let compiler = compiler_files
+        .iter()
+        .map(|path| read(path))
+        .collect::<TaskResult<Vec<_>>>()?
+        .join("\n")
+        .to_ascii_uppercase();
+    for forbidden in [
+        "DFHAID",
+        "DFHBMSCA",
+        "SQLCA",
+        "CMQGMOV",
+        "CMQMDV",
+        "CMQODV",
+        "CMQPMOV",
+        "CMQTML",
+        "CMQV",
+        "OWNED_COMPATIBILITY_LIBRARY",
+        "COMPATIBILITY_COPYBOOKS",
+    ] {
+        require(
+            !compiler.contains(forbidden),
+            &format!("compiler still owns or names host ABI member {forbidden}"),
+        )?;
+    }
+    require(
+        !root
+            .join("crates/kernel/mainframe-env-compiler/src/compatibility.rs")
+            .exists(),
+        "compiler compatibility asset module still exists",
+    )?;
+    for path in [
+        "crates/providers/mainframe-env-cics/abi/DFHAID.cpy",
+        "crates/providers/mainframe-env-cics/abi/DFHBMSCA.cpy",
+        "crates/providers/mainframe-env-db2/abi/SQLCA.cpy",
+        "crates/providers/mainframe-env-mq/abi/CMQGMOV.cpy",
+        "crates/providers/mainframe-env-mq/abi/CMQMDV.cpy",
+        "crates/providers/mainframe-env-mq/abi/CMQODV.cpy",
+        "crates/providers/mainframe-env-mq/abi/CMQPMOV.cpy",
+        "crates/providers/mainframe-env-mq/abi/CMQTML.cpy",
+        "crates/providers/mainframe-env-mq/abi/CMQV.cpy",
+        "conformance/0.2/schemas/host-abi-source-library.schema.json",
+        "docs/architecture/HOST-ABI-SOURCE-LIBRARIES.md",
+    ] {
+        require(
+            root.join(path).is_file(),
+            &format!("host ABI artifact is missing: {path}"),
+        )?;
+    }
+    let contracts_path = root.join("conformance/0.2/inventory/contracts.json");
+    let contracts = json(&contracts_path)?;
+    require(
+        contracts["contracts"]["host_abi_source_library"]
+            == Value::String("mainframe-env.host-abi-source-library@1".into()),
+        "host ABI source-library contract is not frozen",
+    )?;
+    let migration_path = root.join("conformance/0.2/migrations/host-abi-v0-to-v1.json");
+    let migration = json(&migration_path)?;
+    require(
+        migration["schema_version"] == Value::String("mainframe-env.host-abi-migration@1".into())
+            && migration["destructive"] == Value::Bool(false)
+            && migration["compiler_asset_fallback_retained"] == Value::Bool(false)
+            && migration["old_source_bundle_receipts_reproducible"] == Value::Bool(true)
+            && migration["rollback"]["supported"] == Value::Bool(true)
+            && migration["rollback"]["partial_library_selected"] == Value::Bool(false),
+        "host ABI migration or rollback contract is unsafe",
+    )?;
+    let scan_path = root.join("conformance/0.2/evidence/hardcode/CV-207-abi.json");
+    let scan = json(&scan_path)?;
+    require(
+        scan["before"]["compiler_owned_members"].as_u64() == Some(9)
+            && scan["after"]["compiler_owned_members"].as_u64() == Some(0)
+            && scan["after"]["subsystem_owned_members"].as_u64() == Some(9)
+            && scan["after"]["generated_coverage_credit"].as_u64() == Some(0),
+        "host ABI ownership scan does not prove nine compiler members moved with zero credit",
+    )
 }
 
 fn check_coverage(root: &Path) -> TaskResult {

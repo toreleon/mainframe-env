@@ -12,6 +12,7 @@
     "application_package_v2": "mainframe-env.application-package@2",
     "application_install_generation": "mainframe-env.application-install-generation@1",
     "host_abi_library_section": "mainframe-env.application.host-abi-libraries@1",
+    "host_abi_source_library": "mainframe-env.host-abi-source-library@1",
     "sql_section": "mainframe-env.application.sql@1",
     "ims_section": "mainframe-env.application.ims@1",
     "mq_section": "mainframe-env.application.mq@1",

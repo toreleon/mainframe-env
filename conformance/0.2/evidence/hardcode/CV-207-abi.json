@@ -1,0 +1,21 @@
+{
+  "schema_version": "mainframe-env.host-abi-ownership-scan@1",
+  "work_package": "CV-207",
+  "scope": "compiler source plus CICS, Db2, and MQ provider ABI modules and assets",
+  "method": "exact member-name and removed-module scan, followed by byte/digest comparison of the nine reached members",
+  "before": {
+    "compiler_owned_members": 9,
+    "source": "docs/research/IBM-OFFICIAL-COVERAGE-ROADMAP.md"
+  },
+  "after": {
+    "compiler_owned_members": 0,
+    "subsystem_owned_members": 9,
+    "cics_owned_members": 2,
+    "db2_owned_members": 1,
+    "mq_owned_members": 6,
+    "generated_coverage_credit": 0
+  },
+  "license": "Apache-2.0",
+  "vendor_source_text_included": false,
+  "historical_source_bytes_changed": false
+}

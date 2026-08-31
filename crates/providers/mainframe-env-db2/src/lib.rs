@@ -2,8 +2,11 @@
 
 #![forbid(unsafe_code)]
 
+mod abi;
 mod catalog;
 mod service;
+
+pub use abi::db2_abi_library;
 
 pub use catalog::{
     DB2_APPLICATION_CATALOG_CONTRACT, Db2CatalogGeneration, Db2ColumnDefinition, Db2ExtractField,

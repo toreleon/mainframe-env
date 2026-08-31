@@ -2,7 +2,10 @@
 
 #![forbid(unsafe_code)]
 
+mod abi;
 mod service;
+
+pub use abi::cics_abi_library;
 
 pub use service::{
     BmsFieldDefinition, BmsMapDefinition, CicsContinuation, CicsFileDefinition, CicsFileStatus,

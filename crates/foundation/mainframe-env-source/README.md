@@ -14,3 +14,8 @@ Explicit multi-file closures use ordered `SourceLibrary` values. Library order
 is part of the additive source identity; missing, duplicate, ambiguous, unknown,
 or unassigned members fail before compiler publication. The legacy
 `SourceBundle::new` identity remains unchanged.
+
+`HostAbiLibraryDefinition` is the deterministic boundary for subsystem-owned
+compatibility source. It validates version, Apache-2.0 license, non-vendor
+origin, exact member bytes, bounds, uniqueness, and ordered materialization;
+it does not supply ABI content itself.

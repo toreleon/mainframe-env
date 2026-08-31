@@ -1,0 +1,102 @@
+{
+  "compiler_owned_members": 0,
+  "contract": "mainframe-env.host-abi-source-library@1",
+  "generated_coverage_credit": 0,
+  "libraries": [
+    {
+      "id": "mainframe-env.cics-cobol-abi@1",
+      "identity": "sha256:9f8cc6f0a771f5fbe5ba08a04d3e98d63475ed954776a6a0d83b568c3ef24bb0",
+      "library_name": "cics-cobol-abi-v1",
+      "license": "Apache-2.0",
+      "members": [
+        {
+          "bytes": 1136,
+          "name": "DFHAID",
+          "path": "compatibility/DFHAID.cpy",
+          "sha256": "sha256:3dc63be975ea05eb9e3f7dd8d9d31971be742cdab4ea9fd479a3a22463b2c1f4"
+        },
+        {
+          "bytes": 557,
+          "name": "DFHBMSCA",
+          "path": "compatibility/DFHBMSCA.cpy",
+          "sha256": "sha256:cabd3ad0adddb7c8cc0555488af2478db052c570aa93c2954892f7c7d0d0af7e"
+        }
+      ],
+      "origin": "repository-authored behavioral compatibility definition; no vendor source text",
+      "subsystem": "cics",
+      "version": "0.2.0-reached"
+    },
+    {
+      "id": "mainframe-env.db2-cobol-abi@1",
+      "identity": "sha256:6f8242e7027cef090fd9e14586a343dd603ee81ea2ca60270507c6b54dce91cb",
+      "library_name": "db2-cobol-abi-v1",
+      "license": "Apache-2.0",
+      "members": [
+        {
+          "bytes": 746,
+          "name": "SQLCA",
+          "path": "compatibility/SQLCA.cpy",
+          "sha256": "sha256:740a5a578e2d76e0079f94d81df5f336a7289859bc619e5786c441b1a020b9f1"
+        }
+      ],
+      "origin": "repository-authored behavioral compatibility definition; no vendor source text",
+      "subsystem": "db2",
+      "version": "0.2.0-reached"
+    },
+    {
+      "id": "mainframe-env.mq-cobol-abi@1",
+      "identity": "sha256:0acb8aaf4cdb598fac3028bd9c057841553a2d33e1262b704b6ddd0fb6947d9c",
+      "library_name": "mq-cobol-abi-v1",
+      "license": "Apache-2.0",
+      "members": [
+        {
+          "bytes": 262,
+          "name": "CMQGMOV",
+          "path": "compatibility/CMQGMOV.cpy",
+          "sha256": "sha256:fd90c1953d7036d90a0f3a0cb05b4b4c56cf2b3d01335228c366231e4e7c9fc4"
+        },
+        {
+          "bytes": 1565,
+          "name": "CMQMDV",
+          "path": "compatibility/CMQMDV.cpy",
+          "sha256": "sha256:9d3ab77d8c17ba92b9e8f5a69a80578c865cd12902ecf8f066ee826d3443254a"
+        },
+        {
+          "bytes": 429,
+          "name": "CMQODV",
+          "path": "compatibility/CMQODV.cpy",
+          "sha256": "sha256:c681915e32ddbdd9910b3dd331d6637c58e2f472e663e0062e464e63d917155a"
+        },
+        {
+          "bytes": 205,
+          "name": "CMQPMOV",
+          "path": "compatibility/CMQPMOV.cpy",
+          "sha256": "sha256:d19e2866dc7268dd71a44219e0b4e8de77a3e1bad44510052d6ee9c9bd679fc7"
+        },
+        {
+          "bytes": 509,
+          "name": "CMQTML",
+          "path": "compatibility/CMQTML.cpy",
+          "sha256": "sha256:35d900d2e5e414ffe095af9656ffdf95b8af06e39b07207b6eeb6ea3c20d93d9"
+        },
+        {
+          "bytes": 1350,
+          "name": "CMQV",
+          "path": "compatibility/CMQV.cpy",
+          "sha256": "sha256:bdc5b9526dec638526a7a3fa78feca1c166c26d9257b21e1de33a589ff964ce7"
+        }
+      ],
+      "origin": "repository-authored behavioral compatibility definition; no vendor source text",
+      "subsystem": "mq",
+      "version": "0.2.0-reached"
+    }
+  ],
+  "ordered_subsystems": [
+    "cics",
+    "db2",
+    "mq"
+  ],
+  "schema_version": "mainframe-env.host-abi-inventory@1",
+  "status": "pass",
+  "total_members": 9
+}

@@ -9,6 +9,7 @@ license.workspace = true
 fault-injection = []
 
 [dependencies]
+mainframe-env-source.workspace = true
 mainframe-env-execution-api.workspace = true
 mainframe-env-encoding.workspace = true
 mainframe-env-host-api.workspace = true

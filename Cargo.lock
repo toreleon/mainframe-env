@@ -989,6 +989,7 @@ dependencies = [
  "mainframe-env-execution-api",
  "mainframe-env-host-api",
  "mainframe-env-racf",
+ "mainframe-env-source",
  "mainframe-env-store",
  "mainframe-env-store-api",
  "sha2 0.10.9",
@@ -999,12 +1000,15 @@ name = "mainframe-env-cli"
 version = "0.1.1"
 dependencies = [
  "clap",
+ "mainframe-env-cics",
  "mainframe-env-compiler",
  "mainframe-env-compiler-api",
+ "mainframe-env-db2",
  "mainframe-env-execution-api",
  "mainframe-env-host-api",
  "mainframe-env-interpreter",
  "mainframe-env-ir",
+ "mainframe-env-mq",
  "mainframe-env-source",
 ]
 
@@ -1088,6 +1092,7 @@ version = "0.1.1"
 dependencies = [
  "mainframe-env-execution-api",
  "mainframe-env-host-api",
+ "mainframe-env-source",
  "mainframe-env-store",
  "mainframe-env-store-api",
  "serde",
@@ -1165,6 +1170,7 @@ version = "0.1.1"
 dependencies = [
  "mainframe-env-execution-api",
  "mainframe-env-host-api",
+ "mainframe-env-source",
  "mainframe-env-store",
  "mainframe-env-store-api",
  "serde",

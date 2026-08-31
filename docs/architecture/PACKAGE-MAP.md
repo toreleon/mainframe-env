@@ -190,7 +190,8 @@ transient-data records, and idempotent syncpoint intent/result decisions;
 unresolved decisions remain unknown outcomes until explicit reconciliation.
 Installed CICS FILE names resolve through a durable bounded alias catalog to
 typed dataset or alternate-index names.
-Protocol/UI implementations are not dependencies.
+Protocol/UI implementations are not dependencies. CICS also owns the DFHAID
+and DFHBMSCA compatibility source library; the compiler does not.
 
 ### `mainframe-env-racf`
 
@@ -203,7 +204,7 @@ locks directly.
 Owns the additive CardDemo static-SQL table, cursor, SQLCA, extraction, and
 durable unit-of-work boundary. Interactive mutations remain staged until typed
 commit or rollback; batch mutations use the same authority with batch commit
-policy.
+policy. Db2 owns its reached SQLCA compatibility source library.
 
 ### `mainframe-env-ims`
 
@@ -216,6 +217,7 @@ durable commit/rollback boundary.
 Owns the additive CardDemo named queues, handles, trigger selection,
 message/correlation identifiers, wait/no-message conditions, syncpoint gets and
 puts, idempotent replay, unknown-outcome reconciliation, and restart state.
+MQ owns its six reached CMQ* compatibility source members.
 
 ## Stores
 

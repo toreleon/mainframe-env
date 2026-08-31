@@ -18,3 +18,6 @@ mainframe-env-execution-api.workspace = true
 mainframe-env-host-api.workspace = true
 mainframe-env-compiler.workspace = true
 mainframe-env-interpreter.workspace = true
+mainframe-env-cics.workspace = true
+mainframe-env-db2.workspace = true
+mainframe-env-mq.workspace = true

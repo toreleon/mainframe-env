@@ -17,11 +17,11 @@ use mainframe_env_batch::{
     utility_disposition, validate_idcams_control,
 };
 use mainframe_env_cics::{
-    BmsFieldDefinition, BmsMapDefinition, CicsFileDefinition, CicsFileStatus,
+    BmsFieldDefinition, BmsMapDefinition, CicsFileDefinition, CicsFileStatus, cics_abi_library,
 };
 use mainframe_env_compiler::{
     CobolCompiler, ControlEdgeKind, ControlRole, DataCategory, SemanticModel, StatementKind,
-    StorageSection, compatibility_copybooks, owned_compatibility_library,
+    StorageSection,
 };
 use mainframe_env_compiler_api::{
     CompilationMode, CompileOptions, CompileTarget, CompilerRequest, CompilerResult,
@@ -30,7 +30,7 @@ use mainframe_env_compiler_api::{
 use mainframe_env_dataset::{DatasetLimits, DatasetSeedObject, DatasetService};
 use mainframe_env_db2::{
     Db2CatalogGeneration, Db2ColumnDefinition, Db2ExtractField, Db2ExtractLayout,
-    Db2ForeignKeyDefinition, Db2ResultEncoding, Db2TableDefinition,
+    Db2ForeignKeyDefinition, Db2ResultEncoding, Db2TableDefinition, db2_abi_library,
 };
 use mainframe_env_diagnostics::Completeness;
 use mainframe_env_encoding::CodePage;
@@ -50,7 +50,7 @@ use mainframe_env_ims::{
     ImsApplicationDefinition, ImsDatabaseDefinition, ImsLimits, ImsLoadImage, ImsLoadRoot,
     ImsPcbDefinition, ImsPsbDefinition, ImsSegmentDefinition, ImsService, ims_providers,
 };
-use mainframe_env_mq::{MqQueueDefinition, MqService, mq_providers};
+use mainframe_env_mq::{MqQueueDefinition, MqService, mq_abi_library, mq_providers};
 use mainframe_env_racf::{
     MemorySecretResolver, RacfManifest, RacfProfileDefinition, RacfService, RacfUserDefinition,
 };
@@ -59,8 +59,9 @@ use mainframe_env_server::{
     ServerConfig, StoreProfile, TlsConfig, compatible_system_services, default_program_router,
 };
 use mainframe_env_source::{
-    LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLibrary,
-    SourceLimits,
+    HostAbiLibraryDefinition, LogicalPath, MaterializedHostAbiLibraries, SourceBundle,
+    SourceEncoding, SourceFile, SourceFormat, SourceLibrary, SourceLimits,
+    materialize_host_abi_libraries,
 };
 use mainframe_env_store::{MemoryStore, PostgresStateStore, SqliteStateStore};
 use serde::{Deserialize, Serialize};
@@ -1103,9 +1104,10 @@ pub fn verify_carddemo_source_closures_from_env(
             "explicit source closure counts differ from the pinned inventory",
         ));
     }
-    let owned_names = compatibility_copybooks()
+    let owned_names = subsystem_abi_definitions()
         .iter()
-        .map(|copybook| copybook.name.to_string())
+        .flat_map(|library| library.members.iter())
+        .map(|member| member.name.to_string())
         .collect::<BTreeSet<_>>();
     if contract
         .external_compatibility_copybooks
@@ -1124,13 +1126,22 @@ pub fn verify_carddemo_source_closures_from_env(
         .iter()
         .map(|path| source_file(corpus_dir, path, limits))
         .collect::<Result<Vec<_>, _>>()?;
-    let (compatibility, compatibility_library) =
-        owned_compatibility_library(limits).map_err(|error| {
-            CorpusProblem::new(
-                "carddemo.closure.compatibility_invalid",
-                format!("owned compatibility catalog is invalid: {error}"),
-            )
-        })?;
+    let abi = subsystem_abi_libraries(limits)?;
+    let compatibility = abi.files;
+    let compatibility_library = SourceLibrary::new(
+        "owned-compatibility",
+        compatibility
+            .iter()
+            .map(|file| file.path().clone())
+            .collect(),
+        limits,
+    )
+    .map_err(|error| {
+        CorpusProblem::new(
+            "carddemo.closure.compatibility_invalid",
+            format!("legacy compatibility projection is invalid: {error}"),
+        )
+    })?;
     let placeholder_content_present = compatibility.iter().any(|file| {
         String::from_utf8_lossy(file.bytes())
             .to_ascii_lowercase()
@@ -1228,7 +1239,7 @@ pub fn verify_carddemo_source_closures_from_env(
         status: "pass".into(),
         corpus_commit: corpus.commit,
         source_library_contract: mainframe_env_source::SOURCE_LIBRARY_CONTRACT.into(),
-        compatibility_contract: mainframe_env_compiler::COMPATIBILITY_COPYBOOK_CONTRACT.into(),
+        compatibility_contract: LEGACY_COMPATIBILITY_COPYBOOK_CONTRACT.into(),
         programs_checked: source_paths.len(),
         application_copybooks: copybooks.len(),
         owned_compatibility_copybooks: compatibility.len(),
@@ -13527,6 +13538,24 @@ fn digest_field(digest: &mut Sha256, bytes: &[u8]) {
     digest.update(bytes);
 }
 
+const LEGACY_COMPATIBILITY_COPYBOOK_CONTRACT: &str =
+    "mainframe-env.cobol-compatibility-copybooks@1";
+
+fn subsystem_abi_definitions() -> [HostAbiLibraryDefinition; 3] {
+    [cics_abi_library(), db2_abi_library(), mq_abi_library()]
+}
+
+fn subsystem_abi_libraries(
+    limits: SourceLimits,
+) -> Result<MaterializedHostAbiLibraries, CorpusProblem> {
+    materialize_host_abi_libraries(&subsystem_abi_definitions(), limits).map_err(|error| {
+        CorpusProblem::new(
+            "carddemo.abi.invalid",
+            format!("subsystem ABI source libraries are invalid: {error}"),
+        )
+    })
+}
+
 fn explicit_carddemo_bundles(
     corpus_dir: &Path,
 ) -> Result<Vec<(String, SourceBundle)>, CorpusProblem> {
@@ -13554,13 +13583,9 @@ fn explicit_carddemo_bundles(
         .iter()
         .map(|path| source_file(corpus_dir, path, limits))
         .collect::<Result<Vec<_>, _>>()?;
-    let (compatibility, compatibility_library) =
-        owned_compatibility_library(limits).map_err(|error| {
-            CorpusProblem::new(
-                "carddemo.layout.closure_invalid",
-                format!("owned compatibility catalog is invalid: {error}"),
-            )
-        })?;
+    let abi = subsystem_abi_libraries(limits)?;
+    let compatibility = abi.files;
+    let compatibility_libraries = abi.libraries;
     let mut libraries = Vec::new();
     for (index, root) in copy_roots.iter().enumerate() {
         let members = collect_paths(corpus_dir, &[*root], "cpy")?
@@ -13584,7 +13609,7 @@ fn explicit_carddemo_bundles(
             )?,
         );
     }
-    libraries.push(compatibility_library);
+    libraries.extend(compatibility_libraries);
     let mut bundles = Vec::new();
     for primary_path in source_paths {
         let primary = source_file(corpus_dir, &primary_path, limits)?;

@@ -1,9 +1,11 @@
 use mainframe_env_batch::{Program, ProgramInput, ProgramOutput, ProgramRouter};
-use mainframe_env_compiler::{CobolCompiler, owned_compatibility_library};
+use mainframe_env_cics::cics_abi_library;
+use mainframe_env_compiler::CobolCompiler;
 use mainframe_env_compiler_api::{
     CompilationMode, CompileOptions, CompileTarget, CompilerRequest, CompilerResult,
     CompilerService,
 };
+use mainframe_env_db2::db2_abi_library;
 use mainframe_env_execution_api::{
     ArtifactRef, BoundedPayload, ExecutionId, ExecutionOutcome, IdempotencyKey, Invocation,
     InvocationLimits, Principal, RequestId, RunUnitId, Selector, TraceId,
@@ -17,9 +19,10 @@ use mainframe_env_interpreter::{
     encode_cobol_call_result,
 };
 use mainframe_env_ir::CodecLimits;
+use mainframe_env_mq::mq_abi_library;
 use mainframe_env_source::{
     LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLibrary,
-    SourceLimits,
+    SourceLimits, materialize_host_abi_libraries,
 };
 use mainframe_env_store::LocalArtifactStore;
 use mainframe_env_store_api::{ArtifactStore, PlatformStore, ProviderStateRecord};
@@ -938,10 +941,13 @@ fn source_bundle(input: &ProgramInput) -> Result<SourceBundle, HostProblem> {
                 .map_err(|_| HostProblem::Malformed)?,
         );
     }
-    let (compatibility, compatibility_library) =
-        owned_compatibility_library(source_limits).map_err(|_| HostProblem::Malformed)?;
-    files.extend(compatibility);
-    libraries.push(compatibility_library);
+    let abi = materialize_host_abi_libraries(
+        &[cics_abi_library(), db2_abi_library(), mq_abi_library()],
+        source_limits,
+    )
+    .map_err(|_| HostProblem::Malformed)?;
+    files.extend(abi.files);
+    libraries.extend(abi.libraries);
     SourceBundle::with_libraries(
         &path,
         files,

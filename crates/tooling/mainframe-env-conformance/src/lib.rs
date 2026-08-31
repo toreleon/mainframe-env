@@ -19,7 +19,12 @@ use mainframe_env_source::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 
+mod abi;
 mod carddemo;
+
+pub use abi::{
+    HostAbiInventoryReceipt, HostAbiLibraryReceipt, HostAbiMemberReceipt, verify_host_abi_libraries,
+};
 
 pub use carddemo::{
     CardDemoBaseBatchReceipt, CardDemoBaseOnlineReceipt, CardDemoBatchProgramReceipt,
