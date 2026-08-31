@@ -3734,6 +3734,24 @@
       "version": "1.2.1"
     },
     {
+      "bom-ref": "pkg:cargo/static_assertions@1.1.0",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "static_assertions",
+      "properties": [
+        {
+          "name": "cargo:source",
+          "value": "registry+https://github.com/rust-lang/crates.io-index"
+        }
+      ],
+      "purl": "pkg:cargo/static_assertions@1.1.0",
+      "type": "library",
+      "version": "1.1.0"
+    },
+    {
       "bom-ref": "pkg:cargo/stringprep@0.1.5",
       "licenses": [
         {
@@ -5187,7 +5205,7 @@
       },
       {
         "name": "mainframe-env:cargo-lock-sha256",
-        "value": "8bcd476ddc76eba134bbd9f965a3dcd21b88cc0800e62495485c38b679de10fb"
+        "value": "9d3c527a5d17d97bb449474f0329dc1cd8cd77c1baaba189da5873a2de649b43"
       },
       {
         "name": "mainframe-env:release-profile",

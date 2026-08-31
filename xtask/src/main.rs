@@ -2,6 +2,9 @@
 
 #![forbid(unsafe_code)]
 
+mod evidence_seal;
+
+use clap::{Args, CommandFactory, Parser, Subcommand};
 use mainframe_env_conformance::{
     verify_carddemo_application_package_from_env, verify_carddemo_base_batch_from_env,
     verify_carddemo_base_online_from_env, verify_carddemo_batch_programs_from_env,
@@ -33,6 +36,112 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 type TaskResult<T = ()> = Result<T, String>;
 
+#[derive(Debug, Parser)]
+#[command(name = "xtask", disable_version_flag = true)]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<XtaskCommand>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Args)]
+struct CheckArgs {
+    #[arg(long)]
+    check: bool,
+}
+
+#[derive(Debug, Args)]
+struct ReleaseArgs {
+    #[arg(long)]
+    target: String,
+    #[arg(long)]
+    check: bool,
+}
+
+#[derive(Debug, Args)]
+struct EvidenceArgs {
+    #[arg(long)]
+    check: bool,
+    #[command(subcommand)]
+    command: Option<EvidenceCommand>,
+}
+
+#[derive(Debug, Subcommand)]
+enum EvidenceCommand {
+    Seal(CheckArgs),
+    Callback(CallbackArgs),
+}
+
+#[derive(Debug, Args)]
+struct CallbackArgs {
+    #[arg(long)]
+    output: PathBuf,
+}
+
+#[derive(Debug, Subcommand)]
+enum XtaskCommand {
+    Versions(CheckArgs),
+    Architecture(CheckArgs),
+    RuntimeArchitecture(CheckArgs),
+    Profiles(CheckArgs),
+    Schemas(CheckArgs),
+    Inventory(CheckArgs),
+    Evidence(EvidenceArgs),
+    Coverage(CheckArgs),
+    ApplicationPackages(CheckArgs),
+    Db2Catalog(CheckArgs),
+    BatchControllers(CheckArgs),
+    AbiLibraries(CheckArgs),
+    ProgramRegistry(CheckArgs),
+    RouteRegistries(CheckArgs),
+    Dehardcoding(CheckArgs),
+    LedgerConsistency(CheckArgs),
+    MigrationRollback(CheckArgs),
+    FullRegression(CheckArgs),
+    ReviewRepair(CheckArgs),
+    #[command(name = "review-repair-round-2")]
+    ReviewRepairRound2(CheckArgs),
+    #[command(name = "review-repair-round-3")]
+    ReviewRepairRound3(CheckArgs),
+    #[command(name = "review-repair-round-4")]
+    ReviewRepairRound4(CheckArgs),
+    SemanticIdentities(CheckArgs),
+    Conformance(CheckArgs),
+    Certification(CheckArgs),
+    CarddemoCorpus(CheckArgs),
+    CarddemoSource(CheckArgs),
+    CarddemoClosure(CheckArgs),
+    CarddemoLayout(CheckArgs),
+    CarddemoControl(CheckArgs),
+    CarddemoCore(CheckArgs),
+    CarddemoFileCall(CheckArgs),
+    CarddemoHost(CheckArgs),
+    CarddemoPackage(CheckArgs),
+    CarddemoResources(CheckArgs),
+    CarddemoPrograms(CheckArgs),
+    CarddemoCics(CheckArgs),
+    CarddemoCicsRuntime(CheckArgs),
+    CarddemoVsam(CheckArgs),
+    CarddemoDatasetCatalog(CheckArgs),
+    CarddemoSeeds(CheckArgs),
+    CarddemoSecurity(CheckArgs),
+    CarddemoTerminal(CheckArgs),
+    CarddemoBaseOnline(CheckArgs),
+    CarddemoJcl(CheckArgs),
+    CarddemoUtilities(CheckArgs),
+    CarddemoBatchPrograms(CheckArgs),
+    CarddemoBaseBatch(CheckArgs),
+    CarddemoDb2(CheckArgs),
+    CarddemoIms(CheckArgs),
+    CarddemoMqAuthorization(CheckArgs),
+    CarddemoOperatorInstall(CheckArgs),
+    CarddemoOperatorCompile(CheckArgs),
+    CarddemoOperatorSubmit(CheckArgs),
+    CarddemoOperatorReset(CheckArgs),
+    CarddemoFull(CheckArgs),
+    Digest(CheckArgs),
+    Release(ReleaseArgs),
+}
+
 fn main() {
     if let Err(error) = run() {
         eprintln!("xtask: {error}");
@@ -42,113 +151,303 @@ fn main() {
 
 fn run() -> TaskResult {
     let root = repository_root()?;
-    let mut args = env::args().skip(1);
-    let command = args.next().unwrap_or_else(|| "help".to_string());
-    let arguments = args.collect::<Vec<_>>();
-    let check = arguments.iter().any(|arg| arg == "--check");
-
-    match command.as_str() {
-        "versions" => check_versions(&root),
-        "architecture" => check_architecture(&root),
-        "runtime-architecture" => check_runtime_architecture(&root),
-        "profiles" => check_profiles(&root),
-        "schemas" => check_schemas(&root),
-        "inventory" => check_inventory(&root),
-        "evidence" => check_evidence(&root),
-        "coverage" => check_coverage(&root),
-        "application-packages" => check_application_packages(&root),
-        "db2-catalog" => check_db2_catalog(&root),
-        "batch-controllers" => check_batch_controllers(&root),
-        "abi-libraries" if check => check_host_abi_libraries(&root),
-        "abi-libraries" => generate_host_abi_inventory(&root),
-        "program-registry" if check => check_program_registry(&root),
-        "program-registry" => generate_program_registry(&root),
-        "route-registries" if check => check_route_registries(&root),
-        "route-registries" => generate_route_registries(&root),
-        "dehardcoding" => check_dehardcoding(&root),
-        "ledger-consistency" => check_workload_ledger_consistency(&root),
-        "migration-rollback" => check_migration_rollback_rollup(&root),
-        "full-regression" => check_full_regression(&root),
-        "review-repair" => check_review_repair(&root),
-        "review-repair-round-2" => check_review_repair_round_2(&root),
-        "review-repair-round-3" => check_review_repair_round_3(&root),
-        "semantic-identities" if check => check_semantic_identities(&root),
-        "semantic-identities" => generate_semantic_identities(&root),
-        "conformance" => {
-            check_versions(&root)?;
-            check_architecture(&root)?;
-            check_profiles(&root)?;
-            check_schemas(&root)?;
-            check_inventory(&root)?;
-            check_evidence(&root)?;
-            check_coverage(&root)?;
-            check_semantic_identities(&root)?;
-            check_application_packages(&root)?;
-            check_db2_catalog(&root)?;
-            check_batch_controllers(&root)?;
-            check_host_abi_libraries(&root)?;
-            check_program_registry(&root)?;
-            check_route_registries(&root)?;
-            check_migration_rollback_rollup(&root)?;
-            check_full_regression(&root)?;
-            check_review_repair(&root)?;
-            check_review_repair_round_2(&root)?;
-            check_review_repair_round_3(&root)
-        }
-        "certification" => check_certification(&root),
-        "carddemo-corpus" => check_carddemo_corpus(&root),
-        "carddemo-source" => check_carddemo_source(&root),
-        "carddemo-closure" => check_carddemo_closure(&root),
-        "carddemo-layout" => check_carddemo_layout(&root),
-        "carddemo-control" => check_carddemo_control(&root),
-        "carddemo-core" => check_carddemo_core(&root),
-        "carddemo-file-call" => check_carddemo_file_call(&root),
-        "carddemo-host" => check_carddemo_host(&root),
-        "carddemo-package" => check_carddemo_package(&root),
-        "carddemo-resources" => check_carddemo_resources(&root),
-        "carddemo-programs" => check_carddemo_programs(&root),
-        "carddemo-cics" => check_carddemo_cics(&root),
-        "carddemo-cics-runtime" => check_carddemo_cics_runtime(&root),
-        "carddemo-vsam" => check_carddemo_vsam(&root),
-        "carddemo-dataset-catalog" => check_carddemo_dataset_catalog(&root),
-        "carddemo-seeds" => check_carddemo_seeds(&root),
-        "carddemo-security" => check_carddemo_security(&root),
-        "carddemo-terminal" => check_carddemo_terminal(&root),
-        "carddemo-base-online" => check_carddemo_base_online(&root),
-        "carddemo-jcl" => check_carddemo_jcl(&root),
-        "carddemo-utilities" => check_carddemo_utilities(&root),
-        "carddemo-batch-programs" => check_carddemo_batch_programs(&root),
-        "carddemo-base-batch" => check_carddemo_base_batch(&root),
-        "carddemo-db2" => check_carddemo_db2(&root),
-        "carddemo-ims" => check_carddemo_ims(&root),
-        "carddemo-mq-authorization" => check_carddemo_mq_authorization(&root),
-        "carddemo-operator-install" => check_carddemo_operator_install(&root),
-        "carddemo-operator-compile" => check_carddemo_operator_compile(&root),
-        "carddemo-operator-submit" => check_carddemo_operator_submit(&root),
-        "carddemo-operator-reset" => check_carddemo_operator_reset(&root),
-        "carddemo-full" => check_carddemo_full(&root),
-        "digest" => print_digest(&root),
-        "release" if check => {
-            let target = explicit_release_target(&arguments)?;
-            check_release_artifacts(&root, &target)
-        }
-        "release" => {
-            let target = explicit_release_target(&arguments)?;
-            generate_release_artifacts(&root, &target)
-        }
-        "help" | "--help" | "-h" => {
-            println!(
-                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|coverage|semantic-identities|application-packages|db2-catalog|batch-controllers|abi-libraries|program-registry|route-registries|dehardcoding|ledger-consistency|migration-rollback|full-regression|review-repair|review-repair-round-2|review-repair-round-3|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check; release additionally requires --target <triple>"
-            );
-            Ok(())
-        }
-        other => Err(format!("unknown command {other:?}")),
-    }?;
-
+    let Some(command) = Cli::parse().command else {
+        Cli::command()
+            .print_help()
+            .map_err(|error| error.to_string())?;
+        println!();
+        return Ok(());
+    };
+    let (name, check, result) = execute_command(&root, command);
+    result?;
     if check {
-        println!("{command}: pass");
+        println!("{name}: pass");
     }
     Ok(())
+}
+
+fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, TaskResult) {
+    macro_rules! checked {
+        ($name:literal, $args:expr, $call:expr) => {
+            ($name, $args.check, $call)
+        };
+    }
+    match command {
+        XtaskCommand::Versions(args) => checked!("versions", args, check_versions(root)),
+        XtaskCommand::Architecture(args) => {
+            checked!("architecture", args, check_architecture(root))
+        }
+        XtaskCommand::RuntimeArchitecture(args) => checked!(
+            "runtime-architecture",
+            args,
+            check_runtime_architecture(root)
+        ),
+        XtaskCommand::Profiles(args) => checked!("profiles", args, check_profiles(root)),
+        XtaskCommand::Schemas(args) => checked!("schemas", args, check_schemas(root)),
+        XtaskCommand::Inventory(args) => checked!("inventory", args, check_inventory(root)),
+        XtaskCommand::Evidence(args) => match (args.check, args.command) {
+            (check, None) => ("evidence", check, check_evidence(root)),
+            (false, Some(EvidenceCommand::Seal(args))) => (
+                "evidence seal",
+                args.check,
+                if args.check {
+                    check_evidence_seal(root)
+                } else {
+                    generate_evidence_seal(root)
+                },
+            ),
+            (false, Some(EvidenceCommand::Callback(args))) => (
+                "evidence callback",
+                false,
+                write_evidence_callback(root, &args.output),
+            ),
+            (true, Some(_)) => (
+                "evidence",
+                true,
+                Err("evidence --check cannot be combined with a nested subcommand".into()),
+            ),
+        },
+        XtaskCommand::Coverage(args) => checked!("coverage", args, check_coverage(root)),
+        XtaskCommand::ApplicationPackages(args) => checked!(
+            "application-packages",
+            args,
+            check_application_packages(root)
+        ),
+        XtaskCommand::Db2Catalog(args) => checked!("db2-catalog", args, check_db2_catalog(root)),
+        XtaskCommand::BatchControllers(args) => {
+            checked!("batch-controllers", args, check_batch_controllers(root))
+        }
+        XtaskCommand::AbiLibraries(args) => checked!(
+            "abi-libraries",
+            args,
+            if args.check {
+                check_host_abi_libraries(root)
+            } else {
+                generate_host_abi_inventory(root)
+            }
+        ),
+        XtaskCommand::ProgramRegistry(args) => checked!(
+            "program-registry",
+            args,
+            if args.check {
+                check_program_registry(root)
+            } else {
+                generate_program_registry(root)
+            }
+        ),
+        XtaskCommand::RouteRegistries(args) => checked!(
+            "route-registries",
+            args,
+            if args.check {
+                check_route_registries(root)
+            } else {
+                generate_route_registries(root)
+            }
+        ),
+        XtaskCommand::Dehardcoding(args) => {
+            checked!("dehardcoding", args, check_dehardcoding(root))
+        }
+        XtaskCommand::LedgerConsistency(args) => checked!(
+            "ledger-consistency",
+            args,
+            check_workload_ledger_consistency(root)
+        ),
+        XtaskCommand::MigrationRollback(args) => checked!(
+            "migration-rollback",
+            args,
+            check_migration_rollback_rollup(root)
+        ),
+        XtaskCommand::FullRegression(args) => {
+            checked!("full-regression", args, check_full_regression(root))
+        }
+        XtaskCommand::ReviewRepair(args) => {
+            checked!("review-repair", args, check_review_repair(root))
+        }
+        XtaskCommand::ReviewRepairRound2(args) => checked!(
+            "review-repair-round-2",
+            args,
+            check_review_repair_round_2(root)
+        ),
+        XtaskCommand::ReviewRepairRound3(args) => checked!(
+            "review-repair-round-3",
+            args,
+            check_review_repair_round_3(root)
+        ),
+        XtaskCommand::ReviewRepairRound4(args) => checked!(
+            "review-repair-round-4",
+            args,
+            check_review_repair_round_4(root)
+        ),
+        XtaskCommand::SemanticIdentities(args) => checked!(
+            "semantic-identities",
+            args,
+            if args.check {
+                check_semantic_identities(root)
+            } else {
+                generate_semantic_identities(root)
+            }
+        ),
+        XtaskCommand::Conformance(args) => checked!("conformance", args, check_conformance(root)),
+        XtaskCommand::Certification(args) => {
+            checked!("certification", args, check_certification(root))
+        }
+        XtaskCommand::CarddemoCorpus(args) => {
+            checked!("carddemo-corpus", args, check_carddemo_corpus(root))
+        }
+        XtaskCommand::CarddemoSource(args) => {
+            checked!("carddemo-source", args, check_carddemo_source(root))
+        }
+        XtaskCommand::CarddemoClosure(args) => {
+            checked!("carddemo-closure", args, check_carddemo_closure(root))
+        }
+        XtaskCommand::CarddemoLayout(args) => {
+            checked!("carddemo-layout", args, check_carddemo_layout(root))
+        }
+        XtaskCommand::CarddemoControl(args) => {
+            checked!("carddemo-control", args, check_carddemo_control(root))
+        }
+        XtaskCommand::CarddemoCore(args) => {
+            checked!("carddemo-core", args, check_carddemo_core(root))
+        }
+        XtaskCommand::CarddemoFileCall(args) => {
+            checked!("carddemo-file-call", args, check_carddemo_file_call(root))
+        }
+        XtaskCommand::CarddemoHost(args) => {
+            checked!("carddemo-host", args, check_carddemo_host(root))
+        }
+        XtaskCommand::CarddemoPackage(args) => {
+            checked!("carddemo-package", args, check_carddemo_package(root))
+        }
+        XtaskCommand::CarddemoResources(args) => {
+            checked!("carddemo-resources", args, check_carddemo_resources(root))
+        }
+        XtaskCommand::CarddemoPrograms(args) => {
+            checked!("carddemo-programs", args, check_carddemo_programs(root))
+        }
+        XtaskCommand::CarddemoCics(args) => {
+            checked!("carddemo-cics", args, check_carddemo_cics(root))
+        }
+        XtaskCommand::CarddemoCicsRuntime(args) => checked!(
+            "carddemo-cics-runtime",
+            args,
+            check_carddemo_cics_runtime(root)
+        ),
+        XtaskCommand::CarddemoVsam(args) => {
+            checked!("carddemo-vsam", args, check_carddemo_vsam(root))
+        }
+        XtaskCommand::CarddemoDatasetCatalog(args) => checked!(
+            "carddemo-dataset-catalog",
+            args,
+            check_carddemo_dataset_catalog(root)
+        ),
+        XtaskCommand::CarddemoSeeds(args) => {
+            checked!("carddemo-seeds", args, check_carddemo_seeds(root))
+        }
+        XtaskCommand::CarddemoSecurity(args) => {
+            checked!("carddemo-security", args, check_carddemo_security(root))
+        }
+        XtaskCommand::CarddemoTerminal(args) => {
+            checked!("carddemo-terminal", args, check_carddemo_terminal(root))
+        }
+        XtaskCommand::CarddemoBaseOnline(args) => checked!(
+            "carddemo-base-online",
+            args,
+            check_carddemo_base_online(root)
+        ),
+        XtaskCommand::CarddemoJcl(args) => {
+            checked!("carddemo-jcl", args, check_carddemo_jcl(root))
+        }
+        XtaskCommand::CarddemoUtilities(args) => {
+            checked!("carddemo-utilities", args, check_carddemo_utilities(root))
+        }
+        XtaskCommand::CarddemoBatchPrograms(args) => checked!(
+            "carddemo-batch-programs",
+            args,
+            check_carddemo_batch_programs(root)
+        ),
+        XtaskCommand::CarddemoBaseBatch(args) => {
+            checked!("carddemo-base-batch", args, check_carddemo_base_batch(root))
+        }
+        XtaskCommand::CarddemoDb2(args) => {
+            checked!("carddemo-db2", args, check_carddemo_db2(root))
+        }
+        XtaskCommand::CarddemoIms(args) => {
+            checked!("carddemo-ims", args, check_carddemo_ims(root))
+        }
+        XtaskCommand::CarddemoMqAuthorization(args) => checked!(
+            "carddemo-mq-authorization",
+            args,
+            check_carddemo_mq_authorization(root)
+        ),
+        XtaskCommand::CarddemoOperatorInstall(args) => checked!(
+            "carddemo-operator-install",
+            args,
+            check_carddemo_operator_install(root)
+        ),
+        XtaskCommand::CarddemoOperatorCompile(args) => checked!(
+            "carddemo-operator-compile",
+            args,
+            check_carddemo_operator_compile(root)
+        ),
+        XtaskCommand::CarddemoOperatorSubmit(args) => checked!(
+            "carddemo-operator-submit",
+            args,
+            check_carddemo_operator_submit(root)
+        ),
+        XtaskCommand::CarddemoOperatorReset(args) => checked!(
+            "carddemo-operator-reset",
+            args,
+            check_carddemo_operator_reset(root)
+        ),
+        XtaskCommand::CarddemoFull(args) => {
+            checked!("carddemo-full", args, check_carddemo_full(root))
+        }
+        XtaskCommand::Digest(args) => checked!("digest", args, print_digest(root)),
+        XtaskCommand::Release(args) => (
+            "release",
+            args.check,
+            if args.check {
+                check_release_artifacts(root, &args.target)
+            } else {
+                generate_release_artifacts(root, &args.target)
+            },
+        ),
+    }
+}
+
+fn check_conformance(root: &Path) -> TaskResult {
+    check_versions(root)?;
+    check_architecture(root)?;
+    check_profiles(root)?;
+    check_schemas(root)?;
+    check_inventory(root)?;
+    check_evidence(root)?;
+    check_coverage(root)?;
+    check_semantic_identities(root)?;
+    check_application_packages(root)?;
+    check_db2_catalog(root)?;
+    check_batch_controllers(root)?;
+    check_host_abi_libraries(root)?;
+    check_program_registry(root)?;
+    check_route_registries(root)?;
+    check_migration_rollback_rollup(root)?;
+    check_full_regression(root)?;
+    check_review_repair(root)?;
+    check_review_repair_round_2(root)?;
+    check_review_repair_round_3(root)?;
+    check_review_repair_round_4(root)
+}
+
+fn generate_evidence_seal(root: &Path) -> TaskResult {
+    evidence_seal::generate(root)
+}
+
+fn check_evidence_seal(root: &Path) -> TaskResult {
+    evidence_seal::check(root)
+}
+
+fn write_evidence_callback(root: &Path, output: &Path) -> TaskResult {
+    evidence_seal::callback(root, output)
 }
 
 fn check_carddemo_cics(root: &Path) -> TaskResult {
@@ -1749,6 +2048,11 @@ fn schema_for_0_2_artifact(version: &str) -> Option<&'static str> {
         "mainframe-env.review-repair@1" => Some("review-repair.schema.json"),
         "mainframe-env.review-repair-round-2@1" => Some("review-repair-round-2.schema.json"),
         "mainframe-env.review-repair-round-3@1" => Some("review-repair-round-3.schema.json"),
+        "mainframe-env.review-repair-round-4@1" => Some("review-repair-round-4.schema.json"),
+        "mainframe-env.review-repair-round-4-inputs@1" => {
+            Some("review-repair-round-4-inputs.schema.json")
+        }
+        "mainframe-env.github-actions-receipt@1" => Some("github-actions-receipt.schema.json"),
         "mainframe-env.work-package-amendments@1" => Some("work-package-amendments.schema.json"),
         "mainframe-env.common-program-catalog@1" => Some("common-program-catalog.schema.json"),
         "mainframe-env.zosmf-official-route-bindings@1"
@@ -3430,8 +3734,7 @@ fn check_coverage_work_package_evidence(root: &Path) -> TaskResult {
             .get("receipt")
             .and_then(Value::as_object)
             .ok_or_else(|| format!("{} has no receipt object", path.display()))?;
-        let canonical = serde_json::to_vec(receipt).map_err(|error| error.to_string())?;
-        let digest = format!("sha256:{:x}", Sha256::digest(canonical));
+        let digest = canonical_evidence_digest(receipt)?;
         require(
             evidence["evidence_digest"].as_str() == Some(digest.as_str()),
             &format!("{} evidence digest is stale", path.display()),
@@ -3715,6 +4018,7 @@ fn check_workload_ledger_consistency(root: &Path) -> TaskResult {
         "carddemo-full",
         "live-zowe-route",
         "release-checks",
+        "evidence-sealing",
     ]);
     let actual_exit_gates = exit_gates
         .iter()
@@ -4040,8 +4344,7 @@ fn check_review_repair(root: &Path) -> TaskResult {
         .get("receipt")
         .and_then(Value::as_object)
         .ok_or("review repair receipt is missing")?;
-    let canonical = serde_json::to_vec(receipt).map_err(|error| error.to_string())?;
-    let digest = format!("sha256:{:x}", Sha256::digest(canonical));
+    let digest = canonical_evidence_digest(receipt)?;
     require(
         evidence["evidence_digest"].as_str() == Some(digest.as_str()),
         "review repair evidence digest is stale",
@@ -4163,8 +4466,7 @@ fn check_review_repair_round_2(root: &Path) -> TaskResult {
         .get("receipt")
         .and_then(Value::as_object)
         .ok_or("round-2 review repair receipt is missing")?;
-    let canonical = serde_json::to_vec(receipt).map_err(|error| error.to_string())?;
-    let digest = format!("sha256:{:x}", Sha256::digest(canonical));
+    let digest = canonical_evidence_digest(receipt)?;
     require(
         evidence["evidence_digest"].as_str() == Some(digest.as_str()),
         "round-2 review repair evidence digest is stale",
@@ -4327,8 +4629,7 @@ fn check_review_repair_round_3(root: &Path) -> TaskResult {
         .get("receipt")
         .and_then(Value::as_object)
         .ok_or("round-3 review repair receipt is missing")?;
-    let canonical = serde_json::to_vec(receipt).map_err(|error| error.to_string())?;
-    let digest = format!("sha256:{:x}", Sha256::digest(canonical));
+    let digest = canonical_evidence_digest(receipt)?;
     require(
         evidence["evidence_digest"].as_str() == Some(digest.as_str()),
         "round-3 review repair evidence digest is stale",
@@ -4530,6 +4831,164 @@ fn check_review_repair_round_3(root: &Path) -> TaskResult {
             && receipt["remote_actions"]["merged"] == Value::Bool(false),
         "round-3 review repair crossed the release boundary",
     )
+}
+
+fn check_review_repair_round_4(root: &Path) -> TaskResult {
+    check_review_repair_round_3(root)?;
+    check_evidence_seal(root)?;
+    let path = root.join("conformance/0.2/evidence/review-repair-round-4.json");
+    let evidence = json(&path)?;
+    require(
+        evidence["schema_version"] == Value::String("mainframe-env.review-repair-round-4@1".into())
+            && evidence["derived"] == Value::Bool(true)
+            && evidence["status"] == Value::String("pass".into()),
+        "round-four review repair evidence header is invalid",
+    )?;
+    let receipt = evidence
+        .get("receipt")
+        .and_then(Value::as_object)
+        .ok_or("round-four review repair receipt is missing")?;
+    let digest = canonical_evidence_digest(receipt)?;
+    require(
+        evidence["evidence_digest"].as_str() == Some(digest.as_str()),
+        "round-four review repair evidence digest is stale",
+    )?;
+    let receipt = Value::Object(receipt.clone());
+    require(
+        receipt["target_version"] == Value::String("0.2.0".into())
+            && receipt["accepted_parent"]
+                == Value::String("b61d604fbdf4867154f235d45fd4453ef7e3b79d".into())
+            && receipt["branch"] == Value::String("impl/0.2.0".into())
+            && receipt["base"] == Value::String("main".into())
+            && receipt["pull_request"].as_u64() == Some(1)
+            && receipt["future_ci_success_claimed"] == Value::Bool(false),
+        "round-four source, branch, or future-CI boundary is invalid",
+    )?;
+    let findings = array(&receipt, "findings", &path)?;
+    require(
+        findings.len() == 3
+            && findings.iter().enumerate().all(|(index, finding)| {
+                finding["id"].as_u64() == Some((index + 1) as u64)
+                    && finding["state"] == Value::String("closed".into())
+                    && finding["repair"]
+                        .as_str()
+                        .is_some_and(|text| !text.is_empty())
+                    && finding["regression"]
+                        .as_str()
+                        .is_some_and(|text| !text.is_empty())
+            }),
+        "round-four repair must close exactly findings 1 through 3",
+    )?;
+    let supersession = &receipt["round_three_supersession"];
+    require(
+        supersession["status"] == Value::String("superseded".into())
+            && supersession["original"]["completion_commit"]
+                == Value::String("ab4894d6111910b08f37579134520a1de93a1e8a".into())
+            && supersession["original"]["evidence_digest"]
+                == Value::String(
+                    "sha256:bc89e54756b11557bb5828357a1de8661e9d821f7fa9d481129be92994fdbbf9"
+                        .into(),
+                )
+            && supersession["accepted_follow_up"]["tip"]
+                == Value::String("b61d604fbdf4867154f235d45fd4453ef7e3b79d".into())
+            && supersession["accepted_follow_up"]["candidate_source_digest"]
+                == Value::String(
+                    "sha256:b812dbbae8d65467c5576c97314a0a0a2437efb13fccad3a8edebb02657e7435"
+                        .into(),
+                ),
+        "round-three supersession does not preserve and correct the historical identity",
+    )?;
+    require(
+        supersession["accepted_follow_up"]["candidate_source_digest"].as_str()
+            == Some(
+                repository_digest_at_commit(root, "b61d604fbdf4867154f235d45fd4453ef7e3b79d")?
+                    .as_str(),
+            ),
+        "accepted round-three follow-up candidate digest drifted",
+    )?;
+    let failed = supersession["failed_candidates"]
+        .as_array()
+        .ok_or("round-three supersession failed candidates are missing")?;
+    require(
+        failed.len() == 3
+            && failed.iter().all(|run| {
+                run["event"] == Value::String("pull_request".into())
+                    && run["run_status"] == Value::String("completed".into())
+                    && run["run_conclusion"] == Value::String("failure".into())
+                    && run["job"]["name"] == Value::String("v0-foundation".into())
+                    && run["job"]["conclusion"] == Value::String("failure".into())
+            })
+            && failed
+                .iter()
+                .filter_map(|run| run["run_id"].as_u64())
+                .collect::<BTreeSet<_>>()
+                == BTreeSet::from([33420718088, 33422012078, 33424133663]),
+        "round-three supersession failed-run identities are incomplete",
+    )?;
+    let accepted = supersession["accepted_follow_up"]["checks"]
+        .as_array()
+        .ok_or("round-three supersession accepted checks are missing")?;
+    require(
+        accepted.len() == 2
+            && accepted.iter().all(|run| {
+                run["head_sha"] == Value::String("b61d604fbdf4867154f235d45fd4453ef7e3b79d".into())
+                    && run["run_status"] == Value::String("completed".into())
+                    && run["run_conclusion"] == Value::String("success".into())
+                    && run["job"]["name"] == Value::String("v0-foundation".into())
+                    && run["job"]["conclusion"] == Value::String("success".into())
+            })
+            && accepted
+                .iter()
+                .filter_map(|run| run["event"].as_str())
+                .collect::<BTreeSet<_>>()
+                == BTreeSet::from(["pull_request", "push"])
+            && accepted
+                .iter()
+                .filter_map(|run| run["run_id"].as_u64())
+                .collect::<BTreeSet<_>>()
+                == BTreeSet::from([33425915373, 33425919905]),
+        "round-three supersession accepted run identities are incomplete",
+    )?;
+    let source_path = supersession["source_provenance"]["path"]
+        .as_str()
+        .ok_or("round-three supersession source path is missing")?;
+    evidence_seal::validate_actions_source(root, &json(&root.join(source_path))?)?;
+    require(
+        fs::read(root.join("conformance/0.2/evidence/review-repair-round-3.json"))
+            .map_err(|error| error.to_string())?
+            == git_file_bytes(
+                root,
+                "ab4894d6111910b08f37579134520a1de93a1e8a",
+                "conformance/0.2/evidence/review-repair-round-3.json",
+            )?,
+        "historical round-three receipt was rewritten instead of superseded",
+    )?;
+    let completions = evidence_seal::round_four_completion_commits(root, Some(&digest))?;
+    require(
+        completions.len() <= 1,
+        "round-four completion identity is duplicated",
+    )?;
+    if let Some(completion) = completions.first() {
+        require(
+            command_text(root, "git", &["rev-parse", &format!("{completion}^")])?
+                == "b61d604fbdf4867154f235d45fd4453ef7e3b79d",
+            "round-four completion parent is not the accepted b61d604 tip",
+        )?;
+        for artifact in array(&receipt, "artifacts", &path)? {
+            let relative = text(artifact, "path", &path)?;
+            let expected = text(artifact, "sha256", &path)?;
+            require(
+                expected == format!("sha256:{}", git_file_digest(root, completion, relative)?),
+                &format!("round-four sealed artifact drifted: {relative}"),
+            )?;
+        }
+    }
+    require(
+        receipt["remote_actions"]
+            == json!({"tagged": false, "published": false, "deployed": false, "merged": false}),
+        "round-four repair crossed the remote-action boundary",
+    )?;
+    Ok(())
 }
 
 fn validate_official_source(source: &Value, path: &Path, baseline: &str) -> TaskResult {
@@ -4739,6 +5198,8 @@ fn check_certification(root: &Path) -> TaskResult {
     check_semantic_identities(root)?;
     check_application_packages(root)?;
     check_db2_catalog(root)?;
+    check_review_repair_round_4(root)?;
+    check_evidence_seal(root)?;
     check_runtime_architecture(root)?;
 
     let inventory = root.join("conformance/0.1/inventory");
@@ -4994,6 +5455,7 @@ fn repository_digest_excluded(relative: &Path) -> bool {
         || relative == Path::new("conformance/0.2/evidence/review-repair.json")
         || relative == Path::new("conformance/0.2/evidence/review-repair-round-2.json")
         || relative == Path::new("conformance/0.2/evidence/review-repair-round-3.json")
+        || relative == Path::new("conformance/0.2/evidence/review-repair-round-4.json")
         || relative == Path::new("conformance/0.2/evidence/work-packages/CV-209.json")
         || relative == Path::new("docs/delivery/coverage-versions/status/0.2.0.md")
         || (relative_text.starts_with("conformance/0.1/evidence/phase-v")
@@ -5017,6 +5479,9 @@ fn release_source_digest(root: &Path) -> TaskResult<String> {
             || relative == Path::new("conformance/0.2/evidence/review-repair.json")
             || relative == Path::new("conformance/0.2/evidence/review-repair-round-2.json")
             || relative == Path::new("conformance/0.2/evidence/review-repair-round-3.json")
+            || relative == Path::new("conformance/0.2/evidence/review-repair-round-4.json")
+            || relative == Path::new("conformance/0.2/evidence/review-repair-round-4-inputs.json")
+            || relative == Path::new("conformance/0.2/evidence/sources/round-3-ci-runs.json")
             || relative == Path::new("conformance/0.2/evidence/work-packages/CV-209.json")
             || relative == Path::new("docs/delivery/coverage-versions/status/0.2.0.md")
         {
@@ -5032,6 +5497,7 @@ fn release_source_digest(root: &Path) -> TaskResult<String> {
     Ok(format!("sha256:{:x}", digest.finalize()))
 }
 
+#[cfg(test)]
 fn explicit_release_target(arguments: &[String]) -> TaskResult<String> {
     let positions = arguments
         .iter()
@@ -5575,6 +6041,11 @@ fn pretty_json(value: &Value) -> TaskResult<Vec<u8>> {
     Ok(bytes)
 }
 
+fn canonical_evidence_digest(receipt: &serde_json::Map<String, Value>) -> TaskResult<String> {
+    let canonical = serde_json::to_vec(receipt).map_err(|error| error.to_string())?;
+    Ok(format!("sha256:{:x}", Sha256::digest(canonical)))
+}
+
 fn file_digest(path: &Path) -> TaskResult<String> {
     let bytes = fs::read(path).map_err(|error| format!("{}: {error}", path.display()))?;
     Ok(format!("{:x}", Sha256::digest(bytes)))
@@ -5760,6 +6231,38 @@ fn require(condition: bool, message: &str) -> TaskResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn strict_cli_rejects_unknown_duplicate_and_surplus_arguments() {
+        for arguments in [
+            vec!["xtask", "evidence", "seal", "--unknown"],
+            vec!["xtask", "evidence", "seal", "--check", "--check"],
+            vec!["xtask", "evidence", "seal", "surplus"],
+            vec!["xtask", "release", "--target", "host", "--target", "other"],
+            vec![
+                "xtask",
+                "evidence",
+                "callback",
+                "--output",
+                "/tmp/ROUND_4_DONE.json",
+                "--tip",
+                "forged",
+            ],
+        ] {
+            assert!(Cli::try_parse_from(arguments).is_err());
+        }
+        assert!(Cli::try_parse_from(["xtask", "evidence", "seal", "--check"]).is_ok());
+        assert!(
+            Cli::try_parse_from([
+                "xtask",
+                "release",
+                "--check",
+                "--target",
+                "x86_64-unknown-linux-gnu",
+            ])
+            .is_ok()
+        );
+    }
 
     fn temporary_git_repository(name: &str) -> PathBuf {
         let nonce = SystemTime::now()

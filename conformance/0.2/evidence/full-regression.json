@@ -1,108 +1,180 @@
 {
-  "schema_version": "mainframe-env.full-regression@1",
-  "target_version": "0.2.0",
-  "status": "pass",
   "candidate": {
-    "source_digest": "sha256:b812dbbae8d65467c5576c97314a0a0a2437efb13fccad3a8edebb02657e7435",
-    "work_package_base_commit": "edb4558c987a56ee9f0c96438f756d663199942f",
+    "accepted_carddemo_commit": "857115b907ce7098c965a51117a079048ea8182e",
+    "accepted_carddemo_tree": "7e1fa73f4c808a89ddb4f98c0e3f7d0207f861ea",
     "accepted_release_commit": "44f3081eb2fdf22d09e1a97725f5a4163431ca70",
     "accepted_release_tree": "3d504ece02f1c09e124606ded695b00ba984d104",
-    "accepted_carddemo_commit": "857115b907ce7098c965a51117a079048ea8182e",
-    "accepted_carddemo_tree": "7e1fa73f4c808a89ddb4f98c0e3f7d0207f861ea"
+    "source_digest": "sha256:7d7906d3f808e8e26e041475c3ad0ec25d2a43a42f14ce55150f6d3a86854a59",
+    "work_package_base_commit": "edb4558c987a56ee9f0c96438f756d663199942f"
+  },
+  "candidate_unchanged": true,
+  "carddemo": {
+    "corpus_commit": "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e",
+    "full_shape_sha256": "d4701b06593307c36c2355f9a06c21e79a0969588816bdecf522ee7b0033bed3",
+    "issues_input_passed": 26,
+    "journeys_passed": 20,
+    "mixed_requests_completed": 16,
+    "native_or_legacy_fallback_present": false
   },
   "environment": {
-    "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
     "cargo": "cargo 1.98.0 (797e8a9bc 2026-08-05)",
     "msrv_toolchain": "1.95.0-aarch64-apple-darwin",
     "platform": "Darwin 25.5.0 arm64",
     "postgresql_image": "postgres:18",
     "postgresql_server": "18.6 (Debian 18.6-1.pgdg13+2)",
+    "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
     "zowe_cli": "8.36.0",
     "zowe_release": "v3.6.0"
   },
-  "results": [
-    {"command": "cargo fmt --all -- --check", "exit_code": 0, "result": "pass"},
-    {"command": "cargo check --workspace --all-targets --all-features --locked", "exit_code": 0, "result": "pass"},
-    {"command": "MAINFRAME_ENV_POSTGRES_TEST_URL=<disposable> cargo test --workspace --all-features --locked --no-fail-fast", "exit_code": 0, "result": "315 passed, 3 explicitly ignored"},
-    {"command": "MAINFRAME_ENV_POSTGRES_TEST_URL=<disposable> cargo test -p mainframe-env-store durable::tests::postgres18_migration_and_durable_contracts --all-features --locked -- --ignored --exact", "exit_code": 0, "result": "PostgreSQL 18 migration, execution, provider-state, replay, and restart controls passed"},
-    {"command": "MAINFRAME_ENV_POSTGRES_TEST_URL=<disposable> cargo test -p mainframe-env-conformance carddemo::tests::carddemo_full_memory_sqlite_and_postgres_controls --all-features --locked -- --ignored --exact", "exit_code": 0, "result": "memory, SQLite backup/restore, PostgreSQL restart, overload, and principal-isolation controls passed"},
-    {"command": "CARDDEMO_CORPUS_DIR=<clean-pin> MAINFRAME_ENV_POSTGRES_TEST_URL=<disposable> cargo xtask carddemo-full --check", "exit_code": 0, "result": "20/20 journeys; full shape sha256:d4701b06593307c36c2355f9a06c21e79a0969588816bdecf522ee7b0033bed3"},
-    {"command": "Zowe CLI 8.36.0 live route flow against ephemeral ProductServer", "exit_code": 0, "result": "submitted exact ESDSRRDS JCL, observed JOB00001 OUTPUT CC 0000, and downloaded identical PS and ESDS records"},
-    {"command": "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings", "exit_code": 0, "result": "pass"},
-    {"command": "RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --locked", "exit_code": 0, "result": "pass"},
-    {"command": "cargo +1.95.0 check --locked -p mainframe-env-source -p mainframe-env-diagnostics -p mainframe-env-encoding -p mainframe-env-ir -p mainframe-env-compiler-api -p mainframe-env-execution-api -p mainframe-env-host-api -p mainframe-env-store-api -p mainframe-env-coverage", "exit_code": 0, "result": "contract and foundation MSRV pass"},
-    {"command": "cargo deny check", "exit_code": 0, "result": "advisories, bans, licenses, and sources pass"},
-    {"command": "cargo xtask runtime-architecture --check", "exit_code": 0, "result": "release server build and SQLite live smoke pass"},
-    {"command": "cargo xtask architecture --check && cargo xtask profiles --check && cargo xtask schemas --check && cargo xtask inventory --check && cargo xtask evidence --check && cargo xtask coverage --check", "exit_code": 0, "result": "Draft 2020-12 schemas compiled, every bound 0.2/release JSON artifact validated, and all structural gates passed"},
-    {"command": "cargo xtask conformance --check", "exit_code": 0, "result": "all 0.1 historical and 0.2 catalog, registry, dehardcoding, ledger, migration, and regression gates pass"},
-    {"command": "cargo xtask certification --check", "exit_code": 0, "result": "release-mode smoke, workspace tests, package/authority closure, and release artifacts pass"},
-    {"command": "clean checkout at a second path: cargo xtask release --check --target aarch64-apple-darwin", "exit_code": 0, "result": "six retained macOS documents, build inputs, and both binary identities reproduced byte-for-byte"},
-    {"command": "clean pinned Bookworm checkout at a second path: cargo xtask release --check --target x86_64-unknown-linux-gnu", "exit_code": 0, "result": "six retained Linux documents, build inputs, and both x86_64 binary identities reproduced byte-for-byte"},
-    {"command": "git diff --check", "exit_code": 0, "result": "pass"}
-  ],
-  "workspace": {
-    "test_floor": 260,
-    "tests_passed": 315,
-    "tests_ignored_in_workspace_command": 3,
-    "failures": 0,
-    "strict_clippy": true,
-    "rustdoc_warnings": 0,
-    "msrv_passed": true,
-    "dependency_policy_passed": true
-  },
-  "postgresql": {
-    "version": "18",
-    "server_version": "18.6 (Debian 18.6-1.pgdg13+2)",
-    "controls_passed": 3,
-    "migration_and_store_contract": true,
-    "restart_control": true,
-    "disposable_database": true
-  },
-  "carddemo": {
-    "corpus_commit": "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e",
-    "journeys_passed": 20,
-    "issues_input_passed": 26,
-    "mixed_requests_completed": 16,
-    "full_shape_sha256": "d4701b06593307c36c2355f9a06c21e79a0969588816bdecf522ee7b0033bed3",
-    "native_or_legacy_fallback_present": false
-  },
   "live_zowe": {
     "cli_version": "8.36.0",
-    "zowe_release": "v3.6.0",
-    "routes_passed": 4,
-    "job": "ESDSRRDS/JOB00001",
-    "retcode": "CC 0000",
     "dataset_reads": 2,
-    "records_per_dataset": 10
+    "job": "ESDSRRDS/JOB00001",
+    "records_per_dataset": 10,
+    "retcode": "CC 0000",
+    "routes_passed": 4,
+    "zowe_release": "v3.6.0"
+  },
+  "postgresql": {
+    "controls_passed": 3,
+    "disposable_database": true,
+    "migration_and_store_contract": true,
+    "restart_control": true,
+    "server_version": "18.6 (Debian 18.6-1.pgdg13+2)",
+    "version": "18"
   },
   "release": {
     "artifacts_verified": true,
-    "version": "0.2.0",
+    "published": false,
     "targets": {
       "aarch64-apple-darwin": {
-        "manifest_sha256": "894b084918b4deb6e5b9c0697334ea86661e611b3bdfa01257134bd6e24d1c07",
-        "sbom_sha256": "f1dc66d80400fb4d0141e9a6d903c31ba62f81b2c5cd90fa8f32863aabd67a4c",
-        "provenance_sha256": "d6971932f5b3b6283738c093daa76d3e7e7fe2a25ada2625d30d4a0a4f6fa607",
-        "checksums_sha256": "b86df59602cb322a6a6c387c563a08c27739bbc73a41d7530d6f23d9f3dc1fa0",
+        "build_inputs_sha256": "3d62f7c5580384e181affad51ed04b17880f6cec06f534ce8c5b4a426af30abe",
+        "checksums_sha256": "8e4e0a7d7f07aabc9b54b09fbc113c108602370b4aae50d8b59b81da1822794f",
         "licenses_sha256": "127803aadf60cd9d34c1b177f70ee0a32cdf701247053dbcbdd50b24b49acadb",
-        "build_inputs_sha256": "ff30b1d0245aa5dbb219556685a1beabaea4ace8a86ab71164b9a9cf5c0ff207"
+        "manifest_sha256": "2390a056721e7d01f22917312d7fdf8807c58cc40d092860b1966d75c850c1f8",
+        "provenance_sha256": "c447ffdd4dcbecbaae420bf7fb625b94db420da35ceb9c4670650d85992091df",
+        "sbom_sha256": "af8e6c96149a7b38f9c04b9e0bb4747cdd4cdc5a4175caccb6f49779158679aa"
       },
       "x86_64-unknown-linux-gnu": {
-        "manifest_sha256": "1e1062485afca6eb3c2dc3feaf3d9140af5070fb1ca5bd1a74b042e56bdf943b",
-        "sbom_sha256": "f1dc66d80400fb4d0141e9a6d903c31ba62f81b2c5cd90fa8f32863aabd67a4c",
-        "provenance_sha256": "9bc6a166453e40c1ba824b4756df5d2972df71956e2b3d48aa85f85610b95c1f",
-        "checksums_sha256": "4a4c2200c847de51e70cd38e5a3eea0465d79b4d27d7a5a1d792bb2458181520",
+        "build_inputs_sha256": "d3904c36fddebd13bd16d6c8428b7cbcd3d54d47bdd79d6d0189614053d6eceb",
+        "checksums_sha256": "eedd5e810d92aef199e71a133dc9078ad4288d67bfc6875c15a73aaea0dc0d62",
         "licenses_sha256": "127803aadf60cd9d34c1b177f70ee0a32cdf701247053dbcbdd50b24b49acadb",
-        "build_inputs_sha256": "bf1c3acb8a4d518390fda36a85826fe3302de64e6290c2abcc2b364195cea8e4"
+        "manifest_sha256": "b76da5c301ca910239a3c57a79e2eaf3dc8da373922ebc126957708aae7803f7",
+        "provenance_sha256": "fde30389fda06a5d385892a4a7aef53226a95f6000edc789f1578541791b7730",
+        "sbom_sha256": "af8e6c96149a7b38f9c04b9e0bb4747cdd4cdc5a4175caccb6f49779158679aa"
       }
     },
-    "published": false
+    "version": "0.2.0"
   },
-  "candidate_unchanged": true,
   "remote_actions": {
-    "tagged": false,
-    "published": false,
     "deployed": false,
-    "merged": false
+    "merged": false,
+    "published": false,
+    "tagged": false
+  },
+  "results": [
+    {
+      "command": "cargo fmt --all -- --check",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "cargo check --workspace --all-targets --all-features --locked",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "MAINFRAME_ENV_POSTGRES_TEST_URL=<disposable> cargo test --workspace --all-features --locked --no-fail-fast",
+      "exit_code": 0,
+      "result": "325 passed, 3 explicitly ignored"
+    },
+    {
+      "command": "MAINFRAME_ENV_POSTGRES_TEST_URL=<disposable> cargo test -p mainframe-env-store durable::tests::postgres18_migration_and_durable_contracts --all-features --locked -- --ignored --exact",
+      "exit_code": 0,
+      "result": "PostgreSQL 18 migration, execution, provider-state, replay, and restart controls passed"
+    },
+    {
+      "command": "MAINFRAME_ENV_POSTGRES_TEST_URL=<disposable> cargo test -p mainframe-env-conformance carddemo::tests::carddemo_full_memory_sqlite_and_postgres_controls --all-features --locked -- --ignored --exact",
+      "exit_code": 0,
+      "result": "memory, SQLite backup/restore, PostgreSQL restart, overload, and principal-isolation controls passed"
+    },
+    {
+      "command": "CARDDEMO_CORPUS_DIR=<clean-pin> MAINFRAME_ENV_POSTGRES_TEST_URL=<disposable> cargo xtask carddemo-full --check",
+      "exit_code": 0,
+      "result": "20/20 journeys; full shape sha256:d4701b06593307c36c2355f9a06c21e79a0969588816bdecf522ee7b0033bed3"
+    },
+    {
+      "command": "Zowe CLI 8.36.0 live route flow against ephemeral ProductServer",
+      "exit_code": 0,
+      "result": "submitted exact ESDSRRDS JCL, observed JOB00001 OUTPUT CC 0000, and downloaded identical PS and ESDS records"
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --locked",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "cargo +1.95.0 check --locked -p mainframe-env-source -p mainframe-env-diagnostics -p mainframe-env-encoding -p mainframe-env-ir -p mainframe-env-compiler-api -p mainframe-env-execution-api -p mainframe-env-host-api -p mainframe-env-store-api -p mainframe-env-coverage",
+      "exit_code": 0,
+      "result": "contract and foundation MSRV pass"
+    },
+    {
+      "command": "cargo deny check",
+      "exit_code": 0,
+      "result": "advisories, bans, licenses, and sources pass"
+    },
+    {
+      "command": "cargo xtask runtime-architecture --check",
+      "exit_code": 0,
+      "result": "release server build and SQLite live smoke pass"
+    },
+    {
+      "command": "cargo xtask architecture --check && cargo xtask profiles --check && cargo xtask schemas --check && cargo xtask inventory --check && cargo xtask evidence --check && cargo xtask coverage --check",
+      "exit_code": 0,
+      "result": "Draft 2020-12 schemas compiled, every bound 0.2/release JSON artifact validated, and all structural gates passed"
+    },
+    {
+      "command": "cargo xtask conformance --check",
+      "exit_code": 0,
+      "result": "all 0.1 historical and 0.2 catalog, registry, dehardcoding, ledger, migration, and regression gates pass"
+    },
+    {
+      "command": "cargo xtask certification --check",
+      "exit_code": 0,
+      "result": "release-mode smoke, workspace tests, package/authority closure, and release artifacts pass"
+    },
+    {
+      "command": "clean checkout at a second path: cargo xtask release --check --target aarch64-apple-darwin",
+      "exit_code": 0,
+      "result": "six retained macOS documents, build inputs, and both binary identities reproduced byte-for-byte"
+    },
+    {
+      "command": "clean pinned Bookworm checkout at a second path: cargo xtask release --check --target x86_64-unknown-linux-gnu",
+      "exit_code": 0,
+      "result": "six retained Linux documents, build inputs, and both x86_64 binary identities reproduced byte-for-byte"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "result": "pass"
+    }
+  ],
+  "schema_version": "mainframe-env.full-regression@1",
+  "status": "pass",
+  "target_version": "0.2.0",
+  "workspace": {
+    "dependency_policy_passed": true,
+    "failures": 0,
+    "msrv_passed": true,
+    "rustdoc_warnings": 0,
+    "strict_clippy": true,
+    "test_floor": 260,
+    "tests_ignored_in_workspace_command": 3,
+    "tests_passed": 325
   }
 }

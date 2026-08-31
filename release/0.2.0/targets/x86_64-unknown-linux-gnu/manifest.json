@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "path": "bin/mainframe-env-server",
-      "sha256": "15bf15bc6bf081732bf97e366e7ea1265ec19c12d653e7be58c5569ff4082aa3"
+      "sha256": "9d3a98a56c179a839e800265e327681d855f6aad458f8d344ac7383fdd7f9d61"
     },
     {
       "path": "bin/mainframe-env",
@@ -22,7 +22,7 @@
     },
     {
       "path": "build-inputs.json",
-      "sha256": "bf1c3acb8a4d518390fda36a85826fe3302de64e6290c2abcc2b364195cea8e4"
+      "sha256": "d3904c36fddebd13bd16d6c8428b7cbcd3d54d47bdd79d6d0189614053d6eceb"
     }
   ],
   "channel": "stable",

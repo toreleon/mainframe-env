@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/github-actions-receipt@1",
+  "title": "Sourced GitHub Actions run and job receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "repository", "workflow", "provenance", "runs"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.github-actions-receipt@1"},
+    "repository": {"const": "toreleon/mainframe-env"},
+    "workflow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {"id": {"type": "integer", "minimum": 1}, "name": {"const": "mainframe-env"}}
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "run_endpoint", "jobs_endpoint", "cryptographic_signature", "assurance"],
+      "properties": {
+        "method": {"const": "authenticated-gh-api"},
+        "run_endpoint": {"type": "string", "minLength": 1},
+        "jobs_endpoint": {"type": "string", "minLength": 1},
+        "cryptographic_signature": {"type": "null"},
+        "assurance": {"type": "string", "minLength": 1}
+      }
+    },
+    "runs": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "id", "head_sha", "head_branch", "event", "status", "conclusion", "run_attempt", "created_at", "updated_at", "html_url", "jobs"],
+        "properties": {
+          "role": {"enum": ["failed-round-three-completion", "failed-container-history-follow-up", "failed-native-evidence-bootstrap", "accepted-push", "accepted-pull-request"]},
+          "id": {"type": "integer", "minimum": 1},
+          "head_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+          "head_branch": {"const": "impl/0.2.0"},
+          "event": {"enum": ["push", "pull_request"]},
+          "status": {"const": "completed"},
+          "conclusion": {"enum": ["success", "failure"]},
+          "run_attempt": {"const": 1},
+          "created_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"},
+          "html_url": {"type": "string", "format": "uri"},
+          "jobs": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "name", "status", "conclusion", "started_at", "completed_at", "html_url"],
+              "properties": {
+                "id": {"type": "integer", "minimum": 1},
+                "name": {"enum": ["v0-foundation", "contract-msrv"]},
+                "status": {"const": "completed"},
+                "conclusion": {"enum": ["success", "failure"]},
+                "started_at": {"type": "string", "format": "date-time"},
+                "completed_at": {"type": "string", "format": "date-time"},
+                "html_url": {"type": "string", "format": "uri"}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

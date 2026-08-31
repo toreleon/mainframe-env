@@ -4,10 +4,12 @@
 
 mod cobol;
 mod config;
+mod environment_secrets;
 mod product;
 
 pub use cobol::{DefaultProgramRouter, compatible_system_services, default_program_router};
 pub use config::{ConfigOverrides, ServerConfig, StoreProfile, TlsConfig};
+pub use environment_secrets::EnvironmentSecretResolver;
 pub use product::{
     ApplicationPublicationReceipt, BatchInstallReceipt, BatchProgramDefinition,
     HmacSha256PackageTrust, OnlineApplicationDefinition, OnlineInstallReceipt,

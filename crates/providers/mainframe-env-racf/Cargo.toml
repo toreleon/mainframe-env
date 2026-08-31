@@ -10,6 +10,9 @@ mainframe-env-execution-api.workspace = true
 mainframe-env-host-api.workspace = true
 mainframe-env-store-api.workspace = true
 argon2.workspace = true
+zeroize.workspace = true
 
 [dev-dependencies]
 mainframe-env-store = { path = "../../stores/mainframe-env-store" }
+serde.workspace = true
+static_assertions.workspace = true
