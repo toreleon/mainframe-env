@@ -4,10 +4,12 @@ use axum::body::{Body, to_bytes};
 use axum::http::{Method, Request, StatusCode};
 use base64::Engine;
 use mainframe_env_application::{
-    ApplicationInstaller, ApplicationManifest, ApplicationPackage, DatasetCatalog,
-    DatasetCatalogEntry, DatasetDefinition, EntryKind, GenerationGroupDefinition, InstallProblem,
-    InstallState, PackageEntry, ProgramArtifact, ProgramCatalog, ProgramFrame, ProgramFrames,
-    package_identity, parse_bms, parse_csd,
+    APPLICATION_PACKAGE_V2_CONTRACT, ApplicationInstaller, ApplicationInstallerV2,
+    ApplicationManifest, ApplicationPackage, ApplicationPackageV2, ApplicationSections,
+    DatasetCatalog, DatasetCatalogEntry, DatasetDefinition, EntryKind, GenerationGroupDefinition,
+    InstallProblem, InstallState, PackageEntry, PackageLimits, PackageSignature,
+    PackageSignatureVerifier, ProgramArtifact, ProgramCatalog, ProgramFrame, ProgramFrames,
+    SqlColumn, SqlTable, package_identity, package_v2_identity, parse_bms, parse_csd,
 };
 use mainframe_env_batch::{
     JclBundle, JclLimits, JobPlan, JobState, StepCondition, UtilityDisposition, parse_jcl,
@@ -25,6 +27,10 @@ use mainframe_env_compiler_api::{
     CompilerService,
 };
 use mainframe_env_dataset::{DatasetLimits, DatasetSeedObject, DatasetService};
+use mainframe_env_db2::{
+    Db2CatalogGeneration, Db2ColumnDefinition, Db2ExtractField, Db2ExtractLayout,
+    Db2ForeignKeyDefinition, Db2ResultEncoding, Db2TableDefinition,
+};
 use mainframe_env_diagnostics::Completeness;
 use mainframe_env_encoding::CodePage;
 use mainframe_env_execution_api::{
@@ -4642,6 +4648,265 @@ pub fn verify_carddemo_db2_from_env(
     })
 }
 
+struct CardDemoPackageVerifier;
+
+impl PackageSignatureVerifier for CardDemoPackageVerifier {
+    fn verify(&self, key_id: &str, algorithm: &str, identity: &str, signature: &str) -> bool {
+        key_id == "carddemo-conformance-key"
+            && algorithm == "carddemo-conformance-signature@1"
+            && signature == format!("signed:{identity}")
+    }
+}
+
+fn carddemo_db2_column(
+    name: &str,
+    nullable: bool,
+    max_bytes: usize,
+    result_encoding: Db2ResultEncoding,
+) -> Db2ColumnDefinition {
+    Db2ColumnDefinition {
+        name: name.into(),
+        nullable,
+        max_bytes,
+        result_encoding,
+        default_value: nullable.then(Vec::new),
+    }
+}
+
+fn carddemo_db2_definitions() -> Vec<Db2TableDefinition> {
+    let transaction = Db2TableDefinition {
+        name: "CARDDEMO.TRANSACTION_TYPE".into(),
+        columns: vec![
+            carddemo_db2_column("TR_TYPE", false, 2, Db2ResultEncoding::Raw),
+            carddemo_db2_column("TR_DESCRIPTION", true, 50, Db2ResultEncoding::Varchar),
+        ],
+        primary_key: vec!["TR_TYPE".into()],
+        foreign_keys: Vec::new(),
+        extract: Some(Db2ExtractLayout {
+            fields: vec![
+                Db2ExtractField {
+                    column: "TR_TYPE".into(),
+                    width: 2,
+                },
+                Db2ExtractField {
+                    column: "TR_DESCRIPTION".into(),
+                    width: 50,
+                },
+            ],
+            trailer: b"00000000".to_vec(),
+        }),
+    };
+    let category = Db2TableDefinition {
+        name: "CARDDEMO.TRANSACTION_TYPE_CATEGORY".into(),
+        columns: vec![
+            carddemo_db2_column("TRC_TYPE_CODE", false, 2, Db2ResultEncoding::Raw),
+            carddemo_db2_column("TRC_TYPE_CATEGORY", false, 4, Db2ResultEncoding::Raw),
+            carddemo_db2_column("TRC_CAT_DATA", true, 50, Db2ResultEncoding::Raw),
+        ],
+        primary_key: vec!["TRC_TYPE_CODE".into(), "TRC_TYPE_CATEGORY".into()],
+        foreign_keys: vec![Db2ForeignKeyDefinition {
+            columns: vec!["TRC_TYPE_CODE".into()],
+            referenced_table: "CARDDEMO.TRANSACTION_TYPE".into(),
+            referenced_columns: vec!["TR_TYPE".into()],
+            delete_restrict: true,
+        }],
+        extract: Some(Db2ExtractLayout {
+            fields: vec![
+                Db2ExtractField {
+                    column: "TRC_TYPE_CODE".into(),
+                    width: 2,
+                },
+                Db2ExtractField {
+                    column: "TRC_TYPE_CATEGORY".into(),
+                    width: 4,
+                },
+                Db2ExtractField {
+                    column: "TRC_CAT_DATA".into(),
+                    width: 50,
+                },
+            ],
+            trailer: b"0000".to_vec(),
+        }),
+    };
+    let authorization_names = [
+        "CARD_NUM",
+        "AUTH_TS",
+        "AUTH_TYPE",
+        "CARD_EXPIRY_DATE",
+        "MESSAGE_TYPE",
+        "MESSAGE_SOURCE",
+        "AUTH_ID_CODE",
+        "AUTH_RESP_CODE",
+        "AUTH_RESP_REASON",
+        "PROCESSING_CODE",
+        "TRANSACTION_AMT",
+        "APPROVED_AMT",
+        "MERCHANT_CATAGORY_CODE",
+        "ACQR_COUNTRY_CODE",
+        "POS_ENTRY_MODE",
+        "MERCHANT_ID",
+        "MERCHANT_NAME",
+        "MERCHANT_CITY",
+        "MERCHANT_STATE",
+        "MERCHANT_ZIP",
+        "TRANSACTION_ID",
+        "MATCH_STATUS",
+        "AUTH_FRAUD",
+        "FRAUD_RPT_DATE",
+        "ACCT_ID",
+        "CUST_ID",
+    ];
+    let authorization = Db2TableDefinition {
+        name: "CARDDEMO.AUTHFRDS".into(),
+        columns: authorization_names
+            .into_iter()
+            .map(|name| {
+                carddemo_db2_column(
+                    name,
+                    !matches!(name, "CARD_NUM" | "AUTH_TS"),
+                    512,
+                    Db2ResultEncoding::Raw,
+                )
+            })
+            .collect(),
+        primary_key: vec!["CARD_NUM".into(), "AUTH_TS".into()],
+        foreign_keys: Vec::new(),
+        extract: None,
+    };
+    vec![transaction, category, authorization]
+}
+
+fn install_carddemo_db2_package(server: &Arc<ProductServer>) -> Result<(), CorpusProblem> {
+    let definitions = carddemo_db2_definitions();
+    let catalog_bytes = serde_json::to_vec(&definitions)
+        .map_err(|error| CorpusProblem::new("carddemo.db2.package", error.to_string()))?;
+    let payloads = [
+        (EntryKind::Source, "source/manifest", b"source".to_vec()),
+        (
+            EntryKind::Resource,
+            "resource/manifest",
+            b"resource".to_vec(),
+        ),
+        (EntryKind::Program, "program/manifest", b"program".to_vec()),
+        (EntryKind::Data, "data/db2/catalog", catalog_bytes),
+        (EntryKind::Profile, "profile/manifest", b"profile".to_vec()),
+        (
+            EntryKind::Migration,
+            "migration/manifest",
+            b"application-package-v1-to-v2".to_vec(),
+        ),
+    ];
+    let mut entries = Vec::new();
+    let mut blobs = BTreeMap::new();
+    for (kind, path, bytes) in payloads {
+        let digest = format!("sha256:{:x}", Sha256::digest(&bytes));
+        entries.push(PackageEntry {
+            path: path.into(),
+            kind,
+            sha256: digest.clone(),
+            bytes: bytes.len(),
+            depends_on: (kind != EntryKind::Source)
+                .then(|| "source/manifest".into())
+                .into_iter()
+                .collect(),
+        });
+        blobs.insert(digest, bytes);
+    }
+    let sql_tables = definitions
+        .iter()
+        .map(|table| SqlTable {
+            name: table.name.clone(),
+            columns: table
+                .columns
+                .iter()
+                .map(|column| SqlColumn {
+                    name: column.name.clone(),
+                    nullable: column.nullable,
+                })
+                .collect(),
+            primary_key: table.primary_key.clone(),
+        })
+        .collect();
+    let mut package = ApplicationPackageV2 {
+        base: ApplicationPackage {
+            manifest: ApplicationManifest {
+                name: "AWS-CARDDEMO".into(),
+                version: "0.2.0".into(),
+                target_product: "0.2.0".into(),
+                entries,
+            },
+            blobs,
+        },
+        generation: 1,
+        sections: ApplicationSections {
+            schema_version: APPLICATION_PACKAGE_V2_CONTRACT.into(),
+            host_abi_libraries: Vec::new(),
+            sql_tables,
+            sql_rows: Vec::new(),
+            ims_definitions: Vec::new(),
+            ims_rows: Vec::new(),
+            mq_resources: Vec::new(),
+            batch_controllers: Vec::new(),
+            security_resources: Vec::new(),
+        },
+        signature: PackageSignature {
+            algorithm: "carddemo-conformance-signature@1".into(),
+            key_id: "carddemo-conformance-key".into(),
+            value: "pending".into(),
+        },
+    };
+    package.signature.value = format!(
+        "signed:{}",
+        package_v2_identity(&package).map_err(package_problem)?
+    );
+    let installer = ApplicationInstallerV2::new(
+        "0.2.0",
+        PackageLimits::default(),
+        Arc::new(CardDemoPackageVerifier),
+    );
+    let ready = installer.install(&package).map_err(package_problem)?;
+    let selected = installer
+        .selected_package("AWS-CARDDEMO")
+        .map_err(package_problem)?
+        .ok_or_else(|| CorpusProblem::new("carddemo.db2.package", "package is not selected"))?;
+    let data = selected
+        .base
+        .manifest
+        .entries
+        .iter()
+        .find(|entry| entry.path == "data/db2/catalog")
+        .and_then(|entry| selected.base.blobs.get(&entry.sha256))
+        .ok_or_else(|| CorpusProblem::new("carddemo.db2.package", "catalog blob is missing"))?;
+    let installed_definitions: Vec<Db2TableDefinition> = serde_json::from_slice(data)
+        .map_err(|error| CorpusProblem::new("carddemo.db2.package", error.to_string()))?;
+    let declared = selected
+        .sections
+        .sql_tables
+        .iter()
+        .map(|table| table.name.to_ascii_uppercase())
+        .collect::<BTreeSet<_>>();
+    let loaded = installed_definitions
+        .iter()
+        .map(|table| table.name.to_ascii_uppercase())
+        .collect::<BTreeSet<_>>();
+    if declared != loaded {
+        return Err(CorpusProblem::new(
+            "carddemo.db2.package",
+            "typed SQL section and selected catalog blob disagree",
+        ));
+    }
+    server
+        .db2_service()
+        .install_catalog(Db2CatalogGeneration {
+            application: selected.base.manifest.name.clone(),
+            generation: selected.generation,
+            identity: ready.identity,
+            tables: installed_definitions,
+            rows: Vec::new(),
+        })
+        .map_err(terminal_problem)
+}
+
 async fn exercise_db2_routes(
     corpus_dir: &Path,
     online: OnlineApplicationDefinition,
@@ -4668,6 +4933,7 @@ async fn exercise_db2_routes(
         default_program_router(),
     )
     .map_err(terminal_problem)?;
+    install_carddemo_db2_package(&server)?;
     server
         .bootstrap_user("IBMUSER", b"TESTPASS")
         .map_err(terminal_problem)?;
@@ -6454,6 +6720,7 @@ async fn exercise_mq_authorization_routes(
         default_program_router(),
     )
     .map_err(terminal_problem)?;
+    install_carddemo_db2_package(&server)?;
     server
         .bootstrap_user("IBMUSER", b"TESTPASS")
         .map_err(terminal_problem)?;
@@ -7034,7 +7301,7 @@ async fn exercise_mq_authorization_routes(
         &authorization_db2_request(
             Db2Operation::Update,
             305,
-            "UPDATE CARDDEMO.AUTHFRDS SET AUTH_FRAUD",
+            "UPDATE CARDDEMO.AUTHFRDS SET AUTH_FRAUD = :AUTH-FRAUD, FRAUD_RPT_DATE = CURRENT DATE",
             update_inputs,
         )?,
     )

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/db2-application-catalog@1",
+  "title": "mainframe-env generic Db2 application catalog generation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "application", "generation", "identity", "tables", "rows"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.db2-application-catalog@1"},
+    "application": {"type": "string", "minLength": 1},
+    "generation": {"type": "integer", "minimum": 1},
+    "identity": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "tables": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "columns", "primary_key", "foreign_keys", "extract"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "columns": {"type": "array", "minItems": 1},
+          "primary_key": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+          "foreign_keys": {"type": "array"},
+          "extract": {"type": ["object", "null"]}
+        }
+      }
+    },
+    "rows": {"type": "array"}
+  }
+}

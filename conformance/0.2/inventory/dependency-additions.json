@@ -1,0 +1,7 @@
+{
+  "schema_version": "mainframe-env.coverage-dependency-additions@1",
+  "target_version": "0.2.0",
+  "edges": [
+    ["mainframe-env-conformance", "mainframe-env-db2"]
+  ]
+}

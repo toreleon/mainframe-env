@@ -56,6 +56,7 @@ fn run() -> TaskResult {
         "evidence" => check_evidence(&root),
         "coverage" => check_coverage(&root),
         "application-packages" => check_application_packages(&root),
+        "db2-catalog" => check_db2_catalog(&root),
         "semantic-identities" if check => check_semantic_identities(&root),
         "semantic-identities" => generate_semantic_identities(&root),
         "conformance" => {
@@ -67,7 +68,8 @@ fn run() -> TaskResult {
             check_evidence(&root)?;
             check_coverage(&root)?;
             check_semantic_identities(&root)?;
-            check_application_packages(&root)
+            check_application_packages(&root)?;
+            check_db2_catalog(&root)
         }
         "certification" => check_certification(&root),
         "carddemo-corpus" => check_carddemo_corpus(&root),
@@ -106,7 +108,7 @@ fn run() -> TaskResult {
         "release" => generate_release_artifacts(&root),
         "help" | "--help" | "-h" => {
             println!(
-                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|coverage|semantic-identities|application-packages|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check"
+                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|coverage|semantic-identities|application-packages|db2-catalog|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check"
             );
             Ok(())
         }
@@ -1314,8 +1316,13 @@ fn check_declared_dependency_graph(root: &Path) -> TaskResult {
             ))
         })
         .collect::<TaskResult<BTreeSet<_>>>()?;
-    let additions_path = root.join("conformance/0.1.1/inventory/dependency-graph-additions.json");
-    if additions_path.is_file() {
+    for additions_path in [
+        root.join("conformance/0.1.1/inventory/dependency-graph-additions.json"),
+        root.join("conformance/0.2/inventory/dependency-additions.json"),
+    ] {
+        if !additions_path.is_file() {
+            continue;
+        }
         let additions = json(&additions_path)?;
         for edge in array(&additions, "edges", &additions_path)? {
             let values = edge
@@ -1943,6 +1950,85 @@ fn check_application_packages(root: &Path) -> TaskResult {
         require(
             implementation.contains(required),
             &format!("application package implementation omits {required}"),
+        )?;
+    }
+    Ok(())
+}
+
+fn check_db2_catalog(root: &Path) -> TaskResult {
+    let service_path = root.join("crates/providers/mainframe-env-db2/src/service.rs");
+    let service = read(&service_path)?;
+    let production = service.split("#[cfg(test)]").next().unwrap_or(&service);
+    let upper = production.to_ascii_uppercase();
+    for forbidden in [
+        "CARDDEMO",
+        "TRANSACTION_TYPE",
+        "TRANSACTION_TYPE_CATEGORY",
+        "AUTHFRDS",
+        "TYPE-CD-FILTER",
+        "TYPE-DESC-FILTER",
+        "CARD-NUM",
+        "AUTH-TS",
+        "AUTH-FRAUD",
+    ] {
+        require(
+            !upper.contains(forbidden),
+            &format!("Db2 production source contains application identity {forbidden}"),
+        )?;
+    }
+    for required in [
+        "pub fn install_catalog",
+        "Db2CatalogGeneration",
+        "schemas_compatible",
+        "delete_is_restricted",
+        "selected_column_indices",
+        "update_assignments",
+        "validate_foreign_keys",
+    ] {
+        require(
+            production.contains(required),
+            &format!("generic Db2 catalog implementation omits {required}"),
+        )?;
+    }
+    let contracts_path = root.join("conformance/0.2/inventory/contracts.json");
+    let contracts = json(&contracts_path)?;
+    require(
+        contracts["contracts"]["db2_application_catalog"]
+            == Value::String("mainframe-env.db2-application-catalog@1".into()),
+        "Db2 application catalog contract is not frozen",
+    )?;
+    let migration_path = root.join("conformance/0.2/migrations/db2-catalog-v1-to-v2.json");
+    let migration = json(&migration_path)?;
+    require(
+        migration["schema_version"]
+            == Value::String("mainframe-env.db2-catalog-migration@1".into())
+            && migration["destructive"] == Value::Bool(false)
+            && migration["old_rows_readable"] == Value::Bool(true)
+            && migration["schema_fields_have_defaults"] == Value::Bool(true)
+            && migration["installation_requires_quiescence"] == Value::Bool(true)
+            && migration["atomic_catalog_write"] == Value::Bool(true)
+            && migration["rollback"]["supported"] == Value::Bool(true)
+            && migration["rollback"]["requires_backup"] == Value::Bool(true),
+        "Db2 catalog migration or rollback contract is unsafe",
+    )?;
+    let scan_path = root.join("conformance/0.2/evidence/hardcode/CV-205-db2.json");
+    let scan = json(&scan_path)?;
+    require(
+        scan["before"]["h1_h3_lines"].as_u64() == Some(29)
+            && scan["after"]["h1_h3_lines"].as_u64() == Some(0)
+            && scan["after"]["application_table_identifiers"].as_u64() == Some(0)
+            && scan["after"]["application_host_variable_identifiers"].as_u64() == Some(0)
+            && scan["after"]["application_string_dispatch"].as_u64() == Some(0),
+        "Db2 hardcode scan receipt does not prove 29 to zero",
+    )?;
+    for path in [
+        "conformance/0.2/schemas/db2-application-catalog.schema.json",
+        "docs/architecture/DB2-APPLICATION-CATALOG.md",
+        "crates/providers/mainframe-env-db2/README.md",
+    ] {
+        require(
+            root.join(path).is_file(),
+            &format!("Db2 catalog artifact is missing: {path}"),
         )?;
     }
     Ok(())
@@ -2636,6 +2722,7 @@ fn check_certification(root: &Path) -> TaskResult {
     check_coverage(root)?;
     check_semantic_identities(root)?;
     check_application_packages(root)?;
+    check_db2_catalog(root)?;
     check_runtime_architecture(root)?;
 
     let inventory = root.join("conformance/0.1/inventory");

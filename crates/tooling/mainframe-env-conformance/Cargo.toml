@@ -20,6 +20,7 @@ mainframe-env-application.workspace = true
 mainframe-env-batch.workspace = true
 mainframe-env-cics = { workspace = true, features = ["fault-injection"] }
 mainframe-env-dataset.workspace = true
+mainframe-env-db2.workspace = true
 mainframe-env-racf.workspace = true
 mainframe-env-server.workspace = true
 mainframe-env-ims.workspace = true

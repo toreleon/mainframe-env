@@ -17,6 +17,7 @@
     "mq_section": "mainframe-env.application.mq@1",
     "batch_controller_section": "mainframe-env.application.batch-controllers@1",
     "security_resource_section": "mainframe-env.application.security-resources@1",
+    "db2_application_catalog": "mainframe-env.db2-application-catalog@1",
     "program_status": "mainframe-env.coverage-program-status@1",
     "work_package_evidence": "mainframe-env.coverage-work-package-evidence@1"
   },

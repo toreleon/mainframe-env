@@ -1,0 +1,47 @@
+{
+  "schema_version": "mainframe-env.coverage-work-package-evidence@1",
+  "derived": true,
+  "status": "pass",
+  "work_package": "CV-205",
+  "evidence_digest": "sha256:f1960dde919ba8a09c7838794a5b71b2c97253137041d67e3993d738bb0be31b",
+  "receipt": {
+    "target_version": "0.2.0",
+    "deliverable": "Generic package-installed Db2 schema, row, constraint, cursor, and extraction behavior with zero production application identities",
+    "source_identity": "7111308ef3e187e1e32cfbdc4c85b5a644f9846d",
+    "commands": [
+      {"command": "cargo test -p mainframe-env-db2 -p mainframe-env-conformance -p xtask --locked", "exit_code": 0, "result": "2 Db2, 71 conformance, and 5 tooling tests passed; 2 manual/environment tests ignored"},
+      {"command": "cargo clippy -p mainframe-env-db2 -p mainframe-env-conformance -p xtask --all-targets --locked -- -D warnings", "exit_code": 0, "result": "pass"},
+      {"command": "cargo xtask db2-catalog --check", "exit_code": 0, "result": "pass; production Db2 application identity and string-dispatch count zero"},
+      {"command": "CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-db2 --check", "exit_code": 0, "result": "3 programs, 25 extraction records, all CRUD/cursor/restart/rollback/conflict/failure controls, and historical table/dataset/spool digests passed"},
+      {"command": "CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-mq-authorization --check", "exit_code": 0, "result": "4 journeys and generic 26-column fraud insert/update/rollback/restart route passed"},
+      {"command": "cargo xtask architecture --check", "exit_code": 0, "result": "pass"},
+      {"command": "cargo xtask profiles --check", "exit_code": 0, "result": "pass"},
+      {"command": "cargo xtask schemas --check", "exit_code": 0, "result": "pass"},
+      {"command": "cargo xtask coverage --check", "exit_code": 0, "result": "pass"},
+      {"command": "cargo xtask conformance --check", "exit_code": 0, "result": "pass"},
+      {"command": "git diff --check", "exit_code": 0, "result": "pass"}
+    ],
+    "artifacts": [
+      {"path": "crates/providers/mainframe-env-db2/src/catalog.rs", "sha256": "sha256:1eb1773fd882b6007a26577dcd927d213590deeffff6f26e97935424120def05"},
+      {"path": "crates/providers/mainframe-env-db2/src/service.rs", "sha256": "sha256:3fbf8e61ae9321ba7acb3cf928dcd11c12fee898e33e1a8af364df533e651ac1"},
+      {"path": "crates/providers/mainframe-env-db2/README.md", "sha256": "sha256:ef81d2d2eed8604a4b7081c8a288dcd31546ea9a67cdcf7d492570c6521147f2"},
+      {"path": "conformance/0.2/schemas/db2-application-catalog.schema.json", "sha256": "sha256:5cf5eacb932b5b33b2c536c6feb83fc4b772dd8c9fdbceeaac1a6c0354daf5a2"},
+      {"path": "conformance/0.2/migrations/db2-catalog-v1-to-v2.json", "sha256": "sha256:c4e62f817c8c074d98dbd86ade1a711eaa7b57dc2f8b74589c417d54222e8e74"},
+      {"path": "conformance/0.2/evidence/hardcode/CV-205-db2.json", "sha256": "sha256:faa792b1810d234eb8124394075c879777196c4bd4c4de4ad1470ad0704d2692"},
+      {"path": "docs/architecture/DB2-APPLICATION-CATALOG.md", "sha256": "sha256:08dd0b35aad668409fd05963031349ddc548d9a0d1993962d7890ecbef5ec576"}
+    ],
+    "invariants": {
+      "db2_h1_h3_lines_before": 29,
+      "db2_h1_h3_lines_after": 0,
+      "application_string_dispatch_after": 0,
+      "package_selected_before_provider_install": true,
+      "typed_sql_section_matches_catalog_blob": true,
+      "atomic_catalog_install": true,
+      "generic_seed_rows": true,
+      "generic_primary_and_foreign_keys": true,
+      "generic_result_and_extract_layouts": true,
+      "historical_carddemo_db2_digests_unchanged": true,
+      "historical_authorization_shape_unchanged": true
+    }
+  }
+}
