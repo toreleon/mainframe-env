@@ -1,6 +1,6 @@
 # Execution Prompt — Implement mainframe-env 0.10.0
 
-Target version: **0.10.0**  
+Target version: **0.10.0**
 Completion dependencies: 0.9.0
 
 Use this prompt from the repository root. The

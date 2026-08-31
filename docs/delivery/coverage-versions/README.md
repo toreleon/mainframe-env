@@ -1,9 +1,9 @@
 # IBM coverage release plans
 
-Status: **Proposed implementation plans**  
-Applies after: `mainframe-env 0.1.1`  
+Status: **Proposed implementation plans**
+Applies after: `mainframe-env 0.1.1`
 Planning authority:
-[`IBM-OFFICIAL-COVERAGE-ROADMAP.md`](../../research/IBM-OFFICIAL-COVERAGE-ROADMAP.md)  
+[`IBM-OFFICIAL-COVERAGE-ROADMAP.md`](../../research/IBM-OFFICIAL-COVERAGE-ROADMAP.md)
 Machine roadmap:
 [`ibm-official-coverage-roadmap.json`](../../../conformance/roadmap/ibm-official-coverage-roadmap.json)
 

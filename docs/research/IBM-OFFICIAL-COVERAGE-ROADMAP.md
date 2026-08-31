@@ -1,7 +1,7 @@
 # IBM official coverage and de-hardcoding roadmap
 
-Status: research baseline for planning; not a compatibility claim  
-Snapshot date: 2026-08-31  
+Status: research baseline for planning; not a compatibility claim
+Snapshot date: 2026-08-31
 Repository baseline: `mainframe-env` 0.1.1 working tree based on commit
 `857115b907ce7098c965a51117a079048ea8182e`
 
