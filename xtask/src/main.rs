@@ -55,6 +55,8 @@ fn run() -> TaskResult {
         "inventory" => check_inventory(&root),
         "evidence" => check_evidence(&root),
         "coverage" => check_coverage(&root),
+        "semantic-identities" if check => check_semantic_identities(&root),
+        "semantic-identities" => generate_semantic_identities(&root),
         "conformance" => {
             check_versions(&root)?;
             check_architecture(&root)?;
@@ -62,7 +64,8 @@ fn run() -> TaskResult {
             check_schemas(&root)?;
             check_inventory(&root)?;
             check_evidence(&root)?;
-            check_coverage(&root)
+            check_coverage(&root)?;
+            check_semantic_identities(&root)
         }
         "certification" => check_certification(&root),
         "carddemo-corpus" => check_carddemo_corpus(&root),
@@ -101,7 +104,7 @@ fn run() -> TaskResult {
         "release" => generate_release_artifacts(&root),
         "help" | "--help" | "-h" => {
             println!(
-                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|coverage|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check"
+                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|coverage|semantic-identities|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check"
             );
             Ok(())
         }
@@ -1717,6 +1720,145 @@ fn check_inventory(root: &Path) -> TaskResult {
     Ok(())
 }
 
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct GeneratedSemanticRow {
+    id: String,
+    baseline: String,
+    subsystem: String,
+    unit: String,
+    label: String,
+}
+
+fn generate_semantic_identities(root: &Path) -> TaskResult {
+    let path = root.join(
+        "crates/contracts/mainframe-env-host-api/src/generated/official_semantic_identities.rs",
+    );
+    let manifest_path = root.join("conformance/0.2/generated/semantic-identities.json");
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
+    }
+    if let Some(parent) = manifest_path.parent() {
+        fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
+    }
+    let (source, manifest) = semantic_identity_documents(root)?;
+    fs::write(&path, source).map_err(|error| format!("{}: {error}", path.display()))?;
+    fs::write(&manifest_path, manifest)
+        .map_err(|error| format!("{}: {error}", manifest_path.display()))
+}
+
+fn check_semantic_identities(root: &Path) -> TaskResult {
+    let path = root.join(
+        "crates/contracts/mainframe-env-host-api/src/generated/official_semantic_identities.rs",
+    );
+    let manifest_path = root.join("conformance/0.2/generated/semantic-identities.json");
+    let (expected, expected_manifest) = semantic_identity_documents(root)?;
+    let actual = fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?;
+    require(
+        actual == expected,
+        "generated semantic identities are stale; run cargo xtask semantic-identities",
+    )?;
+    let actual_manifest = fs::read(&manifest_path)
+        .map_err(|error| format!("{}: {error}", manifest_path.display()))?;
+    require(
+        actual_manifest == expected_manifest,
+        "generated semantic identity manifest is stale; run cargo xtask semantic-identities",
+    )?;
+    let identity_manifest: Value = serde_json::from_slice(&actual_manifest)
+        .map_err(|error| format!("{}: {error}", manifest_path.display()))?;
+    let handlers_path = root.join("conformance/0.2/generated/subsystem-handlers.json");
+    let handlers = json(&handlers_path)?;
+    require(
+        handlers["schema_version"]
+            == Value::String("mainframe-env.subsystem-handler-registry@1".into())
+            && handlers["generation"].as_u64() == Some(1)
+            && handlers["generated_identity_set_sha256"]
+                == identity_manifest["identity_set_sha256"]
+            && handlers["automatic_registration"] == Value::Bool(false)
+            && handlers["handlers"].as_array().is_some_and(Vec::is_empty)
+            && handlers["coverage_credit"].as_u64() == Some(0),
+        "initial subsystem handler registry must remain explicit, empty, and zero-credit",
+    )
+}
+
+fn semantic_identity_documents(root: &Path) -> TaskResult<(Vec<u8>, Vec<u8>)> {
+    let index_path = root.join("conformance/0.2/catalogs/index.json");
+    let index = json(&index_path)?;
+    let mut rows = Vec::new();
+    for baseline in array(&index, "baselines", &index_path)? {
+        let baseline_id = text(baseline, "id", &index_path)?;
+        let subsystem = text(baseline, "subsystem", &index_path)?;
+        let catalog_path = root.join(text(baseline, "catalog", &index_path)?);
+        let catalog = json(&catalog_path)?;
+        for unit in array(&catalog, "units", &catalog_path)? {
+            let unit_id = text(unit, "id", &catalog_path)?;
+            for row in array(unit, "rows", &catalog_path)? {
+                rows.push(GeneratedSemanticRow {
+                    id: text(row, "id", &catalog_path)?.to_string(),
+                    baseline: baseline_id.to_string(),
+                    subsystem: subsystem.to_string(),
+                    unit: unit_id.to_string(),
+                    label: text(row, "label", &catalog_path)?.to_string(),
+                });
+            }
+        }
+    }
+    rows.sort();
+    require(
+        rows.len() == index["mandatory_rows"].as_u64().unwrap_or_default() as usize,
+        "generated semantic identity count differs from official denominator",
+    )?;
+    require(
+        rows.windows(2).all(|pair| pair[0].id != pair[1].id),
+        "generated semantic identity rows are not unique",
+    )?;
+    let mut set_digest = Sha256::new();
+    for row in &rows {
+        for field in [
+            row.id.as_bytes(),
+            row.baseline.as_bytes(),
+            row.subsystem.as_bytes(),
+            row.unit.as_bytes(),
+            row.label.as_bytes(),
+        ] {
+            set_digest.update((field.len() as u64).to_be_bytes());
+            set_digest.update(field);
+        }
+    }
+    let catalog_digest = file_digest(&index_path)?;
+    let set_digest = format!("{:x}", set_digest.finalize());
+    let mut source =
+        String::from("// @generated by `cargo xtask semantic-identities`; do not edit.\n\n");
+    source.push_str(&format!(
+        "pub const GENERATED_IDENTITY_CATALOG_SHA256: &str = \"sha256:{catalog_digest}\";\n"
+    ));
+    source.push_str(&format!(
+        "pub const GENERATED_IDENTITY_SET_SHA256: &str = \"sha256:{set_digest}\";\n\n"
+    ));
+    source.push_str("pub const OFFICIAL_SEMANTIC_IDENTITIES: &[SemanticIdentityDescriptor] = &[\n");
+    for row in &rows {
+        source.push_str("    SemanticIdentityDescriptor {\n");
+        source.push_str(&format!("        id: {:?},\n", row.id));
+        source.push_str(&format!("        baseline: {:?},\n", row.baseline));
+        source.push_str(&format!("        subsystem: {:?},\n", row.subsystem));
+        source.push_str(&format!("        unit: {:?},\n", row.unit));
+        source.push_str(&format!("        label: {:?},\n", row.label));
+        source.push_str("    },\n");
+    }
+    source.push_str("];\n");
+    let manifest = json!({
+        "schema_version":"mainframe-env.generated-semantic-identities@1",
+        "target_version":"0.2.0",
+        "contract":"mainframe-env.generated-semantic-identity@1",
+        "catalog_index":"conformance/0.2/catalogs/index.json",
+        "catalog_index_sha256":format!("sha256:{catalog_digest}"),
+        "identity_set_sha256":format!("sha256:{set_digest}"),
+        "official_identity_count":rows.len(),
+        "handler_registration_count":0,
+        "coverage_credit":0
+    });
+    Ok((source.into_bytes(), pretty_json(&manifest)?))
+}
+
 fn check_coverage(root: &Path) -> TaskResult {
     let index_path = root.join("conformance/0.2/catalogs/index.json");
     let index = json(&index_path)?;
@@ -1783,7 +1925,8 @@ fn check_coverage(root: &Path) -> TaskResult {
     ]);
     let baselines = array(&index, "baselines", &index_path)?;
     require(
-        baselines.len() == expected.len() && index["baseline_count"] == Value::from(expected.len()),
+        baselines.len() == expected.len()
+            && index["baseline_count"].as_u64() == Some(expected.len() as u64),
         "official source receipt index must contain exactly nine baselines",
     )?;
     let mut baseline_ids = BTreeSet::new();
@@ -1933,8 +2076,8 @@ fn check_coverage_ledger(root: &Path, index: &Value) -> TaskResult {
         "coverage ledger catalog index digest drifted",
     )?;
     require(
-        ledger["generated_catalog_credit"] == Value::from(0)
-            && ledger["official_compatibility_numerator"] == Value::from(0)
+        ledger["generated_catalog_credit"].as_u64() == Some(0)
+            && ledger["official_compatibility_numerator"].as_u64() == Some(0)
             && ledger["evidence_records"]
                 .as_array()
                 .is_some_and(Vec::is_empty),
@@ -1969,7 +2112,7 @@ fn check_coverage_ledger(root: &Path, index: &Value) -> TaskResult {
             seen.insert(id)
                 && row["catalog_sha256"].as_str() == Some(catalog_digest)
                 && row["mandatory_rows"].as_u64() == Some(*denominator)
-                && row["complete_rows"] == Value::from(0),
+                && row["complete_rows"].as_u64() == Some(0),
             &format!("coverage ledger baseline {id} identity or denominator drifted"),
         )?;
         let gates = row["gates"]
@@ -1989,7 +2132,7 @@ fn check_coverage_ledger(root: &Path, index: &Value) -> TaskResult {
         )?;
         for gate in gate_names {
             require(
-                gates[gate]["numerator"] == Value::from(0)
+                gates[gate]["numerator"].as_u64() == Some(0)
                     && gates[gate]["denominator"].as_u64() == Some(*denominator),
                 &format!("coverage ledger baseline {id}/{gate} credited generated coverage"),
             )?;
@@ -2401,6 +2544,8 @@ fn check_certification(root: &Path) -> TaskResult {
     check_schemas(root)?;
     check_inventory(root)?;
     check_evidence(root)?;
+    check_coverage(root)?;
+    check_semantic_identities(root)?;
     check_runtime_architecture(root)?;
 
     let inventory = root.join("conformance/0.1/inventory");

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/subsystem-handler-registry@1",
+  "title": "mainframe-env typed subsystem handler registry generation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "generation", "generated_identity_set_sha256", "automatic_registration", "handlers", "coverage_credit"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.subsystem-handler-registry@1"},
+    "generation": {"type": "integer", "minimum": 1},
+    "generated_identity_set_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "automatic_registration": {"const": false},
+    "handlers": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["semantic_id", "namespace", "subsystem", "generation", "request_schema", "result_schema", "ready"],
+        "properties": {
+          "semantic_id": {"type": "string", "minLength": 8},
+          "namespace": {"enum": ["official", "custom"]},
+          "subsystem": {"type": "string", "minLength": 1},
+          "generation": {"type": "string", "minLength": 1},
+          "request_schema": {"type": "string", "minLength": 1},
+          "result_schema": {"type": "string", "minLength": 1},
+          "ready": {"type": "boolean"}
+        }
+      }
+    },
+    "coverage_credit": {"const": 0}
+  }
+}

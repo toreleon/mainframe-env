@@ -1,0 +1,43 @@
+{
+  "schema_version": "mainframe-env.coverage-work-package-evidence@1",
+  "derived": true,
+  "status": "pass",
+  "work_package": "CV-203",
+  "evidence_digest": "sha256:b4c02f22c5f893eb486620aad5c7cb6961d96d221c55279ab69adf152010e9ce",
+  "receipt": {
+    "target_version": "0.2.0",
+    "deliverable": "Generated official semantic identities and explicit typed SubsystemHandlerRegistry foundation",
+    "source_identity": "3240fabe2e1d055e1c280220a2897fd50b05977d",
+    "commands": [
+      {"command": "cargo test -p mainframe-env-host-api -p xtask --locked", "exit_code": 0, "result": "16 host contract and 5 xtask tests passed"},
+      {"command": "cargo xtask semantic-identities --check", "exit_code": 0, "result": "1506 generated identities and zero automatic handlers matched source catalogs"},
+      {"command": "cargo clippy -p mainframe-env-host-api -p xtask --all-targets --locked -- -D warnings", "exit_code": 0, "result": "pass"},
+      {"command": "cargo xtask architecture --check", "exit_code": 0, "result": "pass"},
+      {"command": "cargo xtask profiles --check", "exit_code": 0, "result": "pass"},
+      {"command": "cargo xtask schemas --check", "exit_code": 0, "result": "pass"},
+      {"command": "cargo xtask coverage --check", "exit_code": 0, "result": "pass"},
+      {"command": "cargo xtask conformance --check", "exit_code": 0, "result": "pass"},
+      {"command": "git diff --check", "exit_code": 0, "result": "pass"}
+    ],
+    "artifacts": [
+      {"path": "crates/contracts/mainframe-env-host-api/src/semantic.rs", "sha256": "sha256:3307d16c55669994f3f05d359a91d5fbaee48023815a51ca19dbcb8fb4341449"},
+      {"path": "crates/contracts/mainframe-env-host-api/src/registry.rs", "sha256": "sha256:2475aebb94ad988408fdf4f931c6b9869593f17624671111f032a3bc9195da95"},
+      {"path": "crates/contracts/mainframe-env-host-api/src/generated/official_semantic_identities.rs", "sha256": "sha256:87bc152cb0eddd3b2217e71b4266b0edb0970f71fe7ee52a2c483355ad37665f"},
+      {"path": "conformance/0.2/generated/semantic-identities.json", "sha256": "sha256:3290beb63e17a547e0b11318199548086ccbe5b487fa2f9f06602d397eccfdd9"},
+      {"path": "conformance/0.2/generated/subsystem-handlers.json", "sha256": "sha256:cb240ce97ee2a394b8b655d29f3dabe71508ae381342466872fd201c5464d617"},
+      {"path": "conformance/0.2/schemas/generated-semantic-identities.schema.json", "sha256": "sha256:387d6eef750e49c0928eae54c4df0ffed471405427bf311a75a9f38efe331c29"},
+      {"path": "conformance/0.2/schemas/subsystem-handler-registry.schema.json", "sha256": "sha256:ea42b841293771b40e7e015c323bf1a1eb34ba3aa1d14bc8a706a8d61c405af7"}
+    ],
+    "invariants": {
+      "official_identity_count": 1506,
+      "identity_set_sha256": "sha256:b659a6e111609d2e03a831ab15995ed591caf66d36429ee940174036136ec974",
+      "official_and_custom_namespaces_separate": true,
+      "automatic_handler_registration": false,
+      "initial_handler_count": 0,
+      "generated_coverage_credit": 0,
+      "duplicate_handlers_rejected": true,
+      "wrong_subsystem_rejected": true,
+      "registry_publication_monotonic": true
+    }
+  }
+}

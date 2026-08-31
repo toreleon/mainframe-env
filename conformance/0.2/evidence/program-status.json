@@ -31,12 +31,12 @@
     "official_baselines": 9,
     "official_mandatory_rows": 1506
   },
-  "current_work_package": "CV-203",
+  "current_work_package": "CV-204",
   "work_packages": [
     {"id": "CV-201", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-201.json"},
     {"id": "CV-202", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-202.json"},
-    {"id": "CV-203", "state": "in-progress", "evidence": null},
-    {"id": "CV-204", "state": "pending", "evidence": null},
+    {"id": "CV-203", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-203.json"},
+    {"id": "CV-204", "state": "in-progress", "evidence": null},
     {"id": "CV-205", "state": "pending", "evidence": null},
     {"id": "CV-206", "state": "pending", "evidence": null},
     {"id": "CV-207", "state": "pending", "evidence": null},
@@ -83,6 +83,16 @@
       "command": "cargo xtask conformance --check",
       "exit_code": 0,
       "result": "CV-202 affected architecture, profile, schema, inventory, evidence, and coverage gates passed"
+    },
+    {
+      "command": "cargo clippy -p mainframe-env-host-api -p xtask --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "result": "initial CV-203 strict check exposed five owned JSON comparison allocations in the coverage validator; comparisons were made allocation-free"
+    },
+    {
+      "command": "cargo test -p mainframe-env-host-api -p xtask --locked && cargo xtask semantic-identities --check",
+      "exit_code": 0,
+      "result": "16 handler/identity tests, 5 tooling tests, and deterministic generation check passed"
     }
   ],
   "evidence_paths": [
@@ -91,13 +101,16 @@
     "conformance/0.2/catalogs/index.json",
     "conformance/0.2/evidence/work-packages/CV-201.json",
     "conformance/0.2/evidence/work-packages/CV-202.json",
-    "conformance/0.2/evidence/coverage-ledger.json"
+    "conformance/0.2/evidence/work-packages/CV-203.json",
+    "conformance/0.2/evidence/coverage-ledger.json",
+    "conformance/0.2/generated/semantic-identities.json",
+    "conformance/0.2/generated/subsystem-handlers.json"
   ],
   "dirty_tree_identity": {
     "algorithm": "cargo xtask digest; length-delimited path and content over the repository excluding Git, target, raw historical evidence, phase/status ledgers, and this status ledger",
-    "digest": "sha256:d06e92ab86a5c76d4eddaeae8563b113c0637f8c51b59c7e4eed9f89fbb6035b"
+    "digest": "sha256:00bcfdd88dc532fa248fa6dcf6f1491d4c0e7afe0ce31754ca73bf973a8b7db0"
   },
   "open_decisions": [],
   "blockers": [],
-  "next_smallest_executable_step": "Implement CV-203 generated semantic identities and the typed SubsystemHandlerRegistry without granting coverage credit."
+  "next_smallest_executable_step": "Implement CV-204 bounded signed/versioned subsystem application-package sections, full reference validation, and atomic generation migration/rollback."
 }

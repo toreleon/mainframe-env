@@ -7,6 +7,8 @@
     "coverage_row": "mainframe-env.coverage-row@1",
     "coverage_evidence": "mainframe-env.coverage-evidence@1",
     "coverage_ledger": "mainframe-env.coverage-ledger@1",
+    "generated_semantic_identity": "mainframe-env.generated-semantic-identity@1",
+    "subsystem_handler_registry": "mainframe-env.subsystem-handler-registry@1",
     "program_status": "mainframe-env.coverage-program-status@1",
     "work_package_evidence": "mainframe-env.coverage-work-package-evidence@1"
   },
