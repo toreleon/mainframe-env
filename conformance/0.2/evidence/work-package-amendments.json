@@ -67,7 +67,7 @@
       },
       "repair_artifacts": [
         {"path": "xtask/src/main.rs", "sha256": "sha256:8e3f41f9d82d9132ccb490301118287f624b37743c814e57843b9978981dd519"},
-        {"path": ".github/workflows/ci.yml", "sha256": "sha256:69084a0a5b9f5760b32953f41aebdaaad72b81a2b07da698187d36cd1bcc0a21"},
+        {"path": ".github/workflows/ci.yml", "sha256": "sha256:cd9e7e5234e8203e67400c13a90fa2c12a86af047ab016307cd3cf1a5906c3c5"},
         {"path": "conformance/0.2/schemas/review-repair-round-3.schema.json", "sha256": "sha256:3ed64a55b21e50873f86eab01624a9399a7f38cd5ca484bc3aca5292acb6b37c"},
         {"path": "conformance/0.2/schemas/release-build-inputs.schema.json", "sha256": "sha256:affa33cf04ac16bfe0878dc71257b71ec74dcde358753171a01e56f2417f9413"},
         {"path": "docs/releases/0.2.md", "sha256": "sha256:6968428f3f95ffed3f739f75c671d075d292d069caf3541a728f1bec9b356052"}

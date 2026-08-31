@@ -26,8 +26,11 @@ jobs:
       - run: RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --locked
       - run: cargo xtask conformance --check
       - run: cargo xtask runtime-architecture --check
+      - run: cargo xtask release --target x86_64-unknown-linux-gnu
+      - run: git diff --exit-code -- release/0.2.0/targets/x86_64-unknown-linux-gnu
       - run: cargo xtask release --check --target x86_64-unknown-linux-gnu
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: linux-release-evidence
           path: release/0.2.0/targets/x86_64-unknown-linux-gnu
