@@ -68,4 +68,6 @@ Do not finish until:
 
 At handoff, provide per-work-package evidence, before/after hardcode scan counts,
 catalog/schema digests, migration/rollback results, full validation results, and
-the exact unchanged candidate identity. Do not tag, push, publish, or deploy.
+the exact unchanged candidate identity. After the full gate passes, push only the
+assigned branch and open the pull request required by the common contract. Do
+not tag, publish, or deploy.
