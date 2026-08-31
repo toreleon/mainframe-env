@@ -13,9 +13,15 @@
   "compatible_rows_preserved_on_upgrade": true,
   "retained_generation_snapshots": true,
   "restart_reload_supported": true,
+  "raw_host_bytes_preserved_exactly": true,
+  "legacy_row_keys_rebuilt_from_exact_primary_key_bytes": true,
+  "seed_defaults_applied_before_key_construction": true,
+  "complete_definition_derived_from_signed_catalog_blob": true,
   "rollback": {
     "supported": true,
-    "method": "atomically restore the provider-retained schema/row snapshot and reselect the prior ready application generation",
-    "requires_backup": true
+    "method": "atomically remove newer owned tables, restore the complete provider-retained schema/row snapshot, validate foreign keys, and reselect the prior ready application generation",
+    "requires_backup": true,
+    "newer_owned_dependents_removed": true,
+    "foreign_keys_validated_before_persistence": true
   }
 }

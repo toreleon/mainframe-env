@@ -7,6 +7,11 @@ pub(crate) const BATCH_CONTROLLER_STATE_CONTRACT: &str = "mainframe-env.batch-co
 const MAX_APPLICATIONS: usize = 1_024;
 const MAX_ACTIVE_CONTROLLERS: usize = 16_384;
 const MAX_RETAINED_GENERATIONS: usize = 64;
+const MAX_CONTROLLERS_PER_GENERATION: usize = 4_096;
+const MAX_RETAINED_GENERATIONS_TOTAL: usize = 4_096;
+const MAX_RETAINED_CONTROLLERS: usize = 65_536;
+pub(crate) const MAX_CONTROLLER_STATE_BYTES: usize = 64 * 1024 * 1024;
+const MAX_CONTROLLER_GENERATION_BYTES: usize = 8 * 1024 * 1024;
 
 #[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(tag = "launcher", rename_all = "kebab-case")]
@@ -242,6 +247,7 @@ struct InstalledGeneration {
     identity: String,
     controllers: BTreeMap<BatchControllerSelector, ResolvedBatchController>,
     generation: BatchControllerGeneration,
+    retained_bytes: usize,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -270,16 +276,81 @@ pub(crate) struct BatchControllerRegistry {
 }
 
 impl BatchControllerRegistry {
+    pub(crate) fn preflight_install(
+        &self,
+        generation: &BatchControllerGeneration,
+    ) -> Result<usize, HostProblem> {
+        let generation_bytes = bounded_generation_size(generation)?;
+        let application = bounded_normalized_name(&generation.application, 128)?;
+        if self
+            .applications
+            .get(&application)
+            .is_some_and(|installed| installed.generations.contains_key(&generation.generation))
+        {
+            return Ok(generation_bytes);
+        }
+        if self.applications.len() >= MAX_APPLICATIONS
+            && !self.applications.contains_key(&application)
+        {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        if self
+            .applications
+            .get(&application)
+            .is_some_and(|installed| installed.generations.len() >= MAX_RETAINED_GENERATIONS)
+        {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let retained_generations = self
+            .applications
+            .values()
+            .try_fold(1usize, |total, installed| {
+                total.checked_add(installed.generations.len())
+            })
+            .ok_or(HostProblem::ResourceExhausted)?;
+        let retained_controllers = self
+            .applications
+            .values()
+            .flat_map(|installed| installed.generations.values())
+            .try_fold(generation.controllers.len(), |total, installed| {
+                total.checked_add(installed.controllers.len())
+            })
+            .ok_or(HostProblem::ResourceExhausted)?;
+        let retained_bytes = self
+            .applications
+            .values()
+            .flat_map(|installed| installed.generations.values())
+            .try_fold(generation_bytes, |total, installed| {
+                total.checked_add(installed.retained_bytes)
+            })
+            .and_then(|total| {
+                total.checked_add(
+                    self.applications
+                        .len()
+                        .saturating_add(1)
+                        .saturating_mul(512),
+                )
+            })
+            .ok_or(HostProblem::ResourceExhausted)?;
+        if retained_generations > MAX_RETAINED_GENERATIONS_TOTAL
+            || retained_controllers > MAX_RETAINED_CONTROLLERS
+            || retained_bytes > MAX_CONTROLLER_STATE_BYTES
+        {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        Ok(generation_bytes)
+    }
+
     pub(crate) fn install(
         &mut self,
         generation: BatchControllerGeneration,
     ) -> Result<BatchControllerInstallReceipt, HostProblem> {
+        let generation_bytes = self.preflight_install(&generation)?;
         let application = normalized_name(&generation.application, 128)?;
         validate_identity(&generation.identity)?;
         if generation.schema_version != BATCH_CONTROLLER_REGISTRY_CONTRACT
             || generation.generation == 0
-            || generation.controllers.is_empty()
-            || generation.controllers.len() > 4096
+            || generation.controllers.len() > MAX_CONTROLLERS_PER_GENERATION
         {
             return Err(HostProblem::Malformed);
         }
@@ -434,6 +505,7 @@ impl BatchControllerRegistry {
                 identity: generation_identity.clone(),
                 controllers: replacement,
                 generation: retained_generation,
+                retained_bytes: generation_bytes,
             });
         installed.selected = Some(generation_number);
         Ok(BatchControllerInstallReceipt {
@@ -483,6 +555,17 @@ impl BatchControllerRegistry {
         }
     }
 
+    pub(crate) fn state_payload(&self) -> Result<Vec<u8>, HostProblem> {
+        self.validate_retained_bounds()?;
+        let payload =
+            serde_json::to_vec(&self.state()).map_err(|_| HostProblem::InfrastructureFailure)?;
+        if payload.len() > MAX_CONTROLLER_STATE_BYTES {
+            Err(HostProblem::ResourceExhausted)
+        } else {
+            Ok(payload)
+        }
+    }
+
     pub(crate) fn from_state(state: BatchControllerRegistryState) -> Result<Self, HostProblem> {
         if state.schema_version != BATCH_CONTROLLER_STATE_CONTRACT
             || state.applications.len() > MAX_APPLICATIONS
@@ -514,6 +597,7 @@ impl BatchControllerRegistry {
                 .remove(&normalized)
                 .ok_or(HostProblem::Malformed)?;
             registry.applications.insert(normalized, installed);
+            registry.validate_retained_bounds()?;
         }
         let selected = registry
             .applications
@@ -544,6 +628,41 @@ impl BatchControllerRegistry {
         Ok(registry)
     }
 
+    fn validate_retained_bounds(&self) -> Result<(), HostProblem> {
+        let generations = self
+            .applications
+            .values()
+            .try_fold(0usize, |total, installed| {
+                total.checked_add(installed.generations.len())
+            })
+            .ok_or(HostProblem::ResourceExhausted)?;
+        let controllers = self
+            .applications
+            .values()
+            .flat_map(|installed| installed.generations.values())
+            .try_fold(0usize, |total, generation| {
+                total.checked_add(generation.controllers.len())
+            })
+            .ok_or(HostProblem::ResourceExhausted)?;
+        let bytes = self
+            .applications
+            .values()
+            .flat_map(|installed| installed.generations.values())
+            .try_fold(
+                self.applications.len().saturating_mul(512),
+                |total, generation| total.checked_add(generation.retained_bytes),
+            )
+            .ok_or(HostProblem::ResourceExhausted)?;
+        if generations > MAX_RETAINED_GENERATIONS_TOTAL
+            || controllers > MAX_RETAINED_CONTROLLERS
+            || bytes > MAX_CONTROLLER_STATE_BYTES
+        {
+            Err(HostProblem::ResourceExhausted)
+        } else {
+            Ok(())
+        }
+    }
+
     pub(crate) fn resolve(
         &self,
         selector: &BatchControllerSelector,
@@ -552,6 +671,107 @@ impl BatchControllerRegistry {
             .get(selector)
             .map(|(_, controller)| controller.clone())
     }
+}
+
+fn bounded_generation_size(generation: &BatchControllerGeneration) -> Result<usize, HostProblem> {
+    if generation.schema_version != BATCH_CONTROLLER_REGISTRY_CONTRACT
+        || generation.generation == 0
+        || generation.controllers.len() > MAX_CONTROLLERS_PER_GENERATION
+    {
+        return Err(HostProblem::Malformed);
+    }
+    bounded_name_input(&generation.application, 128)?;
+    validate_identity(&generation.identity)?;
+    for definition in &generation.controllers {
+        bounded_name_input(&definition.name, 128)?;
+        match &definition.selector {
+            BatchControllerSelector::TsoRun { program } => bounded_name_input(program, 128)?,
+            BatchControllerSelector::ImsController {
+                mode,
+                program,
+                qualifier,
+            } => {
+                bounded_name_input(mode, 16)?;
+                bounded_name_input(program, 128)?;
+                if let Some(qualifier) = qualifier {
+                    bounded_name_input(qualifier, 128)?;
+                }
+            }
+        }
+        if definition.program.path.len() > 384 {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        validate_identity(&definition.program.identity)?;
+        match &definition.plan {
+            BatchControllerPlan::ProgramCall => {}
+            BatchControllerPlan::ImsLoad {
+                database,
+                root_dd,
+                child_dd,
+                ..
+            } => {
+                bounded_name_input(database, 128)?;
+                bounded_name_input(root_dd, 8)?;
+                bounded_name_input(child_dd, 8)?;
+            }
+            BatchControllerPlan::ImsUnload {
+                database,
+                root_segment,
+                child_segment,
+                root_output_dd,
+                child_output_dd,
+                combined_output_dd,
+            } => {
+                for value in [database, root_segment, child_segment] {
+                    bounded_name_input(value, 128)?;
+                }
+                for value in [root_output_dd, child_output_dd, combined_output_dd]
+                    .into_iter()
+                    .flatten()
+                {
+                    bounded_name_input(value, 8)?;
+                }
+            }
+            BatchControllerPlan::ImsPurge {
+                psb,
+                root_segment,
+                child_segment,
+                control_dd,
+                required_expiry_days,
+                checkpoint_prefix,
+                summary_field,
+            } => {
+                for value in [psb, root_segment, child_segment, summary_field] {
+                    bounded_name_input(value, 128)?;
+                }
+                bounded_name_input(control_dd, 8)?;
+                bounded_name_input(required_expiry_days, 16)?;
+                bounded_name_input(checkpoint_prefix, 16)?;
+            }
+        }
+    }
+    let bytes = serde_json::to_vec(generation)
+        .map_err(|_| HostProblem::InfrastructureFailure)?
+        .len();
+    if bytes > MAX_CONTROLLER_GENERATION_BYTES {
+        Err(HostProblem::ResourceExhausted)
+    } else {
+        Ok(bytes)
+    }
+}
+
+fn bounded_name_input(value: &str, max_bytes: usize) -> Result<(), HostProblem> {
+    let value = value.trim();
+    if value.is_empty() || value.len() > max_bytes {
+        Err(HostProblem::ResourceExhausted)
+    } else {
+        Ok(())
+    }
+}
+
+fn bounded_normalized_name(value: &str, max_bytes: usize) -> Result<String, HostProblem> {
+    bounded_name_input(value, max_bytes)?;
+    normalized_name(value, max_bytes)
 }
 
 fn normalized_name(value: &str, max_bytes: usize) -> Result<String, HostProblem> {
@@ -710,6 +930,26 @@ mod tests {
             restored
                 .resolve(&BatchControllerSelector::tso("SECOND").unwrap())
                 .is_none()
+        );
+    }
+
+    #[test]
+    fn empty_generation_atomically_removes_selectors_and_retains_rollback() {
+        let mut registry = BatchControllerRegistry::default();
+        registry.install(generation(1, "FIRST")).unwrap();
+        let mut empty = generation(2, "UNUSED");
+        empty.controllers.clear();
+        assert_eq!(registry.install(empty).unwrap().controllers, 0);
+        assert!(
+            registry
+                .resolve(&BatchControllerSelector::tso("FIRST").unwrap())
+                .is_none()
+        );
+        registry.select("EXAMPLE", 1).unwrap();
+        assert!(
+            registry
+                .resolve(&BatchControllerSelector::tso("FIRST").unwrap())
+                .is_some()
         );
     }
 }

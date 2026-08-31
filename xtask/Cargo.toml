@@ -8,6 +8,7 @@ publish = false
 
 [dependencies]
 mainframe-env-conformance.workspace = true
+jsonschema.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 toml.workspace = true

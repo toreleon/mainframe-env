@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "path": "bin/mainframe-env-server",
-      "sha256": "68a61f87e676d035df12ca1a12e6b44793283521748061559666143b057d3006"
+      "sha256": "93bd31b71f6970337ddebda4100bfbf596bf9a5dfeab82b0fd78ffc9ff834c66"
     },
     {
       "path": "bin/mainframe-env",

@@ -746,17 +746,27 @@ impl ProductServer {
 
     /// Publishes a Db2 catalog only after its complete typed definition agrees
     /// with the server-owned selected application generation.
-    pub fn install_application_db2_catalog(
-        &self,
-        application: &str,
-        tables: Vec<Db2TableDefinition>,
-    ) -> Result<(), HostProblem> {
+    pub fn install_application_db2_catalog(&self, application: &str) -> Result<(), HostProblem> {
         let _publication = self
             .application_publication
             .lock()
             .map_err(|_| HostProblem::InfrastructureFailure)?;
         let selected = self.selected_application_v2(application)?;
         let package = selected.package();
+        let catalog_entry = package
+            .base
+            .manifest
+            .entries
+            .iter()
+            .find(|entry| entry.kind == EntryKind::Data && entry.path == "data/db2/catalog")
+            .ok_or(HostProblem::Malformed)?;
+        let catalog_blob = package
+            .base
+            .blobs
+            .get(&catalog_entry.sha256)
+            .ok_or(HostProblem::Malformed)?;
+        let tables: Vec<Db2TableDefinition> =
+            serde_json::from_slice(catalog_blob).map_err(|_| HostProblem::Malformed)?;
         let declared = package
             .sections
             .sql_tables
@@ -777,7 +787,7 @@ impl ProductServer {
                 )
             })
             .collect::<BTreeSet<_>>();
-        let supplied = tables
+        let signed = tables
             .iter()
             .map(|table| {
                 (
@@ -795,7 +805,7 @@ impl ProductServer {
                 )
             })
             .collect::<BTreeSet<_>>();
-        if declared != supplied {
+        if declared != signed {
             return Err(HostProblem::Malformed);
         }
         let rows = package
@@ -3448,6 +3458,112 @@ mod tests {
         package
     }
 
+    fn signed_db2_package(
+        trust: &HmacSha256PackageTrust,
+    ) -> (
+        mainframe_env_application::ApplicationPackageV2,
+        Vec<Db2TableDefinition>,
+    ) {
+        use mainframe_env_application::{SqlColumn, SqlTable};
+        use mainframe_env_db2::{
+            Db2ColumnDefinition, Db2ExtractField, Db2ExtractLayout, Db2ForeignKeyDefinition,
+            Db2ResultEncoding,
+        };
+        let definitions = vec![
+            Db2TableDefinition {
+                name: "SIGNED.PARENT".into(),
+                columns: vec![
+                    Db2ColumnDefinition {
+                        name: "ID".into(),
+                        nullable: false,
+                        max_bytes: 4,
+                        result_encoding: Db2ResultEncoding::Raw,
+                        default_value: None,
+                    },
+                    Db2ColumnDefinition {
+                        name: "VALUE".into(),
+                        nullable: false,
+                        max_bytes: 37,
+                        result_encoding: Db2ResultEncoding::Varchar,
+                        default_value: Some(b"SIGNED-DEFAULT".to_vec()),
+                    },
+                ],
+                primary_key: vec!["ID".into()],
+                foreign_keys: Vec::new(),
+                extract: Some(Db2ExtractLayout {
+                    fields: vec![Db2ExtractField {
+                        column: "VALUE".into(),
+                        width: 41,
+                    }],
+                    trailer: b"SIGNED".to_vec(),
+                }),
+            },
+            Db2TableDefinition {
+                name: "SIGNED.CHILD".into(),
+                columns: vec![
+                    Db2ColumnDefinition {
+                        name: "PARENT_ID".into(),
+                        nullable: false,
+                        max_bytes: 4,
+                        result_encoding: Db2ResultEncoding::Raw,
+                        default_value: None,
+                    },
+                    Db2ColumnDefinition {
+                        name: "DETAIL".into(),
+                        nullable: false,
+                        max_bytes: 16,
+                        result_encoding: Db2ResultEncoding::Raw,
+                        default_value: Some(b"DETAIL".to_vec()),
+                    },
+                ],
+                primary_key: vec!["PARENT_ID".into(), "DETAIL".into()],
+                foreign_keys: vec![Db2ForeignKeyDefinition {
+                    columns: vec!["PARENT_ID".into()],
+                    referenced_table: "SIGNED.PARENT".into(),
+                    referenced_columns: vec!["ID".into()],
+                    delete_restrict: true,
+                }],
+                extract: None,
+            },
+        ];
+        let mut package = signed_controller_package(trust);
+        package.base.manifest.name = "SIGNED-DB2-APPLICATION".into();
+        package.sections.sql_tables = definitions
+            .iter()
+            .map(|table| SqlTable {
+                name: table.name.clone(),
+                columns: table
+                    .columns
+                    .iter()
+                    .map(|column| SqlColumn {
+                        name: column.name.clone(),
+                        nullable: column.nullable,
+                    })
+                    .collect(),
+                primary_key: table.primary_key.clone(),
+            })
+            .collect();
+        let bytes = serde_json::to_vec(&definitions).unwrap();
+        let sha256 = format!("sha256:{:x}", Sha256::digest(&bytes));
+        let entry = package
+            .base
+            .manifest
+            .entries
+            .iter_mut()
+            .find(|entry| entry.kind == EntryKind::Data)
+            .unwrap();
+        package.base.blobs.remove(&entry.sha256);
+        entry.path = "data/db2/catalog".into();
+        entry.sha256 = sha256.clone();
+        entry.bytes = bytes.len();
+        package.base.blobs.insert(sha256, bytes);
+        let identity = mainframe_env_application::package_v2_identity(&package).unwrap();
+        package.signature.value = trust
+            .sign_identity("test-production-key", &identity)
+            .unwrap();
+        (package, definitions)
+    }
+
     #[test]
     fn subsystem_publication_requires_server_verified_selected_package_handle() {
         let trust = HmacSha256PackageTrust::new(BTreeMap::from([(
@@ -3480,6 +3596,56 @@ mod tests {
             .unwrap();
         assert_eq!(published.identity, ready.identity);
         assert_eq!(published.controllers, 1);
+    }
+
+    #[test]
+    fn db2_publication_derives_every_definition_field_from_the_signed_blob() {
+        let trust = HmacSha256PackageTrust::new(BTreeMap::from([(
+            "test-production-key".into(),
+            b"test-production-package-trust-key".to_vec(),
+        )]))
+        .unwrap();
+        let server =
+            ProductServer::memory_with_package_trust(config(), Arc::new(trust.clone())).unwrap();
+        let (package, signed) = signed_db2_package(&trust);
+        server.install_application_package_v2(&package).unwrap();
+
+        let mut untrusted_caller_copy = signed.clone();
+        untrusted_caller_copy[0].columns[1].max_bytes = 1;
+        untrusted_caller_copy[0].columns[1].result_encoding =
+            mainframe_env_db2::Db2ResultEncoding::Raw;
+        untrusted_caller_copy[0].columns[1].default_value = Some(b"TAMPERED".to_vec());
+        untrusted_caller_copy[1].foreign_keys[0].referenced_columns = vec!["VALUE".into()];
+        untrusted_caller_copy[1].foreign_keys[0].delete_restrict = false;
+        untrusted_caller_copy[0].extract = None;
+
+        server
+            .install_application_db2_catalog("SIGNED-DB2-APPLICATION")
+            .unwrap();
+        let installed_parent = server
+            .db2_service()
+            .table_definition("SIGNED.PARENT")
+            .unwrap();
+        let installed_child = server
+            .db2_service()
+            .table_definition("SIGNED.CHILD")
+            .unwrap();
+        assert_eq!(installed_parent, signed[0]);
+        assert_eq!(installed_child, signed[1]);
+        assert_ne!(installed_parent, untrusted_caller_copy[0]);
+        assert_ne!(installed_child, untrusted_caller_copy[1]);
+        assert_eq!(installed_parent.columns[1].max_bytes, 37);
+        assert_eq!(
+            installed_parent.columns[1].result_encoding,
+            mainframe_env_db2::Db2ResultEncoding::Varchar
+        );
+        assert_eq!(
+            installed_parent.columns[1].default_value.as_deref(),
+            Some(b"SIGNED-DEFAULT".as_slice())
+        );
+        assert!(installed_child.foreign_keys[0].delete_restrict);
+        assert_eq!(installed_child.foreign_keys[0].referenced_columns, ["ID"]);
+        assert_eq!(installed_parent.extract, signed[0].extract);
     }
 
     fn basic() -> String {

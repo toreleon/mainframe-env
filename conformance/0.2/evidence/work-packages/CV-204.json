@@ -3,13 +3,13 @@
   "derived": true,
   "status": "pass",
   "work_package": "CV-204",
-  "evidence_digest": "sha256:6e3c23773214e35994b65382ba10bd91ea60209d6842df9ffbaf098aabeefbbd",
+  "evidence_digest": "sha256:a16b7c1c7beb2829cc0bae52267d9560812d8ecd5f73884d0a69eb0c10065652",
   "receipt": {
     "target_version": "0.2.0",
     "deliverable": "Signed versioned application-package subsystem sections and atomic generation migration/rollback",
     "source_identity": "847561153176397ccf96b8cec7776ebc46d1e5e0",
     "commands": [
-      {"command": "cargo test -p mainframe-env-application -p xtask --locked", "exit_code": 0, "result": "10 application and 7 tooling tests passed, including hostile aggregate/nested and retained-state bounds"},
+      {"command": "cargo test -p mainframe-env-application -p xtask --locked", "exit_code": 0, "result": "11 application and 9 tooling tests passed, including oversized pre-normalization text and 64-generation retained byte/cardinality bounds"},
       {"command": "cargo clippy -p mainframe-env-application -p xtask --all-targets --locked -- -D warnings", "exit_code": 0, "result": "pass"},
       {"command": "cargo xtask application-packages --check", "exit_code": 0, "result": "pass"},
       {"command": "cargo xtask schemas --check", "exit_code": 0, "result": "pass"},
@@ -20,12 +20,12 @@
       {"command": "git diff --check", "exit_code": 0, "result": "pass"}
     ],
     "artifacts": [
-      {"path": "crates/kernel/mainframe-env-application/src/package_v2.rs", "sha256": "sha256:5612536925a20a1f01e94fc7b95d801aee7cec7772e53e325879361749eed9e7"},
+      {"path": "crates/kernel/mainframe-env-application/src/package_v2.rs", "sha256": "sha256:1920e7df7e738fcf5a2a97d61a807f51ea9ed2f2894fc34ad192831abf914a4b"},
       {"path": "crates/kernel/mainframe-env-application/README.md", "sha256": "sha256:ca6b5795a05362a4bd39de7e897e61b605630ca0ab335d7c8da1f0647427009d"},
       {"path": "conformance/0.2/schemas/application-package-v2.schema.json", "sha256": "sha256:b1385de02affe303f4cba4993c9d2519b25a7ca2b4a381f8389b9bfcbcc59b3f"},
       {"path": "conformance/0.2/schemas/application-install-generation.schema.json", "sha256": "sha256:5ba270fdfd6ea1ea4934a6f34d657f657d0c3aaf8afdf0899a5f35a594efa15d"},
-      {"path": "conformance/0.2/migrations/application-package-v1-to-v2.json", "sha256": "sha256:699eeb7514def86e03a19c72113a8a5b1437799e8edb30cbe1ec2563dd9d8942"},
-      {"path": "docs/architecture/APPLICATION-PACKAGES.md", "sha256": "sha256:b02bf9559a8af92ca5d8412497ae36839cbbf7f4dbc0875ca8df6e04633479a5"}
+      {"path": "conformance/0.2/migrations/application-package-v1-to-v2.json", "sha256": "sha256:c4e72e06d2abd5f58c21c4324f8de28cad157d97c9d6c165502ab419df47b0c0"},
+      {"path": "docs/architecture/APPLICATION-PACKAGES.md", "sha256": "sha256:22473ed65e8eb151d800ea2cf4760e54a3e0a16c4aa5b8642436c8155903bd08"}
     ],
     "invariants": {
       "v1_reader_retained": true,
@@ -41,6 +41,9 @@
       "retained_ready_rollback": true,
       "aggregate_entry_and_blob_bytes_bounded": true,
       "nested_cardinalities_bounded": true,
+      "text_bounded_before_normalization": true,
+      "conservative_structural_memory_accounted": true,
+      "retained_item_cardinality_bounded": true,
       "retained_package_state_bounded": true,
       "destructive_migration": false
     }

@@ -11,6 +11,7 @@
     "migration_rollback_rollup": "mainframe-env.migration-rollback-rollup@1",
     "full_regression": "mainframe-env.full-regression@1",
     "review_repair": "mainframe-env.review-repair@1",
+    "review_repair_round_2": "mainframe-env.review-repair-round-2@1",
     "generated_semantic_identity": "mainframe-env.generated-semantic-identity@1",
     "subsystem_handler_registry": "mainframe-env.subsystem-handler-registry@1",
     "application_package_v2": "mainframe-env.application-package@2",

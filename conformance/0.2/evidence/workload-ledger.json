@@ -7,12 +7,12 @@
     {"id": "CV-201", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-201.json", "evidence_digest": "sha256:46241e6219392f492255e5a3932f699926b9bc0d38a555668f084157a42cb2ef"},
     {"id": "CV-202", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-202.json", "evidence_digest": "sha256:f4197a58b19b9e1e5fa97458e62f378afb3b084d06d77015943d1db81feb032d"},
     {"id": "CV-203", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-203.json", "evidence_digest": "sha256:b4c02f22c5f893eb486620aad5c7cb6961d96d221c55279ab69adf152010e9ce"},
-    {"id": "CV-204", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-204.json", "evidence_digest": "sha256:6e3c23773214e35994b65382ba10bd91ea60209d6842df9ffbaf098aabeefbbd"},
-    {"id": "CV-205", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-205.json", "evidence_digest": "sha256:81ac23201607dec65face4c366e2f519d97bf590f9c3ba3a3fbc70387353603e"},
-    {"id": "CV-206", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-206.json", "evidence_digest": "sha256:40490774f62bdfa05d2c0a0ed5ab2ee7be412f356ab27f352c32fbf212a47757"},
+    {"id": "CV-204", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-204.json", "evidence_digest": "sha256:a16b7c1c7beb2829cc0bae52267d9560812d8ecd5f73884d0a69eb0c10065652"},
+    {"id": "CV-205", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-205.json", "evidence_digest": "sha256:45f48a01c8ae995c2becfec541aad51d72f8dac037e383b1f346f04baccfe953"},
+    {"id": "CV-206", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-206.json", "evidence_digest": "sha256:6283751dc39c74a1d872f7cfa7092d95e2b20bf912e41d38033a22118b145ea8"},
     {"id": "CV-207", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-207.json", "evidence_digest": "sha256:80e485e98ff03287a3299252c25e97c710d7d6d4fea9c043f291e7beeeee3f32"},
     {"id": "CV-208", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-208.json", "evidence_digest": "sha256:552543d325c8e7e563063c34dd97f06cdb8135b4e7a3353262664e4d55b21644"},
-    {"id": "CV-209", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-209.json", "evidence_digest": "sha256:32f170e018296607a84f5bc7fa488b9088a91b2cddb8215435f6d090bd3aa180"}
+    {"id": "CV-209", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-209.json", "evidence_digest": "sha256:9deebd86b00355155ebcbb1f7cdf327ed2eae61f884b5a3a78e259806553a869"}
   ],
   "exit_gates": [
     {"id": "official-catalogs", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-201.json"},

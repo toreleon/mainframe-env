@@ -4887,7 +4887,10 @@ fn carddemo_batch_controllers() -> Vec<BatchController> {
     ]
 }
 
-fn install_carddemo_db2_package(server: &Arc<ProductServer>) -> Result<(), CorpusProblem> {
+fn install_carddemo_db2_package(
+    server: &Arc<ProductServer>,
+    batch_programs: &[BatchProgramDefinition],
+) -> Result<(), CorpusProblem> {
     let definitions = carddemo_db2_definitions();
     let batch_controllers = carddemo_batch_controllers();
     let catalog_bytes = serde_json::to_vec(&definitions)
@@ -4921,11 +4924,18 @@ fn install_carddemo_db2_package(server: &Arc<ProductServer>) -> Result<(), Corpu
             .rsplit('/')
             .next()
             .ok_or_else(|| CorpusProblem::new("carddemo.db2.package", "program is missing"))?;
-        payloads.push((
-            EntryKind::Program,
-            controller.program.clone(),
-            format!("carddemo-controller:{program}").into_bytes(),
-        ));
+        let payload = if controller.kind == BatchControllerKind::CobolProgram
+            && controller.properties.get("behavior").map(String::as_str) == Some("program-call")
+        {
+            batch_programs
+                .iter()
+                .find(|definition| definition.name.eq_ignore_ascii_case(program))
+                .map(|definition| definition.payload.clone())
+                .unwrap_or_else(|| format!("carddemo-controller:{program}").into_bytes())
+        } else {
+            format!("carddemo-controller:{program}").into_bytes()
+        };
+        payloads.push((EntryKind::Program, controller.program.clone(), payload));
     }
     let mut entries = Vec::new();
     let mut blobs = BTreeMap::new();
@@ -4997,7 +5007,7 @@ fn install_carddemo_db2_package(server: &Arc<ProductServer>) -> Result<(), Corpu
         .install_application_batch_controllers("AWS-CARDDEMO")
         .map_err(terminal_problem)?;
     server
-        .install_application_db2_catalog("AWS-CARDDEMO", definitions)
+        .install_application_db2_catalog("AWS-CARDDEMO")
         .map_err(terminal_problem)
 }
 
@@ -5028,16 +5038,16 @@ async fn exercise_db2_routes(
         carddemo_package_trust()?,
     )
     .map_err(terminal_problem)?;
-    install_carddemo_db2_package(&server)?;
+    server
+        .install_batch_programs(definitions.clone())
+        .map_err(terminal_problem)?;
+    install_carddemo_db2_package(&server, &definitions)?;
     server
         .bootstrap_user("IBMUSER", b"TESTPASS")
         .map_err(terminal_problem)?;
     install_base_online_authorities(&server, corpus_dir, &online)?;
     server
         .install_online_application(online)
-        .map_err(terminal_problem)?;
-    server
-        .install_batch_programs(definitions)
         .map_err(terminal_problem)?;
     let racf = server.racf_service();
     racf.define_profile("DATASET", "AWS.M2.CARDDEMO.**", "IBMUSER", None)
@@ -6816,7 +6826,7 @@ async fn exercise_mq_authorization_routes(
         carddemo_package_trust()?,
     )
     .map_err(terminal_problem)?;
-    install_carddemo_db2_package(&server)?;
+    install_carddemo_db2_package(&server, &[])?;
     server
         .bootstrap_user("IBMUSER", b"TESTPASS")
         .map_err(terminal_problem)?;
@@ -7900,7 +7910,7 @@ async fn exercise_ims_routes(
         carddemo_package_trust()?,
     )
     .map_err(terminal_problem)?;
-    install_carddemo_db2_package(&server)?;
+    install_carddemo_db2_package(&server, &[])?;
     let ims = server.ims_service();
     let install = ims.install(definition.clone()).map_err(terminal_problem)?;
     if !ims

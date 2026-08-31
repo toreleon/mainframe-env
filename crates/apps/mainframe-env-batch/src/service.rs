@@ -1,5 +1,6 @@
 use crate::controller::{
-    BatchControllerRegistry, BatchControllerRegistryState, ResolvedBatchController,
+    BatchControllerRegistry, BatchControllerRegistryState, MAX_CONTROLLER_STATE_BYTES,
+    ResolvedBatchController,
 };
 use crate::program::{
     ProgramExecution, TsoProgramExecution, program_execution, tso_program_execution,
@@ -175,6 +176,9 @@ impl BatchService {
             .map_err(store_error)?
         {
             Some(record) => {
+                if record.payload.len() > MAX_CONTROLLER_STATE_BYTES {
+                    return Err(HostProblem::ResourceExhausted);
+                }
                 let state: BatchControllerRegistryState =
                     serde_json::from_slice(&record.payload)
                         .map_err(|_| HostProblem::InfrastructureFailure)?;
@@ -211,6 +215,7 @@ impl BatchService {
             .controllers
             .lock()
             .map_err(|_| HostProblem::InfrastructureFailure)?;
+        durable.registry.preflight_install(&generation)?;
         let mut replacement = durable.registry.clone();
         let receipt = replacement.install(generation)?;
         self.persist_controllers(&mut durable, replacement)?;
@@ -721,19 +726,17 @@ impl BatchService {
         let selector = BatchControllerSelector::tso(&program)?;
         if let Some(controller) = self.resolve_controller(&selector)? {
             return match controller.plan {
-                BatchControllerPlan::ProgramCall => self.execute_program_controller(
-                    invocation,
-                    job,
-                    step,
-                    input,
-                    effect_sequence,
-                    controller
-                        .program
-                        .path
-                        .rsplit('/')
-                        .next()
-                        .ok_or(HostProblem::InfrastructureFailure)?,
-                ),
+                BatchControllerPlan::ProgramCall => {
+                    let program = self.verify_controller_program(&controller.program)?;
+                    self.execute_program_controller(
+                        invocation,
+                        job,
+                        step,
+                        input,
+                        effect_sequence,
+                        &program,
+                    )
+                }
                 _ => Err(HostProblem::ProviderFailure),
             };
         }
@@ -807,6 +810,27 @@ impl BatchService {
             .lock()
             .map_err(|_| HostProblem::InfrastructureFailure)
             .map(|durable| durable.registry.resolve(selector))
+    }
+
+    fn verify_controller_program(
+        &self,
+        program: &crate::BatchControllerProgram,
+    ) -> Result<String, HostProblem> {
+        let name = program
+            .path
+            .rsplit('/')
+            .next()
+            .ok_or(HostProblem::InfrastructureFailure)?
+            .to_ascii_uppercase();
+        let record = self
+            .store
+            .get_provider_state("batch-program", &name)
+            .map_err(store_error)?
+            .ok_or(HostProblem::NotFound)?;
+        if record.payload != program.identity.as_bytes() {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        Ok(name)
     }
 
     fn execute_program_controller(
@@ -2164,8 +2188,7 @@ impl BatchService {
         durable: &mut DurableControllers,
         registry: BatchControllerRegistry,
     ) -> Result<(), HostProblem> {
-        let payload = serde_json::to_vec(&registry.state())
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let payload = registry.state_payload()?;
         let version = durable
             .store_version
             .checked_add(1)
@@ -3093,6 +3116,111 @@ mod tests {
         assert!(
             rolled_back
                 .resolve_controller(&BatchControllerSelector::tso("SECOND").unwrap())
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn empty_controller_generation_survives_restart_and_can_roll_back() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let first = service(store.clone(), builtins());
+        first
+            .install_controllers(controller_generation(1, "FIRST"))
+            .unwrap();
+        let mut empty = controller_generation(2, "UNUSED");
+        empty.controllers.clear();
+        assert_eq!(first.install_controllers(empty).unwrap().controllers, 0);
+        drop(first);
+
+        let restarted = service(store.clone(), builtins());
+        assert!(
+            restarted
+                .resolve_controller(&BatchControllerSelector::tso("FIRST").unwrap())
+                .unwrap()
+                .is_none()
+        );
+        restarted
+            .rollback_controllers("RESTART-FIXTURE", 1)
+            .unwrap();
+        drop(restarted);
+
+        let rolled_back = service(store, builtins());
+        assert!(
+            rolled_back
+                .resolve_controller(&BatchControllerSelector::tso("FIRST").unwrap())
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn controller_program_substitution_is_rejected_against_durable_mapping() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone(), builtins());
+        let generation = controller_generation(1, "SIGNEDPGM");
+        let signed = generation.controllers[0].program.clone();
+        service.install_controllers(generation).unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "batch-program".into(),
+                    key: "SIGNEDPGM".into(),
+                    version: 1,
+                    payload: format!("sha256:{:064x}", 999).into_bytes(),
+                },
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            service.verify_controller_program(&signed),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "batch-program".into(),
+                    key: "SIGNEDPGM".into(),
+                    version: 2,
+                    payload: signed.identity.as_bytes().to_vec(),
+                },
+                Some(1),
+            )
+            .unwrap();
+        assert_eq!(
+            service.verify_controller_program(&signed).unwrap(),
+            "SIGNEDPGM"
+        );
+    }
+
+    #[test]
+    fn retained_controller_generation_limit_fails_before_clone_and_survives_restart() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let initial = service(store.clone(), builtins());
+        for generation in 1..=64 {
+            initial
+                .install_controllers(controller_generation(
+                    generation,
+                    &format!("PROGRAM{generation}"),
+                ))
+                .unwrap();
+        }
+        assert_eq!(
+            initial.install_controllers(controller_generation(65, "PROGRAM65")),
+            Err(HostProblem::ResourceExhausted)
+        );
+        drop(initial);
+
+        let restarted = service(store, builtins());
+        assert!(
+            restarted
+                .resolve_controller(&BatchControllerSelector::tso("PROGRAM64").unwrap())
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            restarted
+                .resolve_controller(&BatchControllerSelector::tso("PROGRAM65").unwrap())
                 .unwrap()
                 .is_none()
         );

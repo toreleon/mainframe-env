@@ -191,6 +191,8 @@ pub struct PackageLimits {
     pub max_retained_generations: usize,
     pub max_retained_package_bytes: usize,
     pub max_total_retained_package_bytes: usize,
+    pub max_retained_nested_items: usize,
+    pub max_total_retained_nested_items: usize,
 }
 
 impl Default for PackageLimits {
@@ -216,6 +218,8 @@ impl Default for PackageLimits {
             max_retained_generations: 64,
             max_retained_package_bytes: 256 * 1024 * 1024,
             max_total_retained_package_bytes: 1024 * 1024 * 1024,
+            max_retained_nested_items: 2_000_000,
+            max_total_retained_nested_items: 8_000_000,
         }
     }
 }
@@ -253,6 +257,7 @@ struct InstalledApplication {
     generations: BTreeMap<u64, ApplicationGenerationRecord>,
     packages: BTreeMap<u64, Arc<ApplicationPackageV2>>,
     retained_bytes: usize,
+    retained_items: usize,
 }
 
 #[derive(Clone)]
@@ -282,8 +287,10 @@ impl ApplicationInstallerV2 {
         &self,
         package: &ApplicationPackageV2,
     ) -> Result<ApplicationGenerationRecord, InstallProblem> {
-        let validated = validate_v2(package, &self.product, self.limits, self.verifier.as_ref())?;
-        let identity = validated.identity;
+        let ValidatedPackage {
+            identity,
+            footprint,
+        } = validate_v2(package, &self.product, self.limits, self.verifier.as_ref())?;
         let key = package.base.manifest.name.to_ascii_uppercase();
         let mut applications = self
             .applications
@@ -304,10 +311,17 @@ impl ApplicationInstallerV2 {
         }
         let _total_retained_bytes = applications
             .values()
-            .try_fold(validated.retained_bytes, |total, installed| {
+            .try_fold(footprint.bytes, |total, installed| {
                 total.checked_add(installed.retained_bytes)
             })
             .filter(|bytes| *bytes <= self.limits.max_total_retained_package_bytes)
+            .ok_or(InstallProblem::LimitExceeded)?;
+        let _total_retained_items = applications
+            .values()
+            .try_fold(footprint.items, |total, installed| {
+                total.checked_add(installed.retained_items)
+            })
+            .filter(|items| *items <= self.limits.max_total_retained_nested_items)
             .ok_or(InstallProblem::LimitExceeded)?;
         let installed = applications.entry(key).or_default();
         if installed.generations.len() >= self.limits.max_retained_generations {
@@ -315,8 +329,13 @@ impl ApplicationInstallerV2 {
         }
         let retained_bytes = installed
             .retained_bytes
-            .checked_add(validated.retained_bytes)
+            .checked_add(footprint.bytes)
             .filter(|bytes| *bytes <= self.limits.max_retained_package_bytes)
+            .ok_or(InstallProblem::LimitExceeded)?;
+        let retained_items = installed
+            .retained_items
+            .checked_add(footprint.items)
+            .filter(|items| *items <= self.limits.max_retained_nested_items)
             .ok_or(InstallProblem::LimitExceeded)?;
         if installed
             .generations
@@ -339,6 +358,7 @@ impl ApplicationInstallerV2 {
             .packages
             .insert(package.generation, Arc::new(package.clone()));
         installed.retained_bytes = retained_bytes;
+        installed.retained_items = retained_items;
         Ok(record)
     }
 
@@ -569,7 +589,13 @@ pub fn package_v2_identity(package: &ApplicationPackageV2) -> Result<String, Ins
 
 struct ValidatedPackage {
     identity: String,
-    retained_bytes: usize,
+    footprint: PackageFootprint,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct PackageFootprint {
+    bytes: usize,
+    items: usize,
 }
 
 fn validate_v2(
@@ -578,7 +604,7 @@ fn validate_v2(
     limits: PackageLimits,
     verifier: &dyn PackageSignatureVerifier,
 ) -> Result<ValidatedPackage, InstallProblem> {
-    let retained_bytes = validate_aggregate_bounds(package, limits)?;
+    let footprint = validate_aggregate_bounds(package, limits)?;
     validate_package(&package.base, product)?;
     if package.generation == 0
         || package.sections.schema_version != APPLICATION_PACKAGE_V2_CONTRACT
@@ -601,14 +627,14 @@ fn validate_v2(
     }
     Ok(ValidatedPackage {
         identity,
-        retained_bytes,
+        footprint,
     })
 }
 
 fn validate_aggregate_bounds(
     package: &ApplicationPackageV2,
     limits: PackageLimits,
-) -> Result<usize, InstallProblem> {
+) -> Result<PackageFootprint, InstallProblem> {
     if package.base.manifest.entries.len() > limits.max_manifest_entries
         || package.base.blobs.len() > limits.max_manifest_entries
         || package
@@ -620,6 +646,11 @@ fn validate_aggregate_bounds(
     {
         return Err(InstallProblem::LimitExceeded);
     }
+    validate_preflight_text(package, limits)?;
+    let section_bytes = bounded_sum(
+        section_text_lengths(package),
+        limits.max_total_section_bytes,
+    )?;
     let blob_bytes = bounded_sum(
         package.base.blobs.values().map(Vec::len),
         limits.max_total_blob_bytes,
@@ -696,17 +727,123 @@ fn validate_aggregate_bounds(
                     .iter()
                     .map(|item| 1 + item.properties.len()),
             )
-            .chain(sections.security_resources.iter().map(|_| 3)),
+            .chain(sections.security_resources.iter().map(|_| 3))
+            .chain(std::iter::once(package.base.blobs.len()))
+            .chain(std::iter::once(16)),
         limits.max_total_nested_items,
     )?;
-    let section_bytes = bounded_sum(
-        section_text_lengths(package),
-        limits.max_total_section_bytes,
-    )?;
-    blob_bytes
+    let structural_bytes = nested_items
+        .checked_mul(256)
+        .ok_or(InstallProblem::LimitExceeded)?;
+    let bytes = blob_bytes
         .checked_add(section_bytes)
-        .and_then(|bytes| bytes.checked_add(nested_items))
-        .ok_or(InstallProblem::LimitExceeded)
+        .and_then(|bytes| bytes.checked_add(structural_bytes))
+        .ok_or(InstallProblem::LimitExceeded)?;
+    Ok(PackageFootprint {
+        bytes,
+        items: nested_items,
+    })
+}
+
+fn validate_preflight_text(
+    package: &ApplicationPackageV2,
+    limits: PackageLimits,
+) -> Result<(), InstallProblem> {
+    for value in [
+        package.base.manifest.name.as_str(),
+        package.base.manifest.version.as_str(),
+        package.base.manifest.target_product.as_str(),
+        package.sections.schema_version.as_str(),
+        package.signature.algorithm.as_str(),
+        package.signature.key_id.as_str(),
+        package.signature.value.as_str(),
+    ] {
+        bounded_text(value, 256)?;
+    }
+    for digest in package.base.blobs.keys() {
+        bounded_text(digest, 71)?;
+    }
+    for entry in &package.base.manifest.entries {
+        bounded_text(&entry.path, 4_096)?;
+        bounded_text(&entry.sha256, 71)?;
+        for dependency in &entry.depends_on {
+            bounded_text(dependency, 4_096)?;
+        }
+    }
+    for library in &package.sections.host_abi_libraries {
+        bounded_text(&library.id, 256)?;
+        bounded_text(&library.version, 256)?;
+        for member in &library.members {
+            bounded_text(&member.name, 256)?;
+            bounded_text(&member.blob_sha256, 71)?;
+        }
+    }
+    for table in &package.sections.sql_tables {
+        bounded_text(&table.name, 256)?;
+        for column in &table.columns {
+            bounded_text(&column.name, 256)?;
+        }
+        for key in &table.primary_key {
+            bounded_text(key, 256)?;
+        }
+    }
+    for row in &package.sections.sql_rows {
+        bounded_text(&row.table, 256)?;
+        bounded_values(&row.values, limits)?;
+    }
+    for definition in &package.sections.ims_definitions {
+        bounded_text(&definition.name, 256)?;
+        for segment in &definition.segments {
+            bounded_text(segment, 256)?;
+        }
+    }
+    for row in &package.sections.ims_rows {
+        bounded_text(&row.definition, 256)?;
+        bounded_text(&row.segment, 256)?;
+        bounded_values(&row.values, limits)?;
+    }
+    for resource in &package.sections.mq_resources {
+        bounded_text(&resource.name, 256)?;
+        if let Some(target) = &resource.target {
+            bounded_text(target, 256)?;
+        }
+        if let Some(controller) = &resource.controller {
+            bounded_text(controller, 256)?;
+        }
+    }
+    for controller in &package.sections.batch_controllers {
+        bounded_text(&controller.name, 256)?;
+        bounded_text(&controller.program, 4_096)?;
+        bounded_values(&controller.properties, limits)?;
+    }
+    for resource in &package.sections.security_resources {
+        bounded_text(&resource.class, 256)?;
+        bounded_text(&resource.profile, 256)?;
+        bounded_text(&resource.owner, 256)?;
+    }
+    Ok(())
+}
+
+fn bounded_values(
+    values: &BTreeMap<String, String>,
+    limits: PackageLimits,
+) -> Result<(), InstallProblem> {
+    if values.len() > limits.max_fields_per_record {
+        return Err(InstallProblem::LimitExceeded);
+    }
+    for (name, value) in values {
+        bounded_text(name, 256)?;
+        bounded_text(value, limits.max_value_bytes)?;
+    }
+    Ok(())
+}
+
+fn bounded_text(value: &str, maximum: usize) -> Result<(), InstallProblem> {
+    if value.len() > maximum {
+        Err(InstallProblem::LimitExceeded)
+    } else {
+        Ok(())
+    }
 }
 
 fn section_text_lengths(package: &ApplicationPackageV2) -> impl Iterator<Item = usize> + '_ {
@@ -1263,6 +1400,10 @@ mod tests {
 
         let limits = limits!(max_total_section_bytes: 1);
         assert_limit(&baseline, limits);
+
+        let mut oversized_name = package(1);
+        oversized_name.sections.sql_rows[0].table = "X".repeat(1024 * 1024);
+        assert_limit(&oversized_name, PackageLimits::default());
     }
 
     #[test]
@@ -1274,7 +1415,9 @@ mod tests {
             .insert("VALUE".into(), "second-generation".into());
         resign(&mut second);
 
-        let retained = validate_aggregate_bounds(&first, PackageLimits::default()).unwrap();
+        let retained = validate_aggregate_bounds(&first, PackageLimits::default())
+            .unwrap()
+            .bytes;
         let limits = PackageLimits {
             max_retained_package_bytes: retained,
             ..PackageLimits::default()
@@ -1298,6 +1441,40 @@ mod tests {
         resign(&mut other);
         assert_eq!(
             installer.install(&other),
+            Err(InstallProblem::LimitExceeded)
+        );
+    }
+
+    #[test]
+    fn sixty_four_small_generations_use_conservative_bytes_and_cardinality() {
+        let first = package(1);
+        let footprint = validate_aggregate_bounds(&first, PackageLimits::default()).unwrap();
+        assert!(footprint.bytes >= footprint.items * 256);
+        let limits = PackageLimits {
+            max_retained_package_bytes: footprint.bytes * 64,
+            max_total_retained_package_bytes: footprint.bytes * 64,
+            max_retained_nested_items: footprint.items * 64,
+            max_total_retained_nested_items: footprint.items * 64,
+            ..PackageLimits::default()
+        };
+        let installer = ApplicationInstallerV2::new("0.2.0", limits, Arc::new(TestVerifier));
+        for generation in 1..=64 {
+            installer.install(&package(generation)).unwrap();
+        }
+        assert_eq!(installer.selected("DEMO").unwrap().unwrap().generation, 64);
+        assert_eq!(
+            installer.install(&package(65)),
+            Err(InstallProblem::LimitExceeded)
+        );
+
+        let limits = PackageLimits {
+            max_retained_nested_items: footprint.items * 2 - 1,
+            ..PackageLimits::default()
+        };
+        let installer = ApplicationInstallerV2::new("0.2.0", limits, Arc::new(TestVerifier));
+        installer.install(&first).unwrap();
+        assert_eq!(
+            installer.install(&package(2)),
             Err(InstallProblem::LimitExceeded)
         );
     }

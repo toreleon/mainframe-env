@@ -148,7 +148,7 @@ impl Db2Service {
         store: Arc<dyn ProviderStateStore>,
         limits: Db2Limits,
     ) -> Result<Arc<Self>, HostProblem> {
-        let (store_version, state) = match store
+        let (store_version, mut state) = match store
             .get_provider_state(STATE_NAMESPACE, STATE_KEY)
             .map_err(store_error)?
         {
@@ -159,6 +159,7 @@ impl Db2Service {
             ),
             None => (0, State::default()),
         };
+        rekey_state(&mut state)?;
         validate_state(&state, limits)?;
         Ok(Arc::new(Self {
             store,
@@ -218,6 +219,16 @@ impl Db2Service {
             .ok_or(HostProblem::NotFound)?;
         let mut next = durable.state.clone();
         snapshot_selected_catalog(&mut next, &application)?;
+        let current_tables = next
+            .installations
+            .get(&application)
+            .map(|installation| installation.tables.clone())
+            .unwrap_or_default();
+        let target_tables = target.schemas.keys().cloned().collect::<BTreeSet<_>>();
+        for name in current_tables.difference(&target_tables) {
+            next.schemas.remove(name);
+            next.tables.remove(name);
+        }
         for (name, schema) in &target.schemas {
             next.schemas.insert(name.clone(), schema.clone());
         }
@@ -236,6 +247,7 @@ impl Db2Service {
             .catalog_version
             .checked_add(1)
             .ok_or(HostProblem::ResourceExhausted)?;
+        validate_foreign_keys(&next)?;
         validate_state(&next, self.limits)?;
         self.persist(&mut durable, next)
     }
@@ -286,6 +298,15 @@ impl Db2Service {
             .get(&table.to_ascii_uppercase())
             .ok_or(HostProblem::NotFound)?;
         Ok(table.rows.values().cloned().collect())
+    }
+
+    pub fn table_definition(&self, table: &str) -> Result<Db2TableDefinition, HostProblem> {
+        self.lock()?
+            .state
+            .schemas
+            .get(&table.to_ascii_uppercase())
+            .cloned()
+            .ok_or(HostProblem::NotFound)
     }
 
     pub fn pending_units(&self) -> Result<usize, HostProblem> {
@@ -394,6 +415,7 @@ fn apply_catalog_generation(
             .map(|column| {
                 value_for_column(&seed.values, &column.name)
                     .cloned()
+                    .or_else(|| column.default_value.clone())
                     .unwrap_or_default()
             })
             .collect::<Vec<_>>();
@@ -991,12 +1013,56 @@ fn row_key(definition: &Db2TableDefinition, values: &[Vec<u8>]) -> Result<String
         .map(|index| {
             values
                 .get(index)
-                .map(|value| trimmed(value))
                 .filter(|value| !value.is_empty())
+                .map(|value| key_component(value))
                 .ok_or(HostProblem::Malformed)
         })
         .collect::<Result<Vec<_>, _>>()
         .map(|parts| parts.join("|"))
+}
+
+fn key_component(value: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut encoded = String::with_capacity(16usize.saturating_add(value.len().saturating_mul(2)));
+    encoded.push_str(&format!("{:016x}:", value.len()));
+    for byte in value {
+        encoded.push(char::from(HEX[usize::from(byte >> 4)]));
+        encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
+    }
+    encoded
+}
+
+fn rekey_state(state: &mut State) -> Result<(), HostProblem> {
+    rekey_table_map(&mut state.tables, &state.schemas)?;
+    for pending in state.pending.values_mut() {
+        rekey_table_map(&mut pending.tables, &state.schemas)?;
+    }
+    for generations in state.catalog_generations.values_mut() {
+        for snapshot in generations.values_mut() {
+            rekey_table_map(&mut snapshot.tables, &snapshot.schemas)?;
+        }
+    }
+    Ok(())
+}
+
+fn rekey_table_map(
+    tables: &mut BTreeMap<String, Table>,
+    schemas: &BTreeMap<String, Db2TableDefinition>,
+) -> Result<(), HostProblem> {
+    for (name, table) in tables {
+        let Some(schema) = schemas.get(name) else {
+            continue;
+        };
+        let mut rows = BTreeMap::new();
+        for row in table.rows.values() {
+            let key = row_key(schema, row)?;
+            if rows.insert(key, row.clone()).is_some() {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+        }
+        table.rows = rows;
+    }
+    Ok(())
 }
 
 fn read_relation<'a>(
@@ -1203,19 +1269,21 @@ fn row_from_insert(
 }
 
 fn decode_host_value(column: &Db2ColumnDefinition, value: &[u8]) -> Result<Vec<u8>, HostProblem> {
-    let decoded = if column.result_encoding == Db2ResultEncoding::Varchar && value.len() >= 2 {
-        let declared = u16::from_be_bytes([value[0], value[1]]) as usize;
-        if declared <= value.len() - 2 && declared <= column.max_bytes {
-            let mut value = value[2..2 + declared].to_vec();
-            while value.last() == Some(&b' ') {
-                value.pop();
+    let decoded = match column.result_encoding {
+        Db2ResultEncoding::Raw => value.to_vec(),
+        Db2ResultEncoding::Varchar if value.len() >= 2 => {
+            let declared = u16::from_be_bytes([value[0], value[1]]) as usize;
+            if declared <= value.len() - 2 && declared <= column.max_bytes {
+                let mut value = value[2..2 + declared].to_vec();
+                while value.last() == Some(&b' ') {
+                    value.pop();
+                }
+                value
+            } else {
+                trimmed(value).into_bytes()
             }
-            value
-        } else {
-            trimmed(value).into_bytes()
         }
-    } else {
-        trimmed(value).into_bytes()
+        Db2ResultEncoding::Varchar => trimmed(value).into_bytes(),
     };
     if decoded.len() > column.max_bytes {
         Err(HostProblem::Malformed)
@@ -1250,18 +1318,28 @@ fn key_from_inputs(
         .primary_key
         .iter()
         .map(|column| {
+            let index = definition
+                .column_index(column)
+                .ok_or(HostProblem::Malformed)?;
             input_for_column(inputs, column)
-                .map(|variable| trimmed(&variable.value))
-                .filter(|value| !value.is_empty())
+                .map(|variable| decode_host_value(&definition.columns[index], &variable.value))
+                .transpose()
         })
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>, HostProblem>>()?;
     if values.iter().all(Option::is_none) {
         return Ok(None);
     }
     values
         .into_iter()
         .collect::<Option<Vec<_>>>()
-        .map(|parts| parts.join("|"))
+        .filter(|parts| parts.iter().all(|part| !part.is_empty()))
+        .map(|parts| {
+            parts
+                .iter()
+                .map(|part| key_component(part))
+                .collect::<Vec<_>>()
+                .join("|")
+        })
         .map(Some)
         .ok_or(HostProblem::Malformed)
 }
@@ -1286,13 +1364,19 @@ fn key_from_statement_inputs(
             return key_from_inputs(definition, inputs);
         };
         let host = normalize_identifier(host);
-        let value = inputs
+        let variable = inputs
             .iter()
             .find(|(name, _)| normalize_identifier(name).ends_with(&host))
-            .map(|(_, variable)| trimmed(&variable.value))
-            .filter(|value| !value.is_empty())
+            .map(|(_, variable)| variable)
             .ok_or(HostProblem::Malformed)?;
-        parts.push(value);
+        let index = definition
+            .column_index(column)
+            .ok_or(HostProblem::Malformed)?;
+        let value = decode_host_value(&definition.columns[index], &variable.value)?;
+        if value.is_empty() {
+            return Err(HostProblem::Malformed);
+        }
+        parts.push(key_component(&value));
     }
     Ok(Some(parts.join("|")))
 }
@@ -1829,11 +1913,14 @@ fn table_map_is_valid(
             && schemas
                 .get(name)
                 .is_none_or(|schema| schema.columns.len() == table.columns)
-            && table.rows.values().all(|row| {
+            && table.rows.iter().all(|(key, row)| {
                 row.len() == table.columns
                     && row
                         .iter()
                         .all(|column| column.len() <= limits.max_column_bytes)
+                    && schemas
+                        .get(name)
+                        .is_none_or(|schema| row_key(schema, row).as_ref() == Ok(key))
             })
     })
 }
@@ -2076,6 +2163,47 @@ mod tests {
         catalog
     }
 
+    fn binary_catalog() -> Db2CatalogGeneration {
+        Db2CatalogGeneration {
+            application: "BINARY-FIXTURE".into(),
+            generation: 1,
+            identity: format!("sha256:{:064x}", 777),
+            tables: vec![Db2TableDefinition {
+                name: "APP.BINARY".into(),
+                columns: vec![
+                    Db2ColumnDefinition {
+                        name: "KEY_BYTES".into(),
+                        nullable: false,
+                        max_bytes: 4,
+                        result_encoding: Db2ResultEncoding::Raw,
+                        default_value: None,
+                    },
+                    Db2ColumnDefinition {
+                        name: "PAYLOAD".into(),
+                        nullable: false,
+                        max_bytes: 8,
+                        result_encoding: Db2ResultEncoding::Raw,
+                        default_value: Some(vec![b' ', 0xff, b' ']),
+                    },
+                    Db2ColumnDefinition {
+                        name: "LABEL".into(),
+                        nullable: false,
+                        max_bytes: 8,
+                        result_encoding: Db2ResultEncoding::Varchar,
+                        default_value: Some(b" D ".to_vec()),
+                    },
+                ],
+                primary_key: vec!["KEY_BYTES".into()],
+                foreign_keys: Vec::new(),
+                extract: None,
+            }],
+            rows: vec![crate::Db2SeedRow {
+                table: "APP.BINARY".into(),
+                values: BTreeMap::from([("KEY_BYTES".into(), vec![0xff, b' '])]),
+            }],
+        }
+    }
+
     #[test]
     fn selected_package_catalog_installs_generic_schema_rows_and_layout_atomically() {
         let store = Arc::new(MemoryStore::new(Default::default()));
@@ -2224,6 +2352,197 @@ mod tests {
             assert_eq!(selected.rows[0].columns[0], code.as_bytes());
         }
         assert_eq!(service.table_rows("APP.CODE").unwrap().len(), 2);
+    }
+
+    #[test]
+    fn raw_host_bytes_and_catalog_defaults_survive_insert_update_read_and_restart() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = Db2Service::open(store.clone(), Db2Limits::default()).unwrap();
+        service.install_catalog(binary_catalog()).unwrap();
+        let run = invocation("binary-raw");
+
+        let seeded = service
+            .execute(
+                &run,
+                &request(
+                    Db2Operation::Select,
+                    220,
+                    "SELECT KEY_BYTES, PAYLOAD, LABEL FROM APP.BINARY WHERE KEY_BYTES = :LOOKUP",
+                    BTreeMap::from([(
+                        "LOOKUP".into(),
+                        Db2HostVariable {
+                            value: vec![0xff, b' '],
+                            indicator: None,
+                        },
+                    )]),
+                ),
+            )
+            .unwrap();
+        assert_eq!(seeded.rows[0].columns[0], vec![0xff, b' ']);
+        assert_eq!(seeded.rows[0].columns[1], vec![b' ', 0xff, b' ']);
+        assert_eq!(&seeded.rows[0].columns[2][..5], &[0, 3, b' ', b'D', b' ']);
+
+        let key = vec![b' ', 0xfe, b' '];
+        let inserted_payload = vec![0, 0xff, b' ', b'A', b' '];
+        service
+            .execute(
+                &run,
+                &request(
+                    Db2Operation::Insert,
+                    221,
+                    "INSERT INTO APP.BINARY",
+                    BTreeMap::from([
+                        (
+                            "KEY_BYTES".into(),
+                            Db2HostVariable {
+                                value: key.clone(),
+                                indicator: None,
+                            },
+                        ),
+                        (
+                            "PAYLOAD".into(),
+                            Db2HostVariable {
+                                value: inserted_payload.clone(),
+                                indicator: None,
+                            },
+                        ),
+                        (
+                            "LABEL".into(),
+                            Db2HostVariable {
+                                value: vec![0, 3, b'X', b' ', b'Y'],
+                                indicator: None,
+                            },
+                        ),
+                    ]),
+                ),
+            )
+            .unwrap();
+        service
+            .execute(
+                &run,
+                &request(Db2Operation::Commit, 222, "COMMIT", BTreeMap::new()),
+            )
+            .unwrap();
+        let selected = service
+            .execute(
+                &run,
+                &request(
+                    Db2Operation::Select,
+                    223,
+                    "SELECT KEY_BYTES, PAYLOAD FROM APP.BINARY WHERE KEY_BYTES = :LOOKUP",
+                    BTreeMap::from([(
+                        "LOOKUP".into(),
+                        Db2HostVariable {
+                            value: key.clone(),
+                            indicator: None,
+                        },
+                    )]),
+                ),
+            )
+            .unwrap();
+        assert_eq!(
+            selected.rows[0].columns,
+            vec![key.clone(), inserted_payload]
+        );
+
+        let updated_payload = vec![b' ', 0x80, b' '];
+        service
+            .execute(
+                &run,
+                &request(
+                    Db2Operation::Update,
+                    224,
+                    "UPDATE APP.BINARY SET PAYLOAD = :NEW_PAYLOAD WHERE KEY_BYTES = :LOOKUP",
+                    BTreeMap::from([
+                        (
+                            "LOOKUP".into(),
+                            Db2HostVariable {
+                                value: key.clone(),
+                                indicator: None,
+                            },
+                        ),
+                        (
+                            "NEW_PAYLOAD".into(),
+                            Db2HostVariable {
+                                value: updated_payload.clone(),
+                                indicator: None,
+                            },
+                        ),
+                    ]),
+                ),
+            )
+            .unwrap();
+        service
+            .execute(
+                &run,
+                &request(Db2Operation::Commit, 225, "COMMIT", BTreeMap::new()),
+            )
+            .unwrap();
+        drop(service);
+
+        let restarted = Db2Service::open(store, Db2Limits::default()).unwrap();
+        let selected = restarted
+            .execute(
+                &run,
+                &request(
+                    Db2Operation::Select,
+                    226,
+                    "SELECT KEY_BYTES, PAYLOAD FROM APP.BINARY WHERE KEY_BYTES = :LOOKUP",
+                    BTreeMap::from([(
+                        "LOOKUP".into(),
+                        Db2HostVariable {
+                            value: key.clone(),
+                            indicator: None,
+                        },
+                    )]),
+                ),
+            )
+            .unwrap();
+        assert_eq!(selected.rows[0].columns, vec![key, updated_payload]);
+    }
+
+    #[test]
+    fn rollback_removes_newer_owned_dependents_and_restart_remains_referentially_valid() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = Db2Service::open(store.clone(), Db2Limits::default()).unwrap();
+        let mut first = installed_catalog(31);
+        first.tables.truncate(1);
+        first.rows.truncate(1);
+        service.install_catalog(first).unwrap();
+
+        let mut second = installed_catalog(32);
+        second.generation = 2;
+        second.rows.extend([
+            crate::Db2SeedRow {
+                table: "APP.CODE".into(),
+                values: BTreeMap::from([
+                    ("CODE".into(), b"02".to_vec()),
+                    ("DESCRIPTION".into(), b"SECOND".to_vec()),
+                ]),
+            },
+            crate::Db2SeedRow {
+                table: "APP.CODE_DETAIL".into(),
+                values: BTreeMap::from([
+                    ("CODE".into(), b"02".to_vec()),
+                    ("DETAIL".into(), b"D2".to_vec()),
+                ]),
+            },
+        ]);
+        service.install_catalog(second).unwrap();
+        assert_eq!(service.table_rows("APP.CODE_DETAIL").unwrap().len(), 2);
+        service.rollback_catalog("GENERIC-FIXTURE", 1).unwrap();
+        assert_eq!(
+            service.table_rows("APP.CODE_DETAIL"),
+            Err(HostProblem::NotFound)
+        );
+        drop(service);
+
+        let restarted = Db2Service::open(store, Db2Limits::default()).unwrap();
+        assert_eq!(restarted.table_rows("APP.CODE").unwrap().len(), 1);
+        assert_eq!(
+            restarted.table_rows("APP.CODE_DETAIL"),
+            Err(HostProblem::NotFound)
+        );
     }
 
     #[test]

@@ -132,7 +132,7 @@
     {
       "command": "cargo test --workspace --all-features --locked --no-fail-fast && explicit PostgreSQL 18 controls && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-full --check && Zowe CLI 8.36.0 live flow",
       "exit_code": 0,
-      "result": "289 tests, 3 PostgreSQL controls, 20/20 CardDemo journeys, and 4 live Zowe routes passed on candidate sha256:4d287940960b1c645364d38605f975b3dc3302999c97f04cdfc0b69a4d4eb159"
+      "result": "299 tests, 3 PostgreSQL controls, 20/20 CardDemo journeys, and 4 live Zowe routes passed on candidate sha256:cf745ecbfd6a0d8dac3e824174dd1c2a184e8c563fa1004d27809aec9827c6cc"
     },
     {
       "command": "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings && cargo doc --workspace --all-features --no-deps --locked && cargo +1.95.0 check <contracts> && cargo deny check && cargo xtask runtime-architecture --check && cargo xtask certification --check && cargo xtask release --check --target aarch64-apple-darwin",
@@ -140,9 +140,9 @@
       "result": "strict quality, MSRV, dependency policy, release-mode smoke, certification, and local unpublished 0.2 artifacts passed"
     },
     {
-      "command": "cargo xtask review-repair --check && cargo xtask conformance --check && cargo xtask full-regression --check",
+      "command": "cargo xtask review-repair --check && cargo xtask review-repair-round-2 --check && cargo xtask schemas --check && cargo xtask conformance --check && cargo xtask full-regression --check",
       "exit_code": 0,
-      "result": "all seven independent PR review findings, historical gates, and unchanged-candidate regression evidence pass"
+      "result": "the commit-bound round-1 receipt, all ten round-2 findings, compiled schemas, historical gates, and unchanged-candidate regression evidence pass"
     }
   ],
   "evidence_paths": [
@@ -168,14 +168,15 @@
     "conformance/0.2/evidence/migration-rollback-rollup.json",
     "conformance/0.2/evidence/full-regression.json",
     "conformance/0.2/evidence/review-repair.json",
+    "conformance/0.2/evidence/review-repair-round-2.json",
     "conformance/0.2/generated/semantic-identities.json",
     "conformance/0.2/generated/subsystem-handlers.json"
   ],
   "dirty_tree_identity": {
-    "algorithm": "cargo xtask digest; length-delimited path and content over the repository excluding Git, target, raw historical evidence, phase/status/workload/full-regression/CV-209 derived ledgers, and the Markdown status ledger",
-    "digest": "sha256:4d287940960b1c645364d38605f975b3dc3302999c97f04cdfc0b69a4d4eb159"
+    "algorithm": "cargo xtask digest; length-delimited path and content over the repository excluding Git, target, raw historical evidence, phase/status/workload/full-regression/round-1/round-2/CV-209 derived ledgers, and the Markdown status ledger",
+    "digest": "sha256:cf745ecbfd6a0d8dac3e824174dd1c2a184e8c563fa1004d27809aec9827c6cc"
   },
   "open_decisions": [],
   "blockers": [],
-  "next_smallest_executable_step": "Verify the review-repair evidence, create the single repair completion commit, and push only impl/0.2.0 to update PR #1 without merge, tag, publication, or deployment."
+  "next_smallest_executable_step": "Create the single follow-up repair completion commit, push only impl/0.2.0 to update PR #1, and wait for its macOS and Linux checks without merge, tag, publication, or deployment."
 }

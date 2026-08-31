@@ -21,6 +21,7 @@ Generated from locked Cargo metadata. Full dependency texts remain in their sour
 - MIT OR Apache-2.0
 - MIT OR Apache-2.0 OR LGPL-2.1-or-later
 - MIT OR Apache-2.0 OR Zlib
+- MIT-0
 - MIT/Apache-2.0
 - Unicode-3.0
 - Unlicense OR MIT

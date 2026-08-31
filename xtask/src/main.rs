@@ -70,6 +70,7 @@ fn run() -> TaskResult {
         "migration-rollback" => check_migration_rollback_rollup(&root),
         "full-regression" => check_full_regression(&root),
         "review-repair" => check_review_repair(&root),
+        "review-repair-round-2" => check_review_repair_round_2(&root),
         "semantic-identities" if check => check_semantic_identities(&root),
         "semantic-identities" => generate_semantic_identities(&root),
         "conformance" => {
@@ -89,7 +90,8 @@ fn run() -> TaskResult {
             check_route_registries(&root)?;
             check_migration_rollback_rollup(&root)?;
             check_full_regression(&root)?;
-            check_review_repair(&root)
+            check_review_repair(&root)?;
+            check_review_repair_round_2(&root)
         }
         "certification" => check_certification(&root),
         "carddemo-corpus" => check_carddemo_corpus(&root),
@@ -134,7 +136,7 @@ fn run() -> TaskResult {
         }
         "help" | "--help" | "-h" => {
             println!(
-                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|coverage|semantic-identities|application-packages|db2-catalog|batch-controllers|abi-libraries|program-registry|route-registries|dehardcoding|ledger-consistency|migration-rollback|full-regression|review-repair|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check; release additionally requires --target <triple>"
+                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|coverage|semantic-identities|application-packages|db2-catalog|batch-controllers|abi-libraries|program-registry|route-registries|dehardcoding|ledger-consistency|migration-rollback|full-regression|review-repair|review-repair-round-2|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check; release additionally requires --target <triple>"
             );
             Ok(())
         }
@@ -1641,9 +1643,10 @@ fn check_schemas(root: &Path) -> TaskResult {
         &mut files,
     )?;
     require(!files.is_empty(), "no evidence schemas found")?;
-    for file in files {
-        let value = json(&file)?;
-        let root_object = object(&value, &file)?;
+    files.sort();
+    for file in &files {
+        let value = json(file)?;
+        let root_object = object(&value, file)?;
         require(
             root_object.contains_key("$schema"),
             &format!("{} lacks $schema", file.display()),
@@ -1656,8 +1659,120 @@ fn check_schemas(root: &Path) -> TaskResult {
             root_object.get("type") == Some(&Value::String("object".to_string())),
             &format!("{} must describe an object", file.display()),
         )?;
+        compile_draft_2020_12_schema(&value, file)?;
+    }
+    validate_0_2_schema_artifacts(root)
+}
+
+fn compile_draft_2020_12_schema(schema: &Value, path: &Path) -> TaskResult<jsonschema::Validator> {
+    jsonschema::draft202012::meta::validate(schema)
+        .map_err(|error| format!("{} is not valid Draft 2020-12: {error}", path.display()))?;
+    jsonschema::draft202012::options()
+        .offline()
+        .build(schema)
+        .map_err(|error| format!("{} did not compile: {error}", path.display()))
+}
+
+fn validate_schema_instance(schema: &Value, instance: &Value, path: &Path) -> TaskResult {
+    let validator = compile_draft_2020_12_schema(schema, path)?;
+    validator
+        .validate(instance)
+        .map_err(|error| format!("{} violates its schema: {error}", path.display()))
+}
+
+fn validate_0_2_schema_artifacts(root: &Path) -> TaskResult {
+    let schemas = root.join("conformance/0.2/schemas");
+    let mut artifacts = Vec::new();
+    collect_extension(
+        &root.join("conformance/0.2"),
+        OsStr::new("json"),
+        &mut artifacts,
+    )?;
+    artifacts.retain(|path| !path.starts_with(&schemas));
+    artifacts.sort();
+    for path in artifacts {
+        let instance = json(&path)?;
+        let version = text(&instance, "schema_version", &path)?;
+        let schema_name = schema_for_0_2_artifact(version).ok_or_else(|| {
+            format!(
+                "{} has no Draft 2020-12 schema binding for {version}",
+                path.display()
+            )
+        })?;
+        let schema_path = schemas.join(schema_name);
+        validate_schema_instance(&json(&schema_path)?, &instance, &path)?;
+    }
+
+    let release = root.join("release/0.2.0/targets");
+    if release.is_dir() {
+        for entry in
+            fs::read_dir(&release).map_err(|error| format!("{}: {error}", release.display()))?
+        {
+            let target = entry.map_err(|error| error.to_string())?.path();
+            if !target.is_dir() {
+                return Err(format!(
+                    "release target entry is not a directory: {}",
+                    target.display()
+                ));
+            }
+            for (artifact, schema) in [
+                ("manifest.json", "release-manifest.schema.json"),
+                ("sbom.cdx.json", "release-sbom.schema.json"),
+                ("provenance.intoto.json", "release-provenance.schema.json"),
+            ] {
+                let path = target.join(artifact);
+                let schema_path = schemas.join(schema);
+                validate_schema_instance(&json(&schema_path)?, &json(&path)?, &path)?;
+            }
+        }
     }
     Ok(())
+}
+
+fn schema_for_0_2_artifact(version: &str) -> Option<&'static str> {
+    match version {
+        "mainframe-env.official-source-receipts@1" => Some("official-source-receipts.schema.json"),
+        "mainframe-env.official-catalog@1" => Some("official-catalog.schema.json"),
+        "mainframe-env.coverage-ledger@1" => Some("coverage-ledger.schema.json"),
+        "mainframe-env.coverage-program-status@1" => Some("program-status.schema.json"),
+        "mainframe-env.coverage-work-package-evidence@1" => {
+            Some("work-package-evidence.schema.json")
+        }
+        "mainframe-env.coverage-workload-ledger@1" => Some("workload-ledger.schema.json"),
+        "mainframe-env.migration-rollback-rollup@1" => {
+            Some("migration-rollback-rollup.schema.json")
+        }
+        "mainframe-env.full-regression@1" => Some("full-regression.schema.json"),
+        "mainframe-env.review-repair@1" => Some("review-repair.schema.json"),
+        "mainframe-env.review-repair-round-2@1" => Some("review-repair-round-2.schema.json"),
+        "mainframe-env.common-program-catalog@1" => Some("common-program-catalog.schema.json"),
+        "mainframe-env.zosmf-official-route-bindings@1"
+        | "mainframe-env.custom-route-catalog@1" => Some("route-registry.schema.json"),
+        "mainframe-env.generated-route-registries@1" => {
+            Some("generated-route-registries.schema.json")
+        }
+        "mainframe-env.generated-semantic-identities@1" => {
+            Some("generated-semantic-identities.schema.json")
+        }
+        "mainframe-env.subsystem-handler-registry@1" => {
+            Some("subsystem-handler-registry.schema.json")
+        }
+        "mainframe-env.host-abi-inventory@1" => Some("host-abi-inventory.schema.json"),
+        "mainframe-env.coverage-contract-inventory@1"
+        | "mainframe-env.coverage-dependency-additions@1"
+        | "mainframe-env.coverage-package-additions@1"
+        | "mainframe-env.version-inventory@1" => Some("coverage-inventory.schema.json"),
+        "mainframe-env.application-package-migration@1"
+        | "mainframe-env.batch-controller-migration@1"
+        | "mainframe-env.db2-catalog-migration@1"
+        | "mainframe-env.host-abi-migration@1"
+        | "mainframe-env.registry-migration@1" => Some("migration.schema.json"),
+        "mainframe-env.application-hardcode-scan@1"
+        | "mainframe-env.host-abi-ownership-scan@1"
+        | "mainframe-env.no-application-hardcode@1"
+        | "mainframe-env.no-string-dispatch@1" => Some("hardcode-evidence.schema.json"),
+        _ => None,
+    }
 }
 
 fn check_inventory(root: &Path) -> TaskResult {
@@ -3794,6 +3909,9 @@ fn check_full_regression(root: &Path) -> TaskResult {
 }
 
 fn check_review_repair(root: &Path) -> TaskResult {
+    const REPAIR_COMMIT: &str = "77119bff9b1bef16ee28e94a2ea9ccdcccc22d6b";
+    const REPAIR_SOURCE_DIGEST: &str =
+        "sha256:4d287940960b1c645364d38605f975b3dc3302999c97f04cdfc0b69a4d4eb159";
     check_application_packages(root)?;
     check_db2_catalog(root)?;
     check_batch_controllers(root)?;
@@ -3820,9 +3938,23 @@ fn check_review_repair(root: &Path) -> TaskResult {
         receipt["target_version"] == Value::String("0.2.0".into())
             && receipt["source_identity"]
                 == Value::String("cf834b8d57514f933d1ff6d439949ffb0b8065fa".into())
-            && receipt["candidate_source_digest"].as_str()
-                == Some(repository_digest(root)?.as_str()),
+            && receipt["candidate_source_digest"].as_str() == Some(REPAIR_SOURCE_DIGEST),
         "review repair candidate identity drifted",
+    )?;
+    require(
+        command_text(root, "git", &["rev-parse", &format!("{REPAIR_COMMIT}^")])?
+            == receipt["source_identity"]
+            && command_text(root, "git", &["show", "-s", "--format=%s", REPAIR_COMMIT])?
+                == "Repair 0.2.0 review findings",
+        "review repair history is not bound to its recorded completion commit",
+    )?;
+    let completion_message =
+        command_text(root, "git", &["show", "-s", "--format=%B", REPAIR_COMMIT])?;
+    require(
+        completion_message.contains("Review-Findings: 7=closed")
+            && completion_message.contains("Target-Version: 0.2.0")
+            && completion_message.contains(&format!("Evidence-Digest: {digest}")),
+        "review repair completion trailers drifted",
     )?;
     let findings = array(&receipt, "findings", &path)?;
     require(
@@ -3876,8 +4008,8 @@ fn check_review_repair(root: &Path) -> TaskResult {
         let relative = text(artifact, "path", &path)?;
         let expected = text(artifact, "sha256", &path)?;
         require(
-            expected == format!("sha256:{}", file_digest(&root.join(relative))?),
-            &format!("review repair artifact digest drifted: {relative}"),
+            expected == format!("sha256:{}", git_file_digest(root, REPAIR_COMMIT, relative)?),
+            &format!("review repair historical artifact drifted: {relative}"),
         )?;
     }
     let workflow = read(&root.join(".github/workflows/ci.yml"))?;
@@ -3896,6 +4028,155 @@ fn check_review_repair(root: &Path) -> TaskResult {
             && receipt["remote_actions"]["deployed"] == Value::Bool(false)
             && receipt["remote_actions"]["merged"] == Value::Bool(false),
         "review repair crossed the release boundary",
+    )
+}
+
+fn check_review_repair_round_2(root: &Path) -> TaskResult {
+    const SOURCE_COMMIT: &str = "77119bff9b1bef16ee28e94a2ea9ccdcccc22d6b";
+    const PREREQUISITE_SOURCE: &str = "d4b94362af56f2847bbd62d106867e6f0bb0648a";
+    const PREREQUISITE_COMMIT: &str = "ba1b78a";
+    check_review_repair(root)?;
+    let path = root.join("conformance/0.2/evidence/review-repair-round-2.json");
+    let evidence = json(&path)?;
+    require(
+        evidence["schema_version"] == Value::String("mainframe-env.review-repair-round-2@1".into())
+            && evidence["derived"] == Value::Bool(true)
+            && evidence["status"] == Value::String("pass".into()),
+        "round-2 review repair evidence header is invalid",
+    )?;
+    let receipt = evidence
+        .get("receipt")
+        .and_then(Value::as_object)
+        .ok_or("round-2 review repair receipt is missing")?;
+    let canonical = serde_json::to_vec(receipt).map_err(|error| error.to_string())?;
+    let digest = format!("sha256:{:x}", Sha256::digest(canonical));
+    require(
+        evidence["evidence_digest"].as_str() == Some(digest.as_str()),
+        "round-2 review repair evidence digest is stale",
+    )?;
+    let receipt = Value::Object(receipt.clone());
+    require(
+        receipt["target_version"] == Value::String("0.2.0".into())
+            && receipt["source_identity"] == Value::String(SOURCE_COMMIT.into())
+            && receipt["prerequisite_source"] == Value::String(PREREQUISITE_SOURCE.into())
+            && receipt["prerequisite_commit"]
+                .as_str()
+                .is_some_and(|commit| commit.starts_with(PREREQUISITE_COMMIT))
+            && receipt["candidate_source_digest"].as_str()
+                == Some(repository_digest(root)?.as_str()),
+        "round-2 review repair candidate identity drifted",
+    )?;
+    let prerequisite = text(&receipt, "prerequisite_commit", &path)?;
+    require(
+        command_text(root, "git", &["rev-parse", &format!("{prerequisite}^")])? == SOURCE_COMMIT
+            && command_text(root, "git", &["show", "-s", "--format=%s", prerequisite])?
+                == "Clarify coverage worker PR authorization"
+            && command_text(root, "git", &["rev-parse", PREREQUISITE_SOURCE])?
+                == PREREQUISITE_SOURCE,
+        "round-2 prerequisite cherry-pick identity drifted",
+    )?;
+    let round_one = &receipt["round_one"];
+    require(
+        round_one["completion_commit"] == Value::String(SOURCE_COMMIT.into())
+            && round_one["evidence_path"]
+                == Value::String("conformance/0.2/evidence/review-repair.json".into())
+            && round_one["evidence_digest"]
+                == Value::String(
+                    "sha256:0c9fe6171576d7730ff69b7dc271a87ca5021df7cca1264c03b32b73eb8d03b8"
+                        .into(),
+                )
+            && round_one["validation"] == Value::String("commit-bound".into()),
+        "round-2 receipt does not preserve the round-1 evidence identity",
+    )?;
+    let findings = array(&receipt, "findings", &path)?;
+    require(
+        findings.len() == 10
+            && findings.iter().enumerate().all(|(index, finding)| {
+                finding["id"].as_u64() == Some((index + 1) as u64)
+                    && finding["state"] == Value::String("closed".into())
+                    && finding["repair"]
+                        .as_str()
+                        .is_some_and(|repair| !repair.is_empty())
+                    && finding["regression"]
+                        .as_str()
+                        .is_some_and(|test| !test.is_empty())
+            }),
+        "round-2 review repair must close exactly findings 1 through 10",
+    )?;
+    let commands = array(&receipt, "commands", &path)?;
+    require(
+        commands.len() >= 20
+            && commands
+                .iter()
+                .all(|command| command["exit_code"].as_i64() == Some(0)),
+        "round-2 review repair validation matrix is incomplete or failed",
+    )?;
+    let command_texts = commands
+        .iter()
+        .filter_map(|command| command["command"].as_str())
+        .collect::<Vec<_>>();
+    for required in [
+        "cargo test --locked -p mainframe-env-db2",
+        "cargo test --locked -p mainframe-env-batch",
+        "cargo test --locked -p mainframe-env-application",
+        "cargo test --locked -p mainframe-env-server",
+        "cargo test -p xtask --locked",
+        "cargo xtask schemas --check",
+        "cargo xtask carddemo-db2 --check",
+        "cargo xtask carddemo-ims --check",
+        "cargo xtask carddemo-mq-authorization --check",
+        "cargo fmt --all -- --check",
+        "cargo check --workspace --all-targets --all-features --locked",
+        "cargo test --workspace --all-features --locked --no-fail-fast",
+        "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings",
+        "cargo doc --workspace --all-features --no-deps --locked",
+        "cargo +1.95.0 check",
+        "cargo deny check",
+        "cargo xtask runtime-architecture --check",
+        "PostgreSQL 18",
+        "cargo xtask carddemo-full --check",
+        "Zowe CLI 8.36.0",
+        "cargo xtask conformance --check",
+        "cargo xtask certification --check",
+        "cargo xtask release --check --target aarch64-apple-darwin",
+        "cargo xtask release --check --target x86_64-unknown-linux-gnu",
+        "git diff --check",
+    ] {
+        require(
+            command_texts
+                .iter()
+                .any(|command| command.contains(required)),
+            &format!("round-2 review repair validation omits {required}"),
+        )?;
+    }
+    for artifact in array(&receipt, "artifacts", &path)? {
+        let relative = text(artifact, "path", &path)?;
+        require(
+            !relative.contains("..") && !Path::new(relative).is_absolute(),
+            "round-2 review repair artifact path is unsafe",
+        )?;
+        let expected = text(artifact, "sha256", &path)?;
+        require(
+            expected == format!("sha256:{}", file_digest(&root.join(relative))?),
+            &format!("round-2 review repair artifact digest drifted: {relative}"),
+        )?;
+    }
+    let workflow = read(&root.join(".github/workflows/ci.yml"))?;
+    require(
+        workflow.contains("fetch-depth: 0")
+            && workflow.contains("fetch-tags: true")
+            && workflow.contains("cargo xtask release --check --target x86_64-unknown-linux-gnu"),
+        "CI does not retain the round-2 Linux release gate",
+    )?;
+    let manifest = json(&root.join("release/0.2.0/targets/aarch64-apple-darwin/manifest.json"))?;
+    require(
+        manifest["target"] == Value::String("aarch64-apple-darwin".into())
+            && manifest["published"] == Value::Bool(false)
+            && receipt["remote_actions"]["tagged"] == Value::Bool(false)
+            && receipt["remote_actions"]["published"] == Value::Bool(false)
+            && receipt["remote_actions"]["deployed"] == Value::Bool(false)
+            && receipt["remote_actions"]["merged"] == Value::Bool(false),
+        "round-2 review repair crossed the release boundary",
     )
 }
 
@@ -4326,6 +4607,7 @@ fn repository_digest(root: &Path) -> TaskResult<String> {
             || relative == Path::new("conformance/0.2/evidence/workload-ledger.json")
             || relative == Path::new("conformance/0.2/evidence/full-regression.json")
             || relative == Path::new("conformance/0.2/evidence/review-repair.json")
+            || relative == Path::new("conformance/0.2/evidence/review-repair-round-2.json")
             || relative == Path::new("conformance/0.2/evidence/work-packages/CV-209.json")
             || relative == Path::new("docs/delivery/coverage-versions/status/0.2.0.md")
             || (relative_text.starts_with("conformance/0.1/evidence/phase-v")
@@ -4756,6 +5038,24 @@ fn file_digest(path: &Path) -> TaskResult<String> {
     Ok(format!("{:x}", Sha256::digest(bytes)))
 }
 
+fn git_file_digest(root: &Path, commit: &str, relative: &str) -> TaskResult<String> {
+    require(
+        !relative.contains("..") && !Path::new(relative).is_absolute(),
+        "historical artifact path is unsafe",
+    )?;
+    let object = format!("{commit}:{relative}");
+    let output = Command::new("git")
+        .args(["show", &object])
+        .current_dir(root)
+        .output()
+        .map_err(|error| format!("git show {object}: {error}"))?;
+    require(
+        output.status.success(),
+        &format!("historical artifact is missing: {object}"),
+    )?;
+    Ok(format!("{:x}", Sha256::digest(output.stdout)))
+}
+
 fn command_text(root: &Path, program: &str, arguments: &[&str]) -> TaskResult<String> {
     let output = Command::new(program)
         .args(arguments)
@@ -4846,6 +5146,27 @@ fn require(condition: bool, message: &str) -> TaskResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn draft_2020_12_compilation_rejects_invalid_keyword_values() {
+        let invalid = json!({
+            "$schema":"https://json-schema.org/draft/2020-12/schema",
+            "type":"not-a-json-schema-type"
+        });
+        assert!(compile_draft_2020_12_schema(&invalid, Path::new("invalid.schema.json")).is_err());
+    }
+
+    #[test]
+    fn compiled_schema_rejects_schema_invalid_artifact() {
+        let schema = json!({
+            "$schema":"https://json-schema.org/draft/2020-12/schema",
+            "type":"object",
+            "required":["generation"],
+            "properties":{"generation":{"type":"integer","minimum":1}}
+        });
+        let invalid = json!({"generation":0});
+        assert!(validate_schema_instance(&schema, &invalid, Path::new("artifact.json")).is_err());
+    }
 
     #[test]
     fn release_target_is_explicit_unique_and_safely_bounded() {

@@ -15,7 +15,10 @@
     "same_identity_retry_idempotent": true,
     "production_trust_authority_injected": true,
     "selected_handle_required_for_publication": true,
-    "aggregate_and_retained_bytes_bounded_before_clone": true
+    "text_bounded_before_normalization_or_owned_allocation": true,
+    "aggregate_and_retained_bytes_bounded_before_clone": true,
+    "aggregate_and_retained_cardinality_bounded_before_clone": true,
+    "conservative_nested_structural_bytes_accounted": true
   },
   "rollback": {
     "supported": true,

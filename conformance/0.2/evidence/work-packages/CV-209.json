@@ -3,7 +3,7 @@
   "derived": true,
   "status": "pass",
   "work_package": "CV-209",
-  "evidence_digest": "sha256:32f170e018296607a84f5bc7fa488b9088a91b2cddb8215435f6d090bd3aa180",
+  "evidence_digest": "sha256:9deebd86b00355155ebcbb1f7cdf327ed2eae61f884b5a3a78e259806553a869",
   "receipt": {
     "target_version": "0.2.0",
     "deliverable": "Consistent work/program/coverage ledgers, non-destructive migration rollback rollup, explicit 0.2 candidate identity, and complete unchanged-candidate regression closure",
@@ -12,7 +12,7 @@
       {
         "command": "cargo test -p xtask --locked && cargo xtask ledger-consistency --check && cargo xtask migration-rollback --check",
         "exit_code": 0,
-        "result": "7 tooling tests including contradiction and release-target rejection, nine consistent work-package rows, nine exit gates, and five rollback-capable non-destructive migrations passed"
+        "result": "9 tooling tests including compiled-schema negative cases, contradiction and release-target rejection, nine consistent work-package rows, nine exit gates, and five rollback-capable non-destructive migrations passed"
       },
       {
         "command": "cargo fmt --all -- --check && cargo check --workspace --all-targets --all-features --locked",
@@ -22,7 +22,7 @@
       {
         "command": "MAINFRAME_ENV_POSTGRES_TEST_URL=<disposable> cargo test --workspace --all-features --locked --no-fail-fast",
         "exit_code": 0,
-        "result": "289 tests passed against the 260 floor; 3 explicit manual/PostgreSQL tests ignored and run separately"
+        "result": "299 tests passed against the 260 floor; 3 explicit manual/PostgreSQL tests ignored and run separately"
       },
       {
         "command": "MAINFRAME_ENV_POSTGRES_TEST_URL=<disposable> cargo test -p mainframe-env-store durable::tests::postgres18_migration_and_durable_contracts --all-features --locked -- --ignored --exact && MAINFRAME_ENV_POSTGRES_TEST_URL=<disposable> cargo test -p mainframe-env-conformance carddemo::tests::carddemo_full_memory_sqlite_and_postgres_controls --all-features --locked -- --ignored --exact",
@@ -62,17 +62,17 @@
       {
         "command": "cargo xtask conformance --check && cargo xtask full-regression --check && git diff --check",
         "exit_code": 0,
-        "result": "all structural, historical, 0.2, full-regression, and diff gates passed on the unchanged candidate"
+        "result": "all structural, compiled-schema, historical, 0.2, full-regression, round-2 review, and diff gates passed on the unchanged candidate"
       }
     ],
     "artifacts": [
       {
         "path": "conformance/0.2/evidence/full-regression.json",
-        "sha256": "sha256:a73258882ca25561924b2940e15a8370a8087d2348afe60f1e7e44cd80f365c8"
+        "sha256": "sha256:abd76120d5664b9824b18050bc24b5fe2ce9cd92796e640646b001996bd71f2c"
       },
       {
         "path": "conformance/0.2/evidence/migration-rollback-rollup.json",
-        "sha256": "sha256:5f9a936bfd8ba3315984fd6a911ce439e29a831b3258058ce8f2c8061767e41f"
+        "sha256": "sha256:335cac7d57b97c77d50dbee0801639457e80e12462030091a5b367f083c910b0"
       },
       {
         "path": "conformance/0.2/schemas/workload-ledger.schema.json",
@@ -87,6 +87,10 @@
         "sha256": "sha256:430f73076bc29a96783ba12dbcdf24cc82322f85e1ad381dca9023145507e3c9"
       },
       {
+        "path": "conformance/0.2/schemas/review-repair-round-2.schema.json",
+        "sha256": "sha256:0ce152fbdae2e1fd519e3da1394e607fc01e6941aacf0c23291b4ac237225dcf"
+      },
+      {
         "path": "conformance/0.2/inventory/versions.json",
         "sha256": "sha256:698af75bafaf73c71d6ce5fb933f634a532346603ee306a51d2e26691424a30d"
       },
@@ -96,23 +100,23 @@
       },
       {
         "path": "release/0.2.0/targets/aarch64-apple-darwin/manifest.json",
-        "sha256": "sha256:8c3f0250953e02a02d06aa9ad1be6a3450cc70c3c515c3cd9a7376b8a10c11ae"
+        "sha256": "sha256:3e0051817af934856f1b9edd6ed2118d7d39caa515ad0c0965537afd50805841"
       },
       {
         "path": "release/0.2.0/targets/aarch64-apple-darwin/sbom.cdx.json",
-        "sha256": "sha256:1b8d4b267a6c038743eff109fd4217a5e26c38011fcbbff4d385d04296065de7"
+        "sha256": "sha256:b182a2cc0693cca393db721fa6aee1d69e9772fb80b44edd7cd84780cf0f8ff8"
       },
       {
         "path": "release/0.2.0/targets/aarch64-apple-darwin/provenance.intoto.json",
-        "sha256": "sha256:a864e894cbf4359fa169987cb8609ae6663d792f1e1c96d79a784f722d993fd2"
+        "sha256": "sha256:41e998c53ab82988671301f369794af79b20b42965f13f2d87c22d2229188469"
       },
       {
         "path": "release/0.2.0/targets/aarch64-apple-darwin/checksums.sha256",
-        "sha256": "sha256:a345c6531d798bcbd6ea04136028e62ba233d7dcc6e370fabaec54b3bc47c05d"
+        "sha256": "sha256:6bb89c22d3a7eb62b54c437d7efa7a27c60d0e6f1bdd11d7eedab8e8b2d41167"
       },
       {
         "path": "release/0.2.0/targets/aarch64-apple-darwin/LICENSES.md",
-        "sha256": "sha256:3fdd41495a7c2679e00e562c81f2f324252be10d478ee01c5cbc0c723d631bc6"
+        "sha256": "sha256:127803aadf60cd9d34c1b177f70ee0a32cdf701247053dbcbdd50b24b49acadb"
       }
     ],
     "invariants": {
@@ -128,12 +132,12 @@
       "rollback_supported": 5,
       "partial_state_selected": false,
       "workspace_test_floor": 260,
-      "workspace_tests_passed": 289,
+      "workspace_tests_passed": 299,
       "postgresql_controls_passed": 3,
       "carddemo_journeys_passed": 20,
       "live_zowe_routes_passed": 4,
       "release_artifacts_verified": true,
-      "candidate_source_digest": "sha256:4d287940960b1c645364d38605f975b3dc3302999c97f04cdfc0b69a4d4eb159",
+      "candidate_source_digest": "sha256:cf745ecbfd6a0d8dac3e824174dd1c2a184e8c563fa1004d27809aec9827c6cc",
       "candidate_unchanged": true,
       "tagged": false,
       "published": false,

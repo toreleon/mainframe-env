@@ -14,10 +14,12 @@ resources. ABI members reference package blobs. SQL rows reference declared
 tables and columns. IMS rows reference declared definitions and segments. Batch
 controllers reference program entries. MQ targets and controllers reference
 resources in the same generation. Every reference and bound is validated
-before staging. Preflight bounds cover aggregate manifest/blob bytes, total
-nested entries, per-library ABI members, SQL columns/keys/rows, IMS
-segments/rows, controller property maps, and cumulative retained package bytes;
-the installer rejects them before hashing or cloning hostile input.
+before staging. Allocation-safe preflight text checks run before case
+normalization or owned-key construction. Bounds cover aggregate manifest/blob
+bytes, total nested entries, per-library ABI members, SQL columns/keys/rows,
+IMS segments/rows, controller property maps, conservative structural memory,
+and per-application and global retained byte and item totals; the installer
+rejects hostile input before hashing or cloning it.
 
 Installation uses retained per-application generations. Staging records a
 fully verified identity but does not change selection. Commit marks that exact

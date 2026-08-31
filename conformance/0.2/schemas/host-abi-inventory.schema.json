@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/host-abi-inventory@1",
+  "title": "mainframe-env host ABI inventory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "contract", "ordered_subsystems", "libraries", "total_members", "compiler_owned_members", "generated_coverage_credit"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.host-abi-inventory@1"},
+    "status": {"const": "pass"},
+    "contract": {"const": "mainframe-env.host-abi-source-library@1"},
+    "ordered_subsystems": {"type": "array", "minItems": 3, "uniqueItems": true, "items": {"type": "string"}},
+    "libraries": {"type": "array", "minItems": 3},
+    "total_members": {"type": "integer", "minimum": 1},
+    "compiler_owned_members": {"const": 0},
+    "generated_coverage_credit": {"const": 0}
+  }
+}

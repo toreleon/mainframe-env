@@ -14,12 +14,16 @@
     "same_generation_same_identity_replays": true,
     "same_generation_different_identity_rejected": true,
     "retained_generations_persisted_atomically": true,
-    "selected_generation_reloaded_on_open": true
+    "selected_generation_reloaded_on_open": true,
+    "empty_generation_removes_all_selectors": true,
+    "signed_program_identity_rechecked_at_execution": true,
+    "aggregate_retained_bounds_checked_before_clone": true
   },
   "rollback": {
     "supported": true,
     "method": "reselect a retained, identity-equal controller generation after the application installer reselects the matching ready package generation",
     "partial_generation_selected": false,
-    "unseen_older_generation_accepted": false
+    "unseen_older_generation_accepted": false,
+    "empty_generation_rollback_supported": true
   }
 }

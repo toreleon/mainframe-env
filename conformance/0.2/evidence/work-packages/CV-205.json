@@ -3,13 +3,13 @@
   "derived": true,
   "status": "pass",
   "work_package": "CV-205",
-  "evidence_digest": "sha256:81ac23201607dec65face4c366e2f519d97bf590f9c3ba3a3fbc70387353603e",
+  "evidence_digest": "sha256:45f48a01c8ae995c2becfec541aad51d72f8dac037e383b1f346f04baccfe953",
   "receipt": {
     "target_version": "0.2.0",
     "deliverable": "Generic package-installed Db2 schema, row, constraint, cursor, and extraction behavior with zero production application identities",
     "source_identity": "7111308ef3e187e1e32cfbdc4c85b5a644f9846d",
     "commands": [
-      {"command": "cargo test -p mainframe-env-db2 -p mainframe-env-conformance -p xtask --locked", "exit_code": 0, "result": "5 Db2, 72 conformance, and 7 tooling tests passed; 2 manual/environment tests ignored"},
+      {"command": "cargo test --locked -p mainframe-env-db2 -p mainframe-env-batch -p mainframe-env-application -p mainframe-env-server -p mainframe-env-conformance -p xtask", "exit_code": 0, "result": "7 Db2, 38 batch, 11 application, 18 server, 72 conformance, and 9 tooling tests passed; 2 explicit conformance tests ignored"},
       {"command": "cargo clippy -p mainframe-env-db2 -p mainframe-env-conformance -p xtask --all-targets --locked -- -D warnings", "exit_code": 0, "result": "pass"},
       {"command": "cargo xtask db2-catalog --check", "exit_code": 0, "result": "pass; production Db2 application identity and string-dispatch count zero"},
       {"command": "CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-db2 --check", "exit_code": 0, "result": "3 programs, 25 extraction records, all CRUD/cursor/restart/rollback/conflict/failure controls, and historical table/dataset/spool digests passed"},
@@ -23,12 +23,14 @@
     ],
     "artifacts": [
       {"path": "crates/providers/mainframe-env-db2/src/catalog.rs", "sha256": "sha256:1eb1773fd882b6007a26577dcd927d213590deeffff6f26e97935424120def05"},
-      {"path": "crates/providers/mainframe-env-db2/src/service.rs", "sha256": "sha256:f996f3a880f4e9661960f41ddce74db737c2d89f8431f9c72d1136260959bddb"},
+      {"path": "crates/providers/mainframe-env-db2/src/service.rs", "sha256": "sha256:598e7f25ed811a37003032e54728ac7611cb572ed636281c8a965a59ed1508cb"},
+      {"path": "crates/apps/mainframe-env-server/src/product.rs", "sha256": "sha256:15dbbf9cdcec5ec9b42ce6d67c913a7e763cc7f6c1b7a0ec5721f1c78205446d"},
+      {"path": "crates/tooling/mainframe-env-conformance/src/carddemo.rs", "sha256": "sha256:4ab1ca782bf08d3cefb3c1f8f83e9745e8825ecee09367804a9dc911f247801e"},
       {"path": "crates/providers/mainframe-env-db2/README.md", "sha256": "sha256:ef81d2d2eed8604a4b7081c8a288dcd31546ea9a67cdcf7d492570c6521147f2"},
       {"path": "conformance/0.2/schemas/db2-application-catalog.schema.json", "sha256": "sha256:5cf5eacb932b5b33b2c536c6feb83fc4b772dd8c9fdbceeaac1a6c0354daf5a2"},
-      {"path": "conformance/0.2/migrations/db2-catalog-v1-to-v2.json", "sha256": "sha256:84375fa6ba89212f7534a6f208aa9976150d9cc440dc30768bf6be2d4034bad5"},
+      {"path": "conformance/0.2/migrations/db2-catalog-v1-to-v2.json", "sha256": "sha256:d79d3906c83b27f0093738a03965f2c5fca460bbcca9543b38abf8ec7c2ac901"},
       {"path": "conformance/0.2/evidence/hardcode/CV-205-db2.json", "sha256": "sha256:faa792b1810d234eb8124394075c879777196c4bd4c4de4ad1470ad0704d2692"},
-      {"path": "docs/architecture/DB2-APPLICATION-CATALOG.md", "sha256": "sha256:d837d8046e0ff3b8d9fc99ce37819d92138dfbd001440478b60fd2f0a2d5be58"}
+      {"path": "docs/architecture/DB2-APPLICATION-CATALOG.md", "sha256": "sha256:8925975bc5838b7086fffa488484b409601280de3ef2eed947d3a5b8a6431930"}
     ],
     "invariants": {
       "db2_h1_h3_lines_before": 29,
@@ -41,6 +43,12 @@
       "upgrade_rows_preserved": true,
       "restart_and_retained_rollback": true,
       "primary_key_updates_rejected_before_pending_state": true,
+      "raw_non_utf8_and_space_significant_bytes_preserved": true,
+      "seed_defaults_applied_before_key_construction": true,
+      "legacy_row_keys_rebuilt_from_exact_bytes": true,
+      "complete_definition_derived_from_signed_blob": true,
+      "rollback_removes_newer_owned_dependents": true,
+      "rollback_foreign_keys_validated_before_persistence": true,
       "generic_seed_rows": true,
       "generic_primary_and_foreign_keys": true,
       "generic_result_and_extract_layouts": true,
