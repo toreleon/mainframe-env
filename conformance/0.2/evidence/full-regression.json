@@ -3,7 +3,7 @@
   "target_version": "0.2.0",
   "status": "pass",
   "candidate": {
-    "source_digest": "sha256:c0c21dd8274dc14bf1233890ada32271bcbde7b64559e1f0ef13f504b2bc5d24",
+    "source_digest": "sha256:f0ccc46098271f3fca3e6cecd1ea33aaf26099022be1fd6b9477221c16a3557a",
     "work_package_base_commit": "edb4558c987a56ee9f0c96438f756d663199942f",
     "accepted_release_commit": "44f3081eb2fdf22d09e1a97725f5a4163431ca70",
     "accepted_release_tree": "3d504ece02f1c09e124606ded695b00ba984d104",
@@ -80,20 +80,20 @@
     "version": "0.2.0",
     "targets": {
       "aarch64-apple-darwin": {
-        "manifest_sha256": "80febb17713b86e749964299a22cfad0bce08522a6bedea96e9152d75220a201",
+        "manifest_sha256": "89737fbca8163af009b267188bc053d7dbf6c40c1a088fd28db70a1ad3a098b0",
         "sbom_sha256": "f1dc66d80400fb4d0141e9a6d903c31ba62f81b2c5cd90fa8f32863aabd67a4c",
-        "provenance_sha256": "bf11b26ebef5d3a47b441b39270c44bf8eaba7955699b2c27e71b1f7116b1f0b",
-        "checksums_sha256": "c5e45a3a72fc3ff0ede5f4916c8117d793a6021f8c1f007b6a94a50cd79126d9",
+        "provenance_sha256": "4ddd04a8f4649a38950dff5d0e2a775f950c9fc64ed1a81e1410d3a718babfea",
+        "checksums_sha256": "51cac5771743f5c2059e1d6395095fcb1e274e17b9f18f7fdd0665e2ef9a2b0a",
         "licenses_sha256": "127803aadf60cd9d34c1b177f70ee0a32cdf701247053dbcbdd50b24b49acadb",
-        "build_inputs_sha256": "8821898a36d3da7a935d6f2925ce69381ae8db1733c30fac077476edf97e34a7"
+        "build_inputs_sha256": "73c363dd1ee7cff30f26f16bff743fd7173b10bb9dd3a06d57165cb7f15092d5"
       },
       "x86_64-unknown-linux-gnu": {
-        "manifest_sha256": "fb874881699516e1444c2de76ab90f372e85217f3e6e2835949a95abc7f9f7c1",
+        "manifest_sha256": "8e72c99ad82a92d1479a189eccb5d4d863d9e7378c8762e9a5d3b19ff165e384",
         "sbom_sha256": "f1dc66d80400fb4d0141e9a6d903c31ba62f81b2c5cd90fa8f32863aabd67a4c",
-        "provenance_sha256": "9b1401c0aee27dfe87ff4466df019c30640d8a32c002cd9228571e7881faf317",
-        "checksums_sha256": "d6c2264a99bc0c509c765ec7a9449087fc4fcaa1f3638bd7f807d1ded0898897",
+        "provenance_sha256": "72ea21cc67a837c7dfb5f4aa9fc6f0285dcca933288ccabdb32aca8eef38702e",
+        "checksums_sha256": "37018211398efd0b3a2644b95e99d7d96276f6808d9d1c95e7221fbaafe8b6c7",
         "licenses_sha256": "127803aadf60cd9d34c1b177f70ee0a32cdf701247053dbcbdd50b24b49acadb",
-        "build_inputs_sha256": "38ce95b2db921b6bce2f7dc5821b1a7c39ed9024796ef13d771e25bc7685f78e"
+        "build_inputs_sha256": "60847d62ab3e3e86ac8e42fd92b51f6608caf3bccc08a07d6fdbd04fd20759ce"
       }
     },
     "published": false

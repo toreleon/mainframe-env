@@ -22,7 +22,7 @@
     },
     {
       "path": "build-inputs.json",
-      "sha256": "38ce95b2db921b6bce2f7dc5821b1a7c39ed9024796ef13d771e25bc7685f78e"
+      "sha256": "60847d62ab3e3e86ac8e42fd92b51f6608caf3bccc08a07d6fdbd04fd20759ce"
     }
   ],
   "channel": "stable",

@@ -16,6 +16,9 @@ jobs:
           # omits both the required history and tags.
           fetch-depth: 0
           fetch-tags: true
+      # checkout's container-safe setting is written under a temporary HOME;
+      # conformance invokes Git later from the job shell's persistent HOME.
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - run: cargo fmt --all -- --check
       - run: cargo check --workspace --all-targets --all-features --locked
       - run: cargo test --workspace --all-features --locked --no-fail-fast

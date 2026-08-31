@@ -26,6 +26,6 @@
   },
   "rustc_verbose": "rustc 1.98.0 (88d9e12ae 2026-08-18)\nbinary: rustc\ncommit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea\ncommit-date: 2026-08-18\nrelease: 1.98.0\nLLVM version: 22.1.8",
   "schema_version": "mainframe-env.release-build-inputs@1",
-  "source_digest": "sha256:e522ec0d9f116d5468075d43b19cc31f9a20a752cc5af560832964eb4fb75742",
+  "source_digest": "sha256:41da61a961c350c37b74b8dc0d42a1b2dabfcce552610163eeecfbe58181095c",
   "target": "aarch64-apple-darwin"
 }

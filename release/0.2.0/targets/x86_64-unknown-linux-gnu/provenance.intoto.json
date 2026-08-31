@@ -18,13 +18,13 @@
         },
         {
           "digest": {
-            "sha256": "38ce95b2db921b6bce2f7dc5821b1a7c39ed9024796ef13d771e25bc7685f78e"
+            "sha256": "60847d62ab3e3e86ac8e42fd92b51f6608caf3bccc08a07d6fdbd04fd20759ce"
           },
           "uri": "build-inputs.json"
         },
         {
           "digest": {
-            "sha256": "e522ec0d9f116d5468075d43b19cc31f9a20a752cc5af560832964eb4fb75742"
+            "sha256": "41da61a961c350c37b74b8dc0d42a1b2dabfcce552610163eeecfbe58181095c"
           },
           "uri": "source-tree"
         }
