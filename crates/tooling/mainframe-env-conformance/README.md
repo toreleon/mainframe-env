@@ -7,7 +7,7 @@ not depend on it.
 
 Invariants: fixtures are immutable and bounded, compatibility mismatches stay
 exact, oracle execution is out of process, and external CardDemo paths never
-enter receipts. `CARDEMO_CORPUS_DIR` is consulted only by the explicit
+enter receipts. `CARDDEMO_CORPUS_DIR` is consulted only by the explicit
 CardDemo corpus gate. Verify with `cargo test -p mainframe-env-conformance`.
 The corpus-backed source-preprocessor acceptance route is
 `cargo xtask carddemo-source --check`.

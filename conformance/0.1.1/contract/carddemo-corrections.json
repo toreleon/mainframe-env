@@ -3,7 +3,7 @@
   "corpus_commit": "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e",
   "corrections": [
     {
-      "id": "CARDEMO-ORPHAN-CDV1",
+      "id": "CARDDEMO-ORPHAN-CDV1",
       "disposition": "accepted-owned-source",
       "transaction": "CDV1",
       "program": "COCRDSEC",

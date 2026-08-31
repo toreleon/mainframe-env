@@ -14,7 +14,7 @@
       "commit_subject": "Gate the pinned CardDemo application corpus",
       "evidence": "conformance/0.1.1/evidence/issues/CD-001.json",
       "evidence_digest": "sha256:b97d476b03e315b400dfa9f850c10672cc1d25289ee179c62e6f0f04f0c6c97b",
-      "acceptance": ["CARDEMO_CORPUS_DIR is required only for CardDemo gates", "commit, tree, cleanliness, license, content, runtime-archive, and file-count identities are checked", "dirty, missing, drifted, or unlicensed inputs fail", "no absolute local path enters evidence"]
+      "acceptance": ["CARDDEMO_CORPUS_DIR is required only for CardDemo gates", "commit, tree, cleanliness, license, content, runtime-archive, and file-count identities are checked", "dirty, missing, drifted, or unlicensed inputs fail", "no absolute local path enters evidence"]
     },
     {
       "id": "CD-002",

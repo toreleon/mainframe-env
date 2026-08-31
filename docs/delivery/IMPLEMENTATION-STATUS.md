@@ -1,14 +1,14 @@
 # mainframe-env 0.1 Implementation Status
 
-Current phase: **CD.PREP — CardDemo-full 0.1.1 preparation complete**
-Current work item: CD-001 is next; 0 of 27 implementation issues and 0 of 20 application journeys pass.
-Product version: **0.1.0-alpha.0**
-Source baseline: post-audit receipt commit `3dd0de69c087315f7ec62b9176d046afbb3ea3b8`;
-the uncommitted preparation diff is identified by the working tree until reviewed.
+Current phase: **CARDDEMO 0.1.1 — released locally**
+Current work item: none; all 27 implementation issues and all 20 application journeys pass.
+Product version: **0.1.1**
+Source baseline: CardDemo-full completion commit
+`857115b907ce7098c965a51117a079048ea8182e`; ADR-0007 owns release promotion.
 
-The additive 0.1.1 target is prepared under `conformance/0.1.1/` and
-`docs/delivery/CARDEMO-0.1.1-STATUS.md`. Preparation does not change the product
-version or make a CardDemo execution claim.
+The released 0.1.1 profile is under `conformance/0.1.1/` and
+`docs/delivery/CARDDEMO-0.1.1-STATUS.md`. Product-controlled identifiers use
+`CARDDEMO`; the misspelled upstream FTP dataset remains only as a bounded alias.
 
 ## Completed deliverables
 
@@ -98,10 +98,10 @@ No V0–V7 functional stop-the-line finding is open. Historical oracle attributi
 unsupported surface are retained in
 `conformance/0.1/inventory/known-gaps.json`; they do not create an alternate production route.
 
-The 0.1.1 CardDemo-full target has 27 open implementation issues. The current
-system cannot install or execute a CardDemo journey. Its separate fail-closed
-entry and gap inventory are under `conformance/0.1.1/`; they do not rewrite the
-historical 0.1 evidence.
+The 0.1.1 CardDemo-full target has no open implementation issue. All 20
+journeys execute through public application, terminal, job, and operator
+routes. Its entry and gap inventory are under `conformance/0.1.1/`; historical
+0.1 evidence remains identifiable.
 
 ## Commands already run
 
@@ -110,8 +110,6 @@ passed: COBOL 37, RACF 8, z/OSMF datasets 9, z/OSMF jobs 9, CICS 317, JCL 164, a
 
 ## Next smallest executable step
 
-Implement CD-001 from
-`conformance/0.1.1/inventory/carddemo-gap-matrix.json`: make the pinned local
-CardDemo corpus an executable, license-aware, clean-tree, fail-closed input gate.
-Tagging, publication, deployment, and remote push remain unperformed and require
-separate owner authorization.
+No implementation step remains. The 0.1.1 commit, artifacts, and annotated tag
+are local. Publication, deployment, and remote push require separate owner
+authorization.

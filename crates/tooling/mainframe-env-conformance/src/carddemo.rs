@@ -67,7 +67,7 @@ use std::process::Command;
 use std::sync::Arc;
 use tower::ServiceExt;
 
-const CORPUS_ENV: &str = "CARDEMO_CORPUS_DIR";
+const CORPUS_ENV: &str = "CARDDEMO_CORPUS_DIR";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CorpusProblem {
@@ -771,7 +771,7 @@ pub fn verify_carddemo_corpus_from_env(
     let corpus = env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required for CardDemo gates",
+            "CARDDEMO_CORPUS_DIR is required for CardDemo gates",
         )
     })?;
     verify_carddemo_corpus(Path::new(&corpus), inventory_path)
@@ -905,7 +905,7 @@ pub fn verify_carddemo_source_preprocessing_from_env(
     let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required for CardDemo gates",
+            "CARDDEMO_CORPUS_DIR is required for CardDemo gates",
         )
     })?;
     let corpus_dir = Path::new(&corpus_dir);
@@ -1065,7 +1065,7 @@ pub fn verify_carddemo_source_closures_from_env(
     let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required for CardDemo gates",
+            "CARDDEMO_CORPUS_DIR is required for CardDemo gates",
         )
     })?;
     let corpus_dir = Path::new(&corpus_dir);
@@ -1238,7 +1238,7 @@ pub fn verify_carddemo_data_layouts_from_env(
     let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required for CardDemo gates",
+            "CARDDEMO_CORPUS_DIR is required for CardDemo gates",
         )
     })?;
     let corpus_dir = Path::new(&corpus_dir);
@@ -1352,7 +1352,7 @@ pub fn verify_carddemo_control_flow_from_env(
     let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required for CardDemo gates",
+            "CARDDEMO_CORPUS_DIR is required for CardDemo gates",
         )
     })?;
     let corpus_dir = Path::new(&corpus_dir);
@@ -1469,7 +1469,7 @@ pub fn verify_carddemo_core_semantics_from_env(
     let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required for CardDemo gates",
+            "CARDDEMO_CORPUS_DIR is required for CardDemo gates",
         )
     })?;
     let corpus_dir = Path::new(&corpus_dir);
@@ -1644,7 +1644,7 @@ pub fn verify_carddemo_file_call_semantics_from_env(
     let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required for CardDemo gates",
+            "CARDDEMO_CORPUS_DIR is required for CardDemo gates",
         )
     })?;
     let corpus_dir = Path::new(&corpus_dir);
@@ -1767,7 +1767,7 @@ pub fn verify_carddemo_host_operands_from_env(
     let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required for CardDemo gates",
+            "CARDDEMO_CORPUS_DIR is required for CardDemo gates",
         )
     })?;
     let corpus_dir = Path::new(&corpus_dir);
@@ -1878,7 +1878,7 @@ pub fn verify_carddemo_application_package_from_env(
     let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required for CardDemo gates",
+            "CARDDEMO_CORPUS_DIR is required for CardDemo gates",
         )
     })?;
     let corpus = verify_carddemo_corpus(Path::new(&corpus_dir), inventory_path)?;
@@ -1914,7 +1914,7 @@ pub fn verify_carddemo_application_package_from_env(
     }
     let package = ApplicationPackage {
         manifest: ApplicationManifest {
-            name: "AWS-CARDEMO".into(),
+            name: "AWS-CARDDEMO".into(),
             version: "0.1.1".into(),
             target_product: "0.1.1".into(),
             entries,
@@ -2002,7 +2002,7 @@ pub fn verify_carddemo_resources_from_env(
     let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required for CardDemo gates",
+            "CARDDEMO_CORPUS_DIR is required for CardDemo gates",
         )
     })?;
     let corpus_dir = Path::new(&corpus_dir);
@@ -2125,7 +2125,7 @@ pub fn verify_carddemo_program_routing_from_env(
     let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required for CardDemo gates",
+            "CARDDEMO_CORPUS_DIR is required for CardDemo gates",
         )
     })?;
     let corpus_dir = Path::new(&corpus_dir);
@@ -2210,7 +2210,7 @@ pub fn verify_carddemo_cics_abi_from_env(
     let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required",
+            "CARDDEMO_CORPUS_DIR is required",
         )
     })?;
     let bundles = explicit_carddemo_bundles(Path::new(&corpus_dir))?;
@@ -2297,7 +2297,7 @@ pub fn verify_carddemo_cics_runtime_from_env(
     let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required",
+            "CARDDEMO_CORPUS_DIR is required",
         )
     })?;
     let bundles = explicit_carddemo_bundles(Path::new(&corpus_dir))?;
@@ -2460,7 +2460,7 @@ pub fn verify_carddemo_vsam_from_env(
     let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required",
+            "CARDDEMO_CORPUS_DIR is required",
         )
     })?;
     let corpus_dir = Path::new(&corpus_dir);
@@ -2711,7 +2711,7 @@ pub fn verify_carddemo_dataset_catalog_from_env(
     let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required",
+            "CARDDEMO_CORPUS_DIR is required",
         )
     })?;
     let corpus_dir = Path::new(&corpus_dir);
@@ -3013,7 +3013,7 @@ pub fn verify_carddemo_seeds_from_env(
     let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required",
+            "CARDDEMO_CORPUS_DIR is required",
         )
     })?;
     let corpus_dir = Path::new(&corpus_dir);
@@ -3315,7 +3315,7 @@ pub fn verify_carddemo_security_from_env(
     let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required",
+            "CARDDEMO_CORPUS_DIR is required",
         )
     })?;
     let corpus_dir = Path::new(&corpus_dir);
@@ -3647,7 +3647,7 @@ pub fn verify_carddemo_terminal_from_env(
     let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required",
+            "CARDDEMO_CORPUS_DIR is required",
         )
     })?;
     let corpus_dir = Path::new(&corpus_dir);
@@ -3755,7 +3755,7 @@ pub fn verify_carddemo_base_online_from_env(
     let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required",
+            "CARDDEMO_CORPUS_DIR is required",
         )
     })?;
     let definition = carddemo_base_online_definition(Path::new(&corpus_dir))?;
@@ -3865,7 +3865,7 @@ pub fn verify_carddemo_jcl_from_env(
     let corpus_dir = PathBuf::from(env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required",
+            "CARDDEMO_CORPUS_DIR is required",
         )
     })?);
     let jcl_paths = collect_paths(
@@ -4140,7 +4140,7 @@ pub fn verify_carddemo_utilities_from_env(
     let corpus_dir = PathBuf::from(env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required",
+            "CARDDEMO_CORPUS_DIR is required",
         )
     })?);
     let plans = carddemo_parsed_jcl(&corpus_dir)?;
@@ -4268,7 +4268,7 @@ pub fn verify_carddemo_batch_programs_from_env(
     let corpus_dir = PathBuf::from(env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required",
+            "CARDDEMO_CORPUS_DIR is required",
         )
     })?);
     let plans = carddemo_parsed_jcl(&corpus_dir)?;
@@ -4454,7 +4454,7 @@ pub fn verify_carddemo_base_batch_from_env(
     let corpus_dir = PathBuf::from(env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required",
+            "CARDDEMO_CORPUS_DIR is required",
         )
     })?);
     let bundles = explicit_carddemo_bundles(&corpus_dir)?
@@ -4500,7 +4500,7 @@ pub fn verify_carddemo_db2_from_env(
     let corpus_dir = PathBuf::from(env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required",
+            "CARDDEMO_CORPUS_DIR is required",
         )
     })?);
     let corpus = verify_carddemo_corpus(&corpus_dir, inventory_path)?;
@@ -5322,7 +5322,7 @@ pub fn verify_carddemo_ims_from_env(
     let corpus_dir = PathBuf::from(env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required",
+            "CARDDEMO_CORPUS_DIR is required",
         )
     })?);
     let corpus = verify_carddemo_corpus(&corpus_dir, inventory_path)?;
@@ -5443,7 +5443,7 @@ pub fn verify_carddemo_mq_authorization_from_env(
     let corpus_dir = PathBuf::from(env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required",
+            "CARDDEMO_CORPUS_DIR is required",
         )
     })?);
     let corpus = verify_carddemo_corpus(&corpus_dir, inventory_path)?;
@@ -5610,7 +5610,7 @@ fn verify_cdv1_correction(
         ));
     }
     let correction = &contract.corrections[0];
-    if correction.id != "CARDEMO-ORPHAN-CDV1"
+    if correction.id != "CARDDEMO-ORPHAN-CDV1"
         || correction.disposition != "accepted-owned-source"
         || correction.transaction != "CDV1"
         || correction.program != "COCRDSEC"
@@ -5858,7 +5858,7 @@ pub fn verify_carddemo_full_from_env(
     let corpus_dir = PathBuf::from(env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
-            "CARDEMO_CORPUS_DIR is required",
+            "CARDDEMO_CORPUS_DIR is required",
         )
     })?);
     let corpus = verify_carddemo_corpus(&corpus_dir, inventory_path)?;
@@ -5923,8 +5923,7 @@ pub fn verify_carddemo_full_from_env(
         .map_err(|error| CorpusProblem::new("carddemo.full.runtime", error.to_string()))?;
     let exercise = runtime.block_on(exercise_full_certification())?;
     let release_disposition =
-        "implementation-complete; release-blocked-until-0.1.0-final-or-version-line-correction"
-            .to_string();
+        "product-0.1.1-released-locally; carddemo-conformance-only".to_string();
     let owned_commands = vec![
         "cargo xtask carddemo-operator-install --check".into(),
         "cargo xtask carddemo-operator-compile --check".into(),
@@ -6047,7 +6046,7 @@ fn carddemo_operator_mapping(corpus_dir: &Path) -> Result<OperatorMapping, Corpu
     );
     digest_field(
         &mut digest,
-        b"FTP DATASET PUT -> GET /zosmf/restfiles/ds/{dataset}",
+        b"FTP PUT AWS.M2.CARDEMO.FTP.TEST -> GET /zosmf/restfiles/ds/AWS.M2.CARDDEMO.FTP.TEST",
     );
     Ok(OperatorMapping {
         scripts: scripts.len() + 1,
@@ -6104,13 +6103,13 @@ async fn exercise_full_certification() -> Result<FullCertificationExercise, Corp
     );
     memory
         .racf_service()
-        .define_profile("DATASET", "AWS.M2.CARDEMO.FTP.TEST", "IBMUSER", None)
+        .define_profile("DATASET", "AWS.M2.CARDDEMO.FTP.TEST", "IBMUSER", None)
         .map_err(terminal_problem)?;
     memory
         .racf_service()
         .permit(
             "DATASET",
-            "AWS.M2.CARDEMO.FTP.TEST",
+            "AWS.M2.CARDDEMO.FTP.TEST",
             "IBMUSER",
             AccessIntent::Read,
         )
@@ -6119,7 +6118,7 @@ async fn exercise_full_certification() -> Result<FullCertificationExercise, Corp
         .map_err(|_| CorpusProblem::new("carddemo.full.ftp", "sequence overflow"))?;
     utility_seed_dataset(
         &memory,
-        "AWS.M2.CARDEMO.FTP.TEST",
+        "AWS.M2.CARDDEMO.FTP.TEST",
         DatasetOrganization::Sequential,
         RecordFormat::Fixed,
         16,
@@ -6130,7 +6129,7 @@ async fn exercise_full_certification() -> Result<FullCertificationExercise, Corp
     let (ftp_status, ftp_bytes) = terminal_http(
         &app,
         Method::GET,
-        "/zosmf/restfiles/ds/AWS.M2.CARDEMO.FTP.TEST",
+        "/zosmf/restfiles/ds/AWS.M2.CARDDEMO.FTP.TEST",
         BTreeMap::from([("authorization".into(), basic.clone())]),
         Vec::new(),
     )
@@ -7358,7 +7357,7 @@ fn authorization_invocation(
         RunUnitId::new(run, limits)
             .map_err(|_| CorpusProblem::new("carddemo.authorization.invocation", "run invalid"))?,
         None,
-        Selector::new("program:CARDEMO-AUTH", limits).expect("static selector"),
+        Selector::new("program:CARDDEMO-AUTH", limits).expect("static selector"),
         ArtifactRef::new("carddemo-authorization", limits).expect("static artifact"),
         Principal::new(
             PrincipalId::new("IBMUSER", limits).expect("static principal"),
@@ -13473,7 +13472,7 @@ fn require_corpus_directory(path: &Path) -> Result<(), CorpusProblem> {
     } else {
         Err(CorpusProblem::new(
             "carddemo.corpus.directory_missing",
-            "CARDEMO_CORPUS_DIR does not name an available directory",
+            "CARDDEMO_CORPUS_DIR does not name an available directory",
         ))
     }
 }

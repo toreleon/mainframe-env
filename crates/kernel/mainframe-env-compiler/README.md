@@ -15,7 +15,7 @@ COPY expansion records both included bytes and directive origins. Verify with
 
 The bounded owned definitions for reached DFHAID, DFHBMSCA, SQLCA, and MQ
 copybooks are documented in
-[`docs/compatibility/CARDEMO-COPYBOOKS.md`](../../../docs/compatibility/CARDEMO-COPYBOOKS.md).
+[`docs/compatibility/CARDDEMO-COPYBOOKS.md`](../../../docs/compatibility/CARDDEMO-COPYBOOKS.md).
 
 The semantic data model uses unique qualified identities while retaining simple
 COBOL names for resolution. Recursive groups, sibling REDEFINES, levels

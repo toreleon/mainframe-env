@@ -1,10 +1,10 @@
 {
   "schema_version": "mainframe-env.release-contract@1",
-  "contract_version": "0.1.0",
+  "contract_version": "0.1.1",
   "product": "mainframe-env",
   "release_line": "0.1",
-  "development_version": "0.1.0-alpha.0",
-  "status": "accepted",
+  "development_version": "0.1.1",
+  "status": "released-local",
   "objective": "Deliver one bounded, deterministic, greenfield authority for the frozen COBOL, CICS, JCL/JES, dataset, RACF/SAF, and selected z/OSMF 0.1 surface.",
   "profiles": ["core-server", "conformance"],
   "included_domains": [

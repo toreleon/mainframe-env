@@ -1197,8 +1197,8 @@ fn check_versions(root: &Path) -> TaskResult {
         .ok_or("release rust.pinned is missing")?;
 
     require(
-        version == "0.1.0-alpha.0",
-        "VERSION must remain at the initial development identity",
+        version == "0.1.1",
+        "VERSION must identify the 0.1.1 release",
     )?;
     require(
         cargo_version == version,
@@ -2106,7 +2106,14 @@ fn check_release_artifacts(root: &Path) -> TaskResult {
 }
 
 fn release_documents(root: &Path) -> TaskResult<BTreeMap<PathBuf, Vec<u8>>> {
-    let directory = PathBuf::from("release/0.1.0-alpha.0");
+    let version = read(&root.join("VERSION"))?.trim().to_string();
+    let release_config: toml::Value = read(&root.join("release.toml"))?
+        .parse()
+        .map_err(|error| format!("release.toml: {error}"))?;
+    let channel = release_config["product"]["channel"]
+        .as_str()
+        .ok_or("product.channel is missing")?;
+    let directory = PathBuf::from(format!("release/{version}"));
     let server = root.join("target/release/mainframe-env-server");
     let cli = root.join("target/release/mainframe-env");
     require(server.is_file(), "release server binary has not been built")?;
@@ -2141,6 +2148,12 @@ fn release_documents(root: &Path) -> TaskResult<BTreeMap<PathBuf, Vec<u8>>> {
         .ok_or("cargo metadata has no packages")?;
     let mut components = packages
         .iter()
+        .filter(|package| {
+            !matches!(
+                package.get("name").and_then(Value::as_str),
+                Some("mainframe-env-conformance" | "xtask")
+            )
+        })
         .map(|package| {
             let name = package.get("name").and_then(Value::as_str).unwrap_or("");
             let version = package.get("version").and_then(Value::as_str).unwrap_or("");
@@ -2173,10 +2186,12 @@ fn release_documents(root: &Path) -> TaskResult<BTreeMap<PathBuf, Vec<u8>>> {
         "specVersion":"1.6",
         "version":1,
         "metadata":{
-            "component":{"type":"application","name":"mainframe-env","version":"0.1.0-alpha.0"},
+            "component":{"type":"application","name":"mainframe-env","version":version},
             "properties":[
                 {"name":"mainframe-env:phase-base","value":phase_base},
-                {"name":"mainframe-env:cargo-lock-sha256","value":lock_digest}
+                {"name":"mainframe-env:cargo-lock-sha256","value":lock_digest},
+                {"name":"mainframe-env:release-profile","value":"core-server"},
+                {"name":"mainframe-env:excluded-non-production-workspace-package-count","value":"2"}
             ]
         },
         "components":components
@@ -2184,8 +2199,8 @@ fn release_documents(root: &Path) -> TaskResult<BTreeMap<PathBuf, Vec<u8>>> {
     let manifest = json!({
         "schema_version":"mainframe-env.release-manifest@1",
         "product":"mainframe-env",
-        "version":"0.1.0-alpha.0",
-        "channel":"alpha",
+        "version":version,
+        "channel":channel,
         "phase_base_revision":phase_base,
         "toolchain":rustc,
         "target":format!("{}-{}",std::env::consts::ARCH,std::env::consts::OS),
@@ -2199,7 +2214,7 @@ fn release_documents(root: &Path) -> TaskResult<BTreeMap<PathBuf, Vec<u8>>> {
             {"path":"migrations/sqlite/0001-durable-state.sql","sha256":sqlite_migration},
             {"path":"migrations/postgres/0001-durable-state.sql","sha256":postgres_migration}
         ],
-        "tag":null,
+        "tag":format!("mainframe-env-v{version}"),
         "published":false
     });
     let provenance = json!({
@@ -2215,7 +2230,7 @@ fn release_documents(root: &Path) -> TaskResult<BTreeMap<PathBuf, Vec<u8>>> {
                 "externalParameters":{"profile":"release","locked":true,"all_features":true},
                 "resolvedDependencies":[{"uri":"Cargo.lock","digest":{"sha256":lock_digest}}]
             },
-            "runDetails":{"builder":{"id":"local-codex-workspace"},"metadata":{"invocationId":"ME.V7-local"}}
+            "runDetails":{"builder":{"id":"local-codex-workspace"},"metadata":{"invocationId":format!("mainframe-env-v{version}-local")}}
         }
     });
     let mut licenses = packages

@@ -43,5 +43,5 @@ Verify with:
 
 ```text
 cargo test -p mainframe-env-source -p mainframe-env-compiler
-CARDEMO_CORPUS_DIR=<local-clean-pin> cargo xtask carddemo-closure --check
+CARDDEMO_CORPUS_DIR=<local-clean-pin> cargo xtask carddemo-closure --check
 ```

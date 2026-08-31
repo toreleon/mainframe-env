@@ -1,14 +1,14 @@
 {
   "schema_version": "mainframe-env.carddemo-profile@1",
   "target_product": "0.1.1",
-  "current_product": "0.1.0-alpha.0",
-  "status": "prepared_not_implemented",
+  "current_product": "0.1.1",
+  "status": "conformance_pass",
   "owner_decision": "Execute every application workload present in the clean pinned CardDemo repository through additive 0.1.1 profiles without breaking the existing 0.1 core-server surface.",
   "corpus": {
     "repository": "https://github.com/aws-samples/aws-mainframe-modernization-carddemo.git",
     "commit": "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e",
     "tree": "a1253e31c839f78d1f185b01771ba956da63b005",
-    "environment_key": "CARDEMO_CORPUS_DIR",
+    "environment_key": "CARDDEMO_CORPUS_DIR",
     "clean_required": true
   },
   "compatibility": {
@@ -62,16 +62,17 @@
     "samples/m2/unikix/UniKix_CardDemo_runtime_v1.zip migrated runtime objects",
     "external cloud POS client described by the authorization README"
   ],
-  "unresolved_corpus_decisions": [
+  "unresolved_corpus_decisions": [],
+  "resolved_corpus_decisions": [
     {
-      "id": "CARDEMO-ORPHAN-CDV1",
+      "id": "CARDDEMO-ORPHAN-CDV1",
       "detail": "The base CSD defines CDV1 -> COCRDSEC, but the pinned repository and runtime archive contain no corresponding source or program object.",
-      "required_resolution": "Provide accepted source or approve an explicit disabled/retired resource correction before carddemo-full passes."
+      "resolution": "Owner-approved accepted-owned-source correction at conformance/0.1.1/fixtures/carddemo/COCRDSEC.cbl."
     },
     {
       "id": "RELEASE-ORDER-0.1.1",
-      "detail": "mainframe-env still identifies as 0.1.0-alpha.0.",
-      "required_resolution": "Finalize 0.1.0 or record a version-line correction before cutting any 0.1.1 release."
+      "detail": "The repository owner authorized direct promotion from the unreleased alpha identity.",
+      "resolution": "ADR-0007 records the version-line correction and local 0.1.1 release."
     }
   ]
 }

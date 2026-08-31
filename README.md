@@ -10,8 +10,7 @@ The design goal is a stable, robust platform built around a deterministic
 compiler and execution kernel, with asynchronous infrastructure and external
 frameworks isolated behind owned ports.
 
-The initial product release line is **0.1**, beginning at
-`0.1.0-alpha.0` and reaching `0.1.0` only through the documented release gates.
+The current locally released product is **0.1.1** on the 0.1 release line.
 
 Start with [the documentation index](docs/README.md).
 
@@ -22,10 +21,13 @@ Version, phase-commit, and promotion rules are defined in
 
 ## Current status
 
-- Product roadmap work, including R2A, is paused.
-- The ME.V0 architecture, compatibility freeze, and workspace-foundation gate passes locally.
-- Foundation and product implementation phases ME.V1 through ME.V7 remain incomplete.
-- No production authority has moved.
+- The generic platform passes CardDemo corpus certification: 27/27 issues and
+  20/20 journeys with memory, SQLite, PostgreSQL 18, and live Zowe CLI evidence.
+  CardDemo remains a non-production corpus/workload, not a product feature.
+- Corpus tooling uses `CARDDEMO`; the pinned upstream FTP typo is retained only
+  as a bounded compatibility alias.
+- Local 0.1.1 release artifacts and provenance are generated and verified.
+- No remote publication or production deployment has occurred.
 - No old implementation may be imported by mainframe-env production crates.
 - Existing fixtures, schemas, behavioral tests, and evidence may be reused as
   compatibility inputs.

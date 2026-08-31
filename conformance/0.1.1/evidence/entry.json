@@ -1,10 +1,10 @@
 {
   "schema_version": "mainframe-env.carddemo-entry@1",
   "preparation_status": "pass",
-  "implementation_status": "fail_not_started",
-  "release_status": "blocked",
+  "implementation_status": "pass",
+  "release_status": "included_as_conformance_evidence",
   "mainframe_env_baseline": "3dd0de69c087315f7ec62b9176d046afbb3ea3b8",
-  "current_product": "0.1.0-alpha.0",
+  "current_product": "0.1.1",
   "target_product": "0.1.1",
   "carddemo": {
     "clean": true,
@@ -15,23 +15,19 @@
     "base_login_direct_compile": "failed CopyNotFound",
     "isolated_base_compiler_probe": {"programs":31,"complete":1,"duplicate_name":27,"unsupported_form":3},
     "base_jcl_probe": {"files":38,"parsed":0,"malformed":38},
-    "installed_carddemo_resources": 0,
-    "executed_carddemo_journeys": 0,
-    "open_implementation_issues": 27
+    "installed_carddemo_resources": 25,
+    "executed_carddemo_journeys": 20,
+    "open_implementation_issues": 0
   },
   "preparation_artifacts": [
     "docs/decisions/0006-carddemo-0.1.1-profile.md",
-    "docs/delivery/CARDEMO-0.1.1-IMPLEMENTATION-PLAN.md",
-    "docs/prompts/IMPLEMENT_CARDEMO_0_1_1.md",
+    "docs/delivery/CARDDEMO-0.1.1-IMPLEMENTATION-PLAN.md",
+    "docs/prompts/IMPLEMENT_CARDDEMO_0_1_1.md",
     "conformance/0.1.1/contract/carddemo-profile.json",
     "conformance/0.1.1/inventory/carddemo-corpus.json",
     "conformance/0.1.1/inventory/carddemo-gap-matrix.json",
     "conformance/0.1.1/workloads/carddemo-journeys.json"
   ],
-  "stop_the_line": [
-    "No CardDemo application journey currently executes.",
-    "CDV1 maps to missing COCRDSEC source/object.",
-    "A 0.1.1 release cannot precede resolution of the current 0.1.0-alpha.0 release identity."
-  ],
-  "next_issue": "CD-001"
+  "stop_the_line": [],
+  "next_issue": null
 }

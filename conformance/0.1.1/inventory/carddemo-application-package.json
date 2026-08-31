@@ -1,9 +1,9 @@
 {
   "schema_version":"mainframe-env.application-package-inventory@1",
-  "name":"AWS-CARDEMO",
+  "name":"AWS-CARDDEMO",
   "version":"0.1.1",
   "target_product":"0.1.1",
-  "identity":"sha256:e3f0674a667fe38d3b4aa823f73bf83d7ef1bc8af1f9813c18978761aee34860",
+  "identity":"sha256:8ede841e47d5b1420111af9a653ee48241f49e92dadb1eec3033c4b5d8cf1fa0",
   "entries":{
     "cohorts/data":"sha256:28d078178451a83a0305692cfbf2af8223cb99713ba07df0fd37a3821b02edbe",
     "cohorts/migration":"sha256:c0fc4f661c75e2e243ea3015c8ffa7ea2e95a56738dd1d74a6f99a4c2adc06b8",

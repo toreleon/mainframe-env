@@ -9,6 +9,6 @@
     {"id":"JES-SECURITY-DEFAULT","status":"closed","detail":"JES admission and sensitive rechecks use RACF/SAF and default deny when provider/profile/grant is absent.","blocks":"none"},
     {"id":"ZOSMF-TLS-CSRF","status":"closed","detail":"Rustls construction is the production transport contract and every mutating accepted route enforces X-CSRF-ZOSMF-HEADER.","blocks":"none"},
     {"id":"POSTGRES-RUNNER","status":"closed","detail":"PostgreSQL 18 container migration and durable execution/provider-state contract test passed on this host.","blocks":"none"},
-    {"id":"CARDEMO-LOCAL-CORPUS","status":"closed","detail":"Clean local CardDemo corpus at 59cc6c2... was verified against tree/content/license pins and the 174-block operation inventory.","blocks":"none"}
+    {"id":"CARDDEMO-LOCAL-CORPUS","status":"closed","detail":"Clean local CardDemo corpus at 59cc6c2... was verified against tree/content/license pins and the 174-block operation inventory.","blocks":"none"}
   ]
 }

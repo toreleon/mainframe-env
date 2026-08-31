@@ -101,7 +101,7 @@ and persistence.
 
 ### CD.A — Corpus and application packaging
 
-- Make clean corpus verification executable from `CARDEMO_CORPUS_DIR`.
+- Make clean corpus verification executable from `CARDDEMO_CORPUS_DIR`.
 - Add the generic application manifest and transactional installer.
 - Parse BMS, CSD, runtime dataset imports, copybook libraries, and seed objects
   into owned versioned types.

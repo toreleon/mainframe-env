@@ -1,22 +1,22 @@
 # CardDemo-full 0.1.1 Program Status
 
-Current phase: **CD.F — Db2, IMS, MQ, and cross-resource transactions**
-Current issue: **CD-025 — reached IMS HIDAM, PCB, and DLI workflows IN PROGRESS**
-Next issue: **CD-026 — reached MQ and cross-resource authorization workflows**
-Current product: **0.1.0-alpha.0**
+Current phase: **CD.G — operator compatibility and certification**
+Current issue: **none — CardDemo-full implementation is complete**
+Next issue: **none — all 27 planned implementation issues pass**
+Current product: **0.1.1**
 Target product: **0.1.1**
 CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 
 ## Source identity
 
-- mainframe-env base commit: `3d1a55b1719e150042467e381fc5f8f609510dd6`
+- mainframe-env base commit: `857115b907ce7098c965a51117a079048ea8182e`
 - current deterministic dirty-tree identity:
-  `sha256:b151a26a63175dfbb0bd5bb5912e92c594810378109e7a3244d873521e3bcf2f`
+  `sha256:dc1f6dee14946688b5a4cba1d2a9c8943456ad725ad904424e1fc63176079254`
 - dirty-tree algorithm: SHA-256 of the sorted `sha256sum` records for every
   repository file except `.git/`, `target/`, and the two persistent CardDemo
   status ledgers (which carry the identity).
-- preparation inputs and implementation changes remain local; no version,
-  remote, tag, publication, or deployment action has occurred.
+- implementation and release artifacts remain local; no remote push,
+  publication, or deployment action has occurred.
 
 ## Completed implementation issues
 
@@ -29,7 +29,7 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 - Evidence: `conformance/0.1.1/evidence/issues/CD-001.json`
 - Evidence digest:
   `sha256:b97d476b03e315b400dfa9f850c10672cc1d25289ee179c62e6f0f04f0c6c97b`
-- Acceptance: `CARDEMO_CORPUS_DIR` is consulted only by the explicit CardDemo
+- Acceptance: `CARDDEMO_CORPUS_DIR` is consulted only by the explicit CardDemo
   corpus gate; the exact repository, commit, tree, cleanliness, Apache-2.0
   license, 329-file canonical content identity, two runtime archives, two
   embedded runtime metadata files, and 33 declared file-count cohorts pass.
@@ -493,6 +493,94 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   restart. Rollback, duplicate `-803`, referential `-532`, concurrent `-911`,
   authorization, and missing-environment controls fail closed.
 
+### CD-025 — reached IMS HIDAM, PCB, and DLI workflows
+
+- State: **PASS**
+- Required commit subject: `Implement CardDemo IMS workflows`
+- Completion commit identity:
+  `1b7501b18c3f5bb2f1895b09bfbda7687fba23ae`.
+- Evidence: `conformance/0.1.1/evidence/issues/CD-025.json`
+- Evidence digest:
+  `sha256:9e66695c659f41ca04fff8bff2bad74bf7baf582a20c72191ef2c3bc17ad61e3`
+- All eight pinned IMS definition files are checked. DBPAUTP0/DBPAUTX0 and
+  PSBPAUTB/PSBPAUTL/PAUTBUNL install atomically as two DBDs, three PSBs, and
+  three PCBs with exact HIDAM hierarchy, secondary-index, key, and processing
+  contracts.
+- Four pinned DLI programs compile with typed SCHD, TERM, GU, GN, GNP, ISRT,
+  REPL, DLET, and CHKP requests. The selected execution route schedules the
+  PSB, applies an SSA-qualified GU, returns exact root bytes, and terminates.
+- Zowe CLI 8.36.0 independently submits exact LOADPADB and UNLDPADB. Both
+  reach OUTPUT `CC 0000`; their DFSRRC00 spool reports four loaded and four
+  unloaded root/child segments. Exact hierarchy, index, checkpoint, and spool
+  digests survive warm restart.
+- Missing capability, generation mismatch, malformed segment length, root
+  limit, provider failure, and missing-environment controls fail closed.
+
+### CD-026 — reached MQ and cross-resource authorization workflows
+
+- State: **PASS**
+- Required commit subject: `Implement CardDemo MQ and authorization flows`
+- Completion commit identity:
+  `1666a2092e6a026ad2c58a443090a4a22d9b917d`.
+- Evidence: `conformance/0.1.1/evidence/issues/CD-026.json`
+- Evidence digest:
+  `sha256:16d7ae99a994386982d86314c4bfcf62167d636471cf6482f302cb19e01a28f8`
+- Three pinned programs compile with all five reached MQ verbs. The typed,
+  durable provider owns seven queues, three triggers, handles, correlation and
+  message IDs, no-message conditions, syncpoint staging, idempotent replay,
+  unknown-outcome reconciliation, and restart state.
+- CD.J15 passes exact date and account request/reply bytes with correlation,
+  trigger, wait/no-message, commit, and restart observations. CD.J16 passes
+  approval and decline, duplicate replay, IMS root/child mutation, and actual
+  CICS-coordinated Db2/IMS/MQ commit and rollback.
+- CD.J17 passes qualified IMS summary/detail navigation plus the pinned
+  26-column `CARDDEMO.AUTHFRDS` insert, rollback, commit, fraud update, and
+  persisted marker. CD.J18 submits exact `CBPAUP0J` through public z/OSMF,
+  purges two roots and three children without cursor skips for the derived
+  fixture, checkpoints, and verifies the keyed account adjustment bytes.
+- Zowe CLI 8.36.0 independently submits exact `CBPAUP0J` to an initialized
+  ephemeral ProductServer. `JOB00001` reaches OUTPUT `CC 0000`; live spool
+  reports `EXPIRY-DAYS=00`, `ROOTS=1`, `CHILDREN=1`,
+  `CHECKPOINT=CD02600001`, and `SUMMARY-AUTHORIZATION-ADJUSTED=1`.
+- Missing MQ authority, malformed/limited state, rollback, unknown outcome,
+  replay conflict, and missing-environment controls fail closed. The final
+  memory-store restart preserves exact MQ, IMS, Db2, and dataset state.
+
+### CD-027 — operator compatibility and full-profile certification
+
+- State: **PASS**
+- Required commit subject: `Certify the complete CardDemo application profile`
+- Completion commit identity:
+  `857115b907ce7098c965a51117a079048ea8182e`.
+- Evidence: `conformance/0.1.1/evidence/issues/CD-027.json`
+- Evidence digest:
+  `sha256:cc7fbcd0867e0654c9f3cd937967c6776413759612ceb652eae2be7083f0b17d`
+- Four owned commands are implemented and pass: install derives 23 datasets,
+  13 seeds, and 25 resource links; compile derives 44 source closures and 12
+  batch artifacts; submit executes 12 initialization plus nine operational
+  jobs with 26 spool digests; reset executes seven public routes and seven
+  exact mutations.
+- The pinned helper scripts map 41 FTP/JES JCL submissions to the authenticated
+  z/OSMF Jobs route. `FTPJCL` dataset transfer maps to the authenticated public
+  dataset-content route and is executed byte-exactly; arbitrary FTP remains
+  unsupported.
+- The owner-approved correction supplies hash-pinned owned `COCRDSEC` demo
+  source because the clean corpus and both runtime oracles contain no original
+  implementation. Anonymous `CDV1` launch is denied; authenticated launch
+  displays the explicit unavailable-contract message and returns without
+  reading or mutating card data.
+- Zowe CLI 8.36.0 connects to the ephemeral public server, submits exact
+  `ESDSRRDS.jcl`, and observes OUTPUT `CC 0000` after application authority
+  installation. PREDEL and STEP01 through STEP05 all report RC 0000; Zowe
+  downloads byte-identical ESDS and RRDS results.
+- The evidence-backed full gate derives all 20 journeys from current
+  application runs, not status JSON. It completes 16 mixed requests through an
+  eight-request concurrency limit, cross-principal isolation, SQLite integrity
+  backup/restore, and PostgreSQL 18 restart durability.
+- ADR-0007 resolves release ordering and corrects product-controlled naming to
+  `CARDDEMO`. Version 0.1.1 release artifacts and an annotated tag are local;
+  no remote push, publication, or deployment occurred.
+
 ## Commands and exit codes
 
 - `cargo test -p mainframe-env-conformance --locked` — **0**; 19 passed,
@@ -500,11 +588,11 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 - `cargo test -p xtask --locked` — **0**; 5 passed.
 - `cargo clippy -p mainframe-env-conformance -p xtask --all-targets --locked -- -D warnings`
   — **0**.
-- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-corpus --check` — **1**;
+- `env -u CARDDEMO_CORPUS_DIR cargo xtask carddemo-corpus --check` — **1**;
   expected missing-environment failure.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-corpus --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-corpus --check`
   — **0**; exact pinned receipt passed.
-- `env -u CARDEMO_CORPUS_DIR cargo xtask conformance --check` — **0**;
+- `env -u CARDDEMO_CORPUS_DIR cargo xtask conformance --check` — **0**;
   versions, architecture, profiles, schemas, inventory, and existing evidence
   pass without the CardDemo environment.
 - `cargo fmt --all -- --check` — **0**.
@@ -514,10 +602,10 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 - `cargo check --workspace --all-targets --locked` — **0**.
 - `cargo clippy -p mainframe-env-compiler -p mainframe-env-conformance -p xtask --all-targets --locked -- -D warnings`
   — **0**.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-source --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-source --check`
   — **0**; 44 programs, 62 copybooks, 346 expansions, and 44 deterministic
   replays passed.
-- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-source --check` — **1**;
+- `env -u CARDDEMO_CORPUS_DIR cargo xtask carddemo-source --check` — **1**;
   expected missing-environment failure.
 - `cargo run -p mainframe-env-cli -- compile <redacted-corpus>/app/cbl/COSGN00C.cbl --format fixed`
   — **1**; expected CD-003 closure failure is now the genuine
@@ -529,9 +617,9 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   5 xtask tests passed.
 - `cargo check --workspace --all-targets --locked` — **0**.
 - Affected-package Clippy with `-D warnings` — **0**.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-closure --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-closure --check`
   — **0**; exact CD-003 closure receipt passed.
-- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-closure --check` — **1**;
+- `env -u CARDDEMO_CORPUS_DIR cargo xtask carddemo-closure --check` — **1**;
   expected missing-environment failure.
 - Full-library CLI login compilation — **1**; expected next-phase semantic
   `DuplicateName`, proving the source closure is complete.
@@ -540,9 +628,9 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 - `cargo check --workspace --all-targets --locked` — **0**.
 - Affected compiler/conformance/CLI/server/xtask tests — **0**; 58 passed.
 - Affected-package Clippy with `-D warnings` — **0**.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-layout --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-layout --check`
   — **0**; exact CD-004 layout receipt passed.
-- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-layout --check` — **1**;
+- `env -u CARDDEMO_CORPUS_DIR cargo xtask carddemo-layout --check` — **1**;
   expected missing-environment failure.
 - Full-library CLI login compilation — **1**; expected next-phase HIR
   `UnknownStatement`.
@@ -553,9 +641,9 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   passed.
 - `cargo check --workspace --all-targets --locked` and affected-package Clippy
   with `-D warnings` — **0**.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-control --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-control --check`
   — **0**; all 44 HIR models and the exact CD-005 receipt passed.
-- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-control --check` — **1**;
+- `env -u CARDDEMO_CORPUS_DIR cargo xtask carddemo-control --check` — **1**;
   expected missing-environment failure.
 - Full-library CLI login inspection — **0**; HIR completion reaches the typed
   CD-006 `StructuredControl` boundary without artifact publication.
@@ -563,9 +651,9 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 - `cargo test -p mainframe-env-compiler -p mainframe-env-interpreter -p mainframe-env-conformance --locked`
   — **0**; 27 compiler, 6 interpreter, and 26 conformance tests passed.
 - Workspace check and affected-package Clippy with `-D warnings` — **0**.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-core --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-core --check`
   — **0**; 44 corpus shapes and two exact executable oracles passed.
-- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-core --check` — **1**;
+- `env -u CARDDEMO_CORPUS_DIR cargo xtask carddemo-core --check` — **1**;
   expected missing-environment failure.
 - Full-library CLI login compilation — **0**; a legal artifact was emitted with
   no diagnostics after structured CFG and core semantics lowering.
@@ -573,17 +661,17 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 - `cargo test -p mainframe-env-compiler -p mainframe-env-interpreter -p mainframe-env-conformance --locked`
   — **0**; 27 compiler, 6 interpreter, and 28 conformance tests passed.
 - Workspace check and affected-package Clippy with `-D warnings` — **0**.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-file-call --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-file-call --check`
   — **0**; the exact 44-program file/call contract passed.
-- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-file-call --check` — **1**;
+- `env -u CARDDEMO_CORPUS_DIR cargo xtask carddemo-file-call --check` — **1**;
   expected missing-environment failure.
 - Ordinary conformance and cumulative CD-001–CD-007 gates — **0**.
 - `cargo test -p mainframe-env-compiler -p mainframe-env-interpreter -p mainframe-env-conformance --locked`
   — **0**; 27 compiler, 6 interpreter, and 32 conformance tests passed.
 - Workspace check and affected-package Clippy with `-D warnings` — **0**.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-host --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-host --check`
   — **0**; exact CICS/SQL/DLI/MQ operand and opcode receipt passed.
-- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-host --check` — **1**;
+- `env -u CARDDEMO_CORPUS_DIR cargo xtask carddemo-host --check` — **1**;
   expected missing-environment failure.
 - Ordinary conformance and cumulative CD-001–CD-008 gates — **0**.
 - Focused pre-repair `carddemo_residual_cics_forms_are_executable` — **1**;
@@ -592,9 +680,9 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   tests — **0**; 91 tests passed.
 - Workspace all-target check and affected-package Clippy with `-D warnings` —
   **0**.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-cics-runtime --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-cics-runtime --check`
   — **0**; exact 240-statement, 24-variant runtime receipt passed.
-- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-cics-runtime --check` —
+- `env -u CARDDEMO_CORPUS_DIR cargo xtask carddemo-cics-runtime --check` —
   **1**; expected missing-environment failure.
 - Ordinary conformance, JSON, formatting, redaction, and diff checks — **0**.
 - Pre-evidence `carddemo-seeds` derived gate — **1**; no CD-016 issue receipt
@@ -602,9 +690,9 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 - Dataset, CICS, conformance, and xtask tests — **0**; 63 tests passed.
 - Workspace all-target check and affected-package Clippy with `-D warnings` —
   **0**.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-seeds --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-seeds --check`
   — **0**; exact 13-object/eight-alias receipt passed.
-- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-seeds --check` — **1**;
+- `env -u CARDDEMO_CORPUS_DIR cargo xtask carddemo-seeds --check` — **1**;
   expected missing-environment failure.
 - Ordinary conformance, JSON, formatting, redaction, and diff checks — **0**.
 - Focused pre-repair ESDS append regression — **1**; ESDS/RRDS organizations
@@ -613,9 +701,9 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   and xtask tests — **0**; 83 tests passed.
 - Workspace all-target check and affected-package Clippy with `-D warnings` —
   **0**.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-dataset-catalog --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-dataset-catalog --check`
   — **0**; exact 23-definition catalog receipt passed.
-- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-dataset-catalog --check` —
+- `env -u CARDDEMO_CORPUS_DIR cargo xtask carddemo-dataset-catalog --check` —
   **1**; expected missing-environment failure.
 - Ordinary conformance, JSON, formatting, redaction, and diff checks — **0**.
 - Focused pre-repair KSDS insert regression — **1**; the second WRITE replaced
@@ -624,9 +712,9 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   tests — **0**; 87 tests passed.
 - Workspace all-target check and affected-package Clippy with `-D warnings` —
   **0**.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-vsam --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-vsam --check`
   — **0**; exact key/AIX/reached-operation receipt passed.
-- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-vsam --check` — **1**;
+- `env -u CARDDEMO_CORPUS_DIR cargo xtask carddemo-vsam --check` — **1**;
   expected missing-environment failure.
 - Ordinary conformance, JSON, formatting, redaction, and diff checks — **0**.
 - Focused pre-repair RACF audit regression — **1**; password values were
@@ -636,9 +724,9 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   passed.
 - Workspace all-target check and affected-package Clippy with `-D warnings` —
   **0**.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-security --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-security --check`
   — **0**; exact 64-profile/eight-class least-privilege receipt passed.
-- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-security --check` — **1**;
+- `env -u CARDDEMO_CORPUS_DIR cargo xtask carddemo-security --check` — **1**;
   expected missing-environment failure.
 - All 17 cumulative CardDemo issue gates, ordinary conformance, JSON,
   formatting, redaction, and diff checks — **0**.
@@ -649,10 +737,10 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   compatibility tests passed.
 - Architecture, runtime architecture, profile, schema, and inventory gates —
   **0**.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-terminal --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-terminal --check`
   — **0**; 17 base BMS maps, 441 named fields, and seven public terminal routes
   passed.
-- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-terminal --check` — **1**;
+- `env -u CARDDEMO_CORPUS_DIR cargo xtask carddemo-terminal --check` — **1**;
   expected missing-environment failure.
 - Workspace all-target check, all 18 cumulative CardDemo issue gates, ordinary
   conformance, JSON, formatting, redaction, and diff checks — **0**.
@@ -665,14 +753,14 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 - Compiler, interpreter, CICS, server, and conformance suites — **0**; 121
   tests passed.
 - Affected-package Clippy with `-D warnings` — **0**.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-base-online --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-base-online --check`
   before evidence — **1**; the derived nine-journey receipt passed and only
   the required CD-019 evidence file was absent.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-base-online --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-base-online --check`
   — **0**; nine journeys, 18 installed programs, all 17 transaction/map paths,
   111 dataset reads, seven committed mutations, and rollback, denial, restart,
   concurrency, and resource controls passed.
-- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-base-online --check` — **1**;
+- `env -u CARDDEMO_CORPUS_DIR cargo xtask carddemo-base-online --check` — **1**;
   expected missing-environment failure.
 - Workspace all-target check — **0**.
 - Architecture, runtime architecture, profile, schema, and inventory gates —
@@ -684,20 +772,20 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   concatenation, provenance, compatibility, execution, and bounds tests passed.
 - Batch, conformance, server, and xtask suites — **0**; 92 tests passed.
 - Affected-package Clippy with `-D warnings` — **0**.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-jcl --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-jcl --check`
   before evidence — **1**; the 46-file derived receipt passed and only the
   required CD-020 evidence file was absent.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-jcl --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-jcl --check`
   — **0**; 45 parsed jobs and the single hash-pinned CREASTMT accepted
   correction cover all 46 JCL paths and both procedures.
-- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-jcl --check` — **1**;
+- `env -u CARDDEMO_CORPUS_DIR cargo xtask carddemo-jcl --check` — **1**;
   expected missing-environment failure.
 - Workspace all-target check — **0**.
 - Architecture, runtime architecture, profile, schema, inventory, evidence,
   ordinary conformance, JSON, formatting, redaction, and diff gates — **0**.
 - Focused pre-repair dataset-backed IEBGENER regression — **101**; SYSUT2
   retained stale output instead of the copied SYSUT1 records.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-utilities --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-utilities --check`
   before evidence — **1**; the derived utility receipt passed and only the
   required CD-021 evidence file was absent.
 - Zowe CLI 8.36.0 against the ephemeral local ProductServer — **0**:
@@ -708,11 +796,11 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 - Batch, dataset, z/OSMF gateway, server, conformance, and xtask suites — **0**;
   115 tests passed.
 - Affected-package Clippy with `-D warnings` — **0**.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-utilities --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-utilities --check`
   — **0**; 45 parsed jobs, 62 IDCAMS steps, 96 validated statements, seven
   selected public routes, seven exact mutations, and all DISP, GDG, AIX,
   internal-reader, external-route, and negative controls passed.
-- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-utilities --check` — **1**;
+- `env -u CARDDEMO_CORPUS_DIR cargo xtask carddemo-utilities --check` — **1**;
   expected missing-environment failure.
 - Workspace all-target check — **0**.
 - Architecture, runtime architecture, profile, schema, inventory, evidence,
@@ -723,17 +811,17 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
 - Zowe CLI 8.36.0 submitted the actual pinned `WAITSTEP.jcl` against the
   ephemeral local ProductServer — **0**; `WAITSTEP` completed `CC 0000` and
   JOBLOG reported `WAIT COBSWAIT RC=0000`.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-batch-programs --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-batch-programs --check`
   before evidence — **1**; the complete derived receipt passed and only the
   required CD-022 evidence file was absent.
 - Compiler, interpreter, JES, dataset, server, conformance, and xtask suites —
   **0**; 147 tests passed.
 - Affected-package Clippy with `-D warnings` — **0**.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-batch-programs --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-batch-programs --check`
   — **0**; 11 named entries, CBSTM03B, 12 compiled/installed artifacts, four
   compatible services, four public jobs, three file routes, linkage, ABEND,
   checkpoint, cancellation, timeout, replay, and restart controls passed.
-- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-batch-programs --check` —
+- `env -u CARDDEMO_CORPUS_DIR cargo xtask carddemo-batch-programs --check` —
   **1**; expected missing-environment failure.
 - Workspace all-target, architecture, runtime architecture, profile, schema,
   inventory, evidence, and ordinary conformance gates — **0**.
@@ -745,7 +833,7 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   the corrected hash-pinned `CREASTMT` completed `CC 0000`; exact `INTRDRJ1`
   completed `CC 0000`; and internally submitted `INTRDRJ2` reached OUTPUT
   `CC 0000` with `IDCAMS REPRO` in JOBLOG.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-base-batch --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-base-batch --check`
   before evidence — **1**; CD.J10 through CD.J12 and all controls passed, and
   only the required CD-023 evidence file was absent.
 - Compiler, interpreter, JES, dataset, CICS, server, conformance, and xtask
@@ -763,71 +851,105 @@ CardDemo source: clean `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`
   and server use of the foundation encoding authority.
 - Architecture, runtime architecture, profile, schema, inventory, evidence,
   and ordinary conformance gates — **0**.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-base-batch --check`
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-base-batch --check`
   — **0**; three journeys, 12 initialization jobs, nine operational jobs, two
   CICS file controls, one completed internal submission, 50 catalog/dataset
   digests, 26 job-spool digests, and warm-restart, rollback, and cancellation
   controls passed.
-- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-base-batch --check` — **1**;
+- `env -u CARDDEMO_CORPUS_DIR cargo xtask carddemo-base-batch --check` — **1**;
   expected missing-environment failure.
-
-## Current CD-025 verification
-
-- State: **PASS — completion commit pending**
-- Required commit subject: `Implement CardDemo IMS workflows`
-- Evidence: `conformance/0.1.1/evidence/issues/CD-025.json`
-- Evidence digest:
-  `sha256:9e66695c659f41ca04fff8bff2bad74bf7baf582a20c72191ef2c3bc17ad61e3`
-- All eight pinned IMS definition files are checked. DBPAUTP0/DBPAUTX0 and
-  PSBPAUTB/PSBPAUTL/PAUTBUNL install atomically as two DBDs, three PSBs, and
-  three PCBs with exact HIDAM hierarchy, secondary-index, segment, key, and
-  processing-option contracts.
-- Four pinned DLI programs compile with the exact reached SCHD, TERM, GU, GN,
-  GNP, ISRT, REPL, DLET, and CHKP surface. DLI now lowers to typed IMS requests
-  rather than the generic `MAINFRAME-DLI` program-call fallback.
-- The typed application route schedules PSBPAUTB, performs an SSA-qualified GU,
-  receives exact root bytes, and terminates. Provider controls cover ordered
-  root/child navigation, insert/replace/delete, checkpoint, load/unload,
-  hierarchy/index durability, replay, and warm restart.
-- Zowe CLI 8.36.0 submitted exact pinned LOADPADB and UNLDPADB to the ephemeral
-  local ProductServer. Both reached OUTPUT `CC 0000`; DFSRRC00 SYSPRINT reports
-  four loaded and four unloaded hierarchy segments.
-- Missing capability, generation mismatch, malformed segment length, root
-  limit, provider failure, and missing-environment controls fail closed without
-  changing the exact two-root/two-child hierarchy.
-- Affected contract/interpreter/IMS/JES/server/conformance/xtask suites — **0**;
-  140 tests passed. Affected-package Clippy with `-D warnings` and workspace
-  all-target check — **0**.
-- Architecture, runtime architecture, profile, schema, inventory, evidence,
-  ordinary conformance, formatting, diff, JSON, and redaction gates — **0**.
-- `CARDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-ims --check`
-  — **0**; eight definitions, four DLI programs, three selected routes, exact
-  hierarchy/index, load/unload, checkpoint/restart, and all negative controls
-  passed.
-- `env -u CARDEMO_CORPUS_DIR cargo xtask carddemo-ims --check` — **1**;
-  expected missing-environment failure.
+- Focused typed-MQ ABI regression before repair — **101**; `MQOPEN` still used
+  the generic program-call fallback.
+- Zowe CLI 8.36.0 submitted exact `CBPAUP0J` and retrieved JOBLOG/SYSPRINT from
+  the initialized ephemeral ProductServer — **0**; `JOB00001` reached OUTPUT
+  `CC 0000`, DFSRRC00 returned RC 0000, and exact expiry, purge, checkpoint,
+  and summary-adjustment counts were visible.
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-mq-authorization --check`
+  before evidence — **1**; CD.J15 through CD.J18 passed and only CD-026
+  evidence was absent.
+- Host API, interpreter, MQ, IMS, Db2, CICS, batch, server, conformance, and
+  xtask suites — **0**; 159 tests passed.
+- Affected-package Clippy with `-D warnings`, workspace all-target check,
+  formatting, diff, JSON, digest, and redaction checks — **0**.
+- Architecture, runtime architecture, profile, schema, inventory, and evidence
+  gates — **0** with the additive MQ package and dependency closure declared.
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-mq-authorization --check`
+  — **0**; three programs, five verbs, seven queues, three triggers, four
+  journeys, CICS syncpoint, rollback, unknown outcome, restart, fraud, and
+  purge passed.
+- `env -u CARDDEMO_CORPUS_DIR cargo xtask carddemo-mq-authorization --check` —
+  **1**; expected missing-environment failure.
+- Ordinary conformance without the corpus environment — **0**.
+- `CARDDEMO_CORPUS_DIR=<redacted-local-checkout> cargo xtask carddemo-full --check`
+  before implementation — **1**; focused failure was the absent owned command.
+- Owned operator install, compile, submit, and reset commands — **0**; 23
+  datasets, 13 seeds, 44 program closures, 12 batch artifacts, 21 jobs, 26
+  spool digests, seven public reset routes, and seven exact mutations passed.
+- Ignored CD.J20 store control against a disposable PostgreSQL 18 container —
+  **0**; 16 mixed requests, cross-principal isolation, SQLite backup/restore,
+  and PostgreSQL restart passed. The disposable container was removed.
+- Test-only `CARDDEMO_CDV1_DISPOSITION=retired` CardDemo-full candidate — **1**;
+  a complete 20-journey receipt was derived and only CD-027 evidence was
+  absent. The test value is not owner approval and no evidence was generated.
+- Unset or invalid `CARDDEMO_CDV1_DISPOSITION` — **1** with the expected stable
+  decision-required/decision-invalid failures. Missing PostgreSQL configuration
+  also fails closed before certification.
+- Conformance and xtask suites — **0**; 70 passed, one explicit
+  PostgreSQL-dependent test ignored, and five xtask tests passed.
+- Affected Clippy with warnings denied, formatting, and diff checks — **0**.
+- Accepted `COCRDSEC` compile and public-route regression — **0**; source,
+  correction contract, artifact, denial, screen bytes, and no-data behavior
+  pass with exact digests.
+- Zowe CLI 8.36.0 live operator flow — **0**; the pre-install submission fails
+  closed at the missing application RACF profile, the focused authorized MOD
+  job proves DD semantics, and the installed replay completes exact
+  `ESDSRRDS` at `CC 0000` with byte-identical ESDS/RRDS downloads.
+- Evidence-backed `cargo xtask carddemo-full --check` against disposable
+  PostgreSQL 18 — **0** on two clean-state reproductions; all 20 journeys and
+  exact receipt/digest checks pass.
+- Missing-corpus CardDemo-full control — **1** with expected
+  `carddemo.corpus.environment_missing`.
+- Workspace all-feature tests — **0**; 260 tests passed. The PostgreSQL 18
+  CardDemo and durable-store ignored controls were run explicitly and passed;
+  the manual Zowe live harness was also executed.
+- Workspace check, warnings-denied Clippy, warnings-denied docs, formatting,
+  diff, architecture, runtime architecture, profiles, schemas, inventory,
+  evidence, and ordinary conformance — **0**.
+- `cargo deny check` — **0**; advisories, bans, licenses, and sources pass.
+- `cargo xtask release --check` — **1** at the expected release-order stop:
+  current local binaries differ from the frozen 0.1.0-alpha.0 checksums. The
+  release artifacts were not regenerated.
+- After ADR-0007, evidence-backed `carddemo-full` — **0** with the canonical
+  `CARDDEMO_CORPUS_DIR`; the misspelled environment control fails closed.
+- Production dependency-tree and release-binary marker inspection — **0**;
+  `core-server` contains no conformance dependency, `COCRDSEC` fixture,
+  CardDemo package identity, or corpus environment key.
+- `cargo xtask certification --check`, `cargo xtask release --check`, and
+  `cargo deny check` — **0** for the generic 0.1.1 core-server release.
 
 ## Implementation status
 
-- Issues passed: **24 / 27**
-- Journeys passed: **14 / 20**
+- Issues passed: **27 / 27**
+- Journeys passed: **20 / 20**
 - Installed CardDemo base-online resources: **18 programs, 17 transactions,
   17 maps**
-- Executed CardDemo application journeys: **14**
-- Overall implementation: **IN PROGRESS**
+- Accepted full-profile correction: **1 program, 1 transaction, 2 public route
+  controls**
+- Executed CardDemo application journeys: **20**
+- Overall implementation: **COMPLETE; 0.1.1 RELEASED LOCALLY**
 
 ## Open decisions and blockers
 
-1. The pinned CSD defines `CDV1 -> COCRDSEC`, but the repository and runtime
-   archive contain no source or object. Source or an owner-approved
-   disabled/retired correction is required before the full-profile gate.
-2. The repository is still `0.1.0-alpha.0`. A 0.1.1 release cannot be cut until
-   0.1.0 is finalized or an explicit version-line correction is accepted.
+1. `CDV1 -> COCRDSEC` is resolved by the owner-approved accepted-owned-source
+   correction. The original source remains absent from the pinned corpus and is
+   not misrepresented as recovered upstream behavior.
+2. ADR-0007 records the owner-authorized version-line correction and direct
+   promotion from the unpublished alpha identity to 0.1.1.
 
-Neither decision blocks CD-025. No CD-024 blocker remains.
+The local release commit, artifacts, and annotated tag are authorized. Remote
+push, publication, and deployment remain separate actions. There is no open
+implementation or local-release blocker.
 
 ## Next smallest executable step
 
-Review the complete CD-025 diff, stage only the reached IMS workflow
-implementation and derived evidence, then create the required local completion
-commit.
+Await separate authorization before remote push, publication, or deployment.

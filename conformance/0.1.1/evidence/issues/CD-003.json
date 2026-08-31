@@ -43,7 +43,7 @@
     {"command":"cargo fmt --all -- --check && git diff --check","exit_code":0,"result":"pass"}
   ],
   "published_behavior_references": [
-    "docs/compatibility/CARDEMO-COPYBOOKS.md"
+    "docs/compatibility/CARDDEMO-COPYBOOKS.md"
   ],
   "absolute_local_paths_present": false,
   "native_or_legacy_fallback_present": false

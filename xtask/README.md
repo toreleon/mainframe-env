@@ -7,7 +7,7 @@ inventory, schema, evidence, and content-digest checks. It is not shipped in
 the `core-server` product profile and never imports production implementation
 code directly. The CardDemo-only corpus command delegates the external fixture
 contract to the conformance package and is the only xtask gate that requires
-`CARDEMO_CORPUS_DIR`.
+`CARDDEMO_CORPUS_DIR`.
 
 Non-goals include generating semantic pass results, running hidden fallback
 routes, and replacing selector-specific conformance tests.

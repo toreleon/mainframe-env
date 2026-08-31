@@ -1,0 +1,44 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "predicate": {
+    "buildDefinition": {
+      "buildType": "mainframe-env.cargo-release@1",
+      "externalParameters": {
+        "all_features": true,
+        "locked": true,
+        "profile": "release"
+      },
+      "resolvedDependencies": [
+        {
+          "digest": {
+            "sha256": "05fe2a2e0f2fecdc86edc23a0f25af9a9255895fa59cb8f5b3e4679b83cdbe25"
+          },
+          "uri": "Cargo.lock"
+        }
+      ]
+    },
+    "runDetails": {
+      "builder": {
+        "id": "local-codex-workspace"
+      },
+      "metadata": {
+        "invocationId": "mainframe-env-v0.1.1-local"
+      }
+    }
+  },
+  "predicateType": "https://slsa.dev/provenance/v1",
+  "subject": [
+    {
+      "digest": {
+        "sha256": "c0fd483a22d3090c57c587bb5ec07d8fdd4599d90fdb68fe2eebf6aaf7767389"
+      },
+      "name": "mainframe-env-server"
+    },
+    {
+      "digest": {
+        "sha256": "9d0d4f7711922f4b8f52279d14b9b5adcf9bd96c2fe63aa3c27e3cd41910af4a"
+      },
+      "name": "mainframe-env"
+    }
+  ]
+}

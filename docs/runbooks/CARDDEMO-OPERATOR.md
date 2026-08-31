@@ -1,7 +1,7 @@
 # CardDemo operator compatibility
 
 These commands operate only on the clean corpus selected by
-`CARDEMO_CORPUS_DIR`. The full certification command also requires a disposable
+`CARDDEMO_CORPUS_DIR`. The full certification command also requires a disposable
 PostgreSQL 18 database in `MAINFRAME_ENV_POSTGRES_TEST_URL`. The accepted
 `CDV1` correction is pinned in the 0.1.1 conformance contract.
 
@@ -31,12 +31,14 @@ FTP SITE FILETYPE=JES + PUT job.jcl
   -> zowe zos-jobs submit local-file job.jcl
 ```
 
-`FTPJCL.JCL` sends `AWS.M2.CARDEMO.FTP.TEST` to `welcome.txt`. The selected
-owned substitution is an authenticated dataset-content download through
-`GET /zosmf/restfiles/ds/AWS.M2.CARDEMO.FTP.TEST`; it preserves the dataset
-bytes without implementing arbitrary network FTP, credentials, directories,
-or remote hosts. Other FTP commands remain explicitly unsupported and cannot
-return generic success.
+The pinned `FTPJCL.JCL` contains the upstream typo
+`AWS.M2.CARDEMO.FTP.TEST`. The released product retains that exact spelling as
+a bounded compatibility alias, but the canonical owned dataset is
+`AWS.M2.CARDDEMO.FTP.TEST`. Its selected substitution is an authenticated
+download through `GET /zosmf/restfiles/ds/AWS.M2.CARDDEMO.FTP.TEST`; it
+preserves the dataset bytes without implementing arbitrary network FTP,
+credentials, directories, or remote hosts. Other FTP commands remain
+explicitly unsupported and cannot return generic success.
 
 ## Full-certification decisions
 
@@ -48,6 +50,6 @@ card data. `carddemo-full` verifies the correction contract, source digest,
 compiled artifact, anonymous denial, and authenticated public CICS route; no
 environment override can silently change the disposition.
 
-The repository remains `0.1.0-alpha.0`. A passing implementation receipt uses
-the disposition `release-blocked-until-0.1.0-final-or-version-line-correction`.
-It does not authorize a version bump, tag, push, publication, or deployment.
+The product is released locally as `0.1.1` under ADR-0007. The release commit,
+artifacts, and annotated local tag do not authorize remote push, publication,
+or deployment.

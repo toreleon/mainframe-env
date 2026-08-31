@@ -18,7 +18,7 @@ work starts. The release-order decision is a final gate.
 Read completely before editing:
 
 1. `docs/decisions/0006-carddemo-0.1.1-profile.md`;
-2. `docs/delivery/CARDEMO-0.1.1-IMPLEMENTATION-PLAN.md`;
+2. `docs/delivery/CARDDEMO-0.1.1-IMPLEMENTATION-PLAN.md`;
 3. `conformance/0.1.1/contract/carddemo-profile.json`;
 4. `conformance/0.1.1/inventory/carddemo-corpus.json`;
 5. `conformance/0.1.1/inventory/carddemo-gap-matrix.json`;
@@ -28,7 +28,7 @@ Read completely before editing:
 8. the complete relevant source, resources, data, READMEs, and runtime-oracle
    metadata in the clean CardDemo checkout.
 
-Use `CARDEMO_CORPUS_DIR` as the explicit corpus location. It must resolve to the
+Use `CARDDEMO_CORPUS_DIR` as the explicit corpus location. It must resolve to the
 clean commit and tree in the corpus inventory. Never store its absolute value in
 checked-in evidence.
 
@@ -58,7 +58,7 @@ and fail explicitly outside it.
 
 Maintain:
 
-- `docs/delivery/CARDEMO-0.1.1-STATUS.md`; and
+- `docs/delivery/CARDDEMO-0.1.1-STATUS.md`; and
 - `conformance/0.1.1/evidence/program-status.json`.
 
 At every continuation, read them before planning. Record the current issue,
