@@ -176,7 +176,7 @@
   ],
   "dirty_tree_identity": {
     "algorithm": "cargo xtask digest; length-delimited path and content over the repository excluding Git, target, raw historical evidence, phase/status/workload/full-regression/round-1/round-2/round-3/CV-209 derived ledgers, and the Markdown status ledger",
-    "digest": "sha256:088d1921eaaff1207e0a264c94c5afdda8431eec8cd973069c42f8d6975292d8"
+    "digest": "sha256:b812dbbae8d65467c5576c97314a0a0a2437efb13fccad3a8edebb02657e7435"
   },
   "open_decisions": [],
   "blockers": [],

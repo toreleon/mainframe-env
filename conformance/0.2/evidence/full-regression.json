@@ -3,7 +3,7 @@
   "target_version": "0.2.0",
   "status": "pass",
   "candidate": {
-    "source_digest": "sha256:088d1921eaaff1207e0a264c94c5afdda8431eec8cd973069c42f8d6975292d8",
+    "source_digest": "sha256:b812dbbae8d65467c5576c97314a0a0a2437efb13fccad3a8edebb02657e7435",
     "work_package_base_commit": "edb4558c987a56ee9f0c96438f756d663199942f",
     "accepted_release_commit": "44f3081eb2fdf22d09e1a97725f5a4163431ca70",
     "accepted_release_tree": "3d504ece02f1c09e124606ded695b00ba984d104",
@@ -88,10 +88,10 @@
         "build_inputs_sha256": "ff30b1d0245aa5dbb219556685a1beabaea4ace8a86ab71164b9a9cf5c0ff207"
       },
       "x86_64-unknown-linux-gnu": {
-        "manifest_sha256": "f452031661d44dafc9cc28a070814a0dbf80c84907416421bb01c49bb0ab7d59",
+        "manifest_sha256": "1e1062485afca6eb3c2dc3feaf3d9140af5070fb1ca5bd1a74b042e56bdf943b",
         "sbom_sha256": "f1dc66d80400fb4d0141e9a6d903c31ba62f81b2c5cd90fa8f32863aabd67a4c",
-        "provenance_sha256": "a0b7752da3406208e77c44a4399f7e3c17496371cd16b6715b30eebeea6fafb5",
-        "checksums_sha256": "4d9f340f1ca749b0b5ede504d839fdcf0386e267e84b999db462fafecdbcced4",
+        "provenance_sha256": "9bc6a166453e40c1ba824b4756df5d2972df71956e2b3d48aa85f85610b95c1f",
+        "checksums_sha256": "4a4c2200c847de51e70cd38e5a3eea0465d79b4d27d7a5a1d792bb2458181520",
         "licenses_sha256": "127803aadf60cd9d34c1b177f70ee0a32cdf701247053dbcbdd50b24b49acadb",
         "build_inputs_sha256": "bf1c3acb8a4d518390fda36a85826fe3302de64e6290c2abcc2b364195cea8e4"
       }
