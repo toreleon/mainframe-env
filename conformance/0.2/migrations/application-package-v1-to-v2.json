@@ -12,7 +12,10 @@
     "validate_all_references_before_stage": true,
     "staged_generation_selectable": false,
     "ready_and_selection_same_critical_section": true,
-    "same_identity_retry_idempotent": true
+    "same_identity_retry_idempotent": true,
+    "production_trust_authority_injected": true,
+    "selected_handle_required_for_publication": true,
+    "aggregate_and_retained_bytes_bounded_before_clone": true
   },
   "rollback": {
     "supported": true,

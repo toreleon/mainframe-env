@@ -9,9 +9,13 @@
   "schema_fields_have_defaults": true,
   "installation_requires_quiescence": true,
   "atomic_catalog_write": true,
+  "compatible_rows_preserved_on_first_install": true,
+  "compatible_rows_preserved_on_upgrade": true,
+  "retained_generation_snapshots": true,
+  "restart_reload_supported": true,
   "rollback": {
     "supported": true,
-    "method": "restore the pre-install provider-state record and reselect the prior ready application generation",
+    "method": "atomically restore the provider-retained schema/row snapshot and reselect the prior ready application generation",
     "requires_backup": true
   }
 }

@@ -9,6 +9,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Conformance verifies the accepted release tag and historical
+          # phase/remediation commit trailers. The default one-commit checkout
+          # omits both the required history and tags.
+          fetch-depth: 0
+          fetch-tags: true
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.98.0
@@ -20,6 +26,7 @@ jobs:
       - run: RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --locked
       - run: cargo xtask conformance --check
       - run: cargo xtask runtime-architecture --check
+      - run: cargo xtask release --check --target x86_64-unknown-linux-gnu
 
   contract-msrv:
     runs-on: ubuntu-latest

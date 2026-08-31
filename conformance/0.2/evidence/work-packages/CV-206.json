@@ -3,7 +3,7 @@
   "derived": true,
   "status": "pass",
   "work_package": "CV-206",
-  "evidence_digest": "sha256:deb9c87b73f5f975c85f02648e1d6fc8ab493f128b0f9228db70a28f131ab111",
+  "evidence_digest": "sha256:40490774f62bdfa05d2c0a0ed5ab2ee7be412f356ab27f352c32fbf212a47757",
   "receipt": {
     "target_version": "0.2.0",
     "deliverable": "Package-installed typed batch controllers replacing application-name TSO and IMS branches",
@@ -12,12 +12,12 @@
       {
         "command": "cargo test -p mainframe-env-batch -p mainframe-env-server -p mainframe-env-conformance --locked --no-fail-fast",
         "exit_code": 0,
-        "result": "31 batch, 16 server, and 71 conformance tests passed; 2 manual/environment conformance tests ignored"
+        "result": "34 batch, 17 server, and 72 conformance tests passed; 2 manual/environment conformance tests ignored"
       },
       {
         "command": "cargo test -p mainframe-env-batch -p mainframe-env-server -p xtask --locked",
         "exit_code": 0,
-        "result": "31 registry/runtime, 16 composition, and 5 tooling tests passed"
+        "result": "34 registry/runtime, 17 composition, and 7 tooling tests passed"
       },
       {
         "command": "cargo clippy -p mainframe-env-batch -p mainframe-env-server -p mainframe-env-conformance -p xtask --all-targets --locked -- -D warnings",
@@ -58,15 +58,15 @@
     "artifacts": [
       {
         "path": "crates/apps/mainframe-env-batch/src/controller.rs",
-        "sha256": "sha256:ee006825bead50a977e04a80f64f02fa94e14caf3c99f1bf6b25063f3b7a01a7"
+        "sha256": "sha256:df28908b198b1260c0460f9aa05396cdcc13909f5d46396735109afe8433df42"
       },
       {
         "path": "conformance/0.2/schemas/batch-controller-registry.schema.json",
-        "sha256": "sha256:7b5fec04a6f9e793342343b924e331faaf173d3ae870f6407873a27fb3864649"
+        "sha256": "sha256:0792dca5fd4c43c1396166b12b0523d2c3ac6b2297b9f686859b9e248700882b"
       },
       {
         "path": "conformance/0.2/migrations/batch-controller-v0-to-v1.json",
-        "sha256": "sha256:c2b026283741f93368c3b6fcd1ae753653c89d08c873c39eeeedf3c244462e9a"
+        "sha256": "sha256:549c2254413b9a95e28870237f4e05a2b9ebdbafafd76abede66f7f91c30d3b9"
       },
       {
         "path": "conformance/0.2/evidence/hardcode/CV-206-batch.json",
@@ -74,7 +74,7 @@
       },
       {
         "path": "docs/architecture/BATCH-CONTROLLER-REGISTRY.md",
-        "sha256": "sha256:f6ff7590300f79a3300b703c349389a616dd616fc95cd2d8ccda2e1e3058f09c"
+        "sha256": "sha256:0d942e3ae03a5809fde91ff7e366b1ac67d3ff123e4f5ae947cb88520d4bae8d"
       }
     ],
     "invariants": {
@@ -82,13 +82,16 @@
       "batch_h1_h3_lines_after": 0,
       "application_program_string_dispatch_after": 0,
       "application_data_identities_in_production_after": 0,
-      "selected_package_identity_rechecked_at_composition": true,
+      "server_selected_package_handle_required": true,
+      "selector_bound_to_validated_program_artifact": true,
       "exact_typed_tso_and_ims_selectors": true,
       "bounded_generation_validation": true,
       "atomic_complete_generation_publication": true,
       "same_generation_retry_idempotent": true,
       "selector_conflicts_fail_closed": true,
       "identity_equal_retained_generation_rollback": true,
+      "retained_generations_persisted_atomically": true,
+      "selected_generation_reloaded_on_open": true,
       "unseen_older_generation_rejected": true,
       "missing_controller_unsupported": true,
       "production_branch_fallback_retained": false,

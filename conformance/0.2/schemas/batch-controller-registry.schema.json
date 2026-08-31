@@ -21,11 +21,21 @@
     "controller": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "selector", "plan"],
+      "required": ["name", "selector", "program", "plan"],
       "properties": {
         "name": {"type": "string", "minLength": 1, "maxLength": 128},
         "selector": {"$ref": "#/$defs/selector"},
+        "program": {"$ref": "#/$defs/program"},
         "plan": {"$ref": "#/$defs/plan"}
+      }
+    },
+    "program": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "identity"],
+      "properties": {
+        "path": {"type": "string", "pattern": "^program/[A-Z0-9.$@#_-]+$", "maxLength": 384},
+        "identity": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
       }
     },
     "selector": {

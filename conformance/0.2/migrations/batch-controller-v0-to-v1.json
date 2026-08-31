@@ -9,9 +9,12 @@
   "installation": {
     "bounded": true,
     "validate_complete_generation_before_publish": true,
+    "selector_bound_to_program_artifact": true,
     "selector_conflicts_fail_closed": true,
     "same_generation_same_identity_replays": true,
-    "same_generation_different_identity_rejected": true
+    "same_generation_different_identity_rejected": true,
+    "retained_generations_persisted_atomically": true,
+    "selected_generation_reloaded_on_open": true
   },
   "rollback": {
     "supported": true,

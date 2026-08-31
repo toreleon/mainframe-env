@@ -6,7 +6,8 @@
       "externalParameters": {
         "all_features": true,
         "locked": true,
-        "profile": "release"
+        "profile": "release",
+        "target": "aarch64-apple-darwin"
       },
       "resolvedDependencies": [
         {
@@ -19,10 +20,10 @@
     },
     "runDetails": {
       "builder": {
-        "id": "local-codex-workspace"
+        "id": "mainframe-env-cargo/aarch64-apple-darwin"
       },
       "metadata": {
-        "invocationId": "mainframe-env-v0.2.0-local"
+        "invocationId": "mainframe-env-v0.2.0-aarch64-apple-darwin-local"
       }
     }
   },
@@ -30,13 +31,13 @@
   "subject": [
     {
       "digest": {
-        "sha256": "b95297721e4153add1d877cb086680a2e6e4c1120493b79f24312fb71056ee22"
+        "sha256": "68a61f87e676d035df12ca1a12e6b44793283521748061559666143b057d3006"
       },
       "name": "mainframe-env-server"
     },
     {
       "digest": {
-        "sha256": "4c45580df5e63e5e67bca5b6262217f28c943521f8b81d517745fc2fd33c04bb"
+        "sha256": "9f5bdce06381b636684755320e3c09cc2b917e500253aec6e74bf1fe1efd6a5d"
       },
       "name": "mainframe-env"
     }

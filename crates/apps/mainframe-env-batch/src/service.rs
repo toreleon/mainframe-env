@@ -1,4 +1,6 @@
-use crate::controller::{BatchControllerRegistry, ResolvedBatchController};
+use crate::controller::{
+    BatchControllerRegistry, BatchControllerRegistryState, ResolvedBatchController,
+};
 use crate::program::{
     ProgramExecution, TsoProgramExecution, program_execution, tso_program_execution,
 };
@@ -21,6 +23,9 @@ use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreErro
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
+
+const CONTROLLER_STATE_NAMESPACE: &str = "batch-controller-state";
+const CONTROLLER_STATE_KEY: &str = "registry";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BatchLimits {
@@ -101,12 +106,17 @@ struct State {
     next_id: u64,
 }
 
+struct DurableControllers {
+    store_version: u64,
+    registry: BatchControllerRegistry,
+}
+
 pub struct BatchService {
     host: Arc<ScopedHostService>,
     store: Arc<dyn ProviderStateStore>,
     jcl_limits: JclLimits,
     limits: BatchLimits,
-    controllers: Mutex<BatchControllerRegistry>,
+    controllers: Mutex<DurableControllers>,
     state: Mutex<State>,
 }
 
@@ -160,12 +170,31 @@ impl BatchService {
             })
             .transpose()?
             .unwrap_or(1);
+        let (controller_store_version, controller_registry) = match store
+            .get_provider_state(CONTROLLER_STATE_NAMESPACE, CONTROLLER_STATE_KEY)
+            .map_err(store_error)?
+        {
+            Some(record) => {
+                let state: BatchControllerRegistryState =
+                    serde_json::from_slice(&record.payload)
+                        .map_err(|_| HostProblem::InfrastructureFailure)?;
+                (
+                    record.version,
+                    BatchControllerRegistry::from_state(state)
+                        .map_err(|_| HostProblem::InfrastructureFailure)?,
+                )
+            }
+            None => (0, BatchControllerRegistry::default()),
+        };
         Ok(Arc::new(Self {
             host,
             store,
             jcl_limits,
             limits,
-            controllers: Mutex::new(BatchControllerRegistry::default()),
+            controllers: Mutex::new(DurableControllers {
+                store_version: controller_store_version,
+                registry: controller_registry,
+            }),
             state: Mutex::new(State {
                 jobs,
                 replay,
@@ -178,10 +207,29 @@ impl BatchService {
         &self,
         generation: BatchControllerGeneration,
     ) -> Result<BatchControllerInstallReceipt, HostProblem> {
-        self.controllers
+        let mut durable = self
+            .controllers
             .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?
-            .install(generation)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let mut replacement = durable.registry.clone();
+        let receipt = replacement.install(generation)?;
+        self.persist_controllers(&mut durable, replacement)?;
+        Ok(receipt)
+    }
+
+    pub fn rollback_controllers(
+        &self,
+        application: &str,
+        generation: u64,
+    ) -> Result<BatchControllerInstallReceipt, HostProblem> {
+        let mut durable = self
+            .controllers
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let mut replacement = durable.registry.clone();
+        let receipt = replacement.select(application, generation)?;
+        self.persist_controllers(&mut durable, replacement)?;
+        Ok(receipt)
     }
 
     pub fn submit(
@@ -679,7 +727,12 @@ impl BatchService {
                     step,
                     input,
                     effect_sequence,
-                    controller.selector.program(),
+                    controller
+                        .program
+                        .path
+                        .rsplit('/')
+                        .next()
+                        .ok_or(HostProblem::InfrastructureFailure)?,
                 ),
                 _ => Err(HostProblem::ProviderFailure),
             };
@@ -753,7 +806,7 @@ impl BatchService {
         self.controllers
             .lock()
             .map_err(|_| HostProblem::InfrastructureFailure)
-            .map(|registry| registry.resolve(selector))
+            .map(|durable| durable.registry.resolve(selector))
     }
 
     fn execute_program_controller(
@@ -806,7 +859,13 @@ impl BatchService {
         let controller = self
             .resolve_controller(&selector)?
             .ok_or(HostProblem::Unsupported)?;
-        let program = controller.selector.program().to_string();
+        let program = controller
+            .program
+            .path
+            .rsplit('/')
+            .next()
+            .ok_or(HostProblem::InfrastructureFailure)?
+            .to_string();
         let mode = controller.selector.mode().unwrap_or_default().to_string();
         match controller.plan {
             BatchControllerPlan::ProgramCall => Err(HostProblem::ProviderFailure),
@@ -2100,6 +2159,33 @@ impl BatchService {
             .map_err(store_error)
     }
 
+    fn persist_controllers(
+        &self,
+        durable: &mut DurableControllers,
+        registry: BatchControllerRegistry,
+    ) -> Result<(), HostProblem> {
+        let payload = serde_json::to_vec(&registry.state())
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let version = durable
+            .store_version
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: CONTROLLER_STATE_NAMESPACE.into(),
+                    key: CONTROLLER_STATE_KEY.into(),
+                    version,
+                    payload,
+                },
+                (durable.store_version != 0).then_some(durable.store_version),
+            )
+            .map_err(store_error)?;
+        durable.store_version = version;
+        durable.registry = registry;
+        Ok(())
+    }
+
     fn lock(&self) -> Result<std::sync::MutexGuard<'_, State>, HostProblem> {
         self.state
             .lock()
@@ -2882,6 +2968,26 @@ mod tests {
         ProgramRouter::with_builtins(InvocationLimits::default())
     }
 
+    fn controller_generation(generation: u64, program: &str) -> BatchControllerGeneration {
+        BatchControllerGeneration {
+            schema_version: crate::BATCH_CONTROLLER_REGISTRY_CONTRACT.into(),
+            application: "RESTART-FIXTURE".into(),
+            generation,
+            identity: format!("sha256:{generation:064x}"),
+            controllers: vec![crate::BatchControllerDefinition {
+                name: format!("CONTROLLER-{generation}"),
+                selector: BatchControllerSelector::TsoRun {
+                    program: program.into(),
+                },
+                program: crate::BatchControllerProgram {
+                    path: format!("program/{program}"),
+                    identity: format!("sha256:{:064x}", generation + 100),
+                },
+                plan: BatchControllerPlan::ProgramCall,
+            }],
+        }
+    }
+
     fn service_with_datasets(
         records: Arc<Mutex<BTreeMap<String, Vec<Vec<u8>>>>>,
     ) -> Arc<BatchService> {
@@ -2946,6 +3052,50 @@ mod tests {
         assert!(!more);
         service.purge(&submitted.id).unwrap();
         assert_eq!(service.get(&submitted.id), Err(HostProblem::NotFound));
+    }
+
+    #[test]
+    fn controller_generations_survive_restart_and_rollback_atomically() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let first = service(store.clone(), builtins());
+        first
+            .install_controllers(controller_generation(1, "FIRST"))
+            .unwrap();
+        first
+            .install_controllers(controller_generation(2, "SECOND"))
+            .unwrap();
+        drop(first);
+
+        let restarted = service(store.clone(), builtins());
+        assert!(
+            restarted
+                .resolve_controller(&BatchControllerSelector::tso("SECOND").unwrap())
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            restarted
+                .resolve_controller(&BatchControllerSelector::tso("FIRST").unwrap())
+                .unwrap()
+                .is_none()
+        );
+        restarted
+            .rollback_controllers("RESTART-FIXTURE", 1)
+            .unwrap();
+        drop(restarted);
+
+        let rolled_back = service(store, builtins());
+        let resolved = rolled_back
+            .resolve_controller(&BatchControllerSelector::tso("FIRST").unwrap())
+            .unwrap()
+            .unwrap();
+        assert_eq!(resolved.program.path, "program/FIRST");
+        assert!(
+            rolled_back
+                .resolve_controller(&BatchControllerSelector::tso("SECOND").unwrap())
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]

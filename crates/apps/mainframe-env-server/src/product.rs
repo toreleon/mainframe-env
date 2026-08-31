@@ -2,19 +2,23 @@ use crate::{DefaultProgramRouter, ServerConfig, default_program_router};
 use axum::http::StatusCode;
 use base64::Engine;
 use mainframe_env_application::{
-    ApplicationInstaller, ApplicationPackageV2, BatchController as ApplicationBatchController,
-    BatchControllerKind, package_v2_identity,
+    ApplicationGenerationRecord, ApplicationInstaller, ApplicationInstallerV2,
+    ApplicationPackageV2, BatchController as ApplicationBatchController, BatchControllerKind,
+    EntryKind, InstallProblem, PackageLimits, PackageSignatureVerifier,
+    SelectedApplicationGeneration,
 };
 use mainframe_env_batch::{
     BATCH_CONTROLLER_REGISTRY_CONTRACT, BatchControllerDefinition, BatchControllerGeneration,
-    BatchControllerInstallReceipt, BatchControllerPlan, BatchControllerSelector, BatchService,
-    JclBundle,
+    BatchControllerInstallReceipt, BatchControllerPlan, BatchControllerProgram,
+    BatchControllerSelector, BatchService, JclBundle,
 };
 use mainframe_env_cics::{
     BmsMapDefinition, CicsService, CicsTerminalSnapshot, CicsTraceEntry, cics_provider,
 };
 use mainframe_env_dataset::{DatasetService, dataset_providers};
-use mainframe_env_db2::{Db2Service, db2_providers};
+use mainframe_env_db2::{
+    Db2CatalogGeneration, Db2SeedRow, Db2Service, Db2TableDefinition, db2_providers,
+};
 use mainframe_env_encoding::CodePage;
 use mainframe_env_execution_api::{
     ArtifactRef, BoundedPayload, CapabilityId, ExecutionId, ExecutionOutcome, IdempotencyKey,
@@ -43,6 +47,7 @@ use mainframe_env_store_api::{
 use mainframe_env_zosmf::{
     Authentication, GatewayProblem, GatewayRequest, GatewayResponse, ZosmfBackend, ZosmfLimits,
 };
+use ring::hmac;
 use ring::rand::{SecureRandom, SystemRandom};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use serde_json::{Value, json};
@@ -137,6 +142,8 @@ pub struct ProductServer {
     artifacts: LocalArtifactStore,
     host: Arc<ScopedHostService>,
     applications: ApplicationInstaller,
+    applications_v2: ApplicationInstallerV2,
+    application_publication: Mutex<()>,
     online_programs: Mutex<BTreeMap<String, ArtifactRef>>,
     online_transactions: Mutex<BTreeMap<String, String>>,
     online_traces: Mutex<BTreeMap<String, Vec<CicsTraceEntry>>>,
@@ -150,12 +157,107 @@ pub struct ProductServer {
     outbox_delivered: AtomicU64,
 }
 
+#[derive(Clone, Default)]
+pub struct HmacSha256PackageTrust {
+    keys: BTreeMap<String, Vec<u8>>,
+}
+
+impl HmacSha256PackageTrust {
+    pub fn new(keys: BTreeMap<String, Vec<u8>>) -> Result<Self, HostProblem> {
+        if keys.len() > 1_024
+            || keys.iter().any(|(key_id, key)| {
+                key_id.is_empty()
+                    || key_id.len() > 128
+                    || key_id.chars().any(char::is_control)
+                    || key.len() < 32
+                    || key.len() > 4_096
+            })
+        {
+            return Err(HostProblem::Malformed);
+        }
+        Ok(Self { keys })
+    }
+
+    pub fn from_environment(environment: &BTreeMap<String, String>) -> Result<Self, HostProblem> {
+        let Some(encoded) = environment.get("MAINFRAME_ENV_PACKAGE_HMAC_KEYS") else {
+            return Self::new(BTreeMap::new());
+        };
+        let encoded: BTreeMap<String, String> =
+            serde_json::from_str(encoded).map_err(|_| HostProblem::Malformed)?;
+        let keys = encoded
+            .into_iter()
+            .map(|(key_id, encoded)| {
+                base64::engine::general_purpose::STANDARD
+                    .decode(encoded)
+                    .map(|key| (key_id, key))
+                    .map_err(|_| HostProblem::Malformed)
+            })
+            .collect::<Result<BTreeMap<_, _>, _>>()?;
+        Self::new(keys)
+    }
+
+    pub fn sign_identity(&self, key_id: &str, identity: &str) -> Result<String, HostProblem> {
+        let key = self.keys.get(key_id).ok_or(HostProblem::Unauthorized)?;
+        Ok(
+            base64::engine::general_purpose::STANDARD_NO_PAD.encode(hmac::sign(
+                &hmac::Key::new(hmac::HMAC_SHA256, key),
+                identity.as_bytes(),
+            )),
+        )
+    }
+}
+
+impl PackageSignatureVerifier for HmacSha256PackageTrust {
+    fn verify(&self, key_id: &str, algorithm: &str, identity: &str, signature: &str) -> bool {
+        if algorithm != "hmac-sha256@1" {
+            return false;
+        }
+        let Some(key) = self.keys.get(key_id) else {
+            return false;
+        };
+        let Ok(signature) = base64::engine::general_purpose::STANDARD_NO_PAD.decode(signature)
+        else {
+            return false;
+        };
+        hmac::verify(
+            &hmac::Key::new(hmac::HMAC_SHA256, key),
+            identity.as_bytes(),
+            &signature,
+        )
+        .is_ok()
+    }
+}
+
+struct RejectPackageTrust;
+
+impl PackageSignatureVerifier for RejectPackageTrust {
+    fn verify(&self, _: &str, _: &str, _: &str, _: &str) -> bool {
+        false
+    }
+}
+
 impl ProductServer {
     pub fn open(
         config: ServerConfig,
         store: Arc<dyn PlatformStore>,
         secrets: Arc<MemorySecretResolver>,
         program: Arc<DefaultProgramRouter>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_with_package_trust(
+            config,
+            store,
+            secrets,
+            program,
+            Arc::new(RejectPackageTrust),
+        )
+    }
+
+    pub fn open_with_package_trust(
+        config: ServerConfig,
+        store: Arc<dyn PlatformStore>,
+        secrets: Arc<MemorySecretResolver>,
+        program: Arc<DefaultProgramRouter>,
+        package_trust: Arc<dyn PackageSignatureVerifier>,
     ) -> Result<Arc<Self>, HostProblem> {
         config.validate()?;
         let artifacts = LocalArtifactStore::open(&config.artifact_root, 64 * 1024 * 1024)
@@ -320,6 +422,12 @@ impl ProductServer {
             artifacts,
             host,
             applications: ApplicationInstaller::new("0.1.1"),
+            applications_v2: ApplicationInstallerV2::new(
+                "0.2.0",
+                PackageLimits::default(),
+                package_trust,
+            ),
+            application_publication: Mutex::new(()),
             online_programs: Mutex::new(online_programs),
             online_transactions: Mutex::new(online_transactions),
             online_traces: Mutex::new(BTreeMap::new()),
@@ -341,6 +449,16 @@ impl ProductServer {
         let secrets = Arc::new(MemorySecretResolver::default());
         let program = default_program_router();
         Self::open(config, store, secrets, program)
+    }
+
+    pub fn memory_with_package_trust(
+        config: ServerConfig,
+        package_trust: Arc<dyn PackageSignatureVerifier>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        let store: Arc<dyn PlatformStore> = Arc::new(MemoryStore::new(Default::default()));
+        let secrets = Arc::new(MemorySecretResolver::default());
+        let program = default_program_router();
+        Self::open_with_package_trust(config, store, secrets, program, package_trust)
     }
 
     #[must_use]
@@ -586,29 +704,130 @@ impl ProductServer {
         })
     }
 
-    /// Publishes the batch-controller section of an already verified and
-    /// selected application-package generation as one atomic registry update.
-    pub fn install_application_batch_controllers(
+    pub fn install_application_package_v2(
         &self,
         package: &ApplicationPackageV2,
-        selected_identity: &str,
+    ) -> Result<ApplicationGenerationRecord, HostProblem> {
+        let _publication = self
+            .application_publication
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        self.applications_v2
+            .install(package)
+            .map_err(application_install_problem)
+    }
+
+    /// Publishes the batch-controller section only from the server-owned,
+    /// signature-verified selected package handle.
+    pub fn install_application_batch_controllers(
+        &self,
+        application: &str,
     ) -> Result<BatchControllerInstallReceipt, HostProblem> {
-        if package_v2_identity(package).map_err(|_| HostProblem::Malformed)? != selected_identity {
-            return Err(HostProblem::Malformed);
-        }
+        let _publication = self
+            .application_publication
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let selected = self.selected_application_v2(application)?;
+        let package = selected.package();
         let controllers = package
             .sections
             .batch_controllers
             .iter()
-            .map(decode_application_batch_controller)
+            .map(|controller| decode_application_batch_controller(package, controller))
             .collect::<Result<Vec<_>, _>>()?;
         self.batch.install_controllers(BatchControllerGeneration {
             schema_version: BATCH_CONTROLLER_REGISTRY_CONTRACT.into(),
             application: package.base.manifest.name.clone(),
             generation: package.generation,
-            identity: selected_identity.into(),
+            identity: selected.record().identity.clone(),
             controllers,
         })
+    }
+
+    /// Publishes a Db2 catalog only after its complete typed definition agrees
+    /// with the server-owned selected application generation.
+    pub fn install_application_db2_catalog(
+        &self,
+        application: &str,
+        tables: Vec<Db2TableDefinition>,
+    ) -> Result<(), HostProblem> {
+        let _publication = self
+            .application_publication
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let selected = self.selected_application_v2(application)?;
+        let package = selected.package();
+        let declared = package
+            .sections
+            .sql_tables
+            .iter()
+            .map(|table| {
+                (
+                    table.name.to_ascii_uppercase(),
+                    table
+                        .columns
+                        .iter()
+                        .map(|column| (column.name.to_ascii_uppercase(), column.nullable))
+                        .collect::<Vec<_>>(),
+                    table
+                        .primary_key
+                        .iter()
+                        .map(|column| column.to_ascii_uppercase())
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect::<BTreeSet<_>>();
+        let supplied = tables
+            .iter()
+            .map(|table| {
+                (
+                    table.name.to_ascii_uppercase(),
+                    table
+                        .columns
+                        .iter()
+                        .map(|column| (column.name.to_ascii_uppercase(), column.nullable))
+                        .collect::<Vec<_>>(),
+                    table
+                        .primary_key
+                        .iter()
+                        .map(|column| column.to_ascii_uppercase())
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect::<BTreeSet<_>>();
+        if declared != supplied {
+            return Err(HostProblem::Malformed);
+        }
+        let rows = package
+            .sections
+            .sql_rows
+            .iter()
+            .map(|row| Db2SeedRow {
+                table: row.table.clone(),
+                values: row
+                    .values
+                    .iter()
+                    .map(|(name, value)| (name.clone(), value.as_bytes().to_vec()))
+                    .collect(),
+            })
+            .collect();
+        self.db2.install_catalog(Db2CatalogGeneration {
+            application: package.base.manifest.name.clone(),
+            generation: package.generation,
+            identity: selected.record().identity.clone(),
+            tables,
+            rows,
+        })
+    }
+
+    fn selected_application_v2(
+        &self,
+        application: &str,
+    ) -> Result<SelectedApplicationGeneration, HostProblem> {
+        self.applications_v2
+            .selected_generation(application)
+            .map_err(application_install_problem)?
+            .ok_or(HostProblem::NotFound)
     }
 
     fn online_machine_continuation(
@@ -2553,6 +2772,7 @@ fn secure_random_token(kind: &str) -> Result<String, HostProblem> {
 }
 
 fn decode_application_batch_controller(
+    package: &ApplicationPackageV2,
     controller: &ApplicationBatchController,
 ) -> Result<BatchControllerDefinition, HostProblem> {
     let launcher = controller_property(controller, "launcher")?;
@@ -2567,6 +2787,22 @@ fn decode_application_batch_controller(
         _ => return Err(HostProblem::Malformed),
     };
     let behavior = controller_property(controller, "behavior")?;
+    let artifact = package
+        .base
+        .manifest
+        .entries
+        .iter()
+        .find(|entry| entry.kind == EntryKind::Program && entry.path == controller.program)
+        .ok_or(HostProblem::Malformed)?;
+    let artifact_program = artifact
+        .path
+        .rsplit('/')
+        .next()
+        .filter(|name| name.eq_ignore_ascii_case(selector.program()))
+        .ok_or(HostProblem::Malformed)?;
+    if artifact_program.is_empty() {
+        return Err(HostProblem::Malformed);
+    }
     let plan = match behavior {
         "program-call" if controller.kind == BatchControllerKind::CobolProgram => {
             validate_controller_properties(
@@ -2667,6 +2903,10 @@ fn decode_application_batch_controller(
     Ok(BatchControllerDefinition {
         name: controller.name.clone(),
         selector,
+        program: BatchControllerProgram {
+            path: artifact.path.clone(),
+            identity: artifact.sha256.clone(),
+        },
         plan,
     })
 }
@@ -3062,6 +3302,27 @@ fn store_error(error: StoreError) -> HostProblem {
     }
 }
 
+fn application_install_problem(problem: InstallProblem) -> HostProblem {
+    match problem {
+        InstallProblem::IdentityConflict | InstallProblem::StaleGeneration => {
+            HostProblem::IdempotencyConflict
+        }
+        InstallProblem::UnknownStage => HostProblem::NotFound,
+        InstallProblem::Poisoned => HostProblem::InfrastructureFailure,
+        InstallProblem::LimitExceeded => HostProblem::ResourceExhausted,
+        InstallProblem::InvalidIdentity
+        | InstallProblem::InvalidPath
+        | InstallProblem::DuplicateEntry
+        | InstallProblem::MissingKind
+        | InstallProblem::MissingBlob
+        | InstallProblem::ContentMismatch
+        | InstallProblem::OrphanDependency
+        | InstallProblem::IncompatibleProduct
+        | InstallProblem::InvalidSignature
+        | InstallProblem::MissingReference => HostProblem::Malformed,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3109,6 +3370,116 @@ mod tests {
             )),
             ..ServerConfig::default()
         }
+    }
+
+    fn signed_controller_package(
+        trust: &HmacSha256PackageTrust,
+    ) -> mainframe_env_application::ApplicationPackageV2 {
+        use mainframe_env_application::{
+            APPLICATION_PACKAGE_V2_CONTRACT, ApplicationManifest, ApplicationPackage,
+            ApplicationSections, BatchController, EntryKind, PackageEntry, PackageSignature,
+        };
+        let definitions = [
+            (EntryKind::Source, "source/manifest"),
+            (EntryKind::Resource, "resource/manifest"),
+            (EntryKind::Program, "program/REALPGM"),
+            (EntryKind::Data, "data/manifest"),
+            (EntryKind::Profile, "profile/manifest"),
+            (EntryKind::Migration, "migration/manifest"),
+        ];
+        let mut entries = Vec::new();
+        let mut blobs = BTreeMap::new();
+        for (kind, path) in definitions {
+            let bytes = path.as_bytes().to_vec();
+            let sha256 = format!("sha256:{:x}", Sha256::digest(&bytes));
+            blobs.insert(sha256.clone(), bytes.clone());
+            entries.push(PackageEntry {
+                path: path.into(),
+                kind,
+                sha256,
+                bytes: bytes.len(),
+                depends_on: (kind != EntryKind::Source)
+                    .then(|| "source/manifest".into())
+                    .into_iter()
+                    .collect(),
+            });
+        }
+        let mut package = ApplicationPackageV2 {
+            base: ApplicationPackage {
+                manifest: ApplicationManifest {
+                    name: "TRUSTED-APPLICATION".into(),
+                    version: "0.2.0".into(),
+                    target_product: "0.2.0".into(),
+                    entries,
+                },
+                blobs,
+            },
+            generation: 1,
+            sections: ApplicationSections {
+                schema_version: APPLICATION_PACKAGE_V2_CONTRACT.into(),
+                host_abi_libraries: Vec::new(),
+                sql_tables: Vec::new(),
+                sql_rows: Vec::new(),
+                ims_definitions: Vec::new(),
+                ims_rows: Vec::new(),
+                mq_resources: Vec::new(),
+                batch_controllers: vec![BatchController {
+                    name: "TRUSTED-CONTROLLER".into(),
+                    program: "program/REALPGM".into(),
+                    kind: BatchControllerKind::CobolProgram,
+                    properties: BTreeMap::from([
+                        ("launcher".into(), "tso-run".into()),
+                        ("selector-program".into(), "REALPGM".into()),
+                        ("behavior".into(), "program-call".into()),
+                    ]),
+                }],
+                security_resources: Vec::new(),
+            },
+            signature: PackageSignature {
+                algorithm: "hmac-sha256@1".into(),
+                key_id: "test-production-key".into(),
+                value: "invalid".into(),
+            },
+        };
+        let identity = mainframe_env_application::package_v2_identity(&package).unwrap();
+        package.signature.value = trust
+            .sign_identity("test-production-key", &identity)
+            .unwrap();
+        package
+    }
+
+    #[test]
+    fn subsystem_publication_requires_server_verified_selected_package_handle() {
+        let trust = HmacSha256PackageTrust::new(BTreeMap::from([(
+            "test-production-key".into(),
+            b"test-production-package-trust-key".to_vec(),
+        )]))
+        .unwrap();
+        let server =
+            ProductServer::memory_with_package_trust(config(), Arc::new(trust.clone())).unwrap();
+        assert_eq!(
+            server.install_application_batch_controllers("TRUSTED-APPLICATION"),
+            Err(HostProblem::NotFound)
+        );
+
+        let mut package = signed_controller_package(&trust);
+        package.signature.value = "caller-supplied-digest-is-not-trust".into();
+        assert_eq!(
+            server.install_application_package_v2(&package),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            server.install_application_batch_controllers("TRUSTED-APPLICATION"),
+            Err(HostProblem::NotFound)
+        );
+
+        let package = signed_controller_package(&trust);
+        let ready = server.install_application_package_v2(&package).unwrap();
+        let published = server
+            .install_application_batch_controllers("TRUSTED-APPLICATION")
+            .unwrap();
+        assert_eq!(published.identity, ready.identity);
+        assert_eq!(published.controllers, 1);
     }
 
     fn basic() -> String {

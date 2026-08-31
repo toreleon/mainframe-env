@@ -15,6 +15,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 const STATE_NAMESPACE: &str = "db2-state";
 const STATE_KEY: &str = "catalog";
+const MAX_RETAINED_CATALOG_GENERATIONS: usize = 64;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Db2Limits {
@@ -107,6 +108,8 @@ struct State {
     schemas: BTreeMap<String, Db2TableDefinition>,
     #[serde(default)]
     installations: BTreeMap<String, CatalogInstallation>,
+    #[serde(default)]
+    catalog_generations: BTreeMap<String, BTreeMap<u64, CatalogGenerationSnapshot>>,
     pending: BTreeMap<String, PendingUnit>,
     cursors: BTreeMap<String, Cursor>,
     #[serde(default)]
@@ -119,6 +122,14 @@ struct CatalogInstallation {
     generation: u64,
     identity: String,
     tables: BTreeSet<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+struct CatalogGenerationSnapshot {
+    generation: u64,
+    identity: String,
+    schemas: BTreeMap<String, Db2TableDefinition>,
+    tables: BTreeMap<String, Table>,
 }
 
 struct DurableState {
@@ -184,6 +195,47 @@ impl Db2Service {
         }
         let mut next = durable.state.clone();
         apply_catalog_generation(&mut next, catalog, self.limits)?;
+        validate_state(&next, self.limits)?;
+        self.persist(&mut durable, next)
+    }
+
+    pub fn rollback_catalog(&self, application: &str, generation: u64) -> Result<(), HostProblem> {
+        let mut durable = self.lock()?;
+        if !durable.state.pending.is_empty() || !durable.state.cursors.is_empty() {
+            return Err(HostProblem::Condition {
+                name: "DB2-CATALOG-BUSY".into(),
+                response: -904,
+                response2: 0,
+            });
+        }
+        let application = application.to_ascii_uppercase();
+        let target = durable
+            .state
+            .catalog_generations
+            .get(&application)
+            .and_then(|generations| generations.get(&generation))
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
+        let mut next = durable.state.clone();
+        snapshot_selected_catalog(&mut next, &application)?;
+        for (name, schema) in &target.schemas {
+            next.schemas.insert(name.clone(), schema.clone());
+        }
+        for (name, table) in &target.tables {
+            next.tables.insert(name.clone(), table.clone());
+        }
+        next.installations.insert(
+            application,
+            CatalogInstallation {
+                generation: target.generation,
+                identity: target.identity,
+                tables: target.schemas.keys().cloned().collect(),
+            },
+        );
+        next.catalog_version = next
+            .catalog_version
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
         validate_state(&next, self.limits)?;
         self.persist(&mut durable, next)
     }
@@ -296,22 +348,39 @@ fn apply_catalog_generation(
     {
         return Err(HostProblem::IdempotencyConflict);
     }
-    if let Some(previous) = state.installations.get(&application) {
-        for table in &previous.tables {
-            state.tables.remove(table);
-            state.schemas.remove(table);
-        }
+    snapshot_selected_catalog(state, &application)?;
+    let retained = state
+        .catalog_generations
+        .get(&application)
+        .map_or(0, BTreeMap::len);
+    if !state
+        .catalog_generations
+        .get(&application)
+        .is_some_and(|generations| generations.contains_key(&catalog.generation))
+        && retained >= MAX_RETAINED_CATALOG_GENERATIONS
+    {
+        return Err(HostProblem::ResourceExhausted);
     }
     for definition in &catalog.tables {
         let name = definition.normalized_name();
+        if let Some(existing) = state.schemas.get(&name) {
+            if !schemas_compatible(existing, definition) {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            let table = state.tables.get(&name).ok_or(HostProblem::Malformed)?;
+            if table
+                .rows
+                .values()
+                .any(|row| validate_row(definition, row, limits).is_err())
+            {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+        }
         state.schemas.insert(name.clone(), definition.clone());
-        state.tables.insert(
-            name,
-            Table {
-                columns: definition.columns.len(),
-                rows: BTreeMap::new(),
-            },
-        );
+        state.tables.entry(name).or_insert_with(|| Table {
+            columns: definition.columns.len(),
+            rows: BTreeMap::new(),
+        });
     }
     for seed in &catalog.rows {
         let table_name = seed.table.to_ascii_uppercase();
@@ -336,11 +405,23 @@ fn apply_catalog_generation(
         if table.rows.len() >= limits.max_rows_per_table {
             return Err(HostProblem::ResourceExhausted);
         }
-        if table.rows.insert(key, values).is_some() {
-            return Err(HostProblem::IdempotencyConflict);
+        match table.rows.get(&key) {
+            Some(existing) if existing != &values => {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            Some(_) => {}
+            None => {
+                table.rows.insert(key, values);
+            }
         }
     }
     validate_foreign_keys(state)?;
+    let snapshot = catalog_snapshot(state, catalog.generation, &catalog.identity, &table_names)?;
+    state
+        .catalog_generations
+        .entry(application.clone())
+        .or_default()
+        .insert(catalog.generation, snapshot);
     state.installations.insert(
         application,
         CatalogInstallation {
@@ -354,6 +435,60 @@ fn apply_catalog_generation(
         .checked_add(1)
         .ok_or(HostProblem::ResourceExhausted)?;
     Ok(())
+}
+
+fn snapshot_selected_catalog(state: &mut State, application: &str) -> Result<(), HostProblem> {
+    let Some(selected) = state.installations.get(application).cloned() else {
+        return Ok(());
+    };
+    let snapshot = catalog_snapshot(
+        state,
+        selected.generation,
+        &selected.identity,
+        &selected.tables,
+    )?;
+    state
+        .catalog_generations
+        .entry(application.to_string())
+        .or_default()
+        .insert(selected.generation, snapshot);
+    Ok(())
+}
+
+fn catalog_snapshot(
+    state: &State,
+    generation: u64,
+    identity: &str,
+    names: &BTreeSet<String>,
+) -> Result<CatalogGenerationSnapshot, HostProblem> {
+    let schemas = names
+        .iter()
+        .map(|name| {
+            state
+                .schemas
+                .get(name)
+                .cloned()
+                .map(|schema| (name.clone(), schema))
+                .ok_or(HostProblem::Malformed)
+        })
+        .collect::<Result<BTreeMap<_, _>, _>>()?;
+    let tables = names
+        .iter()
+        .map(|name| {
+            state
+                .tables
+                .get(name)
+                .cloned()
+                .map(|table| (name.clone(), table))
+                .ok_or(HostProblem::Malformed)
+        })
+        .collect::<Result<BTreeMap<_, _>, _>>()?;
+    Ok(CatalogGenerationSnapshot {
+        generation,
+        identity: identity.into(),
+        schemas,
+        tables,
+    })
 }
 
 fn apply_request(
@@ -579,6 +714,20 @@ fn update(state: &mut State, run: &str, request: &Db2Request) -> Result<Db2Resul
     let key = key_from_statement_inputs(&request.statement, &definition, &request.inputs)?
         .ok_or(HostProblem::Malformed)?;
     let assignments = update_assignments(&request.statement, &definition, &request.inputs)?;
+    let primary_key = definition
+        .primary_key_indices()?
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+    if assignments
+        .iter()
+        .any(|(index, _)| primary_key.contains(index))
+    {
+        return Ok(sql_condition(
+            -798,
+            "428C9",
+            "PRIMARY KEY UPDATE IS NOT SUPPORTED",
+        ));
+    }
     let table = write_table(state, run, &name)?;
     let Some(row) = table.rows.get_mut(&key) else {
         return Ok(sql_condition(100, "02000", "ROW NOT FOUND"));
@@ -1649,6 +1798,18 @@ fn validate_state(state: &State, limits: Db2Limits) -> Result<(), HostProblem> {
                     .iter()
                     .any(|table| !state.schemas.contains_key(table))
         })
+        || state.catalog_generations.values().any(|generations| {
+            generations.len() > MAX_RETAINED_CATALOG_GENERATIONS
+                || generations.iter().any(|(generation, snapshot)| {
+                    *generation == 0
+                        || *generation != snapshot.generation
+                        || snapshot.identity.len() != 71
+                        || !snapshot.identity.starts_with("sha256:")
+                        || snapshot.schemas.keys().collect::<BTreeSet<_>>()
+                            != snapshot.tables.keys().collect::<BTreeSet<_>>()
+                        || !table_map_is_valid(&snapshot.tables, &snapshot.schemas, limits)
+                })
+        })
     {
         Err(HostProblem::ResourceExhausted)
     } else {
@@ -1896,6 +2057,25 @@ mod tests {
         }
     }
 
+    fn catalog_generation(
+        generation: u64,
+        identity_byte: u8,
+        extra_seed: Option<(&str, &str)>,
+    ) -> Db2CatalogGeneration {
+        let mut catalog = installed_catalog(identity_byte);
+        catalog.generation = generation;
+        if let Some((code, description)) = extra_seed {
+            catalog.rows.push(crate::Db2SeedRow {
+                table: "APP.CODE".into(),
+                values: BTreeMap::from([
+                    ("CODE".into(), code.as_bytes().to_vec()),
+                    ("DESCRIPTION".into(), description.as_bytes().to_vec()),
+                ]),
+            });
+        }
+        catalog
+    }
+
     #[test]
     fn selected_package_catalog_installs_generic_schema_rows_and_layout_atomically() {
         let store = Arc::new(MemoryStore::new(Default::default()));
@@ -1942,6 +2122,108 @@ mod tests {
                 .len(),
             1
         );
+    }
+
+    #[test]
+    fn compatible_legacy_rows_survive_install_upgrade_restart_and_rollback() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = Db2Service::open(store.clone(), Db2Limits::default()).unwrap();
+        let admin = invocation("legacy-catalog");
+        let ddl = "CREATE TABLE APP.CODE (CODE CHAR(2) NOT NULL, DESCRIPTION VARCHAR(50) NOT NULL, PRIMARY KEY (CODE)); CREATE TABLE APP.CODE_DETAIL (CODE CHAR(2) NOT NULL, DETAIL CHAR(8) NOT NULL, PRIMARY KEY (CODE, DETAIL), FOREIGN KEY (CODE) REFERENCES APP.CODE (CODE)); INSERT INTO APP.CODE (CODE,DESCRIPTION) SELECT '99','LEGACY' FROM SYSIBM.SYSDUMMY1 COMMIT;";
+        service
+            .execute(
+                &admin,
+                &request(Db2Operation::ExecuteScript, 200, ddl, BTreeMap::new()),
+            )
+            .unwrap();
+        service
+            .install_catalog(catalog_generation(1, 1, None))
+            .unwrap();
+        assert_eq!(service.table_rows("APP.CODE").unwrap().len(), 2);
+        service
+            .install_catalog(catalog_generation(2, 2, Some(("02", "UPGRADE"))))
+            .unwrap();
+        assert_eq!(service.table_rows("APP.CODE").unwrap().len(), 3);
+        drop(service);
+
+        let restarted = Db2Service::open(store.clone(), Db2Limits::default()).unwrap();
+        assert_eq!(restarted.table_rows("APP.CODE").unwrap().len(), 3);
+        restarted.rollback_catalog("GENERIC-FIXTURE", 1).unwrap();
+        assert_eq!(restarted.table_rows("APP.CODE").unwrap().len(), 2);
+        drop(restarted);
+
+        let rolled_back = Db2Service::open(store, Db2Limits::default()).unwrap();
+        let rows = rolled_back.table_rows("APP.CODE").unwrap();
+        assert_eq!(rows.len(), 2);
+        assert!(
+            rows.iter()
+                .any(|row| row[0] == b"99" && row[1] == b"LEGACY")
+        );
+        assert!(!rows.iter().any(|row| row[0] == b"02"));
+    }
+
+    #[test]
+    fn primary_key_updates_are_rejected_without_rekey_or_duplicate_corruption() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = Db2Service::open(store, Db2Limits::default()).unwrap();
+        service.install_catalog(installed_catalog(1)).unwrap();
+        let run = invocation("primary-key-update");
+        service
+            .execute(
+                &run,
+                &request(
+                    Db2Operation::Insert,
+                    210,
+                    "INSERT INTO APP.CODE",
+                    BTreeMap::from([
+                        ("CODE".into(), variable("02")),
+                        ("DESCRIPTION".into(), variable("SECOND")),
+                    ]),
+                ),
+            )
+            .unwrap();
+        service
+            .execute(
+                &run,
+                &request(Db2Operation::Commit, 211, "COMMIT", BTreeMap::new()),
+            )
+            .unwrap();
+
+        let rejected = service
+            .execute(
+                &run,
+                &request(
+                    Db2Operation::Update,
+                    212,
+                    "UPDATE APP.CODE SET CODE = :NEW-CODE WHERE CODE = :OLD-CODE",
+                    BTreeMap::from([
+                        ("NEW-CODE".into(), variable("02")),
+                        ("OLD-CODE".into(), variable("01")),
+                    ]),
+                ),
+            )
+            .unwrap();
+        assert_eq!(
+            (rejected.sqlcode, rejected.sqlstate.as_str()),
+            (-798, "428C9")
+        );
+        assert_eq!(service.pending_units().unwrap(), 0);
+        for code in ["01", "02"] {
+            let selected = service
+                .execute(
+                    &run,
+                    &request(
+                        Db2Operation::Select,
+                        213 + u64::from(code == "02"),
+                        "SELECT CODE, DESCRIPTION FROM APP.CODE WHERE CODE = :LOOKUP-CODE",
+                        BTreeMap::from([("LOOKUP-CODE".into(), variable(code))]),
+                    ),
+                )
+                .unwrap();
+            assert_eq!(selected.sqlcode, 0);
+            assert_eq!(selected.rows[0].columns[0], code.as_bytes());
+        }
+        assert_eq!(service.table_rows("APP.CODE").unwrap().len(), 2);
     }
 
     #[test]

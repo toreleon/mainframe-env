@@ -9,7 +9,8 @@ mod service;
 
 pub use controller::{
     BATCH_CONTROLLER_REGISTRY_CONTRACT, BatchControllerDefinition, BatchControllerGeneration,
-    BatchControllerInstallReceipt, BatchControllerPlan, BatchControllerSelector,
+    BatchControllerInstallReceipt, BatchControllerPlan, BatchControllerProgram,
+    BatchControllerSelector,
 };
 
 pub use jcl::{

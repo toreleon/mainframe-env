@@ -4,11 +4,10 @@ use axum::body::{Body, to_bytes};
 use axum::http::{Method, Request, StatusCode};
 use base64::Engine;
 use mainframe_env_application::{
-    APPLICATION_PACKAGE_V2_CONTRACT, ApplicationInstaller, ApplicationInstallerV2,
-    ApplicationManifest, ApplicationPackage, ApplicationPackageV2, ApplicationSections,
-    BatchController, BatchControllerKind, DatasetCatalog, DatasetCatalogEntry, DatasetDefinition,
-    EntryKind, GenerationGroupDefinition, InstallProblem, InstallState, PackageEntry,
-    PackageLimits, PackageSignature, PackageSignatureVerifier, ProgramArtifact, ProgramCatalog,
+    APPLICATION_PACKAGE_V2_CONTRACT, ApplicationInstaller, ApplicationManifest, ApplicationPackage,
+    ApplicationPackageV2, ApplicationSections, BatchController, BatchControllerKind,
+    DatasetCatalog, DatasetCatalogEntry, DatasetDefinition, EntryKind, GenerationGroupDefinition,
+    InstallProblem, InstallState, PackageEntry, PackageSignature, ProgramArtifact, ProgramCatalog,
     ProgramFrame, ProgramFrames, SqlColumn, SqlTable, package_identity, package_v2_identity,
     parse_bms, parse_csd,
 };
@@ -29,8 +28,8 @@ use mainframe_env_compiler_api::{
 };
 use mainframe_env_dataset::{DatasetLimits, DatasetSeedObject, DatasetService};
 use mainframe_env_db2::{
-    Db2CatalogGeneration, Db2ColumnDefinition, Db2ExtractField, Db2ExtractLayout,
-    Db2ForeignKeyDefinition, Db2ResultEncoding, Db2TableDefinition, db2_abi_library,
+    Db2ColumnDefinition, Db2ExtractField, Db2ExtractLayout, Db2ForeignKeyDefinition,
+    Db2ResultEncoding, Db2TableDefinition, db2_abi_library,
 };
 use mainframe_env_diagnostics::Completeness;
 use mainframe_env_encoding::CodePage;
@@ -55,8 +54,9 @@ use mainframe_env_racf::{
     MemorySecretResolver, RacfManifest, RacfProfileDefinition, RacfService, RacfUserDefinition,
 };
 use mainframe_env_server::{
-    BatchProgramDefinition, OnlineApplicationDefinition, OnlineProgramDefinition, ProductServer,
-    ServerConfig, StoreProfile, TlsConfig, compatible_system_services, default_program_router,
+    BatchProgramDefinition, HmacSha256PackageTrust, OnlineApplicationDefinition,
+    OnlineProgramDefinition, ProductServer, ServerConfig, StoreProfile, TlsConfig,
+    compatible_system_services, default_program_router,
 };
 use mainframe_env_source::{
     HostAbiLibraryDefinition, LogicalPath, MaterializedHostAbiLibraries, SourceBundle,
@@ -4660,14 +4660,13 @@ pub fn verify_carddemo_db2_from_env(
     })
 }
 
-struct CardDemoPackageVerifier;
-
-impl PackageSignatureVerifier for CardDemoPackageVerifier {
-    fn verify(&self, key_id: &str, algorithm: &str, identity: &str, signature: &str) -> bool {
-        key_id == "carddemo-conformance-key"
-            && algorithm == "carddemo-conformance-signature@1"
-            && signature == format!("signed:{identity}")
-    }
+fn carddemo_package_trust() -> Result<Arc<HmacSha256PackageTrust>, CorpusProblem> {
+    HmacSha256PackageTrust::new(BTreeMap::from([(
+        "carddemo-conformance-key".into(),
+        b"carddemo-conformance-hmac-key-0001".to_vec(),
+    )]))
+    .map(Arc::new)
+    .map_err(terminal_problem)
 }
 
 fn carddemo_db2_column(
@@ -4793,9 +4792,13 @@ fn carddemo_batch_controller(
     kind: BatchControllerKind,
     properties: &[(&str, &str)],
 ) -> BatchController {
+    let program = properties
+        .iter()
+        .find_map(|(name, value)| (*name == "selector-program").then_some(*value))
+        .expect("every CardDemo controller has a selector program");
     BatchController {
         name: name.into(),
-        program: "program/manifest".into(),
+        program: format!("program/{program}"),
         kind,
         properties: properties
             .iter()
@@ -4886,30 +4889,50 @@ fn carddemo_batch_controllers() -> Vec<BatchController> {
 
 fn install_carddemo_db2_package(server: &Arc<ProductServer>) -> Result<(), CorpusProblem> {
     let definitions = carddemo_db2_definitions();
+    let batch_controllers = carddemo_batch_controllers();
     let catalog_bytes = serde_json::to_vec(&definitions)
         .map_err(|error| CorpusProblem::new("carddemo.db2.package", error.to_string()))?;
-    let payloads = [
-        (EntryKind::Source, "source/manifest", b"source".to_vec()),
+    let mut payloads: Vec<(EntryKind, String, Vec<u8>)> = vec![
+        (
+            EntryKind::Source,
+            "source/manifest".into(),
+            b"source".to_vec(),
+        ),
         (
             EntryKind::Resource,
-            "resource/manifest",
+            "resource/manifest".into(),
             b"resource".to_vec(),
         ),
-        (EntryKind::Program, "program/manifest", b"program".to_vec()),
-        (EntryKind::Data, "data/db2/catalog", catalog_bytes),
-        (EntryKind::Profile, "profile/manifest", b"profile".to_vec()),
+        (EntryKind::Data, "data/db2/catalog".into(), catalog_bytes),
+        (
+            EntryKind::Profile,
+            "profile/manifest".into(),
+            b"profile".to_vec(),
+        ),
         (
             EntryKind::Migration,
-            "migration/manifest",
+            "migration/manifest".into(),
             b"application-package-v1-to-v2".to_vec(),
         ),
     ];
+    for controller in &batch_controllers {
+        let program = controller
+            .program
+            .rsplit('/')
+            .next()
+            .ok_or_else(|| CorpusProblem::new("carddemo.db2.package", "program is missing"))?;
+        payloads.push((
+            EntryKind::Program,
+            controller.program.clone(),
+            format!("carddemo-controller:{program}").into_bytes(),
+        ));
+    }
     let mut entries = Vec::new();
     let mut blobs = BTreeMap::new();
     for (kind, path, bytes) in payloads {
         let digest = format!("sha256:{:x}", Sha256::digest(&bytes));
         entries.push(PackageEntry {
-            path: path.into(),
+            path,
             kind,
             sha256: digest.clone(),
             bytes: bytes.len(),
@@ -4954,67 +4977,27 @@ fn install_carddemo_db2_package(server: &Arc<ProductServer>) -> Result<(), Corpu
             ims_definitions: Vec::new(),
             ims_rows: Vec::new(),
             mq_resources: Vec::new(),
-            batch_controllers: carddemo_batch_controllers(),
+            batch_controllers,
             security_resources: Vec::new(),
         },
         signature: PackageSignature {
-            algorithm: "carddemo-conformance-signature@1".into(),
+            algorithm: "hmac-sha256@1".into(),
             key_id: "carddemo-conformance-key".into(),
             value: "pending".into(),
         },
     };
-    package.signature.value = format!(
-        "signed:{}",
-        package_v2_identity(&package).map_err(package_problem)?
-    );
-    let installer = ApplicationInstallerV2::new(
-        "0.2.0",
-        PackageLimits::default(),
-        Arc::new(CardDemoPackageVerifier),
-    );
-    let ready = installer.install(&package).map_err(package_problem)?;
-    let selected = installer
-        .selected_package("AWS-CARDDEMO")
-        .map_err(package_problem)?
-        .ok_or_else(|| CorpusProblem::new("carddemo.db2.package", "package is not selected"))?;
-    let data = selected
-        .base
-        .manifest
-        .entries
-        .iter()
-        .find(|entry| entry.path == "data/db2/catalog")
-        .and_then(|entry| selected.base.blobs.get(&entry.sha256))
-        .ok_or_else(|| CorpusProblem::new("carddemo.db2.package", "catalog blob is missing"))?;
-    let installed_definitions: Vec<Db2TableDefinition> = serde_json::from_slice(data)
-        .map_err(|error| CorpusProblem::new("carddemo.db2.package", error.to_string()))?;
-    let declared = selected
-        .sections
-        .sql_tables
-        .iter()
-        .map(|table| table.name.to_ascii_uppercase())
-        .collect::<BTreeSet<_>>();
-    let loaded = installed_definitions
-        .iter()
-        .map(|table| table.name.to_ascii_uppercase())
-        .collect::<BTreeSet<_>>();
-    if declared != loaded {
-        return Err(CorpusProblem::new(
-            "carddemo.db2.package",
-            "typed SQL section and selected catalog blob disagree",
-        ));
-    }
-    server
-        .install_application_batch_controllers(selected.as_ref(), &ready.identity)
+    let identity = package_v2_identity(&package).map_err(package_problem)?;
+    package.signature.value = carddemo_package_trust()?
+        .sign_identity("carddemo-conformance-key", &identity)
         .map_err(terminal_problem)?;
     server
-        .db2_service()
-        .install_catalog(Db2CatalogGeneration {
-            application: selected.base.manifest.name.clone(),
-            generation: selected.generation,
-            identity: ready.identity,
-            tables: installed_definitions,
-            rows: Vec::new(),
-        })
+        .install_application_package_v2(&package)
+        .map_err(terminal_problem)?;
+    server
+        .install_application_batch_controllers("AWS-CARDDEMO")
+        .map_err(terminal_problem)?;
+    server
+        .install_application_db2_catalog("AWS-CARDDEMO", definitions)
         .map_err(terminal_problem)
 }
 
@@ -5037,11 +5020,12 @@ async fn exercise_db2_routes(
     };
     let store = Arc::new(MemoryStore::new(Default::default()));
     let secrets = Arc::new(MemorySecretResolver::default());
-    let server = ProductServer::open(
+    let server = ProductServer::open_with_package_trust(
         config.clone(),
         store.clone(),
         secrets.clone(),
         default_program_router(),
+        carddemo_package_trust()?,
     )
     .map_err(terminal_problem)?;
     install_carddemo_db2_package(&server)?;
@@ -6824,11 +6808,12 @@ async fn exercise_mq_authorization_routes(
         ..ServerConfig::default()
     };
     let store = Arc::new(MemoryStore::new(Default::default()));
-    let server = ProductServer::open(
+    let server = ProductServer::open_with_package_trust(
         config.clone(),
         store.clone(),
         Arc::new(MemorySecretResolver::default()),
         default_program_router(),
+        carddemo_package_trust()?,
     )
     .map_err(terminal_problem)?;
     install_carddemo_db2_package(&server)?;
@@ -7907,11 +7892,12 @@ async fn exercise_ims_routes(
         ..ServerConfig::default()
     };
     let store = Arc::new(MemoryStore::new(Default::default()));
-    let server = ProductServer::open(
+    let server = ProductServer::open_with_package_trust(
         config.clone(),
         store.clone(),
         Arc::new(MemorySecretResolver::default()),
         default_program_router(),
+        carddemo_package_trust()?,
     )
     .map_err(terminal_problem)?;
     install_carddemo_db2_package(&server)?;

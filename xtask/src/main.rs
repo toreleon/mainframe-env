@@ -44,7 +44,8 @@ fn run() -> TaskResult {
     let root = repository_root()?;
     let mut args = env::args().skip(1);
     let command = args.next().unwrap_or_else(|| "help".to_string());
-    let check = args.any(|arg| arg == "--check");
+    let arguments = args.collect::<Vec<_>>();
+    let check = arguments.iter().any(|arg| arg == "--check");
 
     match command.as_str() {
         "versions" => check_versions(&root),
@@ -68,6 +69,7 @@ fn run() -> TaskResult {
         "ledger-consistency" => check_workload_ledger_consistency(&root),
         "migration-rollback" => check_migration_rollback_rollup(&root),
         "full-regression" => check_full_regression(&root),
+        "review-repair" => check_review_repair(&root),
         "semantic-identities" if check => check_semantic_identities(&root),
         "semantic-identities" => generate_semantic_identities(&root),
         "conformance" => {
@@ -86,7 +88,8 @@ fn run() -> TaskResult {
             check_program_registry(&root)?;
             check_route_registries(&root)?;
             check_migration_rollback_rollup(&root)?;
-            check_full_regression(&root)
+            check_full_regression(&root)?;
+            check_review_repair(&root)
         }
         "certification" => check_certification(&root),
         "carddemo-corpus" => check_carddemo_corpus(&root),
@@ -121,11 +124,17 @@ fn run() -> TaskResult {
         "carddemo-operator-reset" => check_carddemo_operator_reset(&root),
         "carddemo-full" => check_carddemo_full(&root),
         "digest" => print_digest(&root),
-        "release" if check => check_release_artifacts(&root),
-        "release" => generate_release_artifacts(&root),
+        "release" if check => {
+            let target = explicit_release_target(&arguments)?;
+            check_release_artifacts(&root, &target)
+        }
+        "release" => {
+            let target = explicit_release_target(&arguments)?;
+            generate_release_artifacts(&root, &target)
+        }
         "help" | "--help" | "-h" => {
             println!(
-                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|coverage|semantic-identities|application-packages|db2-catalog|batch-controllers|abi-libraries|program-registry|route-registries|dehardcoding|ledger-consistency|migration-rollback|full-regression|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check"
+                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|coverage|semantic-identities|application-packages|db2-catalog|batch-controllers|abi-libraries|program-registry|route-registries|dehardcoding|ledger-consistency|migration-rollback|full-regression|review-repair|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check; release additionally requires --target <triple>"
             );
             Ok(())
         }
@@ -1936,6 +1945,11 @@ fn check_application_packages(root: &Path) -> TaskResult {
             && migration["atomicity"]["staged_generation_selectable"] == Value::Bool(false)
             && migration["atomicity"]["ready_and_selection_same_critical_section"]
                 == Value::Bool(true)
+            && migration["atomicity"]["production_trust_authority_injected"] == Value::Bool(true)
+            && migration["atomicity"]["selected_handle_required_for_publication"]
+                == Value::Bool(true)
+            && migration["atomicity"]["aggregate_and_retained_bytes_bounded_before_clone"]
+                == Value::Bool(true)
             && migration["rollback"]["supported"] == Value::Bool(true)
             && migration["rollback"]["partial_generation_selected"] == Value::Bool(false),
         "application package migration or rollback contract is unsafe",
@@ -1964,10 +1978,29 @@ fn check_application_packages(root: &Path) -> TaskResult {
         "pub fn stage",
         "pub fn commit",
         "pub fn rollback",
+        "max_total_blob_bytes",
+        "max_total_nested_items",
+        "max_retained_package_bytes",
+        "max_total_retained_package_bytes",
+        "validate_aggregate_bounds",
+        "pub fn selected_generation",
     ] {
         require(
             implementation.contains(required),
             &format!("application package implementation omits {required}"),
+        )?;
+    }
+    let product = read(&root.join("crates/apps/mainframe-env-server/src/product.rs"))?;
+    let production_product = product.split("#[cfg(test)]").next().unwrap_or(&product);
+    for required in [
+        "applications_v2: ApplicationInstallerV2",
+        "pub fn open_with_package_trust",
+        "HmacSha256PackageTrust",
+        "fn selected_application_v2",
+    ] {
+        require(
+            production_product.contains(required),
+            &format!("production composition omits {required}"),
         )?;
     }
     Ok(())
@@ -1996,7 +2029,10 @@ fn check_db2_catalog(root: &Path) -> TaskResult {
     }
     for required in [
         "pub fn install_catalog",
+        "pub fn rollback_catalog",
         "Db2CatalogGeneration",
+        "snapshot_selected_catalog",
+        "CatalogGenerationSnapshot",
         "schemas_compatible",
         "delete_is_restricted",
         "selected_column_indices",
@@ -2025,6 +2061,10 @@ fn check_db2_catalog(root: &Path) -> TaskResult {
             && migration["schema_fields_have_defaults"] == Value::Bool(true)
             && migration["installation_requires_quiescence"] == Value::Bool(true)
             && migration["atomic_catalog_write"] == Value::Bool(true)
+            && migration["compatible_rows_preserved_on_first_install"] == Value::Bool(true)
+            && migration["compatible_rows_preserved_on_upgrade"] == Value::Bool(true)
+            && migration["retained_generation_snapshots"] == Value::Bool(true)
+            && migration["restart_reload_supported"] == Value::Bool(true)
             && migration["rollback"]["supported"] == Value::Bool(true)
             && migration["rollback"]["requires_backup"] == Value::Bool(true),
         "Db2 catalog migration or rollback contract is unsafe",
@@ -2084,7 +2124,11 @@ fn check_batch_controllers(root: &Path) -> TaskResult {
         "BatchControllerGeneration",
         "BatchControllerSelector",
         "BatchControllerPlan",
+        "BatchControllerProgram",
         "pub(crate) fn install",
+        "pub(crate) fn select",
+        "pub(crate) fn state",
+        "pub(crate) fn from_state",
         "pub(crate) fn resolve",
         "Publish only after the full generation validates",
     ] {
@@ -2095,6 +2139,9 @@ fn check_batch_controllers(root: &Path) -> TaskResult {
     }
     for required in [
         "pub fn install_controllers",
+        "pub fn rollback_controllers",
+        "persist_controllers",
+        "CONTROLLER_STATE_NAMESPACE",
         "ims_controller_selector",
         "resolve_controller",
         "execute_program_controller",
@@ -2105,11 +2152,14 @@ fn check_batch_controllers(root: &Path) -> TaskResult {
         )?;
     }
     let product = read(&root.join("crates/apps/mainframe-env-server/src/product.rs"))?;
+    let production_product = product.split("#[cfg(test)]").next().unwrap_or(&product);
     require(
-        product.contains("pub fn install_application_batch_controllers")
-            && product.contains("package_v2_identity")
-            && product.contains("decode_application_batch_controller"),
-        "composition does not derive controllers from an identity-equal selected package",
+        production_product.contains("pub fn install_application_batch_controllers")
+            && production_product.contains("selected_application_v2")
+            && production_product.contains("BatchControllerProgram")
+            && production_product.contains("decode_application_batch_controller")
+            && !production_product.contains("selected_identity: &str"),
+        "composition does not derive controllers from a verified selected package handle",
     )?;
     let contracts_path = root.join("conformance/0.2/inventory/contracts.json");
     let contracts = json(&contracts_path)?;
@@ -2128,7 +2178,12 @@ fn check_batch_controllers(root: &Path) -> TaskResult {
             && migration["installation"]["bounded"] == Value::Bool(true)
             && migration["installation"]["validate_complete_generation_before_publish"]
                 == Value::Bool(true)
+            && migration["installation"]["selector_bound_to_program_artifact"] == Value::Bool(true)
             && migration["installation"]["selector_conflicts_fail_closed"] == Value::Bool(true)
+            && migration["installation"]["retained_generations_persisted_atomically"]
+                == Value::Bool(true)
+            && migration["installation"]["selected_generation_reloaded_on_open"]
+                == Value::Bool(true)
             && migration["rollback"]["supported"] == Value::Bool(true)
             && migration["rollback"]["partial_generation_selected"] == Value::Bool(false)
             && migration["rollback"]["unseen_older_generation_accepted"] == Value::Bool(false),
@@ -3659,7 +3714,7 @@ fn check_full_regression(root: &Path) -> TaskResult {
         "cargo xtask certification --check",
         "cargo xtask carddemo-full --check",
         "Zowe CLI 8.36.0",
-        "cargo xtask release --check",
+        "cargo xtask release --check --target",
         "git diff --check",
     ] {
         require(
@@ -3687,11 +3742,26 @@ fn check_full_regression(root: &Path) -> TaskResult {
         "full regression workload, PostgreSQL, CardDemo, Zowe, or release result is incomplete",
     )?;
     for (name, relative) in [
-        ("manifest_sha256", "release/0.2.0/manifest.json"),
-        ("sbom_sha256", "release/0.2.0/sbom.cdx.json"),
-        ("provenance_sha256", "release/0.2.0/provenance.intoto.json"),
-        ("checksums_sha256", "release/0.2.0/checksums.sha256"),
-        ("licenses_sha256", "release/0.2.0/LICENSES.md"),
+        (
+            "manifest_sha256",
+            "release/0.2.0/targets/aarch64-apple-darwin/manifest.json",
+        ),
+        (
+            "sbom_sha256",
+            "release/0.2.0/targets/aarch64-apple-darwin/sbom.cdx.json",
+        ),
+        (
+            "provenance_sha256",
+            "release/0.2.0/targets/aarch64-apple-darwin/provenance.intoto.json",
+        ),
+        (
+            "checksums_sha256",
+            "release/0.2.0/targets/aarch64-apple-darwin/checksums.sha256",
+        ),
+        (
+            "licenses_sha256",
+            "release/0.2.0/targets/aarch64-apple-darwin/LICENSES.md",
+        ),
     ] {
         require(
             receipt["release"][name].as_str() == Some(file_digest(&root.join(relative))?.as_str()),
@@ -3720,6 +3790,112 @@ fn check_full_regression(root: &Path) -> TaskResult {
                 .join("conformance/0.2/schemas/full-regression.schema.json")
                 .is_file(),
         "full regression contract or schema is missing",
+    )
+}
+
+fn check_review_repair(root: &Path) -> TaskResult {
+    check_application_packages(root)?;
+    check_db2_catalog(root)?;
+    check_batch_controllers(root)?;
+    let path = root.join("conformance/0.2/evidence/review-repair.json");
+    let evidence = json(&path)?;
+    require(
+        evidence["schema_version"] == Value::String("mainframe-env.review-repair@1".into())
+            && evidence["derived"] == Value::Bool(true)
+            && evidence["status"] == Value::String("pass".into()),
+        "review repair evidence header is invalid",
+    )?;
+    let receipt = evidence
+        .get("receipt")
+        .and_then(Value::as_object)
+        .ok_or("review repair receipt is missing")?;
+    let canonical = serde_json::to_vec(receipt).map_err(|error| error.to_string())?;
+    let digest = format!("sha256:{:x}", Sha256::digest(canonical));
+    require(
+        evidence["evidence_digest"].as_str() == Some(digest.as_str()),
+        "review repair evidence digest is stale",
+    )?;
+    let receipt = Value::Object(receipt.clone());
+    require(
+        receipt["target_version"] == Value::String("0.2.0".into())
+            && receipt["source_identity"]
+                == Value::String("cf834b8d57514f933d1ff6d439949ffb0b8065fa".into())
+            && receipt["candidate_source_digest"].as_str()
+                == Some(repository_digest(root)?.as_str()),
+        "review repair candidate identity drifted",
+    )?;
+    let findings = array(&receipt, "findings", &path)?;
+    require(
+        findings.len() == 7
+            && findings.iter().enumerate().all(|(index, finding)| {
+                finding["id"].as_u64() == Some((index + 1) as u64)
+                    && finding["state"] == Value::String("closed".into())
+                    && finding["regression"]
+                        .as_str()
+                        .is_some_and(|test| !test.is_empty())
+            }),
+        "review repair must close exactly findings 1 through 7 with regressions",
+    )?;
+    let commands = array(&receipt, "commands", &path)?;
+    require(
+        commands.len() >= 15
+            && commands
+                .iter()
+                .all(|command| command["exit_code"].as_i64() == Some(0)),
+        "review repair validation matrix is incomplete or failed",
+    )?;
+    let command_texts = commands
+        .iter()
+        .filter_map(|command| command["command"].as_str())
+        .collect::<Vec<_>>();
+    for required in [
+        "cargo test -p mainframe-env-application",
+        "cargo test -p mainframe-env-batch",
+        "cargo test -p mainframe-env-db2",
+        "cargo test -p mainframe-env-server",
+        "cargo fmt --all -- --check",
+        "cargo check --workspace --all-targets --all-features --locked",
+        "cargo test --workspace --all-features --locked --no-fail-fast",
+        "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings",
+        "cargo doc --workspace --all-features --no-deps --locked",
+        "cargo +1.95.0 check",
+        "cargo deny check",
+        "cargo xtask runtime-architecture --check",
+        "cargo xtask carddemo-full --check",
+        "cargo xtask release --check --target aarch64-apple-darwin",
+        "git diff --check",
+    ] {
+        require(
+            command_texts
+                .iter()
+                .any(|command| command.contains(required)),
+            &format!("review repair validation omits {required}"),
+        )?;
+    }
+    for artifact in array(&receipt, "artifacts", &path)? {
+        let relative = text(artifact, "path", &path)?;
+        let expected = text(artifact, "sha256", &path)?;
+        require(
+            expected == format!("sha256:{}", file_digest(&root.join(relative))?),
+            &format!("review repair artifact digest drifted: {relative}"),
+        )?;
+    }
+    let workflow = read(&root.join(".github/workflows/ci.yml"))?;
+    require(
+        workflow.contains("fetch-depth: 0")
+            && workflow.contains("fetch-tags: true")
+            && workflow.contains("cargo xtask release --check --target x86_64-unknown-linux-gnu"),
+        "CI does not exercise full-history conformance and portable release verification",
+    )?;
+    let manifest = json(&root.join("release/0.2.0/targets/aarch64-apple-darwin/manifest.json"))?;
+    require(
+        manifest["target"] == Value::String("aarch64-apple-darwin".into())
+            && manifest["published"] == Value::Bool(false)
+            && receipt["remote_actions"]["tagged"] == Value::Bool(false)
+            && receipt["remote_actions"]["published"] == Value::Bool(false)
+            && receipt["remote_actions"]["deployed"] == Value::Bool(false)
+            && receipt["remote_actions"]["merged"] == Value::Bool(false),
+        "review repair crossed the release boundary",
     )
 }
 
@@ -4125,7 +4301,7 @@ fn check_certification(root: &Path) -> TaskResult {
         workspace_tests.success(),
         "certification workspace tests failed",
     )?;
-    check_release_artifacts(root)?;
+    check_release_artifacts(root, &host_target(root)?)?;
     Ok(())
 }
 
@@ -4149,6 +4325,7 @@ fn repository_digest(root: &Path) -> TaskResult<String> {
             || relative == Path::new("conformance/0.2/evidence/program-status.json")
             || relative == Path::new("conformance/0.2/evidence/workload-ledger.json")
             || relative == Path::new("conformance/0.2/evidence/full-regression.json")
+            || relative == Path::new("conformance/0.2/evidence/review-repair.json")
             || relative == Path::new("conformance/0.2/evidence/work-packages/CV-209.json")
             || relative == Path::new("docs/delivery/coverage-versions/status/0.2.0.md")
             || (relative_text.starts_with("conformance/0.1/evidence/phase-v")
@@ -4166,8 +4343,72 @@ fn repository_digest(root: &Path) -> TaskResult<String> {
     Ok(format!("sha256:{:x}", digest.finalize()))
 }
 
-fn generate_release_artifacts(root: &Path) -> TaskResult {
-    let documents = release_documents(root)?;
+fn explicit_release_target(arguments: &[String]) -> TaskResult<String> {
+    let positions = arguments
+        .iter()
+        .enumerate()
+        .filter_map(|(index, argument)| (argument == "--target").then_some(index))
+        .collect::<Vec<_>>();
+    require(
+        positions.len() == 1,
+        "release requires exactly one --target <triple>",
+    )?;
+    let target = arguments
+        .get(positions[0] + 1)
+        .ok_or("release --target value is missing")?;
+    validate_release_target(target)?;
+    Ok(target.clone())
+}
+
+fn validate_release_target(target: &str) -> TaskResult {
+    require(
+        !target.is_empty()
+            && target.len() <= 128
+            && target
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.')),
+        "release target is invalid",
+    )
+}
+
+fn host_target(root: &Path) -> TaskResult<String> {
+    let verbose = command_text(root, "rustc", &["-vV"])?;
+    let target = verbose
+        .lines()
+        .find_map(|line| line.strip_prefix("host: "))
+        .ok_or("rustc host target is missing")?;
+    validate_release_target(target)?;
+    Ok(target.into())
+}
+
+fn build_release_target(root: &Path, target: &str) -> TaskResult {
+    validate_release_target(target)?;
+    let status = Command::new("cargo")
+        .args([
+            "build",
+            "--release",
+            "-p",
+            "mainframe-env-server",
+            "-p",
+            "mainframe-env-cli",
+            "--all-features",
+            "--locked",
+            "--target",
+            target,
+        ])
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("cargo release build for {target}: {error}"))?;
+    require(
+        status.success(),
+        &format!("release build failed for {target}"),
+    )
+}
+
+fn generate_release_artifacts(root: &Path, target: &str) -> TaskResult {
+    build_release_target(root, target)?;
+    let documents = release_documents(root, target)?;
+    validate_release_documents(&documents, target)?;
     for (relative, bytes) in documents {
         let path = root.join(relative);
         if let Some(parent) = path.parent() {
@@ -4178,19 +4419,161 @@ fn generate_release_artifacts(root: &Path) -> TaskResult {
     Ok(())
 }
 
-fn check_release_artifacts(root: &Path) -> TaskResult {
-    for (relative, expected) in release_documents(root)? {
-        let path = root.join(&relative);
-        let actual = fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?;
+fn check_release_artifacts(root: &Path, target: &str) -> TaskResult {
+    build_release_target(root, target)?;
+    let documents = release_documents(root, target)?;
+    validate_release_documents(&documents, target)?;
+    let directory = root.join(format!(
+        "release/{}/targets/{target}",
+        read(&root.join("VERSION"))?.trim()
+    ));
+    if directory.is_dir() {
+        for (relative, expected) in documents {
+            let path = root.join(&relative);
+            let actual = fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?;
+            require(
+                actual == expected,
+                &format!(
+                    "{} is stale; run cargo xtask release --target {target}",
+                    relative.display()
+                ),
+            )?;
+        }
+    }
+    validate_checked_in_release_targets(root)?;
+    Ok(())
+}
+
+fn validate_checked_in_release_targets(root: &Path) -> TaskResult {
+    let version = read(&root.join("VERSION"))?.trim().to_string();
+    let directory = root.join(format!("release/{version}/targets"));
+    if !directory.is_dir() {
+        return Ok(());
+    }
+    for entry in
+        fs::read_dir(&directory).map_err(|error| format!("{}: {error}", directory.display()))?
+    {
+        let path = entry.map_err(|error| error.to_string())?.path();
+        if !path.is_dir() {
+            return Err(format!(
+                "release target directory contains non-directory {}",
+                path.display()
+            ));
+        }
+        let target = path
+            .file_name()
+            .and_then(OsStr::to_str)
+            .ok_or("release receipt target is not UTF-8")?;
+        validate_release_target(target)?;
+        let mut documents = BTreeMap::new();
+        for name in [
+            "manifest.json",
+            "sbom.cdx.json",
+            "provenance.intoto.json",
+            "checksums.sha256",
+            "LICENSES.md",
+        ] {
+            let document = path.join(name);
+            documents.insert(
+                document
+                    .strip_prefix(root)
+                    .map_err(|error| error.to_string())?
+                    .to_path_buf(),
+                fs::read(&document).map_err(|error| format!("{}: {error}", document.display()))?,
+            );
+        }
+        validate_release_documents(&documents, target)?;
+    }
+    Ok(())
+}
+
+fn validate_release_documents(documents: &BTreeMap<PathBuf, Vec<u8>>, target: &str) -> TaskResult {
+    require(documents.len() == 5, "target release receipt is incomplete")?;
+    let document = |name: &str| {
+        documents
+            .iter()
+            .find_map(|(path, bytes)| (path.file_name() == Some(OsStr::new(name))).then_some(bytes))
+            .ok_or_else(|| format!("target release receipt omits {name}"))
+    };
+    let manifest: Value = serde_json::from_slice(document("manifest.json")?)
+        .map_err(|error| format!("release manifest: {error}"))?;
+    let sbom: Value = serde_json::from_slice(document("sbom.cdx.json")?)
+        .map_err(|error| format!("release SBOM: {error}"))?;
+    let provenance: Value = serde_json::from_slice(document("provenance.intoto.json")?)
+        .map_err(|error| format!("release provenance: {error}"))?;
+    let checksums = std::str::from_utf8(document("checksums.sha256")?)
+        .map_err(|error| format!("release checksums: {error}"))?;
+    let licenses = std::str::from_utf8(document("LICENSES.md")?)
+        .map_err(|error| format!("release licenses: {error}"))?;
+    require(
+        manifest["schema_version"] == Value::String("mainframe-env.release-manifest@1".into())
+            && manifest["target"] == Value::String(target.into())
+            && manifest["published"] == Value::Bool(false)
+            && sbom["bomFormat"] == Value::String("CycloneDX".into())
+            && sbom["specVersion"] == Value::String("1.6".into())
+            && provenance["predicateType"]
+                == Value::String("https://slsa.dev/provenance/v1".into())
+            && provenance["predicate"]["buildDefinition"]["externalParameters"]["target"]
+                == Value::String(target.into())
+            && licenses.starts_with("# License expressions\n"),
+        "target release receipt metadata is inconsistent",
+    )?;
+    let artifacts = manifest["artifacts"]
+        .as_array()
+        .ok_or("release manifest artifacts are missing")?;
+    require(
+        artifacts.len() == 5,
+        "release manifest artifact count drifted",
+    )?;
+    for artifact in artifacts {
+        let path = artifact["path"]
+            .as_str()
+            .ok_or("release artifact path is missing")?;
+        let digest = artifact["sha256"]
+            .as_str()
+            .ok_or("release artifact digest is missing")?;
+        validate_sha256_hex(digest, "release artifact digest")?;
         require(
-            actual == expected,
-            &format!("{} is stale; run cargo xtask release", relative.display()),
+            checksums
+                .lines()
+                .any(|line| line == format!("{digest}  {path}")),
+            &format!("release checksums omit {path}"),
+        )?;
+    }
+    for (name, path) in [
+        ("mainframe-env-server", "bin/mainframe-env-server"),
+        ("mainframe-env", "bin/mainframe-env"),
+    ] {
+        let digest = artifacts
+            .iter()
+            .find(|artifact| artifact["path"].as_str() == Some(path))
+            .and_then(|artifact| artifact["sha256"].as_str())
+            .ok_or_else(|| format!("release manifest omits {path}"))?;
+        require(
+            provenance["subject"].as_array().is_some_and(|subjects| {
+                subjects.iter().any(|subject| {
+                    subject["name"].as_str() == Some(name)
+                        && subject["digest"]["sha256"].as_str() == Some(digest)
+                })
+            }),
+            &format!("release provenance omits {name}"),
         )?;
     }
     Ok(())
 }
 
-fn release_documents(root: &Path) -> TaskResult<BTreeMap<PathBuf, Vec<u8>>> {
+fn validate_sha256_hex(value: &str, field: &str) -> TaskResult {
+    require(
+        value.len() == 64
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()),
+        &format!("{field} is not a lowercase SHA-256 digest"),
+    )
+}
+
+fn release_documents(root: &Path, target: &str) -> TaskResult<BTreeMap<PathBuf, Vec<u8>>> {
+    validate_release_target(target)?;
     let version = read(&root.join("VERSION"))?.trim().to_string();
     let release_config: toml::Value = read(&root.join("release.toml"))?
         .parse()
@@ -4198,11 +4581,26 @@ fn release_documents(root: &Path) -> TaskResult<BTreeMap<PathBuf, Vec<u8>>> {
     let channel = release_config["product"]["channel"]
         .as_str()
         .ok_or("product.channel is missing")?;
-    let directory = PathBuf::from(format!("release/{version}"));
-    let server = root.join("target/release/mainframe-env-server");
-    let cli = root.join("target/release/mainframe-env");
-    require(server.is_file(), "release server binary has not been built")?;
-    require(cli.is_file(), "release CLI binary has not been built")?;
+    let directory = PathBuf::from(format!("release/{version}/targets/{target}"));
+    let executable_suffix = if target.contains("windows") {
+        ".exe"
+    } else {
+        ""
+    };
+    let server = root.join(format!(
+        "target/{target}/release/mainframe-env-server{executable_suffix}"
+    ));
+    let cli = root.join(format!(
+        "target/{target}/release/mainframe-env{executable_suffix}"
+    ));
+    require(
+        server.is_file(),
+        &format!("release server binary was not built for {target}"),
+    )?;
+    require(
+        cli.is_file(),
+        &format!("release CLI binary was not built for {target}"),
+    )?;
     let server_digest = file_digest(&server)?;
     let cli_digest = file_digest(&cli)?;
     let lock_digest = file_digest(&root.join("Cargo.lock"))?;
@@ -4288,7 +4686,7 @@ fn release_documents(root: &Path) -> TaskResult<BTreeMap<PathBuf, Vec<u8>>> {
         "channel":channel,
         "phase_base_revision":phase_base,
         "toolchain":rustc,
-        "target":format!("{}-{}",std::env::consts::ARCH,std::env::consts::OS),
+        "target":target,
         "profile":"release/core-server",
         "contracts":"conformance/0.2/inventory/versions.json",
         "migration_head":"0001-durable-state",
@@ -4312,10 +4710,10 @@ fn release_documents(root: &Path) -> TaskResult<BTreeMap<PathBuf, Vec<u8>>> {
         "predicate":{
             "buildDefinition":{
                 "buildType":"mainframe-env.cargo-release@1",
-                "externalParameters":{"profile":"release","locked":true,"all_features":true},
+                "externalParameters":{"profile":"release","locked":true,"all_features":true,"target":target},
                 "resolvedDependencies":[{"uri":"Cargo.lock","digest":{"sha256":lock_digest}}]
             },
-            "runDetails":{"builder":{"id":"local-codex-workspace"},"metadata":{"invocationId":format!("mainframe-env-v{version}-local")}}
+            "runDetails":{"builder":{"id":format!("mainframe-env-cargo/{target}")},"metadata":{"invocationId":format!("mainframe-env-v{version}-{target}-local")}}
         }
     });
     let mut licenses = packages
@@ -4448,6 +4846,36 @@ fn require(condition: bool, message: &str) -> TaskResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn release_target_is_explicit_unique_and_safely_bounded() {
+        assert_eq!(
+            explicit_release_target(&["--check".into()]),
+            Err("release requires exactly one --target <triple>".into())
+        );
+        assert_eq!(
+            explicit_release_target(&[
+                "--target".into(),
+                "x86_64-unknown-linux-gnu".into(),
+                "--target".into(),
+                "aarch64-apple-darwin".into(),
+            ]),
+            Err("release requires exactly one --target <triple>".into())
+        );
+        assert_eq!(
+            explicit_release_target(&["--target".into(), "../host".into()]),
+            Err("release target is invalid".into())
+        );
+        assert_eq!(
+            explicit_release_target(&[
+                "--check".into(),
+                "--target".into(),
+                "x86_64-unknown-linux-gnu".into(),
+            ])
+            .unwrap(),
+            "x86_64-unknown-linux-gnu"
+        );
+    }
 
     #[test]
     fn forbidden_core_infrastructure_edge_is_rejected() {

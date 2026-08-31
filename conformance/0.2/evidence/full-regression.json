@@ -3,7 +3,7 @@
   "target_version": "0.2.0",
   "status": "pass",
   "candidate": {
-    "source_digest": "sha256:8e3bfbe245243522a265e5251725b6d1c5131e5b2ed6f6f4065c3928774b661a",
+    "source_digest": "sha256:4d287940960b1c645364d38605f975b3dc3302999c97f04cdfc0b69a4d4eb159",
     "work_package_base_commit": "edb4558c987a56ee9f0c96438f756d663199942f",
     "accepted_release_commit": "44f3081eb2fdf22d09e1a97725f5a4163431ca70",
     "accepted_release_tree": "3d504ece02f1c09e124606ded695b00ba984d104",
@@ -23,7 +23,7 @@
   "results": [
     {"command": "cargo fmt --all -- --check", "exit_code": 0, "result": "pass"},
     {"command": "cargo check --workspace --all-targets --all-features --locked", "exit_code": 0, "result": "pass"},
-    {"command": "MAINFRAME_ENV_POSTGRES_TEST_URL=<disposable> cargo test --workspace --all-features --locked --no-fail-fast", "exit_code": 0, "result": "280 passed, 3 explicitly ignored"},
+    {"command": "MAINFRAME_ENV_POSTGRES_TEST_URL=<disposable> cargo test --workspace --all-features --locked --no-fail-fast", "exit_code": 0, "result": "289 passed, 3 explicitly ignored"},
     {"command": "MAINFRAME_ENV_POSTGRES_TEST_URL=<disposable> cargo test -p mainframe-env-store durable::tests::postgres18_migration_and_durable_contracts --all-features --locked -- --ignored --exact", "exit_code": 0, "result": "PostgreSQL 18 migration, execution, provider-state, replay, and restart controls passed"},
     {"command": "MAINFRAME_ENV_POSTGRES_TEST_URL=<disposable> cargo test -p mainframe-env-conformance carddemo::tests::carddemo_full_memory_sqlite_and_postgres_controls --all-features --locked -- --ignored --exact", "exit_code": 0, "result": "memory, SQLite backup/restore, PostgreSQL restart, overload, and principal-isolation controls passed"},
     {"command": "CARDDEMO_CORPUS_DIR=<clean-pin> MAINFRAME_ENV_POSTGRES_TEST_URL=<disposable> cargo xtask carddemo-full --check", "exit_code": 0, "result": "20/20 journeys; full shape sha256:d4701b06593307c36c2355f9a06c21e79a0969588816bdecf522ee7b0033bed3"},
@@ -36,12 +36,12 @@
     {"command": "cargo xtask architecture --check && cargo xtask profiles --check && cargo xtask schemas --check && cargo xtask inventory --check && cargo xtask evidence --check && cargo xtask coverage --check", "exit_code": 0, "result": "pass"},
     {"command": "cargo xtask conformance --check", "exit_code": 0, "result": "all 0.1 historical and 0.2 catalog, registry, dehardcoding, ledger, migration, and regression gates pass"},
     {"command": "cargo xtask certification --check", "exit_code": 0, "result": "release-mode smoke, workspace tests, package/authority closure, and release artifacts pass"},
-    {"command": "cargo xtask release --check", "exit_code": 0, "result": "local 0.2.0 manifest, SBOM, provenance, checksums, and licenses reproduce"},
+    {"command": "cargo xtask release --check --target aarch64-apple-darwin", "exit_code": 0, "result": "target-specific local 0.2.0 manifest, SBOM, provenance, checksums, and licenses reproduce after an explicit-target build"},
     {"command": "git diff --check", "exit_code": 0, "result": "pass"}
   ],
   "workspace": {
     "test_floor": 260,
-    "tests_passed": 280,
+    "tests_passed": 289,
     "tests_ignored_in_workspace_command": 3,
     "failures": 0,
     "strict_clippy": true,
@@ -77,10 +77,11 @@
   "release": {
     "artifacts_verified": true,
     "version": "0.2.0",
-    "manifest_sha256": "0fbb8a509d6f8ab453726086325b5a15db483437a12ac4bfd72565fdf7d8d7dc",
+    "target": "aarch64-apple-darwin",
+    "manifest_sha256": "8c3f0250953e02a02d06aa9ad1be6a3450cc70c3c515c3cd9a7376b8a10c11ae",
     "sbom_sha256": "1b8d4b267a6c038743eff109fd4217a5e26c38011fcbbff4d385d04296065de7",
-    "provenance_sha256": "ce2e0057a5ca00a25d40537a75e4042151441a46f6b729be049d35fc6f03a2ad",
-    "checksums_sha256": "7e79be1f70614819484f3996f0c1e901f401f030097b2b2ed2fbe318690b3e37",
+    "provenance_sha256": "a864e894cbf4359fa169987cb8609ae6663d792f1e1c96d79a784f722d993fd2",
+    "checksums_sha256": "a345c6531d798bcbd6ea04136028e62ba233d7dcc6e370fabaec54b3bc47c05d",
     "licenses_sha256": "3fdd41495a7c2679e00e562c81f2f324252be10d478ee01c5cbc0c723d631bc6",
     "published": false
   },

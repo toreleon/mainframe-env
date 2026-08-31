@@ -16,8 +16,8 @@ pub use package_v2::{
     BATCH_CONTROLLER_SECTION_CONTRACT, BatchController, BatchControllerKind, HostSubsystem,
     IMS_SECTION_CONTRACT, ImsDefinition, ImsSeedRow, MQ_SECTION_CONTRACT, MqResource,
     MqResourceKind, PackageLimits, PackageSignature, PackageSignatureVerifier,
-    SECURITY_RESOURCE_SECTION_CONTRACT, SQL_SECTION_CONTRACT, SecurityResource, SqlColumn,
-    SqlSeedRow, SqlTable, package_v2_identity,
+    SECURITY_RESOURCE_SECTION_CONTRACT, SQL_SECTION_CONTRACT, SecurityResource,
+    SelectedApplicationGeneration, SqlColumn, SqlSeedRow, SqlTable, package_v2_identity,
 };
 
 pub const APPLICATION_PACKAGE_CONTRACT: &str = "mainframe-env.application-package@1";

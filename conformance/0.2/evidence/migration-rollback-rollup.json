@@ -10,7 +10,7 @@
     {
       "id": "application-package-v1-to-v2",
       "path": "conformance/0.2/migrations/application-package-v1-to-v2.json",
-      "sha256": "sha256:672526e70dda7c547aa7ec168b7d467f1945881cd4b9cddaf94903267743af48",
+      "sha256": "sha256:699eeb7514def86e03a19c72113a8a5b1437799e8edb30cbe1ec2563dd9d8942",
       "destructive": false,
       "rollback_supported": true,
       "partial_state_selected": false,
@@ -19,7 +19,7 @@
     {
       "id": "batch-controller-v0-to-v1",
       "path": "conformance/0.2/migrations/batch-controller-v0-to-v1.json",
-      "sha256": "sha256:c2b026283741f93368c3b6fcd1ae753653c89d08c873c39eeeedf3c244462e9a",
+      "sha256": "sha256:549c2254413b9a95e28870237f4e05a2b9ebdbafafd76abede66f7f91c30d3b9",
       "destructive": false,
       "rollback_supported": true,
       "partial_state_selected": false,
@@ -28,7 +28,7 @@
     {
       "id": "db2-catalog-v1-to-v2",
       "path": "conformance/0.2/migrations/db2-catalog-v1-to-v2.json",
-      "sha256": "sha256:c4e62f817c8c074d98dbd86ade1a711eaa7b57dc2f8b74589c417d54222e8e74",
+      "sha256": "sha256:84375fa6ba89212f7534a6f208aa9976150d9cc440dc30768bf6be2d4034bad5",
       "destructive": false,
       "rollback_supported": true,
       "partial_state_selected": false,

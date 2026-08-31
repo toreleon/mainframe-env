@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const BATCH_CONTROLLER_REGISTRY_CONTRACT: &str = "mainframe-env.batch-controller-registry@1";
+pub(crate) const BATCH_CONTROLLER_STATE_CONTRACT: &str = "mainframe-env.batch-controller-state@1";
 const MAX_APPLICATIONS: usize = 1_024;
 const MAX_ACTIVE_CONTROLLERS: usize = 16_384;
 const MAX_RETAINED_GENERATIONS: usize = 64;
@@ -41,7 +42,7 @@ impl BatchControllerSelector {
         })
     }
 
-    pub(crate) fn program(&self) -> &str {
+    pub fn program(&self) -> &str {
         match self {
             Self::TsoRun { program } | Self::ImsController { program, .. } => program,
         }
@@ -169,9 +170,44 @@ impl BatchControllerPlan {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct BatchControllerProgram {
+    pub path: String,
+    pub identity: String,
+}
+
+impl BatchControllerProgram {
+    fn normalized(&self) -> Result<(Self, String), HostProblem> {
+        validate_identity(&self.identity)?;
+        if self.path.starts_with('/')
+            || self
+                .path
+                .split('/')
+                .any(|component| component.is_empty() || matches!(component, "." | ".."))
+            || !self.path.starts_with("program/")
+        {
+            return Err(HostProblem::Malformed);
+        }
+        let name = self
+            .path
+            .rsplit('/')
+            .next()
+            .ok_or(HostProblem::Malformed)
+            .and_then(|name| normalized_name(name, 128))?;
+        Ok((
+            Self {
+                path: self.path.clone(),
+                identity: self.identity.to_ascii_lowercase(),
+            },
+            name,
+        ))
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BatchControllerDefinition {
     pub name: String,
     pub selector: BatchControllerSelector,
+    pub program: BatchControllerProgram,
     pub plan: BatchControllerPlan,
 }
 
@@ -197,6 +233,7 @@ pub struct BatchControllerInstallReceipt {
 pub(crate) struct ResolvedBatchController {
     pub name: String,
     pub selector: BatchControllerSelector,
+    pub program: BatchControllerProgram,
     pub plan: BatchControllerPlan,
 }
 
@@ -204,6 +241,7 @@ pub(crate) struct ResolvedBatchController {
 struct InstalledGeneration {
     identity: String,
     controllers: BTreeMap<BatchControllerSelector, ResolvedBatchController>,
+    generation: BatchControllerGeneration,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -212,7 +250,20 @@ struct InstalledApplication {
     generations: BTreeMap<u64, InstalledGeneration>,
 }
 
-#[derive(Default)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub(crate) struct RetainedBatchControllerApplication {
+    application: String,
+    selected: u64,
+    generations: Vec<BatchControllerGeneration>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub(crate) struct BatchControllerRegistryState {
+    schema_version: String,
+    applications: Vec<RetainedBatchControllerApplication>,
+}
+
+#[derive(Clone, Default)]
 pub(crate) struct BatchControllerRegistry {
     applications: BTreeMap<String, InstalledApplication>,
     controllers: BTreeMap<BatchControllerSelector, (String, ResolvedBatchController)>,
@@ -237,12 +288,19 @@ impl BatchControllerRegistry {
         {
             return Err(HostProblem::ResourceExhausted);
         }
+        let generation_number = generation.generation;
+        let generation_identity = generation.identity.clone();
         let mut names = BTreeSet::new();
         let mut replacement = BTreeMap::new();
+        let mut normalized_definitions = Vec::with_capacity(generation.controllers.len());
         for definition in generation.controllers {
             let name = normalized_name(&definition.name, 128)?;
             let selector = definition.selector.normalized()?;
+            let (program, program_name) = definition.program.normalized()?;
             definition.plan.validate()?;
+            if selector.program() != program_name {
+                return Err(HostProblem::Malformed);
+            }
             if !matches!(
                 (&selector, &definition.plan),
                 (
@@ -262,16 +320,30 @@ impl BatchControllerRegistry {
                     .insert(
                         selector.clone(),
                         ResolvedBatchController {
-                            name,
-                            selector,
-                            plan: definition.plan,
+                            name: name.clone(),
+                            selector: selector.clone(),
+                            program: program.clone(),
+                            plan: definition.plan.clone(),
                         },
                     )
                     .is_some()
             {
                 return Err(HostProblem::IdempotencyConflict);
             }
+            normalized_definitions.push(BatchControllerDefinition {
+                name,
+                selector,
+                program,
+                plan: definition.plan,
+            });
         }
+        let retained_generation = BatchControllerGeneration {
+            schema_version: BATCH_CONTROLLER_REGISTRY_CONTRACT.into(),
+            application: application.clone(),
+            generation: generation_number,
+            identity: generation_identity.clone(),
+            controllers: normalized_definitions,
+        };
         let selected = self
             .applications
             .get(&application)
@@ -279,16 +351,16 @@ impl BatchControllerRegistry {
         if let Some(installed) = self
             .applications
             .get(&application)
-            .and_then(|installed| installed.generations.get(&generation.generation))
+            .and_then(|installed| installed.generations.get(&generation_number))
         {
-            if installed.identity != generation.identity || installed.controllers != replacement {
+            if installed.identity != generation_identity || installed.controllers != replacement {
                 return Err(HostProblem::IdempotencyConflict);
             }
-            if selected == Some(generation.generation) {
+            if selected == Some(generation_number) {
                 return Ok(BatchControllerInstallReceipt {
                     application,
-                    generation: generation.generation,
-                    identity: generation.identity,
+                    generation: generation_number,
+                    identity: generation_identity,
                     controllers: installed.controllers.len(),
                     replayed: true,
                 });
@@ -297,7 +369,7 @@ impl BatchControllerRegistry {
             .applications
             .get(&application)
             .and_then(|installed| installed.generations.keys().next_back().copied())
-            .is_some_and(|latest| generation.generation < latest)
+            .is_some_and(|latest| generation_number < latest)
         {
             return Err(HostProblem::IdempotencyConflict);
         }
@@ -308,7 +380,7 @@ impl BatchControllerRegistry {
         if !self
             .applications
             .get(&application)
-            .is_some_and(|installed| installed.generations.contains_key(&generation.generation))
+            .is_some_and(|installed| installed.generations.contains_key(&generation_number))
             && retained >= MAX_RETAINED_GENERATIONS
         {
             return Err(HostProblem::ResourceExhausted);
@@ -357,19 +429,119 @@ impl BatchControllerRegistry {
         let installed = self.applications.entry(application.clone()).or_default();
         installed
             .generations
-            .entry(generation.generation)
+            .entry(generation_number)
             .or_insert_with(|| InstalledGeneration {
-                identity: generation.identity.clone(),
+                identity: generation_identity.clone(),
                 controllers: replacement,
+                generation: retained_generation,
             });
-        installed.selected = Some(generation.generation);
+        installed.selected = Some(generation_number);
         Ok(BatchControllerInstallReceipt {
             application,
-            generation: generation.generation,
-            identity: generation.identity,
+            generation: generation_number,
+            identity: generation_identity,
             controllers: names.len(),
             replayed: false,
         })
+    }
+
+    pub(crate) fn select(
+        &mut self,
+        application: &str,
+        generation: u64,
+    ) -> Result<BatchControllerInstallReceipt, HostProblem> {
+        let application = normalized_name(application, 128)?;
+        let retained = self
+            .applications
+            .get(&application)
+            .and_then(|installed| installed.generations.get(&generation))
+            .map(|installed| installed.generation.clone())
+            .ok_or(HostProblem::NotFound)?;
+        self.install(retained)
+    }
+
+    pub(crate) fn state(&self) -> BatchControllerRegistryState {
+        BatchControllerRegistryState {
+            schema_version: BATCH_CONTROLLER_STATE_CONTRACT.into(),
+            applications: self
+                .applications
+                .iter()
+                .filter_map(|(application, installed)| {
+                    installed
+                        .selected
+                        .map(|selected| RetainedBatchControllerApplication {
+                            application: application.clone(),
+                            selected,
+                            generations: installed
+                                .generations
+                                .values()
+                                .map(|generation| generation.generation.clone())
+                                .collect(),
+                        })
+                })
+                .collect(),
+        }
+    }
+
+    pub(crate) fn from_state(state: BatchControllerRegistryState) -> Result<Self, HostProblem> {
+        if state.schema_version != BATCH_CONTROLLER_STATE_CONTRACT
+            || state.applications.len() > MAX_APPLICATIONS
+        {
+            return Err(HostProblem::Malformed);
+        }
+        let mut registry = Self::default();
+        let mut applications = BTreeSet::new();
+        for application in state.applications {
+            let normalized = normalized_name(&application.application, 128)?;
+            if !applications.insert(normalized.clone())
+                || application.generations.is_empty()
+                || application.generations.len() > MAX_RETAINED_GENERATIONS
+            {
+                return Err(HostProblem::Malformed);
+            }
+            let mut generations = application.generations;
+            generations.sort_by_key(|generation| generation.generation);
+            let mut isolated = Self::default();
+            for generation in generations {
+                if normalized_name(&generation.application, 128)? != normalized {
+                    return Err(HostProblem::Malformed);
+                }
+                isolated.install(generation)?;
+            }
+            isolated.select(&normalized, application.selected)?;
+            let installed = isolated
+                .applications
+                .remove(&normalized)
+                .ok_or(HostProblem::Malformed)?;
+            registry.applications.insert(normalized, installed);
+        }
+        let selected = registry
+            .applications
+            .iter()
+            .map(|(application, installed)| {
+                let generation = installed
+                    .selected
+                    .and_then(|selected| installed.generations.get(&selected))
+                    .ok_or(HostProblem::Malformed)?;
+                Ok((application.clone(), generation.controllers.clone()))
+            })
+            .collect::<Result<Vec<_>, HostProblem>>()?;
+        for (application, controllers) in selected {
+            if registry.controllers.len().saturating_add(controllers.len()) > MAX_ACTIVE_CONTROLLERS
+            {
+                return Err(HostProblem::ResourceExhausted);
+            }
+            for (selector, controller) in controllers {
+                if registry
+                    .controllers
+                    .insert(selector, (application.clone(), controller))
+                    .is_some()
+                {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+            }
+        }
+        Ok(registry)
     }
 
     pub(crate) fn resolve(
@@ -442,6 +614,10 @@ mod tests {
                 selector: BatchControllerSelector::TsoRun {
                     program: program.into(),
                 },
+                program: BatchControllerProgram {
+                    path: format!("program/{program}"),
+                    identity: format!("sha256:{:064x}", generation + 100),
+                },
                 plan: BatchControllerPlan::ProgramCall,
             }],
         }
@@ -501,6 +677,39 @@ mod tests {
         assert_eq!(
             registry.install(other),
             Err(HostProblem::IdempotencyConflict)
+        );
+    }
+
+    #[test]
+    fn selector_program_must_be_the_validated_package_artifact() {
+        let mut registry = BatchControllerRegistry::default();
+        let mut bypass = generation(1, "EXPECTED");
+        bypass.controllers[0].program.path = "program/DUMMY-MANIFEST".into();
+        assert_eq!(registry.install(bypass), Err(HostProblem::Malformed));
+        assert!(
+            registry
+                .resolve(&BatchControllerSelector::tso("EXPECTED").unwrap())
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn durable_state_rebuilds_selected_generation_and_retains_rollback() {
+        let mut registry = BatchControllerRegistry::default();
+        registry.install(generation(1, "FIRST")).unwrap();
+        registry.install(generation(2, "SECOND")).unwrap();
+        registry.select("EXAMPLE", 1).unwrap();
+
+        let restored = BatchControllerRegistry::from_state(registry.state()).unwrap();
+        assert!(
+            restored
+                .resolve(&BatchControllerSelector::tso("FIRST").unwrap())
+                .is_some()
+        );
+        assert!(
+            restored
+                .resolve(&BatchControllerSelector::tso("SECOND").unwrap())
+                .is_none()
         );
     }
 }

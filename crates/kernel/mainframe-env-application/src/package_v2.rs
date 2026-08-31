@@ -175,7 +175,22 @@ pub struct PackageLimits {
     pub max_items_per_section: usize,
     pub max_fields_per_record: usize,
     pub max_value_bytes: usize,
+    pub max_manifest_entries: usize,
+    pub max_dependencies_per_entry: usize,
+    pub max_total_blob_bytes: usize,
+    pub max_total_section_bytes: usize,
+    pub max_total_nested_items: usize,
+    pub max_members_per_abi_library: usize,
+    pub max_columns_per_sql_table: usize,
+    pub max_key_columns_per_sql_table: usize,
+    pub max_rows_per_sql_table: usize,
+    pub max_segments_per_ims_definition: usize,
+    pub max_rows_per_ims_definition: usize,
+    pub max_properties_per_controller: usize,
+    pub max_applications: usize,
     pub max_retained_generations: usize,
+    pub max_retained_package_bytes: usize,
+    pub max_total_retained_package_bytes: usize,
 }
 
 impl Default for PackageLimits {
@@ -185,7 +200,22 @@ impl Default for PackageLimits {
             max_items_per_section: 16_384,
             max_fields_per_record: 1_024,
             max_value_bytes: 1024 * 1024,
+            max_manifest_entries: 65_536,
+            max_dependencies_per_entry: 1_024,
+            max_total_blob_bytes: 64 * 1024 * 1024,
+            max_total_section_bytes: 64 * 1024 * 1024,
+            max_total_nested_items: 262_144,
+            max_members_per_abi_library: 4_096,
+            max_columns_per_sql_table: 1_024,
+            max_key_columns_per_sql_table: 64,
+            max_rows_per_sql_table: 65_536,
+            max_segments_per_ims_definition: 4_096,
+            max_rows_per_ims_definition: 65_536,
+            max_properties_per_controller: 1_024,
+            max_applications: 1_024,
             max_retained_generations: 64,
+            max_retained_package_bytes: 256 * 1024 * 1024,
+            max_total_retained_package_bytes: 1024 * 1024 * 1024,
         }
     }
 }
@@ -199,11 +229,30 @@ pub struct ApplicationGenerationRecord {
     pub state: InstallState,
 }
 
+#[derive(Clone, Debug)]
+pub struct SelectedApplicationGeneration {
+    record: ApplicationGenerationRecord,
+    package: Arc<ApplicationPackageV2>,
+}
+
+impl SelectedApplicationGeneration {
+    #[must_use]
+    pub fn record(&self) -> &ApplicationGenerationRecord {
+        &self.record
+    }
+
+    #[must_use]
+    pub fn package(&self) -> &ApplicationPackageV2 {
+        self.package.as_ref()
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 struct InstalledApplication {
     selected: Option<u64>,
     generations: BTreeMap<u64, ApplicationGenerationRecord>,
     packages: BTreeMap<u64, Arc<ApplicationPackageV2>>,
+    retained_bytes: usize,
 }
 
 #[derive(Clone)]
@@ -233,23 +282,42 @@ impl ApplicationInstallerV2 {
         &self,
         package: &ApplicationPackageV2,
     ) -> Result<ApplicationGenerationRecord, InstallProblem> {
-        let identity = validate_v2(package, &self.product, self.limits, self.verifier.as_ref())?;
+        let validated = validate_v2(package, &self.product, self.limits, self.verifier.as_ref())?;
+        let identity = validated.identity;
         let key = package.base.manifest.name.to_ascii_uppercase();
         let mut applications = self
             .applications
             .lock()
             .map_err(|_| InstallProblem::Poisoned)?;
-        let installed = applications.entry(key).or_default();
-        if let Some(existing) = installed.generations.get(&package.generation) {
+        if !applications.contains_key(&key) && applications.len() >= self.limits.max_applications {
+            return Err(InstallProblem::LimitExceeded);
+        }
+        if let Some(existing) = applications
+            .get(&key)
+            .and_then(|installed| installed.generations.get(&package.generation))
+        {
             return if existing.identity == identity {
                 Ok(existing.clone())
             } else {
                 Err(InstallProblem::IdentityConflict)
             };
         }
+        let _total_retained_bytes = applications
+            .values()
+            .try_fold(validated.retained_bytes, |total, installed| {
+                total.checked_add(installed.retained_bytes)
+            })
+            .filter(|bytes| *bytes <= self.limits.max_total_retained_package_bytes)
+            .ok_or(InstallProblem::LimitExceeded)?;
+        let installed = applications.entry(key).or_default();
         if installed.generations.len() >= self.limits.max_retained_generations {
             return Err(InstallProblem::LimitExceeded);
         }
+        let retained_bytes = installed
+            .retained_bytes
+            .checked_add(validated.retained_bytes)
+            .filter(|bytes| *bytes <= self.limits.max_retained_package_bytes)
+            .ok_or(InstallProblem::LimitExceeded)?;
         if installed
             .generations
             .last_key_value()
@@ -270,6 +338,7 @@ impl ApplicationInstallerV2 {
         installed
             .packages
             .insert(package.generation, Arc::new(package.clone()));
+        installed.retained_bytes = retained_bytes;
         Ok(record)
     }
 
@@ -277,7 +346,8 @@ impl ApplicationInstallerV2 {
         &self,
         package: &ApplicationPackageV2,
     ) -> Result<ApplicationGenerationRecord, InstallProblem> {
-        let identity = validate_v2(package, &self.product, self.limits, self.verifier.as_ref())?;
+        let identity =
+            validate_v2(package, &self.product, self.limits, self.verifier.as_ref())?.identity;
         let key = package.base.manifest.name.to_ascii_uppercase();
         let mut applications = self
             .applications
@@ -364,6 +434,34 @@ impl ApplicationInstallerV2 {
             .selected
             .and_then(|generation| installed.packages.get(&generation))
             .cloned())
+    }
+
+    pub fn selected_generation(
+        &self,
+        package: &str,
+    ) -> Result<Option<SelectedApplicationGeneration>, InstallProblem> {
+        let applications = self
+            .applications
+            .lock()
+            .map_err(|_| InstallProblem::Poisoned)?;
+        let Some(installed) = applications.get(&package.to_ascii_uppercase()) else {
+            return Ok(None);
+        };
+        let Some(generation) = installed.selected else {
+            return Ok(None);
+        };
+        let record = installed
+            .generations
+            .get(&generation)
+            .filter(|record| record.state == InstallState::Ready)
+            .cloned()
+            .ok_or(InstallProblem::UnknownStage)?;
+        let package = installed
+            .packages
+            .get(&generation)
+            .cloned()
+            .ok_or(InstallProblem::UnknownStage)?;
+        Ok(Some(SelectedApplicationGeneration { record, package }))
     }
 }
 
@@ -469,12 +567,18 @@ pub fn package_v2_identity(package: &ApplicationPackageV2) -> Result<String, Ins
     Ok(format!("sha256:{:x}", digest.finalize()))
 }
 
+struct ValidatedPackage {
+    identity: String,
+    retained_bytes: usize,
+}
+
 fn validate_v2(
     package: &ApplicationPackageV2,
     product: &str,
     limits: PackageLimits,
     verifier: &dyn PackageSignatureVerifier,
-) -> Result<String, InstallProblem> {
+) -> Result<ValidatedPackage, InstallProblem> {
+    let retained_bytes = validate_aggregate_bounds(package, limits)?;
     validate_package(&package.base, product)?;
     if package.generation == 0
         || package.sections.schema_version != APPLICATION_PACKAGE_V2_CONTRACT
@@ -495,7 +599,200 @@ fn validate_v2(
     ) {
         return Err(InstallProblem::InvalidSignature);
     }
-    Ok(identity)
+    Ok(ValidatedPackage {
+        identity,
+        retained_bytes,
+    })
+}
+
+fn validate_aggregate_bounds(
+    package: &ApplicationPackageV2,
+    limits: PackageLimits,
+) -> Result<usize, InstallProblem> {
+    if package.base.manifest.entries.len() > limits.max_manifest_entries
+        || package.base.blobs.len() > limits.max_manifest_entries
+        || package
+            .base
+            .manifest
+            .entries
+            .iter()
+            .any(|entry| entry.depends_on.len() > limits.max_dependencies_per_entry)
+    {
+        return Err(InstallProblem::LimitExceeded);
+    }
+    let blob_bytes = bounded_sum(
+        package.base.blobs.values().map(Vec::len),
+        limits.max_total_blob_bytes,
+    )?;
+    let sections = &package.sections;
+    if sections
+        .host_abi_libraries
+        .iter()
+        .any(|library| library.members.len() > limits.max_members_per_abi_library)
+        || sections.sql_tables.iter().any(|table| {
+            table.columns.len() > limits.max_columns_per_sql_table
+                || table.primary_key.len() > limits.max_key_columns_per_sql_table
+        })
+        || sections
+            .ims_definitions
+            .iter()
+            .any(|definition| definition.segments.len() > limits.max_segments_per_ims_definition)
+        || sections
+            .batch_controllers
+            .iter()
+            .any(|controller| controller.properties.len() > limits.max_properties_per_controller)
+    {
+        return Err(InstallProblem::LimitExceeded);
+    }
+    let mut sql_rows = BTreeMap::<String, usize>::new();
+    for row in &sections.sql_rows {
+        let count = sql_rows.entry(row.table.to_ascii_uppercase()).or_default();
+        *count = count.checked_add(1).ok_or(InstallProblem::LimitExceeded)?;
+        if *count > limits.max_rows_per_sql_table {
+            return Err(InstallProblem::LimitExceeded);
+        }
+    }
+    let mut ims_rows = BTreeMap::<String, usize>::new();
+    for row in &sections.ims_rows {
+        let count = ims_rows
+            .entry(row.definition.to_ascii_uppercase())
+            .or_default();
+        *count = count.checked_add(1).ok_or(InstallProblem::LimitExceeded)?;
+        if *count > limits.max_rows_per_ims_definition {
+            return Err(InstallProblem::LimitExceeded);
+        }
+    }
+    let nested_items = bounded_sum(
+        package
+            .base
+            .manifest
+            .entries
+            .iter()
+            .map(|entry| 1usize.saturating_add(entry.depends_on.len()))
+            .chain(
+                sections
+                    .host_abi_libraries
+                    .iter()
+                    .map(|item| 1 + item.members.len()),
+            )
+            .chain(
+                sections
+                    .sql_tables
+                    .iter()
+                    .map(|item| 1 + item.columns.len() + item.primary_key.len()),
+            )
+            .chain(sections.sql_rows.iter().map(|item| 1 + item.values.len()))
+            .chain(
+                sections
+                    .ims_definitions
+                    .iter()
+                    .map(|item| 1 + item.segments.len()),
+            )
+            .chain(sections.ims_rows.iter().map(|item| 1 + item.values.len()))
+            .chain(sections.mq_resources.iter().map(|_| 3))
+            .chain(
+                sections
+                    .batch_controllers
+                    .iter()
+                    .map(|item| 1 + item.properties.len()),
+            )
+            .chain(sections.security_resources.iter().map(|_| 3)),
+        limits.max_total_nested_items,
+    )?;
+    let section_bytes = bounded_sum(
+        section_text_lengths(package),
+        limits.max_total_section_bytes,
+    )?;
+    blob_bytes
+        .checked_add(section_bytes)
+        .and_then(|bytes| bytes.checked_add(nested_items))
+        .ok_or(InstallProblem::LimitExceeded)
+}
+
+fn section_text_lengths(package: &ApplicationPackageV2) -> impl Iterator<Item = usize> + '_ {
+    let sections = &package.sections;
+    [
+        package.base.manifest.name.len(),
+        package.base.manifest.version.len(),
+        package.base.manifest.target_product.len(),
+        sections.schema_version.len(),
+        package.signature.algorithm.len(),
+        package.signature.key_id.len(),
+        package.signature.value.len(),
+    ]
+    .into_iter()
+    .chain(package.base.blobs.keys().map(String::len))
+    .chain(package.base.manifest.entries.iter().flat_map(|entry| {
+        std::iter::once(entry.path.len())
+            .chain(std::iter::once(entry.sha256.len()))
+            .chain(entry.depends_on.iter().map(String::len))
+    }))
+    .chain(sections.host_abi_libraries.iter().flat_map(|library| {
+        [library.id.len(), library.version.len()].into_iter().chain(
+            library
+                .members
+                .iter()
+                .flat_map(|member| [member.name.len(), member.blob_sha256.len()]),
+        )
+    }))
+    .chain(sections.sql_tables.iter().flat_map(|table| {
+        std::iter::once(table.name.len())
+            .chain(table.columns.iter().map(|column| column.name.len()))
+            .chain(table.primary_key.iter().map(String::len))
+    }))
+    .chain(sections.sql_rows.iter().flat_map(|row| {
+        std::iter::once(row.table.len()).chain(
+            row.values
+                .iter()
+                .flat_map(|(name, value)| [name.len(), value.len()]),
+        )
+    }))
+    .chain(sections.ims_definitions.iter().flat_map(|definition| {
+        std::iter::once(definition.name.len()).chain(definition.segments.iter().map(String::len))
+    }))
+    .chain(sections.ims_rows.iter().flat_map(|row| {
+        [row.definition.len(), row.segment.len()].into_iter().chain(
+            row.values
+                .iter()
+                .flat_map(|(name, value)| [name.len(), value.len()]),
+        )
+    }))
+    .chain(sections.mq_resources.iter().flat_map(|resource| {
+        std::iter::once(resource.name.len())
+            .chain(resource.target.iter().map(String::len))
+            .chain(resource.controller.iter().map(String::len))
+    }))
+    .chain(sections.batch_controllers.iter().flat_map(|controller| {
+        [controller.name.len(), controller.program.len()]
+            .into_iter()
+            .chain(
+                controller
+                    .properties
+                    .iter()
+                    .flat_map(|(name, value)| [name.len(), value.len()]),
+            )
+    }))
+    .chain(sections.security_resources.iter().flat_map(|resource| {
+        [
+            resource.class.len(),
+            resource.profile.len(),
+            resource.owner.len(),
+        ]
+    }))
+}
+
+fn bounded_sum(
+    values: impl IntoIterator<Item = usize>,
+    maximum: usize,
+) -> Result<usize, InstallProblem> {
+    let mut total = 0usize;
+    for value in values {
+        total = total
+            .checked_add(value)
+            .filter(|total| *total <= maximum)
+            .ok_or(InstallProblem::LimitExceeded)?;
+    }
+    Ok(total)
 }
 
 fn validate_sections(
@@ -831,6 +1128,19 @@ mod tests {
         package
     }
 
+    fn resign(package: &mut ApplicationPackageV2) {
+        package.signature.value = format!("signed:{}", package_v2_identity(package).unwrap());
+    }
+
+    fn assert_limit(package: &ApplicationPackageV2, limits: PackageLimits) {
+        let installer = ApplicationInstallerV2::new("0.2.0", limits, Arc::new(TestVerifier));
+        assert_eq!(
+            installer.install(package),
+            Err(InstallProblem::LimitExceeded)
+        );
+        assert_eq!(installer.selected("DEMO").unwrap(), None);
+    }
+
     #[test]
     fn all_subsystem_sections_are_reference_validated_before_staging() {
         let installer =
@@ -904,5 +1214,91 @@ mod tests {
             .values
             .insert("VALUE".into(), "changed".into());
         assert_ne!(package_v2_identity(&reordered).unwrap(), expected);
+    }
+
+    #[test]
+    fn hostile_nested_cardinalities_and_aggregate_bytes_fail_before_staging() {
+        let baseline = package(1);
+        macro_rules! limits {
+            ($field:ident: $value:expr) => {
+                PackageLimits {
+                    $field: $value,
+                    ..PackageLimits::default()
+                }
+            };
+        }
+
+        let limits = limits!(max_manifest_entries: baseline.base.manifest.entries.len() - 1);
+        assert_limit(&baseline, limits);
+
+        let limits = limits!(max_total_blob_bytes: baseline.base.blobs.values().map(Vec::len).sum::<usize>() - 1);
+        assert_limit(&baseline, limits);
+
+        let limits = limits!(max_members_per_abi_library: 0);
+        assert_limit(&baseline, limits);
+
+        let limits = limits!(max_columns_per_sql_table: 1);
+        assert_limit(&baseline, limits);
+
+        let limits = limits!(max_key_columns_per_sql_table: 0);
+        assert_limit(&baseline, limits);
+
+        let limits = limits!(max_rows_per_sql_table: 0);
+        assert_limit(&baseline, limits);
+
+        let limits = limits!(max_segments_per_ims_definition: 0);
+        assert_limit(&baseline, limits);
+
+        let limits = limits!(max_rows_per_ims_definition: 0);
+        assert_limit(&baseline, limits);
+
+        let limits = limits!(max_properties_per_controller: 0);
+        assert_limit(&baseline, limits);
+
+        let limits = limits!(max_applications: 0);
+        assert_limit(&baseline, limits);
+
+        let limits = limits!(max_total_nested_items: 1);
+        assert_limit(&baseline, limits);
+
+        let limits = limits!(max_total_section_bytes: 1);
+        assert_limit(&baseline, limits);
+    }
+
+    #[test]
+    fn retained_generation_bytes_are_bounded_before_package_clone() {
+        let first = package(1);
+        let mut second = package(2);
+        second.sections.sql_rows[0]
+            .values
+            .insert("VALUE".into(), "second-generation".into());
+        resign(&mut second);
+
+        let retained = validate_aggregate_bounds(&first, PackageLimits::default()).unwrap();
+        let limits = PackageLimits {
+            max_retained_package_bytes: retained,
+            ..PackageLimits::default()
+        };
+        let installer = ApplicationInstallerV2::new("0.2.0", limits, Arc::new(TestVerifier));
+        installer.install(&first).unwrap();
+        assert_eq!(
+            installer.install(&second),
+            Err(InstallProblem::LimitExceeded)
+        );
+        assert_eq!(installer.selected("DEMO").unwrap().unwrap().generation, 1);
+
+        let limits = PackageLimits {
+            max_total_retained_package_bytes: retained,
+            ..PackageLimits::default()
+        };
+        let installer = ApplicationInstallerV2::new("0.2.0", limits, Arc::new(TestVerifier));
+        installer.install(&first).unwrap();
+        let mut other = package(1);
+        other.base.manifest.name = "OTHER".into();
+        resign(&mut other);
+        assert_eq!(
+            installer.install(&other),
+            Err(InstallProblem::LimitExceeded)
+        );
     }
 }
