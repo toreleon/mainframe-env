@@ -31,7 +31,7 @@
     "official_baselines": 9,
     "official_mandatory_rows": 1506
   },
-  "current_work_package": "CV-208",
+  "current_work_package": "CV-209",
   "work_packages": [
     {"id": "CV-201", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-201.json"},
     {"id": "CV-202", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-202.json"},
@@ -40,8 +40,8 @@
     {"id": "CV-205", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-205.json"},
     {"id": "CV-206", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-206.json"},
     {"id": "CV-207", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-207.json"},
-    {"id": "CV-208", "state": "in-progress", "evidence": null},
-    {"id": "CV-209", "state": "pending", "evidence": null}
+    {"id": "CV-208", "state": "pass", "evidence": "conformance/0.2/evidence/work-packages/CV-208.json"},
+    {"id": "CV-209", "state": "in-progress", "evidence": null}
   ],
   "commands": [
     {
@@ -123,6 +123,11 @@
       "command": "cargo xtask abi-libraries --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-closure --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-cics --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-db2 --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-ims --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-mq-authorization --check",
       "exit_code": 0,
       "result": "CV-207 moved all nine exact ABI members to three licensed subsystem libraries with zero compiler ownership and unchanged historical receipts/digests"
+    },
+    {
+      "command": "cargo xtask program-registry --check && cargo xtask route-registries --check && cargo xtask dehardcoding --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-utilities --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-base-batch --check",
+      "exit_code": 0,
+      "result": "CV-208 generated 21 typed program entries plus disjoint 23-official/7-custom routes and proved all production hardcode/string-dispatch targets zero with unchanged workload digests"
     }
   ],
   "evidence_paths": [
@@ -136,18 +141,21 @@
     "conformance/0.2/evidence/work-packages/CV-205.json",
     "conformance/0.2/evidence/work-packages/CV-206.json",
     "conformance/0.2/evidence/work-packages/CV-207.json",
+    "conformance/0.2/evidence/work-packages/CV-208.json",
     "conformance/0.2/evidence/hardcode/CV-205-db2.json",
     "conformance/0.2/evidence/hardcode/CV-206-batch.json",
     "conformance/0.2/evidence/hardcode/CV-207-abi.json",
+    "conformance/0.2/evidence/hardcode/no-application-hardcode.json",
+    "conformance/0.2/evidence/hardcode/no-string-dispatch.json",
     "conformance/0.2/evidence/coverage-ledger.json",
     "conformance/0.2/generated/semantic-identities.json",
     "conformance/0.2/generated/subsystem-handlers.json"
   ],
   "dirty_tree_identity": {
     "algorithm": "cargo xtask digest; length-delimited path and content over the repository excluding Git, target, raw historical evidence, phase/status ledgers, and this status ledger",
-    "digest": "sha256:8d5273ead6bac6f9d662c91cf72572b16b64ff502a70400ed3b52d4ca56bd6cd"
+    "digest": "sha256:690bb48c73478b681b91c9174e38575d6b49ba381db7963ed978b41bd954eabd"
   },
   "open_decisions": [],
   "blockers": [],
-  "next_smallest_executable_step": "Implement CV-208 generated common program and separated official/custom z/OSMF route registries plus deterministic architecture scans."
+  "next_smallest_executable_step": "Implement CV-209 ledger consistency, migration/rollback aggregation, full profile closure, and complete 0.2.0 regression evidence."
 }

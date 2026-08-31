@@ -3,7 +3,6 @@ use axum::body::{Body, Bytes};
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, HeaderName, HeaderValue, Response, StatusCode};
 use axum::response::IntoResponse;
-use axum::routing::{get, post, put};
 use base64::Engine;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -14,6 +13,11 @@ use tower::limit::ConcurrencyLimitLayer;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
+
+#[path = "generated/custom_routes.rs"]
+mod custom_routes;
+#[path = "generated/official_routes.rs"]
+mod official_routes;
 
 pub enum Authentication {
     Anonymous,
@@ -239,64 +243,8 @@ struct GatewayState {
 
 pub fn router(backend: Arc<dyn ZosmfBackend>, limits: ZosmfLimits) -> Router {
     let state = GatewayState { backend, limits };
-    Router::new()
-        .route("/zosmf/info", get(info))
-        .route(
-            "/zosmf/services/authenticate",
-            post(authenticate).delete(logout),
-        )
-        .route("/zosmf/restfiles/ds", get(dataset_list))
-        .route(
-            "/zosmf/restfiles/ds/{dsn}",
-            get(dataset_read)
-                .put(dataset_write)
-                .post(dataset_create)
-                .delete(dataset_delete),
-        )
-        .route("/zosmf/restfiles/ds/{dsn}/member", get(member_list))
-        .route("/zosmf/restfiles/ds/{dsn}/search", get(dataset_search))
-        .route("/zosmf/restfiles/ams", put(ams))
-        .route("/zosmf/restjobs/jobs", get(job_list).put(job_submit))
-        .route(
-            "/zosmf/restjobs/jobs/{jobname}/{jobid}",
-            get(job_status).put(job_cancel).delete(job_purge),
-        )
-        .route(
-            "/zosmf/restjobs/jobs/{jobname}/{jobid}/files",
-            get(spool_list),
-        )
-        .route(
-            "/zosmf/restjobs/jobs/{jobname}/{jobid}/files/{file}/records",
-            get(spool_read),
-        )
-        .route("/zosmf/restconsoles/consoles/{name}", put(console_issue))
-        .route(
-            "/zosmf/restconsoles/consoles/{name}/solmsgs/{key}",
-            get(console_solicited),
-        )
-        .route(
-            "/zosmf/restconsoles/consoles/{name}/detections/{key}",
-            get(console_detection),
-        )
-        .route("/zosmf/logs", get(console_logs))
-        .route("/zosmf/restconsoles/v1/log", get(console_log))
-        .route("/mainframe-env/cics/v1/sessions", post(cics_launch))
-        .route(
-            "/mainframe-env/cics/v1/sessions/{session}",
-            get(cics_screen).delete(cics_disconnect),
-        )
-        .route(
-            "/mainframe-env/cics/v1/sessions/{session}/input",
-            put(cics_input),
-        )
-        .route(
-            "/mainframe-env/cics/v1/sessions/{session}/resume",
-            post(cics_resume),
-        )
-        .route(
-            "/mainframe-env/cics/v1/sessions/{session}/tn3270",
-            get(cics_tn3270_screen).put(cics_tn3270_input),
-        )
+    let routes = official_routes::register(Router::<GatewayState>::new());
+    custom_routes::register(routes)
         .fallback(not_found)
         .with_state(state)
         .layer(TimeoutLayer::with_status_code(
@@ -306,6 +254,16 @@ pub fn router(backend: Arc<dyn ZosmfBackend>, limits: ZosmfLimits) -> Router {
         .layer(ConcurrencyLimitLayer::new(limits.max_concurrency))
         .layer(RequestBodyLimitLayer::new(limits.max_body_bytes))
         .layer(TraceLayer::new_for_http())
+}
+
+#[must_use]
+pub const fn official_route_ids() -> &'static [&'static str] {
+    official_routes::OFFICIAL_ROUTE_IDS
+}
+
+#[must_use]
+pub const fn custom_route_ids() -> &'static [&'static str] {
+    custom_routes::CUSTOM_ROUTE_IDS
 }
 
 async fn info(State(state): State<GatewayState>) -> Response<Body> {
@@ -1003,6 +961,18 @@ mod tests {
 
     #[tokio::test]
     async fn every_frozen_route_reaches_typed_backend() {
+        assert_eq!(official_route_ids().len(), 23);
+        assert_eq!(custom_route_ids().len(), 7);
+        assert!(
+            official_route_ids()
+                .iter()
+                .all(|id| id.contains(" /zosmf/"))
+        );
+        assert!(
+            custom_route_ids()
+                .iter()
+                .all(|id| id.contains(" /mainframe-env/"))
+        );
         let backend = Arc::new(Backend {
             calls: AtomicUsize::new(0),
         });

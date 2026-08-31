@@ -165,6 +165,12 @@ registry. The server composition maps only a verified selected application
 package's batch-controller section into this contract; JES never selects
 application behavior by inspecting a workload name.
 
+### `mainframe-env-batch::program`
+
+Owns the generated common-program registry and typed builtin execution. The
+same catalog supplies typed nested TSO and COBOL system-service selection to
+the composing server; names never select behavior outside the registry.
+
 ## Provider packages
 
 ### `mainframe-env-dataset`
@@ -235,7 +241,8 @@ in-process notifications are bounded and reconstructible.
 
 Owns route DTOs and IBM-compatible protocol translation for accepted 0.1
 information, job, dataset, and security/console surfaces. Handlers contain no
-compiler, job, dataset, or RACF business authority.
+compiler, job, dataset, or RACF business authority. Official `/zosmf/*` and
+custom `/mainframe-env/*` registration are generated from disjoint catalogs.
 
 ### `mainframe-env-server`
 

@@ -1,0 +1,14 @@
+{
+  "schema_version": "mainframe-env.custom-route-catalog@1",
+  "namespace": "mainframe-env-custom",
+  "generated_coverage_credit": 0,
+  "routes": [
+    {"id": "POST /mainframe-env/cics/v1/sessions", "handler": "cics_launch"},
+    {"id": "GET /mainframe-env/cics/v1/sessions/{session}", "handler": "cics_screen"},
+    {"id": "DELETE /mainframe-env/cics/v1/sessions/{session}", "handler": "cics_disconnect"},
+    {"id": "PUT /mainframe-env/cics/v1/sessions/{session}/input", "handler": "cics_input"},
+    {"id": "POST /mainframe-env/cics/v1/sessions/{session}/resume", "handler": "cics_resume"},
+    {"id": "GET /mainframe-env/cics/v1/sessions/{session}/tn3270", "handler": "cics_tn3270_screen"},
+    {"id": "PUT /mainframe-env/cics/v1/sessions/{session}/tn3270", "handler": "cics_tn3270_input"}
+  ]
+}

@@ -1,8 +1,11 @@
 use crate::controller::{BatchControllerRegistry, ResolvedBatchController};
+use crate::program::{
+    ProgramExecution, TsoProgramExecution, program_execution, tso_program_execution,
+};
 use crate::{
     BatchControllerGeneration, BatchControllerInstallReceipt, BatchControllerPlan,
     BatchControllerSelector, Disposition, JclBundle, JclLimits, JobPlan, ProgramInput, StepPlan,
-    UtilityDisposition, decode_program_output, parse_jcl, utility_disposition,
+    decode_program_output, parse_jcl,
 };
 use mainframe_env_execution_api::{
     BoundedPayload, IdempotencyKey, Invocation, InvocationLimits, PrincipalId,
@@ -471,7 +474,8 @@ impl BatchService {
                     parameter: step.parameter.clone(),
                     dds,
                 };
-                if step.program.eq_ignore_ascii_case("IDCAMS") {
+                let execution = program_execution(&step.program);
+                if execution == ProgramExecution::Idcams {
                     self.execute_idcams(
                         invocation,
                         job,
@@ -481,54 +485,30 @@ impl BatchService {
                         &mut effect_sequence,
                     )?;
                 }
-                let output = if step.program.eq_ignore_ascii_case("SDSF") {
-                    self.execute_sdsf(invocation, job, step, &input, &mut effect_sequence)?
-                } else if step.program.eq_ignore_ascii_case("IKJEFT01") {
-                    self.execute_db2_tso(invocation, job, step, &input, &mut effect_sequence)?
-                } else if step.program.eq_ignore_ascii_case("DFSRRC00") {
-                    self.execute_ims_controller(
+                let output = match execution {
+                    ProgramExecution::Sdsf => {
+                        self.execute_sdsf(invocation, job, step, &input, &mut effect_sequence)?
+                    }
+                    ProgramExecution::Db2Tso => {
+                        self.execute_db2_tso(invocation, job, step, &input, &mut effect_sequence)?
+                    }
+                    ProgramExecution::ImsController => self.execute_ims_controller(
                         invocation,
                         job,
                         step,
                         &input,
                         &mut effect_sequence,
-                    )?
-                } else {
-                    let bytes =
-                        serde_json::to_vec(&input).map_err(|_| HostProblem::ProviderFailure)?;
-                    let payload = BoundedPayload::new(
-                        "mainframe-env.program.input@1",
-                        bytes,
-                        InvocationLimits::default(),
-                    )
-                    .map_err(|_| HostProblem::ResourceExhausted)?;
-                    if utility_disposition(&step.program)
-                        .is_some_and(|disposition| disposition != UtilityDisposition::Implemented)
-                    {
-                        return Err(HostProblem::Unsupported);
-                    }
-                    let program =
-                        ProgramName::new(&step.program, 128).map_err(|_| HostProblem::Malformed)?;
-                    let sequence = next_effect_sequence(invocation, &mut effect_sequence)?;
-                    let result = self.host.invoke(
-                        invocation,
-                        invocation.deadline_tick.saturating_sub(1),
-                        false,
-                        EffectRequest {
-                            run_unit: invocation.run_unit_id.clone(),
-                            sequence,
-                            deadline_tick: invocation.deadline_tick,
-                            idempotency_key: Some(effect_key(job, step, sequence)?),
-                            request: HostRequest::Program(ProgramRequest::Call {
-                                program,
-                                payload,
-                            }),
-                        },
-                    );
-                    match result.effect.outcome? {
-                        HostResult::Program(payload) => decode_program_output(&payload)?,
-                        _ => return Err(HostProblem::ProviderFailure),
-                    }
+                    )?,
+                    ProgramExecution::ProgramService | ProgramExecution::Idcams => self
+                        .execute_program_controller(
+                            invocation,
+                            job,
+                            step,
+                            &input,
+                            &mut effect_sequence,
+                            &step.program,
+                        )?,
+                    ProgramExecution::Unsupported => return Err(HostProblem::Unsupported),
                 };
                 self.write_dd_outputs(
                     invocation,
@@ -705,10 +685,9 @@ impl BatchService {
             };
         }
         let statement = input_dd_text(input, "SYSIN")?;
-        let operation = match program.as_str() {
-            "DSNTIAD" | "DSNTEP4" => Db2Operation::ExecuteScript,
-            "DSNTIAUL" => Db2Operation::Extract,
-            _ => return Err(HostProblem::Unsupported),
+        let operation = match tso_program_execution(&program).ok_or(HostProblem::Unsupported)? {
+            TsoProgramExecution::ExecuteScript => Db2Operation::ExecuteScript,
+            TsoProgramExecution::Extract => Db2Operation::Extract,
         };
         let result = self.db2_call(
             invocation,

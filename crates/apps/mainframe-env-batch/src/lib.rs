@@ -16,7 +16,8 @@ pub use jcl::{
     DdPlan, Disposition, JclBundle, JclLimits, JobPlan, StepCondition, StepPlan, parse_jcl,
 };
 pub use program::{
-    Program, ProgramInput, ProgramOutput, ProgramRouter, UtilityDisposition, decode_program_output,
+    Program, ProgramInput, ProgramOutput, ProgramRouter, SystemServiceProgram, UtilityDisposition,
+    common_program_catalog_sha256, decode_program_output, system_service_program,
     utility_disposition,
 };
 pub use service::{BatchLimits, BatchService, JobSnapshot, JobState, validate_idcams_control};

@@ -1,4 +1,7 @@
-use mainframe_env_batch::{Program, ProgramInput, ProgramOutput, ProgramRouter};
+use mainframe_env_batch::{
+    Program, ProgramInput, ProgramOutput, ProgramRouter, SystemServiceProgram,
+    system_service_program,
+};
 use mainframe_env_cics::cics_abi_library;
 use mainframe_env_compiler::CobolCompiler;
 use mainframe_env_compiler_api::{
@@ -178,17 +181,13 @@ impl CobolProgram {
         program: &str,
         payload: &BoundedPayload,
     ) -> Result<BoundedPayload, HostProblem> {
-        if program.eq_ignore_ascii_case("CEEDAYS") {
-            return execute_ceedays(payload);
-        }
-        if program.eq_ignore_ascii_case("MVSWAIT") {
-            return execute_mvswait(payload);
-        }
-        if program.eq_ignore_ascii_case("COBDATFT") {
-            return execute_cobdatft(payload);
-        }
-        if program.eq_ignore_ascii_case("CEE3ABD") {
-            return execute_cee3abd(payload);
+        if let Some(service) = system_service_program(program) {
+            return match service {
+                SystemServiceProgram::Ceedays => execute_ceedays(payload),
+                SystemServiceProgram::Mvswait => execute_mvswait(payload),
+                SystemServiceProgram::Cobdatft => execute_cobdatft(payload),
+                SystemServiceProgram::Cee3abd => execute_cee3abd(payload),
+            };
         }
         let store = self.store.get().ok_or(HostProblem::InfrastructureFailure)?;
         let artifacts = self

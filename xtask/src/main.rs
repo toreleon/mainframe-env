@@ -60,6 +60,11 @@ fn run() -> TaskResult {
         "batch-controllers" => check_batch_controllers(&root),
         "abi-libraries" if check => check_host_abi_libraries(&root),
         "abi-libraries" => generate_host_abi_inventory(&root),
+        "program-registry" if check => check_program_registry(&root),
+        "program-registry" => generate_program_registry(&root),
+        "route-registries" if check => check_route_registries(&root),
+        "route-registries" => generate_route_registries(&root),
+        "dehardcoding" => check_dehardcoding(&root),
         "semantic-identities" if check => check_semantic_identities(&root),
         "semantic-identities" => generate_semantic_identities(&root),
         "conformance" => {
@@ -74,7 +79,9 @@ fn run() -> TaskResult {
             check_application_packages(&root)?;
             check_db2_catalog(&root)?;
             check_batch_controllers(&root)?;
-            check_host_abi_libraries(&root)
+            check_host_abi_libraries(&root)?;
+            check_program_registry(&root)?;
+            check_route_registries(&root)
         }
         "certification" => check_certification(&root),
         "carddemo-corpus" => check_carddemo_corpus(&root),
@@ -113,7 +120,7 @@ fn run() -> TaskResult {
         "release" => generate_release_artifacts(&root),
         "help" | "--help" | "-h" => {
             println!(
-                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|coverage|semantic-identities|application-packages|db2-catalog|batch-controllers|abi-libraries|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check"
+                "cargo xtask <versions|architecture|runtime-architecture|profiles|schemas|inventory|evidence|coverage|semantic-identities|application-packages|db2-catalog|batch-controllers|abi-libraries|program-registry|route-registries|dehardcoding|conformance|certification|carddemo-corpus|carddemo-source|carddemo-closure|carddemo-layout|carddemo-control|carddemo-core|carddemo-file-call|carddemo-host|carddemo-package|carddemo-resources|carddemo-programs|carddemo-cics|carddemo-cics-runtime|carddemo-vsam|carddemo-dataset-catalog|carddemo-seeds|carddemo-security|carddemo-terminal|carddemo-base-online|carddemo-jcl|carddemo-utilities|carddemo-batch-programs|carddemo-base-batch|carddemo-db2|carddemo-ims|carddemo-mq-authorization|carddemo-operator-install|carddemo-operator-compile|carddemo-operator-submit|carddemo-operator-reset|carddemo-full|digest|release> --check"
             );
             Ok(())
         }
@@ -1291,6 +1298,7 @@ fn check_architecture(root: &Path) -> TaskResult {
     }
     check_declared_dependency_graph(root)?;
     check_common_execution_route(root)?;
+    check_dehardcoding(root)?;
     check_runtime_unit_gates(root)?;
     Ok(())
 }
@@ -2241,6 +2249,638 @@ fn check_host_abi_libraries(root: &Path) -> TaskResult {
             && scan["after"]["subsystem_owned_members"].as_u64() == Some(9)
             && scan["after"]["generated_coverage_credit"].as_u64() == Some(0),
         "host ABI ownership scan does not prove nine compiler members moved with zero credit",
+    )
+}
+
+fn generate_program_registry(root: &Path) -> TaskResult {
+    let source = render_program_registry(root)?;
+    let path = root.join("crates/apps/mainframe-env-batch/src/generated/common_programs.rs");
+    fs::create_dir_all(path.parent().ok_or("program registry has no parent")?)
+        .map_err(|error| error.to_string())?;
+    fs::write(&path, source).map_err(|error| format!("{}: {error}", path.display()))
+}
+
+fn check_program_registry(root: &Path) -> TaskResult {
+    let expected = render_program_registry(root)?;
+    let path = root.join("crates/apps/mainframe-env-batch/src/generated/common_programs.rs");
+    require(
+        fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))? == expected,
+        "common program registry is stale; run cargo xtask program-registry",
+    )?;
+    let implementation = read(&root.join("crates/apps/mainframe-env-batch/src/program.rs"))?;
+    for forbidden in [
+        "match program.to_ascii_uppercase().as_str()",
+        "for name in [",
+        "match self.0 {",
+    ] {
+        require(
+            !implementation.contains(forbidden),
+            &format!("batch program routing retains handwritten string dispatch {forbidden}"),
+        )?;
+    }
+    for required in [
+        "generated/common_programs.rs",
+        "COMMON_PROGRAMS",
+        "ProgramExecution",
+        "BuiltinProgram",
+    ] {
+        require(
+            implementation.contains(required),
+            &format!("batch program registry integration omits {required}"),
+        )?;
+    }
+    let service = read(&root.join("crates/apps/mainframe-env-batch/src/service.rs"))?;
+    let execution_region = service
+        .split("let input = ProgramInput")
+        .nth(1)
+        .and_then(|tail| tail.split("self.write_dd_outputs").next())
+        .ok_or("batch execution region is missing")?;
+    for forbidden in ["eq_ignore_ascii_case(\"", "utility_disposition("] {
+        require(
+            !execution_region.contains(forbidden),
+            &format!("batch execution retains name dispatch {forbidden}"),
+        )?;
+    }
+    let contracts = json(&root.join("conformance/0.2/inventory/contracts.json"))?;
+    require(
+        contracts["contracts"]["common_program_catalog"]
+            == Value::String("mainframe-env.common-program-catalog@1".into()),
+        "common program catalog contract is not frozen",
+    )?;
+    for path in [
+        "conformance/0.2/programs/common-programs.json",
+        "conformance/0.2/schemas/common-program-catalog.schema.json",
+        "docs/architecture/PROGRAM-AND-ROUTE-REGISTRIES.md",
+    ] {
+        require(
+            root.join(path).is_file(),
+            &format!("common program registry artifact is missing: {path}"),
+        )?;
+    }
+    Ok(())
+}
+
+fn render_program_registry(root: &Path) -> TaskResult<Vec<u8>> {
+    let catalog_path = root.join("conformance/0.2/programs/common-programs.json");
+    let catalog = json(&catalog_path)?;
+    require(
+        catalog["schema_version"] == Value::String("mainframe-env.common-program-catalog@1".into())
+            && catalog["target_version"] == Value::String("0.2.0".into())
+            && catalog["generated_coverage_credit"].as_u64() == Some(0),
+        "common program catalog identity or coverage policy is invalid",
+    )?;
+    let programs = array(&catalog, "programs", &catalog_path)?;
+    let expected_names = BTreeSet::from([
+        "CEE3ABD", "CEEDAYS", "COBDATFT", "DFSRRC00", "DSNTEP4", "DSNTIAD", "DSNTIAUL", "FTP",
+        "IEBCOMPR", "IEBCOPY", "IEBDG", "IEBEDIT", "IEBGENER", "IEBUPDTE", "IEFBR14", "IDCAMS",
+        "IKJEFT01", "IKJEFT1B", "MVSWAIT", "SDSF", "SORT",
+    ]);
+    let names = programs
+        .iter()
+        .map(|program| text(program, "name", &catalog_path))
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        names == expected_names && names.len() == programs.len(),
+        "common program catalog names are missing or duplicated",
+    )?;
+    let mut builtin_variants = Vec::new();
+    let mut tso_variants = Vec::new();
+    let mut system_service_variants = Vec::new();
+    for program in programs {
+        let name = text(program, "name", &catalog_path)?;
+        require(
+            name == name.to_ascii_uppercase()
+                && !name.is_empty()
+                && name.len() <= 128
+                && name.bytes().all(|byte| {
+                    byte.is_ascii_alphanumeric() || matches!(byte, b'$' | b'@' | b'#' | b'_' | b'-')
+                }),
+            &format!("common program name {name:?} is invalid"),
+        )?;
+        let disposition = program["disposition"].as_str();
+        let execution = text(program, "execution", &catalog_path)?;
+        require(
+            disposition.is_none_or(|disposition| {
+                matches!(
+                    disposition,
+                    "implemented"
+                        | "cics-file-control"
+                        | "network-ftp"
+                        | "report-rexx"
+                        | "db2-tso"
+                        | "ims-controller"
+                )
+            }) && matches!(
+                execution,
+                "program-service"
+                    | "idcams"
+                    | "sdsf"
+                    | "db2-tso"
+                    | "ims-controller"
+                    | "unsupported"
+            ),
+            &format!("common program {name} disposition or execution is invalid"),
+        )?;
+        if let Some(builtin) = program["builtin"].as_str() {
+            require(
+                disposition == Some("implemented")
+                    && matches!(execution, "program-service" | "idcams")
+                    && builtin == builtin.to_ascii_lowercase(),
+                &format!("common program {name} builtin binding is invalid"),
+            )?;
+            builtin_variants.push(rust_variant(builtin)?);
+        } else if disposition.is_some() {
+            require(
+                execution != "program-service" && execution != "idcams",
+                &format!("common program {name} is missing its builtin binding"),
+            )?;
+        }
+        if let Some(action) = program["tso_action"].as_str() {
+            require(
+                disposition.is_none()
+                    && execution == "unsupported"
+                    && program["builtin"].is_null()
+                    && program["system_service"].is_null()
+                    && matches!(action, "execute-script" | "extract"),
+                &format!("common program {name} TSO action is invalid"),
+            )?;
+            tso_variants.push(rust_variant(action)?);
+        }
+        if let Some(service) = program["system_service"].as_str() {
+            require(
+                disposition.is_none()
+                    && execution == "unsupported"
+                    && program["builtin"].is_null()
+                    && program["tso_action"].is_null(),
+                &format!("common program {name} system service is invalid"),
+            )?;
+            system_service_variants.push(rust_variant(service)?);
+        }
+        require(
+            disposition.is_some()
+                || program["tso_action"].is_string()
+                || program["system_service"].is_string(),
+            &format!("common program {name} has no registry role"),
+        )?;
+    }
+    let unique_builtins = builtin_variants.iter().collect::<BTreeSet<_>>();
+    require(
+        unique_builtins.len() == builtin_variants.len() && builtin_variants.len() == 9,
+        "common program builtin variants are missing or duplicated",
+    )?;
+    require(
+        tso_variants.iter().collect::<BTreeSet<_>>().len() == 2
+            && system_service_variants
+                .iter()
+                .collect::<BTreeSet<_>>()
+                .len()
+                == 4,
+        "common program internal variants are missing or duplicated",
+    )?;
+    let mut source =
+        String::from("// @generated by `cargo xtask program-registry`; do not edit.\n\n");
+    source.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
+    source.push_str("pub(crate) enum BuiltinProgram {\n");
+    builtin_variants.sort();
+    for variant in &builtin_variants {
+        source.push_str(&format!("    {variant},\n"));
+    }
+    source.push_str("}\n\n");
+    tso_variants.sort();
+    tso_variants.dedup();
+    source.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
+    source.push_str("pub(crate) enum TsoProgramExecution {\n");
+    for variant in &tso_variants {
+        source.push_str(&format!("    {variant},\n"));
+    }
+    source.push_str("}\n\n");
+    system_service_variants.sort();
+    source.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
+    source.push_str("pub enum SystemServiceProgram {\n");
+    for variant in &system_service_variants {
+        source.push_str(&format!("    {variant},\n"));
+    }
+    source.push_str("}\n\n");
+    source.push_str(&format!(
+        "pub(crate) const COMMON_PROGRAM_CATALOG_SHA256: &str =\n    \"sha256:{}\";\n\n",
+        file_digest(&catalog_path)?
+    ));
+    source.push_str("pub(crate) static COMMON_PROGRAMS: &[super::CommonProgramEntry] = &[\n");
+    for program in programs {
+        let Some(disposition) = program["disposition"].as_str() else {
+            continue;
+        };
+        let name = text(program, "name", &catalog_path)?;
+        let disposition = rust_variant(disposition)?;
+        let execution = rust_variant(text(program, "execution", &catalog_path)?)?;
+        let builtin = program["builtin"]
+            .as_str()
+            .map(rust_variant)
+            .transpose()?
+            .map_or_else(
+                || "None".to_string(),
+                |variant| format!("Some(BuiltinProgram::{variant})"),
+            );
+        source.push_str("    super::CommonProgramEntry {\n");
+        source.push_str(&format!("        name: \"{name}\",\n"));
+        source.push_str(&format!(
+            "        disposition: super::UtilityDisposition::{disposition},\n"
+        ));
+        source.push_str(&format!(
+            "        execution: super::ProgramExecution::{execution},\n"
+        ));
+        source.push_str(&format!("        builtin: {builtin},\n"));
+        source.push_str("    },\n");
+    }
+    source.push_str("];\n");
+    source.push_str("\npub(crate) static TSO_PROGRAMS: &[(&str, TsoProgramExecution)] = &[\n");
+    for program in programs {
+        if let Some(action) = program["tso_action"].as_str() {
+            let name = text(program, "name", &catalog_path)?;
+            source.push_str(&format!(
+                "    (\"{name}\", TsoProgramExecution::{}),\n",
+                rust_variant(action)?
+            ));
+        }
+    }
+    source.push_str("];\n");
+    source.push_str("\npub(crate) static SYSTEM_SERVICES: &[(&str, SystemServiceProgram)] = &[\n");
+    for program in programs {
+        if let Some(service) = program["system_service"].as_str() {
+            let name = text(program, "name", &catalog_path)?;
+            source.push_str(&format!(
+                "    (\"{name}\", SystemServiceProgram::{}),\n",
+                rust_variant(service)?
+            ));
+        }
+    }
+    source.push_str("];\n");
+    Ok(source.into_bytes())
+}
+
+fn rust_variant(value: &str) -> TaskResult<String> {
+    let mut output = String::new();
+    for part in value.split(|character: char| !character.is_ascii_alphanumeric()) {
+        if part.is_empty() {
+            continue;
+        }
+        let mut characters = part.chars();
+        let first = characters.next().ok_or("empty Rust variant component")?;
+        output.push(first.to_ascii_uppercase());
+        output.extend(characters.map(|character| character.to_ascii_lowercase()));
+    }
+    require(
+        output
+            .bytes()
+            .next()
+            .is_some_and(|byte| byte.is_ascii_alphabetic()),
+        &format!("cannot derive Rust variant from {value:?}"),
+    )?;
+    Ok(output)
+}
+
+fn generate_route_registries(root: &Path) -> TaskResult {
+    let (official, custom, manifest) = render_route_registries(root)?;
+    let generated = root.join("crates/gateways/mainframe-env-zosmf/src/generated");
+    fs::create_dir_all(&generated).map_err(|error| error.to_string())?;
+    for (path, bytes) in [
+        (generated.join("official_routes.rs"), official),
+        (generated.join("custom_routes.rs"), custom),
+        (
+            root.join("conformance/0.2/generated/route-registries.json"),
+            pretty_json(&manifest)?,
+        ),
+    ] {
+        fs::write(&path, bytes).map_err(|error| format!("{}: {error}", path.display()))?;
+    }
+    Ok(())
+}
+
+fn check_route_registries(root: &Path) -> TaskResult {
+    let (official, custom, manifest) = render_route_registries(root)?;
+    for (path, expected) in [
+        (
+            root.join("crates/gateways/mainframe-env-zosmf/src/generated/official_routes.rs"),
+            official,
+        ),
+        (
+            root.join("crates/gateways/mainframe-env-zosmf/src/generated/custom_routes.rs"),
+            custom,
+        ),
+        (
+            root.join("conformance/0.2/generated/route-registries.json"),
+            pretty_json(&manifest)?,
+        ),
+    ] {
+        require(
+            fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))? == expected,
+            &format!(
+                "{} is stale; run cargo xtask route-registries",
+                path.display()
+            ),
+        )?;
+    }
+    let gateway = read(&root.join("crates/gateways/mainframe-env-zosmf/src/gateway.rs"))?;
+    let registration = gateway
+        .split("pub fn router")
+        .nth(1)
+        .and_then(|tail| tail.split("async fn info").next())
+        .ok_or("z/OSMF router registration region is missing")?;
+    require(
+        !registration.contains(".route(")
+            && registration.contains("official_routes::register")
+            && registration.contains("custom_routes::register"),
+        "z/OSMF router still contains handwritten route registration",
+    )?;
+    let contracts = json(&root.join("conformance/0.2/inventory/contracts.json"))?;
+    require(
+        contracts["contracts"]["official_route_registry"]
+            == Value::String("mainframe-env.zosmf-official-route-bindings@1".into())
+            && contracts["contracts"]["custom_route_registry"]
+                == Value::String("mainframe-env.custom-route-catalog@1".into()),
+        "route registry contracts are not frozen",
+    )?;
+    let migration_path = root.join("conformance/0.2/migrations/registry-v0-to-v1.json");
+    let migration = json(&migration_path)?;
+    require(
+        migration["schema_version"] == Value::String("mainframe-env.registry-migration@1".into())
+            && migration["destructive"] == Value::Bool(false)
+            && migration["runtime_state_changed"] == Value::Bool(false)
+            && migration["catalog_presence_coverage_credit"].as_u64() == Some(0)
+            && migration["generation"]["deterministic"] == Value::Bool(true)
+            && migration["generation"]["official_routes_equal_frozen_catalog"] == Value::Bool(true)
+            && migration["generation"]["custom_routes_disjoint"] == Value::Bool(true)
+            && migration["rollback"]["supported"] == Value::Bool(true)
+            && migration["rollback"]["partial_registry_selected"] == Value::Bool(false),
+        "program/route registry migration or rollback contract is unsafe",
+    )?;
+    for path in [
+        "conformance/0.2/routes/official-route-bindings.json",
+        "conformance/0.2/routes/custom-routes.json",
+        "conformance/0.2/schemas/route-registry.schema.json",
+        "conformance/0.2/schemas/generated-route-registries.schema.json",
+        "docs/architecture/PROGRAM-AND-ROUTE-REGISTRIES.md",
+    ] {
+        require(
+            root.join(path).is_file(),
+            &format!("route registry artifact is missing: {path}"),
+        )?;
+    }
+    Ok(())
+}
+
+fn render_route_registries(root: &Path) -> TaskResult<(Vec<u8>, Vec<u8>, Value)> {
+    let catalog_path = root.join("conformance/0.1/inventory/zosmf-routes.json");
+    let official_path = root.join("conformance/0.2/routes/official-route-bindings.json");
+    let custom_path = root.join("conformance/0.2/routes/custom-routes.json");
+    let catalog = json(&catalog_path)?;
+    let official = json(&official_path)?;
+    let custom = json(&custom_path)?;
+    require(
+        official["schema_version"]
+            == Value::String("mainframe-env.zosmf-official-route-bindings@1".into())
+            && official["namespace"] == Value::String("official-zosmf".into())
+            && official["catalog"]
+                == Value::String("conformance/0.1/inventory/zosmf-routes.json".into())
+            && custom["schema_version"]
+                == Value::String("mainframe-env.custom-route-catalog@1".into())
+            && custom["namespace"] == Value::String("mainframe-env-custom".into())
+            && custom["generated_coverage_credit"].as_u64() == Some(0),
+        "route registry identity, namespace, or coverage policy is invalid",
+    )?;
+    let catalog_ids = array(&catalog, "routes", &catalog_path)?
+        .iter()
+        .map(|route| text(route, "id", &catalog_path).map(str::to_string))
+        .collect::<TaskResult<Vec<_>>>()?;
+    let official_rows = route_rows(&official, &official_path, "/zosmf/")?;
+    let custom_rows = route_rows(&custom, &custom_path, "/mainframe-env/")?;
+    require(
+        official_rows
+            .iter()
+            .map(|row| row.0.clone())
+            .collect::<Vec<_>>()
+            == catalog_ids,
+        "generated official route bindings differ from the frozen owned route catalog",
+    )?;
+    let official_ids = official_rows
+        .iter()
+        .map(|row| row.0.as_str())
+        .collect::<BTreeSet<_>>();
+    let custom_ids = custom_rows
+        .iter()
+        .map(|row| row.0.as_str())
+        .collect::<BTreeSet<_>>();
+    require(
+        official_ids.is_disjoint(&custom_ids)
+            && official_rows.len() == 23
+            && custom_rows.len() == 7,
+        "official and custom route namespaces overlap or have wrong denominators",
+    )?;
+    let gateway = read(&root.join("crates/gateways/mainframe-env-zosmf/src/gateway.rs"))?;
+    for (_, _, _, handler) in official_rows.iter().chain(&custom_rows) {
+        require(
+            gateway.contains(&format!("async fn {handler}(")),
+            &format!("route binding references missing handler {handler}"),
+        )?;
+    }
+    let official_source =
+        render_route_source("route-registries", "OFFICIAL_ROUTE_IDS", &official_rows);
+    let custom_source = render_route_source("route-registries", "CUSTOM_ROUTE_IDS", &custom_rows);
+    let manifest = json!({
+        "schema_version":"mainframe-env.generated-route-registries@1",
+        "target_version":"0.2.0",
+        "official":{
+            "namespace":"official-zosmf",
+            "catalog":"conformance/0.1/inventory/zosmf-routes.json",
+            "catalog_sha256":format!("sha256:{}", file_digest(&catalog_path)?),
+            "bindings_sha256":format!("sha256:{}", file_digest(&official_path)?),
+            "route_count":official_rows.len()
+        },
+        "custom":{
+            "namespace":"mainframe-env-custom",
+            "catalog":"conformance/0.2/routes/custom-routes.json",
+            "catalog_sha256":format!("sha256:{}", file_digest(&custom_path)?),
+            "route_count":custom_rows.len()
+        },
+        "namespaces_disjoint":true,
+        "generated_coverage_credit":0
+    });
+    Ok((official_source, custom_source, manifest))
+}
+
+fn route_rows(
+    catalog: &Value,
+    path: &Path,
+    namespace_prefix: &str,
+) -> TaskResult<Vec<(String, String, String, String)>> {
+    let mut seen = BTreeSet::new();
+    array(catalog, "routes", path)?
+        .iter()
+        .map(|route| {
+            let id = text(route, "id", path)?.to_string();
+            let handler = text(route, "handler", path)?.to_string();
+            let (method, route_path) = id
+                .split_once(' ')
+                .ok_or_else(|| format!("{} route {id:?} is malformed", path.display()))?;
+            require(
+                matches!(method, "GET" | "POST" | "PUT" | "DELETE")
+                    && route_path.starts_with(namespace_prefix)
+                    && !handler.is_empty()
+                    && handler.bytes().all(|byte| {
+                        byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'
+                    })
+                    && seen.insert(id.clone()),
+                &format!("{} route {id:?} is invalid or duplicated", path.display()),
+            )?;
+            let method = method.to_ascii_lowercase();
+            let route_path = route_path.to_string();
+            Ok((id, method, route_path, handler))
+        })
+        .collect()
+}
+
+fn render_route_source(
+    generator: &str,
+    ids_name: &str,
+    rows: &[(String, String, String, String)],
+) -> Vec<u8> {
+    let mut groups: Vec<(String, Vec<(&str, &str)>)> = Vec::new();
+    for (_, method, path, handler) in rows {
+        if let Some((_, methods)) = groups.iter_mut().find(|(known, _)| known == path) {
+            methods.push((method, handler));
+        } else {
+            groups.push((path.clone(), vec![(method, handler)]));
+        }
+    }
+    let mut source = format!(
+        "// @generated by `cargo xtask {generator}`; do not edit.\n\nuse axum::Router;\nuse axum::routing::{{get, post, put}};\n\npub(super) const {ids_name}: &[&str] = &[\n"
+    );
+    for (id, _, _, _) in rows {
+        source.push_str(&format!("    \"{id}\",\n"));
+    }
+    source.push_str(
+        "];
+
+#[rustfmt::skip]
+pub(super) fn register(router: Router<super::GatewayState>) -> Router<super::GatewayState> {
+    router",
+    );
+    for (path, methods) in groups {
+        let (first_method, first_handler) = methods[0];
+        source.push_str(&format!(
+            "\n        .route(\"{path}\", {first_method}(super::{first_handler})"
+        ));
+        for (method, handler) in methods.into_iter().skip(1) {
+            source.push_str(&format!(".{method}(super::{handler})"));
+        }
+        source.push(')');
+    }
+    source.push_str("\n}\n");
+    source.into_bytes()
+}
+
+fn check_dehardcoding(root: &Path) -> TaskResult {
+    let mut rust_files = Vec::new();
+    collect_extension(&root.join("crates"), OsStr::new("rs"), &mut rust_files)?;
+    rust_files.sort();
+    let conformance = root.join("crates/tooling/mainframe-env-conformance");
+    let forbidden_application_identities = [
+        "CARDDEMO",
+        "COBTUPDT",
+        "CBPAUP0C",
+        "PAUDBLOD",
+        "PAUDBUNL",
+        "DBPAUTP0",
+        "PSBPAUTB",
+        "PAUTSUM0",
+        "PAUTDTL1",
+        "AUTHFRDS",
+        "TRANSACTION_TYPE",
+        "TRANSACTION_TYPE_CATEGORY",
+    ];
+    let mut hits = Vec::new();
+    let mut scanned_files = 0usize;
+    for rust_file in rust_files {
+        if rust_file.starts_with(&conformance) {
+            continue;
+        }
+        scanned_files += 1;
+        let source = read(&rust_file)?;
+        let production = source.split("#[cfg(test)]").next().unwrap_or(&source);
+        let upper = production.to_ascii_uppercase();
+        for identity in forbidden_application_identities {
+            if upper.contains(identity) {
+                hits.push(format!(
+                    "{}:{identity}",
+                    rust_file.strip_prefix(root).unwrap_or(&rust_file).display()
+                ));
+            }
+        }
+    }
+    require(
+        hits.is_empty(),
+        &format!("production application hardcode scan found {hits:?}"),
+    )?;
+    let program = read(&root.join("crates/apps/mainframe-env-batch/src/program.rs"))?;
+    let batch = read(&root.join("crates/apps/mainframe-env-batch/src/service.rs"))?;
+    let server = read(&root.join("crates/apps/mainframe-env-server/src/cobol.rs"))?;
+    for (scope, source, forbidden) in [
+        (
+            "common program registry",
+            program.as_str(),
+            vec![
+                "match program.to_ascii_uppercase().as_str()",
+                "for name in [",
+                "match self.0 {",
+            ],
+        ),
+        (
+            "batch execution",
+            batch.split("#[cfg(test)]").next().unwrap_or(&batch),
+            vec![
+                "match program.as_str()",
+                "step.program.eq_ignore_ascii_case(\"",
+            ],
+        ),
+        (
+            "installed system services",
+            server.split("#[cfg(test)]").next().unwrap_or(&server),
+            vec!["program.eq_ignore_ascii_case(\""],
+        ),
+    ] {
+        for pattern in forbidden {
+            require(
+                !source.contains(pattern),
+                &format!("{scope} retains handwritten string dispatch {pattern}"),
+            )?;
+        }
+    }
+    check_program_registry(root)?;
+    check_route_registries(root)?;
+    let hardcode_path = root.join("conformance/0.2/evidence/hardcode/no-application-hardcode.json");
+    let hardcode = json(&hardcode_path)?;
+    require(
+        hardcode["schema_version"]
+            == Value::String("mainframe-env.no-application-hardcode@1".into())
+            && hardcode["before"]["production_h1_h3_lines"].as_u64() == Some(32)
+            && hardcode["after"]["production_h1_h3_lines"].as_u64() == Some(0)
+            && hardcode["after"]["scanned_rust_files"].as_u64() == Some(scanned_files as u64)
+            && hardcode["after"]["application_string_dispatch"].as_u64() == Some(0),
+        "no-application-hardcode receipt is stale or incomplete",
+    )?;
+    let dispatch_path = root.join("conformance/0.2/evidence/hardcode/no-string-dispatch.json");
+    let dispatch = json(&dispatch_path)?;
+    require(
+        dispatch["schema_version"] == Value::String("mainframe-env.no-string-dispatch@1".into())
+            && dispatch["before"]["handwritten_program_dispatch_sites"].as_u64() == Some(12)
+            && dispatch["after"]["handwritten_program_dispatch_sites"].as_u64() == Some(0)
+            && dispatch["before"]["handwritten_route_registration_sites"].as_u64() == Some(22)
+            && dispatch["after"]["handwritten_route_registration_sites"].as_u64() == Some(0)
+            && dispatch["after"]["official_generated_routes"].as_u64() == Some(23)
+            && dispatch["after"]["custom_generated_routes"].as_u64() == Some(7)
+            && dispatch["after"]["application_program_table_transaction_exceptions"].as_u64()
+                == Some(0),
+        "no-string-dispatch receipt is stale or incomplete",
     )
 }
 

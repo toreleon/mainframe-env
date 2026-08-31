@@ -1,0 +1,23 @@
+{
+  "schema_version": "mainframe-env.no-application-hardcode@1",
+  "target_version": "0.2.0",
+  "scope": "production Rust before the first cfg(test), excluding the conformance tooling package",
+  "before": {
+    "production_h1_h3_lines": 32,
+    "db2_lines": 29,
+    "batch_lines": 3,
+    "source": "docs/research/IBM-OFFICIAL-COVERAGE-ROADMAP.md"
+  },
+  "after": {
+    "production_h1_h3_lines": 0,
+    "application_string_dispatch": 0,
+    "scanned_rust_files": 87,
+    "forbidden_identity_hits": []
+  },
+  "allowed_locations": [
+    "signed application-package data",
+    "fixtures and code after cfg(test)",
+    "crates/tooling/mainframe-env-conformance",
+    "conformance"
+  ]
+}

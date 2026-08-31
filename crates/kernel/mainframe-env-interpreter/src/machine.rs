@@ -4966,10 +4966,10 @@ fn decode_display(bytes: &[u8], separate: bool) -> Result<i128, MachineProblem> 
         let digit = if byte.is_ascii_digit() {
             byte - b'0'
         } else if byte == 0 {
-            // CardDemo's transaction file is initialized with a low-values
-            // sentinel record. Enterprise COBOL's permissive zoned-decimal
-            // compatibility treats each low-value byte as the digit zero when
-            // that alphanumeric key is moved to a numeric-display receiver.
+            // Some migrated transaction files use a low-values sentinel
+            // record. Enterprise COBOL's permissive zoned-decimal compatibility
+            // treats each low-value byte as digit zero when that alphanumeric
+            // key is moved to a numeric-display receiver.
             0
         } else if let Some(position) = b"}JKLMNOPQR".iter().position(|value| *value == byte) {
             negative = true;
