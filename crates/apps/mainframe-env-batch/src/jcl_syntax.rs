@@ -437,7 +437,15 @@ pub(crate) fn analyze_jcl_source_file(
                     cntl_definition = None;
                     cntl_bytes = 0;
                 }
-                continuation_expected = statement_continues(operands);
+                let continuation_value = if kind == JclRecordKind::Continuation {
+                    statement_area(raw)
+                        .strip_prefix("//")
+                        .unwrap_or_default()
+                        .trim()
+                } else {
+                    operands
+                };
+                continuation_expected = statement_continues(continuation_value);
             } else {
                 continuation_expected = false;
             }
@@ -478,7 +486,7 @@ pub(crate) fn analyze_jcl_source_file(
         });
     }
 
-    if let Some(state) = inline {
+    if let Some(state) = inline.filter(|state| !state.jcl_terminates) {
         diagnostics.push(diagnostic(
             "MEJCL0704",
             "in-stream data is missing its declared delimiter",

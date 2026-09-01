@@ -173,6 +173,12 @@ pub fn parse_jcl(bundle: &JclBundle, limits: JclLimits) -> Result<JobPlan, HostP
         .any(|diagnostic| matches!(diagnostic.code().as_str(), "MEJCL0733" | "MEJCL0734"))
     {
         Err(HostProblem::NotFound)
+    } else if conversion
+        .diagnostics()
+        .iter()
+        .any(|diagnostic| diagnostic.code().as_str() == "MEJCL0720")
+    {
+        Err(HostProblem::Unsupported)
     } else {
         Err(HostProblem::Malformed)
     }
@@ -214,6 +220,7 @@ pub(crate) fn legacy_job_plan(
     let mut job_dds = Vec::new();
     let mut steps = Vec::<StepPlan>::new();
     let mut outputs = Vec::new();
+    let mut procedure_libraries = Vec::new();
     let mut active_conditions = Vec::<StepCondition>::new();
     for node in document.nodes() {
         match node {
@@ -344,6 +351,9 @@ pub(crate) fn legacy_job_plan(
                     "ENDIF" => {
                         active_conditions.pop();
                     }
+                    "JCLLIB" => {
+                        procedure_libraries.extend(jcllib_values(statement.raw_operands()));
+                    }
                     _ => {}
                 }
             }
@@ -360,7 +370,7 @@ pub(crate) fn legacy_job_plan(
             .iter()
             .map(|symbol| (symbol.name().to_string(), symbol.value().to_string()))
             .collect(),
-        procedure_libraries: Vec::new(),
+        procedure_libraries,
         job_dds,
         steps,
         outputs,
@@ -422,6 +432,7 @@ fn dd_plan(name: &str, statement: &crate::JclStatementNode) -> Result<DdPlan, Ho
             value
                 .trim_matches(['(', ')'])
                 .split(',')
+                .filter(|value| !value.trim().is_empty())
                 .map(disposition)
                 .collect::<Result<Vec<_>, _>>()
         })
@@ -477,6 +488,22 @@ fn assignment_map(value: &str) -> BTreeMap<String, String> {
                 )
             })
         })
+        .collect()
+}
+
+fn jcllib_values(value: &str) -> Vec<String> {
+    let Some((name, value)) = value.split_once('=') else {
+        return Vec::new();
+    };
+    if !name.trim().eq_ignore_ascii_case("ORDER") {
+        return Vec::new();
+    }
+    value
+        .trim()
+        .trim_matches(['(', ')'])
+        .split(',')
+        .map(|value| value.trim().trim_matches(['\'', '"']).to_string())
+        .filter(|value| !value.is_empty())
         .collect()
 }
 

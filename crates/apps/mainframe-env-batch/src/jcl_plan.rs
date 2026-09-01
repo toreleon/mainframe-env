@@ -1062,23 +1062,28 @@ fn valid_dataset(value: &str) -> bool {
 }
 
 fn valid_disposition(value: &str) -> bool {
-    let values = list_items(value)
-        .into_iter()
-        .map(str::to_ascii_uppercase)
+    if value.trim().is_empty() {
+        return false;
+    }
+    let values = value
+        .trim_matches(['(', ')'])
+        .split(',')
+        .map(|value| value.trim().to_ascii_uppercase())
         .collect::<Vec<_>>();
     if values.is_empty() || values.len() > 3 {
         return false;
     }
-    matches!(values[0].as_str(), "OLD" | "SHR" | "NEW" | "MOD")
+    (values[0].is_empty() || matches!(values[0].as_str(), "OLD" | "SHR" | "NEW" | "MOD"))
         && values.get(1).is_none_or(|value| {
-            matches!(
-                value.as_str(),
-                "DELETE" | "KEEP" | "PASS" | "CATLG" | "UNCATLG"
-            )
+            value.is_empty()
+                || matches!(
+                    value.as_str(),
+                    "DELETE" | "KEEP" | "PASS" | "CATLG" | "UNCATLG"
+                )
         })
-        && values
-            .get(2)
-            .is_none_or(|value| matches!(value.as_str(), "DELETE" | "KEEP" | "CATLG" | "UNCATLG"))
+        && values.get(2).is_none_or(|value| {
+            value.is_empty() || matches!(value.as_str(), "DELETE" | "KEEP" | "CATLG" | "UNCATLG")
+        })
 }
 
 fn valid_record_format(value: &str) -> bool {
@@ -1253,7 +1258,6 @@ fn validate_statement_context(
     let mut seen_job = false;
     let mut seen_step = false;
     let mut terminated = false;
-    let mut step_names = BTreeSet::new();
     let mut dd_names = BTreeSet::<(Option<String>, String)>::new();
     let mut output_names = BTreeSet::new();
     for node in nodes {
@@ -1266,9 +1270,12 @@ fn validate_statement_context(
                 .expect("plan source file identity is nonzero"),
             bytes: statement.source().byte_start()..statement.source().byte_end(),
         };
-        if terminated
-            && !matches!(node, JclPlanNode::Annotation { operation, .. } if operation == "NULL")
-        {
+        let allowed_after_null = matches!(
+            node,
+            JclPlanNode::Annotation { operation, .. }
+                if matches!(operation.as_str(), "NULL" | "COMMENT" | "DELIMITER")
+        ) || matches!(node, JclPlanNode::Jecl { operation, .. } if operation == "SIGNOFF");
+        if terminated && !allowed_after_null {
             diagnostics.push(plan_diagnostic(
                 "MEJCL0754",
                 "statement appears after the terminating null statement",
@@ -1294,10 +1301,10 @@ fn validate_statement_context(
                 seen_job = true;
             }
             JclPlanNode::Step { name, .. } => {
-                if !seen_job || !valid_qualified_name(name) || !step_names.insert(name.clone()) {
+                if !seen_job || !valid_qualified_name(name) {
                     diagnostics.push(plan_diagnostic(
                         "MEJCL0756",
-                        "EXEC requires a unique qualified step name after JOB",
+                        "EXEC requires a qualified step name after JOB",
                         Severity::Error,
                         FailureCategory::MalformedInput,
                         Completeness::Incomplete,
@@ -1305,6 +1312,7 @@ fn validate_statement_context(
                     ));
                 }
                 seen_step = true;
+                dd_names.retain(|(step, _)| step.is_none());
             }
             JclPlanNode::Dd { name, step, .. } => {
                 let job_dd = step.is_none();
@@ -1312,7 +1320,7 @@ fn validate_statement_context(
                 let duplicate = !dd_names.insert((step.clone(), name.clone()));
                 if !seen_job
                     || (job_dd && seen_step)
-                    || (job_dd && !job_dd_name)
+                    || (job_dd && !job_dd_name && name != "*")
                     || (!job_dd && !seen_step)
                     || (!valid_program(name) && name != "*")
                     || (duplicate && name != "*")

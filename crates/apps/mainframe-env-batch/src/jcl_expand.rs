@@ -595,12 +595,18 @@ fn expand_sequence(
                         .to_ascii_uppercase();
                     let mut local_overrides = BTreeMap::new();
                     let mut next = index + 1;
-                    while next < input.len() && is_override_statement(&input[next]) {
-                        local_overrides.insert(
-                            input[next].name().unwrap().to_ascii_uppercase(),
-                            input[next].clone(),
-                        );
-                        next += 1;
+                    while next < input.len() {
+                        if input[next].identity() == JclStatementId::Comment {
+                            next += 1;
+                        } else if is_override_statement(&input[next]) {
+                            local_overrides.insert(
+                                input[next].name().unwrap().to_ascii_uppercase(),
+                                input[next].clone(),
+                            );
+                            next += 1;
+                        } else {
+                            break;
+                        }
                     }
                     push_expanded(
                         context,
@@ -1083,6 +1089,11 @@ fn substitute_symbols(
         } else if let Some(symbol) = symbols.get_mut(&name) {
             output.push_str(&symbol.value);
             symbol.uses.push(site.clone());
+        } else if name.starts_with("SYS") || name.ends_with("UID") {
+            // Converter-time system symbols are resolved by JES admission.
+            // Preserve the exact symbolic reference so the parameter's
+            // generated capability remains explicit in the typed plan.
+            output.push_str(&value[index..end]);
         } else {
             context.diagnostics.push(expansion_diagnostic(
                 "MEJCL0737",

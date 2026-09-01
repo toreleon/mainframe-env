@@ -286,7 +286,9 @@ pub fn parse_jcl_statements(syntax: &JclSyntaxAnalysis) -> JclStatementAnalysis 
         index += 1;
         while index < records.len() && records[index].kind() == JclRecordKind::Continuation {
             let continuation = &records[index];
-            let continued = source_field(text, continuation.content_bytes())
+            let content = continuation.content_bytes();
+            let statement_end = content.start.saturating_add(72).min(content.end);
+            let continued = source_field(text, &(content.start..statement_end))
                 .strip_prefix("//")
                 .unwrap_or_default()
                 .trim();

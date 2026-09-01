@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.example/schemas/jcl-licensed-differential-adapter.schema.json",
+  "title": "Licensed JCL differential adapter policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "target_version", "baseline_id", "required_product",
+    "receipt_environment_variable", "status", "licensed_receipt_required_for_pass",
+    "generated_or_historical_result_counts_as_pass", "publication_bytes_retained",
+    "oracle_binary_retained"
+  ],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.jcl-licensed-differential-adapter@1"},
+    "target_version": {"const": "0.7.0"},
+    "baseline_id": {"const": "ibm-zos-3.2-jcl-jes2-2026-06"},
+    "required_product": {"type": "string", "minLength": 1, "maxLength": 256},
+    "receipt_environment_variable": {"const": "MAINFRAME_ENV_JCL_LICENSED_ORACLE_RECEIPT"},
+    "status": {"enum": ["pending", "pass", "fail"]},
+    "licensed_receipt_required_for_pass": {"const": true},
+    "generated_or_historical_result_counts_as_pass": {"const": false},
+    "publication_bytes_retained": {"const": false},
+    "oracle_binary_retained": {"const": false}
+  }
+}

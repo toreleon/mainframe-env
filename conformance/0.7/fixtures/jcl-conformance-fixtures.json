@@ -1,0 +1,3807 @@
+{
+  "fixtures": [
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0001.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD *=BAD\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0001.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD *\nDATA\n/*\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0002.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD ACCODE=\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0002.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD ACCODE=NAME1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0003.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD AMP=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0003.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD AMP=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0004.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD AVGREC=INVALID\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0004.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD AVGREC=U\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0005.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD BLKSIZE=2147483648\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0005.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD BLKSIZE=0\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0006.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD BLKSZLIM=2147483648\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0006.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD BLKSZLIM=0\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0007.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD BURST=MAYBE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0007.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD BURST=YES\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0008.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD CCSID=65536\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0008.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD CCSID=1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0009.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD CHARS=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0009.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD CHARS=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0010.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD CHKPT=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0010.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD CHKPT=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0011.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD CNTL=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0011.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD CNTL=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0012.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD COPIES=NOTNUM\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0012.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD COPIES=1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0013.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DATA=BAD\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0013.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DATA\nDATA\n/*\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0014.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DATACLAS=\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0014.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DATACLAS=NAME1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0015.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DCB=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0015.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DCB=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0016.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DDNAME=BASE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0016.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//BASE DD DSNAME=USER.BASE\n//D DD DDNAME=*.BASE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0017.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DEST=\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0017.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DEST=NAME1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0018.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DISP=(BAD,KEEP)\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0018.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DISP=(NEW,CATLG,DELETE)\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0019.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DLM=LONG\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0019.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DLM=@@\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0020.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DSID=1000000\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0020.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DSID=1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0021.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DSKEYLBL=\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0021.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DSKEYLBL=NAME1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0022.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DSNAME=BAD DATA\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0022.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DSNAME=USER.DATA\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0023.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DSNTYPE=INVALID\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0023.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DSNTYPE=BASIC\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0024.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DUMMY=BAD\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0024.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DUMMY\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0025.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DYNAM=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0025.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DYNAM=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0026.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD EATTR=INVALID\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0026.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD EATTR=NO\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0027.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD EXPDT=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0027.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD EXPDT=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0028.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD FCB=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0028.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD FCB=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0029.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD FILEDATA=INVALID\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0029.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD FILEDATA=BINARY\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0030.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD FLASH=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0030.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD FLASH=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0031.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD FREE=INVALID\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0031.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD FREE=CLOSE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0032.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD FREEVOL=INVALID\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0032.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD FREEVOL=EOV\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0033.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD GDGORDER=INVALID\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0033.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD GDGORDER=FIFO\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0034.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD HOLD=MAYBE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0034.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD HOLD=YES\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0035.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD KEYLABL1=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0035.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD KEYLABL1=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0036.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD KEYLABL2=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0036.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD KEYLABL2=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0037.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD KEYENCD1=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0037.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD KEYENCD1=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0038.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD KEYENCD2=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0038.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD KEYENCD2=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0039.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD KEYLEN=32761\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0039.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD KEYLEN=0\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0040.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD KEYOFF=32761\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0040.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD KEYOFF=0\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0041.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD LABEL=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0041.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD LABEL=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0042.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD LGSTREAM=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0042.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD LGSTREAM=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0043.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD LIKE=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0043.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD LIKE=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0044.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD LRECL=NOTNUM\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0044.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD LRECL=1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0045.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD MAXGENS=2000000001\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0045.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD MAXGENS=0\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0046.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD MGMTCLAS=\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0046.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD MGMTCLAS=NAME1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0047.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD MODIFY=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0047.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD MODIFY=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0048.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD NULLOVRD=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0048.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD NULLOVRD=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0049.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD OUTLIM=16777216\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0049.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD OUTLIM=0\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0050.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD OUTPUT=\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0050.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD OUTPUT=OUT1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0051.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD PATH=relative\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0051.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD PATH=/tmp/data\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0052.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD PATHDISP=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0052.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD PATHDISP=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0053.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD PATHMODE=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0053.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD PATHMODE=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0054.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD PATHOPTS=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0054.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD PATHOPTS=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0055.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD PROTECT=MAYBE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0055.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD PROTECT=YES\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0056.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD RECFM=BAD\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0056.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD RECFM=FB\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0057.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD RECORG=INVALID\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0057.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD RECORG=KS\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0058.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD REFDD=BASE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0058.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//BASE DD DSNAME=USER.BASE\n//D DD REFDD=*.BASE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0059.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD RETPD=10000\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0059.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD RETPD=0\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0060.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD RLS=INVALID\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0060.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD RLS=NRI\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0061.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD ROACCESS=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0061.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD ROACCESS=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0062.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD SECMODEL=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0062.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD SECMODEL=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0063.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD SEGMENT=2147483648\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0063.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD SEGMENT=1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0064.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD SPACE=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0064.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD SPACE=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0065.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD SPIN=INVALID\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0065.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD SPIN=NO\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0066.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD STORCLAS=\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0066.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD STORCLAS=NAME1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0067.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD SUBSYS=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0067.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD SUBSYS=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0068.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD SYMBOLS=INVALID\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0068.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD SYMBOLS=CNVTSYS\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0069.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD SYMLIST=\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0069.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD SYMLIST=(ONE,TWO)\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0070.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD SYSOUT=(AB,TOO,MANY,VALUES)\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0070.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD SYSOUT=*\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0071.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD TERM=INVALID\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0071.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD TERM=TS\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0072.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD UCS=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0072.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD UCS=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0073.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD UNIT=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0073.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD UNIT=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0074.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD VOLUME=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.dd-parameters.0074.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD VOLUME=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0001.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,ABDISPCC=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0001.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,ABDISPCC=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0002.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,ACCT=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0002.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,ACCT=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0003.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,ADDRSPC=INVALID\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0003.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,ADDRSPC=REAL\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0004.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,CCSID=65536\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0004.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,CCSID=1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0005.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,COND=(X,EQ)\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0005.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,COND=(0,EQ)\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0006.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,DYNAMNBR=3274\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0006.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,DYNAMNBR=0\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0007.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,MEMLIMIT=BIG\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0007.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,MEMLIMIT=4M\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0008.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,PARM=\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0008.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,PARM=TEXT\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0009.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,PARMDD=\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0009.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,PARMDD=NAME1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0010.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,PERFORM=1000\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0010.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,PERFORM=1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0011.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=TOO-LONG9\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0011.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {
+        "PROC1": "//PROC1 PROC\n//PS EXEC PGM=IEFBR14\n// PEND\n"
+      },
+      "id": "jcl.fixture.exec-parameters.0012.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PROC=TOO-LONG9\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {
+        "PROC1": "//PROC1 PROC\n//PS EXEC PGM=IEFBR14\n// PEND\n"
+      },
+      "id": "jcl.fixture.exec-parameters.0012.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PROC=PROC1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0013.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,RD=INVALID\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0013.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,RD=NC\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0014.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,REGION=BIG\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0014.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,REGION=4M\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0015.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,REGIONX=BIG\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0015.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,REGIONX=4M\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0016.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,RLSTMOUT=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0016.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,RLSTMOUT=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0017.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,TIME=(1,99)\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0017.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,TIME=1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0018.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,TVSMSG=INVALID\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0018.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,TVSMSG=0\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0019.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,TVSAMCOM=INVALID\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.exec-parameters.0019.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14,TVSAMCOM=NO\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0001.invalid",
+      "includes": {},
+      "primary": "BROKEN\n//J JOB\n//DISPLAY\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0001.valid",
+      "includes": {},
+      "primary": "//J JOB\n//DISPLAY\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0002.invalid",
+      "includes": {},
+      "primary": "BROKEN\n//J JOB\n//C COMMAND 'D A,L'\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0002.valid",
+      "includes": {},
+      "primary": "//J JOB\n//C COMMAND 'D A,L'\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0003.invalid",
+      "includes": {},
+      "primary": "BROKEN\n//J JOB\n//* COMMENT\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0003.valid",
+      "includes": {},
+      "primary": "//J JOB\n//* COMMENT\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0004.invalid",
+      "includes": {},
+      "primary": "BROKEN\n//J JOB\n//C CNTL\nCONTROL\n//E ENDCNTL\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0004.valid",
+      "includes": {},
+      "primary": "//J JOB\n//C CNTL\nCONTROL\n//E ENDCNTL\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0005.invalid",
+      "includes": {},
+      "primary": "BROKEN\n//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DUMMY\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0005.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DUMMY\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0006.invalid",
+      "includes": {},
+      "primary": "BROKEN\n//J JOB\n//S EXEC PGM=IEFBR14\n/*\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0006.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n/*\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0007.invalid",
+      "includes": {},
+      "primary": "BROKEN\n//J JOB\n//C CNTL\nCONTROL\n//E ENDCNTL\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0007.valid",
+      "includes": {},
+      "primary": "//J JOB\n//C CNTL\nCONTROL\n//E ENDCNTL\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0008.invalid",
+      "includes": {},
+      "primary": "BROKEN\n//J JOB\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0008.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0009.invalid",
+      "includes": {},
+      "primary": "BROKEN\n//J JOB\n// SET X=VALUE\n// EXPORT SYMLIST=(X)\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0009.valid",
+      "includes": {},
+      "primary": "//J JOB\n// SET X=VALUE\n// EXPORT SYMLIST=(X)\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0010.invalid",
+      "includes": {},
+      "primary": "BROKEN\n//J JOB\n// IF (RC = 0) THEN\n//S EXEC PGM=IEFBR14\n// ENDIF\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0010.valid",
+      "includes": {},
+      "primary": "//J JOB\n// IF (RC = 0) THEN\n//S EXEC PGM=IEFBR14\n// ENDIF\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0011.invalid",
+      "includes": {
+        "PART": "//* INCLUDED\n"
+      },
+      "primary": "BROKEN\n//J JOB\n//I INCLUDE MEMBER=PART\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0011.valid",
+      "includes": {
+        "PART": "//* INCLUDED\n"
+      },
+      "primary": "//J JOB\n//I INCLUDE MEMBER=PART\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0012.invalid",
+      "includes": {},
+      "primary": "BROKEN\n//J JOB\n//L JCLLIB ORDER=LIB1\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0012.valid",
+      "includes": {},
+      "primary": "//J JOB\n//L JCLLIB ORDER=LIB1\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0013.invalid",
+      "includes": {},
+      "primary": "BROKEN\n//J JOB CLASS=A\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0013.valid",
+      "includes": {},
+      "primary": "//J JOB CLASS=A\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0014.invalid",
+      "includes": {},
+      "primary": "BROKEN\n//J JOB\n//S EXEC PGM=IEFBR14\n//\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0014.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0015.invalid",
+      "includes": {},
+      "primary": "BROKEN\n//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT CLASS=A\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0015.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT CLASS=A\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0016.invalid",
+      "includes": {},
+      "primary": "BROKEN\n//J JOB\n//P PROC\n//X EXEC PGM=IEFBR14\n// PEND\n//S EXEC PROC=P\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0016.valid",
+      "includes": {},
+      "primary": "//J JOB\n//P PROC\n//X EXEC PGM=IEFBR14\n// PEND\n//S EXEC PROC=P\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0017.invalid",
+      "includes": {},
+      "primary": "BROKEN\n//J JOB\n//P PROC\n//X EXEC PGM=IEFBR14\n// PEND\n//S EXEC PROC=P\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0017.valid",
+      "includes": {},
+      "primary": "//J JOB\n//P PROC\n//X EXEC PGM=IEFBR14\n// PEND\n//S EXEC PROC=P\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0018.invalid",
+      "includes": {},
+      "primary": "BROKEN\n//J JOB\n//S SCHEDULE HOLD\n//X EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0018.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S SCHEDULE HOLD\n//X EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0019.invalid",
+      "includes": {},
+      "primary": "BROKEN\n//J JOB\n// SET P=IEFBR14\n//S EXEC PGM=&P.\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0019.valid",
+      "includes": {},
+      "primary": "//J JOB\n// SET P=IEFBR14\n//S EXEC PGM=&P.\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0020.invalid",
+      "includes": {},
+      "primary": "BROKEN\n//J JOB\n//X XMIT DEST\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jcl-statements.0020.valid",
+      "includes": {},
+      "primary": "//J JOB\n//X XMIT DEST\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0001.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n/*$\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0001.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n/*$D A,L\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0002.invalid",
+      "includes": {},
+      "primary": "//J JOB\n/*JOBPARM BAD=VALUE\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0002.valid",
+      "includes": {},
+      "primary": "//J JOB\n/*JOBPARM SYSAFF=SYS1\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0003.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n/*MESSAGE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0003.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n/*MESSAGE HELLO\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0004.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n/*NETACCT\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0004.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n/*NETACCT 1234\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0005.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n/*NOTIFY\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0005.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n/*NOTIFY USER1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0006.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n/*OUTPUT BAD=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0006.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n/*OUTPUT DEST=LOCAL\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0007.invalid",
+      "includes": {},
+      "primary": "//J JOB\n/*PRIORITY 16\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0007.valid",
+      "includes": {},
+      "primary": "//J JOB\n/*PRIORITY 10\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0008.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n/*ROUTE BAD LOCAL\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0008.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n/*ROUTE PRINT LOCAL\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0009.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n/*SETUP\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0009.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n/*SETUP VOL1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0010.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n/*SIGNOFF EXTRA\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0010.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n/*SIGNOFF\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0011.invalid",
+      "includes": {},
+      "primary": "/*SIGNON\n//J JOB\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0011.valid",
+      "includes": {},
+      "primary": "/*SIGNON 1\n//J JOB\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0012.invalid",
+      "includes": {},
+      "primary": "//J JOB\n/*XEQ\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0012.valid",
+      "includes": {},
+      "primary": "//J JOB\n/*XEQ NODE1\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0013.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n/*XMIT\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.jes2-jecl-statements.0013.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n/*XMIT NODE1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0001.invalid",
+      "includes": {},
+      "primary": "//J JOB ''\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0001.valid",
+      "includes": {},
+      "primary": "//J JOB (A)\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0002.invalid",
+      "includes": {},
+      "primary": "//J JOB ADDRSPC=INVALID\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0002.valid",
+      "includes": {},
+      "primary": "//J JOB ADDRSPC=REAL\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0003.invalid",
+      "includes": {},
+      "primary": "//J JOB BYTES=NOTNUM\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0003.valid",
+      "includes": {},
+      "primary": "//J JOB BYTES=1K\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0004.invalid",
+      "includes": {},
+      "primary": "//J JOB CARDS=NOTNUM\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0004.valid",
+      "includes": {},
+      "primary": "//J JOB CARDS=1K\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0005.invalid",
+      "includes": {},
+      "primary": "//J JOB CCSID=65536\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0005.valid",
+      "includes": {},
+      "primary": "//J JOB CCSID=1\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0006.invalid",
+      "includes": {},
+      "primary": "//J JOB CLASS=AB\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0006.valid",
+      "includes": {},
+      "primary": "//J JOB CLASS=A\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0007.invalid",
+      "includes": {},
+      "primary": "//J JOB COND=(X,EQ)\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0007.valid",
+      "includes": {},
+      "primary": "//J JOB COND=(0,EQ)\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0008.invalid",
+      "includes": {},
+      "primary": "//J JOB DSENQSHR=INVALID\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0008.valid",
+      "includes": {},
+      "primary": "//J JOB DSENQSHR=ALLOW\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0009.invalid",
+      "includes": {},
+      "primary": "//J JOB EMAIL=(\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0009.valid",
+      "includes": {},
+      "primary": "//J JOB EMAIL=VALUE\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0010.invalid",
+      "includes": {},
+      "primary": "//J JOB GDGBIAS=INVALID\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0010.valid",
+      "includes": {},
+      "primary": "//J JOB GDGBIAS=JOB\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0011.invalid",
+      "includes": {},
+      "primary": "//J JOB GROUP=(\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0011.valid",
+      "includes": {},
+      "primary": "//J JOB GROUP=VALUE\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0012.invalid",
+      "includes": {},
+      "primary": "//J JOB JESLOG=INVALID\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0012.valid",
+      "includes": {},
+      "primary": "//J JOB JESLOG=SPIN\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0013.invalid",
+      "includes": {},
+      "primary": "//J JOB JOBRC=(\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0013.valid",
+      "includes": {},
+      "primary": "//J JOB JOBRC=VALUE\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0014.invalid",
+      "includes": {},
+      "primary": "//J JOB LINES=NOTNUM\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0014.valid",
+      "includes": {},
+      "primary": "//J JOB LINES=1K\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0015.invalid",
+      "includes": {},
+      "primary": "//J JOB MEMLIMIT=BIG\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0015.valid",
+      "includes": {},
+      "primary": "//J JOB MEMLIMIT=4M\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0016.invalid",
+      "includes": {},
+      "primary": "//J JOB MSGCLASS=AB\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0016.valid",
+      "includes": {},
+      "primary": "//J JOB MSGCLASS=A\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0017.invalid",
+      "includes": {},
+      "primary": "//J JOB MSGLEVEL=(3,2)\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0017.valid",
+      "includes": {},
+      "primary": "//J JOB MSGLEVEL=(1,1)\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0018.invalid",
+      "includes": {},
+      "primary": "//J JOB NOTIFY=\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0018.valid",
+      "includes": {},
+      "primary": "//J JOB NOTIFY=NAME1\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0019.invalid",
+      "includes": {},
+      "primary": "//J JOB PAGES=NOTNUM\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0019.valid",
+      "includes": {},
+      "primary": "//J JOB PAGES=1K\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0020.invalid",
+      "includes": {},
+      "primary": "//J JOB PASSWORD=TOO-LONG9\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0020.valid",
+      "includes": {},
+      "primary": "//J JOB PASSWORD=SECRET\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0021.invalid",
+      "includes": {},
+      "primary": "//J JOB PERFORM=1000\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0021.valid",
+      "includes": {},
+      "primary": "//J JOB PERFORM=1\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0022.invalid",
+      "includes": {},
+      "primary": "//J JOB (A),''\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0022.valid",
+      "includes": {},
+      "primary": "//J JOB (A),'PROGRAMMER'\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0023.invalid",
+      "includes": {},
+      "primary": "//J JOB PRTY=16\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0023.valid",
+      "includes": {},
+      "primary": "//J JOB PRTY=0\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0024.invalid",
+      "includes": {},
+      "primary": "//J JOB RD=INVALID\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0024.valid",
+      "includes": {},
+      "primary": "//J JOB RD=NC\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0025.invalid",
+      "includes": {},
+      "primary": "//J JOB REGION=BIG\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0025.valid",
+      "includes": {},
+      "primary": "//J JOB REGION=4M\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0026.invalid",
+      "includes": {},
+      "primary": "//J JOB REGIONX=BIG\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0026.valid",
+      "includes": {},
+      "primary": "//J JOB REGIONX=4M\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0027.invalid",
+      "includes": {},
+      "primary": "//J JOB RESTART=TOO-LONG9\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0027.valid",
+      "includes": {},
+      "primary": "//J JOB RESTART=STEP1\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0028.invalid",
+      "includes": {},
+      "primary": "//J JOB SECLABEL=(\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0028.valid",
+      "includes": {},
+      "primary": "//J JOB SECLABEL=VALUE\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0029.invalid",
+      "includes": {},
+      "primary": "//J JOB SCHENV=(\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0029.valid",
+      "includes": {},
+      "primary": "//J JOB SCHENV=VALUE\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0030.invalid",
+      "includes": {},
+      "primary": "//J JOB SYSAFF=\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0030.valid",
+      "includes": {},
+      "primary": "//J JOB SYSAFF=(ONE,TWO)\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0031.invalid",
+      "includes": {},
+      "primary": "//J JOB SYSTEM=\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0031.valid",
+      "includes": {},
+      "primary": "//J JOB SYSTEM=(ONE,TWO)\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0032.invalid",
+      "includes": {},
+      "primary": "//J JOB TIME=(1,99)\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0032.valid",
+      "includes": {},
+      "primary": "//J JOB TIME=1\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0033.invalid",
+      "includes": {},
+      "primary": "//J JOB TYPRUN=INVALID\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0033.valid",
+      "includes": {},
+      "primary": "//J JOB TYPRUN=COPY\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0034.invalid",
+      "includes": {},
+      "primary": "//J JOB UJOBCORR=(\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0034.valid",
+      "includes": {},
+      "primary": "//J JOB UJOBCORR=VALUE\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0035.invalid",
+      "includes": {},
+      "primary": "//J JOB USER=\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.job-parameters.0035.valid",
+      "includes": {},
+      "primary": "//J JOB USER=NAME1\n//S EXEC PGM=IEFBR14\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0001.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT ADDRESS=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0001.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT ADDRESS=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0002.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT AFPPARMS=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0002.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT AFPPARMS=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0003.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT AFPSTATS=MAYBE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0003.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT AFPSTATS=YES\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0004.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT BUILDING=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0004.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT BUILDING=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0005.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT BURST=MAYBE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0005.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT BURST=YES\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0006.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT CHARS=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0006.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT CHARS=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0007.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT CKPTLINE=2147483648\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0007.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT CKPTLINE=0\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0008.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT CKPTPAGE=2147483648\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0008.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT CKPTPAGE=0\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0009.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT CKPTSEC=2147483648\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0009.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT CKPTSEC=0\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0010.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT CLASS=AB\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0010.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT CLASS=A\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0011.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT COLORMAP=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0011.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT COLORMAP=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0012.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT COMPACT=MAYBE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0012.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT COMPACT=YES\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0013.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT COMSETUP=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0013.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT COMSETUP=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0014.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT CONTROL=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0014.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT CONTROL=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0015.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT COPIES=NOTNUM\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0015.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT COPIES=1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0016.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT COPYCNT=256\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0016.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT COPYCNT=1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0017.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT DATACK=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0017.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT DATACK=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0018.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT DDNAME=\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0018.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT DDNAME=(ONE,TWO)\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0019.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT DEFAULT=MAYBE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0019.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT DEFAULT=YES\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0020.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT DEPT=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0020.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT DEPT=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0021.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT DEST=\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0021.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT DEST=NAME1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0022.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT DPAGELBL=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0022.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT DPAGELBL=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0023.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT DUPLEX=INVALID\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0023.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT DUPLEX=NO\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0024.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT FCB=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0024.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT FCB=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0025.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT FLASH=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0025.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT FLASH=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0026.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT FORMDEF=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0026.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT FORMDEF=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0027.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT FORMLEN=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0027.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT FORMLEN=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0028.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT FORMS=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0028.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT FORMS=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0029.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT FSSDATA=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0029.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT FSSDATA=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0030.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT GROUPID=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0030.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT GROUPID=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0031.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT INDEX=32\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0031.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT INDEX=0\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0032.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT INTRAY=256\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0032.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT INTRAY=1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0033.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT JESDS=INVALID\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0033.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT JESDS=ALL\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0034.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT LINDEX=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0034.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT LINDEX=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0035.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT LINECT=256\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0035.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT LINECT=0\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0036.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT MAILBCC=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0036.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT MAILBCC=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0037.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT MAILCC=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0037.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT MAILCC=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0038.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT MAILFILE=\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0038.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT MAILFILE=NAME1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0039.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT MAILFROM=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0039.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT MAILFROM=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0040.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT MAILTO=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0040.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT MAILTO=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0041.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT MERGE=MAYBE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0041.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT MERGE=YES\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0042.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT MODIFY=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0042.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT MODIFY=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0043.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT NAME=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0043.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT NAME=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0044.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT NOTIFY=\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0044.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT NOTIFY=(ONE,TWO)\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0045.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT OFFSETXB=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0045.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT OFFSETXB=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0046.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT OFFSETXF=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0046.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT OFFSETXF=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0047.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT OFFSETYB=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0047.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT OFFSETYB=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0048.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT OFFSETYF=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0048.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT OFFSETYF=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0049.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT OUTBIN=65536\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0049.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT OUTBIN=1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0050.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT OUTDISP=INVALID\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0050.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT OUTDISP=HOLD\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0051.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT OVERLAYB=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0051.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT OVERLAYB=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0052.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT OVERLAYF=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0052.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT OVERLAYF=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0053.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT OVFL=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0053.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT OVFL=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0054.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT PAGEDEF=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0054.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT PAGEDEF=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0055.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT PIMSG=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0055.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT PIMSG=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0056.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT PORTNO=65536\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0056.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT PORTNO=1\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0057.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT PRMODE=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0057.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT PRMODE=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0058.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT PRTATTRS=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0058.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT PRTATTRS=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0059.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT PRTERROR=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0059.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT PRTERROR=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0060.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT PRTOPTNS=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0060.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT PRTOPTNS=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0061.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT PRTQUEUE=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0061.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT PRTQUEUE=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0062.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT PRTY=256\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0062.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT PRTY=0\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0063.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT REPLYTO=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0063.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT REPLYTO=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0064.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT RESFMT=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0064.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT RESFMT=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0065.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT RETAINS=10000\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0065.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT RETAINS=0\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0066.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT RETRYL=10000\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0066.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT RETRYL=0\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0067.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT ROOM=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0067.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT ROOM=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0068.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT SYSAREA=MAYBE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0068.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT SYSAREA=YES\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0069.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT THRESHLD=2147483648\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0069.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT THRESHLD=0\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0070.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT TITLE=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0070.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT TITLE=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0071.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT TRC=MAYBE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0071.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT TRC=YES\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0072.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT UCS=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0072.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT UCS=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0073.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT USERDATA=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0073.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT USERDATA=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0074.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT USERLIB=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0074.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT USERLIB=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0075.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT USERPATH=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0075.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT USERPATH=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0076.invalid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT WRITER=(\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    },
+    {
+      "cataloged_procedures": {},
+      "id": "jcl.fixture.output-parameters.0076.valid",
+      "includes": {},
+      "primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT WRITER=VALUE\n",
+      "procedure_libraries": {},
+      "symbols": {}
+    }
+  ],
+  "schema_version": "mainframe-env.jcl-conformance-fixtures@1",
+  "source_catalog_sha256": "sha256:640b6bf949b6feefa6ba2d762286500798d3157794c728c360f4a46fc260fba4",
+  "target_version": "0.7.0"
+}
