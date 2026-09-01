@@ -1239,7 +1239,7 @@ fn check_cobol_statement_bindings(
         ]);
         if matches!(
             row.row_id().as_str().rsplit(':').next(),
-            Some("0029" | "0031" | "0032" | "0034" | "0036")
+            Some("0029" | "0031" | "0032" | "0034" | "0036" | "0044")
         ) {
             expected_obligations.insert("checkpoint-restart");
         }

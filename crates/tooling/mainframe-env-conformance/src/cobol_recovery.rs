@@ -34,6 +34,7 @@ enum Marker {
     SortSecondRecord,
     SearchBranch,
     PerformRepetition,
+    XmlEvent,
 }
 #[derive(Debug, Deserialize, Serialize)]
 struct Output {
@@ -159,6 +160,9 @@ fn execute(fixture: &Fixture) -> Result<Output, String> {
                     .parse::<u8>()
                     .is_ok_and(|value| (1..5).contains(&value))
             }),
+            Marker::XmlEvent => first
+                .variable("XML-EVENT")
+                .is_some_and(|value| value.bytes() == b"CONTENT-CHARACTERS"),
         };
         if reached {
             break;

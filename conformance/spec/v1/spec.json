@@ -34645,6 +34645,23 @@
       ],
       "oracle": "cobol.enterprise-6.5.licensed",
       "recovery": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044",
+      "gate": "recovered",
+      "obligation_id": "checkpoint-restart",
+      "test_id": "cobol.recovery.xml-events",
+      "input": "cobol.recovery.xml-events",
+      "driver": "cobol.recovery.driver",
+      "preconditions": [
+        "cobol.recovery.fixture.available"
+      ],
+      "expected": [
+        "cobol.recovery.exact"
+      ],
+      "oracle": "cobol.enterprise-6.5.licensed",
+      "recovery": null
     }
   ],
   "catalog_digest": "sha256:074f7385b1d1e1127f9cf83dbbc4e0bc46903cfa7739a2515c4085f7d2037f01",
@@ -47492,6 +47509,13 @@
       "applicable_gates": [
         "executed"
       ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044",
+      "obligation_id": "checkpoint-restart",
+      "applicable_gates": [
+        "recovered"
+      ]
     }
   ],
   "registries": {
@@ -48827,23 +48851,23 @@
         "id": "cobol.function.year-to-yyyy.valid"
       },
       {
-        "digest": "sha256:fc5a40c3dcb23434c35ab123c4a5ca0553d957fe22c8007b8a453dd74a1c10c5",
+        "digest": "sha256:cd1a8a845faafd674b6383a8b6d4ca2151a91cf632e8e518b37e44efb49d14ad",
         "id": "cobol.recovery.dynamic-length"
       },
       {
-        "digest": "sha256:fc5a40c3dcb23434c35ab123c4a5ca0553d957fe22c8007b8a453dd74a1c10c5",
+        "digest": "sha256:cd1a8a845faafd674b6383a8b6d4ca2151a91cf632e8e518b37e44efb49d14ad",
         "id": "cobol.recovery.release"
       },
       {
-        "digest": "sha256:fc5a40c3dcb23434c35ab123c4a5ca0553d957fe22c8007b8a453dd74a1c10c5",
+        "digest": "sha256:cd1a8a845faafd674b6383a8b6d4ca2151a91cf632e8e518b37e44efb49d14ad",
         "id": "cobol.recovery.return"
       },
       {
-        "digest": "sha256:fc5a40c3dcb23434c35ab123c4a5ca0553d957fe22c8007b8a453dd74a1c10c5",
+        "digest": "sha256:cd1a8a845faafd674b6383a8b6d4ca2151a91cf632e8e518b37e44efb49d14ad",
         "id": "cobol.recovery.search"
       },
       {
-        "digest": "sha256:fc5a40c3dcb23434c35ab123c4a5ca0553d957fe22c8007b8a453dd74a1c10c5",
+        "digest": "sha256:cd1a8a845faafd674b6383a8b6d4ca2151a91cf632e8e518b37e44efb49d14ad",
         "id": "cobol.recovery.sort"
       },
       {
@@ -51656,7 +51680,7 @@
       },
       {
         "id": "cobol.recovery.perform-repetition",
-        "digest": "sha256:fc5a40c3dcb23434c35ab123c4a5ca0553d957fe22c8007b8a453dd74a1c10c5"
+        "digest": "sha256:cd1a8a845faafd674b6383a8b6d4ca2151a91cf632e8e518b37e44efb49d14ad"
       },
       {
         "id": "cobol.statement-phrase-runtime.entry-alternate-selection",
@@ -51665,6 +51689,10 @@
       {
         "id": "cobol.statement-phrase-runtime.close-reel-dispositions",
         "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300"
+      },
+      {
+        "id": "cobol.recovery.xml-events",
+        "digest": "sha256:cd1a8a845faafd674b6383a8b6d4ca2151a91cf632e8e518b37e44efb49d14ad"
       }
     ],
     "input_shapes": [
@@ -59384,6 +59412,7 @@
       "input": "cobol.statement-runtime.artifact",
       "obligations": [
         "checkpoint-identity",
+        "checkpoint-restart",
         "invalid-forms",
         "licensed-equivalence",
         "phrase-processing-procedure-through",
@@ -59403,6 +59432,7 @@
         "cobol.assurance.resource-conditioned",
         "cobol.condition.exact",
         "cobol.licensed.row-equivalent",
+        "cobol.recovery.exact",
         "cobol.statement-phrase-runtime.executed",
         "cobol.statement-runtime.executed",
         "cobol.statement.accepted",
@@ -59412,6 +59442,7 @@
         "cobol.assurance.fixture.available",
         "cobol.condition.fixture.available",
         "cobol.licensed.receipt.available",
+        "cobol.recovery.fixture.available",
         "cobol.statement-phrase-runtime.fixture.available",
         "cobol.statement-runtime.fixture.available",
         "cobol.statement.fixture.available"
