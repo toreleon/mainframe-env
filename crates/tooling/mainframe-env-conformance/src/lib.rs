@@ -1188,6 +1188,45 @@ mod tests {
         }
     }
     #[test]
+    fn out_of_line_perform_times_until_and_varying_repeat_exactly() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. OUTPERF. DATA DIVISION. WORKING-STORAGE SECTION. 01 I PIC 9 VALUE 0. 01 J PIC 9 VALUE 0. PROCEDURE DIVISION. PERFORM TIMES-P 3 TIMES. PERFORM UNTIL-P UNTIL I > 5. PERFORM VARY-P VARYING J FROM 1 BY 1 UNTIL J > 3. DISPLAY I. STOP RUN. TIMES-P. DISPLAY 'T'. ADD 1 TO I. EXIT. UNTIL-P. DISPLAY 'U'. ADD 1 TO I. EXIT. VARY-P. DISPLAY J. EXIT.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 4096) {
+            MachineDrive::Completed(done) => {
+                assert_eq!(done.output.bytes(), b"T\nT\nT\nU\nU\nU\n1\n2\n3\n6\n")
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn out_of_line_perform_repetition_survives_checkpoint_restore() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. OUTPERFCP. DATA DIVISION. WORKING-STORAGE SECTION. 01 I PIC 99 VALUE 0. PROCEDURE DIVISION. PERFORM WORK-P 5 TIMES. DISPLAY I. STOP RUN. WORK-P. ADD 1 TO I. EXIT.";
+        let artifact = compile(source).unwrap();
+        let invocation = invocation(&artifact, 1024);
+        let mut original = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            original.drive(MachineResume::Start, Quantum::new(6, 4096).unwrap()),
+            MachineDrive::Continue
+        );
+        let checkpoint = original.checkpoint().unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored.restore_checkpoint(&checkpoint).unwrap();
+        let original = drive_to_terminal(&mut original);
+        let restored = drive_to_terminal(&mut restored);
+        assert_eq!(original, restored);
+        assert!(matches!(
+            restored,
+            MachineDrive::Completed(done) if done.output.bytes() == b"05\n"
+        ));
+    }
+    #[test]
     fn nested_performs_preserve_the_outer_same_paragraph_endpoint() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. NESTTHRU. PROCEDURE DIVISION. PERFORM OUTER-PARA THRU OUTER-PARA. DISPLAY 'DONE'. STOP RUN. OUTER-PARA. DISPLAY 'OUTER'. PERFORM INNER-PARA THRU INNER-EXIT. OUTER-EXIT. EXIT. INNER-PARA. DISPLAY 'INNER'. INNER-EXIT. EXIT. NEXT-PARA. DISPLAY 'WRONG'.";
         let artifact = compile(source).unwrap();

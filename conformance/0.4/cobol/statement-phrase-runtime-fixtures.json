@@ -80,6 +80,13 @@
       "expected_output": "06\n"
     },
     {
+      "id": "perform-out-of-line-repetition",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0029",
+      "obligation_id": "phrase-out-of-line-times-until-varying",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. OUTPERF. DATA DIVISION. WORKING-STORAGE SECTION. 01 I PIC 9 VALUE 0. 01 J PIC 9 VALUE 0. PROCEDURE DIVISION. PERFORM TIMES-P 3 TIMES. PERFORM UNTIL-P UNTIL I > 5. PERFORM VARY-P VARYING J FROM 1 BY 1 UNTIL J > 3. DISPLAY I. STOP RUN. TIMES-P. DISPLAY 'T'. ADD 1 TO I. EXIT. UNTIL-P. DISPLAY 'U'. ADD 1 TO I. EXIT. VARY-P. DISPLAY J. EXIT.",
+      "expected_output": "T\nT\nT\nU\nU\nU\n1\n2\n3\n6\n"
+    },
+    {
       "id": "perform-through",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0029",
       "obligation_id": "phrase-through",

@@ -1774,9 +1774,7 @@ impl ReferenceMachine {
                     .insert(normalize(&args[0]), normalize(args.last().unwrap()));
             }
             "perform" => {
-                let target = args.first().ok_or(MachineProblem::InvalidOperation)?;
-                self.perform_stack.push(self.pc);
-                return Ok(Step::Jump(self.label(target)?));
+                return self.out_of_line_perform_step(&args);
             }
             "exit"
                 if args.iter().any(|argument| {
@@ -2250,6 +2248,49 @@ impl ReferenceMachine {
         Ok(Step::Jump(self.control_target(operation, "edge_loop")?))
     }
 
+    fn out_of_line_perform_step(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
+        let target = args.first().ok_or(MachineProblem::InvalidOperation)?;
+        let key = out_of_line_perform_key(self.pc);
+        if let Some(varying) = position(args, "VARYING") {
+            let variable = args
+                .get(varying + 1)
+                .ok_or(MachineProblem::InvalidOperation)?;
+            let from = position(args, "FROM")
+                .and_then(|at| args.get(at + 1))
+                .ok_or(MachineProblem::InvalidOperation)?;
+            let value = self.decimal(from)?;
+            self.write_decimal(variable, value)?;
+            let until = position(args, "UNTIL").ok_or(MachineProblem::InvalidOperation)?;
+            if self.eval_condition(&args[until + 1..])? {
+                return Ok(Step::Next);
+            }
+            self.loop_counts.insert(key, 1);
+        } else if let Some(until) = position(args, "UNTIL") {
+            if self.eval_condition(&args[until + 1..])? {
+                return Ok(Step::Next);
+            }
+            self.loop_counts.insert(key, 1);
+        } else if let Some(times) = position(args, "TIMES") {
+            let clause = 1 + usize::from(
+                args.get(1)
+                    .is_some_and(|token| matches!(token.as_str(), "THROUGH" | "THRU")),
+            ) * 2;
+            if clause >= times {
+                return Err(MachineProblem::InvalidOperation);
+            }
+            let count = value_decimal(self.eval_value(&args[clause..times])?)?;
+            if count.scale != 0 {
+                return Err(MachineProblem::DataException);
+            }
+            if count.coefficient <= 0 {
+                return Ok(Step::Next);
+            }
+            self.loop_counts.insert(key, count.coefficient - 1);
+        }
+        self.perform_stack.push(self.pc);
+        self.label(target).map(Step::Jump)
+    }
+
     fn exit_perform_step(&self, operation: &Operation) -> Result<Step, MachineProblem> {
         let mut parent = optional_integer_attribute(operation, "control_parent")
             .and_then(|value| usize::try_from(value).ok());
@@ -2463,6 +2504,41 @@ impl ReferenceMachine {
                 );
             }
             self.loop_counts.remove(&key);
+        }
+        if operation.identity.name() == "perform" {
+            let arguments = arguments(&operation);
+            let key = out_of_line_perform_key(call_pc);
+            if let Some(remaining) = self.loop_counts.get(&key).copied() {
+                let repeat = if remaining > 0 && position(&arguments, "TIMES").is_some() {
+                    self.loop_counts.insert(key, remaining - 1);
+                    true
+                } else if let Some(varying) = position(&arguments, "VARYING") {
+                    let variable = arguments
+                        .get(varying + 1)
+                        .ok_or(MachineProblem::InvalidOperation)?;
+                    let by = position(&arguments, "BY")
+                        .and_then(|at| arguments.get(at + 1))
+                        .ok_or(MachineProblem::InvalidOperation)?;
+                    let value = decimal_add(
+                        self.arithmetic_mode,
+                        self.decimal(variable)?,
+                        self.decimal(by)?,
+                    )?;
+                    self.write_decimal(variable, value)?;
+                    let until =
+                        position(&arguments, "UNTIL").ok_or(MachineProblem::InvalidOperation)?;
+                    !self.eval_condition(&arguments[until + 1..])?
+                } else if let Some(until) = position(&arguments, "UNTIL") {
+                    !self.eval_condition(&arguments[until + 1..])?
+                } else {
+                    false
+                };
+                if repeat {
+                    self.perform_stack.push(call_pc);
+                    return self.label(arguments.first().ok_or(MachineProblem::InvalidOperation)?);
+                }
+                self.loop_counts.remove(&key);
+            }
         }
         if optional_integer_attribute(&operation, "edge_loop").is_some() {
             return match self.perform_control_end(&operation)? {
@@ -10086,6 +10162,10 @@ fn xml_processing_target(args: &[String]) -> Option<&str> {
 
 const fn xml_state_key(pc: usize) -> usize {
     pc | (1usize << (usize::BITS - 1))
+}
+
+const fn out_of_line_perform_key(pc: usize) -> usize {
+    pc | (1usize << (usize::BITS - 2))
 }
 
 fn xml_document_events(source: &str) -> Result<Vec<(String, Vec<u8>)>, MachineProblem> {
