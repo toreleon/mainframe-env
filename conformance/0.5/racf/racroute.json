@@ -1,0 +1,21 @@
+{
+  "schema_version": "mainframe-env.racroute-catalog@1",
+  "baseline_id": "ibm-zos-3.2-racf-saf-2026",
+  "supporting_source_sha256": "sha256:83e6eed67f5631268e03ad9459c5ac5fde03bd9d78152eb07403b70af3c4cf78",
+  "requests": [
+    {"row_id":"ibm-zos-3.2-racf-saf-2026:racroute-request-types:0001","variant":"Audit","keyword":"AUDIT","mutating":true,"requires_acee":false,"uses_cache":false},
+    {"row_id":"ibm-zos-3.2-racf-saf-2026:racroute-request-types:0002","variant":"Auth","keyword":"AUTH","mutating":false,"requires_acee":false,"uses_cache":true},
+    {"row_id":"ibm-zos-3.2-racf-saf-2026:racroute-request-types:0003","variant":"Define","keyword":"DEFINE","mutating":true,"requires_acee":true,"uses_cache":false},
+    {"row_id":"ibm-zos-3.2-racf-saf-2026:racroute-request-types:0004","variant":"Dirauth","keyword":"DIRAUTH","mutating":false,"requires_acee":true,"uses_cache":false},
+    {"row_id":"ibm-zos-3.2-racf-saf-2026:racroute-request-types:0005","variant":"Extract","keyword":"EXTRACT","mutating":false,"requires_acee":true,"uses_cache":false},
+    {"row_id":"ibm-zos-3.2-racf-saf-2026:racroute-request-types:0006","variant":"Fastauth","keyword":"FASTAUTH","mutating":false,"requires_acee":true,"uses_cache":true},
+    {"row_id":"ibm-zos-3.2-racf-saf-2026:racroute-request-types:0007","variant":"List","keyword":"LIST","mutating":true,"requires_acee":true,"uses_cache":true},
+    {"row_id":"ibm-zos-3.2-racf-saf-2026:racroute-request-types:0008","variant":"Signon","keyword":"SIGNON","mutating":true,"requires_acee":false,"uses_cache":false},
+    {"row_id":"ibm-zos-3.2-racf-saf-2026:racroute-request-types:0009","variant":"Stat","keyword":"STAT","mutating":false,"requires_acee":true,"uses_cache":false},
+    {"row_id":"ibm-zos-3.2-racf-saf-2026:racroute-request-types:0010","variant":"Tokenbld","keyword":"TOKENBLD","mutating":true,"requires_acee":true,"uses_cache":false},
+    {"row_id":"ibm-zos-3.2-racf-saf-2026:racroute-request-types:0011","variant":"Tokenmap","keyword":"TOKENMAP","mutating":true,"requires_acee":false,"uses_cache":false},
+    {"row_id":"ibm-zos-3.2-racf-saf-2026:racroute-request-types:0012","variant":"Tokenxtr","keyword":"TOKENXTR","mutating":false,"requires_acee":true,"uses_cache":false},
+    {"row_id":"ibm-zos-3.2-racf-saf-2026:racroute-request-types:0013","variant":"Verify","keyword":"VERIFY","mutating":true,"requires_acee":false,"uses_cache":false},
+    {"row_id":"ibm-zos-3.2-racf-saf-2026:racroute-request-types:0014","variant":"Verifyx","keyword":"VERIFYX","mutating":true,"requires_acee":false,"uses_cache":false}
+  ]
+}

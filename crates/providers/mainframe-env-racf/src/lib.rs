@@ -7,6 +7,7 @@ mod command;
 mod command_processor;
 mod database;
 mod model;
+mod saf;
 
 pub use authority::{
     MemorySecretResolver, RacfInstallReceipt, RacfLimits, RacfManifest, RacfProfileDefinition,
@@ -14,8 +15,9 @@ pub use authority::{
 };
 pub use command::{
     CommandDescriptor, CommandDiagnostic, CommandDiagnosticCode, CommandDomain, CommandFamily,
-    CommandLanguageLimits, SuppliedClassDescriptor, ValidatedCommand, command_descriptors,
-    recognize_command, supplied_class_descriptors, validate_command,
+    CommandLanguageLimits, RacrouteDescriptor, RacrouteRequestType, SuppliedClassDescriptor,
+    ValidatedCommand, command_descriptors, racroute_descriptors, recognize_command,
+    supplied_class_descriptors, validate_command,
 };
 pub use command_processor::{CommandContext, CommandObjectKind, CommandRecord, CommandResult};
 pub use database::{SecurityDatabase, SecurityDatabaseSummary};
@@ -30,4 +32,9 @@ pub use model::{
     SecurityDatabaseLimits, SecurityMigration, SecurityPolicyOptions, SecuritySchemaProblem,
     SecurityToken, SecurityTransaction, SegmentFieldKind, SegmentFieldSchema, SegmentTemplate,
     SegmentValue, TokenKind, TokenState, TransactionState,
+};
+pub use saf::{
+    AccessEnvironment, AceeSummary, ExtractedSecurityRecord, RacrouteOutcome, RacrouteRequest,
+    RacrouteResult, RacrouteState, SafDefineAction, SafExtractKind, SafRequestContext,
+    SafVerifyAction, TokenMetadata,
 };

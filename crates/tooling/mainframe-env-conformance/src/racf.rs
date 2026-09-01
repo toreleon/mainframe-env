@@ -6,18 +6,24 @@ use mainframe_env_coverage::{
 use mainframe_env_execution_api::{InvocationLimits, PrincipalId};
 use mainframe_env_host_api::SecretRef;
 use mainframe_env_racf::{
-    CommandContext, CommandDiagnosticCode, CommandFamily, MemorySecretResolver, RacfService,
-    command_descriptors, recognize_command, validate_command,
+    AccessEnvironment, AccessLevel, CommandContext, CommandDiagnosticCode, CommandFamily,
+    DecisionOutcome, DecisionReason, MemorySecretResolver, RacfService, RacrouteRequest,
+    RacrouteRequestType, RacrouteResult, SafDefineAction, SafExtractKind, SafRequestContext,
+    SafVerifyAction, TokenKind, command_descriptors, racroute_descriptors, recognize_command,
+    validate_command,
 };
 use mainframe_env_store::MemoryStore;
 use mainframe_env_store_api::ProviderStateStore;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 struct RacfCommandDriver;
+struct RacrouteDriver;
 struct RacfReady;
 struct RacfPassed;
 
 static RACF_DRIVER: RacfCommandDriver = RacfCommandDriver;
+static RACROUTE_DRIVER: RacrouteDriver = RacrouteDriver;
 static RACF_READY: RacfReady = RacfReady;
 static RACF_PASSED: RacfPassed = RacfPassed;
 
@@ -25,7 +31,16 @@ pub fn racf_runtime(spec: &CompiledSpec) -> Result<RuntimeRegistry<'static>, Spe
     let limits = ConformanceLimits::default();
     RuntimeRegistry::new(
         spec,
-        vec![(DriverRef::new("racf.command.driver", limits)?, &RACF_DRIVER)],
+        vec![
+            (
+                DriverRef::new("racf.command.driver", limits)?,
+                &RACF_DRIVER as &dyn ConformanceDriver,
+            ),
+            (
+                DriverRef::new("racf.racroute.driver", limits)?,
+                &RACROUTE_DRIVER as &dyn ConformanceDriver,
+            ),
+        ],
         vec![(
             PredicateRef::new("racf.authority.ready", limits)?,
             &RACF_READY,
@@ -92,9 +107,68 @@ impl ConformanceDriver for RacfCommandDriver {
     }
 }
 
+impl ConformanceDriver for RacrouteDriver {
+    fn execute(&self, fixture: &FixtureRef) -> Result<DriverOutput, String> {
+        let parts = fixture.as_str().split('.').collect::<Vec<_>>();
+        if parts.len() != 6 || parts[0] != "racf" || parts[1] != "racroute" || parts[5] != "fixture"
+        {
+            return Err("unknown RACROUTE fixture identity".into());
+        }
+        let sequence = parts[2]
+            .parse::<usize>()
+            .map_err(|_| "invalid RACROUTE fixture sequence")?;
+        let descriptor = racroute_descriptors()
+            .get(
+                sequence
+                    .checked_sub(1)
+                    .ok_or("invalid RACROUTE fixture sequence")?,
+            )
+            .ok_or("RACROUTE fixture sequence exceeds catalog")?;
+        let obligation = parts[3];
+        let gate = parts[4];
+        match (obligation, gate) {
+            ("syntax", "recognized") => {
+                if racroute_descriptors()
+                    .iter()
+                    .filter(|candidate| candidate.keyword() == descriptor.keyword())
+                    .count()
+                    != 1
+                {
+                    return Err("RACROUTE generated recognition is ambiguous".into());
+                }
+            }
+            ("syntax", "validated") => {
+                if shape_request(descriptor.request_type()).request_type()
+                    != descriptor.request_type()
+                {
+                    return Err("RACROUTE typed request selected the wrong state machine".into());
+                }
+            }
+            ("authorized", "executed") => {
+                execute_racroute_case(descriptor.request_type(), RacrouteCase::Allowed)?
+            }
+            ("unauthorized", "executed" | "conditioned") => {
+                execute_racroute_case(descriptor.request_type(), RacrouteCase::Denied)?
+            }
+            ("malformed", "conditioned") => {
+                execute_racroute_case(descriptor.request_type(), RacrouteCase::Malformed)?
+            }
+            _ => return Err("RACROUTE fixture obligation/gate is unsupported".into()),
+        }
+        DriverOutput::new(
+            format!("racf:{}:{obligation}:{gate}:pass", descriptor.keyword()).into_bytes(),
+            ConformanceLimits::default(),
+        )
+        .map_err(|problem| problem.to_string())
+    }
+}
+
 impl ConformancePredicate for RacfReady {
     fn evaluate(&self, fixture: &FixtureRef) -> Result<bool, String> {
-        Ok(command_descriptors().len() == 34 && fixture.as_str().starts_with("racf.command."))
+        Ok(command_descriptors().len() == 34
+            && racroute_descriptors().len() == 14
+            && (fixture.as_str().starts_with("racf.command.")
+                || fixture.as_str().starts_with("racf.racroute.")))
     }
 }
 
@@ -117,6 +191,8 @@ fn setup() -> Result<(Arc<RacfService>, CommandContext), String> {
     let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
     let secrets = Arc::new(MemorySecretResolver::default());
     secrets.insert("secret:admin", b"ADMIN-PASSWORD".to_vec());
+    secrets.insert("secret:user1", b"USER-PASSWORD".to_vec());
+    secrets.insert("secret:bad", b"WRONG-PASSWORD".to_vec());
     let service = RacfService::open(store, secrets, Default::default())
         .map_err(|problem| format!("RACF setup failed: {problem:?}"))?;
     service
@@ -135,6 +211,349 @@ fn setup() -> Result<(Arc<RacfService>, CommandContext), String> {
     )
     .map_err(|problem| problem.to_string())?;
     Ok((service, context))
+}
+
+#[derive(Clone, Copy)]
+enum RacrouteCase {
+    Allowed,
+    Denied,
+    Malformed,
+}
+
+fn execute_racroute_case(
+    request_type: RacrouteRequestType,
+    mode: RacrouteCase,
+) -> Result<(), String> {
+    let (service, base) = setup()?;
+    for (sequence, command) in [
+        "ADDUSER USER1 PASSWORD('USER-PASSWORD')",
+        "RDEFINE FACILITY APP.** OWNER(RACFADM) UACC(ALTER)",
+        "RDEFINE RRSFDATA DIRECT.NODE1 OWNER(RACFADM) UACC(READ)",
+        "SETROPTS CLASSACT(RRSFDATA) RACLIST(FACILITY)",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        service
+            .execute_command(&context(&base, 100 + sequence)?, command)
+            .map_err(|problem| problem.to_string())?;
+    }
+    let admin = base.actor().clone();
+    let verify = service
+        .racroute(
+            &saf_context(&admin, None, "PREP-VERIFY", 10)?,
+            RacrouteRequest::Verify {
+                user: admin.clone(),
+                credential_reference: SecretRef::new("secret:admin", Default::default())
+                    .map_err(|problem| format!("RACROUTE secret reference: {problem:?}"))?,
+                action: SafVerifyAction::CreateAcee,
+                acee_id: None,
+            },
+        )
+        .map_err(|problem| format!("RACROUTE ACEE preparation: {problem:?}"))?;
+    let admin_acee = match verify.result {
+        Some(RacrouteResult::Verified {
+            acee: Some(acee), ..
+        }) => acee.id,
+        _ => return Err("RACROUTE ACEE preparation returned no ACEE".into()),
+    };
+    let token_digest = digest('2');
+    let token_id = if matches!(
+        request_type,
+        RacrouteRequestType::Tokenmap | RacrouteRequestType::Tokenxtr
+    ) {
+        let built = service
+            .racroute(
+                &saf_context(&admin, Some(&admin_acee), "PREP-TOKEN", 11)?,
+                RacrouteRequest::Tokenbld {
+                    owner: admin.clone(),
+                    kind: TokenKind::SafIdentity,
+                    token_reference: "secret:conformance-token".into(),
+                    token_digest: token_digest.clone(),
+                    scopes: BTreeSet::from(["FACILITY".into()]),
+                    expires_tick: Some(100),
+                },
+            )
+            .map_err(|problem| format!("RACROUTE token preparation: {problem:?}"))?;
+        match built.result {
+            Some(RacrouteResult::TokenBuilt(token)) => Some(token.id),
+            _ => return Err("RACROUTE token preparation returned no token".into()),
+        }
+    } else {
+        None
+    };
+    let caller = if matches!(mode, RacrouteCase::Denied) {
+        PrincipalId::new("MISSING", InvocationLimits::default())
+            .map_err(|problem| problem.to_string())?
+    } else {
+        admin.clone()
+    };
+    let descriptor = racroute_descriptors()
+        .iter()
+        .find(|descriptor| descriptor.request_type() == request_type)
+        .ok_or("missing RACROUTE descriptor")?;
+    let acee = if matches!(mode, RacrouteCase::Allowed | RacrouteCase::Malformed)
+        && descriptor.requires_acee()
+    {
+        Some(admin_acee.as_str())
+    } else {
+        None
+    };
+    let request = match mode {
+        RacrouteCase::Malformed => malformed_request(request_type, &admin, &admin_acee),
+        _ => allowed_request(
+            request_type,
+            &admin,
+            &admin_acee,
+            token_id.as_deref(),
+            &token_digest,
+        ),
+    };
+    let before = service
+        .database()
+        .summary()
+        .map_err(|problem| format!("RACROUTE summary: {problem:?}"))?;
+    let outcome = service
+        .racroute(&saf_context(&caller, acee, "CASE-REQUEST", 20)?, request)
+        .map_err(|problem| format!("RACROUTE selected route failed: {problem:?}"))?;
+    match mode {
+        RacrouteCase::Allowed if outcome.status.reason != DecisionReason::Granted => Err(format!(
+            "RACROUTE allowed route denied with {:?}",
+            outcome.status.reason
+        )),
+        RacrouteCase::Denied | RacrouteCase::Malformed
+            if outcome.status.reason == DecisionReason::Granted =>
+        {
+            Err("RACROUTE negative route unexpectedly allowed".into())
+        }
+        RacrouteCase::Denied => {
+            let after = service
+                .database()
+                .summary()
+                .map_err(|problem| format!("RACROUTE summary: {problem:?}"))?;
+            if (
+                before.principals,
+                before.groups,
+                before.profiles,
+                before.acees,
+                before.tokens,
+            ) != (
+                after.principals,
+                after.groups,
+                after.profiles,
+                after.acees,
+                after.tokens,
+            ) || after.audits != before.audits + 1
+            {
+                return Err("RACROUTE denial mutated protected state or omitted audit".into());
+            }
+            Ok(())
+        }
+        _ => Ok(()),
+    }
+}
+
+fn saf_context(
+    caller: &PrincipalId,
+    acee: Option<&str>,
+    id: &str,
+    tick: u64,
+) -> Result<SafRequestContext, String> {
+    SafRequestContext::new(
+        caller.clone(),
+        acee.map(str::to_string),
+        None,
+        id,
+        "RACF-CONFORMANCE",
+        tick,
+    )
+    .map_err(|problem| format!("RACROUTE context: {problem:?}"))
+}
+
+fn digest(value: char) -> String {
+    format!("sha256:{}", value.to_string().repeat(64))
+}
+
+fn shape_request(request_type: RacrouteRequestType) -> RacrouteRequest {
+    let principal =
+        PrincipalId::new("RACFADM", InvocationLimits::default()).expect("static principal");
+    allowed_request(
+        request_type,
+        &principal,
+        "ACEE00000000000000000001000000",
+        Some("TOKEN00000000000000000001000000"),
+        &digest('2'),
+    )
+}
+
+fn allowed_request(
+    request_type: RacrouteRequestType,
+    principal: &PrincipalId,
+    parent_acee: &str,
+    token_id: Option<&str>,
+    token_digest: &str,
+) -> RacrouteRequest {
+    match request_type {
+        RacrouteRequestType::Audit => RacrouteRequest::Audit {
+            action: "CONFORMANCE.AUDIT".into(),
+            resource_digest: digest('1'),
+            decision: DecisionOutcome::Allow,
+            fields: BTreeMap::new(),
+        },
+        RacrouteRequestType::Auth => RacrouteRequest::Auth {
+            class: "FACILITY".into(),
+            resource: "APP.ONE".into(),
+            access: AccessLevel::Read,
+            environment: AccessEnvironment::default(),
+        },
+        RacrouteRequestType::Define => RacrouteRequest::Define {
+            action: SafDefineAction::Add,
+            class: "FACILITY".into(),
+            resource: "SAF.DEFINED".into(),
+            owner: principal.as_str().into(),
+            uacc: AccessLevel::Read,
+            generic: false,
+        },
+        RacrouteRequestType::Dirauth => RacrouteRequest::Dirauth {
+            node: "NODE1".into(),
+        },
+        RacrouteRequestType::Extract => RacrouteRequest::Extract {
+            kind: SafExtractKind::User,
+            class: None,
+            name: principal.as_str().into(),
+        },
+        RacrouteRequestType::Fastauth => RacrouteRequest::Fastauth {
+            class: "FACILITY".into(),
+            resource: "APP.ONE".into(),
+            access: AccessLevel::Read,
+            environment: AccessEnvironment::default(),
+        },
+        RacrouteRequestType::List => RacrouteRequest::List {
+            class: "FACILITY".into(),
+            global: true,
+            refresh: true,
+        },
+        RacrouteRequestType::Signon => RacrouteRequest::Signon {
+            user: PrincipalId::new("USER1", InvocationLimits::default()).expect("static user"),
+            credential_reference: SecretRef::new("secret:user1", Default::default())
+                .expect("static secret reference"),
+        },
+        RacrouteRequestType::Stat => RacrouteRequest::Stat { class: None },
+        RacrouteRequestType::Tokenbld => RacrouteRequest::Tokenbld {
+            owner: principal.clone(),
+            kind: TokenKind::SafIdentity,
+            token_reference: "secret:conformance-token".into(),
+            token_digest: token_digest.into(),
+            scopes: BTreeSet::from(["FACILITY".into()]),
+            expires_tick: Some(100),
+        },
+        RacrouteRequestType::Tokenmap => RacrouteRequest::Tokenmap {
+            token_digest: token_digest.into(),
+        },
+        RacrouteRequestType::Tokenxtr => RacrouteRequest::Tokenxtr {
+            token_id: token_id.unwrap_or("TOKEN00000000000000000001000000").into(),
+        },
+        RacrouteRequestType::Verify => RacrouteRequest::Verify {
+            user: principal.clone(),
+            credential_reference: SecretRef::new("secret:admin", Default::default())
+                .expect("static secret reference"),
+            action: SafVerifyAction::AuthenticateOnly,
+            acee_id: None,
+        },
+        RacrouteRequestType::Verifyx => RacrouteRequest::Verifyx {
+            user: principal.clone(),
+            credential_reference: SecretRef::new("secret:admin", Default::default())
+                .expect("static secret reference"),
+            action: SafVerifyAction::CreateAcee,
+            acee_id: None,
+            parent_acee: Some(parent_acee.into()),
+        },
+    }
+}
+
+fn malformed_request(
+    request_type: RacrouteRequestType,
+    principal: &PrincipalId,
+    parent_acee: &str,
+) -> RacrouteRequest {
+    match request_type {
+        RacrouteRequestType::Audit => RacrouteRequest::Audit {
+            action: "BAD.AUDIT".into(),
+            resource_digest: "not-a-digest".into(),
+            decision: DecisionOutcome::Deny,
+            fields: BTreeMap::new(),
+        },
+        RacrouteRequestType::Auth => RacrouteRequest::Auth {
+            class: String::new(),
+            resource: "APP.ONE".into(),
+            access: AccessLevel::Read,
+            environment: Default::default(),
+        },
+        RacrouteRequestType::Define => RacrouteRequest::Define {
+            action: SafDefineAction::Add,
+            class: String::new(),
+            resource: "BAD".into(),
+            owner: principal.as_str().into(),
+            uacc: AccessLevel::None,
+            generic: false,
+        },
+        RacrouteRequestType::Dirauth => RacrouteRequest::Dirauth {
+            node: "BAD NODE".into(),
+        },
+        RacrouteRequestType::Extract => RacrouteRequest::Extract {
+            kind: SafExtractKind::User,
+            class: None,
+            name: String::new(),
+        },
+        RacrouteRequestType::Fastauth => RacrouteRequest::Fastauth {
+            class: "FACILITY".into(),
+            resource: String::new(),
+            access: AccessLevel::Read,
+            environment: Default::default(),
+        },
+        RacrouteRequestType::List => RacrouteRequest::List {
+            class: String::new(),
+            global: true,
+            refresh: true,
+        },
+        RacrouteRequestType::Signon => RacrouteRequest::Signon {
+            user: PrincipalId::new("USER1", InvocationLimits::default()).expect("static user"),
+            credential_reference: SecretRef::new("secret:bad", Default::default())
+                .expect("static secret reference"),
+        },
+        RacrouteRequestType::Stat => RacrouteRequest::Stat {
+            class: Some(String::new()),
+        },
+        RacrouteRequestType::Tokenbld => RacrouteRequest::Tokenbld {
+            owner: principal.clone(),
+            kind: TokenKind::SafIdentity,
+            token_reference: "plaintext".into(),
+            token_digest: digest('2'),
+            scopes: BTreeSet::new(),
+            expires_tick: Some(100),
+        },
+        RacrouteRequestType::Tokenmap => RacrouteRequest::Tokenmap {
+            token_digest: "bad-digest".into(),
+        },
+        RacrouteRequestType::Tokenxtr => RacrouteRequest::Tokenxtr {
+            token_id: "BAD VALUE".into(),
+        },
+        RacrouteRequestType::Verify => RacrouteRequest::Verify {
+            user: principal.clone(),
+            credential_reference: SecretRef::new("secret:bad", Default::default())
+                .expect("static secret reference"),
+            action: SafVerifyAction::AuthenticateOnly,
+            acee_id: None,
+        },
+        RacrouteRequestType::Verifyx => RacrouteRequest::Verifyx {
+            user: principal.clone(),
+            credential_reference: SecretRef::new("secret:bad", Default::default())
+                .expect("static secret reference"),
+            action: SafVerifyAction::CreateAcee,
+            acee_id: None,
+            parent_acee: Some(parent_acee.into()),
+        },
+    }
 }
 
 fn context(base: &CommandContext, sequence: usize) -> Result<CommandContext, String> {

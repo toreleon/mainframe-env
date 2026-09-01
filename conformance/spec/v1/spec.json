@@ -3161,6 +3161,1434 @@
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0034",
       "spec_version": "mainframe-env.conformance-ir@1",
       "test_id": "racf.command.0034.malformed.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "recognized",
+      "input": "racf.racroute.0001.syntax.recognized.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0001",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0001.syntax.recognized"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "validated",
+      "input": "racf.racroute.0001.syntax.validated.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0001",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0001.syntax.validated"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0001.authorized.executed.fixture",
+      "obligation_id": "authorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0001",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0001.authorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0001.unauthorized.executed.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0001",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0001.unauthorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0001.unauthorized.conditioned.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0001",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0001.unauthorized.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0001.malformed.conditioned.fixture",
+      "obligation_id": "malformed",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0001",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0001.malformed.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "recognized",
+      "input": "racf.racroute.0002.syntax.recognized.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0002",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0002.syntax.recognized"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "validated",
+      "input": "racf.racroute.0002.syntax.validated.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0002",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0002.syntax.validated"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0002.authorized.executed.fixture",
+      "obligation_id": "authorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0002",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0002.authorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0002.unauthorized.executed.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0002",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0002.unauthorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0002.unauthorized.conditioned.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0002",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0002.unauthorized.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0002.malformed.conditioned.fixture",
+      "obligation_id": "malformed",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0002",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0002.malformed.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "recognized",
+      "input": "racf.racroute.0003.syntax.recognized.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0003",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0003.syntax.recognized"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "validated",
+      "input": "racf.racroute.0003.syntax.validated.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0003",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0003.syntax.validated"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0003.authorized.executed.fixture",
+      "obligation_id": "authorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0003",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0003.authorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0003.unauthorized.executed.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0003",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0003.unauthorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0003.unauthorized.conditioned.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0003",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0003.unauthorized.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0003.malformed.conditioned.fixture",
+      "obligation_id": "malformed",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0003",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0003.malformed.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "recognized",
+      "input": "racf.racroute.0004.syntax.recognized.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0004",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0004.syntax.recognized"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "validated",
+      "input": "racf.racroute.0004.syntax.validated.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0004",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0004.syntax.validated"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0004.authorized.executed.fixture",
+      "obligation_id": "authorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0004",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0004.authorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0004.unauthorized.executed.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0004",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0004.unauthorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0004.unauthorized.conditioned.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0004",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0004.unauthorized.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0004.malformed.conditioned.fixture",
+      "obligation_id": "malformed",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0004",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0004.malformed.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "recognized",
+      "input": "racf.racroute.0005.syntax.recognized.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0005",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0005.syntax.recognized"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "validated",
+      "input": "racf.racroute.0005.syntax.validated.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0005",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0005.syntax.validated"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0005.authorized.executed.fixture",
+      "obligation_id": "authorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0005",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0005.authorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0005.unauthorized.executed.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0005",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0005.unauthorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0005.unauthorized.conditioned.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0005",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0005.unauthorized.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0005.malformed.conditioned.fixture",
+      "obligation_id": "malformed",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0005",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0005.malformed.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "recognized",
+      "input": "racf.racroute.0006.syntax.recognized.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0006",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0006.syntax.recognized"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "validated",
+      "input": "racf.racroute.0006.syntax.validated.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0006",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0006.syntax.validated"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0006.authorized.executed.fixture",
+      "obligation_id": "authorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0006",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0006.authorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0006.unauthorized.executed.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0006",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0006.unauthorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0006.unauthorized.conditioned.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0006",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0006.unauthorized.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0006.malformed.conditioned.fixture",
+      "obligation_id": "malformed",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0006",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0006.malformed.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "recognized",
+      "input": "racf.racroute.0007.syntax.recognized.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0007",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0007.syntax.recognized"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "validated",
+      "input": "racf.racroute.0007.syntax.validated.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0007",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0007.syntax.validated"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0007.authorized.executed.fixture",
+      "obligation_id": "authorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0007",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0007.authorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0007.unauthorized.executed.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0007",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0007.unauthorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0007.unauthorized.conditioned.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0007",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0007.unauthorized.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0007.malformed.conditioned.fixture",
+      "obligation_id": "malformed",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0007",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0007.malformed.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "recognized",
+      "input": "racf.racroute.0008.syntax.recognized.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0008",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0008.syntax.recognized"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "validated",
+      "input": "racf.racroute.0008.syntax.validated.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0008",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0008.syntax.validated"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0008.authorized.executed.fixture",
+      "obligation_id": "authorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0008",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0008.authorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0008.unauthorized.executed.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0008",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0008.unauthorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0008.unauthorized.conditioned.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0008",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0008.unauthorized.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0008.malformed.conditioned.fixture",
+      "obligation_id": "malformed",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0008",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0008.malformed.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "recognized",
+      "input": "racf.racroute.0009.syntax.recognized.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0009",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0009.syntax.recognized"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "validated",
+      "input": "racf.racroute.0009.syntax.validated.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0009",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0009.syntax.validated"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0009.authorized.executed.fixture",
+      "obligation_id": "authorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0009",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0009.authorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0009.unauthorized.executed.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0009",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0009.unauthorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0009.unauthorized.conditioned.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0009",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0009.unauthorized.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0009.malformed.conditioned.fixture",
+      "obligation_id": "malformed",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0009",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0009.malformed.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "recognized",
+      "input": "racf.racroute.0010.syntax.recognized.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0010",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0010.syntax.recognized"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "validated",
+      "input": "racf.racroute.0010.syntax.validated.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0010",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0010.syntax.validated"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0010.authorized.executed.fixture",
+      "obligation_id": "authorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0010",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0010.authorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0010.unauthorized.executed.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0010",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0010.unauthorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0010.unauthorized.conditioned.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0010",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0010.unauthorized.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0010.malformed.conditioned.fixture",
+      "obligation_id": "malformed",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0010",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0010.malformed.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "recognized",
+      "input": "racf.racroute.0011.syntax.recognized.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0011",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0011.syntax.recognized"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "validated",
+      "input": "racf.racroute.0011.syntax.validated.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0011",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0011.syntax.validated"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0011.authorized.executed.fixture",
+      "obligation_id": "authorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0011",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0011.authorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0011.unauthorized.executed.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0011",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0011.unauthorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0011.unauthorized.conditioned.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0011",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0011.unauthorized.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0011.malformed.conditioned.fixture",
+      "obligation_id": "malformed",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0011",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0011.malformed.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "recognized",
+      "input": "racf.racroute.0012.syntax.recognized.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0012",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0012.syntax.recognized"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "validated",
+      "input": "racf.racroute.0012.syntax.validated.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0012",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0012.syntax.validated"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0012.authorized.executed.fixture",
+      "obligation_id": "authorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0012",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0012.authorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0012.unauthorized.executed.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0012",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0012.unauthorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0012.unauthorized.conditioned.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0012",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0012.unauthorized.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0012.malformed.conditioned.fixture",
+      "obligation_id": "malformed",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0012",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0012.malformed.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "recognized",
+      "input": "racf.racroute.0013.syntax.recognized.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0013",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0013.syntax.recognized"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "validated",
+      "input": "racf.racroute.0013.syntax.validated.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0013",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0013.syntax.validated"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0013.authorized.executed.fixture",
+      "obligation_id": "authorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0013",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0013.authorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0013.unauthorized.executed.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0013",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0013.unauthorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0013.unauthorized.conditioned.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0013",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0013.unauthorized.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0013.malformed.conditioned.fixture",
+      "obligation_id": "malformed",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0013",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0013.malformed.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "recognized",
+      "input": "racf.racroute.0014.syntax.recognized.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0014",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0014.syntax.recognized"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "validated",
+      "input": "racf.racroute.0014.syntax.validated.fixture",
+      "obligation_id": "syntax",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0014",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0014.syntax.validated"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0014.authorized.executed.fixture",
+      "obligation_id": "authorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0014",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0014.authorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "executed",
+      "input": "racf.racroute.0014.unauthorized.executed.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0014",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0014.unauthorized.executed"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0014.unauthorized.conditioned.fixture",
+      "obligation_id": "unauthorized",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0014",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0014.unauthorized.conditioned"
+    },
+    {
+      "driver": "racf.racroute.driver",
+      "expected": [
+        "racf.command.passed"
+      ],
+      "gate": "conditioned",
+      "input": "racf.racroute.0014.malformed.conditioned.fixture",
+      "obligation_id": "malformed",
+      "oracle": null,
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0014",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "racf.racroute.0014.malformed.conditioned"
     }
   ],
   "catalog_digest": "sha256:074f7385b1d1e1127f9cf83dbbc4e0bc46903cfa7739a2515c4085f7d2037f01",
@@ -4094,14 +5522,436 @@
       ],
       "obligation_id": "malformed",
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0034"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated"
+      ],
+      "obligation_id": "syntax",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0001"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "authorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0001"
+    },
+    {
+      "applicable_gates": [
+        "executed",
+        "conditioned"
+      ],
+      "obligation_id": "unauthorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0001"
+    },
+    {
+      "applicable_gates": [
+        "conditioned"
+      ],
+      "obligation_id": "malformed",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0001"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated"
+      ],
+      "obligation_id": "syntax",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0002"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "authorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0002"
+    },
+    {
+      "applicable_gates": [
+        "executed",
+        "conditioned"
+      ],
+      "obligation_id": "unauthorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0002"
+    },
+    {
+      "applicable_gates": [
+        "conditioned"
+      ],
+      "obligation_id": "malformed",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0002"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated"
+      ],
+      "obligation_id": "syntax",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0003"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "authorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0003"
+    },
+    {
+      "applicable_gates": [
+        "executed",
+        "conditioned"
+      ],
+      "obligation_id": "unauthorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0003"
+    },
+    {
+      "applicable_gates": [
+        "conditioned"
+      ],
+      "obligation_id": "malformed",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0003"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated"
+      ],
+      "obligation_id": "syntax",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0004"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "authorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0004"
+    },
+    {
+      "applicable_gates": [
+        "executed",
+        "conditioned"
+      ],
+      "obligation_id": "unauthorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0004"
+    },
+    {
+      "applicable_gates": [
+        "conditioned"
+      ],
+      "obligation_id": "malformed",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0004"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated"
+      ],
+      "obligation_id": "syntax",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0005"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "authorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0005"
+    },
+    {
+      "applicable_gates": [
+        "executed",
+        "conditioned"
+      ],
+      "obligation_id": "unauthorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0005"
+    },
+    {
+      "applicable_gates": [
+        "conditioned"
+      ],
+      "obligation_id": "malformed",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0005"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated"
+      ],
+      "obligation_id": "syntax",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0006"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "authorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0006"
+    },
+    {
+      "applicable_gates": [
+        "executed",
+        "conditioned"
+      ],
+      "obligation_id": "unauthorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0006"
+    },
+    {
+      "applicable_gates": [
+        "conditioned"
+      ],
+      "obligation_id": "malformed",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0006"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated"
+      ],
+      "obligation_id": "syntax",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0007"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "authorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0007"
+    },
+    {
+      "applicable_gates": [
+        "executed",
+        "conditioned"
+      ],
+      "obligation_id": "unauthorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0007"
+    },
+    {
+      "applicable_gates": [
+        "conditioned"
+      ],
+      "obligation_id": "malformed",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0007"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated"
+      ],
+      "obligation_id": "syntax",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0008"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "authorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0008"
+    },
+    {
+      "applicable_gates": [
+        "executed",
+        "conditioned"
+      ],
+      "obligation_id": "unauthorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0008"
+    },
+    {
+      "applicable_gates": [
+        "conditioned"
+      ],
+      "obligation_id": "malformed",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0008"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated"
+      ],
+      "obligation_id": "syntax",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0009"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "authorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0009"
+    },
+    {
+      "applicable_gates": [
+        "executed",
+        "conditioned"
+      ],
+      "obligation_id": "unauthorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0009"
+    },
+    {
+      "applicable_gates": [
+        "conditioned"
+      ],
+      "obligation_id": "malformed",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0009"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated"
+      ],
+      "obligation_id": "syntax",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0010"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "authorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0010"
+    },
+    {
+      "applicable_gates": [
+        "executed",
+        "conditioned"
+      ],
+      "obligation_id": "unauthorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0010"
+    },
+    {
+      "applicable_gates": [
+        "conditioned"
+      ],
+      "obligation_id": "malformed",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0010"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated"
+      ],
+      "obligation_id": "syntax",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0011"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "authorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0011"
+    },
+    {
+      "applicable_gates": [
+        "executed",
+        "conditioned"
+      ],
+      "obligation_id": "unauthorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0011"
+    },
+    {
+      "applicable_gates": [
+        "conditioned"
+      ],
+      "obligation_id": "malformed",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0011"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated"
+      ],
+      "obligation_id": "syntax",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0012"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "authorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0012"
+    },
+    {
+      "applicable_gates": [
+        "executed",
+        "conditioned"
+      ],
+      "obligation_id": "unauthorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0012"
+    },
+    {
+      "applicable_gates": [
+        "conditioned"
+      ],
+      "obligation_id": "malformed",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0012"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated"
+      ],
+      "obligation_id": "syntax",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0013"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "authorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0013"
+    },
+    {
+      "applicable_gates": [
+        "executed",
+        "conditioned"
+      ],
+      "obligation_id": "unauthorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0013"
+    },
+    {
+      "applicable_gates": [
+        "conditioned"
+      ],
+      "obligation_id": "malformed",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0013"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated"
+      ],
+      "obligation_id": "syntax",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0014"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "authorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0014"
+    },
+    {
+      "applicable_gates": [
+        "executed",
+        "conditioned"
+      ],
+      "obligation_id": "unauthorized",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0014"
+    },
+    {
+      "applicable_gates": [
+        "conditioned"
+      ],
+      "obligation_id": "malformed",
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0014"
     }
   ],
   "registries": {
     "conditions": [
-      "racf.command.diagnostic"
+      "racf.command.diagnostic",
+      "racf.racroute.status"
     ],
     "drivers": [
-      "racf.command.driver"
+      "racf.command.driver",
+      "racf.racroute.driver"
     ],
     "failure_points": [],
     "fixtures": [
@@ -4848,16 +6698,354 @@
       {
         "digest": "sha256:af1753237a0542531aa4e465ccd3d9a238a5cd0ef577c535a4f089135e9c2606",
         "id": "racf.command.0034.syntax.validated.fixture"
+      },
+      {
+        "digest": "sha256:d14ace620c8c640e25a6ef42314eb6afa1fa88e61401e1d362bdd60e73e7d9d2",
+        "id": "racf.racroute.0001.authorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:e8d46c9fa2810fddbddf77527ebf8d09511344433a3e2b1c90d2b0876f2a5b6a",
+        "id": "racf.racroute.0001.malformed.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:254591329cb3c942cdb249e0f3a5a615a5e6b3484d834ab9350c523c9b6e72c9",
+        "id": "racf.racroute.0001.syntax.recognized.fixture"
+      },
+      {
+        "digest": "sha256:17109b0991cf74c100723860802bf58973cb5eb18cf873cee7a6a5b58146df42",
+        "id": "racf.racroute.0001.syntax.validated.fixture"
+      },
+      {
+        "digest": "sha256:854d44023969b1712045d958cee5413eebf4e18b2ebe9b2e8414b86bd5027789",
+        "id": "racf.racroute.0001.unauthorized.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:9ffd1cb04a98ab45068da9ae9248811f1c507efda510bb7cfb41d4590de5e678",
+        "id": "racf.racroute.0001.unauthorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:5f3cf1c45ea9946928b39e888d715ea185efaa21d14c8372554ed2d286e2628d",
+        "id": "racf.racroute.0002.authorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:113b31ddb244366b8186d9c4d76443a585d5be619dece69e2ec60aa3b7e338d8",
+        "id": "racf.racroute.0002.malformed.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:e7ce7650b4664e315a830b99f4c69e2f86ba2b07c830c3776b5c2f3974deb444",
+        "id": "racf.racroute.0002.syntax.recognized.fixture"
+      },
+      {
+        "digest": "sha256:7341112b96fa65f9b6ba3f5687fad014b9074ecdc8978807c679c8a7bbbfdfcd",
+        "id": "racf.racroute.0002.syntax.validated.fixture"
+      },
+      {
+        "digest": "sha256:f572153f817a5a99abc3df318ce76ea07c5acbbf3e557521687f29e5382a6c68",
+        "id": "racf.racroute.0002.unauthorized.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:9cf9929a4054a40f55c03a9c821d05f2d1947e1f697e7318ea29a4a0d44569c7",
+        "id": "racf.racroute.0002.unauthorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:9f5b75dc03d95fb1152bd37f64c87764dfa239efe8ef54c753661fed7fee678e",
+        "id": "racf.racroute.0003.authorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:a8700e4cee2fe0b6c3699b2ae1fe19f23174a291dee8eb9f51007f29cff4f017",
+        "id": "racf.racroute.0003.malformed.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:80e5c0dda5c60d3b979e61c144f7a1e17313d2310c097b83c014594f1ba7db0f",
+        "id": "racf.racroute.0003.syntax.recognized.fixture"
+      },
+      {
+        "digest": "sha256:d0e7b508cf0f05db5bef0bac65ddd88d46e14732884d27bc917c465b6dd5e415",
+        "id": "racf.racroute.0003.syntax.validated.fixture"
+      },
+      {
+        "digest": "sha256:08c7ae77e2d5937ebf2bc544b1526d5f845da9a4c59f19dd4f2bb5a43605f636",
+        "id": "racf.racroute.0003.unauthorized.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:1e30e3436b8ce0cddcc026587f582db9d4976767265d0baa6c828af77b36bfc8",
+        "id": "racf.racroute.0003.unauthorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:b63462ffb9533a44ca469a13ac1b04172bbffedca8e2236a186b2c6e16f26574",
+        "id": "racf.racroute.0004.authorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:be689236ada1e35bf74ba16d83ebd01816115f4eabe954026de4cf8c5263f4db",
+        "id": "racf.racroute.0004.malformed.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:8b9e2d59098622f7c9d4a6b4d2804ffe52294ebe5bbb4b72e0352a40e9112997",
+        "id": "racf.racroute.0004.syntax.recognized.fixture"
+      },
+      {
+        "digest": "sha256:ec7caecb706ea80d819d80e1bcb83212f05ff0bbc041dcd3d7e35e9fb2e3dc90",
+        "id": "racf.racroute.0004.syntax.validated.fixture"
+      },
+      {
+        "digest": "sha256:6ffb4c6b40fc440b1e8d059f77bed470315133d862e6c0412af8b73e372736da",
+        "id": "racf.racroute.0004.unauthorized.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:9923b99652f43c2ace9d171dfdb792261180db35d3420758b1438174c7547b19",
+        "id": "racf.racroute.0004.unauthorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:9f1fef7a387af295190563178bd3982339c9d3dfafb15cd4a160ee75afccc0cb",
+        "id": "racf.racroute.0005.authorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:d742382678d2b83fffcd31ce90cdc72a65cecb175d0efb99f552f255592cb10a",
+        "id": "racf.racroute.0005.malformed.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:72967057b0c1d35e13b432a02d4d422ea16b7aa9ef8a3917d123ca621f45d7a2",
+        "id": "racf.racroute.0005.syntax.recognized.fixture"
+      },
+      {
+        "digest": "sha256:c06e9d2da366c592b20c1d2bbecf5cd4d851b40b2dc47dd12af03b0a030ad6ee",
+        "id": "racf.racroute.0005.syntax.validated.fixture"
+      },
+      {
+        "digest": "sha256:bc522877d233f433ea94e7eca3785023a2066dba3498aa708094e9c1389982ef",
+        "id": "racf.racroute.0005.unauthorized.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:2f53eb65d8a718759cb6b0f5e8da6416139776a14a5e0c646781d92da97df4a4",
+        "id": "racf.racroute.0005.unauthorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:f6f198af448565b07ebf3b4514c50497cb9641bfb9a770a18713f3393f7d485f",
+        "id": "racf.racroute.0006.authorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:4e5d94208d869b45509b4b4e65069ca0d8a27af8927e1f8a1db97f6ccc78e171",
+        "id": "racf.racroute.0006.malformed.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:5104328cd62935b7c779dcbc596706dd56e54720b8969c176760c7e05475fafb",
+        "id": "racf.racroute.0006.syntax.recognized.fixture"
+      },
+      {
+        "digest": "sha256:8e8fafde446e8dcc1a8d59f58cdc9be0565a468dd729897b342a2d7ac83aefd2",
+        "id": "racf.racroute.0006.syntax.validated.fixture"
+      },
+      {
+        "digest": "sha256:3b6d6d5680fd3389407d6a393781d555af13bca0992aed0194b24f19da3fe2e1",
+        "id": "racf.racroute.0006.unauthorized.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:abf312bbafc053820184d59a1e4f6bdc696729992a758216d80fae1f974c04ae",
+        "id": "racf.racroute.0006.unauthorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:59e7797d382e496b1bf9f24a992e1947c42d830afba15602ea11f120cf96ad1d",
+        "id": "racf.racroute.0007.authorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:43032ae1957e82c31d8e86dfb2e29adc3d86f99d03827b71c7c6c5673f25a2ad",
+        "id": "racf.racroute.0007.malformed.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:eab9b6b7acd06f9c7e15595d95dfc49332a952fefa05ad179adb44f629697533",
+        "id": "racf.racroute.0007.syntax.recognized.fixture"
+      },
+      {
+        "digest": "sha256:d437a19296470dea1d227c9b0c62bdf672aa343afd9b0469eab89fc8f26d00e2",
+        "id": "racf.racroute.0007.syntax.validated.fixture"
+      },
+      {
+        "digest": "sha256:d4d2f8b2bffdf144a5e956b0357288bcd8763484557641d150f04da1a82c087c",
+        "id": "racf.racroute.0007.unauthorized.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:ac23dc82fc1f4efff5df25eb3adeb73057a5a4f7e418f1ffa0306b9de75d5805",
+        "id": "racf.racroute.0007.unauthorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:e7cf8e1ef453694bc9091919066b2c91d4bcac7c8d1ab4db4af6ebe861c64633",
+        "id": "racf.racroute.0008.authorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:f11af5658d3b9fc0c7909da79b3fd979d234b088a3c9afb17ea479f521a05ed3",
+        "id": "racf.racroute.0008.malformed.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:237ebab1579156452bf8ffc812edb5e761560c997bb15423c24c7b5bf551f8cf",
+        "id": "racf.racroute.0008.syntax.recognized.fixture"
+      },
+      {
+        "digest": "sha256:c63fc8d21fcda1474870a9a6230150c553960b70c4c49a98689bf06d24751dd0",
+        "id": "racf.racroute.0008.syntax.validated.fixture"
+      },
+      {
+        "digest": "sha256:6695b887d193c5bf751437f53268ffda5b5316f5ea81bb3298fff6766eb9e793",
+        "id": "racf.racroute.0008.unauthorized.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:7ff1709b9c5c034092103d42f2cfc02fc9663cdaedce36b25048d87067369d4a",
+        "id": "racf.racroute.0008.unauthorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:2bb4661eaea4a4e61b0aaeda2560a76728799c5f15523af0d9cf777eda57464a",
+        "id": "racf.racroute.0009.authorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:0cf7f965cc882bc6e9854ead31d62469147d23eba3f0733a58afd47341a04ca1",
+        "id": "racf.racroute.0009.malformed.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:e00f03d72e887f96f17d4d77abf554f3822f0b1c1a831da73e24d34c0a010de2",
+        "id": "racf.racroute.0009.syntax.recognized.fixture"
+      },
+      {
+        "digest": "sha256:9e0813f7ce7094577d145206f07bf5e2fc1def118d94f2789b1e7c319ab1b4c4",
+        "id": "racf.racroute.0009.syntax.validated.fixture"
+      },
+      {
+        "digest": "sha256:f75a06424e28465e4cc63dba156fb3987fbe6e2bb20af19a0dfdc5674ec73a7a",
+        "id": "racf.racroute.0009.unauthorized.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:6eeac1171422c6fcbfee6a0ce75f3a4a653b1a08b8fd43946f3f5d63c48e0688",
+        "id": "racf.racroute.0009.unauthorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:466e93cb0caa3804ef507d9375efadbe2a69d3a7dc20ce3868f2fa4c383b1a08",
+        "id": "racf.racroute.0010.authorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:3184efe527f30fb2cc7b218bc529d76d57079ddc9c6629e0b59469e80aed088c",
+        "id": "racf.racroute.0010.malformed.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:54a9db4c7dfd296728e91134ec407fa0f6606970f9cab7352e8f40d5ef0cc979",
+        "id": "racf.racroute.0010.syntax.recognized.fixture"
+      },
+      {
+        "digest": "sha256:f73bb8a9e6a4a973e25afdc1e7b40112305a7d3dd75c0bfdae9e045252c8c32e",
+        "id": "racf.racroute.0010.syntax.validated.fixture"
+      },
+      {
+        "digest": "sha256:d539efead351ce4abe7173ce1d05edb6481afd8c060e4af5424ee1966bdf0c7c",
+        "id": "racf.racroute.0010.unauthorized.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:a124605d7ec22f3f104f16b76c12d785aeefd5ded6e45687dded213054e9d801",
+        "id": "racf.racroute.0010.unauthorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:dc6ac745555a5127f36674e1f1a25695e0be1c885d3df61826fe5640075af863",
+        "id": "racf.racroute.0011.authorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:36f7e561097239d935e04b9013d11328bcef1b536b92aaedcfc6374ff35488a2",
+        "id": "racf.racroute.0011.malformed.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:3c6a04f371f474f94173213347d2c857c11851b0875ec3a4eb2b850e1ffb6925",
+        "id": "racf.racroute.0011.syntax.recognized.fixture"
+      },
+      {
+        "digest": "sha256:f4fade67f77becac26e13b1af280af9bb7e6b88f2c1f8370e7e6dae62ada5041",
+        "id": "racf.racroute.0011.syntax.validated.fixture"
+      },
+      {
+        "digest": "sha256:6ccd2fa4403310b4352692e5cf7875fc659310a05374d6d74cd17988b5e59e54",
+        "id": "racf.racroute.0011.unauthorized.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:d359046ad632d9d3dc433e8de54a8dba98ce29e26d138cc25125e16cc199b58d",
+        "id": "racf.racroute.0011.unauthorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:af595e19b84973406368e2b25f1d9746f8618b760dfe50bad906ff732d76b2fa",
+        "id": "racf.racroute.0012.authorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:88c4dbc602a081bd9a96446e5713bb3b3d18c5c17fdc15efe1796f1d0c6b3f25",
+        "id": "racf.racroute.0012.malformed.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:59c7190f2eb16c681059587b076391b4a88a45cce871f49cca7864bce3448d42",
+        "id": "racf.racroute.0012.syntax.recognized.fixture"
+      },
+      {
+        "digest": "sha256:74437b9e32c0da9049362a9ecce28cd8707a938225d22ae3a2d648a97efbf4b2",
+        "id": "racf.racroute.0012.syntax.validated.fixture"
+      },
+      {
+        "digest": "sha256:8d782eeefcef400a1dcaa24445f4ebf6e2d84f7c656fa82f3fcbfcd682cb5a3a",
+        "id": "racf.racroute.0012.unauthorized.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:d2650ff956551702d5605ac240537a327d1bb42adf96feed0ed9881451dc0cea",
+        "id": "racf.racroute.0012.unauthorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:9512a96e0f114d23b99790020669ce7165d0daad1b094514be422b9f34b3d5e9",
+        "id": "racf.racroute.0013.authorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:48953a337b7b9000b479c5e9b931632f5cc9b7da3ad08830a7f32009181bc754",
+        "id": "racf.racroute.0013.malformed.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:4b6cb6a7fcf6b0b84955556c0b5f15c0592b86a858af9c9c21a2fbeb10460732",
+        "id": "racf.racroute.0013.syntax.recognized.fixture"
+      },
+      {
+        "digest": "sha256:656a9bdf4df3709ade47232bb28ad6f619283ac9cf29ebad9b81c055b69c3c00",
+        "id": "racf.racroute.0013.syntax.validated.fixture"
+      },
+      {
+        "digest": "sha256:1c78c323014e8dec97f33690895095cca8f0adcb867989204859523795104c53",
+        "id": "racf.racroute.0013.unauthorized.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:45398084aacb6760d887ce4c8ff7312989ff45d16fb8d3a0979e2a56e976a49c",
+        "id": "racf.racroute.0013.unauthorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:8b8e0e992ab73974f9147dca17f51fcf5419a5f579a356ebccbce238b74b868a",
+        "id": "racf.racroute.0014.authorized.executed.fixture"
+      },
+      {
+        "digest": "sha256:15982162402e6f66c7354c7377867c747c12e26fc83dfc1e25824212c2644c89",
+        "id": "racf.racroute.0014.malformed.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:4e527d3537b49fc199c5d6c32bbcfc514aaebb94fc799a4ae787f67bb7abee82",
+        "id": "racf.racroute.0014.syntax.recognized.fixture"
+      },
+      {
+        "digest": "sha256:b67070cffbdc4a9abcea9bf613313a9d83e0ef37205d1d910ec3aed75a3dd1f1",
+        "id": "racf.racroute.0014.syntax.validated.fixture"
+      },
+      {
+        "digest": "sha256:086fc9e937b65c6e43fcea5d52fbca41ee209d6f86c6cb9d1a79b334f58b10a3",
+        "id": "racf.racroute.0014.unauthorized.conditioned.fixture"
+      },
+      {
+        "digest": "sha256:d117ea882e54b819321d8577e4a51030c7a730572170211097f6abfc4c02b2c4",
+        "id": "racf.racroute.0014.unauthorized.executed.fixture"
       }
     ],
     "input_shapes": [
-      "racf.command.text"
+      "racf.command.text",
+      "racf.racroute.typed"
     ],
     "observations": [
       "racf.command.passed"
     ],
     "operations": [
-      "racf.command"
+      "racf.command",
+      "racf.racroute"
     ],
     "oracles": [],
     "predicates": [
@@ -4866,7 +7054,8 @@
     "recoveries": [],
     "scenario_steps": [],
     "transitions": [
-      "racf.command.transition"
+      "racf.command.transition",
+      "racf.racroute.transition"
     ]
   },
   "rows": [
@@ -5911,6 +8100,440 @@
       "recovery": null,
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0034",
       "transition": "racf.command.transition"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [
+        "racf.racroute.status"
+      ],
+      "input": "racf.racroute.typed",
+      "obligations": [
+        "syntax",
+        "authorized",
+        "unauthorized",
+        "malformed"
+      ],
+      "operation": "racf.racroute",
+      "oracle": null,
+      "postconditions": [
+        "racf.command.passed"
+      ],
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0001",
+      "transition": "racf.racroute.transition"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [
+        "racf.racroute.status"
+      ],
+      "input": "racf.racroute.typed",
+      "obligations": [
+        "syntax",
+        "authorized",
+        "unauthorized",
+        "malformed"
+      ],
+      "operation": "racf.racroute",
+      "oracle": null,
+      "postconditions": [
+        "racf.command.passed"
+      ],
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0002",
+      "transition": "racf.racroute.transition"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [
+        "racf.racroute.status"
+      ],
+      "input": "racf.racroute.typed",
+      "obligations": [
+        "syntax",
+        "authorized",
+        "unauthorized",
+        "malformed"
+      ],
+      "operation": "racf.racroute",
+      "oracle": null,
+      "postconditions": [
+        "racf.command.passed"
+      ],
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0003",
+      "transition": "racf.racroute.transition"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [
+        "racf.racroute.status"
+      ],
+      "input": "racf.racroute.typed",
+      "obligations": [
+        "syntax",
+        "authorized",
+        "unauthorized",
+        "malformed"
+      ],
+      "operation": "racf.racroute",
+      "oracle": null,
+      "postconditions": [
+        "racf.command.passed"
+      ],
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0004",
+      "transition": "racf.racroute.transition"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [
+        "racf.racroute.status"
+      ],
+      "input": "racf.racroute.typed",
+      "obligations": [
+        "syntax",
+        "authorized",
+        "unauthorized",
+        "malformed"
+      ],
+      "operation": "racf.racroute",
+      "oracle": null,
+      "postconditions": [
+        "racf.command.passed"
+      ],
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0005",
+      "transition": "racf.racroute.transition"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [
+        "racf.racroute.status"
+      ],
+      "input": "racf.racroute.typed",
+      "obligations": [
+        "syntax",
+        "authorized",
+        "unauthorized",
+        "malformed"
+      ],
+      "operation": "racf.racroute",
+      "oracle": null,
+      "postconditions": [
+        "racf.command.passed"
+      ],
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0006",
+      "transition": "racf.racroute.transition"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [
+        "racf.racroute.status"
+      ],
+      "input": "racf.racroute.typed",
+      "obligations": [
+        "syntax",
+        "authorized",
+        "unauthorized",
+        "malformed"
+      ],
+      "operation": "racf.racroute",
+      "oracle": null,
+      "postconditions": [
+        "racf.command.passed"
+      ],
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0007",
+      "transition": "racf.racroute.transition"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [
+        "racf.racroute.status"
+      ],
+      "input": "racf.racroute.typed",
+      "obligations": [
+        "syntax",
+        "authorized",
+        "unauthorized",
+        "malformed"
+      ],
+      "operation": "racf.racroute",
+      "oracle": null,
+      "postconditions": [
+        "racf.command.passed"
+      ],
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0008",
+      "transition": "racf.racroute.transition"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [
+        "racf.racroute.status"
+      ],
+      "input": "racf.racroute.typed",
+      "obligations": [
+        "syntax",
+        "authorized",
+        "unauthorized",
+        "malformed"
+      ],
+      "operation": "racf.racroute",
+      "oracle": null,
+      "postconditions": [
+        "racf.command.passed"
+      ],
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0009",
+      "transition": "racf.racroute.transition"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [
+        "racf.racroute.status"
+      ],
+      "input": "racf.racroute.typed",
+      "obligations": [
+        "syntax",
+        "authorized",
+        "unauthorized",
+        "malformed"
+      ],
+      "operation": "racf.racroute",
+      "oracle": null,
+      "postconditions": [
+        "racf.command.passed"
+      ],
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0010",
+      "transition": "racf.racroute.transition"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [
+        "racf.racroute.status"
+      ],
+      "input": "racf.racroute.typed",
+      "obligations": [
+        "syntax",
+        "authorized",
+        "unauthorized",
+        "malformed"
+      ],
+      "operation": "racf.racroute",
+      "oracle": null,
+      "postconditions": [
+        "racf.command.passed"
+      ],
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0011",
+      "transition": "racf.racroute.transition"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [
+        "racf.racroute.status"
+      ],
+      "input": "racf.racroute.typed",
+      "obligations": [
+        "syntax",
+        "authorized",
+        "unauthorized",
+        "malformed"
+      ],
+      "operation": "racf.racroute",
+      "oracle": null,
+      "postconditions": [
+        "racf.command.passed"
+      ],
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0012",
+      "transition": "racf.racroute.transition"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [
+        "racf.racroute.status"
+      ],
+      "input": "racf.racroute.typed",
+      "obligations": [
+        "syntax",
+        "authorized",
+        "unauthorized",
+        "malformed"
+      ],
+      "operation": "racf.racroute",
+      "oracle": null,
+      "postconditions": [
+        "racf.command.passed"
+      ],
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0013",
+      "transition": "racf.racroute.transition"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [
+        "racf.racroute.status"
+      ],
+      "input": "racf.racroute.typed",
+      "obligations": [
+        "syntax",
+        "authorized",
+        "unauthorized",
+        "malformed"
+      ],
+      "operation": "racf.racroute",
+      "oracle": null,
+      "postconditions": [
+        "racf.command.passed"
+      ],
+      "preconditions": [
+        "racf.authority.ready"
+      ],
+      "recovery": null,
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0014",
+      "transition": "racf.racroute.transition"
     }
   ],
   "scenarios": [],

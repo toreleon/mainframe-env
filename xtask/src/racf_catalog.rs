@@ -4,10 +4,13 @@ const CATALOG_PATH: &str = "conformance/0.5/racf/command-language.json";
 const SCHEMA_PATH: &str = "conformance/0.5/schemas/racf-command-catalog.schema.json";
 const CLASS_CATALOG_PATH: &str = "conformance/0.5/racf/supplied-classes.json";
 const CLASS_SCHEMA_PATH: &str = "conformance/0.5/schemas/racf-class-catalog.schema.json";
+const RACROUTE_PATH: &str = "conformance/0.5/racf/racroute.json";
+const RACROUTE_SCHEMA_PATH: &str = "conformance/0.5/schemas/racroute-catalog.schema.json";
 const GENERATED_PATH: &str =
     "crates/providers/mainframe-env-racf/src/generated/racf_command_catalog.rs";
 const SPEC_PATH: &str = "conformance/spec/v1/spec.json";
 const RACF_ROW_PREFIX: &str = "ibm-zos-3.2-racf-saf-2026:racf-command-families:";
+const RACROUTE_ROW_PREFIX: &str = "ibm-zos-3.2-racf-saf-2026:racroute-request-types:";
 
 pub(super) fn generate(root: &Path) -> TaskResult {
     let generated = render(root)?;
@@ -48,14 +51,26 @@ fn project_spec(root: &Path) -> TaskResult<Vec<u8>> {
             .as_object_mut()
             .ok_or("shared Conformance IR registries are not an object")?;
         for (name, values) in [
-            ("operations", vec!["racf.command"]),
-            ("input_shapes", vec!["racf.command.text"]),
+            ("operations", vec!["racf.command", "racf.racroute"]),
+            (
+                "input_shapes",
+                vec!["racf.command.text", "racf.racroute.typed"],
+            ),
             ("predicates", vec!["racf.authority.ready"]),
-            ("transitions", vec!["racf.command.transition"]),
+            (
+                "transitions",
+                vec!["racf.command.transition", "racf.racroute.transition"],
+            ),
             ("observations", vec!["racf.command.passed"]),
-            ("conditions", vec!["racf.command.diagnostic"]),
+            (
+                "conditions",
+                vec!["racf.command.diagnostic", "racf.racroute.status"],
+            ),
             ("recoveries", Vec::new()),
-            ("drivers", vec!["racf.command.driver"]),
+            (
+                "drivers",
+                vec!["racf.command.driver", "racf.racroute.driver"],
+            ),
             ("scenario_steps", Vec::new()),
             ("failure_points", Vec::new()),
         ] {
@@ -69,27 +84,27 @@ fn project_spec(root: &Path) -> TaskResult<Vec<u8>> {
         .cloned()
         .ok_or("shared Conformance IR rows are not an array")?;
     rows.retain(|row| {
-        !row["row_id"]
-            .as_str()
-            .is_some_and(|row_id| row_id.starts_with(RACF_ROW_PREFIX))
+        !row["row_id"].as_str().is_some_and(|row_id| {
+            row_id.starts_with(RACF_ROW_PREFIX) || row_id.starts_with(RACROUTE_ROW_PREFIX)
+        })
     });
     let mut obligations = spec["obligations"]
         .as_array()
         .cloned()
         .ok_or("shared Conformance IR obligations are not an array")?;
     obligations.retain(|obligation| {
-        !obligation["row_id"]
-            .as_str()
-            .is_some_and(|row_id| row_id.starts_with(RACF_ROW_PREFIX))
+        !obligation["row_id"].as_str().is_some_and(|row_id| {
+            row_id.starts_with(RACF_ROW_PREFIX) || row_id.starts_with(RACROUTE_ROW_PREFIX)
+        })
     });
     let mut cases = spec["cases"]
         .as_array()
         .cloned()
         .ok_or("shared Conformance IR cases are not an array")?;
     cases.retain(|case| {
-        !case["row_id"]
-            .as_str()
-            .is_some_and(|row_id| row_id.starts_with(RACF_ROW_PREFIX))
+        !case["row_id"].as_str().is_some_and(|row_id| {
+            row_id.starts_with(RACF_ROW_PREFIX) || row_id.starts_with(RACROUTE_ROW_PREFIX)
+        })
     });
 
     let mut fixtures = Vec::new();
@@ -130,6 +145,7 @@ fn project_spec(root: &Path) -> TaskResult<Vec<u8>> {
                 push_case(
                     &mut cases,
                     &mut fixtures,
+                    "command",
                     row_id,
                     sequence,
                     obligation,
@@ -146,6 +162,7 @@ fn project_spec(root: &Path) -> TaskResult<Vec<u8>> {
             push_case(
                 &mut cases,
                 &mut fixtures,
+                "command",
                 row_id,
                 sequence,
                 "authorized",
@@ -160,9 +177,55 @@ fn project_spec(root: &Path) -> TaskResult<Vec<u8>> {
                 push_case(
                     &mut cases,
                     &mut fixtures,
+                    "command",
                     row_id,
                     sequence,
                     "unauthorized",
+                    gate,
+                );
+            }
+        }
+    }
+    let racroute_path = root.join(RACROUTE_PATH);
+    let racroute = json(&racroute_path)?;
+    for (index, request) in array(&racroute, "requests", &racroute_path)?
+        .iter()
+        .enumerate()
+    {
+        let row_id = text(request, "row_id", &racroute_path)?;
+        let sequence = index + 1;
+        rows.push(json!({
+            "row_id": row_id,
+            "operation": "racf.racroute",
+            "input": "racf.racroute.typed",
+            "preconditions": ["racf.authority.ready"],
+            "transition": "racf.racroute.transition",
+            "postconditions": ["racf.command.passed"],
+            "conditions": ["racf.racroute.status"],
+            "recovery": Value::Null,
+            "oracle": Value::Null,
+            "applicable_gates": ["recognized", "validated", "executed", "conditioned", "recovered", "differential"],
+            "obligations": ["syntax", "authorized", "unauthorized", "malformed"]
+        }));
+        for (obligation, gates) in [
+            ("syntax", vec!["recognized", "validated"]),
+            ("authorized", vec!["executed"]),
+            ("unauthorized", vec!["executed", "conditioned"]),
+            ("malformed", vec!["conditioned"]),
+        ] {
+            obligations.push(json!({
+                "row_id": row_id,
+                "obligation_id": obligation,
+                "applicable_gates": gates,
+            }));
+            for gate in gates {
+                push_case(
+                    &mut cases,
+                    &mut fixtures,
+                    "racroute",
+                    row_id,
+                    sequence,
+                    obligation,
                     gate,
                 );
             }
@@ -183,12 +246,13 @@ fn project_spec(root: &Path) -> TaskResult<Vec<u8>> {
 fn push_case(
     cases: &mut Vec<Value>,
     fixtures: &mut Vec<(String, String)>,
+    surface: &str,
     row_id: &str,
     sequence: usize,
     obligation: &str,
     gate: &str,
 ) {
-    let test_id = format!("racf.command.{sequence:04}.{obligation}.{gate}");
+    let test_id = format!("racf.{surface}.{sequence:04}.{obligation}.{gate}");
     let fixture = format!("{test_id}.fixture");
     let digest = format!("sha256:{:x}", Sha256::digest(fixture.as_bytes()));
     fixtures.push((fixture.clone(), digest));
@@ -198,7 +262,7 @@ fn push_case(
         "obligation_id": obligation,
         "gate": gate,
         "test_id": test_id,
-        "driver": "racf.command.driver",
+        "driver": format!("racf.{surface}.driver"),
         "input": fixture,
         "preconditions": ["racf.authority.ready"],
         "expected": ["racf.command.passed"],
@@ -280,6 +344,34 @@ fn render(root: &Path) -> TaskResult<Vec<u8>> {
         require(
             class_names.insert(name),
             &format!("duplicate RACF supplied class {name}"),
+        )?;
+    }
+    let racroute_path = root.join(RACROUTE_PATH);
+    let racroute = json(&racroute_path)?;
+    validate_schema_instance(
+        &json(&root.join(RACROUTE_SCHEMA_PATH))?,
+        &racroute,
+        &racroute_path,
+    )?;
+    let requests = array(&racroute, "requests", &racroute_path)?;
+    let official_requests = array(&units[1], "rows", &official_path)?;
+    require(
+        requests.len() == 14 && official_requests.len() == requests.len(),
+        "RACROUTE generated/official request denominators differ",
+    )?;
+    let mut request_variants = BTreeSet::new();
+    for (index, request) in requests.iter().enumerate() {
+        let variant = text(request, "variant", &racroute_path)?;
+        require(
+            request_variants.insert(variant),
+            &format!("duplicate RACROUTE request variant {variant}"),
+        )?;
+        require(
+            text(request, "row_id", &racroute_path)?
+                == text(&official_requests[index], "id", &official_path)?
+                && text(request, "keyword", &racroute_path)?
+                    == text(&official_requests[index], "label", &official_path)?,
+            &format!("RACROUTE request identity drifted at {variant}"),
         )?;
     }
 
@@ -379,6 +471,28 @@ fn render(root: &Path) -> TaskResult<Vec<u8>> {
             boolean(class, "raclist", &class_path)?,
             integer(class, "max_profile_name_bytes", &class_path)?,
             posit,
+        ));
+    }
+    out.push_str("];\n");
+    out.push_str(
+        "\n#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]\n\
+         pub enum RacrouteRequestType {\n",
+    );
+    for request in requests {
+        out.push_str("    ");
+        out.push_str(text(request, "variant", &racroute_path)?);
+        out.push_str(",\n");
+    }
+    out.push_str("}\n\npub const RACROUTE_DESCRIPTORS: &[RacrouteDescriptor] = &[\n");
+    for request in requests {
+        out.push_str(&format!(
+            "    RacrouteDescriptor {{ request_type: RacrouteRequestType::{}, row_id: {:?}, keyword: {:?}, mutating: {}, requires_acee: {}, uses_cache: {} }},\n",
+            text(request, "variant", &racroute_path)?,
+            text(request, "row_id", &racroute_path)?,
+            text(request, "keyword", &racroute_path)?,
+            boolean(request, "mutating", &racroute_path)?,
+            boolean(request, "requires_acee", &racroute_path)?,
+            boolean(request, "uses_cache", &racroute_path)?,
         ));
     }
     out.push_str("];\n");

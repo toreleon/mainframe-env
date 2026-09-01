@@ -33,3 +33,12 @@ snapshots with explicit refresh semantics, PROGRAM control, RACPRIV, SET,
 RVARY, STOP/RESTART, and bounded RACPRMCK member validation. A RACLISTed class
 never falls through to live profiles when its cache is absent, and stopped or
 inactive authority state fails closed.
+
+SEC-504 adds the generated 14-request RACROUTE registry and typed AUDIT, AUTH,
+DEFINE, DIRAUTH, EXTRACT, FASTAUTH, LIST, SIGNON, STAT, TOKENBLD, TOKENMAP,
+TOKENXTR, VERIFY, and VERIFYX state machines. The host authorization adapter and
+SAF routes share one evaluator for profile specificity, group hierarchy,
+conditional access, labels/levels/categories, RACLIST generations, PROGRAM
+control, and return/reason mapping. ACEEs, nesting/delegation, and token
+metadata remain bounded owned records; raw credentials and token material do
+not enter results or audit.

@@ -509,3 +509,38 @@ pub const SUPPLIED_CLASS_DESCRIPTORS: &[SuppliedClassDescriptor] = &[
     SuppliedClassDescriptor { name: "TSOPROC", active: false, generic_allowed: true, generic_active: true, discrete_allowed: true, raclist: false, max_profile_name_bytes: 246, posit: None },
     SuppliedClassDescriptor { name: "UNIXPRIV", active: false, generic_allowed: true, generic_active: true, discrete_allowed: true, raclist: false, max_profile_name_bytes: 246, posit: None },
 ];
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum RacrouteRequestType {
+    Audit,
+    Auth,
+    Define,
+    Dirauth,
+    Extract,
+    Fastauth,
+    List,
+    Signon,
+    Stat,
+    Tokenbld,
+    Tokenmap,
+    Tokenxtr,
+    Verify,
+    Verifyx,
+}
+
+pub const RACROUTE_DESCRIPTORS: &[RacrouteDescriptor] = &[
+    RacrouteDescriptor { request_type: RacrouteRequestType::Audit, row_id: "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0001", keyword: "AUDIT", mutating: true, requires_acee: false, uses_cache: false },
+    RacrouteDescriptor { request_type: RacrouteRequestType::Auth, row_id: "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0002", keyword: "AUTH", mutating: false, requires_acee: false, uses_cache: true },
+    RacrouteDescriptor { request_type: RacrouteRequestType::Define, row_id: "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0003", keyword: "DEFINE", mutating: true, requires_acee: true, uses_cache: false },
+    RacrouteDescriptor { request_type: RacrouteRequestType::Dirauth, row_id: "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0004", keyword: "DIRAUTH", mutating: false, requires_acee: true, uses_cache: false },
+    RacrouteDescriptor { request_type: RacrouteRequestType::Extract, row_id: "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0005", keyword: "EXTRACT", mutating: false, requires_acee: true, uses_cache: false },
+    RacrouteDescriptor { request_type: RacrouteRequestType::Fastauth, row_id: "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0006", keyword: "FASTAUTH", mutating: false, requires_acee: true, uses_cache: true },
+    RacrouteDescriptor { request_type: RacrouteRequestType::List, row_id: "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0007", keyword: "LIST", mutating: true, requires_acee: true, uses_cache: true },
+    RacrouteDescriptor { request_type: RacrouteRequestType::Signon, row_id: "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0008", keyword: "SIGNON", mutating: true, requires_acee: false, uses_cache: false },
+    RacrouteDescriptor { request_type: RacrouteRequestType::Stat, row_id: "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0009", keyword: "STAT", mutating: false, requires_acee: true, uses_cache: false },
+    RacrouteDescriptor { request_type: RacrouteRequestType::Tokenbld, row_id: "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0010", keyword: "TOKENBLD", mutating: true, requires_acee: true, uses_cache: false },
+    RacrouteDescriptor { request_type: RacrouteRequestType::Tokenmap, row_id: "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0011", keyword: "TOKENMAP", mutating: true, requires_acee: false, uses_cache: false },
+    RacrouteDescriptor { request_type: RacrouteRequestType::Tokenxtr, row_id: "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0012", keyword: "TOKENXTR", mutating: false, requires_acee: true, uses_cache: false },
+    RacrouteDescriptor { request_type: RacrouteRequestType::Verify, row_id: "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0013", keyword: "VERIFY", mutating: true, requires_acee: false, uses_cache: false },
+    RacrouteDescriptor { request_type: RacrouteRequestType::Verifyx, row_id: "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0014", keyword: "VERIFYX", mutating: true, requires_acee: false, uses_cache: false },
+];

@@ -330,6 +330,14 @@ impl RacfService {
         crate::command_processor::execute(self, context, input)
     }
 
+    pub fn racroute(
+        &self,
+        context: &crate::saf::SafRequestContext,
+        request: crate::saf::RacrouteRequest,
+    ) -> Result<crate::saf::RacrouteOutcome, HostProblem> {
+        crate::saf::execute(self, context, request)
+    }
+
     pub fn add_group(&self, name: &str) -> Result<(), HostProblem> {
         let name = normalize(name, 8)?;
         self.database.mutate(|snapshot| {
@@ -556,68 +564,17 @@ impl RacfService {
         resource: &ResourceName,
         intent: AccessIntent,
     ) -> Result<SecurityDecision, HostProblem> {
-        let class = normalize(class, 32)?;
         let snapshot = self.database.read()?;
-        if !snapshot.subsystem.running || !snapshot.database_status.active {
-            return Ok(SecurityDecision::Deny);
-        }
-        let Some(user) = snapshot.principals.get(principal.as_str()) else {
-            return Ok(SecurityDecision::Deny);
-        };
-        if matches!(
-            user.state,
-            PrincipalState::Revoked | PrincipalState::Suspended | PrincipalState::Locked
-        ) {
-            return Ok(SecurityDecision::Deny);
-        }
-        let Some(class_record) = snapshot.classes.get(&class) else {
-            return Ok(SecurityDecision::Deny);
-        };
-        if !class_record.active {
-            return Ok(SecurityDecision::Deny);
-        }
-        if class == "PROGRAM" && !snapshot.policy.program_control {
-            return Ok(SecurityDecision::Deny);
-        }
-        let profiles = if class_record.raclist {
-            let Some(cache) = snapshot.raclist_caches.get(&class) else {
-                return Ok(SecurityDecision::Deny);
-            };
-            cache.profiles.values().collect::<Vec<_>>()
-        } else {
-            snapshot.profiles.values().collect::<Vec<_>>()
-        };
-        let selected = profiles
-            .into_iter()
-            .filter(|profile| {
-                profile.class == class
-                    && if profile.generic {
-                        class_record.generic_active
-                            && generic_match(&profile.name, resource.as_str())
-                    } else {
-                        profile.name == resource.as_str()
-                    }
-            })
-            .max_by_key(|profile| specificity(&profile.name));
-        let Some(profile) = selected else {
-            return Ok(SecurityDecision::Deny);
-        };
-        let requested: AccessLevel = intent.into();
-        let direct = profile
-            .access_list
-            .iter()
-            .filter(|entry| entry.principal == principal.as_str() && entry.when.is_none())
-            .map(|entry| entry.access)
-            .max();
-        let groups = effective_groups(&snapshot.connections, principal.as_str());
-        let group = profile
-            .access_list
-            .iter()
-            .filter(|entry| groups.contains(&entry.principal) && entry.when.is_none())
-            .map(|entry| entry.access)
-            .max();
-        let granted = direct.or(group).unwrap_or(profile.uacc);
-        Ok(if granted.permits(requested) {
+        let decision = crate::saf::evaluate_access(
+            &snapshot,
+            principal.as_str(),
+            class,
+            resource.as_str(),
+            intent.into(),
+            &crate::saf::AccessEnvironment::default(),
+            false,
+        );
+        Ok(if decision.outcome == DecisionOutcome::Allow {
             SecurityDecision::Allow
         } else {
             SecurityDecision::Deny
@@ -932,17 +889,6 @@ fn install_supplied_class_catalog(database: &SecurityDatabase) -> Result<(), Hos
     Ok(())
 }
 
-fn effective_groups(
-    connections: &BTreeMap<String, GroupConnection>,
-    principal: &str,
-) -> BTreeSet<String> {
-    connections
-        .values()
-        .filter(|connection| connection.user == principal && !connection.revoked)
-        .map(|connection| connection.group.clone())
-        .collect()
-}
-
 fn status(reason: DecisionReason) -> SafStatus {
     SafStatus {
         saf_return_code: 0,
@@ -1020,46 +966,6 @@ fn normalize_pattern(value: &str, max: usize) -> Result<String, HostProblem> {
 
 fn contains_generic(pattern: &str) -> bool {
     pattern.bytes().any(|byte| matches!(byte, b'*' | b'%'))
-}
-
-fn generic_match(pattern: &str, value: &str) -> bool {
-    let pattern = pattern.split('.').collect::<Vec<_>>();
-    let value = value.split('.').collect::<Vec<_>>();
-    match_parts(&pattern, &value)
-}
-
-fn match_parts(pattern: &[&str], value: &[&str]) -> bool {
-    if pattern.is_empty() {
-        return value.is_empty();
-    }
-    if pattern[0] == "**" {
-        return (0..=value.len()).any(|skip| match_parts(&pattern[1..], &value[skip..]));
-    }
-    if value.is_empty() {
-        return false;
-    }
-    qualifier(pattern[0], value[0]) && match_parts(&pattern[1..], &value[1..])
-}
-
-fn qualifier(pattern: &str, value: &str) -> bool {
-    if pattern == "*" {
-        return true;
-    }
-    pattern.len() == value.len()
-        && pattern
-            .bytes()
-            .zip(value.bytes())
-            .all(|(pattern, value)| pattern == b'%' || pattern == value)
-}
-
-fn specificity(pattern: &str) -> (usize, usize) {
-    (
-        pattern
-            .bytes()
-            .filter(|byte| !matches!(byte, b'*' | b'%'))
-            .count(),
-        usize::MAX - pattern.matches("**").count(),
-    )
 }
 
 fn redact_audit(mut event: AuditEvent, limits: RacfLimits) -> Result<AuditEvent, HostProblem> {

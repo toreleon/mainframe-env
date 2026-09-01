@@ -190,14 +190,14 @@ pub(crate) fn execute(
                         context,
                         &parsed,
                         DecisionOutcome::Deny,
-                        status_for(DecisionReason::MalformedRequest),
+                        crate::saf::status_for_reason(DecisionReason::MalformedRequest),
                         &request_digest,
                     )?;
                     return Ok((
                         (
                             ExecutionOutcome::Failure(SemanticProblem::Conflict),
                             false,
-                            status_for(DecisionReason::MalformedRequest),
+                            crate::saf::status_for_reason(DecisionReason::MalformedRequest),
                         ),
                         true,
                     ));
@@ -218,7 +218,7 @@ pub(crate) fn execute(
             };
             match applied {
                 Ok(records) => {
-                    let status = status_for(DecisionReason::Granted);
+                    let status = crate::saf::status_for_reason(DecisionReason::Granted);
                     if parsed.descriptor.mutating() {
                         append_transaction(
                             &mut staged,
@@ -241,7 +241,7 @@ pub(crate) fn execute(
                     Ok(((ExecutionOutcome::Success(records), false, status), true))
                 }
                 Err(problem) => {
-                    let status = status_for(reason_for_problem(&problem));
+                    let status = crate::saf::status_for_reason(reason_for_problem(&problem));
                     if parsed.descriptor.mutating() {
                         append_transaction(
                             snapshot,
@@ -2104,41 +2104,6 @@ fn problem_from_reason(reason: DecisionReason) -> SemanticProblem {
         }
         DecisionReason::ResourceExhausted => SemanticProblem::Exhausted,
         _ => SemanticProblem::Conflict,
-    }
-}
-
-fn status_for(reason: DecisionReason) -> SafStatus {
-    match reason {
-        DecisionReason::Granted => SafStatus {
-            saf_return_code: 0,
-            racf_return_code: 0,
-            racf_reason_code: 0,
-            reason,
-        },
-        DecisionReason::DefaultDeny | DecisionReason::InsufficientAccess => SafStatus {
-            saf_return_code: 8,
-            racf_return_code: 8,
-            racf_reason_code: 4,
-            reason,
-        },
-        DecisionReason::ProfileNotFound | DecisionReason::PrincipalNotFound => SafStatus {
-            saf_return_code: 8,
-            racf_return_code: 8,
-            racf_reason_code: 8,
-            reason,
-        },
-        DecisionReason::ResourceExhausted => SafStatus {
-            saf_return_code: 12,
-            racf_return_code: 12,
-            racf_reason_code: 16,
-            reason,
-        },
-        _ => SafStatus {
-            saf_return_code: 8,
-            racf_return_code: 8,
-            racf_reason_code: 12,
-            reason,
-        },
     }
 }
 

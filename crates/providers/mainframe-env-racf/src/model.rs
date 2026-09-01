@@ -998,6 +998,18 @@ impl SecurityDatabaseSnapshot {
                 || acee.version == 0
                 || !self.principals.contains_key(&acee.principal)
                 || acee
+                    .default_group
+                    .as_ref()
+                    .is_some_and(|group| !self.groups.contains_key(group))
+                || acee
+                    .groups
+                    .iter()
+                    .any(|group| !self.groups.contains_key(group))
+                || acee
+                    .delegated_by
+                    .as_ref()
+                    .is_some_and(|principal| !self.principals.contains_key(principal))
+                || acee
                     .parent
                     .as_ref()
                     .is_some_and(|parent| parent == id || !self.acees.contains_key(parent))
@@ -1007,6 +1019,17 @@ impl SecurityDatabaseSnapshot {
                     .any(|token| !self.tokens.contains_key(token))
             {
                 return Err(SecuritySchemaProblem::MissingReference);
+            }
+            let mut seen = BTreeSet::new();
+            let mut parent = acee.parent.as_deref();
+            while let Some(candidate) = parent {
+                if candidate == id || !seen.insert(candidate) {
+                    return Err(SecuritySchemaProblem::Cycle);
+                }
+                parent = self
+                    .acees
+                    .get(candidate)
+                    .and_then(|parent| parent.parent.as_deref());
             }
         }
         for (id, token) in &self.tokens {

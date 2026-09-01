@@ -42,13 +42,25 @@ pub struct SuppliedClassDescriptor {
     pub posit: Option<u16>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RacrouteDescriptor {
+    request_type: RacrouteRequestType,
+    row_id: &'static str,
+    keyword: &'static str,
+    mutating: bool,
+    requires_acee: bool,
+    uses_cache: bool,
+}
+
 mod generated {
-    use super::{CommandDescriptor, CommandDomain, SuppliedClassDescriptor};
+    use super::{CommandDescriptor, CommandDomain, RacrouteDescriptor, SuppliedClassDescriptor};
     include!("generated/racf_command_catalog.rs");
 }
 
 use generated::COMMAND_DESCRIPTORS;
 pub use generated::CommandFamily;
+use generated::RACROUTE_DESCRIPTORS;
+pub use generated::RacrouteRequestType;
 use generated::SUPPLIED_CLASS_DESCRIPTORS;
 
 impl CommandDescriptor {
@@ -111,6 +123,43 @@ pub const fn command_descriptors() -> &'static [CommandDescriptor] {
 #[must_use]
 pub const fn supplied_class_descriptors() -> &'static [SuppliedClassDescriptor] {
     SUPPLIED_CLASS_DESCRIPTORS
+}
+
+impl RacrouteDescriptor {
+    #[must_use]
+    pub const fn request_type(self) -> RacrouteRequestType {
+        self.request_type
+    }
+
+    #[must_use]
+    pub const fn row_id(self) -> &'static str {
+        self.row_id
+    }
+
+    #[must_use]
+    pub const fn keyword(self) -> &'static str {
+        self.keyword
+    }
+
+    #[must_use]
+    pub const fn mutating(self) -> bool {
+        self.mutating
+    }
+
+    #[must_use]
+    pub const fn requires_acee(self) -> bool {
+        self.requires_acee
+    }
+
+    #[must_use]
+    pub const fn uses_cache(self) -> bool {
+        self.uses_cache
+    }
+}
+
+#[must_use]
+pub const fn racroute_descriptors() -> &'static [RacrouteDescriptor] {
+    RACROUTE_DESCRIPTORS
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
