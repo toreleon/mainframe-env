@@ -257,6 +257,13 @@
       "obligation_id": "phrase-internal-numeric-separate-sign",
       "source": "PROCESS DISPSIGN(SEP)\nIDENTIFICATION DIVISION. PROGRAM-ID. DISPLAYSEP. DATA DIVISION. WORKING-STORAGE SECTION. 01 PACKED-X PIC S9(3) COMP-3 VALUE -12. 01 BINARY-X PIC S9(3) COMP VALUE 7. PROCEDURE DIVISION. DISPLAY PACKED-X. DISPLAY BINARY-X. STOP RUN.",
       "expected_output": "-012\n+007\n"
+    },
+    {
+      "id": "json-generate-group-hierarchy",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0023",
+      "obligation_id": "phrase-group-hierarchy",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. JSONGROUP. DATA DIVISION. WORKING-STORAGE SECTION. 01 GREETING. 05 COUNT-X PIC 99 VALUE 12. 05 MSG PIC X(5) VALUE 'Hello'. 01 JSON-X PIC X(80). 01 LEN-X PIC 99. PROCEDURE DIVISION. JSON GENERATE JSON-X FROM GREETING COUNT IN LEN-X. DISPLAY JSON-X(1:LEN-X). STOP RUN.",
+      "expected_output": "{\"GREETING\":{\"COUNT-X\":12,\"MSG\":\"Hello\"}}\n"
     }
   ]
 }

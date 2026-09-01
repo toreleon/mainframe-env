@@ -1282,6 +1282,9 @@ fn check_cobol_statement_bindings(
             }
             Some("0023" | "0043") => {
                 expected_obligations.insert("phrase-count-in");
+                if row.row_id().as_str().ends_with(":0023") {
+                    expected_obligations.insert("phrase-group-hierarchy");
+                }
             }
             Some("0024") => {
                 expected_obligations.insert("phrase-with-detail");
