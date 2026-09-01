@@ -1244,7 +1244,7 @@ fn validate_simple_header(kind: StatementKind, tokens: &[Token<'_>]) -> Result<(
         StatementKind::Allocate => validate_allocate(tokens),
         StatementKind::Alter => validate_alter(tokens),
         StatementKind::Call => validate_call_like(tokens, false),
-        StatementKind::Cancel | StatementKind::Free => validate_variadic_operands(tokens, 1),
+        StatementKind::Cancel => validate_cancel(tokens),
         StatementKind::Close => validate_close(tokens),
         StatementKind::Compute => validate_compute(tokens),
         StatementKind::Continue | StatementKind::NextSentence => {
@@ -1268,6 +1268,7 @@ fn validate_simple_header(kind: StatementKind, tokens: &[Token<'_>]) -> Result<(
         StatementKind::Divide => validate_divide(tokens),
         StatementKind::Entry => validate_entry(tokens),
         StatementKind::Exit => validate_exit(tokens),
+        StatementKind::Free => validate_free(tokens),
         StatementKind::GoTo => validate_go_to(tokens),
         StatementKind::Initialize => validate_initialize(tokens),
         StatementKind::Inspect => validate_inspect(tokens),
@@ -1424,8 +1425,44 @@ fn validate_close(tokens: &[Token<'_>]) -> Result<(), &'static str> {
     (files > 0).then_some(()).ok_or("CLOSE requires a file")
 }
 
-fn validate_variadic_operands(tokens: &[Token<'_>], start: usize) -> Result<(), &'static str> {
-    validate_operand_list(&tokens[start..], 1)
+fn validate_cancel(tokens: &[Token<'_>]) -> Result<(), &'static str> {
+    let mut cursor = Cursor::new(tokens, 1);
+    let mut targets = 0usize;
+    while !cursor.done() {
+        let target = cursor
+            .tokens
+            .get(cursor.position)
+            .ok_or("CANCEL target is missing")?;
+        if !matches!(target.kind, TokenKind::Word | TokenKind::Literal)
+            || is_grammar_keyword(target)
+        {
+            return Err("CANCEL target must be a program name or identifier");
+        }
+        cursor.operand()?;
+        targets += 1;
+    }
+    (targets > 0)
+        .then_some(())
+        .ok_or("CANCEL requires at least one target")
+}
+
+fn validate_free(tokens: &[Token<'_>]) -> Result<(), &'static str> {
+    let mut cursor = Cursor::new(tokens, 1);
+    let mut pointers = 0usize;
+    while !cursor.done() {
+        let pointer = cursor
+            .tokens
+            .get(cursor.position)
+            .ok_or("FREE pointer is missing")?;
+        if pointer.kind != TokenKind::Word || is_grammar_keyword(pointer) {
+            return Err("FREE operand must be a pointer identifier");
+        }
+        cursor.operand()?;
+        pointers += 1;
+    }
+    (pointers > 0)
+        .then_some(())
+        .ok_or("FREE requires at least one pointer")
 }
 
 fn validate_compute(tokens: &[Token<'_>]) -> Result<(), &'static str> {
