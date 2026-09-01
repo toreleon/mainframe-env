@@ -1,0 +1,2200 @@
+{
+  "families": [
+    {
+      "denominator": 20,
+      "id": "jcl-statements",
+      "rows": [
+        {
+          "aliases": [],
+          "keyword": "JCL-COMMAND",
+          "label": "JCL command",
+          "ordinal": 1,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0001",
+          "rust_variant": "JclCommand",
+          "source_locator": "pdf-page:47;table:1"
+        },
+        {
+          "aliases": [],
+          "keyword": "COMMAND",
+          "label": "COMMAND",
+          "ordinal": 2,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0002",
+          "rust_variant": "Command",
+          "source_locator": "pdf-page:47;table:1"
+        },
+        {
+          "aliases": [
+            "//*"
+          ],
+          "keyword": "COMMENT",
+          "label": "comment",
+          "ordinal": 3,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0003",
+          "rust_variant": "Comment",
+          "source_locator": "pdf-page:47;table:1"
+        },
+        {
+          "aliases": [],
+          "keyword": "CNTL",
+          "label": "CNTL",
+          "ordinal": 4,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0004",
+          "rust_variant": "Cntl",
+          "source_locator": "pdf-page:47;table:1"
+        },
+        {
+          "aliases": [],
+          "keyword": "DD",
+          "label": "DD",
+          "ordinal": 5,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0005",
+          "rust_variant": "Dd",
+          "source_locator": "pdf-page:47;table:1"
+        },
+        {
+          "aliases": [
+            "/*"
+          ],
+          "keyword": "DELIMITER",
+          "label": "delimiter",
+          "ordinal": 6,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0006",
+          "rust_variant": "Delimiter",
+          "source_locator": "pdf-page:47;table:1"
+        },
+        {
+          "aliases": [],
+          "keyword": "ENDCNTL",
+          "label": "ENDCNTL",
+          "ordinal": 7,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0007",
+          "rust_variant": "Endcntl",
+          "source_locator": "pdf-page:47;table:1"
+        },
+        {
+          "aliases": [],
+          "keyword": "EXEC",
+          "label": "EXEC",
+          "ordinal": 8,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0008",
+          "rust_variant": "Exec",
+          "source_locator": "pdf-page:47;table:1"
+        },
+        {
+          "aliases": [],
+          "keyword": "EXPORT",
+          "label": "EXPORT",
+          "ordinal": 9,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0009",
+          "rust_variant": "Export",
+          "source_locator": "pdf-page:47;table:1"
+        },
+        {
+          "aliases": [
+            "THEN",
+            "ELSE",
+            "ENDIF"
+          ],
+          "keyword": "IF",
+          "label": "IF/THEN/ELSE/ENDIF",
+          "ordinal": 10,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0010",
+          "rust_variant": "Conditional",
+          "source_locator": "pdf-page:47;table:1"
+        },
+        {
+          "aliases": [],
+          "keyword": "INCLUDE",
+          "label": "INCLUDE",
+          "ordinal": 11,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0011",
+          "rust_variant": "Include",
+          "source_locator": "pdf-page:48;table:1"
+        },
+        {
+          "aliases": [],
+          "keyword": "JCLLIB",
+          "label": "JCLLIB",
+          "ordinal": 12,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0012",
+          "rust_variant": "Jcllib",
+          "source_locator": "pdf-page:48;table:1"
+        },
+        {
+          "aliases": [],
+          "keyword": "JOB",
+          "label": "JOB",
+          "ordinal": 13,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0013",
+          "rust_variant": "Job",
+          "source_locator": "pdf-page:48;table:1"
+        },
+        {
+          "aliases": [
+            "//"
+          ],
+          "keyword": "NULL",
+          "label": "null",
+          "ordinal": 14,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0014",
+          "rust_variant": "Null",
+          "source_locator": "pdf-page:48;table:1"
+        },
+        {
+          "aliases": [],
+          "keyword": "OUTPUT",
+          "label": "OUTPUT JCL",
+          "ordinal": 15,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0015",
+          "rust_variant": "Output",
+          "source_locator": "pdf-page:48;table:1"
+        },
+        {
+          "aliases": [],
+          "keyword": "PEND",
+          "label": "PEND",
+          "ordinal": 16,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0016",
+          "rust_variant": "Pend",
+          "source_locator": "pdf-page:48;table:1"
+        },
+        {
+          "aliases": [],
+          "keyword": "PROC",
+          "label": "PROC",
+          "ordinal": 17,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0017",
+          "rust_variant": "Proc",
+          "source_locator": "pdf-page:48;table:1"
+        },
+        {
+          "aliases": [],
+          "keyword": "SCHEDULE",
+          "label": "SCHEDULE",
+          "ordinal": 18,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0018",
+          "rust_variant": "Schedule",
+          "source_locator": "pdf-page:48;table:1"
+        },
+        {
+          "aliases": [],
+          "keyword": "SET",
+          "label": "SET",
+          "ordinal": 19,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0019",
+          "rust_variant": "Set",
+          "source_locator": "pdf-page:48;table:1"
+        },
+        {
+          "aliases": [],
+          "keyword": "XMIT",
+          "label": "XMIT",
+          "ordinal": 20,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0020",
+          "rust_variant": "Xmit",
+          "source_locator": "pdf-page:48;table:1"
+        }
+      ]
+    },
+    {
+      "denominator": 13,
+      "id": "jes2-jecl-statements",
+      "rows": [
+        {
+          "aliases": [
+            "/*$"
+          ],
+          "keyword": "$",
+          "label": "JES2 command statement",
+          "ordinal": 1,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0001",
+          "rust_variant": "Command",
+          "source_locator": "pdf-page:643;outline:JES2 command statement"
+        },
+        {
+          "aliases": [],
+          "keyword": "JOBPARM",
+          "label": "/*JOBPARM statement",
+          "ordinal": 2,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0002",
+          "rust_variant": "Jobparm",
+          "source_locator": "pdf-page:645;outline:/*JOBPARM statement"
+        },
+        {
+          "aliases": [],
+          "keyword": "MESSAGE",
+          "label": "/*MESSAGE statement",
+          "ordinal": 3,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0003",
+          "rust_variant": "Message",
+          "source_locator": "pdf-page:650;outline:/*MESSAGE statement"
+        },
+        {
+          "aliases": [],
+          "keyword": "NETACCT",
+          "label": "/*NETACCT statement",
+          "ordinal": 4,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0004",
+          "rust_variant": "Netacct",
+          "source_locator": "pdf-page:651;outline:/*NETACCT statement"
+        },
+        {
+          "aliases": [],
+          "keyword": "NOTIFY",
+          "label": "/*NOTIFY statement",
+          "ordinal": 5,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0005",
+          "rust_variant": "Notify",
+          "source_locator": "pdf-page:652;outline:/*NOTIFY statement"
+        },
+        {
+          "aliases": [],
+          "keyword": "OUTPUT",
+          "label": "/*OUTPUT statement",
+          "ordinal": 6,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0006",
+          "rust_variant": "Output",
+          "source_locator": "pdf-page:653;outline:/*OUTPUT statement"
+        },
+        {
+          "aliases": [],
+          "keyword": "PRIORITY",
+          "label": "/*PRIORITY statement",
+          "ordinal": 7,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0007",
+          "rust_variant": "Priority",
+          "source_locator": "pdf-page:660;outline:/*PRIORITY statement"
+        },
+        {
+          "aliases": [],
+          "keyword": "ROUTE",
+          "label": "/*ROUTE statement",
+          "ordinal": 8,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0008",
+          "rust_variant": "Route",
+          "source_locator": "pdf-page:661;outline:/*ROUTE statement"
+        },
+        {
+          "aliases": [],
+          "keyword": "SETUP",
+          "label": "/*SETUP statement",
+          "ordinal": 9,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0009",
+          "rust_variant": "Setup",
+          "source_locator": "pdf-page:664;outline:/*SETUP statement"
+        },
+        {
+          "aliases": [],
+          "keyword": "SIGNOFF",
+          "label": "/*SIGNOFF statement",
+          "ordinal": 10,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0010",
+          "rust_variant": "Signoff",
+          "source_locator": "pdf-page:665;outline:/*SIGNOFF statement"
+        },
+        {
+          "aliases": [],
+          "keyword": "SIGNON",
+          "label": "/*SIGNON statement",
+          "ordinal": 11,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0011",
+          "rust_variant": "Signon",
+          "source_locator": "pdf-page:666;outline:/*SIGNON statement"
+        },
+        {
+          "aliases": [],
+          "keyword": "XEQ",
+          "label": "/*XEQ statement",
+          "ordinal": 12,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0012",
+          "rust_variant": "Xeq",
+          "source_locator": "pdf-page:668;outline:/*XEQ statement"
+        },
+        {
+          "aliases": [],
+          "keyword": "XMIT",
+          "label": "/*XMIT statement",
+          "ordinal": 13,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0013",
+          "rust_variant": "Xmit",
+          "source_locator": "pdf-page:669;outline:/*XMIT statement"
+        }
+      ]
+    },
+    {
+      "denominator": 74,
+      "id": "dd-parameters",
+      "rows": [
+        {
+          "aliases": [],
+          "keyword": "*",
+          "label": "* Parameter",
+          "ordinal": 1,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0001",
+          "rust_variant": "Asterisk",
+          "source_locator": "pdf-page:141;outline:* Parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "ACCODE",
+          "label": "ACCODE parameter",
+          "ordinal": 2,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0002",
+          "rust_variant": "Accode",
+          "source_locator": "pdf-page:144;outline:ACCODE parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "AMP",
+          "label": "AMP parameter",
+          "ordinal": 3,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0003",
+          "rust_variant": "Amp",
+          "source_locator": "pdf-page:145;outline:AMP parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "AVGREC",
+          "label": "AVGREC parameter",
+          "ordinal": 4,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0004",
+          "rust_variant": "Avgrec",
+          "source_locator": "pdf-page:152;outline:AVGREC parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "BLKSIZE",
+          "label": "BLKSIZE parameter",
+          "ordinal": 5,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0005",
+          "rust_variant": "Blksize",
+          "source_locator": "pdf-page:153;outline:BLKSIZE parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "BLKSZLIM",
+          "label": "BLKSZLIM parameter",
+          "ordinal": 6,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0006",
+          "rust_variant": "Blkszlim",
+          "source_locator": "pdf-page:155;outline:BLKSZLIM parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "BURST",
+          "label": "BURST parameter",
+          "ordinal": 7,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0007",
+          "rust_variant": "Burst",
+          "source_locator": "pdf-page:156;outline:BURST parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "CCSID",
+          "label": "CCSID parameter",
+          "ordinal": 8,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0008",
+          "rust_variant": "Ccsid",
+          "source_locator": "pdf-page:157;outline:CCSID parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "CHARS",
+          "label": "CHARS parameter",
+          "ordinal": 9,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0009",
+          "rust_variant": "Chars",
+          "source_locator": "pdf-page:160;outline:CHARS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "CHKPT",
+          "label": "CHKPT parameter",
+          "ordinal": 10,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0010",
+          "rust_variant": "Chkpt",
+          "source_locator": "pdf-page:162;outline:CHKPT parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "CNTL",
+          "label": "CNTL parameter",
+          "ordinal": 11,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0011",
+          "rust_variant": "Cntl",
+          "source_locator": "pdf-page:163;outline:CNTL parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "COPIES",
+          "label": "COPIES parameter",
+          "ordinal": 12,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0012",
+          "rust_variant": "Copies",
+          "source_locator": "pdf-page:164;outline:COPIES parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "DATA",
+          "label": "DATA parameter",
+          "ordinal": 13,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0013",
+          "rust_variant": "Data",
+          "source_locator": "pdf-page:167;outline:DATA parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "DATACLAS",
+          "label": "DATACLAS parameter",
+          "ordinal": 14,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0014",
+          "rust_variant": "Dataclas",
+          "source_locator": "pdf-page:169;outline:DATACLAS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "DCB",
+          "label": "DCB parameter",
+          "ordinal": 15,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0015",
+          "rust_variant": "Dcb",
+          "source_locator": "pdf-page:172;outline:DCB parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "DDNAME",
+          "label": "DDNAME parameter",
+          "ordinal": 16,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0016",
+          "rust_variant": "Ddname",
+          "source_locator": "pdf-page:185;outline:DDNAME parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "DEST",
+          "label": "DEST parameter",
+          "ordinal": 17,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0017",
+          "rust_variant": "Dest",
+          "source_locator": "pdf-page:189;outline:DEST parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "DISP",
+          "label": "DISP parameter",
+          "ordinal": 18,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0018",
+          "rust_variant": "Disp",
+          "source_locator": "pdf-page:193;outline:DISP parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "DLM",
+          "label": "DLM parameter",
+          "ordinal": 19,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0019",
+          "rust_variant": "Dlm",
+          "source_locator": "pdf-page:206;outline:DLM parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "DSID",
+          "label": "DSID Parameter",
+          "ordinal": 20,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0020",
+          "rust_variant": "Dsid",
+          "source_locator": "pdf-page:207;outline:DSID Parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "DSKEYLBL",
+          "label": "DSKEYLBL parameter",
+          "ordinal": 21,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0021",
+          "rust_variant": "Dskeylbl",
+          "source_locator": "pdf-page:209;outline:DSKEYLBL parameter"
+        },
+        {
+          "aliases": [
+            "DSN"
+          ],
+          "keyword": "DSNAME",
+          "label": "DSNAME parameter",
+          "ordinal": 22,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0022",
+          "rust_variant": "Dsname",
+          "source_locator": "pdf-page:210;outline:DSNAME parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "DSNTYPE",
+          "label": "DSNTYPE parameter",
+          "ordinal": 23,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0023",
+          "rust_variant": "Dsntype",
+          "source_locator": "pdf-page:217;outline:DSNTYPE parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "DUMMY",
+          "label": "DUMMY parameter",
+          "ordinal": 24,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0024",
+          "rust_variant": "Dummy",
+          "source_locator": "pdf-page:221;outline:DUMMY parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "DYNAM",
+          "label": "DYNAM parameter",
+          "ordinal": 25,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0025",
+          "rust_variant": "Dynam",
+          "source_locator": "pdf-page:224;outline:DYNAM parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "EATTR",
+          "label": "EATTR parameter",
+          "ordinal": 26,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0026",
+          "rust_variant": "Eattr",
+          "source_locator": "pdf-page:224;outline:EATTR parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "EXPDT",
+          "label": "EXPDT parameter",
+          "ordinal": 27,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0027",
+          "rust_variant": "Expdt",
+          "source_locator": "pdf-page:225;outline:EXPDT parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "FCB",
+          "label": "FCB parameter",
+          "ordinal": 28,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0028",
+          "rust_variant": "Fcb",
+          "source_locator": "pdf-page:227;outline:FCB parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "FILEDATA",
+          "label": "FILEDATA parameter",
+          "ordinal": 29,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0029",
+          "rust_variant": "Filedata",
+          "source_locator": "pdf-page:230;outline:FILEDATA parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "FLASH",
+          "label": "FLASH parameter",
+          "ordinal": 30,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0030",
+          "rust_variant": "Flash",
+          "source_locator": "pdf-page:231;outline:FLASH parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "FREE",
+          "label": "FREE parameter",
+          "ordinal": 31,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0031",
+          "rust_variant": "Free",
+          "source_locator": "pdf-page:233;outline:FREE parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "FREEVOL",
+          "label": "FREEVOL parameter",
+          "ordinal": 32,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0032",
+          "rust_variant": "Freevol",
+          "source_locator": "pdf-page:235;outline:FREEVOL parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "GDGORDER",
+          "label": "GDGORDER parameter",
+          "ordinal": 33,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0033",
+          "rust_variant": "Gdgorder",
+          "source_locator": "pdf-page:236;outline:GDGORDER parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "HOLD",
+          "label": "HOLD parameter",
+          "ordinal": 34,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0034",
+          "rust_variant": "Hold",
+          "source_locator": "pdf-page:237;outline:HOLD parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "KEYLABL1",
+          "label": "KEYLABL1 parameter",
+          "ordinal": 35,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0035",
+          "rust_variant": "Keylabl1",
+          "source_locator": "pdf-page:240;outline:KEYLABL1 parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "KEYLABL2",
+          "label": "KEYLABL2 parameter",
+          "ordinal": 36,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0036",
+          "rust_variant": "Keylabl2",
+          "source_locator": "pdf-page:241;outline:KEYLABL2 parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "KEYENCD1",
+          "label": "KEYENCD1 parameter",
+          "ordinal": 37,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0037",
+          "rust_variant": "Keyencd1",
+          "source_locator": "pdf-page:242;outline:KEYENCD1 parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "KEYENCD2",
+          "label": "KEYENCD2 parameter",
+          "ordinal": 38,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0038",
+          "rust_variant": "Keyencd2",
+          "source_locator": "pdf-page:243;outline:KEYENCD2 parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "KEYLEN",
+          "label": "KEYLEN parameter",
+          "ordinal": 39,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0039",
+          "rust_variant": "Keylen",
+          "source_locator": "pdf-page:244;outline:KEYLEN parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "KEYOFF",
+          "label": "KEYOFF parameter",
+          "ordinal": 40,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0040",
+          "rust_variant": "Keyoff",
+          "source_locator": "pdf-page:246;outline:KEYOFF parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "LABEL",
+          "label": "LABEL parameter",
+          "ordinal": 41,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0041",
+          "rust_variant": "Label",
+          "source_locator": "pdf-page:247;outline:LABEL parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "LGSTREAM",
+          "label": "LGSTREAM parameter",
+          "ordinal": 42,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0042",
+          "rust_variant": "Lgstream",
+          "source_locator": "pdf-page:252;outline:LGSTREAM parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "LIKE",
+          "label": "LIKE parameter",
+          "ordinal": 43,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0043",
+          "rust_variant": "Like",
+          "source_locator": "pdf-page:254;outline:LIKE parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "LRECL",
+          "label": "LRECL parameter",
+          "ordinal": 44,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0044",
+          "rust_variant": "Lrecl",
+          "source_locator": "pdf-page:256;outline:LRECL parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "MAXGENS",
+          "label": "MAXGENS parameter",
+          "ordinal": 45,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0045",
+          "rust_variant": "Maxgens",
+          "source_locator": "pdf-page:258;outline:MAXGENS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "MGMTCLAS",
+          "label": "MGMTCLAS parameter",
+          "ordinal": 46,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0046",
+          "rust_variant": "Mgmtclas",
+          "source_locator": "pdf-page:258;outline:MGMTCLAS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "MODIFY",
+          "label": "MODIFY parameter",
+          "ordinal": 47,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0047",
+          "rust_variant": "Modify",
+          "source_locator": "pdf-page:260;outline:MODIFY parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "NULLOVRD",
+          "label": "NULLOVRD parameter",
+          "ordinal": 48,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0048",
+          "rust_variant": "Nullovrd",
+          "source_locator": "pdf-page:262;outline:NULLOVRD parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "OUTLIM",
+          "label": "OUTLIM parameter",
+          "ordinal": 49,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0049",
+          "rust_variant": "Outlim",
+          "source_locator": "pdf-page:262;outline:OUTLIM parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "OUTPUT",
+          "label": "OUTPUT parameter",
+          "ordinal": 50,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0050",
+          "rust_variant": "Output",
+          "source_locator": "pdf-page:263;outline:OUTPUT parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "PATH",
+          "label": "PATH parameter",
+          "ordinal": 51,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0051",
+          "rust_variant": "Path",
+          "source_locator": "pdf-page:267;outline:PATH parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "PATHDISP",
+          "label": "PATHDISP parameter",
+          "ordinal": 52,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0052",
+          "rust_variant": "Pathdisp",
+          "source_locator": "pdf-page:270;outline:PATHDISP parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "PATHMODE",
+          "label": "PATHMODE parameter",
+          "ordinal": 53,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0053",
+          "rust_variant": "Pathmode",
+          "source_locator": "pdf-page:271;outline:PATHMODE parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "PATHOPTS",
+          "label": "PATHOPTS parameter",
+          "ordinal": 54,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0054",
+          "rust_variant": "Pathopts",
+          "source_locator": "pdf-page:275;outline:PATHOPTS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "PROTECT",
+          "label": "PROTECT parameter",
+          "ordinal": 55,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0055",
+          "rust_variant": "Protect",
+          "source_locator": "pdf-page:281;outline:PROTECT parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "RECFM",
+          "label": "RECFM parameter",
+          "ordinal": 56,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0056",
+          "rust_variant": "Recfm",
+          "source_locator": "pdf-page:283;outline:RECFM parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "RECORG",
+          "label": "RECORG parameter",
+          "ordinal": 57,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0057",
+          "rust_variant": "Recorg",
+          "source_locator": "pdf-page:286;outline:RECORG parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "REFDD",
+          "label": "REFDD parameter",
+          "ordinal": 58,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0058",
+          "rust_variant": "Refdd",
+          "source_locator": "pdf-page:287;outline:REFDD parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "RETPD",
+          "label": "RETPD parameter",
+          "ordinal": 59,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0059",
+          "rust_variant": "Retpd",
+          "source_locator": "pdf-page:289;outline:RETPD parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "RLS",
+          "label": "RLS parameter",
+          "ordinal": 60,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0060",
+          "rust_variant": "Rls",
+          "source_locator": "pdf-page:291;outline:RLS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "ROACCESS",
+          "label": "ROACCESS parameter",
+          "ordinal": 61,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0061",
+          "rust_variant": "Roaccess",
+          "source_locator": "pdf-page:293;outline:ROACCESS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "SECMODEL",
+          "label": "SECMODEL parameter",
+          "ordinal": 62,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0062",
+          "rust_variant": "Secmodel",
+          "source_locator": "pdf-page:294;outline:SECMODEL parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "SEGMENT",
+          "label": "SEGMENT parameter",
+          "ordinal": 63,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0063",
+          "rust_variant": "Segment",
+          "source_locator": "pdf-page:296;outline:SEGMENT parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "SPACE",
+          "label": "SPACE parameter",
+          "ordinal": 64,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0064",
+          "rust_variant": "Space",
+          "source_locator": "pdf-page:297;outline:SPACE parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "SPIN",
+          "label": "SPIN parameter",
+          "ordinal": 65,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0065",
+          "rust_variant": "Spin",
+          "source_locator": "pdf-page:304;outline:SPIN parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "STORCLAS",
+          "label": "STORCLAS parameter",
+          "ordinal": 66,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0066",
+          "rust_variant": "Storclas",
+          "source_locator": "pdf-page:307;outline:STORCLAS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "SUBSYS",
+          "label": "SUBSYS parameter",
+          "ordinal": 67,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0067",
+          "rust_variant": "Subsys",
+          "source_locator": "pdf-page:309;outline:SUBSYS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "SYMBOLS",
+          "label": "SYMBOLS parameter",
+          "ordinal": 68,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0068",
+          "rust_variant": "Symbols",
+          "source_locator": "pdf-page:312;outline:SYMBOLS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "SYMLIST",
+          "label": "SYMLIST parameter",
+          "ordinal": 69,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0069",
+          "rust_variant": "Symlist",
+          "source_locator": "pdf-page:313;outline:SYMLIST parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "SYSOUT",
+          "label": "SYSOUT parameter",
+          "ordinal": 70,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0070",
+          "rust_variant": "Sysout",
+          "source_locator": "pdf-page:315;outline:SYSOUT parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "TERM",
+          "label": "TERM parameter",
+          "ordinal": 71,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0071",
+          "rust_variant": "Term",
+          "source_locator": "pdf-page:320;outline:TERM parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "UCS",
+          "label": "UCS parameter",
+          "ordinal": 72,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0072",
+          "rust_variant": "Ucs",
+          "source_locator": "pdf-page:321;outline:UCS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "UNIT",
+          "label": "UNIT parameter",
+          "ordinal": 73,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0073",
+          "rust_variant": "Unit",
+          "source_locator": "pdf-page:324;outline:UNIT parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "VOLUME",
+          "label": "VOLUME parameter",
+          "ordinal": 74,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0074",
+          "rust_variant": "Volume",
+          "source_locator": "pdf-page:330;outline:VOLUME parameter"
+        }
+      ]
+    },
+    {
+      "denominator": 19,
+      "id": "exec-parameters",
+      "rows": [
+        {
+          "aliases": [],
+          "keyword": "ABDISPCC",
+          "label": "ABDISPCC parameter",
+          "ordinal": 1,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0001",
+          "rust_variant": "Abdispcc",
+          "source_locator": "pdf-page:368;outline:ABDISPCC parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "ACCT",
+          "label": "ACCT parameter",
+          "ordinal": 2,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0002",
+          "rust_variant": "Acct",
+          "source_locator": "pdf-page:369;outline:ACCT parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "ADDRSPC",
+          "label": "ADDRSPC parameter",
+          "ordinal": 3,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0003",
+          "rust_variant": "Addrspc",
+          "source_locator": "pdf-page:371;outline:ADDRSPC parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "CCSID",
+          "label": "CCSID parameter",
+          "ordinal": 4,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0004",
+          "rust_variant": "Ccsid",
+          "source_locator": "pdf-page:372;outline:CCSID parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "COND",
+          "label": "COND parameter",
+          "ordinal": 5,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0005",
+          "rust_variant": "Cond",
+          "source_locator": "pdf-page:373;outline:COND parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "DYNAMNBR",
+          "label": "DYNAMNBR parameter",
+          "ordinal": 6,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0006",
+          "rust_variant": "Dynamnbr",
+          "source_locator": "pdf-page:380;outline:DYNAMNBR parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "MEMLIMIT",
+          "label": "MEMLIMIT parameter",
+          "ordinal": 7,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0007",
+          "rust_variant": "Memlimit",
+          "source_locator": "pdf-page:381;outline:MEMLIMIT parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "PARM",
+          "label": "PARM parameter",
+          "ordinal": 8,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0008",
+          "rust_variant": "Parm",
+          "source_locator": "pdf-page:382;outline:PARM parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "PARMDD",
+          "label": "PARMDD parameter",
+          "ordinal": 9,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0009",
+          "rust_variant": "Parmdd",
+          "source_locator": "pdf-page:384;outline:PARMDD parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "PERFORM",
+          "label": "PERFORM parameter",
+          "ordinal": 10,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0010",
+          "rust_variant": "Perform",
+          "source_locator": "pdf-page:386;outline:PERFORM parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "PGM",
+          "label": "PGM parameter",
+          "ordinal": 11,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0011",
+          "rust_variant": "Pgm",
+          "source_locator": "pdf-page:387;outline:PGM parameter"
+        },
+        {
+          "aliases": [
+            "PROCEDURE-NAME"
+          ],
+          "keyword": "PROC",
+          "label": "PROC and procedure name parameters",
+          "ordinal": 12,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0012",
+          "rust_variant": "ProcAndProcedureName",
+          "source_locator": "pdf-page:389;outline:PROC and procedure name parameters"
+        },
+        {
+          "aliases": [],
+          "keyword": "RD",
+          "label": "RD parameter",
+          "ordinal": 13,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0013",
+          "rust_variant": "Rd",
+          "source_locator": "pdf-page:390;outline:RD parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "REGION",
+          "label": "REGION parameter",
+          "ordinal": 14,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0014",
+          "rust_variant": "Region",
+          "source_locator": "pdf-page:393;outline:REGION parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "REGIONX",
+          "label": "REGIONX parameter",
+          "ordinal": 15,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0015",
+          "rust_variant": "Regionx",
+          "source_locator": "pdf-page:396;outline:REGIONX parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "RLSTMOUT",
+          "label": "RLSTMOUT parameter",
+          "ordinal": 16,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0016",
+          "rust_variant": "Rlstmout",
+          "source_locator": "pdf-page:398;outline:RLSTMOUT parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "TIME",
+          "label": "TIME parameter",
+          "ordinal": 17,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0017",
+          "rust_variant": "Time",
+          "source_locator": "pdf-page:399;outline:TIME parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "TVSMSG",
+          "label": "TVSMSG parameter",
+          "ordinal": 18,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0018",
+          "rust_variant": "Tvsmsg",
+          "source_locator": "pdf-page:402;outline:TVSMSG parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "TVSAMCOM",
+          "label": "TVSAMCOM parameter",
+          "ordinal": 19,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0019",
+          "rust_variant": "Tvsamcom",
+          "source_locator": "pdf-page:403;outline:TVSAMCOM parameter"
+        }
+      ]
+    },
+    {
+      "denominator": 35,
+      "id": "job-parameters",
+      "rows": [
+        {
+          "aliases": [],
+          "keyword": "POSITIONAL-ACCOUNTING",
+          "label": "Accounting information parameter",
+          "ordinal": 1,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0001",
+          "rust_variant": "AccountingInformation",
+          "source_locator": "pdf-page:442;outline:Accounting information parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "ADDRSPC",
+          "label": "ADDRSPC parameter",
+          "ordinal": 2,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0002",
+          "rust_variant": "Addrspc",
+          "source_locator": "pdf-page:444;outline:ADDRSPC parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "BYTES",
+          "label": "BYTES parameter",
+          "ordinal": 3,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0003",
+          "rust_variant": "Bytes",
+          "source_locator": "pdf-page:445;outline:BYTES parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "CARDS",
+          "label": "CARDS parameter",
+          "ordinal": 4,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0004",
+          "rust_variant": "Cards",
+          "source_locator": "pdf-page:447;outline:CARDS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "CCSID",
+          "label": "CCSID parameter",
+          "ordinal": 5,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0005",
+          "rust_variant": "Ccsid",
+          "source_locator": "pdf-page:449;outline:CCSID parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "CLASS",
+          "label": "CLASS parameter",
+          "ordinal": 6,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0006",
+          "rust_variant": "Class",
+          "source_locator": "pdf-page:450;outline:CLASS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "COND",
+          "label": "COND parameter",
+          "ordinal": 7,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0007",
+          "rust_variant": "Cond",
+          "source_locator": "pdf-page:451;outline:COND parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "DSENQSHR",
+          "label": "DSENQSHR parameter",
+          "ordinal": 8,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0008",
+          "rust_variant": "Dsenqshr",
+          "source_locator": "pdf-page:453;outline:DSENQSHR parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "EMAIL",
+          "label": "EMAIL parameter",
+          "ordinal": 9,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0009",
+          "rust_variant": "Email",
+          "source_locator": "pdf-page:455;outline:EMAIL parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "GDGBIAS",
+          "label": "GDGBIAS parameter",
+          "ordinal": 10,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0010",
+          "rust_variant": "Gdgbias",
+          "source_locator": "pdf-page:455;outline:GDGBIAS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "GROUP",
+          "label": "GROUP parameter",
+          "ordinal": 11,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0011",
+          "rust_variant": "Group",
+          "source_locator": "pdf-page:456;outline:GROUP parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "JESLOG",
+          "label": "JESLOG parameter",
+          "ordinal": 12,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0012",
+          "rust_variant": "Jeslog",
+          "source_locator": "pdf-page:457;outline:JESLOG parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "JOBRC",
+          "label": "JOBRC parameter",
+          "ordinal": 13,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0013",
+          "rust_variant": "Jobrc",
+          "source_locator": "pdf-page:459;outline:JOBRC parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "LINES",
+          "label": "LINES parameter",
+          "ordinal": 14,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0014",
+          "rust_variant": "Lines",
+          "source_locator": "pdf-page:460;outline:LINES parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "MEMLIMIT",
+          "label": "MEMLIMIT parameter",
+          "ordinal": 15,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0015",
+          "rust_variant": "Memlimit",
+          "source_locator": "pdf-page:461;outline:MEMLIMIT parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "MSGCLASS",
+          "label": "MSGCLASS parameter",
+          "ordinal": 16,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0016",
+          "rust_variant": "Msgclass",
+          "source_locator": "pdf-page:462;outline:MSGCLASS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "MSGLEVEL",
+          "label": "MSGLEVEL parameter",
+          "ordinal": 17,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0017",
+          "rust_variant": "Msglevel",
+          "source_locator": "pdf-page:464;outline:MSGLEVEL parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "NOTIFY",
+          "label": "NOTIFY parameter",
+          "ordinal": 18,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0018",
+          "rust_variant": "Notify",
+          "source_locator": "pdf-page:466;outline:NOTIFY parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "PAGES",
+          "label": "PAGES parameter",
+          "ordinal": 19,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0019",
+          "rust_variant": "Pages",
+          "source_locator": "pdf-page:467;outline:PAGES parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "PASSWORD",
+          "label": "PASSWORD parameter",
+          "ordinal": 20,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0020",
+          "rust_variant": "Password",
+          "source_locator": "pdf-page:469;outline:PASSWORD parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "PERFORM",
+          "label": "PERFORM parameter",
+          "ordinal": 21,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0021",
+          "rust_variant": "Perform",
+          "source_locator": "pdf-page:471;outline:PERFORM parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "POSITIONAL-PROGRAMMER",
+          "label": "Programmer's name parameter",
+          "ordinal": 22,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0022",
+          "rust_variant": "ProgrammersName",
+          "source_locator": "pdf-page:473;outline:Programmer's name parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "PRTY",
+          "label": "PRTY parameter",
+          "ordinal": 23,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0023",
+          "rust_variant": "Prty",
+          "source_locator": "pdf-page:474;outline:PRTY parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "RD",
+          "label": "RD parameter",
+          "ordinal": 24,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0024",
+          "rust_variant": "Rd",
+          "source_locator": "pdf-page:475;outline:RD parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "REGION",
+          "label": "REGION parameter",
+          "ordinal": 25,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0025",
+          "rust_variant": "Region",
+          "source_locator": "pdf-page:478;outline:REGION parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "REGIONX",
+          "label": "REGIONX parameter",
+          "ordinal": 26,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0026",
+          "rust_variant": "Regionx",
+          "source_locator": "pdf-page:480;outline:REGIONX parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "RESTART",
+          "label": "RESTART parameter",
+          "ordinal": 27,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0027",
+          "rust_variant": "Restart",
+          "source_locator": "pdf-page:483;outline:RESTART parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "SECLABEL",
+          "label": "SECLABEL parameter",
+          "ordinal": 28,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0028",
+          "rust_variant": "Seclabel",
+          "source_locator": "pdf-page:485;outline:SECLABEL parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "SCHENV",
+          "label": "SCHENV parameter",
+          "ordinal": 29,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0029",
+          "rust_variant": "Schenv",
+          "source_locator": "pdf-page:486;outline:SCHENV parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "SYSAFF",
+          "label": "SYSAFF parameter",
+          "ordinal": 30,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0030",
+          "rust_variant": "Sysaff",
+          "source_locator": "pdf-page:487;outline:SYSAFF parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "SYSTEM",
+          "label": "SYSTEM parameter",
+          "ordinal": 31,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0031",
+          "rust_variant": "System",
+          "source_locator": "pdf-page:489;outline:SYSTEM parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "TIME",
+          "label": "TIME parameter",
+          "ordinal": 32,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0032",
+          "rust_variant": "Time",
+          "source_locator": "pdf-page:490;outline:TIME parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "TYPRUN",
+          "label": "TYPRUN parameter",
+          "ordinal": 33,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0033",
+          "rust_variant": "Typrun",
+          "source_locator": "pdf-page:493;outline:TYPRUN parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "UJOBCORR",
+          "label": "UJOBCORR parameter",
+          "ordinal": 34,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0034",
+          "rust_variant": "Ujobcorr",
+          "source_locator": "pdf-page:495;outline:UJOBCORR parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "USER",
+          "label": "USER parameter",
+          "ordinal": 35,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0035",
+          "rust_variant": "User",
+          "source_locator": "pdf-page:496;outline:USER parameter"
+        }
+      ]
+    },
+    {
+      "denominator": 76,
+      "id": "output-parameters",
+      "rows": [
+        {
+          "aliases": [],
+          "keyword": "ADDRESS",
+          "label": "ADDRESS parameter",
+          "ordinal": 1,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0001",
+          "rust_variant": "Address",
+          "source_locator": "pdf-page:519;outline:ADDRESS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "AFPPARMS",
+          "label": "AFPPARMS parameter",
+          "ordinal": 2,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0002",
+          "rust_variant": "Afpparms",
+          "source_locator": "pdf-page:520;outline:AFPPARMS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "AFPSTATS",
+          "label": "AFPSTATS parameter",
+          "ordinal": 3,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0003",
+          "rust_variant": "Afpstats",
+          "source_locator": "pdf-page:521;outline:AFPSTATS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "BUILDING",
+          "label": "BUILDING parameter",
+          "ordinal": 4,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0004",
+          "rust_variant": "Building",
+          "source_locator": "pdf-page:522;outline:BUILDING parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "BURST",
+          "label": "BURST parameter",
+          "ordinal": 5,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0005",
+          "rust_variant": "Burst",
+          "source_locator": "pdf-page:523;outline:BURST parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "CHARS",
+          "label": "CHARS parameter",
+          "ordinal": 6,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0006",
+          "rust_variant": "Chars",
+          "source_locator": "pdf-page:524;outline:CHARS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "CKPTLINE",
+          "label": "CKPTLINE parameter",
+          "ordinal": 7,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0007",
+          "rust_variant": "Ckptline",
+          "source_locator": "pdf-page:525;outline:CKPTLINE parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "CKPTPAGE",
+          "label": "CKPTPAGE parameter",
+          "ordinal": 8,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0008",
+          "rust_variant": "Ckptpage",
+          "source_locator": "pdf-page:526;outline:CKPTPAGE parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "CKPTSEC",
+          "label": "CKPTSEC parameter",
+          "ordinal": 9,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0009",
+          "rust_variant": "Ckptsec",
+          "source_locator": "pdf-page:527;outline:CKPTSEC parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "CLASS",
+          "label": "CLASS parameter",
+          "ordinal": 10,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0010",
+          "rust_variant": "Class",
+          "source_locator": "pdf-page:527;outline:CLASS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "COLORMAP",
+          "label": "COLORMAP parameter",
+          "ordinal": 11,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0011",
+          "rust_variant": "Colormap",
+          "source_locator": "pdf-page:529;outline:COLORMAP parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "COMPACT",
+          "label": "COMPACT parameter",
+          "ordinal": 12,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0012",
+          "rust_variant": "Compact",
+          "source_locator": "pdf-page:530;outline:COMPACT parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "COMSETUP",
+          "label": "COMSETUP parameter",
+          "ordinal": 13,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0013",
+          "rust_variant": "Comsetup",
+          "source_locator": "pdf-page:530;outline:COMSETUP parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "CONTROL",
+          "label": "CONTROL parameter",
+          "ordinal": 14,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0014",
+          "rust_variant": "Control",
+          "source_locator": "pdf-page:531;outline:CONTROL parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "COPIES",
+          "label": "COPIES parameter",
+          "ordinal": 15,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0015",
+          "rust_variant": "Copies",
+          "source_locator": "pdf-page:532;outline:COPIES parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "COPYCNT",
+          "label": "COPYCNT parameter",
+          "ordinal": 16,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0016",
+          "rust_variant": "Copycnt",
+          "source_locator": "pdf-page:534;outline:COPYCNT parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "DATACK",
+          "label": "DATACK parameter",
+          "ordinal": 17,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0017",
+          "rust_variant": "Datack",
+          "source_locator": "pdf-page:534;outline:DATACK parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "DDNAME",
+          "label": "DDNAME parameter",
+          "ordinal": 18,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0018",
+          "rust_variant": "Ddname",
+          "source_locator": "pdf-page:536;outline:DDNAME parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "DEFAULT",
+          "label": "DEFAULT parameter",
+          "ordinal": 19,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0019",
+          "rust_variant": "Default",
+          "source_locator": "pdf-page:536;outline:DEFAULT parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "DEPT",
+          "label": "DEPT parameter",
+          "ordinal": 20,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0020",
+          "rust_variant": "Dept",
+          "source_locator": "pdf-page:538;outline:DEPT parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "DEST",
+          "label": "DEST parameter",
+          "ordinal": 21,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0021",
+          "rust_variant": "Dest",
+          "source_locator": "pdf-page:539;outline:DEST parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "DPAGELBL",
+          "label": "DPAGELBL parameter",
+          "ordinal": 22,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0022",
+          "rust_variant": "Dpagelbl",
+          "source_locator": "pdf-page:542;outline:DPAGELBL parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "DUPLEX",
+          "label": "DUPLEX parameter",
+          "ordinal": 23,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0023",
+          "rust_variant": "Duplex",
+          "source_locator": "pdf-page:543;outline:DUPLEX parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "FCB",
+          "label": "FCB parameter",
+          "ordinal": 24,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0024",
+          "rust_variant": "Fcb",
+          "source_locator": "pdf-page:544;outline:FCB parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "FLASH",
+          "label": "FLASH parameter",
+          "ordinal": 25,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0025",
+          "rust_variant": "Flash",
+          "source_locator": "pdf-page:546;outline:FLASH parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "FORMDEF",
+          "label": "FORMDEF parameter",
+          "ordinal": 26,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0026",
+          "rust_variant": "Formdef",
+          "source_locator": "pdf-page:547;outline:FORMDEF parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "FORMLEN",
+          "label": "FORMLEN parameter",
+          "ordinal": 27,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0027",
+          "rust_variant": "Formlen",
+          "source_locator": "pdf-page:548;outline:FORMLEN parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "FORMS",
+          "label": "FORMS parameter",
+          "ordinal": 28,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0028",
+          "rust_variant": "Forms",
+          "source_locator": "pdf-page:549;outline:FORMS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "FSSDATA",
+          "label": "FSSDATA parameter",
+          "ordinal": 29,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0029",
+          "rust_variant": "Fssdata",
+          "source_locator": "pdf-page:550;outline:FSSDATA parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "GROUPID",
+          "label": "GROUPID parameter",
+          "ordinal": 30,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0030",
+          "rust_variant": "Groupid",
+          "source_locator": "pdf-page:552;outline:GROUPID parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "INDEX",
+          "label": "INDEX parameter",
+          "ordinal": 31,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0031",
+          "rust_variant": "Index",
+          "source_locator": "pdf-page:554;outline:INDEX parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "INTRAY",
+          "label": "INTRAY parameter",
+          "ordinal": 32,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0032",
+          "rust_variant": "Intray",
+          "source_locator": "pdf-page:554;outline:INTRAY parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "JESDS",
+          "label": "JESDS parameter",
+          "ordinal": 33,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0033",
+          "rust_variant": "Jesds",
+          "source_locator": "pdf-page:555;outline:JESDS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "LINDEX",
+          "label": "LINDEX parameter",
+          "ordinal": 34,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0034",
+          "rust_variant": "Lindex",
+          "source_locator": "pdf-page:557;outline:LINDEX parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "LINECT",
+          "label": "LINECT parameter",
+          "ordinal": 35,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0035",
+          "rust_variant": "Linect",
+          "source_locator": "pdf-page:557;outline:LINECT parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "MAILBCC",
+          "label": "MAILBCC parameter",
+          "ordinal": 36,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0036",
+          "rust_variant": "Mailbcc",
+          "source_locator": "pdf-page:558;outline:MAILBCC parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "MAILCC",
+          "label": "MAILCC parameter",
+          "ordinal": 37,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0037",
+          "rust_variant": "Mailcc",
+          "source_locator": "pdf-page:559;outline:MAILCC parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "MAILFILE",
+          "label": "MAILFILE parameter",
+          "ordinal": 38,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0038",
+          "rust_variant": "Mailfile",
+          "source_locator": "pdf-page:560;outline:MAILFILE parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "MAILFROM",
+          "label": "MAILFROM parameter",
+          "ordinal": 39,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0039",
+          "rust_variant": "Mailfrom",
+          "source_locator": "pdf-page:561;outline:MAILFROM parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "MAILTO",
+          "label": "MAILTO parameter",
+          "ordinal": 40,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0040",
+          "rust_variant": "Mailto",
+          "source_locator": "pdf-page:561;outline:MAILTO parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "MERGE",
+          "label": "MERGE parameter",
+          "ordinal": 41,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0041",
+          "rust_variant": "Merge",
+          "source_locator": "pdf-page:562;outline:MERGE parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "MODIFY",
+          "label": "MODIFY parameter",
+          "ordinal": 42,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0042",
+          "rust_variant": "Modify",
+          "source_locator": "pdf-page:563;outline:MODIFY parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "NAME",
+          "label": "NAME parameter",
+          "ordinal": 43,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0043",
+          "rust_variant": "Name",
+          "source_locator": "pdf-page:564;outline:NAME parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "NOTIFY",
+          "label": "NOTIFY parameter",
+          "ordinal": 44,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0044",
+          "rust_variant": "Notify",
+          "source_locator": "pdf-page:565;outline:NOTIFY parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "OFFSETXB",
+          "label": "OFFSETXB parameter",
+          "ordinal": 45,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0045",
+          "rust_variant": "Offsetxb",
+          "source_locator": "pdf-page:566;outline:OFFSETXB parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "OFFSETXF",
+          "label": "OFFSETXF parameter",
+          "ordinal": 46,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0046",
+          "rust_variant": "Offsetxf",
+          "source_locator": "pdf-page:566;outline:OFFSETXF parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "OFFSETYB",
+          "label": "OFFSETYB parameter",
+          "ordinal": 47,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0047",
+          "rust_variant": "Offsetyb",
+          "source_locator": "pdf-page:567;outline:OFFSETYB parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "OFFSETYF",
+          "label": "OFFSETYF parameter",
+          "ordinal": 48,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0048",
+          "rust_variant": "Offsetyf",
+          "source_locator": "pdf-page:567;outline:OFFSETYF parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "OUTBIN",
+          "label": "OUTBIN parameter",
+          "ordinal": 49,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0049",
+          "rust_variant": "Outbin",
+          "source_locator": "pdf-page:567;outline:OUTBIN parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "OUTDISP",
+          "label": "OUTDISP parameter",
+          "ordinal": 50,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0050",
+          "rust_variant": "Outdisp",
+          "source_locator": "pdf-page:568;outline:OUTDISP parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "OVERLAYB",
+          "label": "OVERLAYB parameter",
+          "ordinal": 51,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0051",
+          "rust_variant": "Overlayb",
+          "source_locator": "pdf-page:570;outline:OVERLAYB parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "OVERLAYF",
+          "label": "OVERLAYF parameter",
+          "ordinal": 52,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0052",
+          "rust_variant": "Overlayf",
+          "source_locator": "pdf-page:570;outline:OVERLAYF parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "OVFL",
+          "label": "OVFL parameter",
+          "ordinal": 53,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0053",
+          "rust_variant": "Ovfl",
+          "source_locator": "pdf-page:570;outline:OVFL parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "PAGEDEF",
+          "label": "PAGEDEF parameter",
+          "ordinal": 54,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0054",
+          "rust_variant": "Pagedef",
+          "source_locator": "pdf-page:571;outline:PAGEDEF parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "PIMSG",
+          "label": "PIMSG parameter",
+          "ordinal": 55,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0055",
+          "rust_variant": "Pimsg",
+          "source_locator": "pdf-page:572;outline:PIMSG parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "PORTNO",
+          "label": "PORTNO parameter",
+          "ordinal": 56,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0056",
+          "rust_variant": "Portno",
+          "source_locator": "pdf-page:573;outline:PORTNO parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "PRMODE",
+          "label": "PRMODE parameter",
+          "ordinal": 57,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0057",
+          "rust_variant": "Prmode",
+          "source_locator": "pdf-page:574;outline:PRMODE parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "PRTATTRS",
+          "label": "PRTATTRS parameter",
+          "ordinal": 58,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0058",
+          "rust_variant": "Prtattrs",
+          "source_locator": "pdf-page:575;outline:PRTATTRS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "PRTERROR",
+          "label": "PRTERROR parameter",
+          "ordinal": 59,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0059",
+          "rust_variant": "Prterror",
+          "source_locator": "pdf-page:576;outline:PRTERROR parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "PRTOPTNS",
+          "label": "PRTOPTNS parameter",
+          "ordinal": 60,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0060",
+          "rust_variant": "Prtoptns",
+          "source_locator": "pdf-page:577;outline:PRTOPTNS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "PRTQUEUE",
+          "label": "PRTQUEUE parameter",
+          "ordinal": 61,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0061",
+          "rust_variant": "Prtqueue",
+          "source_locator": "pdf-page:577;outline:PRTQUEUE parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "PRTY",
+          "label": "PRTY parameter",
+          "ordinal": 62,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0062",
+          "rust_variant": "Prty",
+          "source_locator": "pdf-page:578;outline:PRTY parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "REPLYTO",
+          "label": "REPLYTO parameter",
+          "ordinal": 63,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0063",
+          "rust_variant": "Replyto",
+          "source_locator": "pdf-page:579;outline:REPLYTO parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "RESFMT",
+          "label": "RESFMT parameter",
+          "ordinal": 64,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0064",
+          "rust_variant": "Resfmt",
+          "source_locator": "pdf-page:579;outline:RESFMT parameter"
+        },
+        {
+          "aliases": [
+            "RETAINF"
+          ],
+          "keyword": "RETAINS",
+          "label": "RETAINS and RETAINF parameters",
+          "ordinal": 65,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0065",
+          "rust_variant": "RetainsAndRetainf",
+          "source_locator": "pdf-page:580;outline:RETAINS and RETAINF parameters"
+        },
+        {
+          "aliases": [
+            "RETRYT"
+          ],
+          "keyword": "RETRYL",
+          "label": "RETRYL and RETRYT parameters",
+          "ordinal": 66,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0066",
+          "rust_variant": "RetrylAndRetryt",
+          "source_locator": "pdf-page:581;outline:RETRYL and RETRYT parameters"
+        },
+        {
+          "aliases": [],
+          "keyword": "ROOM",
+          "label": "ROOM parameter",
+          "ordinal": 67,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0067",
+          "rust_variant": "Room",
+          "source_locator": "pdf-page:582;outline:ROOM parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "SYSAREA",
+          "label": "SYSAREA parameter",
+          "ordinal": 68,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0068",
+          "rust_variant": "Sysarea",
+          "source_locator": "pdf-page:583;outline:SYSAREA parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "THRESHLD",
+          "label": "THRESHLD parameter",
+          "ordinal": 69,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0069",
+          "rust_variant": "Threshld",
+          "source_locator": "pdf-page:584;outline:THRESHLD parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "TITLE",
+          "label": "TITLE parameter",
+          "ordinal": 70,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0070",
+          "rust_variant": "Title",
+          "source_locator": "pdf-page:585;outline:TITLE parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "TRC",
+          "label": "TRC parameter",
+          "ordinal": 71,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0071",
+          "rust_variant": "Trc",
+          "source_locator": "pdf-page:585;outline:TRC parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "UCS",
+          "label": "UCS parameter",
+          "ordinal": 72,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0072",
+          "rust_variant": "Ucs",
+          "source_locator": "pdf-page:586;outline:UCS parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "USERDATA",
+          "label": "USERDATA parameter",
+          "ordinal": 73,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0073",
+          "rust_variant": "Userdata",
+          "source_locator": "pdf-page:588;outline:USERDATA parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "USERLIB",
+          "label": "USERLIB parameter",
+          "ordinal": 74,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0074",
+          "rust_variant": "Userlib",
+          "source_locator": "pdf-page:591;outline:USERLIB parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "USERPATH",
+          "label": "USERPATH parameter",
+          "ordinal": 75,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0075",
+          "rust_variant": "Userpath",
+          "source_locator": "pdf-page:592;outline:USERPATH parameter"
+        },
+        {
+          "aliases": [],
+          "keyword": "WRITER",
+          "label": "WRITER parameter",
+          "ordinal": 76,
+          "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0076",
+          "rust_variant": "Writer",
+          "source_locator": "pdf-page:593;outline:WRITER parameter"
+        }
+      ]
+    }
+  ],
+  "generated_coverage_credit": 0,
+  "plan_schema": "conformance/0.7/schemas/jcl-job-plan.schema.json",
+  "plan_schema_sha256": "sha256:d97d87abec8d17fb9acfccca343f3d998efba0eaed8f25302854ee532ef8dd1e",
+  "schema_version": "mainframe-env.jcl-generated-catalog@1",
+  "source_catalog": "conformance/0.2/catalogs/jcl-jes2.json",
+  "source_catalog_sha256": "sha256:640b6bf949b6feefa6ba2d762286500798d3157794c728c360f4a46fc260fba4",
+  "target_version": "0.7.0"
+}

@@ -143,6 +143,7 @@ pub struct JclRecord {
     line: usize,
     content_bytes: Range<usize>,
     terminator_bytes: Range<usize>,
+    fields: Option<JclRecordFields>,
 }
 
 impl JclRecord {
@@ -169,6 +170,38 @@ impl JclRecord {
     #[must_use]
     pub fn terminator_bytes(&self) -> &Range<usize> {
         &self.terminator_bytes
+    }
+
+    #[must_use]
+    pub fn fields(&self) -> Option<&JclRecordFields> {
+        self.fields.as_ref()
+    }
+}
+
+/// Exact primary-source ranges for the three fields of a JCL statement
+/// record. Continuation records expose their physical fields without
+/// reinterpreting them as a new statement.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JclRecordFields {
+    name: Range<usize>,
+    operation: Range<usize>,
+    operands: Range<usize>,
+}
+
+impl JclRecordFields {
+    #[must_use]
+    pub fn name(&self) -> &Range<usize> {
+        &self.name
+    }
+
+    #[must_use]
+    pub fn operation(&self) -> &Range<usize> {
+        &self.operation
+    }
+
+    #[must_use]
+    pub fn operands(&self) -> &Range<usize> {
+        &self.operands
     }
 }
 
@@ -263,6 +296,7 @@ struct InStreamState {
     jcl_terminates: bool,
     bytes: usize,
     definition_span: Range<usize>,
+    first_data_record: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -285,26 +319,43 @@ pub fn analyze_jcl_syntax(
     let text = std::str::from_utf8(primary.bytes())
         .map_err(|_| JclSyntaxProblem::SourceNotUtf8)?
         .to_string();
-    let physical = physical_records(&text);
-    if physical.len() > limits.max_lines {
+    let physical_records = physical_records(&text);
+    if physical_records.len() > limits.max_lines {
         return Err(JclSyntaxProblem::LineLimitExceeded);
     }
 
     let mut builder = GreenNodeBuilder::new();
     builder.start_node(JclSyntaxKind::Root.into());
-    let mut records = Vec::with_capacity(physical.len());
+    let mut records = Vec::with_capacity(physical_records.len());
     let mut diagnostics = Vec::new();
     let mut inline = None::<InStreamState>;
+    let mut cntl_definition = None::<Range<usize>>;
+    let mut cntl_bytes = 0usize;
     let mut continuation_expected = false;
     let mut token_count = 0usize;
 
-    for (index, physical) in physical.iter().enumerate() {
+    for (index, physical) in physical_records.iter().enumerate() {
         let raw = &text[physical.content.clone()];
         let line = index + 1;
         let file = source.primary();
         let mut kind = JclRecordKind::Error;
 
-        if let Some(state) = inline.as_mut() {
+        if cntl_definition.is_some() && !is_endcntl_record(raw) {
+            cntl_bytes = cntl_bytes
+                .checked_add(raw.len() + physical.terminator.len())
+                .ok_or(JclSyntaxProblem::InlineDataLimitExceeded)?;
+            if cntl_bytes > limits.max_inline_bytes {
+                return Err(JclSyntaxProblem::InlineDataLimitExceeded);
+            }
+            kind = JclRecordKind::InStreamData;
+        }
+
+        let inline_active = kind == JclRecordKind::Error
+            && inline
+                .as_ref()
+                .is_some_and(|state| index >= state.first_data_record);
+        if inline_active {
+            let state = inline.as_mut().expect("active in-stream state exists");
             let semantic = statement_area(raw);
             let delimiter = semantic.trim_end() == state.delimiter;
             if delimiter {
@@ -357,9 +408,22 @@ pub fn analyze_jcl_syntax(
                 let operation = &raw[fields.operation.clone()];
                 let operands = &raw[fields.operands.clone()];
                 if operation.eq_ignore_ascii_case("DD")
-                    && let Some(state) = inline_state(operands, physical.content.clone())
+                    && let Some((continued, first_data_record, definition_end)) =
+                        continued_inline_operands(&text, &physical_records, index, operands)
+                    && let Some(state) = inline_state(
+                        &continued,
+                        physical.content.start..definition_end,
+                        first_data_record,
+                    )
                 {
                     inline = Some(state);
+                }
+                if operation.eq_ignore_ascii_case("CNTL") {
+                    cntl_definition = Some(physical.content.clone());
+                    cntl_bytes = 0;
+                } else if operation.eq_ignore_ascii_case("ENDCNTL") {
+                    cntl_definition = None;
+                    cntl_bytes = 0;
                 }
                 continuation_expected = statement_continues(operands);
             } else {
@@ -381,6 +445,14 @@ pub fn analyze_jcl_syntax(
             return Err(JclSyntaxProblem::TokenLimitExceeded);
         }
 
+        let fields = matches!(kind, JclRecordKind::Statement | JclRecordKind::Continuation)
+            .then(|| statement_fields(raw))
+            .flatten()
+            .map(|fields| JclRecordFields {
+                name: absolute(&fields.name, physical.content.start),
+                operation: absolute(&fields.operation, physical.content.start),
+                operands: absolute(&fields.operands, physical.content.start),
+            });
         records.push(JclRecord {
             kind,
             span: SourceRange {
@@ -390,6 +462,7 @@ pub fn analyze_jcl_syntax(
             line,
             content_bytes: physical.content.clone(),
             terminator_bytes: physical.terminator.clone(),
+            fields,
         });
     }
 
@@ -399,6 +472,14 @@ pub fn analyze_jcl_syntax(
             "in-stream data is missing its declared delimiter",
             source.primary(),
             state.definition_span,
+        ));
+    }
+    if let Some(definition) = cntl_definition {
+        diagnostics.push(diagnostic(
+            "MEJCL0705",
+            "CNTL statement is missing a matching ENDCNTL statement",
+            source.primary(),
+            definition,
         ));
     }
     builder.finish_node();
@@ -546,10 +627,14 @@ fn statement_area(raw: &str) -> &str {
     &raw[..raw.len().min(72)]
 }
 
+fn absolute(range: &Range<usize>, start: usize) -> Range<usize> {
+    start + range.start..start + range.end
+}
+
 fn classify_control_record(raw: &str, continuation_expected: bool) -> JclRecordKind {
     if raw.starts_with("//*") {
         JclRecordKind::Comment
-    } else if raw == "//" || raw.get(2..).is_some_and(|value| value.trim().is_empty()) {
+    } else if raw.starts_with("//") && raw.get(2..).is_some_and(|value| value.trim().is_empty()) {
         JclRecordKind::Null
     } else if raw.starts_with("//") {
         if continuation_expected && raw.as_bytes().get(2).is_some_and(u8::is_ascii_whitespace) {
@@ -566,6 +651,13 @@ fn classify_control_record(raw: &str, continuation_expected: bool) -> JclRecordK
     } else {
         JclRecordKind::Error
     }
+}
+
+fn is_endcntl_record(raw: &str) -> bool {
+    statement_fields(raw).is_some_and(|fields| {
+        raw.get(fields.operation)
+            .is_some_and(|operation| operation.eq_ignore_ascii_case("ENDCNTL"))
+    })
 }
 
 fn statement_fields(raw: &str) -> Option<StatementFields> {
@@ -598,7 +690,11 @@ fn statement_fields(raw: &str) -> Option<StatementFields> {
     })
 }
 
-fn inline_state(operands: &str, definition_span: Range<usize>) -> Option<InStreamState> {
+fn inline_state(
+    operands: &str,
+    definition_span: Range<usize>,
+    first_data_record: usize,
+) -> Option<InStreamState> {
     let first = top_level_operands(operands).into_iter().next()?;
     let first = first.trim();
     let jcl_terminates = first == "*";
@@ -617,7 +713,35 @@ fn inline_state(operands: &str, definition_span: Range<usize>) -> Option<InStrea
         jcl_terminates,
         bytes: 0,
         definition_span,
+        first_data_record,
     })
+}
+
+fn continued_inline_operands(
+    text: &str,
+    records: &[PhysicalRecord],
+    statement_index: usize,
+    operands: &str,
+) -> Option<(String, usize, usize)> {
+    let mut joined = operands.trim_end().to_string();
+    let mut next = statement_index + 1;
+    let mut definition_end = records[statement_index].content.end;
+    while statement_continues(&joined) && next < records.len() {
+        let raw = text.get(records[next].content.clone())?;
+        if !raw.starts_with("//") || !raw.as_bytes().get(2).is_some_and(u8::is_ascii_whitespace) {
+            break;
+        }
+        let continuation = raw.strip_prefix("//")?.trim();
+        if joined.ends_with(',') {
+            joined.push_str(continuation);
+        } else {
+            joined.push(' ');
+            joined.push_str(continuation);
+        }
+        definition_end = records[next].content.end;
+        next += 1;
+    }
+    Some((joined, next, definition_end))
 }
 
 fn statement_continues(operands: &str) -> bool {

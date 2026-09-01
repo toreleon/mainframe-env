@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 mod evidence_seal;
+mod jcl_catalog;
 
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use mainframe_env_conformance::{
@@ -120,6 +121,7 @@ enum XtaskCommand {
     #[command(name = "review-repair-round-5")]
     ReviewRepairRound5(CheckArgs),
     SemanticIdentities(CheckArgs),
+    JclCatalog(CheckArgs),
     Spec(CheckArgs),
     Conformance(ConformanceArgs),
     Certification(CheckArgs),
@@ -306,6 +308,15 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
                 generate_semantic_identities(root)
             }
         ),
+        XtaskCommand::JclCatalog(args) => checked!(
+            "jcl-catalog",
+            args,
+            if args.check {
+                jcl_catalog::check(root)
+            } else {
+                jcl_catalog::generate(root)
+            }
+        ),
         XtaskCommand::Spec(args) => checked!("spec", args, check_spec(root)),
         XtaskCommand::Conformance(args) => {
             let focused = args.subsystem.is_some()
@@ -451,6 +462,7 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
 
 fn check_conformance(root: &Path) -> TaskResult {
     check_spec(root)?;
+    jcl_catalog::check(root)?;
     check_versions(root)?;
     check_architecture(root)?;
     check_profiles(root)?;
