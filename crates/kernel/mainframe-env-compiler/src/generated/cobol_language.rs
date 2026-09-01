@@ -1370,7 +1370,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Acos,
@@ -1386,7 +1386,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Annuity,
@@ -1405,7 +1405,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Asin,
@@ -1421,7 +1421,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Atan,
@@ -1437,7 +1437,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::BitOf,
@@ -1462,7 +1462,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::BitToChar,
@@ -1478,7 +1478,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::ByteLength,
@@ -1502,7 +1502,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Char,
@@ -1518,7 +1518,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: Some(1usize),
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::CombinedDatetime,
@@ -1537,7 +1537,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::ContentOf,
@@ -1560,7 +1560,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Cos,
@@ -1576,7 +1576,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::CurrentDate,
@@ -1635,7 +1635,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         ],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::DayOfInteger,
@@ -1651,7 +1651,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::DayToYyyyddd,
@@ -1678,7 +1678,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         ],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::DisplayOf,
@@ -1711,7 +1711,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         ],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::E,
@@ -1727,7 +1727,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Exp,
@@ -1743,7 +1743,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Exp10,
@@ -1759,7 +1759,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Factorial,
@@ -1775,7 +1775,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::FormattedCurrentDate,
@@ -1795,7 +1795,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[0usize],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::FormattedDate,
@@ -1818,7 +1818,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[0usize],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::FormattedDatetime,
@@ -1859,7 +1859,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         ],
         literal_arguments: &[0usize],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::FormattedTime,
@@ -1898,7 +1898,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         ],
         literal_arguments: &[0usize],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::HexOf,
@@ -1923,7 +1923,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::HexToChar,
@@ -1939,7 +1939,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Integer,
@@ -1955,7 +1955,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::IntegerOfDate,
@@ -1987,7 +1987,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::IntegerOfFormattedDate,
@@ -2014,7 +2014,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[0usize],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::IntegerPart,
@@ -2030,7 +2030,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Length,
@@ -2069,7 +2069,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Log10,
@@ -2085,7 +2085,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::LowerCase,
@@ -2128,7 +2128,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Mean,
@@ -2144,7 +2144,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Median,
@@ -2160,7 +2160,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Midrange,
@@ -2176,7 +2176,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Min,
@@ -2198,7 +2198,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Mod,
@@ -2254,7 +2254,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         ],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Numval,
@@ -2328,7 +2328,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Ord,
@@ -2347,7 +2347,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::OrdMax,
@@ -2368,7 +2368,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::OrdMin,
@@ -2389,7 +2389,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Pi,
@@ -2405,7 +2405,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::PresentValue,
@@ -2424,7 +2424,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Random,
@@ -2448,7 +2448,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         ],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Range,
@@ -2467,7 +2467,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Rem,
@@ -2486,7 +2486,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Reverse,
@@ -2506,7 +2506,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::SecondsFromFormattedTime,
@@ -2533,7 +2533,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[0usize],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::SecondsPastMidnight,
@@ -2549,7 +2549,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Sign,
@@ -2565,7 +2565,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Sin,
@@ -2581,7 +2581,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Sqrt,
@@ -2597,7 +2597,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::StandardDeviation,
@@ -2613,7 +2613,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Sum,
@@ -2632,7 +2632,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Tan,
@@ -2648,7 +2648,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::TestDateYyyymmdd,
@@ -2664,7 +2664,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::TestDayYyyyddd,
@@ -2680,7 +2680,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::TestFormattedDatetime,
@@ -2707,7 +2707,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[0usize],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::TestNumval,
@@ -2781,7 +2781,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Trim,
@@ -2870,7 +2870,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         ],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Upos,
@@ -2894,7 +2894,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::UpperCase,
@@ -2940,7 +2940,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Usupplementary,
@@ -2961,7 +2961,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Uuid4,
@@ -2977,7 +2977,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: Some(36usize),
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Uvalid,
@@ -2998,7 +2998,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Uwidth,
@@ -3022,7 +3022,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::Variance,
@@ -3038,7 +3038,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::WhenCompiled,
@@ -3054,7 +3054,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         }],
         literal_arguments: &[],
         fixed_length: Some(21usize),
-        runtime_supported: false,
+        runtime_supported: true,
     },
     IntrinsicFunctionDescriptor {
         kind: IntrinsicFunctionKind::YearToYyyy,
@@ -3081,7 +3081,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         ],
         literal_arguments: &[],
         fixed_length: None,
-        runtime_supported: false,
+        runtime_supported: true,
     },
 ];
 
@@ -3110,7 +3110,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::DebugContext,
         fixed_length: None,
         writable: false,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::IgyJavaiopCallException,
@@ -3123,7 +3123,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: None,
         writable: false,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::Jnienvptr,
@@ -3136,7 +3136,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: None,
         writable: false,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::JsonCode,
@@ -3149,7 +3149,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(4usize),
         writable: true,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::JsonStatus,
@@ -3162,7 +3162,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(4usize),
         writable: false,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::LengthOf,
@@ -3188,7 +3188,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::File,
         fixed_length: None,
         writable: false,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::ReturnCode,
@@ -3214,7 +3214,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(1usize),
         writable: false,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::ShiftIn,
@@ -3227,7 +3227,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(1usize),
         writable: false,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::SortControl,
@@ -3240,7 +3240,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(8usize),
         writable: true,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::SortCoreSize,
@@ -3253,7 +3253,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(4usize),
         writable: true,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::SortFileSize,
@@ -3266,7 +3266,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(4usize),
         writable: true,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::SortMessage,
@@ -3279,7 +3279,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(8usize),
         writable: true,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::SortModeSize,
@@ -3292,7 +3292,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(4usize),
         writable: true,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::SortReturn,
@@ -3305,7 +3305,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(2usize),
         writable: true,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::Tally,
@@ -3318,7 +3318,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(4usize),
         writable: true,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::WhenCompiled,
@@ -3331,7 +3331,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(16usize),
         writable: false,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::XmlCode,
@@ -3344,7 +3344,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(4usize),
         writable: true,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::XmlEvent,
@@ -3357,7 +3357,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(30usize),
         writable: false,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::XmlInformation,
@@ -3370,7 +3370,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(4usize),
         writable: false,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::XmlNamespace,
@@ -3383,7 +3383,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: None,
         writable: false,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::XmlNnamespace,
@@ -3396,7 +3396,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: None,
         writable: false,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::XmlNamespacePrefix,
@@ -3409,7 +3409,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: None,
         writable: false,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::XmlNnamespacePrefix,
@@ -3422,7 +3422,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: None,
         writable: false,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::XmlNtext,
@@ -3435,7 +3435,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: None,
         writable: false,
-        runtime_supported: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::XmlText,
@@ -3448,7 +3448,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: None,
         writable: false,
-        runtime_supported: false,
+        runtime_supported: true,
     },
 ];
 

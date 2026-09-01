@@ -605,7 +605,21 @@ impl<'a> GrammarParser<'a> {
         let mut index = start + keyword_length;
         let mut depth = 0usize;
         while index < self.tokens.len() {
-            if depth == 0 && (self.at_simple_stop(kind, index) || self.classify_at(index).is_some())
+            let exit_qualifier = kind == StatementKind::Exit
+                && index == start + 1
+                && [
+                    "PROGRAM",
+                    "METHOD",
+                    "FUNCTION",
+                    "PERFORM",
+                    "PARAGRAPH",
+                    "SECTION",
+                ]
+                .iter()
+                .any(|word| self.tokens[index].is(word));
+            if depth == 0
+                && (self.at_simple_stop(kind, index)
+                    || (!exit_qualifier && self.classify_at(index).is_some()))
             {
                 return validate_simple_header(kind, &self.tokens[start..index])
                     .map(|()| index)
@@ -1310,7 +1324,18 @@ fn validate_accept(tokens: &[Token<'_>]) -> Result<(), &'static str> {
     let mut cursor = Cursor::new(tokens, 1);
     cursor.operand()?;
     if cursor.eat("FROM") {
+        let source = cursor.position;
         cursor.operand()?;
+        if tokens.get(source).is_some_and(|token| token.is("DATE")) {
+            cursor.eat("YYYYMMDD");
+        } else if tokens.get(source).is_some_and(|token| token.is("DAY")) {
+            cursor.eat("YYYYDDD");
+        } else if tokens
+            .get(source)
+            .is_some_and(|token| token.is("ENVIRONMENT"))
+        {
+            cursor.operand()?;
+        }
     }
     cursor.finish()
 }
@@ -1320,6 +1345,20 @@ fn validate_add_subtract(
     separator: &str,
     allow_direct_giving: bool,
 ) -> Result<(), &'static str> {
+    if tokens
+        .get(1)
+        .is_some_and(|token| token.is("CORRESPONDING") || token.is("CORR"))
+    {
+        if !allow_direct_giving {
+            return Err("CORRESPONDING is not valid for this arithmetic statement");
+        }
+        let mut cursor = Cursor::new(tokens, 2);
+        cursor.operand()?;
+        cursor.expect(separator)?;
+        cursor.operand()?;
+        cursor.eat("ROUNDED");
+        return cursor.finish();
+    }
     let split = find_word(tokens, 1, separator)
         .or_else(|| {
             allow_direct_giving
@@ -1597,13 +1636,18 @@ fn validate_exit(tokens: &[Token<'_>]) -> Result<(), &'static str> {
 }
 
 fn validate_go_to(tokens: &[Token<'_>]) -> Result<(), &'static str> {
-    let mut cursor = Cursor::new(tokens, 2);
-    cursor.operand()?;
-    if cursor.eat("DEPENDING") {
+    if let Some(depending) = find_word(tokens, 2, "DEPENDING") {
+        validate_operand_list(&tokens[2..depending], 1)?;
+        let mut cursor = Cursor::new(tokens, depending);
+        cursor.expect("DEPENDING")?;
         cursor.expect("ON")?;
         cursor.operand()?;
+        cursor.finish()
+    } else {
+        let mut cursor = Cursor::new(tokens, 2);
+        cursor.operand()?;
+        cursor.finish()
     }
-    cursor.finish()
 }
 
 fn validate_initialize(tokens: &[Token<'_>]) -> Result<(), &'static str> {

@@ -1,0 +1,125 @@
+{
+  "schema_version": "mainframe-env.cobol-statement-phrase-runtime-fixtures@1",
+  "target_version": "0.4.0",
+  "fixtures": [
+    {
+      "id": "add-corresponding",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0002",
+      "obligation_id": "phrase-corresponding",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. ADDCORR. DATA DIVISION. WORKING-STORAGE SECTION. 01 SOURCE-G. 05 COUNT-X PIC 99 VALUE 2. 05 NESTED-G. 10 AMOUNT-X PIC 99 VALUE 3. 05 TEXT-X PIC X VALUE 'S'. 01 TARGET-G. 05 COUNT-X PIC 99 VALUE 10. 05 NESTED-G. 10 AMOUNT-X PIC 99 VALUE 20. 05 TEXT-X PIC X VALUE 'T'. PROCEDURE DIVISION. ADD CORRESPONDING SOURCE-G TO TARGET-G. DISPLAY COUNT-X OF TARGET-G AMOUNT-X OF NESTED-G OF TARGET-G TEXT-X OF TARGET-G. STOP RUN.",
+      "expected_output": "1223T\n"
+    },
+    {
+      "id": "display-upon-no-advancing",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0011",
+      "obligation_id": "phrase-upon-no-advancing",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. DISPLAYOPT. PROCEDURE DIVISION. DISPLAY 'A' UPON CONSOLE WITH NO ADVANCING. DISPLAY 'B'. STOP RUN.",
+      "expected_output": "AB\n"
+    },
+    {
+      "id": "exit-perform",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0015",
+      "obligation_id": "phrase-perform",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. EXITPERF. DATA DIVISION. WORKING-STORAGE SECTION. 01 I PIC 9 VALUE 0. PROCEDURE DIVISION.\nPERFORM VARYING I FROM 1 BY 1 UNTIL I > 4\n IF I = 3\n  EXIT PERFORM\n END-IF\n DISPLAY I\nEND-PERFORM.\nDISPLAY 'DONE'.\nSTOP RUN.",
+      "expected_output": "1\n2\nDONE\n"
+    },
+    {
+      "id": "exit-paragraph",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0015",
+      "obligation_id": "phrase-paragraph",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. EXITPARA. PROCEDURE DIVISION. PERFORM WORK-P. DISPLAY 'DONE'. STOP RUN. WORK-P. DISPLAY 'WORK'. EXIT PARAGRAPH. DISPLAY 'BAD'. NEXT-P. DISPLAY 'WRONG'.",
+      "expected_output": "WORK\nDONE\n"
+    },
+    {
+      "id": "initialize-with-filler",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0020",
+      "obligation_id": "phrase-with-filler",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. INITFILL. DATA DIVISION. WORKING-STORAGE SECTION. 01 GROUP-A. 05 FILLER PIC X VALUE 'A'. 05 VALUE-A PIC X VALUE 'B'. 01 GROUP-B. 05 FILLER PIC X VALUE 'C'. 05 VALUE-B PIC X VALUE 'D'. PROCEDURE DIVISION. INITIALIZE GROUP-A. INITIALIZE GROUP-B WITH FILLER. DISPLAY GROUP-A. DISPLAY GROUP-B. STOP RUN.",
+      "expected_output": "A \n  \n"
+    },
+    {
+      "id": "move-corresponding",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0026",
+      "obligation_id": "phrase-corresponding",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. MOVECORR. DATA DIVISION. WORKING-STORAGE SECTION. 01 SOURCE-G. 05 COUNT-X PIC 9(3) COMP-3 VALUE 12. 05 NESTED-G. 10 TEXT-X PIC X(2) VALUE 'OK'. 05 ONLY-SOURCE PIC X VALUE 'S'. 01 TARGET-G. 05 COUNT-X PIC 9(4) VALUE 0. 05 NESTED-G. 10 TEXT-X PIC X(3) VALUE 'BAD'. 05 ONLY-TARGET PIC X VALUE 'T'. PROCEDURE DIVISION. MOVE CORRESPONDING SOURCE-G TO TARGET-G. DISPLAY COUNT-X OF TARGET-G TEXT-X OF NESTED-G OF TARGET-G ONLY-TARGET. STOP RUN.",
+      "expected_output": "0012OK T\n"
+    },
+    {
+      "id": "perform-inline-varying",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0029",
+      "obligation_id": "phrase-inline-varying",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. PERFVARY. DATA DIVISION. WORKING-STORAGE SECTION. 01 I PIC 9 VALUE 0. 01 TOTAL PIC 99 VALUE 0. PROCEDURE DIVISION. PERFORM VARYING I FROM 1 BY 1 UNTIL I > 3 ADD I TO TOTAL END-PERFORM. DISPLAY TOTAL. STOP RUN.",
+      "expected_output": "06\n"
+    },
+    {
+      "id": "perform-through",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0029",
+      "obligation_id": "phrase-through",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. SAMETHRU. PROCEDURE DIVISION. PERFORM WORK-PARA THRU WORK-PARA. DISPLAY 'DONE'. STOP RUN. WORK-PARA. DISPLAY 'WORK'. WORK-EXIT. EXIT. NEXT-PARA. DISPLAY 'WRONG'.",
+      "expected_output": "WORK\nDONE\n"
+    },
+    {
+      "id": "read-next-record",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0030",
+      "obligation_id": "phrase-next-record",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. READNEXT. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT TEST-FILE ASSIGN TO TESTDD ORGANIZATION IS SEQUENTIAL ACCESS MODE IS SEQUENTIAL. DATA DIVISION. FILE SECTION. FD TEST-FILE. 01 TEST-RECORD PIC X(8). WORKING-STORAGE SECTION. 01 OUT-X PIC X(8). PROCEDURE DIVISION. OPEN INPUT TEST-FILE. READ TEST-FILE NEXT RECORD INTO OUT-X AT END DISPLAY 'BAD' END-READ. DISPLAY OUT-X. CLOSE TEST-FILE. STOP RUN.",
+      "expected_output": "RECORD  \n"
+    },
+    {
+      "id": "release-from",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0031",
+      "obligation_id": "phrase-from",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. SORTFROM. DATA DIVISION. FILE SECTION. SD SORT-FILE. 01 SORT-RECORD PIC X(4). WORKING-STORAGE SECTION. 01 SOURCE-X PIC X(4) VALUE 'AA01'. 01 OUT-X PIC X(4). PROCEDURE DIVISION. SORT SORT-FILE ON ASCENDING KEY SORT-RECORD INPUT PROCEDURE FEED OUTPUT PROCEDURE DRAIN. STOP RUN. FEED. RELEASE SORT-RECORD FROM SOURCE-X. EXIT. DRAIN. RETURN SORT-FILE RECORD INTO OUT-X AT END DISPLAY 'BAD' END-RETURN. DISPLAY OUT-X. EXIT.",
+      "expected_output": "AA01\n"
+    },
+    {
+      "id": "return-into-at-end",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0032",
+      "obligation_id": "phrase-into-at-end",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. SORTRETURN. DATA DIVISION. FILE SECTION. SD SORT-FILE. 01 SORT-RECORD PIC X(4). WORKING-STORAGE SECTION. 01 SOURCE-X PIC X(4) VALUE 'AA01'. 01 OUT-X PIC X(4). PROCEDURE DIVISION. SORT SORT-FILE ON ASCENDING KEY SORT-RECORD INPUT PROCEDURE FEED OUTPUT PROCEDURE DRAIN. STOP RUN. FEED. RELEASE SORT-RECORD FROM SOURCE-X. EXIT. DRAIN. RETURN SORT-FILE RECORD INTO OUT-X AT END DISPLAY 'BAD' END-RETURN. DISPLAY OUT-X. EXIT.",
+      "expected_output": "AA01\n"
+    },
+    {
+      "id": "set-up-down-by",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0035",
+      "obligation_id": "phrase-up-down-by",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. SETDELTA. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 99 VALUE 10. 01 B PIC 99 VALUE 20. PROCEDURE DIVISION. SET A B UP BY 3. SET A B DOWN BY 1. DISPLAY A B. STOP RUN.",
+      "expected_output": "1222\n"
+    },
+    {
+      "id": "search-all",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0034",
+      "obligation_id": "phrase-all",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. SEARCHALL. DATA DIVISION. WORKING-STORAGE SECTION. 01 ROOT-X. 05 TABLE-X OCCURS 4 TIMES ASCENDING KEY IS VALUE-X INDEXED BY IDX. 10 VALUE-X PIC X. PROCEDURE DIVISION. MOVE 'A' TO VALUE-X(1). MOVE 'B' TO VALUE-X(2). MOVE 'C' TO VALUE-X(3). MOVE 'D' TO VALUE-X(4). SEARCH ALL TABLE-X AT END DISPLAY 'MISS' WHEN VALUE-X(IDX) = 'C' DISPLAY IDX END-SEARCH. STOP RUN.",
+      "expected_output": "3\n"
+    },
+    {
+      "id": "string-with-pointer",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0039",
+      "obligation_id": "phrase-with-pointer",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. STRINGPTR. DATA DIVISION. WORKING-STORAGE SECTION. 01 TARGET-X PIC X(8) VALUE '--------'. 01 PTR-X PIC 9 VALUE 3. PROCEDURE DIVISION. STRING 'AB' DELIMITED BY SIZE INTO TARGET-X WITH POINTER PTR-X END-STRING. DISPLAY TARGET-X. DISPLAY PTR-X. STOP RUN.",
+      "expected_output": "--AB----\n5\n"
+    },
+    {
+      "id": "unstring-pointer-tally",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0041",
+      "obligation_id": "phrase-pointer-tally",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. UNSTRINGPTR. DATA DIVISION. WORKING-STORAGE SECTION. 01 SOURCE-X PIC X(5) VALUE 'A,B,C'. 01 A-X PIC X(4). 01 B-X PIC X(4). 01 C-X PIC X(4). 01 PTR-X PIC 9 VALUE 1. 01 TALLY-X PIC 9 VALUE 0. PROCEDURE DIVISION. UNSTRING SOURCE-X DELIMITED BY ',' INTO A-X B-X C-X WITH POINTER PTR-X TALLYING IN TALLY-X END-UNSTRING. DISPLAY A-X B-X C-X. DISPLAY TALLY-X. STOP RUN.",
+      "expected_output": "A   B   C   \n3\n"
+    },
+    {
+      "id": "json-generate-count",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0023",
+      "obligation_id": "phrase-count-in",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. JSONCOUNT. DATA DIVISION. WORKING-STORAGE SECTION. 01 SOURCE-X PIC X(3) VALUE 'A&B'. 01 JSON-X PIC X(64). 01 JSON-N PIC 99. PROCEDURE DIVISION. JSON GENERATE JSON-X FROM SOURCE-X COUNT IN JSON-N. DISPLAY JSON-N. STOP RUN.",
+      "expected_output": "18\n"
+    },
+    {
+      "id": "xml-generate-count",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0043",
+      "obligation_id": "phrase-count-in",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. XMLCOUNT. DATA DIVISION. WORKING-STORAGE SECTION. 01 SOURCE-X PIC X(3) VALUE 'A&B'. 01 XML-X PIC X(64). 01 XML-N PIC 99. PROCEDURE DIVISION. XML GENERATE XML-X FROM SOURCE-X COUNT IN XML-N. DISPLAY XML-N. STOP RUN.",
+      "expected_output": "28\n"
+    }
+  ]
+}

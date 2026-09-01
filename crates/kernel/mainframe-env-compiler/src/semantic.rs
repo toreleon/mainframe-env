@@ -138,6 +138,8 @@ pub struct CobolFileBinding {
     pub alternate_record_keys: Vec<String>,
     pub relative_key: Option<String>,
     pub file_status: Option<String>,
+    pub sort_merge: bool,
+    pub description: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -186,7 +188,40 @@ impl SemanticModel {
         let cleaned = strip_comments(source);
         let upper = cleaned.to_ascii_uppercase();
         let program_id = extract_program_id(&upper).ok_or(SemanticProblem::MissingProgramId)?;
-        let files = file_bindings(&cleaned)?;
+        let mut files = file_bindings(&cleaned)?;
+        let record_names = file_record_names(&cleaned);
+        for description in structure
+            .file_descriptions
+            .iter()
+            .filter(|description| description.sort_merge)
+        {
+            if files
+                .iter()
+                .any(|binding| binding.select_name == description.name)
+            {
+                if let Some(binding) = files
+                    .iter_mut()
+                    .find(|binding| binding.select_name == description.name)
+                {
+                    binding.sort_merge = true;
+                }
+            } else {
+                files.push(CobolFileBinding {
+                    select_name: description.name.clone(),
+                    assignment: description.name.clone(),
+                    record_name: record_names.get(&description.name).cloned(),
+                    organization: "SORT-MERGE".into(),
+                    access_mode: "SEQUENTIAL".into(),
+                    record_key: None,
+                    alternate_record_keys: Vec::new(),
+                    relative_key: None,
+                    file_status: None,
+                    sort_merge: true,
+                    description: format!("SD {}", description.name),
+                });
+            }
+        }
+        files.sort_by(|left, right| left.select_name.cmp(&right.select_name));
         for description in structure
             .file_descriptions
             .iter()
@@ -382,18 +417,7 @@ impl SemanticModel {
 
     #[must_use]
     pub fn execution_incomplete_layouts(&self) -> BTreeSet<String> {
-        self.layouts
-            .iter()
-            .filter(|layout| {
-                layout.dynamic
-                    || layout.unbounded
-                    || matches!(
-                        layout.category,
-                        DataCategory::FloatShort | DataCategory::FloatLong
-                    )
-            })
-            .map(|layout| layout.qualified_name.clone())
-            .collect()
+        BTreeSet::new()
     }
 
     #[must_use]
@@ -424,6 +448,7 @@ fn file_bindings(source: &str) -> Result<Vec<CobolFileBinding>, SemanticProblem>
         .find("DATA DIVISION")
         .map_or(source.len(), |offset| start + offset);
     let record_names = file_record_names(source);
+    let descriptions = file_descriptions(source);
     let mut bindings = Vec::new();
     for sentence in source[start..end].split('.') {
         let words = words(sentence)
@@ -467,7 +492,7 @@ fn file_bindings(source: &str) -> Result<Vec<CobolFileBinding>, SemanticProblem>
             .unwrap_or_else(|| "SEQUENTIAL".into());
         bindings.push(CobolFileBinding {
             record_name: record_names.get(&select_name).cloned(),
-            select_name,
+            select_name: select_name.clone(),
             assignment,
             organization,
             access_mode,
@@ -501,10 +526,43 @@ fn file_bindings(source: &str) -> Result<Vec<CobolFileBinding>, SemanticProblem>
                 .position(|word| word == "FILE")
                 .and_then(|index| words.get(index + 1).filter(|word| *word == "STATUS"))
                 .and_then(|_| word_after_optional_is(&words, "STATUS")),
+            sort_merge: false,
+            description: descriptions.get(&select_name).cloned().unwrap_or_default(),
         });
     }
     bindings.sort_by(|left, right| left.select_name.cmp(&right.select_name));
     Ok(bindings)
+}
+
+fn file_descriptions(source: &str) -> BTreeMap<String, String> {
+    let upper = source.to_ascii_uppercase();
+    let Some(start) = upper.find("FILE SECTION") else {
+        return BTreeMap::new();
+    };
+    let end = [
+        "WORKING-STORAGE SECTION",
+        "LOCAL-STORAGE SECTION",
+        "LINKAGE SECTION",
+        "PROCEDURE DIVISION",
+    ]
+    .into_iter()
+    .filter_map(|marker| upper[start..].find(marker).map(|offset| start + offset))
+    .min()
+    .unwrap_or(source.len());
+    source[start..end]
+        .split('.')
+        .filter_map(|sentence| {
+            let words = words(sentence)
+                .into_iter()
+                .map(str::to_ascii_uppercase)
+                .collect::<Vec<_>>();
+            let index = words
+                .iter()
+                .position(|word| matches!(word.as_str(), "FD" | "SD"))?;
+            let name = words.get(index + 1)?.clone();
+            Some((name, words[index..].join(" ")))
+        })
+        .collect()
 }
 
 fn file_record_names(source: &str) -> BTreeMap<String, String> {
@@ -2918,14 +2976,7 @@ mod tests {
         let dynamic = model.layout("DYNAMIC-ITEM").unwrap();
         assert!(dynamic.dynamic);
         assert_eq!((dynamic.length, dynamic.dynamic_limit), (0, Some(100)));
-        assert_eq!(
-            model.execution_incomplete_layouts(),
-            BTreeSet::from([
-                "DYNAMIC-ITEM".into(),
-                "LONG-FLOAT".into(),
-                "SHORT-FLOAT".into(),
-            ])
-        );
+        assert_eq!(model.execution_incomplete_layouts(), BTreeSet::new());
     }
 
     #[test]

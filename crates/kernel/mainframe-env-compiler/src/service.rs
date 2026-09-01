@@ -104,12 +104,10 @@ impl CobolCompiler {
         let incomplete_layouts = semantic.execution_incomplete_layouts();
         let incomplete_intrinsics = semantic.execution_incomplete_intrinsics();
         let incomplete_registers = semantic.execution_incomplete_special_registers();
-        let incomplete_arithmetic = hir.execution_incomplete_arithmetic_receivers();
         let execution_incomplete = !unsupported_statements.is_empty()
             || !incomplete_layouts.is_empty()
             || !incomplete_intrinsics.is_empty()
-            || !incomplete_registers.is_empty()
-            || !incomplete_arithmetic.is_empty();
+            || !incomplete_registers.is_empty();
         for kind in unsupported_statements {
             if diagnostics.len() >= self.limits.max_diagnostics {
                 break;
@@ -162,20 +160,6 @@ impl CobolCompiler {
                 format!(
                     "{} is recognized and typed but has no 0.3 execution route",
                     crate::special_register_descriptor(register).name
-                ),
-            ));
-        }
-        for (kind, line) in incomplete_arithmetic {
-            if diagnostics.len() >= self.limits.max_diagnostics {
-                break;
-            }
-            diagnostics.push(diagnostic(
-                "MECOB0204",
-                Phase::Lower,
-                FailureCategory::Unsupported,
-                format!(
-                    "{} at procedure line {line} has multiple receivers whose execution is deferred to 0.4",
-                    kind.slug()
                 ),
             ));
         }
@@ -251,7 +235,17 @@ impl CompilerService for CobolCompiler {
             .hir
             .as_ref()
             .ok_or(CompilerProblem::IncompleteStage)?;
-        let mir = lower_to_core(hir, self.limits.ir).map_err(lower_problem)?;
+        let effective_options = analysis
+            .syntax
+            .as_ref()
+            .ok_or(CompilerProblem::IncompleteStage)?
+            .effective_compiler_options();
+        let mir = lower_to_core(
+            hir,
+            effective_options.arithmetic_mode().as_str(),
+            self.limits.ir,
+        )
+        .map_err(lower_problem)?;
         let legalized = LegalizedMir::legalize(
             request.source.id(),
             mir,
@@ -264,13 +258,11 @@ impl CompilerService for CobolCompiler {
         let mut manifest_options = request.options.values().clone();
         manifest_options.insert(
             "cobol.effective-lp".into(),
-            analysis
-                .syntax
-                .as_ref()
-                .ok_or(CompilerProblem::IncompleteStage)?
-                .effective_compiler_options()
-                .lp()
-                .to_string(),
+            effective_options.lp().to_string(),
+        );
+        manifest_options.insert(
+            "cobol.effective-arith".into(),
+            effective_options.arithmetic_mode().as_str().into(),
         );
         let manifest = ArtifactManifest {
             compiler_generation: format!("mainframe-env-cobol-{}", env!("CARGO_PKG_VERSION")),
@@ -359,6 +351,7 @@ fn diagnostic(code: &str, phase: Phase, category: FailureCategory, message: Stri
 mod tests {
     use super::*;
     use mainframe_env_compiler_api::{CompileOptions, CompileTarget};
+    use mainframe_env_ir::{Attribute, CodecLimits, decode_binary};
     use mainframe_env_source::{
         LogicalPath, SourceEncoding, SourceFile, SourceFormat, SourceLibrary, SourceLimits,
     };
@@ -407,6 +400,38 @@ mod tests {
             CompilerResult::Published { artifact, .. } => assert!(!artifact.payload().is_empty()),
             other => panic!("unexpected {other:?}"),
         }
+    }
+
+    #[test]
+    fn arithmetic_mode_is_embedded_in_manifest_and_executable_payload() {
+        let source = format!("PROCESS ARITH(COMPAT)\n{HELLO}");
+        let result = CobolCompiler::default()
+            .compile(request(&source, CompilationMode::Executable))
+            .unwrap();
+        let CompilerResult::Published { artifact, .. } = result else {
+            panic!("ARITH(COMPAT) did not publish: {result:?}");
+        };
+        assert_eq!(
+            artifact
+                .manifest()
+                .options
+                .values()
+                .get("cobol.effective-arith")
+                .map(String::as_str),
+            Some("compatible")
+        );
+        let module = decode_binary(artifact.payload(), CodecLimits::default()).unwrap();
+        let config = module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .find(|operation| operation.identity.name() == "config")
+            .expect("runtime config operation");
+        assert_eq!(
+            config.attributes.get("arithmetic_mode"),
+            Some(&Attribute::Text("compatible".into()))
+        );
     }
     #[test]
     fn exec_sql_publishes_through_typed_host_lowering() {
@@ -549,7 +574,7 @@ mod tests {
     }
 
     #[test]
-    fn lp64_types_and_dynamic_layouts_are_typed_but_dynamic_execution_is_blocked() {
+    fn lp64_types_and_bounded_dynamic_layouts_publish() {
         let source = "PROCESS LP(64)\nIDENTIFICATION DIVISION. PROGRAM-ID. STORAGE. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR POINTER. 01 OBJ OBJECT REFERENCE. 01 DYNAMIC-ITEM PIC X DYNAMIC LENGTH LIMIT IS 64. PROCEDURE DIVISION. STOP RUN.";
         let analysis = CobolCompiler::default().analyze(&bundle(source));
         let semantic = analysis.semantic.as_ref().expect("semantic metadata");
@@ -559,19 +584,12 @@ mod tests {
             semantic.layout("DYNAMIC-ITEM").unwrap().dynamic_limit,
             Some(64)
         );
-        assert_eq!(analysis.completeness, Completeness::Unsupported);
-        assert!(analysis.diagnostics.iter().any(|diagnostic| {
-            diagnostic.code().as_str() == "MECOB0201"
-                && diagnostic.public_message().contains("DYNAMIC-ITEM")
-        }));
+        assert_eq!(analysis.completeness, Completeness::Complete);
         assert!(matches!(
             CobolCompiler::default()
                 .compile(request(source, CompilationMode::Executable))
                 .unwrap(),
-            CompilerResult::Failed {
-                completeness: Completeness::Unsupported,
-                ..
-            }
+            CompilerResult::Published { .. }
         ));
     }
 
@@ -594,7 +612,7 @@ mod tests {
     }
 
     #[test]
-    fn intrinsic_and_special_register_nodes_are_typed_and_unsupported_execution_is_blocked() {
+    fn intrinsic_and_special_register_nodes_are_typed_and_publishable() {
         let source = "IDENTIFICATION DIVISION.\nPROGRAM-ID. FUNCTIONS.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 TEXT-X PIC X(8) VALUE 'ABC'.\n01 NUM-X PIC 9(3)V99 COMP-3 VALUE 1.5.\n01 INT-X PIC 9(4) BINARY.\nPROCEDURE DIVISION.\nMOVE FUNCTION LOWER-CASE(TEXT-X) TO TEXT-X.\nMOVE FUNCTION ABS(NUM-X) TO NUM-X.\nMOVE LENGTH OF TEXT-X TO INT-X.\nDISPLAY WHEN-COMPILED.\nSTOP RUN.\n";
         let analysis = CobolCompiler::default().analyze(&bundle(source));
         let semantic = analysis.semantic.as_ref().expect("function semantic model");
@@ -612,18 +630,24 @@ mod tests {
                 .iter()
                 .all(|register| !register.source.is_empty())
         );
-        assert_eq!(analysis.completeness, Completeness::Unsupported);
-        assert!(analysis.diagnostics.iter().any(|diagnostic| {
-            diagnostic.code().as_str() == "MECOB0202" && diagnostic.public_message().contains("ABS")
-        }));
+        assert_eq!(analysis.completeness, Completeness::Complete);
+        assert!(
+            !analysis
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code().as_str() == "MECOB0202")
+        );
+        assert!(
+            !analysis
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code().as_str() == "MECOB0203")
+        );
         assert!(matches!(
             CobolCompiler::default()
                 .compile(request(source, CompilationMode::Executable))
                 .unwrap(),
-            CompilerResult::Failed {
-                completeness: Completeness::Unsupported,
-                ..
-            }
+            CompilerResult::Published { .. }
         ));
     }
 
@@ -662,6 +686,47 @@ mod tests {
             span.source.as_str() == "HELLO.cbl" && span.source_start < span.source_end
         }));
         assert!(!statement.source.is_empty());
+    }
+
+    #[test]
+    fn delete_and_relational_start_publish_through_the_single_core_route() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. FILEOPS. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT TEST-FILE ASSIGN TO TESTDD ORGANIZATION IS INDEXED ACCESS MODE IS DYNAMIC RECORD KEY IS REC-KEY FILE STATUS IS FILE-STATUS. DATA DIVISION. FILE SECTION. FD TEST-FILE. 01 TEST-RECORD. 05 REC-KEY PIC X(2). 05 REC-VALUE PIC X(6). WORKING-STORAGE SECTION. 01 FILE-STATUS PIC XX. PROCEDURE DIVISION. START TEST-FILE KEY IS NOT LESS THAN REC-KEY INVALID KEY CONTINUE END-START. DELETE TEST-FILE RECORD INVALID KEY CONTINUE END-DELETE. STOP RUN.";
+        let result = CobolCompiler::default()
+            .compile(request(source, CompilationMode::Executable))
+            .unwrap();
+        assert!(
+            matches!(result, CompilerResult::Published { .. }),
+            "{result:?}"
+        );
+        let analysis = CobolCompiler::default().analyze(&bundle(source));
+        let hir = analysis.hir.expect("typed HIR");
+        assert!(
+            [crate::StatementKind::Start, crate::StatementKind::Delete]
+                .into_iter()
+                .all(|kind| hir
+                    .statements
+                    .iter()
+                    .any(|statement| statement.kind == kind))
+        );
+    }
+
+    #[test]
+    fn sort_merge_release_and_return_publish_with_sd_runtime_metadata() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SORTOPS. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT INPUT-FILE ASSIGN TO INPUTDD ORGANIZATION IS SEQUENTIAL. SELECT OUTPUT-FILE ASSIGN TO OUTPUTDD ORGANIZATION IS SEQUENTIAL. DATA DIVISION. FILE SECTION. FD INPUT-FILE. 01 INPUT-RECORD PIC X(8). FD OUTPUT-FILE. 01 OUTPUT-RECORD PIC X(8). SD SORT-FILE. 01 SORT-RECORD. 05 SORT-KEY PIC X(2). 05 SORT-DATA PIC X(6). PROCEDURE DIVISION. SORT SORT-FILE ON ASCENDING KEY SORT-KEY USING INPUT-FILE GIVING OUTPUT-FILE. MERGE SORT-FILE ON ASCENDING KEY SORT-KEY USING INPUT-FILE GIVING OUTPUT-FILE. RELEASE SORT-RECORD FROM INPUT-RECORD. RETURN SORT-FILE RECORD INTO OUTPUT-RECORD AT END CONTINUE END-RETURN. STOP RUN.";
+        let result = CobolCompiler::default()
+            .compile(request(source, CompilationMode::Executable))
+            .unwrap();
+        assert!(
+            matches!(result, CompilerResult::Published { .. }),
+            "{result:?}"
+        );
+        let analysis = CobolCompiler::default().analyze(&bundle(source));
+        let semantic = analysis.semantic.expect("typed semantic model");
+        assert!(semantic.files.iter().any(|file| {
+            file.select_name == "SORT-FILE"
+                && file.record_name.as_deref() == Some("SORT-RECORD")
+                && file.sort_merge
+        }));
     }
 
     #[test]
@@ -822,33 +887,27 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_special_registers_are_typed_but_never_publish() {
+    fn when_compiled_register_is_typed_and_publishes() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. REGISTER. PROCEDURE DIVISION. DISPLAY WHEN-COMPILED. STOP RUN.";
         let compiler = CobolCompiler::default();
         let analysis = compiler.analyze(&bundle(source));
         let semantic = analysis.semantic.as_ref().expect("register semantic model");
         assert!(semantic.special_registers.iter().any(|register| {
-            register.kind == crate::SpecialRegisterKind::WhenCompiled && !register.runtime_supported
+            register.kind == crate::SpecialRegisterKind::WhenCompiled && register.runtime_supported
         }));
         assert!(analysis.hir.is_some());
-        assert_eq!(analysis.completeness, Completeness::Unsupported);
-        assert!(analysis.diagnostics.iter().any(|diagnostic| {
-            diagnostic.code().as_str() == "MECOB0203"
-                && diagnostic.public_message().contains("WHEN-COMPILED")
-        }));
+        assert_eq!(analysis.completeness, Completeness::Complete);
+        assert!(analysis.diagnostics.is_empty());
         assert!(matches!(
             compiler
                 .compile(request(source, CompilationMode::Executable))
                 .unwrap(),
-            CompilerResult::Failed {
-                completeness: Completeness::Unsupported,
-                ..
-            }
+            CompilerResult::Published { .. }
         ));
     }
 
     #[test]
-    fn comp1_and_comp2_keep_layouts_but_never_publish() {
+    fn comp1_and_comp2_publish_through_the_owned_ieee_adapter() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. FLOATS. DATA DIVISION. WORKING-STORAGE SECTION. 01 SHORT-X COMP-1. 01 LONG-X COMP-2. PROCEDURE DIVISION. DISPLAY SHORT-X LONG-X. STOP RUN.";
         let compiler = CobolCompiler::default();
         let analysis = compiler.analyze(&bundle(source));
@@ -862,26 +921,17 @@ mod tests {
             crate::DataCategory::FloatLong
         );
         assert!(analysis.hir.is_some());
-        assert_eq!(analysis.completeness, Completeness::Unsupported);
-        for name in ["SHORT-X", "LONG-X"] {
-            assert!(analysis.diagnostics.iter().any(|diagnostic| {
-                diagnostic.code().as_str() == "MECOB0201"
-                    && diagnostic.public_message().contains(name)
-            }));
-        }
+        assert_eq!(analysis.completeness, Completeness::Complete);
         assert!(matches!(
             compiler
                 .compile(request(source, CompilationMode::Executable))
                 .unwrap(),
-            CompilerResult::Failed {
-                completeness: Completeness::Unsupported,
-                ..
-            }
+            CompilerResult::Published { .. }
         ));
     }
 
     #[test]
-    fn unsupported_state_survives_zero_and_exhausted_diagnostic_caps() {
+    fn completed_state_survives_zero_and_exhausted_diagnostic_caps() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CAPS. DATA DIVISION. WORKING-STORAGE SECTION. 01 FLOAT-X COMP-1. PROCEDURE DIVISION. DISPLAY WHEN-COMPILED FLOAT-X. STOP RUN.";
         for max_diagnostics in [0, 1] {
             let compiler = CobolCompiler::new(CobolCompilerLimits {
@@ -889,16 +939,16 @@ mod tests {
                 ..CobolCompilerLimits::default()
             });
             let analysis = compiler.analyze(&bundle(source));
-            assert_eq!(analysis.diagnostics.len(), max_diagnostics);
-            assert_eq!(analysis.completeness, Completeness::Unsupported);
+            assert!(analysis.diagnostics.is_empty());
+            assert_eq!(analysis.completeness, Completeness::Complete);
             assert!(analysis.hir.is_some());
             assert!(matches!(
                 compiler
                     .compile(request(source, CompilationMode::Analyze))
                     .unwrap(),
                 CompilerResult::Analysis {
-                    hir: None,
-                    completeness: Completeness::Unsupported,
+                    hir: Some(_),
+                    completeness: Completeness::Complete,
                     ..
                 }
             ));
@@ -906,10 +956,7 @@ mod tests {
                 compiler
                     .compile(request(source, CompilationMode::Executable))
                     .unwrap(),
-                CompilerResult::Failed {
-                    completeness: Completeness::Unsupported,
-                    ..
-                }
+                CompilerResult::Published { .. }
             ));
         }
     }
@@ -941,7 +988,7 @@ mod tests {
     }
 
     #[test]
-    fn multiple_arithmetic_receivers_build_typed_hir_but_defer_execution() {
+    fn multiple_arithmetic_receivers_publish_through_the_owned_runtime_route() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. MULTIRECV. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9 VALUE 1. 01 B PIC 9 VALUE 2. 01 C PIC 9 VALUE 3. PROCEDURE DIVISION. ADD A TO B C. SUBTRACT A FROM B C. STOP RUN.";
         let compiler = CobolCompiler::default();
         let analysis = compiler.analyze(&bundle(source));
@@ -951,23 +998,12 @@ mod tests {
                 statement.kind == kind && statement.official == kind.official_kind()
             }));
         }
-        assert_eq!(analysis.completeness, Completeness::Unsupported);
-        assert_eq!(
-            analysis
-                .diagnostics
-                .iter()
-                .filter(|diagnostic| diagnostic.code().as_str() == "MECOB0204")
-                .count(),
-            2
-        );
+        assert_eq!(analysis.completeness, Completeness::Complete);
         assert!(matches!(
             compiler
                 .compile(request(source, CompilationMode::Executable))
                 .unwrap(),
-            CompilerResult::Failed {
-                completeness: Completeness::Unsupported,
-                ..
-            }
+            CompilerResult::Published { .. }
         ));
     }
 }

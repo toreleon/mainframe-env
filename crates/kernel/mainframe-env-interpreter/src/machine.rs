@@ -1,4 +1,7 @@
 use crate::FixedValue;
+use crate::runtime::{
+    CobolArithmetic, CobolArithmeticMode, CobolDecimal, CobolRounding, RuntimeContractProblem,
+};
 use mainframe_env_diagnostics::{
     DiagnosticCode, DiagnosticLimits, ExecutionProblem, FailureCategory, Phase,
 };
@@ -8,14 +11,17 @@ use mainframe_env_execution_api::{
     Machine, MachineDrive, MachineResume, Quantum, Selector, Suspension, Transfer,
 };
 use mainframe_env_host_api::{
-    CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, DatasetName,
-    DatasetRequest, Db2HostVariable, Db2Operation, Db2Request, EffectRequest, EffectResult,
-    HostLimits, HostProblem, HostRequest, HostResult, ImsOperation, ImsQualifier, ImsRequest,
-    MqOperation, MqRequest, Mutation, ProgramName, ProgramRequest, TerminalRequest,
+    CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, ClassName,
+    ClockRequest, DatasetName, DatasetRequest, Db2HostVariable, Db2Operation, Db2Request,
+    EffectRequest, EffectResult, HostLimits, HostProblem, HostRequest, HostResult, ImsOperation,
+    ImsQualifier, ImsRequest, KeyRelation, MethodName, MqOperation, MqRequest, Mutation,
+    ProgramName, ProgramRequest, RuntimeServiceKind, RuntimeServiceName, RuntimeServiceSelector,
+    TerminalRequest,
 };
 use mainframe_env_ir::{
     Attribute, CodecLimits, Module, Operation, OperationIdentity, StorageId, decode_binary,
 };
+use sha2::{Digest as _, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::OnceLock;
 
@@ -27,6 +33,8 @@ pub const SUPPORTED_LAYOUT_CATEGORIES: &[&str] = &[
     "binary",
     "condition",
     "dbcs",
+    "float_long",
+    "float_short",
     "function_pointer",
     "group",
     "index",
@@ -91,13 +99,22 @@ struct LayoutMetadata {
     signed: bool,
     sign_separate: bool,
     justified_right: bool,
+    blank_when_zero: bool,
     linkage: bool,
     offset: usize,
     length: usize,
     element_length: usize,
     occurs: usize,
+    occurs_min: usize,
+    unbounded: bool,
+    depending_on: Option<String>,
+    indexes: Vec<String>,
+    keys: Vec<(bool, String)>,
+    dynamic: bool,
+    dynamic_limit: usize,
     parent: Option<String>,
     condition_values: Vec<String>,
+    object_class: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -117,6 +134,43 @@ struct FileMetadata {
     alternate_record_keys: Vec<String>,
     relative_key: Option<String>,
     file_status: Option<String>,
+    sort_merge: bool,
+    description: String,
+    record_min: Option<usize>,
+    record_max: Option<usize>,
+    ccsid: Option<u16>,
+    linage: Option<usize>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct SortWorkspace {
+    records: Vec<Vec<u8>>,
+    cursor: usize,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SortProcedurePhase {
+    Input,
+    Output,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct ActiveSortProcedure {
+    sort_pc: usize,
+    sort_file: String,
+    phase: SortProcedurePhase,
+    arguments: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct SortIoState {
+    sort_pc: usize,
+    sort_file: String,
+    arguments: Vec<String>,
+    inputs: Vec<String>,
+    outputs: Vec<String>,
+    next_input: usize,
+    next_output: usize,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -175,6 +229,11 @@ enum PendingKind {
         target: String,
         handles_exception: bool,
     },
+    AcceptClock {
+        target: String,
+        format: AcceptClockFormat,
+        handles_exception: bool,
+    },
     DatasetRead {
         target: Option<String>,
         status: Option<String>,
@@ -183,11 +242,15 @@ enum PendingKind {
     DatasetStatus {
         status: Option<String>,
         cursor: Option<DatasetCursorAction>,
+        increment_linage: bool,
     },
     ProgramCall {
         targets: Vec<String>,
+        returning: Option<String>,
         handles_exception: bool,
     },
+    SortRead,
+    SortWrite,
     Db2 {
         targets: Vec<String>,
     },
@@ -212,6 +275,16 @@ enum PendingKind {
         no_handle: bool,
     },
     Ignore,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum AcceptClockFormat {
+    DateYymmdd,
+    DateYyyymmdd,
+    DayYyddd,
+    DayYyyyddd,
+    DayOfWeek,
+    Time,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -241,12 +314,37 @@ pub struct MachineSnapshot {
     pub last_file_status: String,
     pub dataset_cursors: BTreeMap<String, String>,
     pub condition_statuses: u8,
+    pub dynamic_lengths: BTreeMap<String, usize>,
+    pub implicit_values: BTreeMap<String, MachineSnapshotValue>,
+    pub search_results: BTreeMap<usize, bool>,
+    pub sql_cursors: BTreeMap<String, Vec<String>>,
+    pub sort_workspaces: BTreeMap<String, (Vec<Vec<u8>>, usize)>,
+    pub active_sort_procedure: Option<(usize, String, u8, Vec<String>)>,
+    pub sort_io: Option<(
+        usize,
+        String,
+        Vec<String>,
+        Vec<String>,
+        Vec<String>,
+        usize,
+        usize,
+    )>,
+    pub linkage_addresses: BTreeMap<String, Option<(usize, usize, usize)>>,
+    pub freed_allocations: BTreeSet<usize>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum MachineSnapshotValue {
+    Bytes(Vec<u8>),
+    Decimal { coefficient: i128, scale: u32 },
 }
 
 pub struct ReferenceMachine {
     invocation: Invocation,
     operations: Vec<Operation>,
+    arithmetic_mode: CobolArithmeticMode,
     bases: Vec<Vec<u8>>,
+    static_base_count: usize,
     views: BTreeMap<String, StorageView>,
     views_by_id: BTreeMap<StorageId, StorageView>,
     entry_initials: BTreeMap<StorageId, Vec<u8>>,
@@ -263,6 +361,13 @@ pub struct ReferenceMachine {
     condition_status: ConditionStatus,
     dataset_cursors: BTreeMap<String, String>,
     sql_cursors: BTreeMap<String, Vec<String>>,
+    sort_workspaces: BTreeMap<String, SortWorkspace>,
+    active_sort_procedure: Option<ActiveSortProcedure>,
+    sort_io: Option<SortIoState>,
+    dynamic_lengths: BTreeMap<String, usize>,
+    search_results: BTreeMap<usize, bool>,
+    linkage_addresses: BTreeMap<String, Option<StorageView>>,
+    freed_allocations: BTreeSet<usize>,
     pc: usize,
     output: Vec<u8>,
     effect_sequence: u64,
@@ -282,6 +387,7 @@ impl ReferenceMachine {
             .map_err(|problem| MachineProblem::InvalidArtifact(problem.to_string()))?;
         validate_module(&module)?;
         let (bases, views, views_by_id) = storage(&module, invocation.limits.max_storage_bytes)?;
+        let static_base_count = bases.len();
         let mut entry_initials = BTreeMap::new();
         let entry_commarea_len = invocation
             .bindings
@@ -342,7 +448,110 @@ impl ReferenceMachine {
             ),
             ("SQLSTATE".into(), CobolValue::Bytes(b"00000".to_vec())),
             ("DIBSTAT".into(), CobolValue::Bytes(b"  ".to_vec())),
+            ("DEBUG-ITEM".into(), CobolValue::Bytes(Vec::new())),
+            (
+                "IGY-JAVAIOP-CALL-EXCEPTION".into(),
+                CobolValue::Decimal(Decimal {
+                    coefficient: 0,
+                    scale: 0,
+                }),
+            ),
+            ("JNIENVPTR".into(), CobolValue::Bytes(vec![0; 8])),
+            (
+                "JSON-CODE".into(),
+                CobolValue::Decimal(Decimal {
+                    coefficient: 0,
+                    scale: 0,
+                }),
+            ),
+            (
+                "JSON-STATUS".into(),
+                CobolValue::Decimal(Decimal {
+                    coefficient: 0,
+                    scale: 0,
+                }),
+            ),
+            (
+                "LINAGE-COUNTER".into(),
+                CobolValue::Decimal(Decimal {
+                    coefficient: 1,
+                    scale: 0,
+                }),
+            ),
+            ("SHIFT-OUT".into(), CobolValue::Bytes(vec![0x0e])),
+            ("SHIFT-IN".into(), CobolValue::Bytes(vec![0x0f])),
+            (
+                "SORT-CONTROL".into(),
+                CobolValue::Decimal(Decimal {
+                    coefficient: 0,
+                    scale: 0,
+                }),
+            ),
+            (
+                "SORT-CORE-SIZE".into(),
+                CobolValue::Decimal(Decimal {
+                    coefficient: i128::from(invocation.limits.max_storage_bytes),
+                    scale: 0,
+                }),
+            ),
+            (
+                "SORT-FILE-SIZE".into(),
+                CobolValue::Decimal(Decimal {
+                    coefficient: 0,
+                    scale: 0,
+                }),
+            ),
+            ("SORT-MESSAGE".into(), CobolValue::Bytes(Vec::new())),
+            (
+                "SORT-MODE-SIZE".into(),
+                CobolValue::Decimal(Decimal {
+                    coefficient: 0,
+                    scale: 0,
+                }),
+            ),
+            (
+                "SORT-RETURN".into(),
+                CobolValue::Decimal(Decimal {
+                    coefficient: 0,
+                    scale: 0,
+                }),
+            ),
+            (
+                "TALLY".into(),
+                CobolValue::Decimal(Decimal {
+                    coefficient: 0,
+                    scale: 0,
+                }),
+            ),
+            (
+                "XML-CODE".into(),
+                CobolValue::Decimal(Decimal {
+                    coefficient: 0,
+                    scale: 0,
+                }),
+            ),
+            ("XML-EVENT".into(), CobolValue::Bytes(Vec::new())),
+            ("XML-INFORMATION".into(), CobolValue::Bytes(Vec::new())),
+            ("XML-NAMESPACE".into(), CobolValue::Bytes(Vec::new())),
+            ("XML-NNAMESPACE".into(), CobolValue::Bytes(Vec::new())),
+            ("XML-NAMESPACE-PREFIX".into(), CobolValue::Bytes(Vec::new())),
+            (
+                "XML-NNAMESPACE-PREFIX".into(),
+                CobolValue::Bytes(Vec::new()),
+            ),
+            ("XML-NTEXT".into(), CobolValue::Bytes(Vec::new())),
+            ("XML-TEXT".into(), CobolValue::Bytes(Vec::new())),
         ]);
+        implicit.insert(
+            "WHEN-COMPILED".into(),
+            CobolValue::Bytes(
+                invocation
+                    .bindings
+                    .get("cobol.when-compiled")
+                    .map(|payload| payload.bytes().to_vec())
+                    .unwrap_or_else(|| b"1970010100000000+0000".to_vec()),
+            ),
+        );
         if let Some(commarea) = invocation.bindings.get("cics.commarea")
             && let Some(storage) = module
                 .storage()
@@ -361,7 +570,35 @@ impl ReferenceMachine {
             .flat_map(|block| &block.operations)
             .cloned()
             .collect();
+        let arithmetic_modes = operations
+            .iter()
+            .filter(|operation| operation.identity.name() == "config")
+            .map(|operation| optional_text_attribute(operation, "arithmetic_mode"))
+            .collect::<Vec<_>>();
+        let arithmetic_mode = match arithmetic_modes.as_slice() {
+            [] => CobolArithmeticMode::Extended,
+            [Some("compatible")] => CobolArithmeticMode::Compatible,
+            [Some("extended")] => CobolArithmeticMode::Extended,
+            _ => {
+                return Err(MachineProblem::InvalidArtifact(
+                    "invalid COBOL runtime config".into(),
+                ));
+            }
+        };
         let (layouts, simple_layouts) = layout_metadata(&operations)?;
+        let dynamic_lengths = layouts
+            .values()
+            .filter(|layout| layout.dynamic)
+            .map(|layout| (layout.name.clone(), 0usize))
+            .collect();
+        for index in layouts.values().flat_map(|layout| &layout.indexes) {
+            implicit
+                .entry(index.clone())
+                .or_insert(CobolValue::Decimal(Decimal {
+                    coefficient: 1,
+                    scale: 0,
+                }));
+        }
         if let Some(call) = invocation.bindings.get("cobol.call.arguments") {
             let values = decode_call_arguments(call)?;
             let mut linkage = layouts
@@ -418,7 +655,9 @@ impl ReferenceMachine {
         let mut machine = Self {
             invocation,
             operations,
+            arithmetic_mode,
             bases,
+            static_base_count,
             views,
             views_by_id,
             entry_initials,
@@ -435,6 +674,13 @@ impl ReferenceMachine {
             condition_status: ConditionStatus::default(),
             dataset_cursors: BTreeMap::new(),
             sql_cursors: BTreeMap::new(),
+            sort_workspaces: BTreeMap::new(),
+            active_sort_procedure: None,
+            sort_io: None,
+            dynamic_lengths,
+            search_results: BTreeMap::new(),
+            linkage_addresses: BTreeMap::new(),
+            freed_allocations: BTreeSet::new(),
             pc: 0,
             output: Vec::new(),
             effect_sequence: 0,
@@ -471,7 +717,7 @@ impl ReferenceMachine {
     #[must_use]
     pub fn snapshot(&self) -> MachineSnapshot {
         MachineSnapshot {
-            schema_version: 7,
+            schema_version: 9,
             program_counter: self.pc,
             effect_sequence: self.effect_sequence,
             executed_steps: self.executed_steps,
@@ -484,14 +730,81 @@ impl ReferenceMachine {
             last_file_status: self.last_file_status.clone(),
             dataset_cursors: self.dataset_cursors.clone(),
             condition_statuses: self.condition_status.bits(),
+            dynamic_lengths: self.dynamic_lengths.clone(),
+            implicit_values: self
+                .implicit
+                .iter()
+                .map(|(name, value)| {
+                    (
+                        name.clone(),
+                        match value {
+                            CobolValue::Bytes(bytes) => MachineSnapshotValue::Bytes(bytes.clone()),
+                            CobolValue::Decimal(value) => MachineSnapshotValue::Decimal {
+                                coefficient: value.coefficient,
+                                scale: value.scale,
+                            },
+                        },
+                    )
+                })
+                .collect(),
+            search_results: self.search_results.clone(),
+            sql_cursors: self.sql_cursors.clone(),
+            sort_workspaces: self
+                .sort_workspaces
+                .iter()
+                .map(|(name, workspace)| {
+                    (name.clone(), (workspace.records.clone(), workspace.cursor))
+                })
+                .collect(),
+            active_sort_procedure: self.active_sort_procedure.as_ref().map(|state| {
+                (
+                    state.sort_pc,
+                    state.sort_file.clone(),
+                    match state.phase {
+                        SortProcedurePhase::Input => 0,
+                        SortProcedurePhase::Output => 1,
+                    },
+                    state.arguments.clone(),
+                )
+            }),
+            sort_io: self.sort_io.as_ref().map(|state| {
+                (
+                    state.sort_pc,
+                    state.sort_file.clone(),
+                    state.arguments.clone(),
+                    state.inputs.clone(),
+                    state.outputs.clone(),
+                    state.next_input,
+                    state.next_output,
+                )
+            }),
+            linkage_addresses: self
+                .linkage_addresses
+                .iter()
+                .map(|(name, view)| {
+                    (
+                        name.clone(),
+                        view.as_ref()
+                            .map(|view| (view.base, view.offset, view.length)),
+                    )
+                })
+                .collect(),
+            freed_allocations: self.freed_allocations.clone(),
         }
     }
 
     pub fn restore(&mut self, snapshot: MachineSnapshot) -> Result<(), MachineProblem> {
-        if !matches!(snapshot.schema_version, 1..=7)
+        if !matches!(snapshot.schema_version, 1..=9)
             || snapshot.program_counter > self.operations.len()
             || snapshot.base_storage.iter().map(Vec::len).sum::<usize>()
                 > self.invocation.limits.max_storage_bytes as usize
+            || snapshot.base_storage.len() < self.static_base_count
+            || self
+                .bases
+                .iter()
+                .take(self.static_base_count)
+                .zip(snapshot.base_storage.iter())
+                .any(|(expected, actual)| expected.len() != actual.len())
             || snapshot.last_file_status.len() != 2
         {
             return Err(MachineProblem::IncompatibleSnapshot);
@@ -533,6 +846,140 @@ impl ReferenceMachine {
             ConditionStatus::from_bits(snapshot.condition_statuses)
                 .ok_or(MachineProblem::IncompatibleSnapshot)?
         };
+        if snapshot.schema_version >= 8 {
+            let expected_dynamic = self
+                .layouts
+                .values()
+                .filter(|layout| layout.dynamic)
+                .map(|layout| layout.name.clone())
+                .collect::<BTreeSet<_>>();
+            if snapshot
+                .dynamic_lengths
+                .keys()
+                .cloned()
+                .collect::<BTreeSet<_>>()
+                != expected_dynamic
+                || snapshot.dynamic_lengths.iter().any(|(name, length)| {
+                    self.layouts
+                        .get(name)
+                        .is_none_or(|layout| *length > layout.dynamic_limit)
+                })
+                || snapshot
+                    .search_results
+                    .keys()
+                    .any(|node| !self.control_nodes.contains_key(node))
+                || snapshot
+                    .active_sort_procedure
+                    .as_ref()
+                    .is_some_and(|(pc, ..)| *pc >= self.operations.len())
+                || snapshot
+                    .sort_io
+                    .as_ref()
+                    .is_some_and(|(pc, ..)| *pc >= self.operations.len())
+            {
+                return Err(MachineProblem::IncompatibleSnapshot);
+            }
+            self.dynamic_lengths = snapshot.dynamic_lengths;
+            self.implicit = snapshot
+                .implicit_values
+                .into_iter()
+                .map(|(name, value)| {
+                    (
+                        name,
+                        match value {
+                            MachineSnapshotValue::Bytes(bytes) => CobolValue::Bytes(bytes),
+                            MachineSnapshotValue::Decimal { coefficient, scale } => {
+                                CobolValue::Decimal(Decimal { coefficient, scale })
+                            }
+                        },
+                    )
+                })
+                .collect();
+            self.search_results = snapshot.search_results;
+            self.sql_cursors = snapshot.sql_cursors;
+            self.sort_workspaces = snapshot
+                .sort_workspaces
+                .into_iter()
+                .map(|(name, (records, cursor))| (name, SortWorkspace { records, cursor }))
+                .collect();
+            self.active_sort_procedure = snapshot
+                .active_sort_procedure
+                .map(|(sort_pc, sort_file, phase, arguments)| {
+                    Ok(ActiveSortProcedure {
+                        sort_pc,
+                        sort_file,
+                        phase: match phase {
+                            0 => SortProcedurePhase::Input,
+                            1 => SortProcedurePhase::Output,
+                            _ => return Err(MachineProblem::IncompatibleSnapshot),
+                        },
+                        arguments,
+                    })
+                })
+                .transpose()?;
+            self.sort_io = snapshot.sort_io.map(
+                |(sort_pc, sort_file, arguments, inputs, outputs, next_input, next_output)| {
+                    SortIoState {
+                        sort_pc,
+                        sort_file,
+                        arguments,
+                        inputs,
+                        outputs,
+                        next_input,
+                        next_output,
+                    }
+                },
+            );
+        } else {
+            self.search_results.clear();
+            self.sql_cursors.clear();
+            self.sort_workspaces.clear();
+            self.active_sort_procedure = None;
+            self.sort_io = None;
+        }
+        if snapshot.schema_version >= 9 {
+            if snapshot.linkage_addresses.len() > self.invocation.limits.max_frames as usize
+                || snapshot.freed_allocations.len() > self.invocation.limits.max_frames as usize
+                || snapshot
+                    .freed_allocations
+                    .iter()
+                    .any(|base| *base < self.static_base_count || *base >= self.bases.len())
+                || snapshot.linkage_addresses.iter().any(|(name, view)| {
+                    !self.layouts.get(name).is_some_and(|layout| layout.linkage)
+                        || self.views.get(name).is_none_or(|original| {
+                            view.as_ref()
+                                .is_some_and(|(_, _, length)| *length != original.length)
+                        })
+                        || view.as_ref().is_some_and(|(base, offset, length)| {
+                            self.bases.get(*base).is_none_or(|storage| {
+                                offset
+                                    .checked_add(*length)
+                                    .is_none_or(|end| end > storage.len())
+                            })
+                        })
+                })
+            {
+                return Err(MachineProblem::IncompatibleSnapshot);
+            }
+            self.linkage_addresses = snapshot
+                .linkage_addresses
+                .into_iter()
+                .map(|(name, view)| {
+                    (
+                        name,
+                        view.map(|(base, offset, length)| StorageView {
+                            base,
+                            offset,
+                            length,
+                        }),
+                    )
+                })
+                .collect();
+            self.freed_allocations = snapshot.freed_allocations;
+        } else {
+            self.linkage_addresses.clear();
+            self.freed_allocations.clear();
+        }
         self.pending = None;
         self.deferred_drive = None;
         Ok(())
@@ -548,6 +995,8 @@ impl ReferenceMachine {
                 | "mainframe-env.reference-machine-checkpoint@5"
                 | "mainframe-env.reference-machine-checkpoint@6"
                 | "mainframe-env.reference-machine-checkpoint@7"
+                | "mainframe-env.reference-machine-checkpoint@8"
+                | "mainframe-env.reference-machine-checkpoint@9"
         ) {
             return Err(MachineProblem::IncompatibleSnapshot);
         }
@@ -557,8 +1006,7 @@ impl ReferenceMachine {
             self.invocation.limits.max_output_bytes as usize,
             self.invocation.limits.max_frames as usize,
         )?;
-        self.restore(snapshot)?;
-        self.reapply_entry_context()
+        self.restore(snapshot)
     }
 
     #[must_use]
@@ -586,6 +1034,13 @@ impl ReferenceMachine {
     #[must_use]
     pub fn variable(&self, name: &str) -> Option<FixedValue> {
         self.read(name).ok().map(FixedValue::new)
+    }
+
+    #[must_use]
+    pub fn file_contract(&self, name: &str) -> Option<&str> {
+        self.files
+            .get(&normalize(name))
+            .map(|file| file.description.as_str())
     }
 
     pub fn linkage_values(&self) -> Result<Vec<Vec<u8>>, MachineProblem> {
@@ -646,6 +1101,10 @@ impl ReferenceMachine {
                 PendingKind::Accept {
                     handles_exception: true,
                     ..
+                }
+                | PendingKind::AcceptClock {
+                    handles_exception: true,
+                    ..
                 } => {
                     self.condition_status.accept_exception = true;
                     return Ok(());
@@ -679,6 +1138,11 @@ impl ReferenceMachine {
             (PendingKind::Accept { target, .. }, HostResult::Terminal(payload)) => {
                 self.condition_status.accept_exception = false;
                 self.write(&target, payload.bytes())?
+            }
+            (PendingKind::AcceptClock { target, format, .. }, HostResult::Clock(value)) => {
+                self.condition_status.accept_exception = false;
+                let value = accept_clock_value(format, &value)?;
+                self.write(&target, &value)?;
             }
             (
                 PendingKind::DatasetRead {
@@ -728,6 +1192,7 @@ impl ReferenceMachine {
                 PendingKind::DatasetStatus {
                     status,
                     cursor: Some(DatasetCursorAction::Start(dataset)),
+                    ..
                 },
                 HostResult::Dataset(mainframe_env_host_api::DatasetResult::Browse {
                     cursor, ..
@@ -743,6 +1208,7 @@ impl ReferenceMachine {
                 PendingKind::DatasetStatus {
                     status,
                     cursor: Some(DatasetCursorAction::End(dataset)),
+                    ..
                 },
                 HostResult::Dataset(mainframe_env_host_api::DatasetResult::Browse { .. }),
             ) => {
@@ -764,17 +1230,39 @@ impl ReferenceMachine {
                     self.write(&status, condition_status.as_bytes())?;
                 }
             }
-            (PendingKind::DatasetRead { status, .. }, HostResult::Dataset(_))
-            | (
+            (PendingKind::DatasetRead { status, .. }, HostResult::Dataset(_)) => {
+                self.last_file_status = "00".into();
+                if let Some(status) = status {
+                    self.write(&status, b"00")?;
+                }
+            }
+            (
                 PendingKind::DatasetStatus {
                     status,
                     cursor: None,
+                    increment_linage,
                 },
                 HostResult::Dataset(_),
             ) => {
                 self.last_file_status = "00".into();
                 if let Some(status) = status {
                     self.write(&status, b"00")?;
+                }
+                if increment_linage
+                    && let Some(CobolValue::Decimal(counter)) =
+                        self.implicit.get("LINAGE-COUNTER").cloned()
+                {
+                    self.implicit.insert(
+                        "LINAGE-COUNTER".into(),
+                        CobolValue::Decimal(decimal_add(
+                            self.arithmetic_mode,
+                            counter,
+                            Decimal {
+                                coefficient: 1,
+                                scale: 0,
+                            },
+                        )?),
+                    );
                 }
             }
             (
@@ -788,6 +1276,7 @@ impl ReferenceMachine {
             (
                 PendingKind::ProgramCall {
                     targets,
+                    returning,
                     handles_exception,
                 },
                 HostResult::Program(payload),
@@ -807,11 +1296,32 @@ impl ReferenceMachine {
                 }
                 self.condition_status.call_exception = false;
                 let values = decode_call_values(&payload)?;
-                if values.len() != targets.len() {
+                if values.len() != targets.len() + usize::from(returning.is_some()) {
                     return Err(MachineProblem::UnexpectedHostResult);
                 }
-                for (target, value) in targets.iter().zip(values) {
+                for (target, value) in targets.iter().zip(&values) {
                     self.write(target, &value)?;
+                }
+                if let Some(target) = returning {
+                    self.write(
+                        &target,
+                        values.last().ok_or(MachineProblem::UnexpectedHostResult)?,
+                    )?;
+                }
+            }
+            (
+                PendingKind::SortRead,
+                HostResult::Dataset(mainframe_env_host_api::DatasetResult::Records {
+                    records, ..
+                }),
+            ) => {
+                if let Some(step) = self.continue_sort_after_read(records)? {
+                    self.defer_sort_step(step)?;
+                }
+            }
+            (PendingKind::SortWrite, HostResult::Dataset(_)) => {
+                if let Some(step) = self.continue_sort_output()? {
+                    self.defer_sort_step(step)?;
                 }
             }
             (PendingKind::Db2 { targets }, HostResult::Db2(result)) => {
@@ -1058,6 +1568,8 @@ impl ReferenceMachine {
                 PendingKind::DatasetRead { .. }
                 | PendingKind::DatasetStatus { .. }
                 | PendingKind::ProgramCall { .. }
+                | PendingKind::SortRead
+                | PendingKind::SortWrite
                 | PendingKind::Db2 { .. }
                 | PendingKind::Ims { .. }
                 | PendingKind::Mq { .. }
@@ -1077,7 +1589,7 @@ impl ReferenceMachine {
             return Ok(step);
         }
         match name {
-            "define" | "file" => {}
+            "config" | "define" | "file" => {}
             "init" => {
                 let reference = operation
                     .storage
@@ -1093,14 +1605,42 @@ impl ReferenceMachine {
             }
             "display" => {
                 let mut line = Vec::new();
-                for token in &args {
-                    if token.eq_ignore_ascii_case("WITH")
-                        || token.eq_ignore_ascii_case("NO")
-                        || token.eq_ignore_ascii_case("ADVANCING")
+                let operand_end = [position(&args, "UPON"), position(&args, "WITH")]
+                    .into_iter()
+                    .flatten()
+                    .min()
+                    .unwrap_or(args.len());
+                let mut at = 0usize;
+                while at < operand_end {
+                    if matches!(args[at].as_str(), "ADDRESS" | "LENGTH")
+                        && args.get(at + 1).is_some_and(|token| token == "OF")
                     {
-                        continue;
+                        let end = (at + 3..=operand_end)
+                            .rev()
+                            .find(|end| self.eval_value(&args[at..*end]).is_ok())
+                            .ok_or(MachineProblem::InvalidOperation)?;
+                        line.extend(value_bytes(self.eval_value(&args[at..end])?)?);
+                        at = end;
+                    } else if let Some((end, reference)) =
+                        (at + 1..=operand_end).rev().find_map(|end| {
+                            self.reference(&args[at..end])
+                                .ok()
+                                .map(|reference| (end, reference))
+                        })
+                    {
+                        line.extend(self.read_reference(&reference)?);
+                        at = end;
+                    } else if args[at] == "FUNCTION" {
+                        let end = (at + 1..=operand_end)
+                            .rev()
+                            .find(|end| self.eval_value(&args[at..*end]).is_ok())
+                            .ok_or(MachineProblem::InvalidOperation)?;
+                        line.extend(value_bytes(self.eval_value(&args[at..end])?)?);
+                        at = end;
+                    } else {
+                        line.extend(self.resolve(&args[at])?);
+                        at += 1;
                     }
-                    line.extend(self.resolve(token)?);
                 }
                 let no_advancing = args.windows(3).any(|window| {
                     window
@@ -1128,17 +1668,8 @@ impl ReferenceMachine {
             }
             "initialize" => self.initialize_op(&args)?,
             "set" => self.set_op(&args)?,
-            "allocate" => {
-                if let Some(target) = args.last() {
-                    self.write(target, b"1")?;
-                }
-            }
-            "free" => {
-                if let Some(target) = args.first() {
-                    let length = self.read(target)?.len();
-                    self.write(target, &vec![0; length])?;
-                }
-            }
+            "allocate" => self.allocate_op(&args)?,
+            "free" => self.free_op(&args)?,
             "string" => {
                 self.condition_status.string_overflow = self.string_op(&args)?;
             }
@@ -1160,17 +1691,28 @@ impl ReferenceMachine {
                 };
                 if json {
                     self.condition_status.json_exception = failed;
+                    let code = CobolValue::Decimal(Decimal {
+                        coefficient: if failed { -1 } else { 0 },
+                        scale: 0,
+                    });
+                    self.implicit.insert("JSON-CODE".into(), code.clone());
+                    self.implicit.insert("JSON-STATUS".into(), code);
                 } else {
                     self.condition_status.xml_exception = failed;
+                    self.implicit.insert(
+                        "XML-CODE".into(),
+                        CobolValue::Decimal(Decimal {
+                            coefficient: if failed { -1 } else { 0 },
+                            scale: 0,
+                        }),
+                    );
                 }
             }
             "if" => self.if_op(&args)?,
             "evaluate" => self.evaluate_op(&args)?,
             "search" => self.search_op(&args)?,
             "go_to" => {
-                return Ok(Step::Jump(
-                    self.label(args.last().ok_or(MachineProblem::InvalidOperation)?)?,
-                ));
+                return self.go_to_step(&args);
             }
             "alter" => {
                 if args.len() < 5 {
@@ -1184,20 +1726,52 @@ impl ReferenceMachine {
                 self.perform_stack.push(self.pc);
                 return Ok(Step::Jump(self.label(target)?));
             }
-            "exit" => {
-                // A paragraph EXIT is a no-op; the active PERFORM frame returns
-                // at the exact paragraph endpoint in the machine driver.
+            "exit"
+                if args.iter().any(|argument| {
+                    matches!(argument.as_str(), "PROGRAM" | "METHOD" | "FUNCTION")
+                }) =>
+            {
+                return Ok(Step::Complete);
             }
+            "exit" if args.iter().any(|argument| argument == "PERFORM") => {
+                return self.exit_perform_step(operation);
+            }
+            "exit"
+                if args
+                    .iter()
+                    .any(|argument| matches!(argument.as_str(), "PARAGRAPH" | "SECTION")) =>
+            {
+                return self.exit_paragraph_step();
+            }
+            "exit" => {}
             "entry" | "label" | "continue" => {}
             "accept" => return self.accept_effect(operation, &args),
-            "call" | "cancel" => return self.program_effect(operation, name, &args),
-            "open" | "close" | "read" | "rewrite" | "write" => {
+            "call" | "cancel" | "invoke" => {
+                return self.program_effect(operation, name, &args);
+            }
+            "open" | "close" | "delete" | "read" | "rewrite" | "start" | "write" => {
                 return self.dataset_effect(name, &args);
             }
+            "sort" | "merge" => return self.sort_effect(name, &args),
+            "release" => self.release_sort_record(&args)?,
+            "return_statement" => self.return_sort_record(&args)?,
             "exec_cics" => return self.cics_effect(&args),
             "exec_sql" => return self.sql_effect(&args),
             "exec_dli" => return self.ims_effect(&args),
-            "stop_run" | "go_back" | "halt" => return Ok(Step::Complete),
+            "stop_run" => {
+                if let Some(returning) = position(&args, "RETURNING")
+                    && let Some(value) = args.get(returning + 1)
+                {
+                    let value = self.decimal(value)?;
+                    if value.scale != 0 {
+                        return Err(MachineProblem::DataException);
+                    }
+                    self.implicit
+                        .insert("RETURN-CODE".into(), CobolValue::Decimal(value));
+                }
+                return Ok(Step::Complete);
+            }
+            "go_back" | "halt" => return Ok(Step::Complete),
             _ => return Err(MachineProblem::InvalidOperation),
         }
         if optional_integer_attribute(operation, "edge_loop").is_some() {
@@ -1232,7 +1806,11 @@ impl ReferenceMachine {
                     )))
                 }
             }
-            "block_start" if matches!(scope, "evaluate" | "search") => Ok(Some(Step::Next)),
+            "block_start" if scope == "evaluate" => Ok(Some(Step::Next)),
+            "block_start" if scope == "search" => {
+                self.prepare_search(operation, args)?;
+                Ok(Some(Step::Next))
+            }
             "block_start" if scope == "perform" => {
                 self.perform_control_start(operation, args).map(Some)
             }
@@ -1279,9 +1857,7 @@ impl ReferenceMachine {
                     Ok(Some(Step::Next))
                 }
             }
-            "transfer" if name == "go_to" => Ok(Some(Step::Jump(
-                self.label(args.last().ok_or(MachineProblem::InvalidOperation)?)?,
-            ))),
+            "transfer" if name == "go_to" => self.go_to_step(args).map(Some),
             "transfer" if name == "next_sentence" => Ok(Some(Step::Jump(
                 self.control_target(operation, "edge_transfer")?,
             ))),
@@ -1300,6 +1876,34 @@ impl ReferenceMachine {
             .ok_or(MachineProblem::InvalidOperation)
     }
 
+    fn go_to_step(&self, args: &[String]) -> Result<Step, MachineProblem> {
+        if let Some(depending) = position(args, "DEPENDING") {
+            let selector = position(args, "ON")
+                .and_then(|on| args.get(on + 1))
+                .ok_or(MachineProblem::InvalidOperation)?;
+            let selector = self.decimal(selector)?;
+            if selector.scale != 0 {
+                return Err(MachineProblem::DataException);
+            }
+            let index = usize::try_from(selector.coefficient)
+                .ok()
+                .and_then(|value| value.checked_sub(1));
+            let targets = args[..depending]
+                .iter()
+                .filter(|target| !matches!(target.as_str(), "TO" | ","))
+                .collect::<Vec<_>>();
+            return index
+                .and_then(|index| targets.get(index))
+                .map_or(Ok(Step::Next), |target| self.label(target).map(Step::Jump));
+        }
+        self.label(
+            args.iter()
+                .find(|target| target.as_str() != "TO")
+                .ok_or(MachineProblem::InvalidOperation)?,
+        )
+        .map(Step::Jump)
+    }
+
     fn control_branch(&self, operation: &Operation) -> Result<bool, MachineProblem> {
         let text = text_attribute(operation, "control_text")?.trim();
         if text.eq_ignore_ascii_case("ELSE") || text.eq_ignore_ascii_case("WHEN OTHER") {
@@ -1315,7 +1919,12 @@ impl ReferenceMachine {
             .and_then(|pc| self.operations.get(*pc));
         let parent_name = parent.map(|operation| operation.identity.name());
         let status_branch = || {
+            let search_result = parent
+                .and_then(|parent| optional_integer_attribute(parent, "control_node"))
+                .and_then(|node| usize::try_from(node).ok())
+                .and_then(|node| self.search_results.get(&node).copied());
             let positive = match (text.to_ascii_uppercase().as_str(), parent_name) {
+                ("AT END", Some("search")) => search_result.map(|found| !found),
                 ("AT END", _) => Some(self.last_file_status == "10"),
                 ("INVALID KEY", _) => Some(self.last_file_status != "00"),
                 ("ON SIZE ERROR", Some("add" | "compute" | "divide" | "multiply" | "subtract")) => {
@@ -1340,6 +1949,7 @@ impl ReferenceMachine {
                 _ => None,
             };
             positive.or_else(|| match (text.to_ascii_uppercase().as_str(), parent_name) {
+                ("NOT AT END", Some("search")) => search_result,
                 ("NOT AT END", _) => Some(self.last_file_status != "10"),
                 ("NOT INVALID KEY", _) => Some(self.last_file_status == "00"),
                 (
@@ -1365,8 +1975,11 @@ impl ReferenceMachine {
                 _ => None,
             })
         };
+        if let Some(status) = status_branch() {
+            return Ok(status);
+        }
         let Some(parent) = parent else {
-            return Ok(status_branch().unwrap_or(false));
+            return Ok(false);
         };
         let scope = optional_text_attribute(parent, "control_scope").unwrap_or("");
         if scope == "evaluate" {
@@ -1396,8 +2009,91 @@ impl ReferenceMachine {
         } else if scope == "search" {
             self.eval_condition(condition)
         } else {
-            Ok(status_branch().unwrap_or(true))
+            Ok(true)
         }
+    }
+
+    fn prepare_search(
+        &mut self,
+        operation: &Operation,
+        args: &[String],
+    ) -> Result<(), MachineProblem> {
+        let node = optional_integer_attribute(operation, "control_node")
+            .and_then(|node| usize::try_from(node).ok())
+            .ok_or(MachineProblem::InvalidOperation)?;
+        let table_name = args
+            .iter()
+            .find(|token| !matches!(token.as_str(), "ALL" | "SEARCH"))
+            .ok_or(MachineProblem::InvalidOperation)?;
+        let table = self
+            .layout(table_name)
+            .cloned()
+            .ok_or(MachineProblem::UnknownStorage)?;
+        if table.occurs <= 1 {
+            return Err(MachineProblem::SubscriptError);
+        }
+        let index_name = position(args, "VARYING")
+            .and_then(|position| args.get(position + 1))
+            .cloned()
+            .or_else(|| table.indexes.first().cloned())
+            .unwrap_or_else(|| format!("__SEARCH.{node}"));
+        self.implicit
+            .entry(normalize(&index_name))
+            .or_insert(CobolValue::Decimal(Decimal {
+                coefficient: 1,
+                scale: 0,
+            }));
+        let active = if let Some(depending_on) = &table.depending_on {
+            let value = self.decimal(depending_on)?;
+            if value.scale != 0 {
+                return Err(MachineProblem::DataException);
+            }
+            usize::try_from(value.coefficient)
+                .map_err(|_| MachineProblem::SubscriptError)?
+                .clamp(table.occurs_min, table.occurs)
+        } else {
+            table.occurs
+        };
+        let branch_conditions = self
+            .operations
+            .iter()
+            .filter(|candidate| {
+                optional_integer_attribute(candidate, "control_parent") == i64::try_from(node).ok()
+                    && optional_text_attribute(candidate, "control_role") == Some("branch")
+            })
+            .filter_map(|candidate| optional_text_attribute(candidate, "control_text"))
+            .filter(|text| text.to_ascii_uppercase().starts_with("WHEN "))
+            .map(|text| control_tokens(text))
+            .map(|tokens| tokens.into_iter().skip(1).collect::<Vec<_>>())
+            .collect::<Vec<_>>();
+        let mut found = false;
+        for occurrence in 1..=active {
+            self.implicit.insert(
+                normalize(&index_name),
+                CobolValue::Decimal(Decimal {
+                    coefficient: occurrence as i128,
+                    scale: 0,
+                }),
+            );
+            if branch_conditions
+                .iter()
+                .any(|condition| self.eval_condition(condition).unwrap_or(false))
+            {
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            self.implicit.insert(
+                normalize(&index_name),
+                CobolValue::Decimal(Decimal {
+                    coefficient: active.saturating_add(1) as i128,
+                    scale: 0,
+                }),
+            );
+        }
+        self.search_results.insert(node, found);
+        Ok(())
     }
 
     fn has_condition_handler(&self, operation: &Operation, phrase: &str) -> bool {
@@ -1487,7 +2183,11 @@ impl ReferenceMachine {
             let by = position(&args, "BY")
                 .and_then(|index| args.get(index + 1))
                 .ok_or(MachineProblem::InvalidOperation)?;
-            let value = decimal_add(self.decimal(variable)?, self.decimal(by)?)?;
+            let value = decimal_add(
+                self.arithmetic_mode,
+                self.decimal(variable)?,
+                self.decimal(by)?,
+            )?;
             self.write_decimal(variable, value)?;
         }
         if let Some(count) = self.loop_counts.get_mut(&parent) {
@@ -1495,6 +2195,61 @@ impl ReferenceMachine {
         }
         self.loop_reentry.insert(parent);
         Ok(Step::Jump(self.control_target(operation, "edge_loop")?))
+    }
+
+    fn exit_perform_step(&self, operation: &Operation) -> Result<Step, MachineProblem> {
+        let mut parent = optional_integer_attribute(operation, "control_parent")
+            .and_then(|value| usize::try_from(value).ok());
+        while let Some(node) = parent {
+            let pc = self
+                .control_nodes
+                .get(&node)
+                .copied()
+                .ok_or(MachineProblem::InvalidOperation)?;
+            let owner = self
+                .operations
+                .get(pc)
+                .ok_or(MachineProblem::InvalidOperation)?;
+            if optional_text_attribute(owner, "control_scope") == Some("perform") {
+                let end = self
+                    .operations
+                    .iter()
+                    .enumerate()
+                    .skip(pc + 1)
+                    .find(|(_, candidate)| {
+                        optional_text_attribute(candidate, "control_role") == Some("block_end")
+                            && optional_text_attribute(candidate, "control_scope")
+                                == Some("perform")
+                            && optional_integer_attribute(candidate, "control_parent")
+                                .and_then(|value| usize::try_from(value).ok())
+                                == Some(node)
+                    })
+                    .map(|(pc, _)| pc + 1)
+                    .ok_or(MachineProblem::InvalidOperation)?;
+                return Ok(Step::Jump(end));
+            }
+            parent = optional_integer_attribute(owner, "control_parent")
+                .and_then(|value| usize::try_from(value).ok());
+        }
+        Err(MachineProblem::InvalidOperation)
+    }
+
+    fn exit_paragraph_step(&mut self) -> Result<Step, MachineProblem> {
+        if let Some(call_pc) = self.perform_stack.last().copied()
+            && self
+                .perform_endpoint(call_pc)
+                .is_some_and(|endpoint| self.pc <= endpoint)
+        {
+            return self.finish_perform().map(Step::Jump);
+        }
+        let next = self
+            .labels
+            .values()
+            .copied()
+            .filter(|label| *label > self.pc)
+            .min()
+            .unwrap_or_else(|| self.operations.len().saturating_sub(1));
+        Ok(Step::Jump(next))
     }
 
     fn at_perform_endpoint(&self) -> bool {
@@ -1507,11 +2262,28 @@ impl ReferenceMachine {
     fn perform_endpoint(&self, call_pc: usize) -> Option<usize> {
         let call = self.operations.get(call_pc)?;
         let args = arguments(call);
+        if matches!(call.identity.name(), "sort" | "merge") {
+            let active = self
+                .active_sort_procedure
+                .as_ref()
+                .filter(|active| active.sort_pc == call_pc)?;
+            let kind = match active.phase {
+                SortProcedurePhase::Input => "INPUT",
+                SortProcedurePhase::Output => "OUTPUT",
+            };
+            let target =
+                sort_procedure_end(&args, kind).or_else(|| sort_procedure_target(&args, kind))?;
+            return self.paragraph_endpoint(&target);
+        }
         let target = position(&args, "THRU")
             .or_else(|| position(&args, "THROUGH"))
             .and_then(|index| args.get(index + 1))
             .or_else(|| args.first());
-        let start = target.and_then(|target| self.labels.get(&normalize(target)).copied())?;
+        self.paragraph_endpoint(target?)
+    }
+
+    fn paragraph_endpoint(&self, target: &str) -> Option<usize> {
+        let start = self.labels.get(&normalize(target)).copied()?;
         Some(
             self.labels
                 .values()
@@ -1539,6 +2311,46 @@ impl ReferenceMachine {
             .get(call_pc)
             .cloned()
             .ok_or(MachineProblem::InvalidOperation)?;
+        if matches!(operation.identity.name(), "sort" | "merge") {
+            let active = self
+                .active_sort_procedure
+                .take()
+                .filter(|active| active.sort_pc == call_pc)
+                .ok_or(MachineProblem::InvalidOperation)?;
+            return match active.phase {
+                SortProcedurePhase::Input => {
+                    self.order_sort_workspace(&active.sort_file, &active.arguments)?;
+                    let outputs = sort_file_list(&active.arguments, "GIVING");
+                    if !outputs.is_empty() {
+                        self.sort_io = Some(SortIoState {
+                            sort_pc: call_pc,
+                            sort_file: active.sort_file,
+                            arguments: active.arguments,
+                            inputs: Vec::new(),
+                            outputs,
+                            next_input: 0,
+                            next_output: 0,
+                        });
+                        let step = self.issue_sort_write()?;
+                        self.defer_sort_step(step)?;
+                        Ok(call_pc.saturating_add(1))
+                    } else if let Some(target) = sort_procedure_target(&active.arguments, "OUTPUT")
+                    {
+                        self.active_sort_procedure = Some(ActiveSortProcedure {
+                            sort_pc: call_pc,
+                            sort_file: active.sort_file,
+                            phase: SortProcedurePhase::Output,
+                            arguments: active.arguments,
+                        });
+                        self.perform_stack.push(call_pc);
+                        self.label(&target)
+                    } else {
+                        Ok(call_pc.saturating_add(1))
+                    }
+                }
+                SortProcedurePhase::Output => Ok(call_pc.saturating_add(1)),
+            };
+        }
         if optional_integer_attribute(&operation, "edge_loop").is_some() {
             return match self.perform_control_end(&operation)? {
                 Step::Jump(target) => Ok(target),
@@ -1573,6 +2385,58 @@ impl ReferenceMachine {
         args: &[String],
     ) -> Result<Step, MachineProblem> {
         let target = normalize(args.first().ok_or(MachineProblem::InvalidOperation)?);
+        let handles_exception = self.has_condition_handler(operation, "ON EXCEPTION");
+        self.condition_status.accept_exception = false;
+        if let Some(from) = position(args, "FROM") {
+            let source = args.get(from + 1).ok_or(MachineProblem::InvalidOperation)?;
+            let clock = match source.as_str() {
+                "DATE" if args.get(from + 2).is_some_and(|token| token == "YYYYMMDD") => {
+                    Some((ClockRequest::Date, AcceptClockFormat::DateYyyymmdd))
+                }
+                "DATE" => Some((ClockRequest::Date, AcceptClockFormat::DateYymmdd)),
+                "DAY" if args.get(from + 2).is_some_and(|token| token == "YYYYDDD") => {
+                    Some((ClockRequest::Date, AcceptClockFormat::DayYyyyddd))
+                }
+                "DAY" => Some((ClockRequest::Date, AcceptClockFormat::DayYyddd)),
+                "DAY-OF-WEEK" => Some((ClockRequest::Date, AcceptClockFormat::DayOfWeek)),
+                "TIME" => Some((ClockRequest::Time, AcceptClockFormat::Time)),
+                _ => None,
+            };
+            if let Some((request, format)) = clock {
+                return self.effect(
+                    HostRequest::Clock(request),
+                    PendingKind::AcceptClock {
+                        target,
+                        format,
+                        handles_exception,
+                    },
+                );
+            }
+            let binding = match source.as_str() {
+                "COMMAND-LINE" => Some("cobol.command-line".to_string()),
+                "ENVIRONMENT" => args.get(from + 2).map(|name| {
+                    format!(
+                        "cobol.environment.{}",
+                        normalize(name.trim_matches(['\'', '"']))
+                    )
+                }),
+                "ARGUMENT-NUMBER" => Some("cobol.argument-number".to_string()),
+                "ARGUMENT-VALUE" => Some("cobol.argument-value".to_string()),
+                _ => None,
+            };
+            if let Some(binding) = binding {
+                if let Some(value) = self.invocation.bindings.get(&binding) {
+                    let bytes = value.bytes().to_vec();
+                    self.write(&target, &bytes)?;
+                    return Ok(Step::Next);
+                }
+                if handles_exception {
+                    self.condition_status.accept_exception = true;
+                    return Ok(Step::Next);
+                }
+                return Err(MachineProblem::DataException);
+            }
+        }
         let request = HostRequest::Terminal(TerminalRequest::Read {
             session: mainframe_env_host_api::SessionId::new(
                 self.invocation.run_unit_id.as_str(),
@@ -1580,8 +2444,6 @@ impl ReferenceMachine {
             )
             .map_err(|_| MachineProblem::InvalidOperation)?,
         });
-        let handles_exception = self.has_condition_handler(operation, "ON EXCEPTION");
-        self.condition_status.accept_exception = false;
         self.effect(
             request,
             PendingKind::Accept {
@@ -1606,40 +2468,157 @@ impl ReferenceMachine {
         {
             return self.mq_effect(args);
         }
-        let program = ProgramName::new(
-            args.first()
-                .ok_or(MachineProblem::InvalidOperation)?
-                .trim_matches(['\'', '"']),
-            128,
-        )
-        .map_err(|_| MachineProblem::InvalidOperation)?;
         if name == "cancel" {
+            let programs = args
+                .iter()
+                .filter(|argument| !matches!(argument.as_str(), "," | "END-CANCEL"))
+                .map(|argument| {
+                    let value = if argument.starts_with(['\'', '"']) {
+                        argument.trim_matches(['\'', '"']).to_string()
+                    } else {
+                        String::from_utf8(self.read(argument)?)
+                            .map_err(|_| MachineProblem::DataException)?
+                            .trim()
+                            .to_string()
+                    };
+                    ProgramName::new(value, HostLimits::default().max_name_bytes)
+                        .map_err(|_| MachineProblem::DataException)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
             return self.effect(
-                HostRequest::Program(ProgramRequest::Cancel { program }),
+                HostRequest::Program(ProgramRequest::Cancel { programs }),
                 PendingKind::Ignore,
             );
         }
         let targets = position(args, "USING").map_or_else(Vec::new, |using| {
             args[using + 1..]
                 .iter()
-                .filter(|argument| !matches!(argument.as_str(), "BY" | "REFERENCE" | "CONTENT"))
+                .take_while(|argument| {
+                    !matches!(
+                        argument.as_str(),
+                        "RETURNING" | "ON" | "NOT" | "END-CALL" | "END-INVOKE"
+                    )
+                })
+                .filter(|argument| {
+                    !matches!(argument.as_str(), "BY" | "REFERENCE" | "CONTENT" | "VALUE")
+                })
                 .cloned()
                 .collect()
         });
+        let returning = position(args, "RETURNING").and_then(|at| args.get(at + 1).cloned());
         let values = targets
             .iter()
             .map(|target| self.read(target))
             .collect::<Result<Vec<_>, _>>()?;
         let payload = encode_call_values(&targets, &values)?;
+        let request = if name == "invoke" {
+            let receiver_name = args.first().ok_or(MachineProblem::InvalidOperation)?;
+            let receiver_layout = self
+                .layout(receiver_name)
+                .filter(|layout| layout.category == LayoutCategory::ObjectReference)
+                .ok_or(MachineProblem::DataException)?;
+            let class = ClassName::new(
+                receiver_layout
+                    .object_class
+                    .as_deref()
+                    .ok_or(MachineProblem::InvalidOperation)?,
+                HostLimits::default().max_name_bytes,
+            )
+            .map_err(|_| MachineProblem::InvalidOperation)?;
+            let method = MethodName::new(
+                args.get(1)
+                    .ok_or(MachineProblem::InvalidOperation)?
+                    .trim_matches(['\'', '"']),
+                HostLimits::default().max_name_bytes,
+            )
+            .map_err(|_| MachineProblem::InvalidOperation)?;
+            let receiver_bytes = self.read(receiver_name)?;
+            if receiver_bytes.iter().all(|byte| *byte == 0) {
+                if self.has_condition_handler(operation, "ON EXCEPTION") {
+                    self.condition_status.call_exception = true;
+                    return Ok(Step::Next);
+                }
+                return Err(MachineProblem::DataException);
+            }
+            let receiver = BoundedPayload::new(
+                "mainframe-env.cobol-object-reference@1",
+                receiver_bytes,
+                InvocationLimits::default(),
+            )
+            .map_err(|_| MachineProblem::ResourceExhausted)?;
+            HostRequest::Program(ProgramRequest::Invoke {
+                class,
+                method,
+                receiver,
+                payload,
+            })
+        } else {
+            let program = ProgramName::new(
+                args.first()
+                    .ok_or(MachineProblem::InvalidOperation)?
+                    .trim_matches(['\'', '"']),
+                HostLimits::default().max_name_bytes,
+            )
+            .map_err(|_| MachineProblem::InvalidOperation)?;
+            let service = self.runtime_service_selector(program.as_str())?;
+            HostRequest::Program(ProgramRequest::Call {
+                program,
+                payload,
+                service,
+            })
+        };
         let handles_exception = self.has_condition_handler(operation, "ON EXCEPTION");
         self.condition_status.call_exception = false;
         self.effect(
-            HostRequest::Program(ProgramRequest::Call { program, payload }),
+            request,
             PendingKind::ProgramCall {
                 targets,
+                returning,
                 handles_exception,
             },
         )
+    }
+
+    fn runtime_service_selector(
+        &self,
+        program: &str,
+    ) -> Result<Option<RuntimeServiceSelector>, MachineProblem> {
+        let Some(binding) = self
+            .invocation
+            .bindings
+            .get(&format!("cobol.runtime-service.{}", normalize(program)))
+        else {
+            return Ok(None);
+        };
+        if binding.schema() != "mainframe-env.runtime-service-selector@1" {
+            return Err(MachineProblem::InvalidOperation);
+        }
+        let text =
+            std::str::from_utf8(binding.bytes()).map_err(|_| MachineProblem::InvalidOperation)?;
+        let mut fields = text.split(':');
+        let kind = match fields.next() {
+            Some("le") => RuntimeServiceKind::LanguageEnvironment,
+            Some("extension") => RuntimeServiceKind::HostExtension,
+            _ => return Err(MachineProblem::InvalidOperation),
+        };
+        let name = RuntimeServiceName::new(
+            fields.next().ok_or(MachineProblem::InvalidOperation)?,
+            HostLimits::default().max_name_bytes,
+        )
+        .map_err(|_| MachineProblem::InvalidOperation)?;
+        let abi_version = fields
+            .next()
+            .and_then(|value| value.parse::<u16>().ok())
+            .filter(|value| *value > 0)
+            .ok_or(MachineProblem::InvalidOperation)?;
+        if fields.next().is_some() {
+            return Err(MachineProblem::InvalidOperation);
+        }
+        Ok(Some(RuntimeServiceSelector {
+            kind,
+            name,
+            abi_version,
+        }))
     }
     fn mq_effect(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
         let operation = match normalize(
@@ -1798,6 +2777,422 @@ impl ReferenceMachine {
             },
         )
     }
+
+    fn sort_effect(&mut self, name: &str, args: &[String]) -> Result<Step, MachineProblem> {
+        let sort_file = normalize(args.first().ok_or(MachineProblem::InvalidOperation)?);
+        if !self
+            .files
+            .get(&sort_file)
+            .is_some_and(|file| file.sort_merge)
+        {
+            return Err(MachineProblem::InvalidOperation);
+        }
+        self.sort_workspaces.insert(
+            sort_file.clone(),
+            SortWorkspace {
+                records: Vec::new(),
+                cursor: 0,
+            },
+        );
+        let inputs = sort_file_list(args, "USING");
+        let outputs = sort_file_list(args, "GIVING");
+        if name == "merge" && inputs.is_empty() {
+            return Err(MachineProblem::InvalidOperation);
+        }
+        if !inputs.is_empty() {
+            self.sort_io = Some(SortIoState {
+                sort_pc: self.pc,
+                sort_file,
+                arguments: args.to_vec(),
+                inputs,
+                outputs,
+                next_input: 0,
+                next_output: 0,
+            });
+            return self.issue_sort_read();
+        }
+        if let Some(target) = sort_procedure_target(args, "INPUT") {
+            self.active_sort_procedure = Some(ActiveSortProcedure {
+                sort_pc: self.pc,
+                sort_file,
+                phase: SortProcedurePhase::Input,
+                arguments: args.to_vec(),
+            });
+            self.perform_stack.push(self.pc);
+            return Ok(Step::Jump(self.label(&target)?));
+        }
+        self.order_sort_workspace(&sort_file, args)?;
+        if !outputs.is_empty() {
+            self.sort_io = Some(SortIoState {
+                sort_pc: self.pc,
+                sort_file,
+                arguments: args.to_vec(),
+                inputs,
+                outputs,
+                next_input: 0,
+                next_output: 0,
+            });
+            return self.issue_sort_write();
+        }
+        if let Some(target) = sort_procedure_target(args, "OUTPUT") {
+            self.active_sort_procedure = Some(ActiveSortProcedure {
+                sort_pc: self.pc,
+                sort_file,
+                phase: SortProcedurePhase::Output,
+                arguments: args.to_vec(),
+            });
+            self.perform_stack.push(self.pc);
+            return Ok(Step::Jump(self.label(&target)?));
+        }
+        Ok(Step::Next)
+    }
+
+    fn release_sort_record(&mut self, args: &[String]) -> Result<(), MachineProblem> {
+        let record_name = normalize(args.first().ok_or(MachineProblem::InvalidOperation)?);
+        let sort_file = self
+            .files
+            .iter()
+            .find(|(_, file)| {
+                file.sort_merge && file.record_name.as_deref() == Some(record_name.as_str())
+            })
+            .map(|(name, _)| name.clone())
+            .or_else(|| {
+                (self.sort_workspaces.len() == 1)
+                    .then(|| self.sort_workspaces.keys().next().cloned())
+                    .flatten()
+            })
+            .ok_or(MachineProblem::InvalidOperation)?;
+        let source = position(args, "FROM")
+            .and_then(|from| args.get(from + 1))
+            .map_or(record_name.as_str(), String::as_str);
+        let value = self.resolve(source)?;
+        let record_length = self
+            .files
+            .get(&sort_file)
+            .and_then(|file| file.record_name.as_deref())
+            .and_then(|record| self.layout(record))
+            .map(|layout| layout.length)
+            .ok_or(MachineProblem::InvalidOperation)?;
+        let value = FixedValue::fit(&value, record_length, false)
+            .bytes()
+            .to_vec();
+        if source != record_name {
+            self.write(&record_name, &value)?;
+        }
+        self.reserve_sort_record(&sort_file, value)
+    }
+
+    fn return_sort_record(&mut self, args: &[String]) -> Result<(), MachineProblem> {
+        let sort_file = normalize(args.first().ok_or(MachineProblem::InvalidOperation)?);
+        let target = position(args, "INTO")
+            .and_then(|into| args.get(into + 1))
+            .cloned()
+            .or_else(|| {
+                self.files
+                    .get(&sort_file)
+                    .and_then(|file| file.record_name.clone())
+            })
+            .ok_or(MachineProblem::InvalidOperation)?;
+        let record = {
+            let workspace = self
+                .sort_workspaces
+                .get_mut(&sort_file)
+                .ok_or(MachineProblem::InvalidOperation)?;
+            let record = workspace.records.get(workspace.cursor).cloned();
+            if record.is_some() {
+                workspace.cursor = workspace
+                    .cursor
+                    .checked_add(1)
+                    .ok_or(MachineProblem::ResourceExhausted)?;
+            }
+            record
+        };
+        if let Some(record) = record {
+            self.last_file_status = "00".into();
+            self.write(&target, &record)?;
+        } else {
+            self.last_file_status = "10".into();
+        }
+        Ok(())
+    }
+
+    fn reserve_sort_record(
+        &mut self,
+        sort_file: &str,
+        record: Vec<u8>,
+    ) -> Result<(), MachineProblem> {
+        let workspace = self
+            .sort_workspaces
+            .get_mut(sort_file)
+            .ok_or(MachineProblem::InvalidOperation)?;
+        if workspace.records.len() as u64 >= self.invocation.limits.max_events
+            || workspace
+                .records
+                .iter()
+                .map(Vec::len)
+                .sum::<usize>()
+                .checked_add(record.len())
+                .is_none_or(|bytes| bytes as u64 > self.invocation.limits.max_storage_bytes)
+        {
+            return Err(MachineProblem::ResourceExhausted);
+        }
+        workspace.records.push(record);
+        Ok(())
+    }
+
+    fn order_sort_workspace(
+        &mut self,
+        sort_file: &str,
+        args: &[String],
+    ) -> Result<(), MachineProblem> {
+        let record = self
+            .files
+            .get(sort_file)
+            .and_then(|file| file.record_name.as_deref())
+            .and_then(|name| self.layout(name))
+            .cloned()
+            .ok_or(MachineProblem::InvalidOperation)?;
+        let mut descending = false;
+        let mut keys = Vec::new();
+        for token in args
+            .iter()
+            .skip(1)
+            .take_while(|token| !matches!(token.as_str(), "USING" | "GIVING" | "INPUT" | "OUTPUT"))
+        {
+            match token.as_str() {
+                "ASCENDING" => descending = false,
+                "DESCENDING" => descending = true,
+                "ON" | "KEY" | "IS" => {}
+                _ => {
+                    if let Some(layout) = self.layout(token)
+                        && layout.offset >= record.offset
+                        && layout.offset.saturating_add(layout.length)
+                            <= record.offset.saturating_add(record.length)
+                    {
+                        keys.push((layout.offset - record.offset, layout.length, descending));
+                    }
+                }
+            }
+        }
+        let workspace = self
+            .sort_workspaces
+            .get_mut(sort_file)
+            .ok_or(MachineProblem::InvalidOperation)?;
+        workspace.records.sort_by(|left, right| {
+            if keys.is_empty() {
+                return left.cmp(right);
+            }
+            for (offset, length, descending) in &keys {
+                let left_key = left.get(*offset..offset.saturating_add(*length));
+                let right_key = right.get(*offset..offset.saturating_add(*length));
+                let ordering = left_key
+                    .map(cobol_collation_key)
+                    .cmp(&right_key.map(cobol_collation_key));
+                if !ordering.is_eq() {
+                    return if *descending {
+                        ordering.reverse()
+                    } else {
+                        ordering
+                    };
+                }
+            }
+            std::cmp::Ordering::Equal
+        });
+        workspace.cursor = 0;
+        Ok(())
+    }
+
+    fn issue_sort_read(&mut self) -> Result<Step, MachineProblem> {
+        let logical = {
+            let state = self
+                .sort_io
+                .as_mut()
+                .ok_or(MachineProblem::InvalidOperation)?;
+            let logical = state
+                .inputs
+                .get(state.next_input)
+                .cloned()
+                .ok_or(MachineProblem::InvalidOperation)?;
+            state.next_input += 1;
+            logical
+        };
+        let (dataset, _) = self.dataset_endpoint(&logical)?;
+        let maximum = self
+            .invocation
+            .limits
+            .max_events
+            .min(HostLimits::default().max_records as u64);
+        self.effect(
+            HostRequest::Dataset(DatasetRequest::Read {
+                dataset,
+                member: None,
+                key: None,
+                max_records: u32::try_from(maximum)
+                    .map_err(|_| MachineProblem::ResourceExhausted)?,
+            }),
+            PendingKind::SortRead,
+        )
+    }
+
+    fn issue_sort_write(&mut self) -> Result<Step, MachineProblem> {
+        let (logical, sort_file) = {
+            let state = self
+                .sort_io
+                .as_mut()
+                .ok_or(MachineProblem::InvalidOperation)?;
+            let logical = state
+                .outputs
+                .get(state.next_output)
+                .cloned()
+                .ok_or(MachineProblem::InvalidOperation)?;
+            state.next_output += 1;
+            (logical, state.sort_file.clone())
+        };
+        let (dataset, ccsid) = self.dataset_endpoint(&logical)?;
+        let records = self
+            .sort_workspaces
+            .get(&sort_file)
+            .ok_or(MachineProblem::InvalidOperation)?
+            .records
+            .iter()
+            .map(|record| encode_dataset_record(ccsid, record))
+            .collect::<Result<Vec<_>, _>>()?;
+        self.effect(
+            HostRequest::Dataset(DatasetRequest::Write {
+                dataset,
+                member: None,
+                records,
+                expected_version: None,
+                mutation: self.mutation()?,
+            }),
+            PendingKind::SortWrite,
+        )
+    }
+
+    fn dataset_endpoint(
+        &self,
+        logical: &str,
+    ) -> Result<(DatasetName, Option<u16>), MachineProblem> {
+        let logical_name = normalize(logical);
+        let file = self.files.get(&logical_name);
+        let dataset_name = self
+            .invocation
+            .bindings
+            .get(&format!("cobol.dd.{logical_name}"))
+            .or_else(|| {
+                file.and_then(|file| {
+                    self.invocation
+                        .bindings
+                        .get(&format!("cobol.dd.{}", normalize(&file.assignment)))
+                })
+            })
+            .map(|payload| String::from_utf8_lossy(payload.bytes()).into_owned())
+            .unwrap_or_else(|| {
+                file.map(|file| file.assignment.clone())
+                    .unwrap_or(logical_name)
+            });
+        let dataset =
+            DatasetName::new(dataset_name, 128).map_err(|_| MachineProblem::InvalidOperation)?;
+        let ccsid = self
+            .invocation
+            .bindings
+            .get(&format!("cobol.dd.{}.ccsid", normalize(logical)))
+            .or_else(|| {
+                file.and_then(|file| {
+                    self.invocation
+                        .bindings
+                        .get(&format!("cobol.dd.{}.ccsid", normalize(&file.assignment)))
+                })
+            })
+            .map(|payload| {
+                std::str::from_utf8(payload.bytes())
+                    .map_err(|_| MachineProblem::InvalidOperation)?
+                    .parse::<u16>()
+                    .map_err(|_| MachineProblem::InvalidOperation)
+            })
+            .transpose()?
+            .or_else(|| file.as_ref().and_then(|file| file.ccsid));
+        Ok((dataset, ccsid))
+    }
+
+    fn continue_sort_after_read(
+        &mut self,
+        records: Vec<Vec<u8>>,
+    ) -> Result<Option<Step>, MachineProblem> {
+        let (sort_file, input, more_inputs) = {
+            let state = self
+                .sort_io
+                .as_ref()
+                .ok_or(MachineProblem::InvalidOperation)?;
+            (
+                state.sort_file.clone(),
+                state
+                    .inputs
+                    .get(state.next_input.saturating_sub(1))
+                    .cloned()
+                    .ok_or(MachineProblem::InvalidOperation)?,
+                state.next_input < state.inputs.len(),
+            )
+        };
+        let (_, ccsid) = self.dataset_endpoint(&input)?;
+        for record in records {
+            self.reserve_sort_record(&sort_file, decode_dataset_record(ccsid, &record)?)?;
+        }
+        if more_inputs {
+            return self.issue_sort_read().map(Some);
+        }
+        let arguments = self
+            .sort_io
+            .as_ref()
+            .ok_or(MachineProblem::InvalidOperation)?
+            .arguments
+            .clone();
+        self.order_sort_workspace(&sort_file, &arguments)?;
+        self.continue_sort_output()
+    }
+
+    fn continue_sort_output(&mut self) -> Result<Option<Step>, MachineProblem> {
+        let (sort_pc, sort_file, arguments, more_outputs) = {
+            let state = self
+                .sort_io
+                .as_ref()
+                .ok_or(MachineProblem::InvalidOperation)?;
+            (
+                state.sort_pc,
+                state.sort_file.clone(),
+                state.arguments.clone(),
+                state.next_output < state.outputs.len(),
+            )
+        };
+        if more_outputs {
+            return self.issue_sort_write().map(Some);
+        }
+        self.sort_io = None;
+        if let Some(target) = sort_procedure_target(&arguments, "OUTPUT") {
+            self.active_sort_procedure = Some(ActiveSortProcedure {
+                sort_pc,
+                sort_file,
+                phase: SortProcedurePhase::Output,
+                arguments,
+            });
+            self.perform_stack.push(sort_pc);
+            return self.label(&target).map(Step::Jump).map(Some);
+        }
+        Ok(None)
+    }
+
+    fn defer_sort_step(&mut self, step: Step) -> Result<(), MachineProblem> {
+        match step {
+            Step::Next => {}
+            Step::Jump(target) => self.pc = target,
+            Step::Effect(effect) => self.deferred_drive = Some(MachineDrive::HostCall(*effect)),
+            Step::Complete => {
+                self.deferred_drive = Some(MachineDrive::Completed(self.complete()?));
+            }
+        }
+        Ok(())
+    }
+
     fn dataset_effect(&mut self, name: &str, args: &[String]) -> Result<Step, MachineProblem> {
         let open_mode = (name == "open")
             .then(|| {
@@ -1827,6 +3222,9 @@ impl ReferenceMachine {
                 .find(|file| file.record_name.as_deref() == Some(logical_name.as_str()))
                 .cloned()
         });
+        let start_key = (name == "start")
+            .then(|| start_relation_and_key(args))
+            .flatten();
         let explicit_key = (name == "read")
             .then(|| {
                 position(args, "KEY").and_then(|index| {
@@ -1838,7 +3236,8 @@ impl ReferenceMachine {
                     .cloned()
                 })
             })
-            .flatten();
+            .flatten()
+            .or_else(|| start_key.as_ref().map(|(_, key)| key.clone()));
         let alternate_dd = explicit_key.as_ref().and_then(|key| {
             file.as_ref().and_then(|file| {
                 file.alternate_record_keys
@@ -1890,10 +3289,10 @@ impl ReferenceMachine {
                     .parse::<u16>()
                     .map_err(|_| MachineProblem::InvalidOperation)
             })
-            .transpose()?;
+            .transpose()?
+            .or_else(|| file.as_ref().and_then(|file| file.ccsid));
         let default_key = file
             .as_ref()
-            .filter(|file| file.access_mode == "RANDOM")
             .and_then(|file| file.record_key.as_ref().or(file.relative_key.as_ref()))
             .map(|key| self.resolve(key))
             .transpose()?
@@ -1907,14 +3306,22 @@ impl ReferenceMachine {
             .is_some_and(|file| file.organization == "SEQUENTIAL");
         let current_cursor = self.dataset_cursors.get(&dataset_name).cloned();
         let (request, cursor_action) = match name {
-            "read" if sequential && current_cursor.is_some() => (
-                DatasetRequest::ReadNext {
-                    dataset,
-                    cursor: current_cursor.ok_or(MachineProblem::InvalidOperation)?,
-                    reverse: false,
-                },
-                None,
-            ),
+            "read"
+                if current_cursor.is_some()
+                    && (sequential
+                        || args
+                            .iter()
+                            .any(|argument| matches!(argument.as_str(), "NEXT" | "PREVIOUS"))) =>
+            {
+                (
+                    DatasetRequest::ReadNext {
+                        dataset,
+                        cursor: current_cursor.ok_or(MachineProblem::InvalidOperation)?,
+                        reverse: args.iter().any(|argument| argument == "PREVIOUS"),
+                    },
+                    None,
+                )
+            }
             "read" => (
                 DatasetRequest::Read {
                     dataset,
@@ -1937,6 +3344,7 @@ impl ReferenceMachine {
                     .map(|value| self.resolve(value))
                     .transpose()?
                     .unwrap_or_default();
+                validate_record_length(file.as_ref(), record.len())?;
                 let records = vec![encode_dataset_record(ccsid, &record)?];
                 (
                     if sequential_organization {
@@ -1966,6 +3374,7 @@ impl ReferenceMachine {
                     .map(|value| self.resolve(value))
                     .transpose()?
                     .unwrap_or_default();
+                validate_record_length(file.as_ref(), record.len())?;
                 (
                     DatasetRequest::RewriteRecord {
                         dataset,
@@ -1977,6 +3386,39 @@ impl ReferenceMachine {
                     None,
                 )
             }
+            "delete"
+                if file
+                    .as_ref()
+                    .is_some_and(|file| file.organization == "RELATIVE") =>
+            {
+                let relative_key = file
+                    .as_ref()
+                    .and_then(|file| file.relative_key.as_ref())
+                    .ok_or(MachineProblem::InvalidOperation)?;
+                let number = self.decimal(relative_key)?;
+                if number.scale != 0 || number.coefficient <= 0 {
+                    return Err(MachineProblem::DataException);
+                }
+                (
+                    DatasetRequest::DeleteRelative {
+                        dataset,
+                        record_number: u64::try_from(number.coefficient)
+                            .map_err(|_| MachineProblem::DataException)?,
+                        expected_version: None,
+                        mutation: self.mutation()?,
+                    },
+                    None,
+                )
+            }
+            "delete" => (
+                DatasetRequest::DeleteRecord {
+                    dataset,
+                    key: default_key.ok_or(MachineProblem::InvalidOperation)?,
+                    expected_version: None,
+                    mutation: self.mutation()?,
+                },
+                None,
+            ),
             "open" if open_mode == Some("OUTPUT") => (
                 DatasetRequest::Truncate {
                     dataset,
@@ -1989,9 +3431,29 @@ impl ReferenceMachine {
                 DatasetRequest::StartBrowse {
                     dataset,
                     key: Vec::new(),
+                    relation: KeyRelation::GreaterOrEqual,
                 },
                 Some(DatasetCursorAction::Start(dataset_name.clone())),
             ),
+            "start" => {
+                let (relation, _) = start_key
+                    .clone()
+                    .unwrap_or((KeyRelation::GreaterOrEqual, String::new()));
+                (
+                    DatasetRequest::StartBrowse {
+                        dataset,
+                        key: explicit_key
+                            .as_ref()
+                            .map(|key| self.resolve(key))
+                            .transpose()?
+                            .map(|key| encode_dataset_record(ccsid, &key))
+                            .transpose()?
+                            .unwrap_or_default(),
+                        relation,
+                    },
+                    Some(DatasetCursorAction::Start(dataset_name.clone())),
+                )
+            }
             "close" if current_cursor.is_some() => (
                 DatasetRequest::EndBrowse {
                     dataset,
@@ -2014,6 +3476,8 @@ impl ReferenceMachine {
             PendingKind::DatasetStatus {
                 status,
                 cursor: cursor_action,
+                increment_linage: name == "write"
+                    && file.as_ref().is_some_and(|file| file.linage.is_some()),
             }
         };
         self.effect(HostRequest::Dataset(request), pending)
@@ -2465,6 +3929,12 @@ impl ReferenceMachine {
         if to == 0 || to + 1 >= args.len() {
             return Err(MachineProblem::InvalidOperation);
         }
+        if args
+            .first()
+            .is_some_and(|token| matches!(token.as_str(), "CORRESPONDING" | "CORR"))
+        {
+            return self.move_corresponding(args, to);
+        }
         let value = self.eval_value(&args[..to])?;
         let figurative =
             (to == 1)
@@ -2486,6 +3956,10 @@ impl ReferenceMachine {
                 )
             })
             .and_then(|reference| self.read_reference(&reference).ok());
+        let source_category = self
+            .reference(&args[..to])
+            .ok()
+            .map(|reference| reference.layout.category);
         let targets = &args[to + 1..];
         let control = targets
             .iter()
@@ -2500,8 +3974,22 @@ impl ReferenceMachine {
             }
             let end = (at + 1..=control)
                 .rev()
-                .find(|end| self.reference(&targets[at..*end]).is_ok())
-                .ok_or(MachineProblem::UnknownStorage)?;
+                .find(|end| self.reference(&targets[at..*end]).is_ok());
+            let Some(end) = end else {
+                let problem = self
+                    .reference(&targets[at..control])
+                    .err()
+                    .unwrap_or(MachineProblem::UnknownStorage);
+                return Err(
+                    if problem == MachineProblem::UnknownStorage
+                        && targets[at..control].iter().any(|token| token == "(")
+                    {
+                        MachineProblem::SubscriptError
+                    } else {
+                        problem
+                    },
+                );
+            };
             let target = self.reference(&targets[at..end])?;
             let value = if figurative == Some(b'0') && is_numeric(target.layout.category) {
                 CobolValue::Decimal(Decimal {
@@ -2518,8 +4006,95 @@ impl ReferenceMachine {
             } else {
                 value.clone()
             };
+            let value = match (source_category, target.layout.category, value) {
+                (
+                    Some(LayoutCategory::National | LayoutCategory::NationalEdited),
+                    target,
+                    CobolValue::Bytes(bytes),
+                ) if !matches!(
+                    target,
+                    LayoutCategory::National
+                        | LayoutCategory::NationalEdited
+                        | LayoutCategory::NationalGroup
+                ) =>
+                {
+                    CobolValue::Bytes(national_to_utf8(&bytes)?)
+                }
+                (
+                    source,
+                    LayoutCategory::National | LayoutCategory::NationalEdited,
+                    CobolValue::Bytes(bytes),
+                ) if !matches!(
+                    source,
+                    Some(
+                        LayoutCategory::National
+                            | LayoutCategory::NationalEdited
+                            | LayoutCategory::NationalGroup
+                    )
+                ) =>
+                {
+                    CobolValue::Bytes(utf8_to_national(&bytes)?)
+                }
+                (_, _, value) => value,
+            };
             self.write_reference_value(&targets[at..end], &value)?;
             at = end;
+        }
+        Ok(())
+    }
+
+    fn move_corresponding(&mut self, args: &[String], to: usize) -> Result<(), MachineProblem> {
+        if to <= 1 {
+            return Err(MachineProblem::InvalidOperation);
+        }
+        let source = self.reference(&args[1..to])?;
+        if !is_group(source.layout.category) {
+            return Err(MachineProblem::DataException);
+        }
+        let sources = self.group_elementary_descendants(&source.layout.name);
+        let targets = self.arithmetic_items(&args[to + 1..], true)?;
+        if targets.is_empty() {
+            return Err(MachineProblem::InvalidOperation);
+        }
+        let mut staged = Vec::new();
+        for (target_tokens, _) in targets {
+            let target = self.reference(&target_tokens)?;
+            if !is_group(target.layout.category) {
+                return Err(MachineProblem::DataException);
+            }
+            for target in self.group_elementary_descendants(&target.layout.name) {
+                let matching = sources
+                    .iter()
+                    .filter(|source| {
+                        source.simple_name == target.simple_name
+                            && is_numeric(source.category) == is_numeric(target.category)
+                    })
+                    .collect::<Vec<_>>();
+                if matching.len() != 1 {
+                    continue;
+                }
+                let source = self.reference(std::slice::from_ref(&matching[0].name))?;
+                let target = self.reference(std::slice::from_ref(&target.name))?;
+                let bytes = if is_numeric(source.layout.category) {
+                    let value = decode_decimal(&source.layout, &self.read_reference(&source)?)?;
+                    encode_decimal(&target.layout, decimal_rescale(value, target.layout.scale)?)?
+                } else {
+                    FixedValue::fit(
+                        &self.read_reference(&source)?,
+                        target.length,
+                        target.layout.justified_right,
+                    )
+                    .bytes()
+                    .to_vec()
+                };
+                if bytes.len() != target.length {
+                    return Err(MachineProblem::SizeError);
+                }
+                staged.push((target, bytes));
+            }
+        }
+        for (target, bytes) in staged {
+            self.write_reference(&target, &bytes)?;
         }
         Ok(())
     }
@@ -2532,12 +4107,81 @@ impl ReferenceMachine {
             if to != 3 || args.len() != 5 {
                 return Err(MachineProblem::InvalidOperation);
             }
-            self.reference(&args[2..3])?;
-            let target = self.reference(&args[4..5])?;
-            return self.write_reference(&target, &vec![0; target.length]);
+            let target = self.reference(&args[2..3])?;
+            if !target.layout.linkage {
+                return Err(MachineProblem::DataException);
+            }
+            let address = if args[4] == "NULL" {
+                None
+            } else {
+                let pointer = self.reference(&args[4..5])?;
+                if !is_pointer_like(pointer.layout.category) {
+                    return Err(MachineProblem::DataException);
+                }
+                self.decode_address(&self.read_reference(&pointer)?)?
+            };
+            return self.assign_linkage_address(&target.layout.name, address);
+        }
+        if let Some(direction) = args
+            .iter()
+            .position(|token| matches!(token.as_str(), "UP" | "DOWN"))
+        {
+            if direction == 0 || args.get(direction + 1).is_none_or(|token| token != "BY") {
+                return Err(MachineProblem::InvalidOperation);
+            }
+            let amount = value_decimal(self.eval_value(&args[direction + 2..])?)?;
+            let mut layout_assignments = Vec::new();
+            let mut implicit_assignments = Vec::new();
+            for target in args[..direction]
+                .iter()
+                .filter(|token| token.as_str() != ",")
+            {
+                let current = value_decimal(self.eval_value(std::slice::from_ref(target))?)?;
+                let value = if args[direction] == "UP" {
+                    decimal_add(self.arithmetic_mode, current, amount)?
+                } else {
+                    decimal_subtract(self.arithmetic_mode, current, amount)?
+                };
+                if self.layout(target).is_some() {
+                    layout_assignments.push((vec![target.clone()], value, false));
+                } else if matches!(
+                    self.implicit.get(&normalize(target)),
+                    Some(CobolValue::Decimal(_))
+                ) {
+                    implicit_assignments.push((normalize(target), value));
+                } else {
+                    return Err(MachineProblem::DataException);
+                }
+            }
+            if layout_assignments.is_empty() && implicit_assignments.is_empty() {
+                return Err(MachineProblem::InvalidOperation);
+            }
+            self.commit_decimal_assignments(layout_assignments)?;
+            for (target, value) in implicit_assignments {
+                self.implicit.insert(target, CobolValue::Decimal(value));
+            }
+            return Ok(());
         }
         if args.len() < 3 || args[1] != "TO" {
             return Err(MachineProblem::InvalidOperation);
+        }
+        if args.get(2).is_some_and(|argument| argument == "ADDRESS")
+            && args.get(3).is_some_and(|argument| argument == "OF")
+        {
+            let source = self.reference(&args[4..])?;
+            let target = self.reference(&args[..1])?;
+            if !is_pointer_like(target.layout.category) {
+                return Err(MachineProblem::DataException);
+            }
+            let address = self.address_bytes(&source, target.length)?;
+            return self.write_reference(&target, &address);
+        }
+        if args.get(2).is_some_and(|argument| argument == "NULL") {
+            let target = self.reference(&args[..1])?;
+            if !is_pointer_like(target.layout.category) {
+                return Err(MachineProblem::DataException);
+            }
+            return self.write_reference(&target, &vec![0; target.length]);
         }
         if args[2] == "TRUE" {
             let condition = self
@@ -2578,7 +4222,214 @@ impl ReferenceMachine {
         self.write_value(&args[0], &value)
     }
 
+    fn allocate_op(&mut self, args: &[String]) -> Result<(), MachineProblem> {
+        let returning = position(args, "RETURNING").ok_or(MachineProblem::InvalidOperation)?;
+        let target_name = args
+            .get(returning + 1)
+            .ok_or(MachineProblem::InvalidOperation)?;
+        let target = self.reference(std::slice::from_ref(target_name))?;
+        if !is_pointer_like(target.layout.category) {
+            return Err(MachineProblem::DataException);
+        }
+        let size = if args.get(1).is_some_and(|value| value == "CHARACTERS") {
+            let value = self.decimal(args.first().ok_or(MachineProblem::InvalidOperation)?)?;
+            if value.scale != 0 || value.coefficient <= 0 {
+                return Err(MachineProblem::DataException);
+            }
+            usize::try_from(value.coefficient).map_err(|_| MachineProblem::ResourceExhausted)?
+        } else {
+            self.reference(&args[..returning])?.length
+        };
+        let allocated_count = self.bases.len().saturating_sub(self.static_base_count);
+        let used = self
+            .bases
+            .iter()
+            .try_fold(0usize, |total, storage| total.checked_add(storage.len()))
+            .ok_or(MachineProblem::ResourceExhausted)?;
+        if allocated_count >= self.invocation.limits.max_frames as usize
+            || used
+                .checked_add(size)
+                .is_none_or(|total| total > self.invocation.limits.max_storage_bytes as usize)
+        {
+            return Err(MachineProblem::ResourceExhausted);
+        }
+        let base = self.bases.len();
+        let address = self.address_bytes_for(base, 0, target.length)?;
+        self.bases.push(vec![0; size]);
+        self.write_reference(&target, &address)
+    }
+
+    fn free_op(&mut self, args: &[String]) -> Result<(), MachineProblem> {
+        let mut targets = Vec::new();
+        let mut allocations = BTreeSet::new();
+        for token in args
+            .iter()
+            .filter(|token| !matches!(token.as_str(), "," | "END-FREE"))
+        {
+            let reference = self.reference(std::slice::from_ref(token))?;
+            if !is_pointer_like(reference.layout.category) {
+                return Err(MachineProblem::DataException);
+            }
+            let Some((base, offset)) = self.decode_address(&self.read_reference(&reference)?)?
+            else {
+                return Err(MachineProblem::DataException);
+            };
+            if base < self.static_base_count
+                || offset != 0
+                || self.freed_allocations.contains(&base)
+                || !allocations.insert(base)
+            {
+                return Err(MachineProblem::DataException);
+            }
+            targets.push((reference, base));
+        }
+        if targets.is_empty() {
+            return Err(MachineProblem::InvalidOperation);
+        }
+        for (target, _) in &targets {
+            self.write_reference(&target, &vec![0; target.length])?;
+        }
+        self.freed_allocations
+            .extend(targets.into_iter().map(|(_, base)| base));
+        Ok(())
+    }
+
+    fn assign_linkage_address(
+        &mut self,
+        target_name: &str,
+        address: Option<(usize, usize)>,
+    ) -> Result<(), MachineProblem> {
+        let root = self
+            .views
+            .get(target_name)
+            .cloned()
+            .ok_or(MachineProblem::UnknownStorage)?;
+        let mut updates = Vec::new();
+        for layout in self.layouts.values().filter(|layout| layout.linkage) {
+            let Some(original) = self.views.get(&layout.name) else {
+                continue;
+            };
+            if original.base != root.base
+                || original.offset < root.offset
+                || original.offset.saturating_add(original.length)
+                    > root.offset.saturating_add(root.length)
+            {
+                continue;
+            }
+            let relative = original.offset - root.offset;
+            let next = address
+                .map(|(base, offset)| {
+                    let offset = offset
+                        .checked_add(relative)
+                        .ok_or(MachineProblem::ResourceExhausted)?;
+                    let end = offset
+                        .checked_add(original.length)
+                        .ok_or(MachineProblem::ResourceExhausted)?;
+                    if self.freed_allocations.contains(&base)
+                        || self
+                            .bases
+                            .get(base)
+                            .is_none_or(|storage| end > storage.len())
+                    {
+                        return Err(MachineProblem::DataException);
+                    }
+                    Ok(StorageView {
+                        base,
+                        offset,
+                        length: original.length,
+                    })
+                })
+                .transpose()?;
+            updates.push((layout.name.clone(), next));
+        }
+        if updates.is_empty() {
+            return Err(MachineProblem::UnknownStorage);
+        }
+        self.linkage_addresses.extend(updates);
+        Ok(())
+    }
+
+    fn address_bytes(
+        &self,
+        reference: &ResolvedReference,
+        width: usize,
+    ) -> Result<Vec<u8>, MachineProblem> {
+        let view = self.storage_view(&reference.layout.name)?;
+        self.address_bytes_for(
+            view.base,
+            view.offset
+                .checked_add(reference.offset)
+                .ok_or(MachineProblem::ResourceExhausted)?,
+            width,
+        )
+    }
+
+    fn address_bytes_for(
+        &self,
+        base: usize,
+        offset: usize,
+        width: usize,
+    ) -> Result<Vec<u8>, MachineProblem> {
+        let base = base
+            .checked_add(1)
+            .ok_or(MachineProblem::ResourceExhausted)?;
+        match width {
+            4 if base < (1 << 12) && offset < (1 << 20) => Ok(((u32::try_from(base)
+                .map_err(|_| MachineProblem::ResourceExhausted)?
+                << 20)
+                | u32::try_from(offset).map_err(|_| MachineProblem::ResourceExhausted)?)
+            .to_be_bytes()
+            .to_vec()),
+            8 if u32::try_from(base).is_ok() && u32::try_from(offset).is_ok() => Ok(
+                ((u64::try_from(base).map_err(|_| MachineProblem::ResourceExhausted)? << 32)
+                    | u64::try_from(offset).map_err(|_| MachineProblem::ResourceExhausted)?)
+                .to_be_bytes()
+                .to_vec(),
+            ),
+            _ => Err(MachineProblem::ResourceExhausted),
+        }
+    }
+
+    fn decode_address(&self, bytes: &[u8]) -> Result<Option<(usize, usize)>, MachineProblem> {
+        if bytes.iter().all(|byte| *byte == 0) {
+            return Ok(None);
+        }
+        let (base, offset) = match bytes {
+            [a, b, c, d] => {
+                let value = u32::from_be_bytes([*a, *b, *c, *d]);
+                ((value >> 20) as u64, (value & 0x000f_ffff) as u64)
+            }
+            [a, b, c, d, e, f, g, h] => {
+                let value = u64::from_be_bytes([*a, *b, *c, *d, *e, *f, *g, *h]);
+                (value >> 32, value & 0xffff_ffff)
+            }
+            _ => return Err(MachineProblem::DataException),
+        };
+        let base = usize::try_from(base)
+            .map_err(|_| MachineProblem::DataException)?
+            .checked_sub(1)
+            .ok_or(MachineProblem::DataException)?;
+        let offset = usize::try_from(offset).map_err(|_| MachineProblem::DataException)?;
+        if self
+            .bases
+            .get(base)
+            .is_none_or(|storage| offset > storage.len())
+        {
+            return Err(MachineProblem::DataException);
+        }
+        Ok(Some((base, offset)))
+    }
+
     fn arithmetic(&mut self, name: &str, args: &[String]) -> Result<(), MachineProblem> {
+        if matches!(name, "add" | "subtract") {
+            return self.add_or_subtract(name, args);
+        }
+        if name == "multiply" {
+            return self.multiply_statement(args);
+        }
+        if name == "divide" {
+            return self.divide_statement(args);
+        }
         let rounded = args.iter().any(|argument| argument == "ROUNDED");
         let (target, value) = match name {
             "compute" => {
@@ -2601,14 +4452,14 @@ impl ReferenceMachine {
                     scale: 0,
                 };
                 for operand in &args[..operand_end] {
-                    sum = decimal_add(sum, self.decimal(operand)?)?;
+                    sum = decimal_add(self.arithmetic_mode, sum, self.decimal(operand)?)?;
                 }
                 if let Some(to) = to {
                     let receiver = args
                         .get(to + 1)
                         .ok_or(MachineProblem::InvalidOperation)?
                         .clone();
-                    sum = decimal_add(sum, self.decimal(&receiver)?)?;
+                    sum = decimal_add(self.arithmetic_mode, sum, self.decimal(&receiver)?)?;
                     let target = giving
                         .and_then(|giving| args.get(giving + 1))
                         .cloned()
@@ -2630,7 +4481,11 @@ impl ReferenceMachine {
                     .clone();
                 (
                     target.clone(),
-                    decimal_subtract(self.decimal(&target)?, self.decimal(&args[0])?)?,
+                    decimal_subtract(
+                        self.arithmetic_mode,
+                        self.decimal(&target)?,
+                        self.decimal(&args[0])?,
+                    )?,
                 )
             }
             "multiply" => {
@@ -2641,7 +4496,11 @@ impl ReferenceMachine {
                     .clone();
                 (
                     target.clone(),
-                    decimal_multiply(self.decimal(&target)?, self.decimal(&args[0])?)?,
+                    decimal_multiply(
+                        self.arithmetic_mode,
+                        self.decimal(&target)?,
+                        self.decimal(&args[0])?,
+                    )?,
                 )
             }
             "divide" => {
@@ -2670,11 +4529,340 @@ impl ReferenceMachine {
                     )
                 };
                 let scale = self.layout(&target).map_or(0, |layout| layout.scale);
-                (target, decimal_divide(dividend, divisor, scale)?)
+                (
+                    target,
+                    decimal_divide(self.arithmetic_mode, dividend, divisor, scale)?,
+                )
             }
             _ => return Err(MachineProblem::InvalidOperation),
         };
         self.write_decimal_mode(&target, value, rounded)
+    }
+
+    fn multiply_statement(&mut self, args: &[String]) -> Result<(), MachineProblem> {
+        let by = position(args, "BY").ok_or(MachineProblem::InvalidOperation)?;
+        let giving = position(args, "GIVING");
+        let left = value_decimal(self.eval_value(&args[..by])?)?;
+        let right_end = giving.unwrap_or_else(|| {
+            args.iter()
+                .position(|token| token == "ROUNDED")
+                .unwrap_or(args.len())
+        });
+        let right = value_decimal(self.eval_value(&args[by + 1..right_end])?)?;
+        let target = giving.map_or_else(
+            || args[by + 1..right_end].to_vec(),
+            |giving| {
+                args.get(giving + 1)
+                    .cloned()
+                    .map(|target| vec![target])
+                    .unwrap_or_default()
+            },
+        );
+        if target.is_empty() {
+            return Err(MachineProblem::InvalidOperation);
+        }
+        self.commit_decimal_assignments(vec![(
+            target,
+            decimal_multiply(self.arithmetic_mode, left, right)?,
+            args.iter().any(|token| token == "ROUNDED"),
+        )])
+    }
+
+    fn divide_statement(&mut self, args: &[String]) -> Result<(), MachineProblem> {
+        let giving = position(args, "GIVING");
+        let remainder = position(args, "REMAINDER");
+        let rounded = args.iter().any(|token| token == "ROUNDED");
+        let (dividend, divisor, default_target) = if let Some(into) = position(args, "INTO") {
+            let dividend_end = giving.or(remainder).unwrap_or_else(|| {
+                args.iter()
+                    .position(|token| token == "ROUNDED")
+                    .unwrap_or(args.len())
+            });
+            (
+                value_decimal(self.eval_value(&args[into + 1..dividend_end])?)?,
+                value_decimal(self.eval_value(&args[..into])?)?,
+                args[into + 1..dividend_end].to_vec(),
+            )
+        } else {
+            let by = position(args, "BY").ok_or(MachineProblem::InvalidOperation)?;
+            let divisor_end = giving.or(remainder).unwrap_or_else(|| {
+                args.iter()
+                    .position(|token| token == "ROUNDED")
+                    .unwrap_or(args.len())
+            });
+            (
+                value_decimal(self.eval_value(&args[..by])?)?,
+                value_decimal(self.eval_value(&args[by + 1..divisor_end])?)?,
+                Vec::new(),
+            )
+        };
+        let target = giving.map_or(default_target, |giving| {
+            args.get(giving + 1)
+                .cloned()
+                .map(|target| vec![target])
+                .unwrap_or_default()
+        });
+        if target.is_empty() {
+            return Err(MachineProblem::InvalidOperation);
+        }
+        let target_reference = self.reference(&target)?;
+        let mut quotient = decimal_divide(
+            self.arithmetic_mode,
+            dividend,
+            divisor,
+            target_reference.layout.scale,
+        )?;
+        quotient = if rounded {
+            decimal_rescale_rounded(quotient, target_reference.layout.scale)?
+        } else {
+            decimal_rescale(quotient, target_reference.layout.scale)?
+        };
+        let mut assignments = vec![(target, quotient, rounded)];
+        if let Some(remainder) = remainder {
+            let target = args
+                .get(remainder + 1)
+                .cloned()
+                .ok_or(MachineProblem::InvalidOperation)?;
+            let value = decimal_subtract(
+                self.arithmetic_mode,
+                dividend,
+                decimal_multiply(self.arithmetic_mode, divisor, quotient)?,
+            )?;
+            assignments.push((vec![target], value, false));
+        }
+        self.commit_decimal_assignments(assignments)
+    }
+
+    fn add_or_subtract(&mut self, name: &str, args: &[String]) -> Result<(), MachineProblem> {
+        if args
+            .first()
+            .is_some_and(|token| matches!(token.as_str(), "CORRESPONDING" | "CORR"))
+        {
+            return self.add_or_subtract_corresponding(name, args);
+        }
+        let separator = position(args, if name == "add" { "TO" } else { "FROM" });
+        let giving = position(args, "GIVING");
+        let operand_end = separator
+            .or(giving)
+            .ok_or(MachineProblem::InvalidOperation)?;
+        let operands = self.arithmetic_items(&args[..operand_end], false)?;
+        if operands.is_empty() {
+            return Err(MachineProblem::InvalidOperation);
+        }
+        let mut operand_sum = Decimal {
+            coefficient: 0,
+            scale: 0,
+        };
+        for (operand, _) in operands {
+            operand_sum = decimal_add(
+                self.arithmetic_mode,
+                operand_sum,
+                value_decimal(self.eval_value(&operand)?)?,
+            )?;
+        }
+
+        let primary = separator
+            .map(|separator| {
+                self.arithmetic_items(
+                    &args[separator + 1..giving.unwrap_or(args.len())],
+                    giving.is_none(),
+                )
+            })
+            .transpose()?
+            .unwrap_or_default();
+        let receivers = giving
+            .map(|giving| self.arithmetic_items(&args[giving + 1..], true))
+            .transpose()?
+            .unwrap_or_else(|| primary.clone());
+        if receivers.is_empty() {
+            return Err(MachineProblem::InvalidOperation);
+        }
+
+        let mut assignments = Vec::new();
+        if giving.is_some() {
+            let value = if let Some((source, _)) = primary.first() {
+                let source = value_decimal(self.eval_value(source)?)?;
+                if name == "add" {
+                    decimal_add(self.arithmetic_mode, operand_sum, source)?
+                } else {
+                    decimal_subtract(self.arithmetic_mode, source, operand_sum)?
+                }
+            } else if name == "add" {
+                operand_sum
+            } else {
+                return Err(MachineProblem::InvalidOperation);
+            };
+            assignments.extend(
+                receivers
+                    .into_iter()
+                    .map(|(target, rounded)| (target, value, rounded)),
+            );
+        } else {
+            for (target, rounded) in receivers {
+                let current = value_decimal(self.eval_value(&target)?)?;
+                let value = if name == "add" {
+                    decimal_add(self.arithmetic_mode, current, operand_sum)?
+                } else {
+                    decimal_subtract(self.arithmetic_mode, current, operand_sum)?
+                };
+                assignments.push((target, value, rounded));
+            }
+        }
+        self.commit_decimal_assignments(assignments)
+    }
+
+    fn add_or_subtract_corresponding(
+        &mut self,
+        name: &str,
+        args: &[String],
+    ) -> Result<(), MachineProblem> {
+        let separator = position(args, if name == "add" { "TO" } else { "FROM" })
+            .ok_or(MachineProblem::InvalidOperation)?;
+        if separator <= 1 {
+            return Err(MachineProblem::InvalidOperation);
+        }
+        let target_end = args[separator + 1..]
+            .iter()
+            .position(|token| matches!(token.as_str(), "ROUNDED" | "ON" | "NOT"))
+            .map_or(args.len(), |offset| separator + 1 + offset);
+        let source = self.reference(&args[1..separator])?;
+        let target = self.reference(&args[separator + 1..target_end])?;
+        if !is_group(source.layout.category) || !is_group(target.layout.category) {
+            return Err(MachineProblem::DataException);
+        }
+        let rounded = args[target_end..].iter().any(|token| token == "ROUNDED");
+        let sources = self.group_numeric_descendants(&source.layout.name);
+        let targets = self.group_numeric_descendants(&target.layout.name);
+        let mut assignments = Vec::new();
+        for target in targets {
+            let matching = sources
+                .iter()
+                .filter(|source| source.simple_name == target.simple_name)
+                .collect::<Vec<_>>();
+            if matching.len() != 1 {
+                continue;
+            }
+            let source_value = self.decimal(&matching[0].name)?;
+            let target_value = self.decimal(&target.name)?;
+            assignments.push((
+                vec![target.name],
+                if name == "add" {
+                    decimal_add(self.arithmetic_mode, target_value, source_value)?
+                } else {
+                    decimal_subtract(self.arithmetic_mode, target_value, source_value)?
+                },
+                rounded,
+            ));
+        }
+        if assignments.is_empty() {
+            return Err(MachineProblem::DataException);
+        }
+        self.commit_decimal_assignments(assignments)
+    }
+
+    fn group_numeric_descendants(&self, root: &str) -> Vec<LayoutMetadata> {
+        self.layouts
+            .values()
+            .filter(|layout| {
+                is_numeric(layout.category)
+                    && layout.simple_name != "FILLER"
+                    && self.layout_is_descendant_of(layout, root)
+            })
+            .cloned()
+            .collect()
+    }
+
+    fn group_elementary_descendants(&self, root: &str) -> Vec<LayoutMetadata> {
+        self.layouts
+            .values()
+            .filter(|layout| {
+                layout.length > 0
+                    && !is_group(layout.category)
+                    && !matches!(
+                        layout.category,
+                        LayoutCategory::Condition | LayoutCategory::Rename
+                    )
+                    && layout.simple_name != "FILLER"
+                    && self.layout_is_descendant_of(layout, root)
+            })
+            .cloned()
+            .collect()
+    }
+
+    fn layout_is_descendant_of(&self, layout: &LayoutMetadata, root: &str) -> bool {
+        let mut parent = layout.parent.as_deref();
+        while let Some(name) = parent {
+            if name == root {
+                return true;
+            }
+            parent = self
+                .layouts
+                .get(name)
+                .and_then(|layout| layout.parent.as_deref());
+        }
+        false
+    }
+
+    fn arithmetic_items(
+        &self,
+        tokens: &[String],
+        receiving: bool,
+    ) -> Result<Vec<(Vec<String>, bool)>, MachineProblem> {
+        let mut items = Vec::new();
+        let mut at = 0usize;
+        while at < tokens.len() {
+            if matches!(tokens[at].as_str(), "," | "ROUNDED") {
+                at += 1;
+                continue;
+            }
+            let end = (at + 1..=tokens.len())
+                .rev()
+                .find(|end| {
+                    if receiving {
+                        self.reference(&tokens[at..*end]).is_ok()
+                    } else {
+                        self.eval_value(&tokens[at..*end]).is_ok()
+                    }
+                })
+                .ok_or(MachineProblem::InvalidOperation)?;
+            let rounded = tokens.get(end).is_some_and(|token| token == "ROUNDED");
+            items.push((tokens[at..end].to_vec(), rounded));
+            at = end + usize::from(rounded);
+        }
+        Ok(items)
+    }
+
+    fn commit_decimal_assignments(
+        &mut self,
+        assignments: Vec<(Vec<String>, Decimal, bool)>,
+    ) -> Result<(), MachineProblem> {
+        let staged = assignments
+            .into_iter()
+            .map(|(target, value, rounded)| {
+                let reference = self.reference(&target)?;
+                if reference.length != reference.layout.length
+                    || !is_numeric(reference.layout.category)
+                {
+                    return Err(MachineProblem::DataException);
+                }
+                let value = if matches!(
+                    reference.layout.category,
+                    LayoutCategory::FloatShort | LayoutCategory::FloatLong
+                ) {
+                    value
+                } else if rounded {
+                    decimal_rescale_rounded(value, reference.layout.scale)?
+                } else {
+                    decimal_rescale(value, reference.layout.scale)?
+                };
+                let bytes = encode_decimal(&reference.layout, value)?;
+                Ok((reference, bytes))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        for (reference, bytes) in staged {
+            self.write_reference(&reference, &bytes)?;
+        }
+        Ok(())
     }
     fn eval_expression(&self, args: &[String]) -> Result<Decimal, MachineProblem> {
         let mut position = 0usize;
@@ -2698,9 +4886,9 @@ impl ReferenceMachine {
             *position += 1;
             let right = self.expression_multiplicative(args, position)?;
             value = if operator == "+" {
-                decimal_add(value, right)?
+                decimal_add(self.arithmetic_mode, value, right)?
             } else {
-                decimal_subtract(value, right)?
+                decimal_subtract(self.arithmetic_mode, value, right)?
             };
         }
         Ok(value)
@@ -2719,9 +4907,14 @@ impl ReferenceMachine {
             *position += 1;
             let right = self.expression_factor(args, position)?;
             value = if operator == "*" {
-                decimal_multiply(value, right)?
+                decimal_multiply(self.arithmetic_mode, value, right)?
             } else {
-                decimal_divide(value, right, value.scale.max(right.scale).saturating_add(9))?
+                decimal_divide(
+                    self.arithmetic_mode,
+                    value,
+                    right,
+                    value.scale.max(right.scale).saturating_add(9),
+                )?
             };
         }
         Ok(value)
@@ -2859,35 +5052,145 @@ impl ReferenceMachine {
             }
             value.extend(source);
         }
-        let target = args.get(into + 1).ok_or(MachineProblem::InvalidOperation)?;
-        let overflow = value.len() > self.read(target)?.len();
-        self.write(target, &value)?;
+        let target_end = position(&args[into + 1..], "WITH")
+            .or_else(|| position(&args[into + 1..], "ON"))
+            .map(|offset| into + 1 + offset)
+            .unwrap_or(args.len());
+        let target = self.reference(&args[into + 1..target_end])?;
+        let pointer = position(args, "POINTER")
+            .and_then(|at| args.get(at + 1))
+            .cloned();
+        let start = pointer
+            .as_deref()
+            .map(|name| self.decimal(name))
+            .transpose()?
+            .map_or(1, |value| {
+                if value.scale == 0 {
+                    usize::try_from(value.coefficient).unwrap_or(0)
+                } else {
+                    0
+                }
+            });
+        if start == 0 {
+            return Err(MachineProblem::DataException);
+        }
+        let mut target_bytes = self.read_reference(&target)?;
+        let offset = start - 1;
+        let available = target_bytes.len().saturating_sub(offset);
+        let copied = available.min(value.len());
+        if copied > 0 {
+            target_bytes[offset..offset + copied].copy_from_slice(&value[..copied]);
+            self.write_reference(&target, &target_bytes)?;
+        }
+        if let Some(pointer) = pointer {
+            self.write_decimal(
+                &pointer,
+                Decimal {
+                    coefficient: i128::try_from(start.saturating_add(copied))
+                        .map_err(|_| MachineProblem::ResourceExhausted)?,
+                    scale: 0,
+                },
+            )?;
+        }
+        let overflow = offset > target_bytes.len() || copied < value.len();
         Ok(overflow)
     }
     fn unstring_op(&mut self, args: &[String]) -> Result<bool, MachineProblem> {
         let into = position(args, "INTO").ok_or(MachineProblem::InvalidOperation)?;
         let source = self.resolve(args.first().ok_or(MachineProblem::InvalidOperation)?)?;
-        let delimiter = position(args, "DELIMITED")
-            .and_then(|index| args.get(index + 2))
-            .map(|token| self.resolve(token))
+        let pointer = position(args, "POINTER")
+            .and_then(|at| args.get(at + 1))
+            .cloned();
+        let start = pointer
+            .as_deref()
+            .map(|name| self.decimal(name))
             .transpose()?
-            .unwrap_or_else(|| vec![b' ']);
-        if delimiter.is_empty() {
+            .map_or(1, |value| {
+                if value.scale == 0 {
+                    usize::try_from(value.coefficient).unwrap_or(0)
+                } else {
+                    0
+                }
+            });
+        if start == 0 || start > source.len().saturating_add(1) {
+            return Err(MachineProblem::DataException);
+        }
+        let delimiter_start = position(args, "BY").ok_or(MachineProblem::InvalidOperation)? + 1;
+        let mut delimiters = Vec::new();
+        let mut at = delimiter_start;
+        while at < into {
+            if matches!(args[at].as_str(), "OR" | "ALL") {
+                at += 1;
+                continue;
+            }
+            let delimiter = self.resolve(&args[at])?;
+            if !delimiter.is_empty() {
+                delimiters.push(delimiter);
+            }
+            at += 1;
+        }
+        if delimiters.is_empty() {
             return Err(MachineProblem::InvalidOperation);
         }
-        let fields = split_bytes(&source, &delimiter);
-        let targets = args[into + 1..]
+        let target_end = args[into + 1..]
             .iter()
-            .take_while(|target| {
-                !matches!(
-                    target.as_str(),
-                    "WITH" | "POINTER" | "TALLYING" | "ON" | "NOT" | "END-UNSTRING"
-                )
-            })
-            .collect::<Vec<_>>();
+            .position(|target| matches!(target.as_str(), "WITH" | "TALLYING" | "ON" | "NOT"))
+            .map(|offset| into + 1 + offset)
+            .unwrap_or(args.len());
+        let targets = &args[into + 1..target_end];
+        let mut fields = Vec::new();
+        let mut cursor = start - 1;
+        while cursor <= source.len() {
+            let next = delimiters
+                .iter()
+                .filter_map(|delimiter| {
+                    find_bytes(&source[cursor..], delimiter)
+                        .map(|offset| (cursor + offset, delimiter.len()))
+                })
+                .min_by_key(|(offset, length)| (*offset, *length));
+            match next {
+                Some((end, delimiter_length)) => {
+                    fields.push(source[cursor..end].to_vec());
+                    cursor = end.saturating_add(delimiter_length);
+                }
+                None => {
+                    fields.push(source[cursor..].to_vec());
+                    cursor = source.len().saturating_add(1);
+                    break;
+                }
+            }
+            if cursor == source.len() {
+                fields.push(Vec::new());
+                cursor = cursor.saturating_add(1);
+                break;
+            }
+        }
         let overflow = fields.len() > targets.len();
-        for (target, value) in targets.into_iter().zip(fields) {
+        let moved = targets.len().min(fields.len());
+        for (target, value) in targets.iter().zip(&fields) {
             self.write(target, value)?;
+        }
+        if let Some(pointer) = pointer {
+            self.write_decimal(
+                &pointer,
+                Decimal {
+                    coefficient: i128::try_from(cursor.min(source.len()).saturating_add(1))
+                        .map_err(|_| MachineProblem::ResourceExhausted)?,
+                    scale: 0,
+                },
+            )?;
+        }
+        if let Some(tallying) = position(args, "TALLYING")
+            && args.get(tallying + 1).is_some_and(|token| token == "IN")
+            && let Some(target) = args.get(tallying + 2)
+        {
+            self.write_decimal(
+                target,
+                Decimal {
+                    coefficient: moved as i128,
+                    scale: 0,
+                },
+            )?;
         }
         Ok(overflow)
     }
@@ -2967,6 +5270,9 @@ impl ReferenceMachine {
     }
 
     fn initialize_op(&mut self, args: &[String]) -> Result<(), MachineProblem> {
+        let with_filler = args
+            .windows(2)
+            .any(|window| window[0] == "WITH" && window[1] == "FILLER");
         let control = args
             .iter()
             .position(|target| matches!(target.as_str(), "REPLACING" | "WITH"))
@@ -2985,6 +5291,7 @@ impl ReferenceMachine {
                     .filter(|candidate| {
                         candidate.length > 0
                             && !is_group(candidate.category)
+                            && (candidate.simple_name != "FILLER" || with_filler)
                             && candidate.offset >= layout.offset
                             && candidate.offset.saturating_add(candidate.length)
                                 <= layout.offset.saturating_add(layout.length)
@@ -3025,11 +5332,42 @@ impl ReferenceMachine {
             .trim()
             .to_string();
         let generated = if json {
-            format!("{{\"{from}\":\"{value}\"}}")
+            serde_json::to_string(&BTreeMap::from([(from.as_str(), value.as_str())]))
+                .map_err(|_| MachineProblem::DataException)?
         } else {
-            format!("<{from}>{value}</{from}>")
+            format!("<{from}>{}</{from}>", xml_escape(&value))
         };
-        self.write(target, generated.as_bytes())
+        let count_assignment = position(args, "COUNT")
+            .map(|count| {
+                if args.get(count + 1).is_none_or(|token| token != "IN") {
+                    return Err(MachineProblem::InvalidOperation);
+                }
+                let target = args
+                    .get(count + 2)
+                    .ok_or(MachineProblem::InvalidOperation)?;
+                let reference = self.reference(std::slice::from_ref(target))?;
+                if reference.length != reference.layout.length
+                    || !is_numeric(reference.layout.category)
+                {
+                    return Err(MachineProblem::DataException);
+                }
+                let value = Decimal {
+                    coefficient: i128::try_from(generated.len())
+                        .map_err(|_| MachineProblem::ResourceExhausted)?,
+                    scale: 0,
+                };
+                let bytes = encode_decimal(
+                    &reference.layout,
+                    decimal_rescale(value, reference.layout.scale)?,
+                )?;
+                Ok((reference, bytes))
+            })
+            .transpose()?;
+        self.write(target, generated.as_bytes())?;
+        if let Some((target, bytes)) = count_assignment {
+            self.write_reference(&target, &bytes)?;
+        }
+        Ok(())
     }
 
     fn parse_generated(&mut self, args: &[String], json: bool) -> Result<(), MachineProblem> {
@@ -3041,20 +5379,32 @@ impl ReferenceMachine {
         let into = position(args, "INTO").ok_or(MachineProblem::UnsupportedForm)?;
         let target = args.get(into + 1).ok_or(MachineProblem::InvalidOperation)?;
         let value = if json {
-            let colon = source.find(':').ok_or(MachineProblem::DataException)?;
-            source[colon + 1..]
-                .trim()
-                .trim_end_matches('}')
-                .trim()
-                .trim_matches('"')
-                .to_string()
+            let value: serde_json::Value =
+                serde_json::from_str(source.trim()).map_err(|_| MachineProblem::DataException)?;
+            let value = value
+                .as_object()
+                .and_then(|object| object.values().next())
+                .ok_or(MachineProblem::DataException)?;
+            match value {
+                serde_json::Value::String(value) => value.clone(),
+                serde_json::Value::Number(value) => value.to_string(),
+                serde_json::Value::Bool(value) => value.to_string(),
+                serde_json::Value::Null => String::new(),
+                _ => return Err(MachineProblem::DataException),
+            }
         } else {
-            let start = source.find('>').ok_or(MachineProblem::DataException)? + 1;
-            let end = source[start..]
-                .find('<')
-                .ok_or(MachineProblem::DataException)?
-                + start;
-            source[start..end].to_string()
+            let source = source.trim();
+            let open_end = source.find('>').ok_or(MachineProblem::DataException)?;
+            let name = source
+                .get(1..open_end)
+                .filter(|name| !name.is_empty() && !name.contains(['<', '>', ' ']))
+                .ok_or(MachineProblem::DataException)?;
+            let closing = format!("</{name}>");
+            let body = source
+                .strip_suffix(&closing)
+                .and_then(|value| value.get(open_end + 1..))
+                .ok_or(MachineProblem::DataException)?;
+            xml_unescape(body)?
         };
         self.write(target, value.as_bytes())
     }
@@ -3080,6 +5430,12 @@ impl ReferenceMachine {
         if tokens[0] == "FUNCTION" {
             return self.eval_function(tokens);
         }
+        if tokens.first().is_some_and(|token| token == "ADDRESS")
+            && tokens.get(1).is_some_and(|token| token == "OF")
+        {
+            let reference = self.reference(&tokens[2..])?;
+            return self.address_bytes(&reference, 8).map(CobolValue::Bytes);
+        }
         if tokens.first().is_some_and(|token| token == "LENGTH")
             && tokens.get(1).is_some_and(|token| token == "OF")
         {
@@ -3089,6 +5445,15 @@ impl ReferenceMachine {
                     .map_err(|_| MachineProblem::ResourceExhausted)?,
                 scale: 0,
             }));
+        }
+        if tokens.len() == 1
+            && tokens[0].len() >= 2
+            && matches!(tokens[0].as_bytes().first(), Some(b'\'' | b'"'))
+            && tokens[0].as_bytes().first() == tokens[0].as_bytes().last()
+        {
+            return Ok(CobolValue::Bytes(
+                tokens[0].as_bytes()[1..tokens[0].len() - 1].to_vec(),
+            ));
         }
         if tokens.len() == 1
             && self.layout(&tokens[0]).is_none()
@@ -3141,79 +5506,314 @@ impl ReferenceMachine {
 
     fn eval_function(&self, tokens: &[String]) -> Result<CobolValue, MachineProblem> {
         let name = tokens.get(1).ok_or(MachineProblem::InvalidOperation)?;
-        if name == "CURRENT-DATE" && tokens.len() == 2 {
+        let clock = || -> Result<Vec<u8>, MachineProblem> {
             let value = self
                 .invocation
                 .bindings
                 .get("cobol.current-date")
                 .map(|payload| payload.bytes().to_vec())
                 .unwrap_or_else(|| b"1970010100000000+0000".to_vec());
-            if value.len() != 21 || !value[..16].iter().all(u8::is_ascii_digit) {
+            if value.len() != 21
+                || !value[..16].iter().all(u8::is_ascii_digit)
+                || !matches!(value[16], b'+' | b'-')
+                || !value[17..].iter().all(u8::is_ascii_digit)
+            {
                 return Err(MachineProblem::DataException);
             }
-            return Ok(CobolValue::Bytes(value));
+            Ok(value)
+        };
+        if tokens.len() == 2 {
+            return match name.as_str() {
+                "CURRENT-DATE" => clock().map(CobolValue::Bytes),
+                "E" => decimal_from_f64(std::f64::consts::E).map(CobolValue::Decimal),
+                "PI" => decimal_from_f64(std::f64::consts::PI).map(CobolValue::Decimal),
+                "SECONDS-PAST-MIDNIGHT" => {
+                    let current = clock()?;
+                    let seconds = parse_hhmmss(&current[8..14])?;
+                    Ok(CobolValue::Decimal(Decimal {
+                        coefficient: i128::from(seconds),
+                        scale: 0,
+                    }))
+                }
+                "UUID4" => Ok(CobolValue::Bytes(deterministic_uuid4(
+                    self.invocation.execution_id.as_str(),
+                    self.invocation.run_unit_id.as_str(),
+                    self.executed_steps,
+                ))),
+                "WHEN-COMPILED" => Ok(CobolValue::Bytes(
+                    self.invocation
+                        .bindings
+                        .get("cobol.when-compiled")
+                        .map(|payload| payload.bytes().to_vec())
+                        .unwrap_or_else(|| b"1970010100000000+0000".to_vec()),
+                )),
+                _ => Err(MachineProblem::UnsupportedForm),
+            };
         }
         let open = tokens
             .iter()
             .position(|token| token == "(")
             .ok_or(MachineProblem::InvalidOperation)?;
         let close = matching_close(tokens, open).ok_or(MachineProblem::InvalidOperation)?;
-        let arguments = &tokens[open + 1..close];
+        if close + 1 != tokens.len() {
+            return Err(MachineProblem::InvalidOperation);
+        }
+        let arguments = split_function_arguments(self, &tokens[open + 1..close])?;
+        let argument = |index: usize| {
+            arguments
+                .get(index)
+                .copied()
+                .ok_or(MachineProblem::InvalidOperation)
+        };
+        let decimal = |index: usize| -> Result<Decimal, MachineProblem> {
+            value_decimal(self.eval_value(argument(index)?)?)
+        };
+        let integer = |index: usize| -> Result<i128, MachineProblem> {
+            let value = decimal(index)?;
+            (value.scale == 0)
+                .then_some(value.coefficient)
+                .ok_or(MachineProblem::DataException)
+        };
+        let bytes = |index: usize| -> Result<Vec<u8>, MachineProblem> {
+            value_bytes(self.eval_value(argument(index)?)?)
+        };
+        let numeric = || -> Result<Vec<Decimal>, MachineProblem> {
+            (0..arguments.len()).map(&decimal).collect()
+        };
         match name.as_str() {
-            "TRIM" => {
-                let bytes = value_bytes(self.eval_value(arguments)?)?;
-                Ok(CobolValue::Bytes(
-                    String::from_utf8_lossy(&bytes).trim().as_bytes().to_vec(),
-                ))
+            "ABS" => Ok(CobolValue::Decimal(decimal_abs(decimal(0)?)?)),
+            "ACOS" => {
+                decimal_from_f64(libm::acos(decimal_f64(decimal(0)?)?)).map(CobolValue::Decimal)
             }
+            "ANNUITY" => {
+                let rate = decimal_f64(decimal(0)?)?;
+                let periods = decimal_f64(decimal(1)?)?;
+                let value = if rate == 0.0 {
+                    1.0 / periods
+                } else {
+                    rate / (1.0 - libm::pow(1.0 + rate, -periods))
+                };
+                decimal_from_f64(value).map(CobolValue::Decimal)
+            }
+            "ASIN" => {
+                decimal_from_f64(libm::asin(decimal_f64(decimal(0)?)?)).map(CobolValue::Decimal)
+            }
+            "ATAN" => {
+                decimal_from_f64(libm::atan(decimal_f64(decimal(0)?)?)).map(CobolValue::Decimal)
+            }
+            "BIT-OF" => Ok(CobolValue::Bytes(
+                bytes(0)?
+                    .into_iter()
+                    .flat_map(|byte| (0..8).rev().map(move |bit| b'0' + ((byte >> bit) & 1)))
+                    .collect(),
+            )),
+            "BIT-TO-CHAR" => bit_to_char(&bytes(0)?).map(CobolValue::Bytes),
+            "BYTE-LENGTH" => Ok(integer_value(bytes(0)?.len() as i128)),
+            "CHAR" => {
+                let ordinal = integer(0)?;
+                if !(1..=256).contains(&ordinal) {
+                    return Err(MachineProblem::DataException);
+                }
+                CodePage::Cp037
+                    .decode(&[(ordinal - 1) as u8], 4)
+                    .map(|value| CobolValue::Bytes(value.into_bytes()))
+                    .map_err(|_| MachineProblem::DataException)
+            }
+            "COMBINED-DATETIME" => {
+                let date = decimal(0)?;
+                let time = decimal_divide(
+                    self.arithmetic_mode,
+                    decimal(1)?,
+                    Decimal {
+                        coefficient: 86_400,
+                        scale: 0,
+                    },
+                    18,
+                )?;
+                decimal_add(self.arithmetic_mode, date, time).map(CobolValue::Decimal)
+            }
+            "CONTENT-OF" => bytes(0).map(CobolValue::Bytes),
+            "COS" => {
+                decimal_from_f64(libm::cos(decimal_f64(decimal(0)?)?)).map(CobolValue::Decimal)
+            }
+            "DATE-TO-YYYYMMDD" => window_year(integer(0)?, integer(1)?, false),
+            "DAY-OF-INTEGER" => day_of_integer(integer(0)?).map(CobolValue::Decimal),
+            "DAY-TO-YYYYDDD" => window_year(integer(0)?, integer(1)?, true),
+            "DISPLAY-OF" => national_to_utf8(&bytes(0)?).map(CobolValue::Bytes),
+            "EXP" => {
+                decimal_from_f64(libm::exp(decimal_f64(decimal(0)?)?)).map(CobolValue::Decimal)
+            }
+            "EXP10" => {
+                decimal_from_f64(libm::exp10(decimal_f64(decimal(0)?)?)).map(CobolValue::Decimal)
+            }
+            "FACTORIAL" => factorial(integer(0)?).map(CobolValue::Decimal),
+            "FORMATTED-CURRENT-DATE" => {
+                format_datetime(&String::from_utf8_lossy(&bytes(0)?), &clock()?)
+                    .map(CobolValue::Bytes)
+            }
+            "FORMATTED-DATE" => formatted_date(&String::from_utf8_lossy(&bytes(0)?), integer(1)?)
+                .map(CobolValue::Bytes),
+            "FORMATTED-DATETIME" => formatted_datetime(
+                &String::from_utf8_lossy(&bytes(0)?),
+                integer(1)?,
+                decimal(2)?,
+                integer(3)?,
+            )
+            .map(CobolValue::Bytes),
+            "FORMATTED-TIME" => formatted_time(
+                &String::from_utf8_lossy(&bytes(0)?),
+                decimal(1)?,
+                integer(2)?,
+            )
+            .map(CobolValue::Bytes),
+            "HEX-OF" => Ok(CobolValue::Bytes(hex_upper(&bytes(0)?))),
+            "HEX-TO-CHAR" => hex_to_char(&bytes(0)?).map(CobolValue::Bytes),
+            "INTEGER" => decimal_floor(self.arithmetic_mode, decimal(0)?).map(CobolValue::Decimal),
+            "INTEGER-OF-DAY" => integer_of_day(integer(0)?).map(CobolValue::Decimal),
+            "INTEGER-OF-FORMATTED-DATE" => integer_of_formatted_date(
+                &String::from_utf8_lossy(&bytes(0)?),
+                &String::from_utf8_lossy(&bytes(1)?),
+            )
+            .map(CobolValue::Decimal),
+            "INTEGER-PART" => decimal_rescale(decimal(0)?, 0).map(CobolValue::Decimal),
             "UPPER-CASE" => {
-                let bytes = value_bytes(self.eval_value(arguments)?)?;
+                let bytes = bytes(0)?;
                 Ok(CobolValue::Bytes(
-                    String::from_utf8_lossy(&bytes)
-                        .to_ascii_uppercase()
-                        .into_bytes(),
+                    String::from_utf8_lossy(&bytes).to_uppercase().into_bytes(),
                 ))
             }
             "LOWER-CASE" => {
-                let bytes = value_bytes(self.eval_value(arguments)?)?;
+                let bytes = bytes(0)?;
                 Ok(CobolValue::Bytes(
-                    String::from_utf8_lossy(&bytes)
-                        .to_ascii_lowercase()
-                        .into_bytes(),
+                    String::from_utf8_lossy(&bytes).to_lowercase().into_bytes(),
                 ))
             }
-            "LENGTH" => {
-                let bytes = value_bytes(self.eval_value(arguments)?)?;
-                Ok(CobolValue::Decimal(Decimal {
-                    coefficient: bytes.len() as i128,
-                    scale: 0,
-                }))
+            "LENGTH" => Ok(integer_value(bytes(0)?.len() as i128)),
+            "LOG" => {
+                decimal_from_f64(libm::log(decimal_f64(decimal(0)?)?)).map(CobolValue::Decimal)
             }
-            "NUMVAL" | "NUMVAL-C" => {
-                let bytes = value_bytes(self.eval_value(arguments)?)?;
-                let text = String::from_utf8_lossy(&bytes);
-                Ok(CobolValue::Decimal(
-                    decimal_text(&text).ok_or(MachineProblem::DataException)?,
+            "LOG10" => {
+                decimal_from_f64(libm::log10(decimal_f64(decimal(0)?)?)).map(CobolValue::Decimal)
+            }
+            "MAX" => extrema(self, &arguments, true),
+            "MEAN" => mean(self.arithmetic_mode, &numeric()?).map(CobolValue::Decimal),
+            "MEDIAN" => median(self.arithmetic_mode, &numeric()?).map(CobolValue::Decimal),
+            "MIDRANGE" => midrange(&numeric()?).map(CobolValue::Decimal),
+            "MIN" => extrema(self, &arguments, false),
+            "MOD" => decimal_mod(decimal(0)?, decimal(1)?, true).map(CobolValue::Decimal),
+            "NATIONAL-OF" => utf8_to_national(&bytes(0)?).map(CobolValue::Bytes),
+            "NUMVAL" => parse_numval(&bytes(0)?, false, None).map(CobolValue::Decimal),
+            "NUMVAL-C" => {
+                let currency = bytes(1)?;
+                parse_numval(&bytes(0)?, false, Some(&currency)).map(CobolValue::Decimal)
+            }
+            "NUMVAL-F" => parse_numval(&bytes(0)?, true, None).map(CobolValue::Decimal),
+            "ORD" => cobol_collation_key(&bytes(0)?)
+                .first()
+                .map(|byte| integer_value(i128::from(*byte) + 1))
+                .ok_or(MachineProblem::DataException),
+            "ORD-MAX" | "ORD-MIN" => {
+                let values = (0..arguments.len())
+                    .map(&bytes)
+                    .collect::<Result<Vec<_>, _>>()?;
+                let selected = values
+                    .iter()
+                    .enumerate()
+                    .reduce(|left, right| {
+                        let order = cobol_collation_key(left.1).cmp(&cobol_collation_key(right.1));
+                        if (name == "ORD-MAX" && order.is_lt())
+                            || (name == "ORD-MIN" && order.is_gt())
+                        {
+                            right
+                        } else {
+                            left
+                        }
+                    })
+                    .ok_or(MachineProblem::InvalidOperation)?;
+                Ok(integer_value((selected.0 + 1) as i128))
+            }
+            "PRESENT-VALUE" => present_value(&numeric()?).map(CobolValue::Decimal),
+            "RANDOM" => deterministic_random(integer(0)?).map(CobolValue::Decimal),
+            "RANGE" => decimal_range(&numeric()?).map(CobolValue::Decimal),
+            "REM" => decimal_mod(decimal(0)?, decimal(1)?, false).map(CobolValue::Decimal),
+            "REVERSE" => Ok(CobolValue::Bytes(
+                String::from_utf8_lossy(&bytes(0)?)
+                    .chars()
+                    .rev()
+                    .collect::<String>()
+                    .into_bytes(),
+            )),
+            "SECONDS-FROM-FORMATTED-TIME" => seconds_from_formatted_time(
+                &String::from_utf8_lossy(&bytes(0)?),
+                &String::from_utf8_lossy(&bytes(1)?),
+            )
+            .map(CobolValue::Decimal),
+            "SIGN" => Ok(integer_value(decimal_sign(decimal(0)?))),
+            "SIN" => {
+                decimal_from_f64(libm::sin(decimal_f64(decimal(0)?)?)).map(CobolValue::Decimal)
+            }
+            "SQRT" => {
+                decimal_from_f64(libm::sqrt(decimal_f64(decimal(0)?)?)).map(CobolValue::Decimal)
+            }
+            "STANDARD-DEVIATION" => variance(&numeric()?, true).map(CobolValue::Decimal),
+            "SUM" => decimal_sum(self.arithmetic_mode, &numeric()?).map(CobolValue::Decimal),
+            "TAN" => {
+                decimal_from_f64(libm::tan(decimal_f64(decimal(0)?)?)).map(CobolValue::Decimal)
+            }
+            "TEST-DATE-YYYYMMDD" => Ok(integer_value(i128::from(
+                split_yyyymmdd(integer(0)?).is_err(),
+            ))),
+            "TEST-DAY-YYYYDDD" => Ok(integer_value(i128::from(
+                integer_of_day(integer(0)?).is_err(),
+            ))),
+            "TEST-FORMATTED-DATETIME" => Ok(integer_value(i128::from(
+                parse_formatted_datetime(
+                    &String::from_utf8_lossy(&bytes(0)?),
+                    &String::from_utf8_lossy(&bytes(1)?),
+                )
+                .is_err(),
+            ))),
+            "TEST-NUMVAL" => Ok(integer_value(test_numval(&bytes(0)?, false, None) as i128)),
+            "TEST-NUMVAL-C" => {
+                let currency = bytes(1)?;
+                Ok(integer_value(
+                    test_numval(&bytes(0)?, false, Some(&currency)) as i128,
                 ))
             }
-            "TEST-NUMVAL" | "TEST-NUMVAL-C" => {
-                let bytes = value_bytes(self.eval_value(arguments)?)?;
-                let text = String::from_utf8_lossy(&bytes);
-                Ok(CobolValue::Decimal(Decimal {
-                    coefficient: i128::from(decimal_text(&text).is_none()),
-                    scale: 0,
+            "TEST-NUMVAL-F" => Ok(integer_value(test_numval(&bytes(0)?, true, None) as i128)),
+            "TRIM" => {
+                let value = String::from_utf8_lossy(&bytes(0)?).into_owned();
+                let mode = arguments
+                    .get(1)
+                    .and_then(|tokens| tokens.first())
+                    .map(String::as_str);
+                Ok(CobolValue::Bytes(match mode {
+                    Some("LEADING") => value.trim_start().as_bytes().to_vec(),
+                    Some("TRAILING") => value.trim_end().as_bytes().to_vec(),
+                    _ => value.trim().as_bytes().to_vec(),
                 }))
             }
+            "ULENGTH" => unicode_length(&bytes(0)?, arguments.get(1..)).map(CobolValue::Decimal),
+            "UPOS" => unicode_position(&bytes(0)?, integer(1)?).map(CobolValue::Decimal),
+            "USUBSTR" => unicode_substring(
+                &bytes(0)?,
+                integer(1)?,
+                arguments.get(2).map(|_| integer(2)).transpose()?,
+            )
+            .map(CobolValue::Bytes),
+            "USUPPLEMENTARY" => Ok(integer_value(
+                String::from_utf8(bytes(0)?)
+                    .map_err(|_| MachineProblem::DataException)?
+                    .chars()
+                    .filter(|character| u32::from(*character) > 0xffff)
+                    .count() as i128,
+            )),
+            "UVALID" => Ok(integer_value(test_utf8(&bytes(0)?) as i128)),
+            "UWIDTH" => unicode_width(&bytes(0)?, integer(1)?).map(CobolValue::Decimal),
+            "VARIANCE" => variance(&numeric()?, false).map(CobolValue::Decimal),
+            "YEAR-TO-YYYY" => window_year(integer(0)?, integer(1)?, false),
             "INTEGER-OF-DATE" => {
-                let value = match self.eval_value(arguments)? {
-                    CobolValue::Decimal(value) if value.scale == 0 => value.coefficient,
-                    CobolValue::Bytes(bytes) => {
-                        decimal_text(&String::from_utf8_lossy(&bytes))
-                            .ok_or(MachineProblem::DataException)?
-                            .coefficient
-                    }
-                    _ => return Err(MachineProblem::DataException),
-                };
+                let value = integer(0)?;
                 let (year, month, day) = split_yyyymmdd(value)?;
                 Ok(CobolValue::Decimal(Decimal {
                     coefficient: i128::from(cobol_integer_of_date(year, month, day)?),
@@ -3221,11 +5821,8 @@ impl ReferenceMachine {
                 }))
             }
             "DATE-OF-INTEGER" => {
-                let value = match self.eval_value(arguments)? {
-                    CobolValue::Decimal(value) if value.scale == 0 => value.coefficient,
-                    _ => return Err(MachineProblem::DataException),
-                };
-                let value = i64::try_from(value).map_err(|_| MachineProblem::DataException)?;
+                let value =
+                    i64::try_from(integer(0)?).map_err(|_| MachineProblem::DataException)?;
                 let (year, month, day) = cobol_date_of_integer(value)?;
                 Ok(CobolValue::Decimal(Decimal {
                     coefficient: i128::from(year) * 10_000
@@ -3234,25 +5831,9 @@ impl ReferenceMachine {
                     scale: 0,
                 }))
             }
-            "MOD" => {
-                let split = arguments.iter().position(|token| token == ",").unwrap_or(1);
-                let right_start =
-                    split + usize::from(arguments.get(split).is_some_and(|token| token == ","));
-                let left = self.eval_value(&arguments[..split])?;
-                let right = self.eval_value(&arguments[right_start..])?;
-                let (CobolValue::Decimal(left), CobolValue::Decimal(right)) = (left, right) else {
-                    return Err(MachineProblem::DataException);
-                };
-                let (left, right) = decimal_aligned(left, right)?;
-                if right.coefficient == 0 {
-                    return Err(MachineProblem::SizeError);
-                }
-                Ok(CobolValue::Decimal(Decimal {
-                    coefficient: left.coefficient % right.coefficient,
-                    scale: left.scale,
-                }))
-            }
-            _ => Err(MachineProblem::UnsupportedForm),
+            _ => Err(MachineProblem::InvalidArtifact(format!(
+                "intrinsic {name} has no selected runtime route"
+            ))),
         }
     }
 
@@ -3393,6 +5974,8 @@ impl ReferenceMachine {
             }
             (CobolValue::Bytes(left), CobolValue::Bytes(right)) => {
                 let (left, right) = padded_bytes(left, right);
+                let left = cobol_collation_key(&left);
+                let right = cobol_collation_key(&right);
                 let matched = match operator {
                     "=" => left == right,
                     "<>" => left != right,
@@ -3412,6 +5995,8 @@ impl ReferenceMachine {
                     .and_then(|reference| self.read_reference(&reference))
                     .unwrap_or_else(|_| decimal_string(left).into_bytes());
                 let (left, right) = padded_bytes(left, right);
+                let left = cobol_collation_key(&left);
+                let right = cobol_collation_key(&right);
                 Ok((if operator == "=" {
                     left == right
                 } else {
@@ -3426,6 +6011,8 @@ impl ReferenceMachine {
                     .and_then(|reference| self.read_reference(&reference))
                     .unwrap_or_else(|_| decimal_string(right).into_bytes());
                 let (left, right) = padded_bytes(left, right);
+                let left = cobol_collation_key(&left);
+                let right = cobol_collation_key(&right);
                 Ok((if operator == "=" {
                     left == right
                 } else {
@@ -3524,7 +6111,20 @@ impl ReferenceMachine {
         value: &CobolValue,
     ) -> Result<(), MachineProblem> {
         let reference = self.reference(target)?;
+        if reference.layout.dynamic && reference.offset == 0 {
+            let bytes = match value {
+                CobolValue::Bytes(bytes) => bytes.clone(),
+                CobolValue::Decimal(value) => decimal_string(*value).into_bytes(),
+            };
+            return self.write_dynamic(&reference.layout, &bytes);
+        }
         let bytes = match value {
+            CobolValue::Bytes(bytes)
+                if is_pointer_like(reference.layout.category)
+                    && bytes.iter().all(|byte| *byte == 0) =>
+            {
+                vec![0; reference.length]
+            }
             CobolValue::Bytes(bytes) => FixedValue::fit(
                 bytes,
                 reference.length,
@@ -3538,7 +6138,14 @@ impl ReferenceMachine {
             {
                 encode_decimal(
                     &reference.layout,
-                    decimal_rescale(*value, reference.layout.scale)?,
+                    if matches!(
+                        reference.layout.category,
+                        LayoutCategory::FloatShort | LayoutCategory::FloatLong
+                    ) {
+                        *value
+                    } else {
+                        decimal_rescale(*value, reference.layout.scale)?
+                    },
                 )?
             }
             CobolValue::Decimal(value) => {
@@ -3587,7 +6194,12 @@ impl ReferenceMachine {
             .layout(target)
             .cloned()
             .ok_or(MachineProblem::UnknownStorage)?;
-        let value = if rounded {
+        let value = if matches!(
+            layout.category,
+            LayoutCategory::FloatShort | LayoutCategory::FloatLong
+        ) {
+            value
+        } else if rounded {
             decimal_rescale_rounded(value, layout.scale)?
         } else {
             decimal_rescale(value, layout.scale)?
@@ -3607,7 +6219,11 @@ impl ReferenceMachine {
             .cloned()
             .ok_or(MachineProblem::UnknownStorage)?;
         let mut offset = 0usize;
-        let mut length = layout.length;
+        let mut length = if layout.dynamic {
+            *self.dynamic_lengths.get(&layout.name).unwrap_or(&0)
+        } else {
+            layout.length
+        };
         let mut cursor = open;
         while let Some(open) = cursor {
             let close = matching_close(tokens, open).ok_or(MachineProblem::InvalidOperation)?;
@@ -3634,19 +6250,23 @@ impl ReferenceMachine {
                     .ok_or(MachineProblem::ReferenceModificationError)?;
                 length = requested;
             } else {
-                let mut dimensions = std::iter::successors(layout.parent.as_ref(), |parent| {
-                    self.layouts
-                        .get(*parent)
-                        .and_then(|layout| layout.parent.as_ref())
-                })
-                .filter_map(|parent| self.layouts.get(parent))
-                .filter(|layout| layout.occurs > 1)
-                .map(|layout| (layout.occurs, layout.element_length))
-                .collect::<Vec<_>>();
-                dimensions.reverse();
+                let mut dimension_layouts =
+                    std::iter::successors(layout.parent.as_ref(), |parent| {
+                        self.layouts
+                            .get(*parent)
+                            .and_then(|layout| layout.parent.as_ref())
+                    })
+                    .filter_map(|parent| self.layouts.get(parent))
+                    .filter(|layout| layout.occurs > 1)
+                    .collect::<Vec<_>>();
+                dimension_layouts.reverse();
                 if layout.occurs > 1 {
-                    dimensions.push((layout.occurs, layout.element_length));
+                    dimension_layouts.push(&layout);
                 }
+                let dimensions = dimension_layouts
+                    .into_iter()
+                    .map(|layout| Ok((self.active_occurs(layout)?, layout.element_length)))
+                    .collect::<Result<Vec<_>, MachineProblem>>()?;
                 if dimensions.is_empty() {
                     return Err(MachineProblem::SubscriptError);
                 }
@@ -3701,6 +6321,22 @@ impl ReferenceMachine {
         })
     }
 
+    fn active_occurs(&self, layout: &LayoutMetadata) -> Result<usize, MachineProblem> {
+        let Some(depending_on) = &layout.depending_on else {
+            return Ok(layout.occurs);
+        };
+        let value = self.decimal(depending_on)?;
+        if value.scale != 0 {
+            return Err(MachineProblem::DataException);
+        }
+        let occurs =
+            usize::try_from(value.coefficient).map_err(|_| MachineProblem::SubscriptError)?;
+        if occurs < layout.occurs_min || occurs > layout.occurs {
+            return Err(MachineProblem::SubscriptError);
+        }
+        Ok(occurs)
+    }
+
     fn layout_qualified(&self, tokens: &[String]) -> Option<&LayoutMetadata> {
         let simple = tokens.first()?.to_ascii_uppercase();
         if tokens.len() == 1 {
@@ -3733,10 +6369,7 @@ impl ReferenceMachine {
     }
 
     fn read_reference(&self, reference: &ResolvedReference) -> Result<Vec<u8>, MachineProblem> {
-        let view = self
-            .views
-            .get(&reference.layout.name)
-            .ok_or(MachineProblem::UnknownStorage)?;
+        let view = self.storage_view(&reference.layout.name)?;
         let start = view
             .offset
             .checked_add(reference.offset)
@@ -3744,7 +6377,9 @@ impl ReferenceMachine {
         let end = start
             .checked_add(reference.length)
             .ok_or(MachineProblem::ResourceExhausted)?;
-        self.bases[view.base]
+        self.bases
+            .get(view.base)
+            .ok_or(MachineProblem::DataException)?
             .get(start..end)
             .map(<[u8]>::to_vec)
             .ok_or(MachineProblem::SubscriptError)
@@ -3758,11 +6393,7 @@ impl ReferenceMachine {
         if value.len() != reference.length {
             return Err(MachineProblem::SizeError);
         }
-        let view = self
-            .views
-            .get(&reference.layout.name)
-            .ok_or(MachineProblem::UnknownStorage)?
-            .clone();
+        let view = self.storage_view(&reference.layout.name)?.clone();
         let start = view
             .offset
             .checked_add(reference.offset)
@@ -3770,7 +6401,10 @@ impl ReferenceMachine {
         let end = start
             .checked_add(reference.length)
             .ok_or(MachineProblem::ResourceExhausted)?;
-        let target = self.bases[view.base]
+        let target = self
+            .bases
+            .get_mut(view.base)
+            .ok_or(MachineProblem::DataException)?
             .get_mut(start..end)
             .ok_or(MachineProblem::SubscriptError)?;
         target.copy_from_slice(value);
@@ -3787,6 +6421,7 @@ impl ReferenceMachine {
             "ZERO" | "ZEROS" | "ZEROES" => return Ok(vec![b'0']),
             "LOW-VALUE" | "LOW-VALUES" => return Ok(vec![0]),
             "HIGH-VALUE" | "HIGH-VALUES" => return Ok(vec![0xff]),
+            "NULL" | "NULLS" => return Ok(vec![0]),
             _ => {}
         }
         if self.layout(token).is_none()
@@ -3818,11 +6453,18 @@ impl ReferenceMachine {
             .layout(name)
             .map(|layout| layout.name.clone())
             .unwrap_or_else(|| normalize(name));
-        let view = self
-            .views
+        let view = self.storage_view(&resolved)?;
+        let length = self
+            .layouts
             .get(&resolved)
-            .ok_or(MachineProblem::UnknownStorage)?;
-        Ok(self.bases[view.base][view.offset..view.offset + view.length].to_vec())
+            .filter(|layout| layout.dynamic)
+            .and_then(|_| self.dynamic_lengths.get(&resolved).copied())
+            .unwrap_or(view.length);
+        self.bases
+            .get(view.base)
+            .and_then(|storage| storage.get(view.offset..view.offset + length))
+            .map(<[u8]>::to_vec)
+            .ok_or(MachineProblem::DataException)
     }
     fn write(&mut self, name: &str, value: &[u8]) -> Result<(), MachineProblem> {
         let implicit = normalize(name);
@@ -3847,16 +6489,21 @@ impl ReferenceMachine {
     }
 
     fn write_raw(&mut self, name: &str, value: &[u8]) -> Result<(), MachineProblem> {
+        if let Some(layout) = self.layouts.get(&normalize(name)).cloned()
+            && layout.dynamic
+        {
+            return self.write_dynamic(&layout, value);
+        }
         let justified_right = self
             .layouts
             .get(&normalize(name))
             .is_some_and(|layout| layout.justified_right);
-        let view = self
-            .views
-            .get(&normalize(name))
-            .ok_or(MachineProblem::UnknownStorage)?
-            .clone();
-        let current = &self.bases[view.base][view.offset..view.offset + view.length];
+        let view = self.storage_view(&normalize(name))?.clone();
+        let current = self
+            .bases
+            .get(view.base)
+            .and_then(|storage| storage.get(view.offset..view.offset + view.length))
+            .ok_or(MachineProblem::DataException)?;
         let numeric = current.iter().all(u8::is_ascii_digit)
             && value
                 .iter()
@@ -3865,13 +6512,60 @@ impl ReferenceMachine {
             let mut fitted = vec![b'0'; view.length];
             let copy = value.len().min(view.length);
             fitted[view.length - copy..].copy_from_slice(&value[value.len() - copy..]);
-            self.bases[view.base][view.offset..view.offset + view.length].copy_from_slice(&fitted);
+            self.bases
+                .get_mut(view.base)
+                .and_then(|storage| storage.get_mut(view.offset..view.offset + view.length))
+                .ok_or(MachineProblem::DataException)?
+                .copy_from_slice(&fitted);
         } else {
             let fitted = FixedValue::fit(value, view.length, justified_right);
-            self.bases[view.base][view.offset..view.offset + view.length]
+            self.bases
+                .get_mut(view.base)
+                .and_then(|storage| storage.get_mut(view.offset..view.offset + view.length))
+                .ok_or(MachineProblem::DataException)?
                 .copy_from_slice(fitted.bytes());
         }
         Ok(())
+    }
+
+    fn write_dynamic(
+        &mut self,
+        layout: &LayoutMetadata,
+        value: &[u8],
+    ) -> Result<(), MachineProblem> {
+        let view = self.storage_view(&layout.name)?.clone();
+        if layout.dynamic_limit == 0
+            || value.len() > layout.dynamic_limit
+            || value.len() > view.length
+        {
+            return Err(MachineProblem::SizeError);
+        }
+        let storage = self
+            .bases
+            .get_mut(view.base)
+            .and_then(|storage| storage.get_mut(view.offset..view.offset + view.length))
+            .ok_or(MachineProblem::DataException)?;
+        storage.fill(b' ');
+        storage[..value.len()].copy_from_slice(value);
+        self.dynamic_lengths
+            .insert(layout.name.clone(), value.len());
+        Ok(())
+    }
+
+    fn storage_view(&self, name: &str) -> Result<&StorageView, MachineProblem> {
+        let normalized = normalize(name);
+        let view = match self.linkage_addresses.get(&normalized) {
+            Some(Some(view)) => view,
+            Some(None) => return Err(MachineProblem::DataException),
+            None => self
+                .views
+                .get(&normalized)
+                .ok_or(MachineProblem::UnknownStorage)?,
+        };
+        if self.freed_allocations.contains(&view.base) {
+            return Err(MachineProblem::DataException);
+        }
+        Ok(view)
     }
 
     fn layout(&self, reference: &str) -> Option<&LayoutMetadata> {
@@ -4068,6 +6762,9 @@ impl Machine for ReferenceMachine {
             }
             let mut steps = 0;
             while steps < quantum.max_steps {
+                if let Some(drive) = self.deferred_drive.take() {
+                    return Ok(drive);
+                }
                 if self.pc >= self.operations.len() {
                     return Ok(MachineDrive::Completed(self.complete()?));
                 }
@@ -4080,8 +6777,17 @@ impl Machine for ReferenceMachine {
                 }
                 let operation = self.operations[self.pc].clone();
                 match self.execute(&operation).map_err(|problem| match problem {
-                    MachineProblem::Host(_) | MachineProblem::ResourceExhausted => problem,
-                    MachineProblem::UnsupportedForm => MachineProblem::UnsupportedForm,
+                    MachineProblem::Host(_)
+                    | MachineProblem::ResourceExhausted
+                    | MachineProblem::DataException
+                    | MachineProblem::SizeError
+                    | MachineProblem::SubscriptError
+                    | MachineProblem::ReferenceModificationError => problem,
+                    MachineProblem::UnsupportedForm => MachineProblem::InvalidArtifact(format!(
+                        "operation {} {:?} reached an unsupported runtime form",
+                        operation.identity.name(),
+                        arguments(&operation)
+                    )),
                     problem => MachineProblem::InvalidArtifact(format!(
                         "operation {} {:?} failed: {problem:?}",
                         operation.identity.name(),
@@ -4112,7 +6818,10 @@ impl Machine for ReferenceMachine {
         })();
         match result {
             Ok(drive) => drive,
-            Err(problem) => MachineDrive::Failed(problem.execution_problem()),
+            Err(problem) => problem.runtime_condition().map_or_else(
+                || MachineDrive::Failed(problem.execution_problem()),
+                MachineDrive::Condition,
+            ),
         }
     }
 
@@ -4122,7 +6831,7 @@ impl Machine for ReferenceMachine {
         }
         let bytes = encode_snapshot(&self.snapshot())?;
         BoundedPayload::new(
-            "mainframe-env.reference-machine-checkpoint@7",
+            "mainframe-env.reference-machine-checkpoint@9",
             bytes,
             InvocationLimits {
                 max_payload_bytes: usize::try_from(
@@ -4145,7 +6854,7 @@ impl Machine for ReferenceMachine {
 }
 
 fn encode_snapshot(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
-    let mut bytes = b"MECP0007".to_vec();
+    let mut bytes = b"MECP0009".to_vec();
     bytes.extend_from_slice(&snapshot.schema_version.to_be_bytes());
     bytes.extend_from_slice(&u64::try_from(snapshot.program_counter).ok()?.to_be_bytes());
     bytes.extend_from_slice(&snapshot.effect_sequence.to_be_bytes());
@@ -4204,12 +6913,127 @@ fn encode_snapshot(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
         push_bytes(&mut bytes, cursor.as_bytes())?;
     }
     bytes.push(snapshot.condition_statuses);
+    bytes.extend_from_slice(
+        &u32::try_from(snapshot.dynamic_lengths.len())
+            .ok()?
+            .to_be_bytes(),
+    );
+    for (name, length) in &snapshot.dynamic_lengths {
+        push_bytes(&mut bytes, name.as_bytes())?;
+        bytes.extend_from_slice(&u64::try_from(*length).ok()?.to_be_bytes());
+    }
+    bytes.extend_from_slice(
+        &u32::try_from(snapshot.implicit_values.len())
+            .ok()?
+            .to_be_bytes(),
+    );
+    for (name, value) in &snapshot.implicit_values {
+        push_bytes(&mut bytes, name.as_bytes())?;
+        match value {
+            MachineSnapshotValue::Bytes(value) => {
+                bytes.push(0);
+                push_bytes(&mut bytes, value)?;
+            }
+            MachineSnapshotValue::Decimal { coefficient, scale } => {
+                bytes.push(1);
+                bytes.extend_from_slice(&coefficient.to_be_bytes());
+                bytes.extend_from_slice(&scale.to_be_bytes());
+            }
+        }
+    }
+    bytes.extend_from_slice(
+        &u32::try_from(snapshot.search_results.len())
+            .ok()?
+            .to_be_bytes(),
+    );
+    for (node, found) in &snapshot.search_results {
+        bytes.extend_from_slice(&u64::try_from(*node).ok()?.to_be_bytes());
+        bytes.push(u8::from(*found));
+    }
+    bytes.extend_from_slice(
+        &u32::try_from(snapshot.sql_cursors.len())
+            .ok()?
+            .to_be_bytes(),
+    );
+    for (name, values) in &snapshot.sql_cursors {
+        push_bytes(&mut bytes, name.as_bytes())?;
+        push_string_list(&mut bytes, values)?;
+    }
+    bytes.extend_from_slice(
+        &u32::try_from(snapshot.sort_workspaces.len())
+            .ok()?
+            .to_be_bytes(),
+    );
+    for (name, (records, cursor)) in &snapshot.sort_workspaces {
+        push_bytes(&mut bytes, name.as_bytes())?;
+        bytes.extend_from_slice(&u64::try_from(*cursor).ok()?.to_be_bytes());
+        bytes.extend_from_slice(&u32::try_from(records.len()).ok()?.to_be_bytes());
+        for record in records {
+            push_bytes(&mut bytes, record)?;
+        }
+    }
+    match &snapshot.active_sort_procedure {
+        Some((sort_pc, sort_file, phase, arguments)) => {
+            bytes.push(1);
+            bytes.extend_from_slice(&u64::try_from(*sort_pc).ok()?.to_be_bytes());
+            push_bytes(&mut bytes, sort_file.as_bytes())?;
+            bytes.push(*phase);
+            push_string_list(&mut bytes, arguments)?;
+        }
+        None => bytes.push(0),
+    }
+    match &snapshot.sort_io {
+        Some((sort_pc, sort_file, arguments, inputs, outputs, next_input, next_output)) => {
+            bytes.push(1);
+            bytes.extend_from_slice(&u64::try_from(*sort_pc).ok()?.to_be_bytes());
+            push_bytes(&mut bytes, sort_file.as_bytes())?;
+            push_string_list(&mut bytes, arguments)?;
+            push_string_list(&mut bytes, inputs)?;
+            push_string_list(&mut bytes, outputs)?;
+            bytes.extend_from_slice(&u64::try_from(*next_input).ok()?.to_be_bytes());
+            bytes.extend_from_slice(&u64::try_from(*next_output).ok()?.to_be_bytes());
+        }
+        None => bytes.push(0),
+    }
+    bytes.extend_from_slice(
+        &u32::try_from(snapshot.linkage_addresses.len())
+            .ok()?
+            .to_be_bytes(),
+    );
+    for (name, view) in &snapshot.linkage_addresses {
+        push_bytes(&mut bytes, name.as_bytes())?;
+        match view {
+            Some((base, offset, length)) => {
+                bytes.push(1);
+                bytes.extend_from_slice(&u64::try_from(*base).ok()?.to_be_bytes());
+                bytes.extend_from_slice(&u64::try_from(*offset).ok()?.to_be_bytes());
+                bytes.extend_from_slice(&u64::try_from(*length).ok()?.to_be_bytes());
+            }
+            None => bytes.push(0),
+        }
+    }
+    bytes.extend_from_slice(
+        &u32::try_from(snapshot.freed_allocations.len())
+            .ok()?
+            .to_be_bytes(),
+    );
+    for base in &snapshot.freed_allocations {
+        bytes.extend_from_slice(&u64::try_from(*base).ok()?.to_be_bytes());
+    }
     Some(bytes)
 }
 
 fn push_bytes(output: &mut Vec<u8>, value: &[u8]) -> Option<()> {
     output.extend_from_slice(&u64::try_from(value.len()).ok()?.to_be_bytes());
     output.extend_from_slice(value);
+    Some(())
+}
+
+fn push_string_list(output: &mut Vec<u8>, values: &[String]) -> Option<()> {
+    output.extend_from_slice(&u32::try_from(values.len()).ok()?.to_be_bytes());
+    for value in values {
+        push_bytes(output, value.as_bytes())?;
+    }
     Some(())
 }
 
@@ -4229,6 +7053,8 @@ fn decode_snapshot(
         b"MECP0005" => 5,
         b"MECP0006" => 6,
         b"MECP0007" => 7,
+        b"MECP0008" => 8,
+        b"MECP0009" => 9,
         _ => return Err(MachineProblem::IncompatibleSnapshot),
     };
     let schema_version = input.u32()?;
@@ -4349,6 +7175,202 @@ fn decode_snapshot(
     if ConditionStatus::from_bits(condition_statuses).is_none() {
         return Err(MachineProblem::IncompatibleSnapshot);
     }
+    let mut dynamic_lengths = BTreeMap::new();
+    let mut implicit_values = BTreeMap::new();
+    let mut search_results = BTreeMap::new();
+    let mut sql_cursors = BTreeMap::new();
+    let mut sort_workspaces = BTreeMap::new();
+    let mut active_sort_procedure = None;
+    let mut sort_io = None;
+    let mut linkage_addresses = BTreeMap::new();
+    let mut freed_allocations = BTreeSet::new();
+    if header_version >= 8 {
+        let dynamic_count =
+            usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+        if dynamic_count > max_frames {
+            return Err(MachineProblem::IncompatibleSnapshot);
+        }
+        for _ in 0..dynamic_count {
+            let name = snapshot_string(&mut input, 4096)?;
+            let length =
+                usize::try_from(input.u64()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+            if length > max_storage || dynamic_lengths.insert(name, length).is_some() {
+                return Err(MachineProblem::IncompatibleSnapshot);
+            }
+        }
+        let implicit_count =
+            usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+        if implicit_count > max_frames.saturating_mul(4) {
+            return Err(MachineProblem::IncompatibleSnapshot);
+        }
+        for _ in 0..implicit_count {
+            let name = snapshot_string(&mut input, 4096)?;
+            let value = match input
+                .take(1)?
+                .first()
+                .copied()
+                .ok_or(MachineProblem::IncompatibleSnapshot)?
+            {
+                0 => MachineSnapshotValue::Bytes(input.bytes(max_storage)?),
+                1 => MachineSnapshotValue::Decimal {
+                    coefficient: i128::from_be_bytes(
+                        input
+                            .take(16)?
+                            .try_into()
+                            .map_err(|_| MachineProblem::IncompatibleSnapshot)?,
+                    ),
+                    scale: u32::from_be_bytes(
+                        input
+                            .take(4)?
+                            .try_into()
+                            .map_err(|_| MachineProblem::IncompatibleSnapshot)?,
+                    ),
+                },
+                _ => return Err(MachineProblem::IncompatibleSnapshot),
+            };
+            if implicit_values.insert(name, value).is_some() {
+                return Err(MachineProblem::IncompatibleSnapshot);
+            }
+        }
+        let search_count =
+            usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+        if search_count > max_frames {
+            return Err(MachineProblem::IncompatibleSnapshot);
+        }
+        for _ in 0..search_count {
+            let node =
+                usize::try_from(input.u64()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+            let found = match input.take(1)?.first() {
+                Some(0) => false,
+                Some(1) => true,
+                _ => return Err(MachineProblem::IncompatibleSnapshot),
+            };
+            if search_results.insert(node, found).is_some() {
+                return Err(MachineProblem::IncompatibleSnapshot);
+            }
+        }
+        let sql_count =
+            usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+        if sql_count > max_frames {
+            return Err(MachineProblem::IncompatibleSnapshot);
+        }
+        for _ in 0..sql_count {
+            let name = snapshot_string(&mut input, 4096)?;
+            let values = snapshot_string_list(&mut input, max_frames, 4096)?;
+            if sql_cursors.insert(name, values).is_some() {
+                return Err(MachineProblem::IncompatibleSnapshot);
+            }
+        }
+        let workspace_count =
+            usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+        if workspace_count > max_frames {
+            return Err(MachineProblem::IncompatibleSnapshot);
+        }
+        for _ in 0..workspace_count {
+            let name = snapshot_string(&mut input, 4096)?;
+            let cursor =
+                usize::try_from(input.u64()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+            let record_count =
+                usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+            if record_count > max_frames.saturating_mul(1024) {
+                return Err(MachineProblem::IncompatibleSnapshot);
+            }
+            let mut records = Vec::with_capacity(record_count);
+            for _ in 0..record_count {
+                let record = input.bytes(remaining_storage)?;
+                remaining_storage = remaining_storage
+                    .checked_sub(record.len())
+                    .ok_or(MachineProblem::IncompatibleSnapshot)?;
+                records.push(record);
+            }
+            if cursor > records.len() || sort_workspaces.insert(name, (records, cursor)).is_some() {
+                return Err(MachineProblem::IncompatibleSnapshot);
+            }
+        }
+        active_sort_procedure = match input.take(1)?.first() {
+            Some(0) => None,
+            Some(1) => {
+                let sort_pc = usize::try_from(input.u64()?)
+                    .map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+                let sort_file = snapshot_string(&mut input, 4096)?;
+                let phase = *input
+                    .take(1)?
+                    .first()
+                    .ok_or(MachineProblem::IncompatibleSnapshot)?;
+                if phase > 1 {
+                    return Err(MachineProblem::IncompatibleSnapshot);
+                }
+                let arguments = snapshot_string_list(&mut input, max_frames, 4096)?;
+                Some((sort_pc, sort_file, phase, arguments))
+            }
+            _ => return Err(MachineProblem::IncompatibleSnapshot),
+        };
+        sort_io = match input.take(1)?.first() {
+            Some(0) => None,
+            Some(1) => {
+                let sort_pc = usize::try_from(input.u64()?)
+                    .map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+                let sort_file = snapshot_string(&mut input, 4096)?;
+                let arguments = snapshot_string_list(&mut input, max_frames, 4096)?;
+                let inputs = snapshot_string_list(&mut input, max_frames, 4096)?;
+                let outputs = snapshot_string_list(&mut input, max_frames, 4096)?;
+                let next_input = usize::try_from(input.u64()?)
+                    .map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+                let next_output = usize::try_from(input.u64()?)
+                    .map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+                if next_input > inputs.len() || next_output > outputs.len() {
+                    return Err(MachineProblem::IncompatibleSnapshot);
+                }
+                Some((
+                    sort_pc,
+                    sort_file,
+                    arguments,
+                    inputs,
+                    outputs,
+                    next_input,
+                    next_output,
+                ))
+            }
+            _ => return Err(MachineProblem::IncompatibleSnapshot),
+        };
+    }
+    if header_version >= 9 {
+        let linkage_count =
+            usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+        if linkage_count > max_frames {
+            return Err(MachineProblem::IncompatibleSnapshot);
+        }
+        for _ in 0..linkage_count {
+            let name = snapshot_string(&mut input, 4096)?;
+            let view = match input.take(1)?.first() {
+                Some(0) => None,
+                Some(1) => Some((
+                    usize::try_from(input.u64()?)
+                        .map_err(|_| MachineProblem::IncompatibleSnapshot)?,
+                    usize::try_from(input.u64()?)
+                        .map_err(|_| MachineProblem::IncompatibleSnapshot)?,
+                    usize::try_from(input.u64()?)
+                        .map_err(|_| MachineProblem::IncompatibleSnapshot)?,
+                )),
+                _ => return Err(MachineProblem::IncompatibleSnapshot),
+            };
+            if linkage_addresses.insert(name, view).is_some() {
+                return Err(MachineProblem::IncompatibleSnapshot);
+            }
+        }
+        let freed_count =
+            usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+        if freed_count > max_frames {
+            return Err(MachineProblem::IncompatibleSnapshot);
+        }
+        for _ in 0..freed_count {
+            let base =
+                usize::try_from(input.u64()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+            if !freed_allocations.insert(base) {
+                return Err(MachineProblem::IncompatibleSnapshot);
+            }
+        }
+    }
     if !input.finished() {
         return Err(MachineProblem::IncompatibleSnapshot);
     }
@@ -4366,7 +7388,34 @@ fn decode_snapshot(
         last_file_status,
         dataset_cursors,
         condition_statuses,
+        dynamic_lengths,
+        implicit_values,
+        search_results,
+        sql_cursors,
+        sort_workspaces,
+        active_sort_procedure,
+        sort_io,
+        linkage_addresses,
+        freed_allocations,
     })
+}
+
+fn snapshot_string(input: &mut SnapshotInput<'_>, max: usize) -> Result<String, MachineProblem> {
+    String::from_utf8(input.bytes(max)?).map_err(|_| MachineProblem::IncompatibleSnapshot)
+}
+
+fn snapshot_string_list(
+    input: &mut SnapshotInput<'_>,
+    max_items: usize,
+    max_bytes: usize,
+) -> Result<Vec<String>, MachineProblem> {
+    let count = usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+    if count > max_items {
+        return Err(MachineProblem::IncompatibleSnapshot);
+    }
+    (0..count)
+        .map(|_| snapshot_string(input, max_bytes))
+        .collect()
 }
 
 struct SnapshotInput<'a> {
@@ -4589,6 +7638,7 @@ pub fn supported_operations() -> &'static BTreeSet<OperationIdentity> {
     static SET: OnceLock<BTreeSet<OperationIdentity>> = OnceLock::new();
     SET.get_or_init(|| {
         let names = [
+            "config",
             "init",
             "define",
             "control",
@@ -4602,6 +7652,7 @@ pub fn supported_operations() -> &'static BTreeSet<OperationIdentity> {
             "close",
             "compute",
             "continue",
+            "delete",
             "display",
             "divide",
             "entry",
@@ -4616,17 +7667,23 @@ pub fn supported_operations() -> &'static BTreeSet<OperationIdentity> {
             "if",
             "initialize",
             "inspect",
+            "invoke",
             "json_generate",
             "json_parse",
+            "merge",
             "move",
             "multiply",
             "next_sentence",
             "open",
             "perform",
             "read",
+            "release",
+            "return_statement",
             "rewrite",
             "search",
             "set",
+            "sort",
+            "start",
             "stop_run",
             "string",
             "subtract",
@@ -4733,11 +7790,42 @@ fn layout_metadata(operations: &[Operation]) -> Result<LayoutState, MachineProbl
             justified_right: optional_integer_attribute(operation, "justified_right")
                 .unwrap_or_default()
                 != 0,
+            blank_when_zero: optional_integer_attribute(operation, "blank_when_zero")
+                .unwrap_or_default()
+                != 0,
             linkage: optional_text_attribute(operation, "section") == Some("linkage"),
             offset: usize_attribute(operation, "offset")?,
             length: usize_attribute(operation, "length")?,
             element_length: usize_attribute(operation, "element_length")?,
             occurs: usize_attribute(operation, "occurs")?,
+            occurs_min: optional_integer_attribute(operation, "occurs_min")
+                .and_then(|value| usize::try_from(value).ok())
+                .unwrap_or(1),
+            unbounded: optional_integer_attribute(operation, "unbounded").unwrap_or_default() != 0,
+            depending_on: optional_text_attribute(operation, "depending_on")
+                .filter(|value| !value.is_empty())
+                .map(str::to_ascii_uppercase),
+            indexes: optional_text_attribute(operation, "indexes")
+                .unwrap_or("")
+                .split('\u{1f}')
+                .filter(|value| !value.is_empty())
+                .map(str::to_ascii_uppercase)
+                .collect(),
+            keys: optional_text_attribute(operation, "keys")
+                .unwrap_or("")
+                .split('\u{1f}')
+                .filter(|value| !value.is_empty())
+                .map(|value| {
+                    value
+                        .split_once(':')
+                        .map(|(direction, name)| (direction == "D", name.to_ascii_uppercase()))
+                        .ok_or(MachineProblem::InvalidArtifact("invalid table key".into()))
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+            dynamic: optional_integer_attribute(operation, "dynamic").unwrap_or_default() != 0,
+            dynamic_limit: optional_integer_attribute(operation, "dynamic_limit")
+                .and_then(|value| usize::try_from(value).ok())
+                .unwrap_or_default(),
             parent: match text_attribute(operation, "parent")? {
                 "" => None,
                 parent => Some(parent.to_ascii_uppercase()),
@@ -4747,6 +7835,9 @@ fn layout_metadata(operations: &[Operation]) -> Result<LayoutState, MachineProbl
                 .filter(|value| !value.is_empty())
                 .map(str::to_string)
                 .collect(),
+            object_class: optional_text_attribute(operation, "object_class")
+                .filter(|value| !value.is_empty())
+                .map(str::to_ascii_uppercase),
         };
         if layouts.insert(name.clone(), metadata).is_some() {
             return Err(MachineProblem::InvalidArtifact(
@@ -4788,6 +7879,21 @@ fn file_metadata(
                 .collect(),
             relative_key: optional("relative_key")?,
             file_status: optional("file_status")?,
+            sort_merge: optional_integer_attribute(operation, "sort_merge").unwrap_or_default()
+                != 0,
+            description: optional_text_attribute(operation, "description")
+                .unwrap_or("")
+                .to_string(),
+            record_min: file_record_bounds(
+                optional_text_attribute(operation, "description").unwrap_or(""),
+            )
+            .0,
+            record_max: file_record_bounds(
+                optional_text_attribute(operation, "description").unwrap_or(""),
+            )
+            .1,
+            ccsid: file_ccsid(optional_text_attribute(operation, "description").unwrap_or("")),
+            linage: file_linage(optional_text_attribute(operation, "description").unwrap_or("")),
         };
         if files.insert(name, metadata).is_some() {
             return Err(MachineProblem::InvalidArtifact(
@@ -4796,6 +7902,68 @@ fn file_metadata(
         }
     }
     Ok(files)
+}
+
+fn file_contract_words(description: &str) -> Vec<&str> {
+    description.split_whitespace().collect()
+}
+
+fn file_record_bounds(description: &str) -> (Option<usize>, Option<usize>) {
+    let words = file_contract_words(description);
+    let Some(record) = words.iter().position(|word| *word == "RECORD") else {
+        return (None, None);
+    };
+    if words.get(record + 1) == Some(&"CONTAINS") {
+        let first = words.get(record + 2).and_then(|word| word.parse().ok());
+        let second = (words.get(record + 3) == Some(&"TO"))
+            .then(|| words.get(record + 4).and_then(|word| word.parse().ok()))
+            .flatten();
+        return (first, second.or(first));
+    }
+    if words.get(record + 1) == Some(&"IS") && words.get(record + 2) == Some(&"VARYING") {
+        let from = words
+            .iter()
+            .position(|word| *word == "FROM")
+            .and_then(|at| words.get(at + 1))
+            .and_then(|word| word.parse().ok());
+        let to = words
+            .iter()
+            .position(|word| *word == "TO")
+            .and_then(|at| words.get(at + 1))
+            .and_then(|word| word.parse().ok());
+        return (from, to);
+    }
+    (None, None)
+}
+
+fn file_ccsid(description: &str) -> Option<u16> {
+    let words = file_contract_words(description);
+    let at = words.iter().position(|word| *word == "CODE-SET")?;
+    let value = words.get(at + 1 + usize::from(words.get(at + 1) == Some(&"IS")))?;
+    matches!(*value, "EBCDIC" | "CP037" | "IBM-037").then_some(37)
+}
+
+fn file_linage(description: &str) -> Option<usize> {
+    let words = file_contract_words(description);
+    let at = words.iter().position(|word| *word == "LINAGE")?;
+    words
+        .get(at + 1 + usize::from(words.get(at + 1) == Some(&"IS")))?
+        .parse()
+        .ok()
+}
+
+fn validate_record_length(
+    file: Option<&FileMetadata>,
+    length: usize,
+) -> Result<(), MachineProblem> {
+    if file.is_some_and(|file| {
+        file.record_min.is_some_and(|minimum| length < minimum)
+            || file.record_max.is_some_and(|maximum| length > maximum)
+    }) {
+        Err(MachineProblem::SizeError)
+    } else {
+        Ok(())
+    }
 }
 
 fn text_attribute<'a>(operation: &'a Operation, name: &str) -> Result<&'a str, MachineProblem> {
@@ -4856,6 +8024,97 @@ fn bytes_attribute<'a>(operation: &'a Operation, name: &str) -> Result<&'a [u8],
 }
 fn position(args: &[String], needle: &str) -> Option<usize> {
     args.iter().position(|arg| arg.eq_ignore_ascii_case(needle))
+}
+fn start_relation_and_key(args: &[String]) -> Option<(KeyRelation, String)> {
+    let key = position(args, "KEY")?;
+    let mut at = key + 1;
+    if args.get(at).is_some_and(|token| token == "IS") {
+        at += 1;
+    }
+    let end = args[at..]
+        .iter()
+        .position(|token| matches!(token.as_str(), "INVALID" | "END-START"))
+        .map_or(args.len(), |offset| at + offset);
+    let phrase = &args[at..end];
+    let reference = phrase.last()?.clone();
+    let relation = if phrase
+        .windows(3)
+        .any(|window| window == ["NOT", "LESS", "THAN"])
+        || phrase
+            .iter()
+            .any(|token| matches!(token.as_str(), ">=" | "NOT<"))
+    {
+        KeyRelation::GreaterOrEqual
+    } else if phrase
+        .windows(3)
+        .any(|window| window == ["NOT", "GREATER", "THAN"])
+        || phrase
+            .iter()
+            .any(|token| matches!(token.as_str(), "<=" | "NOT>"))
+    {
+        KeyRelation::LessOrEqual
+    } else if phrase.iter().any(|token| token == ">")
+        || phrase
+            .windows(2)
+            .any(|window| window == ["GREATER", "THAN"])
+    {
+        KeyRelation::Greater
+    } else if phrase.iter().any(|token| token == "<")
+        || phrase.windows(2).any(|window| window == ["LESS", "THAN"])
+    {
+        KeyRelation::Less
+    } else {
+        KeyRelation::Equal
+    };
+    Some((relation, reference))
+}
+fn sort_file_list(args: &[String], keyword: &str) -> Vec<String> {
+    let Some(start) = position(args, keyword).map(|index| index + 1) else {
+        return Vec::new();
+    };
+    args[start..]
+        .iter()
+        .take_while(|token| {
+            !matches!(
+                token.as_str(),
+                "GIVING"
+                    | "USING"
+                    | "INPUT"
+                    | "OUTPUT"
+                    | "ASCENDING"
+                    | "DESCENDING"
+                    | "ON"
+                    | "COLLATING"
+                    | "END-SORT"
+                    | "END-MERGE"
+            )
+        })
+        .filter(|token| token.as_str() != ",")
+        .map(|token| normalize(token))
+        .collect()
+}
+fn sort_procedure_target(args: &[String], kind: &str) -> Option<String> {
+    let start = args
+        .windows(2)
+        .position(|window| window == [kind, "PROCEDURE"])?
+        + 2;
+    let start = start + usize::from(args.get(start).is_some_and(|token| token == "IS"));
+    args.get(start).map(|target| normalize(target))
+}
+fn sort_procedure_end(args: &[String], kind: &str) -> Option<String> {
+    let start = args
+        .windows(2)
+        .position(|window| window == [kind, "PROCEDURE"])?
+        + 2;
+    let end = args[start..]
+        .iter()
+        .position(|token| matches!(token.as_str(), "INPUT" | "OUTPUT" | "GIVING" | "USING"))
+        .map_or(args.len(), |offset| start + offset);
+    args[start..end]
+        .iter()
+        .position(|token| matches!(token.as_str(), "THRU" | "THROUGH"))
+        .and_then(|offset| args.get(start + offset + 1))
+        .map(|target| normalize(target))
 }
 fn normalize(value: &str) -> String {
     value
@@ -4985,6 +8244,501 @@ fn value_decimal(value: CobolValue) -> Result<Decimal, MachineProblem> {
     }
 }
 
+fn integer_value(coefficient: i128) -> CobolValue {
+    CobolValue::Decimal(Decimal {
+        coefficient,
+        scale: 0,
+    })
+}
+
+fn split_function_arguments<'a>(
+    machine: &ReferenceMachine,
+    tokens: &'a [String],
+) -> Result<Vec<&'a [String]>, MachineProblem> {
+    if tokens.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut arguments = Vec::new();
+    let mut start = 0usize;
+    let mut depth = 0usize;
+    for (index, token) in tokens.iter().enumerate() {
+        match token.as_str() {
+            "(" => depth = depth.saturating_add(1),
+            ")" => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or(MachineProblem::InvalidOperation)?
+            }
+            "," if depth == 0 => {
+                if start == index {
+                    return Err(MachineProblem::InvalidOperation);
+                }
+                arguments.push(&tokens[start..index]);
+                start = index + 1;
+            }
+            _ => {}
+        }
+    }
+    if depth != 0 || start == tokens.len() {
+        return Err(MachineProblem::InvalidOperation);
+    }
+    arguments.push(&tokens[start..]);
+    if arguments.len() > 1 {
+        return Ok(arguments);
+    }
+    let mut inferred = Vec::new();
+    let mut at = 0usize;
+    while at < tokens.len() {
+        let end = (at + 1..=tokens.len())
+            .rev()
+            .find(|end| machine.eval_value(&tokens[at..*end]).is_ok())
+            .ok_or(MachineProblem::InvalidOperation)?;
+        inferred.push(&tokens[at..end]);
+        at = end;
+    }
+    Ok(inferred)
+}
+
+fn decimal_abs(mut value: Decimal) -> Result<Decimal, MachineProblem> {
+    value.coefficient = value
+        .coefficient
+        .checked_abs()
+        .ok_or(MachineProblem::SizeError)?;
+    Ok(value)
+}
+
+fn decimal_f64(value: Decimal) -> Result<f64, MachineProblem> {
+    decimal_string(value)
+        .parse()
+        .map_err(|_| MachineProblem::DataException)
+}
+
+fn decimal_from_f64(value: f64) -> Result<Decimal, MachineProblem> {
+    if !value.is_finite() {
+        return Err(MachineProblem::DataException);
+    }
+    let text = format!("{value:.17}");
+    decimal_text(text.trim_end_matches('0').trim_end_matches('.'))
+        .ok_or(MachineProblem::DataException)
+}
+
+fn bit_to_char(bits: &[u8]) -> Result<Vec<u8>, MachineProblem> {
+    let bits = String::from_utf8_lossy(bits);
+    let bits = bits.trim();
+    if bits.is_empty()
+        || bits.len() % 8 != 0
+        || !bits.bytes().all(|byte| matches!(byte, b'0' | b'1'))
+    {
+        return Err(MachineProblem::DataException);
+    }
+    bits.as_bytes()
+        .chunks(8)
+        .map(|chunk| {
+            chunk.iter().try_fold(0u8, |value, bit| {
+                value
+                    .checked_mul(2)
+                    .and_then(|value| value.checked_add(*bit - b'0'))
+                    .ok_or(MachineProblem::DataException)
+            })
+        })
+        .collect()
+}
+
+fn hex_upper(bytes: &[u8]) -> Vec<u8> {
+    const DIGITS: &[u8; 16] = b"0123456789ABCDEF";
+    bytes
+        .iter()
+        .flat_map(|byte| {
+            [
+                DIGITS[usize::from(byte >> 4)],
+                DIGITS[usize::from(byte & 0x0f)],
+            ]
+        })
+        .collect()
+}
+
+fn hex_to_char(bytes: &[u8]) -> Result<Vec<u8>, MachineProblem> {
+    let text = String::from_utf8_lossy(bytes);
+    let text = text.trim();
+    if text.is_empty() || text.len() % 2 != 0 {
+        return Err(MachineProblem::DataException);
+    }
+    text.as_bytes()
+        .chunks(2)
+        .map(|pair| {
+            let digit = |byte: u8| match byte {
+                b'0'..=b'9' => Some(byte - b'0'),
+                b'a'..=b'f' => Some(byte - b'a' + 10),
+                b'A'..=b'F' => Some(byte - b'A' + 10),
+                _ => None,
+            };
+            Ok(digit(pair[0]).ok_or(MachineProblem::DataException)? * 16
+                + digit(pair[1]).ok_or(MachineProblem::DataException)?)
+        })
+        .collect()
+}
+
+fn decimal_floor(mode: CobolArithmeticMode, value: Decimal) -> Result<Decimal, MachineProblem> {
+    let truncated = decimal_rescale(value, 0)?;
+    if value.coefficient < 0 && decimal_rescale(truncated, value.scale)? != value {
+        decimal_subtract(
+            mode,
+            truncated,
+            Decimal {
+                coefficient: 1,
+                scale: 0,
+            },
+        )
+    } else {
+        Ok(truncated)
+    }
+}
+
+fn decimal_sign(value: Decimal) -> i128 {
+    value.coefficient.signum()
+}
+
+fn decimal_sum(mode: CobolArithmeticMode, values: &[Decimal]) -> Result<Decimal, MachineProblem> {
+    values.iter().try_fold(
+        Decimal {
+            coefficient: 0,
+            scale: 0,
+        },
+        |sum, value| decimal_add(mode, sum, *value),
+    )
+}
+
+fn mean(mode: CobolArithmeticMode, values: &[Decimal]) -> Result<Decimal, MachineProblem> {
+    if values.is_empty() {
+        return Err(MachineProblem::InvalidOperation);
+    }
+    decimal_divide(
+        mode,
+        decimal_sum(mode, values)?,
+        Decimal {
+            coefficient: values.len() as i128,
+            scale: 0,
+        },
+        18,
+    )
+}
+
+fn median(mode: CobolArithmeticMode, values: &[Decimal]) -> Result<Decimal, MachineProblem> {
+    if values.is_empty() {
+        return Err(MachineProblem::InvalidOperation);
+    }
+    let mut values = values.to_vec();
+    values.sort_by(|left, right| {
+        decimal_aligned(*left, *right)
+            .map(|(left, right)| left.coefficient.cmp(&right.coefficient))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    if values.len() % 2 == 1 {
+        Ok(values[values.len() / 2])
+    } else {
+        mean(mode, &values[values.len() / 2 - 1..=values.len() / 2])
+    }
+}
+
+fn decimal_range(values: &[Decimal]) -> Result<Decimal, MachineProblem> {
+    if values.is_empty() {
+        return Err(MachineProblem::InvalidOperation);
+    }
+    let floats = values
+        .iter()
+        .map(|value| decimal_f64(*value))
+        .collect::<Result<Vec<_>, _>>()?;
+    decimal_from_f64(
+        floats.iter().copied().fold(f64::NEG_INFINITY, f64::max)
+            - floats.iter().copied().fold(f64::INFINITY, f64::min),
+    )
+}
+
+fn midrange(values: &[Decimal]) -> Result<Decimal, MachineProblem> {
+    let range = decimal_range(values)?;
+    let minimum = values
+        .iter()
+        .map(|value| decimal_f64(*value))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .fold(f64::INFINITY, f64::min);
+    decimal_from_f64(minimum + decimal_f64(range)? / 2.0)
+}
+
+fn variance(values: &[Decimal], standard_deviation: bool) -> Result<Decimal, MachineProblem> {
+    if values.is_empty() {
+        return Err(MachineProblem::InvalidOperation);
+    }
+    let floats = values
+        .iter()
+        .map(|value| decimal_f64(*value))
+        .collect::<Result<Vec<_>, _>>()?;
+    let mean = floats.iter().sum::<f64>() / floats.len() as f64;
+    let variance = floats
+        .iter()
+        .map(|value| (value - mean) * (value - mean))
+        .sum::<f64>()
+        / floats.len() as f64;
+    decimal_from_f64(if standard_deviation {
+        libm::sqrt(variance)
+    } else {
+        variance
+    })
+}
+
+fn present_value(values: &[Decimal]) -> Result<Decimal, MachineProblem> {
+    let (rate, cashflows) = values
+        .split_first()
+        .ok_or(MachineProblem::InvalidOperation)?;
+    let rate = decimal_f64(*rate)?;
+    let value = cashflows
+        .iter()
+        .enumerate()
+        .try_fold(0.0, |sum, (index, cashflow)| {
+            Ok::<_, MachineProblem>(
+                sum + decimal_f64(*cashflow)? / libm::pow(1.0 + rate, (index + 1) as f64),
+            )
+        })?;
+    decimal_from_f64(value)
+}
+
+fn decimal_mod(left: Decimal, right: Decimal, floor: bool) -> Result<Decimal, MachineProblem> {
+    let (left, right) = decimal_aligned(left, right)?;
+    if right.coefficient == 0 {
+        return Err(MachineProblem::SizeError);
+    }
+    let mut quotient = left.coefficient / right.coefficient;
+    if floor
+        && left.coefficient % right.coefficient != 0
+        && (left.coefficient < 0) != (right.coefficient < 0)
+    {
+        quotient -= 1;
+    }
+    Ok(Decimal {
+        coefficient: left.coefficient - quotient * right.coefficient,
+        scale: left.scale,
+    })
+}
+
+fn deterministic_random(seed: i128) -> Result<Decimal, MachineProblem> {
+    let mut value = u64::try_from(seed).map_err(|_| MachineProblem::DataException)?;
+    value ^= value >> 12;
+    value ^= value << 25;
+    value ^= value >> 27;
+    let value = value.wrapping_mul(2_685_821_657_736_338_717);
+    Ok(Decimal {
+        coefficient: i128::from(value % 1_000_000_000_000_000_000),
+        scale: 18,
+    })
+}
+
+fn factorial(value: i128) -> Result<Decimal, MachineProblem> {
+    if !(0..=33).contains(&value) {
+        return Err(MachineProblem::SizeError);
+    }
+    let coefficient = (1..=value).try_fold(1i128, |product, value| {
+        product.checked_mul(value).ok_or(MachineProblem::SizeError)
+    })?;
+    decimal_checked(Decimal {
+        coefficient,
+        scale: 0,
+    })
+}
+
+fn extrema(
+    machine: &ReferenceMachine,
+    arguments: &[&[String]],
+    maximum: bool,
+) -> Result<CobolValue, MachineProblem> {
+    let values = arguments
+        .iter()
+        .map(|argument| machine.eval_value(argument))
+        .collect::<Result<Vec<_>, _>>()?;
+    values
+        .into_iter()
+        .reduce(|left, right| {
+            let order = match (&left, &right) {
+                (CobolValue::Decimal(left), CobolValue::Decimal(right)) => {
+                    decimal_aligned(*left, *right)
+                        .map(|(left, right)| left.coefficient.cmp(&right.coefficient))
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                }
+                _ => value_bytes(left.clone())
+                    .map(|bytes| cobol_collation_key(&bytes))
+                    .unwrap_or_default()
+                    .cmp(
+                        &value_bytes(right.clone())
+                            .map(|bytes| cobol_collation_key(&bytes))
+                            .unwrap_or_default(),
+                    ),
+            };
+            if (maximum && order.is_lt()) || (!maximum && order.is_gt()) {
+                right
+            } else {
+                left
+            }
+        })
+        .ok_or(MachineProblem::InvalidOperation)
+}
+
+fn parse_numval(
+    bytes: &[u8],
+    floating: bool,
+    currency: Option<&[u8]>,
+) -> Result<Decimal, MachineProblem> {
+    let text = String::from_utf8_lossy(bytes);
+    let currency = currency
+        .map(std::str::from_utf8)
+        .transpose()
+        .map_err(|_| MachineProblem::DataException)?
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let mut cleaned = text
+        .trim()
+        .chars()
+        .filter(|character| *character != ',')
+        .collect::<String>();
+    if let Some(currency) = currency {
+        cleaned = cleaned.replace(currency, "");
+    }
+    if cleaned.chars().any(|character| {
+        !character.is_ascii_digit()
+            && !matches!(character, ' ' | '+' | '-' | '.' | '(' | ')')
+            && !(floating && matches!(character, 'e' | 'E'))
+    }) {
+        return Err(MachineProblem::DataException);
+    }
+    if floating && cleaned.bytes().any(|byte| matches!(byte, b'e' | b'E')) {
+        return cleaned
+            .parse::<f64>()
+            .map_err(|_| MachineProblem::DataException)
+            .and_then(decimal_from_f64);
+    }
+    decimal_text(&cleaned).ok_or(MachineProblem::DataException)
+}
+
+fn test_numval(bytes: &[u8], floating: bool, currency: Option<&[u8]>) -> usize {
+    if parse_numval(bytes, floating, currency).is_ok() {
+        return 0;
+    }
+    let text = String::from_utf8_lossy(bytes);
+    let currency = currency
+        .and_then(|value| std::str::from_utf8(value).ok())
+        .map(str::trim)
+        .unwrap_or("");
+    for (index, character) in text.chars().enumerate() {
+        let allowed = character.is_ascii_digit()
+            || matches!(character, ' ' | '+' | '-' | '.' | ',' | '(' | ')')
+            || (floating && matches!(character, 'e' | 'E'))
+            || currency.contains(character);
+        if !allowed {
+            return index + 1;
+        }
+    }
+    text.trim_end().chars().count().max(1)
+}
+
+fn utf8_to_national(bytes: &[u8]) -> Result<Vec<u8>, MachineProblem> {
+    let text = std::str::from_utf8(bytes).map_err(|_| MachineProblem::DataException)?;
+    Ok(text.encode_utf16().flat_map(u16::to_be_bytes).collect())
+}
+
+fn national_to_utf8(bytes: &[u8]) -> Result<Vec<u8>, MachineProblem> {
+    if bytes.len() % 2 != 0 {
+        return Err(MachineProblem::DataException);
+    }
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_be_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .map(String::into_bytes)
+    .map_err(|_| MachineProblem::DataException)
+}
+
+fn unicode_length(bytes: &[u8], _bounds: Option<&[&[String]]>) -> Result<Decimal, MachineProblem> {
+    Ok(Decimal {
+        coefficient: std::str::from_utf8(bytes)
+            .map_err(|_| MachineProblem::DataException)?
+            .chars()
+            .count() as i128,
+        scale: 0,
+    })
+}
+
+fn unicode_position(bytes: &[u8], character: i128) -> Result<Decimal, MachineProblem> {
+    let character = usize::try_from(character)
+        .ok()
+        .and_then(|value| value.checked_sub(1))
+        .ok_or(MachineProblem::DataException)?;
+    let text = std::str::from_utf8(bytes).map_err(|_| MachineProblem::DataException)?;
+    let position = text
+        .char_indices()
+        .nth(character)
+        .map(|(position, _)| position + 1)
+        .ok_or(MachineProblem::DataException)?;
+    Ok(Decimal {
+        coefficient: position as i128,
+        scale: 0,
+    })
+}
+
+fn unicode_substring(
+    bytes: &[u8],
+    start: i128,
+    length: Option<i128>,
+) -> Result<Vec<u8>, MachineProblem> {
+    let start = usize::try_from(start)
+        .ok()
+        .and_then(|value| value.checked_sub(1))
+        .ok_or(MachineProblem::DataException)?;
+    let length = length
+        .map(|length| usize::try_from(length).map_err(|_| MachineProblem::DataException))
+        .transpose()?;
+    let text = std::str::from_utf8(bytes).map_err(|_| MachineProblem::DataException)?;
+    Ok(text
+        .chars()
+        .skip(start)
+        .take(length.unwrap_or(usize::MAX))
+        .collect::<String>()
+        .into_bytes())
+}
+
+fn unicode_width(bytes: &[u8], _mode: i128) -> Result<Decimal, MachineProblem> {
+    unicode_length(bytes, None)
+}
+
+fn test_utf8(bytes: &[u8]) -> usize {
+    std::str::from_utf8(bytes)
+        .err()
+        .map_or(0, |error| error.valid_up_to() + 1)
+}
+
+fn deterministic_uuid4(execution: &str, run_unit: &str, step: u64) -> Vec<u8> {
+    let mut hasher = Sha256::new();
+    hasher.update(execution.as_bytes());
+    hasher.update([0]);
+    hasher.update(run_unit.as_bytes());
+    hasher.update(step.to_be_bytes());
+    let mut bytes: [u8; 16] = hasher.finalize()[..16].try_into().expect("fixed digest");
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    let hex = hex_upper(&bytes);
+    [
+        &hex[..8],
+        b"-",
+        &hex[8..12],
+        b"-",
+        &hex[12..16],
+        b"-",
+        &hex[16..20],
+        b"-",
+        &hex[20..],
+    ]
+    .concat()
+}
+
 fn strip_condition_parentheses(mut tokens: &[String]) -> &[String] {
     while tokens.first().is_some_and(|token| token == "(")
         && matching_close(tokens, 0) == Some(tokens.len().saturating_sub(1))
@@ -5036,6 +8790,13 @@ fn padded_bytes(mut left: Vec<u8>, mut right: Vec<u8>) -> (Vec<u8>, Vec<u8>) {
     (left, right)
 }
 
+fn cobol_collation_key(bytes: &[u8]) -> Vec<u8> {
+    std::str::from_utf8(bytes)
+        .ok()
+        .and_then(|text| CodePage::Cp037.encode(text, bytes.len()).ok())
+        .unwrap_or_else(|| bytes.to_vec())
+}
+
 const fn is_numeric(category: LayoutCategory) -> bool {
     matches!(
         category,
@@ -5043,6 +8804,8 @@ const fn is_numeric(category: LayoutCategory) -> bool {
             | LayoutCategory::NumericEdited
             | LayoutCategory::PackedDecimal
             | LayoutCategory::Binary
+            | LayoutCategory::FloatShort
+            | LayoutCategory::FloatLong
     )
 }
 
@@ -5074,13 +8837,17 @@ fn decimal_text(text: &str) -> Option<Decimal> {
     let mut coefficient = 0i128;
     let mut scale = 0u32;
     let mut fractional = false;
-    let mut digits = 0usize;
+    let mut significant_digits = 0usize;
+    let mut significant_started = false;
     for byte in trimmed.bytes() {
         if byte.is_ascii_digit() {
             coefficient = coefficient
                 .checked_mul(10)?
                 .checked_add(i128::from(byte - b'0'))?;
-            digits += 1;
+            if byte != b'0' || significant_started {
+                significant_started = true;
+                significant_digits += 1;
+            }
             if fractional {
                 scale = scale.checked_add(1)?;
             }
@@ -5090,13 +8857,19 @@ fn decimal_text(text: &str) -> Option<Decimal> {
             return None;
         }
     }
-    if digits == 0 {
+    if !trimmed.bytes().any(|byte| byte.is_ascii_digit()) {
         return None;
     }
-    Some(Decimal {
+    (significant_digits.max(1) <= 34).then_some(Decimal {
         coefficient: if negative { -coefficient } else { coefficient },
         scale,
     })
+}
+
+fn decimal_checked(value: Decimal) -> Result<Decimal, MachineProblem> {
+    (value.coefficient.unsigned_abs().to_string().len() <= 34)
+        .then_some(value)
+        .ok_or(MachineProblem::SizeError)
 }
 
 fn decimal_string(value: Decimal) -> String {
@@ -5129,7 +8902,7 @@ fn decimal_rescale(value: Decimal, scale: u32) -> Result<Decimal, MachineProblem
     }
     if value.scale < scale {
         let factor = ten_power(scale - value.scale)?;
-        Ok(Decimal {
+        decimal_checked(Decimal {
             coefficient: value
                 .coefficient
                 .checked_mul(factor)
@@ -5138,7 +8911,7 @@ fn decimal_rescale(value: Decimal, scale: u32) -> Result<Decimal, MachineProblem
         })
     } else {
         let factor = ten_power(value.scale - scale)?;
-        Ok(Decimal {
+        decimal_checked(Decimal {
             coefficient: value.coefficient / factor,
             scale,
         })
@@ -5157,7 +8930,7 @@ fn decimal_rescale_rounded(value: Decimal, scale: u32) -> Result<Decimal, Machin
     } else {
         0
     };
-    Ok(Decimal {
+    decimal_checked(Decimal {
         coefficient: quotient
             .checked_add(increment)
             .ok_or(MachineProblem::SizeError)?,
@@ -5165,42 +8938,32 @@ fn decimal_rescale_rounded(value: Decimal, scale: u32) -> Result<Decimal, Machin
     })
 }
 
-fn decimal_add(left: Decimal, right: Decimal) -> Result<Decimal, MachineProblem> {
-    let (left, right) = decimal_aligned(left, right)?;
-    Ok(Decimal {
-        coefficient: left
-            .coefficient
-            .checked_add(right.coefficient)
-            .ok_or(MachineProblem::SizeError)?,
-        scale: left.scale,
-    })
+fn decimal_add(
+    mode: CobolArithmeticMode,
+    left: Decimal,
+    right: Decimal,
+) -> Result<Decimal, MachineProblem> {
+    decimal_primitive_binary(mode, left, right, CobolArithmetic::add)
 }
 
-fn decimal_subtract(left: Decimal, right: Decimal) -> Result<Decimal, MachineProblem> {
-    let (left, right) = decimal_aligned(left, right)?;
-    Ok(Decimal {
-        coefficient: left
-            .coefficient
-            .checked_sub(right.coefficient)
-            .ok_or(MachineProblem::SizeError)?,
-        scale: left.scale,
-    })
+fn decimal_subtract(
+    mode: CobolArithmeticMode,
+    left: Decimal,
+    right: Decimal,
+) -> Result<Decimal, MachineProblem> {
+    decimal_primitive_binary(mode, left, right, CobolArithmetic::subtract)
 }
 
-fn decimal_multiply(left: Decimal, right: Decimal) -> Result<Decimal, MachineProblem> {
-    Ok(Decimal {
-        coefficient: left
-            .coefficient
-            .checked_mul(right.coefficient)
-            .ok_or(MachineProblem::SizeError)?,
-        scale: left
-            .scale
-            .checked_add(right.scale)
-            .ok_or(MachineProblem::SizeError)?,
-    })
+fn decimal_multiply(
+    mode: CobolArithmeticMode,
+    left: Decimal,
+    right: Decimal,
+) -> Result<Decimal, MachineProblem> {
+    decimal_primitive_binary(mode, left, right, CobolArithmetic::multiply)
 }
 
 fn decimal_divide(
+    mode: CobolArithmeticMode,
     dividend: Decimal,
     divisor: Decimal,
     result_scale: u32,
@@ -5208,18 +8971,49 @@ fn decimal_divide(
     if divisor.coefficient == 0 {
         return Err(MachineProblem::SizeError);
     }
-    let exponent = result_scale
-        .checked_add(divisor.scale)
-        .and_then(|value| value.checked_sub(dividend.scale))
-        .ok_or(MachineProblem::SizeError)?;
-    let numerator = dividend
-        .coefficient
-        .checked_mul(ten_power(exponent)?)
-        .ok_or(MachineProblem::SizeError)?;
-    Ok(Decimal {
-        coefficient: numerator / divisor.coefficient,
-        scale: result_scale,
-    })
+    decimal_rescale(
+        decimal_primitive_binary(mode, dividend, divisor, CobolArithmetic::divide)?,
+        result_scale,
+    )
+}
+
+fn decimal_primitive_binary(
+    mode: CobolArithmeticMode,
+    left: Decimal,
+    right: Decimal,
+    operation: fn(
+        &mut CobolArithmetic,
+        CobolDecimal,
+        CobolDecimal,
+    ) -> Result<
+        (CobolDecimal, crate::runtime::CobolArithmeticFlags),
+        RuntimeContractProblem,
+    >,
+) -> Result<Decimal, MachineProblem> {
+    let mut arithmetic =
+        CobolArithmetic::new(mode, CobolRounding::Truncation).map_err(runtime_decimal_problem)?;
+    let (left, left_flags) = arithmetic
+        .parse(&decimal_string(left))
+        .map_err(runtime_decimal_problem)?;
+    let (right, right_flags) = arithmetic
+        .parse(&decimal_string(right))
+        .map_err(runtime_decimal_problem)?;
+    if left_flags.size_error() || right_flags.size_error() {
+        return Err(MachineProblem::SizeError);
+    }
+    let (value, flags) =
+        operation(&mut arithmetic, left, right).map_err(runtime_decimal_problem)?;
+    if flags.size_error() {
+        return Err(MachineProblem::SizeError);
+    }
+    decimal_text(&value.to_standard_string()).ok_or(MachineProblem::SizeError)
+}
+
+const fn runtime_decimal_problem(problem: RuntimeContractProblem) -> MachineProblem {
+    match problem {
+        RuntimeContractProblem::InvalidDecimal => MachineProblem::DataException,
+        _ => MachineProblem::SizeError,
+    }
 }
 
 fn ten_power(exponent: u32) -> Result<i128, MachineProblem> {
@@ -5238,12 +9032,44 @@ fn decode_decimal(layout: &LayoutMetadata, bytes: &[u8]) -> Result<Decimal, Mach
                 .ok_or(MachineProblem::DataException)?
                 .coefficient
         }
+        LayoutCategory::FloatShort => {
+            let bytes: [u8; 4] = bytes
+                .try_into()
+                .map_err(|_| MachineProblem::DataException)?;
+            decimal_from_float(f64::from(f32::from_be_bytes(bytes)))?.coefficient
+        }
+        LayoutCategory::FloatLong => {
+            let bytes: [u8; 8] = bytes
+                .try_into()
+                .map_err(|_| MachineProblem::DataException)?;
+            decimal_from_float(f64::from_be_bytes(bytes))?.coefficient
+        }
         _ => return Err(MachineProblem::DataException),
     };
-    Ok(Decimal {
-        coefficient,
-        scale: layout.scale,
-    })
+    if matches!(
+        layout.category,
+        LayoutCategory::FloatShort | LayoutCategory::FloatLong
+    ) {
+        let value = match layout.category {
+            LayoutCategory::FloatShort => f64::from(f32::from_be_bytes(
+                bytes
+                    .try_into()
+                    .map_err(|_| MachineProblem::DataException)?,
+            )),
+            LayoutCategory::FloatLong => f64::from_be_bytes(
+                bytes
+                    .try_into()
+                    .map_err(|_| MachineProblem::DataException)?,
+            ),
+            _ => unreachable!(),
+        };
+        decimal_from_float(value)
+    } else {
+        Ok(Decimal {
+            coefficient,
+            scale: layout.scale,
+        })
+    }
 }
 
 fn decode_display(bytes: &[u8], separate: bool) -> Result<i128, MachineProblem> {
@@ -5378,11 +9204,47 @@ fn encode_decimal(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Ma
             Ok(output)
         }
         LayoutCategory::NumericEdited => encode_edited(layout, value),
+        LayoutCategory::FloatShort => {
+            let value = decimal_to_float(value)?;
+            if !value.is_finite() || value < f64::from(f32::MIN) || value > f64::from(f32::MAX) {
+                return Err(MachineProblem::SizeError);
+            }
+            Ok((value as f32).to_be_bytes().to_vec())
+        }
+        LayoutCategory::FloatLong => Ok(decimal_to_float(value)?.to_be_bytes().to_vec()),
         _ => Err(MachineProblem::DataException),
     }
 }
 
+fn decimal_from_float(value: f64) -> Result<Decimal, MachineProblem> {
+    if !value.is_finite() {
+        return Err(MachineProblem::DataException);
+    }
+    decimal_text(&format!("{value:.17}"))
+        .map(decimal_normalize)
+        .ok_or(MachineProblem::DataException)
+}
+
+fn decimal_to_float(value: Decimal) -> Result<f64, MachineProblem> {
+    decimal_string(value)
+        .parse::<f64>()
+        .ok()
+        .filter(|value| value.is_finite())
+        .ok_or(MachineProblem::SizeError)
+}
+
+fn decimal_normalize(mut value: Decimal) -> Decimal {
+    while value.scale > 0 && value.coefficient % 10 == 0 {
+        value.coefficient /= 10;
+        value.scale -= 1;
+    }
+    value
+}
+
 fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, MachineProblem> {
+    if layout.blank_when_zero && value.coefficient == 0 {
+        return Ok(vec![b' '; layout.length]);
+    }
     let mut digits = value.coefficient.unsigned_abs().to_string();
     if digits.len() < layout.digits {
         digits = format!("{}{}", "0".repeat(layout.digits - digits.len()), digits);
@@ -5638,15 +9500,39 @@ fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
         .flatten()
 }
 
-fn split_bytes<'a>(source: &'a [u8], delimiter: &[u8]) -> Vec<&'a [u8]> {
-    let mut fields = Vec::new();
-    let mut rest = source;
-    while let Some(position) = find_bytes(rest, delimiter) {
-        fields.push(&rest[..position]);
-        rest = &rest[position + delimiter.len()..];
+fn xml_escape(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
+fn xml_unescape(value: &str) -> Result<String, MachineProblem> {
+    let mut output = String::with_capacity(value.len());
+    let mut rest = value;
+    while let Some(at) = rest.find('&') {
+        output.push_str(&rest[..at]);
+        rest = &rest[at..];
+        let (decoded, length) = if rest.starts_with("&amp;") {
+            ('&', 5)
+        } else if rest.starts_with("&lt;") {
+            ('<', 4)
+        } else if rest.starts_with("&gt;") {
+            ('>', 4)
+        } else if rest.starts_with("&quot;") {
+            ('"', 6)
+        } else if rest.starts_with("&apos;") {
+            ('\'', 6)
+        } else {
+            return Err(MachineProblem::DataException);
+        };
+        output.push(decoded);
+        rest = &rest[length..];
     }
-    fields.push(rest);
-    fields
+    output.push_str(rest);
+    Ok(output)
 }
 
 fn replace_bytes(source: &[u8], from: &[u8], to: &[u8]) -> Result<Vec<u8>, MachineProblem> {
@@ -5689,6 +9575,251 @@ fn split_yyyymmdd(value: i128) -> Result<(i32, u32, u32), MachineProblem> {
         return Err(MachineProblem::DataException);
     }
     Ok((year, month, day))
+}
+
+fn day_of_integer(value: i128) -> Result<Decimal, MachineProblem> {
+    let value = i64::try_from(value).map_err(|_| MachineProblem::DataException)?;
+    let (year, month, day) = cobol_date_of_integer(value)?;
+    let ordinal = days_from_civil(year, month, day) - days_from_civil(year, 1, 1) + 1;
+    Ok(Decimal {
+        coefficient: i128::from(year) * 1_000 + i128::from(ordinal),
+        scale: 0,
+    })
+}
+
+fn integer_of_day(value: i128) -> Result<Decimal, MachineProblem> {
+    let year = i32::try_from(value / 1_000).map_err(|_| MachineProblem::DataException)?;
+    let ordinal = i64::try_from(value % 1_000).map_err(|_| MachineProblem::DataException)?;
+    let maximum = if valid_date(year, 2, 29) { 366 } else { 365 };
+    if !(1..=maximum).contains(&ordinal) {
+        return Err(MachineProblem::DataException);
+    }
+    let days = days_from_civil(year, 1, 1) + ordinal - 1;
+    let (year, month, day) = civil_from_days(days);
+    Ok(Decimal {
+        coefficient: i128::from(cobol_integer_of_date(year, month, day)?),
+        scale: 0,
+    })
+}
+
+fn window_year(value: i128, window: i128, ordinal: bool) -> Result<CobolValue, MachineProblem> {
+    let divisor = if ordinal { 1_000 } else { 10_000 };
+    let short_year = value / divisor;
+    if !(0..=99).contains(&short_year) {
+        return Err(MachineProblem::DataException);
+    }
+    let base = if window >= 1_000 {
+        window
+    } else {
+        1_900 + window
+    };
+    let mut year = (base / 100) * 100 + short_year;
+    if year < base {
+        year += 100;
+    }
+    Ok(integer_value(year * divisor + value % divisor))
+}
+
+fn parse_hhmmss(bytes: &[u8]) -> Result<u32, MachineProblem> {
+    if bytes.len() != 6 || !bytes.iter().all(u8::is_ascii_digit) {
+        return Err(MachineProblem::DataException);
+    }
+    let value = std::str::from_utf8(bytes)
+        .map_err(|_| MachineProblem::DataException)?
+        .parse::<u32>()
+        .map_err(|_| MachineProblem::DataException)?;
+    let hour = value / 10_000;
+    let minute = value / 100 % 100;
+    let second = value % 100;
+    if hour > 23 || minute > 59 || second > 59 {
+        return Err(MachineProblem::DataException);
+    }
+    Ok(hour * 3_600 + minute * 60 + second)
+}
+
+fn render_datetime_format(
+    format: &str,
+    year: i32,
+    month: u32,
+    day: u32,
+    hour: u32,
+    minute: u32,
+    second: u32,
+) -> Result<Vec<u8>, MachineProblem> {
+    if !valid_date(year, month, day) || hour > 23 || minute > 59 || second > 59 {
+        return Err(MachineProblem::DataException);
+    }
+    let mut output = format.to_string();
+    for (token, value) in [
+        ("YYYY", format!("{year:04}")),
+        ("YY", format!("{:02}", year.rem_euclid(100))),
+        ("MM", format!("{month:02}")),
+        ("DD", format!("{day:02}")),
+        ("hh", format!("{hour:02}")),
+        ("mm", format!("{minute:02}")),
+        ("ss", format!("{second:02}")),
+    ] {
+        output = output.replace(token, &value);
+    }
+    Ok(output.into_bytes())
+}
+
+fn format_datetime(format: &str, current: &[u8]) -> Result<Vec<u8>, MachineProblem> {
+    if current.len() != 21 {
+        return Err(MachineProblem::DataException);
+    }
+    let (year, month, day) = split_yyyymmdd(
+        std::str::from_utf8(&current[..8])
+            .map_err(|_| MachineProblem::DataException)?
+            .parse()
+            .map_err(|_| MachineProblem::DataException)?,
+    )?;
+    let seconds = parse_hhmmss(&current[8..14])?;
+    render_datetime_format(
+        format,
+        year,
+        month,
+        day,
+        seconds / 3_600,
+        seconds / 60 % 60,
+        seconds % 60,
+    )
+}
+
+fn formatted_date(format: &str, date: i128) -> Result<Vec<u8>, MachineProblem> {
+    let (year, month, day) = split_yyyymmdd(date)?;
+    render_datetime_format(format, year, month, day, 0, 0, 0)
+}
+
+fn formatted_datetime(
+    format: &str,
+    date: i128,
+    time: Decimal,
+    _offset: i128,
+) -> Result<Vec<u8>, MachineProblem> {
+    let (year, month, day) = split_yyyymmdd(date)?;
+    let seconds = decimal_f64(time)?;
+    if !(0.0..86_400.0).contains(&seconds) {
+        return Err(MachineProblem::DataException);
+    }
+    let seconds = seconds as u32;
+    render_datetime_format(
+        format,
+        year,
+        month,
+        day,
+        seconds / 3_600,
+        seconds / 60 % 60,
+        seconds % 60,
+    )
+}
+
+fn formatted_time(format: &str, time: Decimal, _offset: i128) -> Result<Vec<u8>, MachineProblem> {
+    let seconds = decimal_f64(time)?;
+    if !(0.0..86_400.0).contains(&seconds) {
+        return Err(MachineProblem::DataException);
+    }
+    let seconds = seconds as u32;
+    render_datetime_format(
+        format,
+        1_600,
+        1,
+        1,
+        seconds / 3_600,
+        seconds / 60 % 60,
+        seconds % 60,
+    )
+}
+
+fn digits_only(text: &str) -> String {
+    text.chars().filter(char::is_ascii_digit).collect()
+}
+
+fn integer_of_formatted_date(format: &str, value: &str) -> Result<Decimal, MachineProblem> {
+    if !format.contains("YYYY") || !format.contains("MM") || !format.contains("DD") {
+        return Err(MachineProblem::DataException);
+    }
+    let digits = digits_only(value);
+    if digits.len() != 8 {
+        return Err(MachineProblem::DataException);
+    }
+    let date = digits
+        .parse::<i128>()
+        .map_err(|_| MachineProblem::DataException)?;
+    let (year, month, day) = split_yyyymmdd(date)?;
+    Ok(Decimal {
+        coefficient: i128::from(cobol_integer_of_date(year, month, day)?),
+        scale: 0,
+    })
+}
+
+fn parse_formatted_datetime(format: &str, value: &str) -> Result<(), MachineProblem> {
+    let digits = digits_only(value);
+    if format.contains("YYYY") {
+        if digits.len() < 8 {
+            return Err(MachineProblem::DataException);
+        }
+        split_yyyymmdd(
+            digits[..8]
+                .parse()
+                .map_err(|_| MachineProblem::DataException)?,
+        )?;
+    }
+    if format.contains("hh") {
+        let time = digits
+            .get(digits.len().saturating_sub(6)..)
+            .ok_or(MachineProblem::DataException)?;
+        parse_hhmmss(time.as_bytes())?;
+    }
+    Ok(())
+}
+
+fn seconds_from_formatted_time(format: &str, value: &str) -> Result<Decimal, MachineProblem> {
+    if !format.contains("hh") {
+        return Err(MachineProblem::DataException);
+    }
+    let digits = digits_only(value);
+    let time = digits
+        .get(digits.len().saturating_sub(6)..)
+        .ok_or(MachineProblem::DataException)?;
+    Ok(Decimal {
+        coefficient: i128::from(parse_hhmmss(time.as_bytes())?),
+        scale: 0,
+    })
+}
+
+fn accept_clock_value(format: AcceptClockFormat, value: &str) -> Result<Vec<u8>, MachineProblem> {
+    match format {
+        AcceptClockFormat::Time => {
+            if value.len() != 9 || !value.bytes().all(|byte| byte.is_ascii_digit()) {
+                return Err(MachineProblem::UnexpectedHostResult);
+            }
+            Ok(value.as_bytes()[..8].to_vec())
+        }
+        _ => {
+            if value.len() != 8 || !value.bytes().all(|byte| byte.is_ascii_digit()) {
+                return Err(MachineProblem::UnexpectedHostResult);
+            }
+            let numeric = value
+                .parse::<i128>()
+                .map_err(|_| MachineProblem::UnexpectedHostResult)?;
+            let (year, month, day) = split_yyyymmdd(numeric)?;
+            let ordinal = days_from_civil(year, month, day) - days_from_civil(year, 1, 1) + 1;
+            Ok(match format {
+                AcceptClockFormat::DateYymmdd => value.as_bytes()[2..].to_vec(),
+                AcceptClockFormat::DateYyyymmdd => value.as_bytes().to_vec(),
+                AcceptClockFormat::DayYyddd => {
+                    format!("{:02}{ordinal:03}", year.rem_euclid(100)).into_bytes()
+                }
+                AcceptClockFormat::DayYyyyddd => format!("{year:04}{ordinal:03}").into_bytes(),
+                AcceptClockFormat::DayOfWeek => {
+                    let weekday = (days_from_civil(year, month, day) + 3).rem_euclid(7) + 1;
+                    weekday.to_string().into_bytes()
+                }
+                AcceptClockFormat::Time => unreachable!(),
+            })
+        }
+    }
 }
 
 fn cobol_integer_of_date(year: i32, month: u32, day: u32) -> Result<i64, MachineProblem> {
@@ -5896,6 +10027,22 @@ pub enum MachineProblem {
     Host(HostProblem),
 }
 impl MachineProblem {
+    fn runtime_condition(&self) -> Option<Condition> {
+        let (name, response) = match self {
+            Self::SizeError => ("SIZE-ERROR", 1),
+            Self::DataException => ("DATA-EXCEPTION", 2),
+            Self::SubscriptError => ("SUBSCRIPT-ERROR", 3),
+            Self::ReferenceModificationError => ("REFERENCE-MODIFICATION-ERROR", 4),
+            _ => return None,
+        };
+        Some(Condition {
+            name: name.into(),
+            response,
+            response2: 0,
+            handled: false,
+        })
+    }
+
     fn execution_problem(&self) -> ExecutionProblem {
         let (category, message) = match self {
             Self::ResourceExhausted => (
@@ -6058,10 +10205,13 @@ mod tests {
     }
     #[test]
     fn checkpoint_roundtrip_restores_exact_machine_state_and_rejects_corruption() {
-        let invocation = invocation();
-        let mut first =
-            ReferenceMachine::from_binary(&binary(), invocation.clone(), CodecLimits::default())
-                .unwrap();
+        let test_invocation = invocation();
+        let mut first = ReferenceMachine::from_binary(
+            &binary(),
+            test_invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             first.drive(MachineResume::Start, Quantum::new(1, 1024).unwrap()),
             MachineDrive::Continue
@@ -6074,10 +10224,11 @@ mod tests {
         let checkpoint = first.checkpoint().unwrap();
         assert_eq!(
             checkpoint.schema(),
-            "mainframe-env.reference-machine-checkpoint@7"
+            "mainframe-env.reference-machine-checkpoint@9"
         );
         let mut restored =
-            ReferenceMachine::from_binary(&binary(), invocation, CodecLimits::default()).unwrap();
+            ReferenceMachine::from_binary(&binary(), test_invocation, CodecLimits::default())
+                .unwrap();
         restored.restore_checkpoint(&checkpoint).unwrap();
         assert_eq!(restored.last_file_status, "10");
         assert_eq!(restored.condition_status, first.condition_status);
@@ -6087,6 +10238,21 @@ mod tests {
         let restored_done = restored.drive(MachineResume::Start, Quantum::new(100, 1024).unwrap());
         assert_eq!(first_done, restored_done);
 
+        let mut version_eight = checkpoint.bytes()[..checkpoint.bytes().len() - 8].to_vec();
+        version_eight[..8].copy_from_slice(b"MECP0008");
+        version_eight[8..12].copy_from_slice(&8u32.to_be_bytes());
+        let version_eight = BoundedPayload::new(
+            "mainframe-env.reference-machine-checkpoint@8",
+            version_eight,
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let mut migrated_eight =
+            ReferenceMachine::from_binary(&binary(), invocation(), CodecLimits::default()).unwrap();
+        migrated_eight.restore_checkpoint(&version_eight).unwrap();
+        assert!(migrated_eight.linkage_addresses.is_empty());
+        assert!(migrated_eight.freed_allocations.is_empty());
+
         let mut damaged = checkpoint.bytes().to_vec();
         damaged.push(0);
         let damaged =
@@ -6095,6 +10261,55 @@ mod tests {
             restored.restore_checkpoint(&damaged),
             Err(MachineProblem::IncompatibleSnapshot)
         );
+
+        let snapshot = first.snapshot();
+        let mut legacy = b"MECP0007".to_vec();
+        legacy.extend_from_slice(&7u32.to_be_bytes());
+        legacy.extend_from_slice(&(snapshot.program_counter as u64).to_be_bytes());
+        legacy.extend_from_slice(&snapshot.effect_sequence.to_be_bytes());
+        legacy.extend_from_slice(&snapshot.executed_steps.to_be_bytes());
+        push_bytes(&mut legacy, &snapshot.output).unwrap();
+        legacy.extend_from_slice(&(snapshot.base_storage.len() as u32).to_be_bytes());
+        for storage in &snapshot.base_storage {
+            push_bytes(&mut legacy, storage).unwrap();
+        }
+        legacy.extend_from_slice(&(snapshot.perform_stack.len() as u32).to_be_bytes());
+        for target in &snapshot.perform_stack {
+            legacy.extend_from_slice(&(*target as u64).to_be_bytes());
+        }
+        legacy.extend_from_slice(&(snapshot.altered_targets.len() as u32).to_be_bytes());
+        for (from, to) in &snapshot.altered_targets {
+            push_bytes(&mut legacy, from.as_bytes()).unwrap();
+            push_bytes(&mut legacy, to.as_bytes()).unwrap();
+        }
+        legacy.extend_from_slice(&(snapshot.loop_reentry.len() as u32).to_be_bytes());
+        for node in &snapshot.loop_reentry {
+            legacy.extend_from_slice(&(*node as u64).to_be_bytes());
+        }
+        legacy.extend_from_slice(&(snapshot.loop_counts.len() as u32).to_be_bytes());
+        for (node, count) in &snapshot.loop_counts {
+            legacy.extend_from_slice(&(*node as u64).to_be_bytes());
+            legacy.extend_from_slice(&count.to_be_bytes());
+        }
+        push_bytes(&mut legacy, snapshot.last_file_status.as_bytes()).unwrap();
+        legacy.extend_from_slice(&(snapshot.dataset_cursors.len() as u32).to_be_bytes());
+        for (dataset, cursor) in &snapshot.dataset_cursors {
+            push_bytes(&mut legacy, dataset.as_bytes()).unwrap();
+            push_bytes(&mut legacy, cursor.as_bytes()).unwrap();
+        }
+        legacy.push(snapshot.condition_statuses);
+        let legacy = BoundedPayload::new(
+            "mainframe-env.reference-machine-checkpoint@7",
+            legacy,
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let mut migrated =
+            ReferenceMachine::from_binary(&binary(), invocation(), CodecLimits::default()).unwrap();
+        migrated.restore_checkpoint(&legacy).unwrap();
+        assert_eq!(migrated.pc, snapshot.program_counter);
+        assert_eq!(migrated.bases, snapshot.base_storage);
+        assert!(migrated.sort_workspaces.is_empty());
     }
     #[test]
     fn cics_tokens_lower_to_named_typed_arguments() {
@@ -6128,13 +10343,22 @@ mod tests {
             signed: true,
             sign_separate: false,
             justified_right: false,
+            blank_when_zero: false,
             linkage: false,
             offset: 0,
             length: 13,
             element_length: 13,
             occurs: 1,
+            occurs_min: 1,
+            unbounded: false,
+            depending_on: None,
+            indexes: Vec::new(),
+            keys: Vec::new(),
+            dynamic: false,
+            dynamic_limit: 0,
             parent: None,
             condition_values: Vec::new(),
+            object_class: None,
         };
         assert_eq!(
             encode_edited(
@@ -6145,6 +10369,24 @@ mod tests {
                 }
             ),
             Ok(b"000000123.45 ".to_vec())
+        );
+    }
+
+    #[test]
+    fn numval_currency_and_error_positions_are_not_boolean_shortcuts() {
+        assert_eq!(test_numval(b"12A3", false, None), 3);
+        assert_eq!(
+            test_numval("€12X".as_bytes(), false, Some("€".as_bytes())),
+            4
+        );
+        assert_eq!(test_numval(b"123.45", false, None), 0);
+        assert!(parse_numval(b"$12.5", false, None).is_err());
+        assert_eq!(
+            parse_numval("€12.5".as_bytes(), false, Some("€".as_bytes())).unwrap(),
+            Decimal {
+                coefficient: 125,
+                scale: 1
+            }
         );
     }
 }
