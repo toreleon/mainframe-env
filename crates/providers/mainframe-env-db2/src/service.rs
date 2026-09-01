@@ -1,3 +1,7 @@
+use crate::catalog::{
+    Db2CatalogGeneration, Db2ColumnDefinition, Db2ResultEncoding, Db2TableDefinition,
+    input_for_column, normalize_identifier, value_for_column,
+};
 use mainframe_env_execution_api::{CapabilityId, Invocation, InvocationLimits, ServiceClass};
 use mainframe_env_host_api::{
     CapabilityDescriptor, Db2HostVariable, Db2Operation, Db2Request, Db2Result, Db2Row,
@@ -6,11 +10,13 @@ use mainframe_env_host_api::{
 use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 const STATE_NAMESPACE: &str = "db2-state";
 const STATE_KEY: &str = "catalog";
+const MAX_RETAINED_CATALOG_GENERATIONS: usize = 64;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Db2Limits {
@@ -21,6 +27,13 @@ pub struct Db2Limits {
     pub max_cursors: usize,
     pub max_replays: usize,
     pub max_state_bytes: usize,
+    pub max_catalog_bytes: usize,
+    pub max_primary_key_columns: usize,
+    pub max_foreign_keys_per_table: usize,
+    pub max_foreign_key_columns: usize,
+    pub max_extract_fields: usize,
+    pub max_catalog_text_bytes: usize,
+    pub max_catalog_nested_items: usize,
 }
 
 impl Default for Db2Limits {
@@ -33,6 +46,13 @@ impl Default for Db2Limits {
             max_cursors: 4_096,
             max_replays: 65_536,
             max_state_bytes: 64 * 1024 * 1024,
+            max_catalog_bytes: 8 * 1024 * 1024,
+            max_primary_key_columns: 64,
+            max_foreign_keys_per_table: 1_024,
+            max_foreign_key_columns: 64,
+            max_extract_fields: 1_024,
+            max_catalog_text_bytes: 4 * 1024 * 1024,
+            max_catalog_nested_items: 262_144,
         }
     }
 }
@@ -99,9 +119,48 @@ impl RecordedResult {
 struct State {
     catalog_version: u64,
     tables: BTreeMap<String, Table>,
+    #[serde(default)]
+    schemas: BTreeMap<String, Db2TableDefinition>,
+    #[serde(default)]
+    installations: BTreeMap<String, CatalogInstallation>,
+    #[serde(default)]
+    catalog_generations: BTreeMap<String, BTreeMap<u64, CatalogGenerationSnapshot>>,
+    #[serde(default)]
+    table_provenance: BTreeMap<String, TableProvenance>,
+    #[serde(default)]
+    legacy_snapshots: BTreeMap<String, LegacyTableSnapshot>,
     pending: BTreeMap<String, PendingUnit>,
     cursors: BTreeMap<String, Cursor>,
+    #[serde(default)]
+    cursor_declarations: BTreeMap<String, String>,
     replay: BTreeMap<String, RecordedResult>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+struct CatalogInstallation {
+    generation: u64,
+    identity: String,
+    tables: BTreeSet<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+struct CatalogGenerationSnapshot {
+    generation: u64,
+    identity: String,
+    schemas: BTreeMap<String, Db2TableDefinition>,
+    tables: BTreeMap<String, Table>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+enum TableProvenance {
+    Legacy,
+    Application { owner: String, generation: u64 },
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+struct LegacyTableSnapshot {
+    schema: Db2TableDefinition,
+    table: Table,
 }
 
 struct DurableState {
@@ -120,7 +179,7 @@ impl Db2Service {
         store: Arc<dyn ProviderStateStore>,
         limits: Db2Limits,
     ) -> Result<Arc<Self>, HostProblem> {
-        let (store_version, state) = match store
+        let (store_version, mut state) = match store
             .get_provider_state(STATE_NAMESPACE, STATE_KEY)
             .map_err(store_error)?
         {
@@ -131,6 +190,8 @@ impl Db2Service {
             ),
             None => (0, State::default()),
         };
+        migrate_table_provenance(&mut state)?;
+        rekey_state(&mut state)?;
         validate_state(&state, limits)?;
         Ok(Arc::new(Self {
             store,
@@ -140,6 +201,114 @@ impl Db2Service {
                 state,
             }),
         }))
+    }
+
+    pub fn install_catalog(&self, catalog: Db2CatalogGeneration) -> Result<(), HostProblem> {
+        catalog.validate(self.limits)?;
+        let mut durable = self.lock()?;
+        if !durable.state.pending.is_empty() || !durable.state.cursors.is_empty() {
+            return Err(HostProblem::Condition {
+                name: "DB2-CATALOG-BUSY".into(),
+                response: -904,
+                response2: 0,
+            });
+        }
+        let application = catalog.application.to_ascii_uppercase();
+        if let Some(existing) = durable.state.installations.get(&application) {
+            if existing.generation == catalog.generation {
+                return if existing.identity == catalog.identity {
+                    Ok(())
+                } else {
+                    Err(HostProblem::IdempotencyConflict)
+                };
+            }
+            if existing.generation > catalog.generation {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+        }
+        let mut next = durable.state.clone();
+        apply_catalog_generation(&mut next, catalog, self.limits)?;
+        validate_state(&next, self.limits)?;
+        self.persist(&mut durable, next)
+    }
+
+    pub fn rollback_catalog(&self, application: &str, generation: u64) -> Result<(), HostProblem> {
+        let mut durable = self.lock()?;
+        if !durable.state.pending.is_empty() || !durable.state.cursors.is_empty() {
+            return Err(HostProblem::Condition {
+                name: "DB2-CATALOG-BUSY".into(),
+                response: -904,
+                response2: 0,
+            });
+        }
+        let application = application.to_ascii_uppercase();
+        let target = durable
+            .state
+            .catalog_generations
+            .get(&application)
+            .and_then(|generations| generations.get(&generation))
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
+        let mut next = durable.state.clone();
+        snapshot_selected_catalog(&mut next, &application)?;
+        let current_tables = next
+            .installations
+            .get(&application)
+            .map(|installation| installation.tables.clone())
+            .unwrap_or_default();
+        let target_tables = target.schemas.keys().cloned().collect::<BTreeSet<_>>();
+        for name in current_tables.difference(&target_tables) {
+            match next.table_provenance.get(name).cloned() {
+                Some(TableProvenance::Legacy) => {
+                    let legacy = next
+                        .legacy_snapshots
+                        .get(name)
+                        .cloned()
+                        .ok_or(HostProblem::InfrastructureFailure)?;
+                    next.schemas.insert(name.clone(), legacy.schema);
+                    next.tables.insert(name.clone(), legacy.table);
+                }
+                Some(TableProvenance::Application { owner, .. }) if owner == application => {
+                    next.schemas.remove(name);
+                    next.tables.remove(name);
+                    next.table_provenance.remove(name);
+                    next.legacy_snapshots.remove(name);
+                }
+                _ => return Err(HostProblem::InfrastructureFailure),
+            }
+        }
+        for (name, schema) in &target.schemas {
+            next.schemas.insert(name.clone(), schema.clone());
+            if !next.table_provenance.contains_key(name) {
+                let provenance = if next.legacy_snapshots.contains_key(name) {
+                    TableProvenance::Legacy
+                } else {
+                    TableProvenance::Application {
+                        owner: application.clone(),
+                        generation: target.generation,
+                    }
+                };
+                next.table_provenance.insert(name.clone(), provenance);
+            }
+        }
+        for (name, table) in &target.tables {
+            next.tables.insert(name.clone(), table.clone());
+        }
+        next.installations.insert(
+            application,
+            CatalogInstallation {
+                generation: target.generation,
+                identity: target.identity,
+                tables: target.schemas.keys().cloned().collect(),
+            },
+        );
+        next.catalog_version = next
+            .catalog_version
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        validate_foreign_keys(&next)?;
+        validate_state(&next, self.limits)?;
+        self.persist(&mut durable, next)
     }
 
     pub fn execute(
@@ -164,14 +333,16 @@ impl Db2Service {
         }
         let mut next = durable.state.clone();
         let result = apply_request(&mut next, invocation, request, self.limits)?;
-        if request.operation.is_mutating() {
-            let key = replay_key.ok_or(HostProblem::MissingIdempotency)?;
-            if next.replay.len() >= self.limits.max_replays {
-                return Err(HostProblem::ResourceExhausted);
+        if request.operation.is_mutating() || request.operation == Db2Operation::DeclareCursor {
+            if request.operation.is_mutating() {
+                let key = replay_key.ok_or(HostProblem::MissingIdempotency)?;
+                if next.replay.len() >= self.limits.max_replays {
+                    return Err(HostProblem::ResourceExhausted);
+                }
+                let mut recorded = RecordedResult::from(&result);
+                recorded.request_sha256 = request_sha256;
+                next.replay.insert(key.to_string(), recorded);
             }
-            let mut recorded = RecordedResult::from(&result);
-            recorded.request_sha256 = request_sha256;
-            next.replay.insert(key.to_string(), recorded);
             validate_state(&next, self.limits)?;
             self.persist(&mut durable, next)?;
         }
@@ -186,6 +357,15 @@ impl Db2Service {
             .get(&table.to_ascii_uppercase())
             .ok_or(HostProblem::NotFound)?;
         Ok(table.rows.values().cloned().collect())
+    }
+
+    pub fn table_definition(&self, table: &str) -> Result<Db2TableDefinition, HostProblem> {
+        self.lock()?
+            .state
+            .schemas
+            .get(&table.to_ascii_uppercase())
+            .cloned()
+            .ok_or(HostProblem::NotFound)
     }
 
     pub fn pending_units(&self) -> Result<usize, HostProblem> {
@@ -224,6 +404,212 @@ impl Db2Service {
     }
 }
 
+fn apply_catalog_generation(
+    state: &mut State,
+    catalog: Db2CatalogGeneration,
+    limits: Db2Limits,
+) -> Result<(), HostProblem> {
+    let application = catalog.application.to_ascii_uppercase();
+    let owned_elsewhere = state
+        .installations
+        .iter()
+        .filter(|(owner, _)| *owner != &application)
+        .flat_map(|(_, installation)| installation.tables.iter())
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let table_names = catalog
+        .tables
+        .iter()
+        .map(Db2TableDefinition::normalized_name)
+        .collect::<BTreeSet<_>>();
+    if table_names
+        .iter()
+        .any(|table| owned_elsewhere.contains(table))
+    {
+        return Err(HostProblem::IdempotencyConflict);
+    }
+    snapshot_selected_catalog(state, &application)?;
+    let currently_owned = state
+        .installations
+        .get(&application)
+        .map(|installation| installation.tables.clone())
+        .unwrap_or_default();
+    let retained = state
+        .catalog_generations
+        .get(&application)
+        .map_or(0, BTreeMap::len);
+    if !state
+        .catalog_generations
+        .get(&application)
+        .is_some_and(|generations| generations.contains_key(&catalog.generation))
+        && retained >= MAX_RETAINED_CATALOG_GENERATIONS
+    {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    for definition in &catalog.tables {
+        let name = definition.normalized_name();
+        let existed_before_adoption =
+            state.tables.contains_key(&name) && !currently_owned.contains(&name);
+        if existed_before_adoption {
+            if !matches!(
+                state.table_provenance.get(&name),
+                Some(TableProvenance::Legacy)
+            ) {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            if !state.legacy_snapshots.contains_key(&name) {
+                let schema = state
+                    .schemas
+                    .get(&name)
+                    .cloned()
+                    .ok_or(HostProblem::Malformed)?;
+                let table = state
+                    .tables
+                    .get(&name)
+                    .cloned()
+                    .ok_or(HostProblem::Malformed)?;
+                state
+                    .legacy_snapshots
+                    .insert(name.clone(), LegacyTableSnapshot { schema, table });
+            }
+        } else if !state.tables.contains_key(&name) {
+            state.table_provenance.insert(
+                name.clone(),
+                TableProvenance::Application {
+                    owner: application.clone(),
+                    generation: catalog.generation,
+                },
+            );
+        }
+        if let Some(existing) = state.schemas.get(&name) {
+            if !schemas_compatible(existing, definition) {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            let table = state.tables.get(&name).ok_or(HostProblem::Malformed)?;
+            if table
+                .rows
+                .values()
+                .any(|row| validate_row(definition, row, limits).is_err())
+            {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+        }
+        state.schemas.insert(name.clone(), definition.clone());
+        state.tables.entry(name).or_insert_with(|| Table {
+            columns: definition.columns.len(),
+            rows: BTreeMap::new(),
+        });
+    }
+    for seed in &catalog.rows {
+        let table_name = seed.table.to_ascii_uppercase();
+        let definition = state
+            .schemas
+            .get(&table_name)
+            .ok_or(HostProblem::Malformed)?;
+        let values = definition
+            .columns
+            .iter()
+            .map(|column| {
+                value_for_column(&seed.values, &column.name)
+                    .cloned()
+                    .or_else(|| column.default_value.clone())
+                    .unwrap_or_default()
+            })
+            .collect::<Vec<_>>();
+        let key = row_key(definition, &values)?;
+        let table = state
+            .tables
+            .get_mut(&table_name)
+            .ok_or(HostProblem::Malformed)?;
+        if table.rows.len() >= limits.max_rows_per_table {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        match table.rows.get(&key) {
+            Some(existing) if existing != &values => {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            Some(_) => {}
+            None => {
+                table.rows.insert(key, values);
+            }
+        }
+    }
+    validate_foreign_keys(state)?;
+    let snapshot = catalog_snapshot(state, catalog.generation, &catalog.identity, &table_names)?;
+    state
+        .catalog_generations
+        .entry(application.clone())
+        .or_default()
+        .insert(catalog.generation, snapshot);
+    state.installations.insert(
+        application,
+        CatalogInstallation {
+            generation: catalog.generation,
+            identity: catalog.identity,
+            tables: table_names,
+        },
+    );
+    state.catalog_version = state
+        .catalog_version
+        .checked_add(1)
+        .ok_or(HostProblem::ResourceExhausted)?;
+    Ok(())
+}
+
+fn snapshot_selected_catalog(state: &mut State, application: &str) -> Result<(), HostProblem> {
+    let Some(selected) = state.installations.get(application).cloned() else {
+        return Ok(());
+    };
+    let snapshot = catalog_snapshot(
+        state,
+        selected.generation,
+        &selected.identity,
+        &selected.tables,
+    )?;
+    state
+        .catalog_generations
+        .entry(application.to_string())
+        .or_default()
+        .insert(selected.generation, snapshot);
+    Ok(())
+}
+
+fn catalog_snapshot(
+    state: &State,
+    generation: u64,
+    identity: &str,
+    names: &BTreeSet<String>,
+) -> Result<CatalogGenerationSnapshot, HostProblem> {
+    let schemas = names
+        .iter()
+        .map(|name| {
+            state
+                .schemas
+                .get(name)
+                .cloned()
+                .map(|schema| (name.clone(), schema))
+                .ok_or(HostProblem::Malformed)
+        })
+        .collect::<Result<BTreeMap<_, _>, _>>()?;
+    let tables = names
+        .iter()
+        .map(|name| {
+            state
+                .tables
+                .get(name)
+                .cloned()
+                .map(|table| (name.clone(), table))
+                .ok_or(HostProblem::Malformed)
+        })
+        .collect::<Result<BTreeMap<_, _>, _>>()?;
+    Ok(CatalogGenerationSnapshot {
+        generation,
+        identity: identity.into(),
+        schemas,
+        tables,
+    })
+}
+
 fn apply_request(
     state: &mut State,
     invocation: &Invocation,
@@ -234,7 +620,7 @@ fn apply_request(
     match request.operation {
         Db2Operation::ExecuteScript => execute_script(state, &request.statement, limits),
         Db2Operation::FreePlans => Ok(success(0, "PLANS FREED", Vec::new())),
-        Db2Operation::DeclareCursor => Ok(success(0, "CURSOR DECLARED", Vec::new())),
+        Db2Operation::DeclareCursor => declare_cursor(state, run, request, limits),
         Db2Operation::Select => select(state, run, request),
         Db2Operation::Count => count(state, run, request),
         Db2Operation::Insert => {
@@ -266,67 +652,101 @@ fn execute_script(
     statement: &str,
     limits: Db2Limits,
 ) -> Result<Db2Result, HostProblem> {
-    let upper = statement.to_ascii_uppercase();
-    let mut affected = 0u64;
-    for (name, columns) in [
-        ("CARDDEMO.TRANSACTION_TYPE", 2usize),
-        ("CARDDEMO.TRANSACTION_TYPE_CATEGORY", 3usize),
-        ("CARDDEMO.AUTHFRDS", 26usize),
-    ] {
-        if upper.contains(&format!("CREATE TABLE {name}"))
-            || upper.contains(&format!("CREATE TABLE  {name}"))
-        {
-            if state.tables.len() >= limits.max_tables && !state.tables.contains_key(name) {
-                return Err(HostProblem::ResourceExhausted);
+    let mut changed = false;
+    for definition in parse_create_tables(statement, limits)? {
+        let name = definition.normalized_name();
+        if state.tables.len() >= limits.max_tables && !state.tables.contains_key(&name) {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        if let Some(installed) = state.schemas.get(&name) {
+            if !ddl_redeclaration_compatible(installed, &definition) {
+                return Err(HostProblem::IdempotencyConflict);
             }
-            state.tables.entry(name.into()).or_insert(Table {
-                columns,
-                rows: BTreeMap::new(),
-            });
-        }
-    }
-    let mut rest = statement;
-    while let Some(offset) = rest.to_ascii_uppercase().find("INSERT INTO") {
-        rest = &rest[offset..];
-        let upper_rest = rest.to_ascii_uppercase();
-        let target = &upper_rest[..upper_rest.find('(').unwrap_or(upper_rest.len())];
-        let (table_name, columns) = if target.contains("CARDDEMO.TRANSACTION_TYPE_CATEGORY") {
-            ("CARDDEMO.TRANSACTION_TYPE_CATEGORY", 3usize)
-        } else if target.contains("CARDDEMO.TRANSACTION_TYPE") {
-            ("CARDDEMO.TRANSACTION_TYPE", 2usize)
         } else {
-            return Err(HostProblem::Unsupported);
-        };
-        let end = upper_rest.find("COMMIT").unwrap_or(rest.len());
-        let control = &rest[..end];
-        let literals = quoted_literals(control)?;
-        if literals.len() % columns != 0 {
-            return Err(HostProblem::Malformed);
+            state.schemas.insert(name.clone(), definition.clone());
+            changed = true;
         }
-        let table = state.tables.entry(table_name.into()).or_insert(Table {
-            columns,
+        state.tables.entry(name).or_insert_with(|| Table {
+            columns: definition.columns.len(),
             rows: BTreeMap::new(),
         });
-        for values in literals.chunks(columns) {
-            if table.rows.len() >= limits.max_rows_per_table {
+        state
+            .table_provenance
+            .entry(definition.normalized_name())
+            .or_insert(TableProvenance::Legacy);
+    }
+
+    let mut affected = 0_u64;
+    let upper = statement.to_ascii_uppercase();
+    let mut offset = 0_usize;
+    while let Some(relative) = upper[offset..].find("INSERT INTO") {
+        let start = offset + relative;
+        let tail = &statement[start..];
+        let tail_upper = &upper[start..];
+        let table_name = identifier_after(tail, "INTO")
+            .ok_or(HostProblem::Malformed)?
+            .to_ascii_uppercase();
+        let definition = state
+            .schemas
+            .get(&table_name)
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
+        let columns = insert_columns(tail, &definition)?;
+        let next_insert = tail_upper
+            .get("INSERT INTO".len()..)
+            .and_then(|value| value.find("INSERT INTO"))
+            .map(|value| value + "INSERT INTO".len());
+        let end = [tail_upper.find("COMMIT"), next_insert, tail_upper.find(';')]
+            .into_iter()
+            .flatten()
+            .filter(|end| *end > "INSERT INTO".len())
+            .min()
+            .unwrap_or(tail.len());
+        let literals = quoted_literals(&tail[..end])?;
+        if columns.is_empty() || literals.len() % columns.len() != 0 {
+            return Err(HostProblem::Malformed);
+        }
+        for values in literals.chunks(columns.len()) {
+            let mut row = vec![Vec::new(); definition.columns.len()];
+            for (column, value) in columns.iter().zip(values) {
+                let index = definition
+                    .column_index(column)
+                    .ok_or(HostProblem::Malformed)?;
+                row[index] = value.as_bytes().to_vec();
+            }
+            validate_row(&definition, &row, limits)?;
+            let key = row_key(&definition, &row)?;
+            let table = state
+                .tables
+                .get_mut(&table_name)
+                .ok_or(HostProblem::NotFound)?;
+            if table.rows.len() >= limits.max_rows_per_table && !table.rows.contains_key(&key) {
                 return Err(HostProblem::ResourceExhausted);
             }
-            let key = row_key(table_name, values)?;
-            table.rows.insert(
-                key,
-                values
-                    .iter()
-                    .map(|value| value.as_bytes().to_vec())
-                    .collect(),
-            );
-            affected += 1;
+            match table.rows.get(&key) {
+                Some(existing) if existing != &row => {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+                Some(_) => {}
+                None => {
+                    table.rows.insert(key, row);
+                    affected += 1;
+                    changed = true;
+                }
+            }
         }
-        rest = rest.get(end..).unwrap_or_default();
-        if end == 0 {
+        offset = start.saturating_add(end.max("INSERT INTO".len()));
+        if offset >= statement.len() {
             break;
         }
     }
-    state.catalog_version = state.catalog_version.saturating_add(1);
+    validate_foreign_keys(state)?;
+    if changed {
+        state.catalog_version = state
+            .catalog_version
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+    }
     Ok(success(affected, "SCRIPT EXECUTED", Vec::new()))
 }
 
@@ -343,34 +763,35 @@ fn select(state: &State, run: &str, request: &Db2Request) -> Result<Db2Result, H
             }],
         ));
     }
-    let table = read_table(state, run, "CARDDEMO.TRANSACTION_TYPE")?;
-    let key = key_input(&request.inputs).ok_or(HostProblem::Malformed)?;
-    match table.rows.get(&key) {
-        Some(row) => Ok(success(
-            0,
-            "ROW",
-            vec![Db2Row {
-                columns: vec![row[0].clone(), varchar(&row[1])],
-            }],
-        )),
-        None => Ok(sql_condition(100, "02000", "ROW NOT FOUND")),
+    let (_, definition, table) = read_relation(state, run, &request.statement)?;
+    let columns = selected_column_indices(&request.statement, definition)?;
+    let key = key_from_statement_inputs(&request.statement, definition, &request.inputs)?;
+    let selected = if let Some(key) = key {
+        table.rows.get(&key).into_iter().collect::<Vec<_>>()
+    } else {
+        table
+            .rows
+            .values()
+            .take(request.max_rows as usize)
+            .collect()
+    };
+    if selected.is_empty() {
+        return Ok(sql_condition(100, "02000", "ROW NOT FOUND"));
     }
+    let rows = selected
+        .into_iter()
+        .map(|row| result_row(definition, row, &columns))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(success(0, "ROW", rows))
 }
 
 fn count(state: &State, run: &str, request: &Db2Request) -> Result<Db2Result, HostProblem> {
-    let table = read_table(state, run, "CARDDEMO.TRANSACTION_TYPE")?;
-    let type_filter = input_named(&request.inputs, "TYPE-CD-FILTER").map(trimmed);
-    let desc_filter = input_named(&request.inputs, "TYPE-DESC-FILTER").map(trimmed);
+    let (_, definition, table) = read_relation(state, run, &request.statement)?;
+    let predicates = sql_predicates(&request.statement, definition, &request.inputs)?;
     let count = table
         .rows
         .values()
-        .filter(|row| {
-            type_filter.as_ref().is_none_or(|filter| {
-                filter.is_empty() || String::from_utf8_lossy(&row[0]).contains(filter)
-            }) && desc_filter.as_ref().is_none_or(|filter| {
-                filter.is_empty() || String::from_utf8_lossy(&row[1]).contains(filter)
-            })
-        })
+        .filter(|row| predicates.iter().all(|predicate| predicate.matches(row)))
         .count();
     Ok(success(
         0,
@@ -387,147 +808,106 @@ fn insert(
     request: &Db2Request,
     limits: Db2Limits,
 ) -> Result<Db2Result, HostProblem> {
-    if request
-        .statement
-        .to_ascii_uppercase()
-        .contains("CARDDEMO.AUTHFRDS")
-    {
-        return insert_authfrds(state, run, request, limits);
-    }
-    let key = key_input(&request.inputs).ok_or(HostProblem::Malformed)?;
-    let description = description_input(&request.inputs).ok_or(HostProblem::Malformed)?;
-    let table = write_table(state, run, "CARDDEMO.TRANSACTION_TYPE", 2)?;
+    let name = table_for_operation(&request.statement, "INTO")?;
+    let definition = state
+        .schemas
+        .get(&name)
+        .cloned()
+        .ok_or(HostProblem::NotFound)?;
+    let row = row_from_insert(&request.statement, &definition, &request.inputs, limits)?;
+    let key = row_key(&definition, &row)?;
+    let table = write_table(state, run, &name)?;
     if table.rows.contains_key(&key) {
         return Ok(sql_condition(-803, "23505", "DUPLICATE KEY"));
     }
     if table.rows.len() >= limits.max_rows_per_table {
         return Err(HostProblem::ResourceExhausted);
     }
-    table.rows.insert(
-        key.clone(),
-        vec![key.into_bytes(), description.into_bytes()],
-    );
+    table.rows.insert(key, row);
     Ok(success(1, "ROW INSERTED", Vec::new()))
 }
 
 fn update(state: &mut State, run: &str, request: &Db2Request) -> Result<Db2Result, HostProblem> {
-    if request
-        .statement
-        .to_ascii_uppercase()
-        .contains("CARDDEMO.AUTHFRDS")
+    let name = table_for_operation(&request.statement, "UPDATE")?;
+    let definition = state
+        .schemas
+        .get(&name)
+        .cloned()
+        .ok_or(HostProblem::NotFound)?;
+    let key = key_from_statement_inputs(&request.statement, &definition, &request.inputs)?
+        .ok_or(HostProblem::Malformed)?;
+    let assignments = update_assignments(&request.statement, &definition, &request.inputs)?;
+    let primary_key = definition
+        .primary_key_indices()?
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+    if assignments
+        .iter()
+        .any(|(index, _)| primary_key.contains(index))
     {
-        return update_authfrds(state, run, request);
+        return Ok(sql_condition(
+            -798,
+            "428C9",
+            "PRIMARY KEY UPDATE IS NOT SUPPORTED",
+        ));
     }
-    let key = key_input(&request.inputs).ok_or(HostProblem::Malformed)?;
-    let description = description_input(&request.inputs).ok_or(HostProblem::Malformed)?;
-    let table = write_table(state, run, "CARDDEMO.TRANSACTION_TYPE", 2)?;
+    let table = write_table(state, run, &name)?;
     let Some(row) = table.rows.get_mut(&key) else {
         return Ok(sql_condition(100, "02000", "ROW NOT FOUND"));
     };
-    row[1] = description.into_bytes();
+    for (index, value) in assignments {
+        row[index] = value;
+    }
     Ok(success(1, "ROW UPDATED", Vec::new()))
 }
 
-const AUTHFRDS_COLUMNS: [&str; 26] = [
-    "CARD-NUM",
-    "AUTH-TS",
-    "AUTH-TYPE",
-    "CARD-EXPIRY-DATE",
-    "MESSAGE-TYPE",
-    "MESSAGE-SOURCE",
-    "AUTH-ID-CODE",
-    "AUTH-RESP-CODE",
-    "AUTH-RESP-REASON",
-    "PROCESSING-CODE",
-    "TRANSACTION-AMT",
-    "APPROVED-AMT",
-    "MERCHANT-CATAGORY-CODE",
-    "ACQR-COUNTRY-CODE",
-    "POS-ENTRY-MODE",
-    "MERCHANT-ID",
-    "MERCHANT-NAME",
-    "MERCHANT-CITY",
-    "MERCHANT-STATE",
-    "MERCHANT-ZIP",
-    "TRANSACTION-ID",
-    "MATCH-STATUS",
-    "AUTH-FRAUD",
-    "FRAUD-RPT-DATE",
-    "ACCT-ID",
-    "CUST-ID",
-];
-
-fn insert_authfrds(
-    state: &mut State,
-    run: &str,
-    request: &Db2Request,
-    limits: Db2Limits,
-) -> Result<Db2Result, HostProblem> {
-    let card = input_named(&request.inputs, "CARD-NUM")
-        .map(trimmed)
+fn delete(state: &mut State, run: &str, request: &Db2Request) -> Result<Db2Result, HostProblem> {
+    let name = table_for_operation(&request.statement, "FROM")?;
+    let definition = state
+        .schemas
+        .get(&name)
+        .cloned()
+        .ok_or(HostProblem::NotFound)?;
+    let key = key_from_statement_inputs(&request.statement, &definition, &request.inputs)?
         .ok_or(HostProblem::Malformed)?;
-    let timestamp = input_named(&request.inputs, "AUTH-TS")
-        .map(trimmed)
-        .ok_or(HostProblem::Malformed)?;
-    let key = format!("{card}|{timestamp}");
-    let table = write_table(state, run, "CARDDEMO.AUTHFRDS", AUTHFRDS_COLUMNS.len())?;
-    if table.rows.contains_key(&key) {
-        return Ok(sql_condition(-803, "23505", "DUPLICATE KEY"));
-    }
-    if table.rows.len() >= limits.max_rows_per_table {
-        return Err(HostProblem::ResourceExhausted);
-    }
-    let row = AUTHFRDS_COLUMNS
-        .iter()
-        .map(|column| {
-            input_named(&request.inputs, column)
-                .map(ToOwned::to_owned)
-                .unwrap_or_default()
-        })
-        .collect();
-    table.rows.insert(key, row);
-    Ok(success(1, "AUTHORIZATION ROW INSERTED", Vec::new()))
-}
-
-fn update_authfrds(
-    state: &mut State,
-    run: &str,
-    request: &Db2Request,
-) -> Result<Db2Result, HostProblem> {
-    let card = input_named(&request.inputs, "CARD-NUM")
-        .map(trimmed)
-        .ok_or(HostProblem::Malformed)?;
-    let timestamp = input_named(&request.inputs, "AUTH-TS")
-        .map(trimmed)
-        .ok_or(HostProblem::Malformed)?;
-    let fraud = input_named(&request.inputs, "AUTH-FRAUD")
-        .map(ToOwned::to_owned)
-        .ok_or(HostProblem::Malformed)?;
-    let table = write_table(state, run, "CARDDEMO.AUTHFRDS", AUTHFRDS_COLUMNS.len())?;
-    let Some(row) = table.rows.get_mut(&format!("{card}|{timestamp}")) else {
+    let table = read_table(state, run, &name)?;
+    let Some(row) = table.rows.get(&key) else {
         return Ok(sql_condition(100, "02000", "ROW NOT FOUND"));
     };
-    row[22] = fraud;
-    row[23] = b"CURRENT DATE".to_vec();
-    Ok(success(1, "AUTHORIZATION FRAUD UPDATED", Vec::new()))
-}
-
-fn delete(state: &mut State, run: &str, request: &Db2Request) -> Result<Db2Result, HostProblem> {
-    let key = key_input(&request.inputs).ok_or(HostProblem::Malformed)?;
-    if read_table(state, run, "CARDDEMO.TRANSACTION_TYPE_CATEGORY").is_ok_and(|table| {
-        table
-            .rows
-            .keys()
-            .any(|category| category.starts_with(&format!("{key}|")))
-    }) {
+    if delete_is_restricted(state, run, &name, &definition, row)? {
         return Ok(sql_condition(-532, "23504", "DELETE RESTRICTED"));
     }
-    let table = write_table(state, run, "CARDDEMO.TRANSACTION_TYPE", 2)?;
+    let table = write_table(state, run, &name)?;
     if table.rows.remove(&key).is_none() {
         Ok(sql_condition(100, "02000", "ROW NOT FOUND"))
     } else {
         Ok(success(1, "ROW DELETED", Vec::new()))
     }
+}
+
+fn declare_cursor(
+    state: &mut State,
+    run: &str,
+    request: &Db2Request,
+    limits: Db2Limits,
+) -> Result<Db2Result, HostProblem> {
+    if state.cursor_declarations.len() >= limits.max_cursors {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let name = request
+        .cursor
+        .clone()
+        .or_else(|| identifier_after(&request.statement, "DECLARE"))
+        .ok_or(HostProblem::Malformed)?;
+    if !request.statement.to_ascii_uppercase().contains(" CURSOR ")
+        || !request.statement.to_ascii_uppercase().contains(" FROM ")
+    {
+        return Err(HostProblem::Malformed);
+    }
+    state
+        .cursor_declarations
+        .insert(cursor_key(run, &name), request.statement.clone());
+    Ok(success(0, "CURSOR DECLARED", Vec::new()))
 }
 
 fn open_cursor(
@@ -540,28 +920,44 @@ fn open_cursor(
         return Err(HostProblem::ResourceExhausted);
     }
     let cursor_name = request.cursor.as_deref().ok_or(HostProblem::Malformed)?;
-    let table = read_table(state, run, "CARDDEMO.TRANSACTION_TYPE")?;
-    let backward = request.statement.to_ascii_uppercase().contains(" DESC");
+    let statement = if request.statement.to_ascii_uppercase().contains(" FROM ") {
+        request.statement.clone()
+    } else {
+        state
+            .cursor_declarations
+            .get(&cursor_key(run, cursor_name))
+            .cloned()
+            .ok_or(HostProblem::NotFound)?
+    };
+    let (_, definition, table) = read_relation(state, run, &statement)?;
+    let backward = statement.to_ascii_uppercase().contains(" DESC");
+    let columns = selected_column_indices(&statement, definition)?;
+    let key_index = *definition
+        .primary_key_indices()?
+        .first()
+        .ok_or(HostProblem::Malformed)?;
     let start = request
         .inputs
         .values()
         .next()
-        .map(|value| trimmed(&value.value));
-    let mut rows = table
-        .rows
-        .values()
+        .map(|value| predicate_operand(&definition.columns[key_index], &value.value))
+        .transpose()?;
+    let mut ordered = table.rows.values().collect::<Vec<_>>();
+    ordered.sort_by(|left, right| compare_primary_key_rows(definition, left, right));
+    let mut rows = ordered
+        .into_iter()
         .filter(|row| {
             start.as_ref().is_none_or(|start| {
-                start.is_empty()
+                start.bytes().is_empty()
                     || if backward {
-                        String::from_utf8_lossy(&row[0]).as_ref() <= start.as_str()
+                        row[key_index].as_slice() <= start.bytes()
                     } else {
-                        String::from_utf8_lossy(&row[0]).as_ref() >= start.as_str()
+                        row[key_index].as_slice() >= start.bytes()
                     }
             })
         })
-        .map(|row| vec![row[0].clone(), varchar(&row[1])])
-        .collect::<Vec<_>>();
+        .map(|row| result_row(definition, row, &columns).map(|row| row.columns))
+        .collect::<Result<Vec<_>, _>>()?;
     if backward {
         rows.reverse();
     }
@@ -612,6 +1008,7 @@ fn commit(state: &mut State, run: &str) -> Result<Db2Result, HostProblem> {
         return Ok(sql_condition(-911, "40001", "SERIALIZATION CONFLICT"));
     }
     state.tables = pending.tables;
+    validate_foreign_keys(state)?;
     state.catalog_version = state
         .catalog_version
         .checked_add(1)
@@ -632,16 +1029,11 @@ fn extract(
     request: &Db2Request,
     limits: Db2Limits,
 ) -> Result<Db2Result, HostProblem> {
-    let category = request
-        .statement
-        .to_ascii_uppercase()
-        .contains("TRANSACTION_TYPE_CATEGORY");
-    let table_name = if category {
-        "CARDDEMO.TRANSACTION_TYPE_CATEGORY"
-    } else {
-        "CARDDEMO.TRANSACTION_TYPE"
-    };
-    let table = read_table(state, run, table_name)?;
+    let (_, definition, table) = read_relation(state, run, &request.statement)?;
+    let layout = definition
+        .extract
+        .as_ref()
+        .ok_or(HostProblem::Unsupported)?;
     if table.rows.len() > limits.max_rows_per_table {
         return Err(HostProblem::ResourceExhausted);
     }
@@ -649,35 +1041,19 @@ fn extract(
         .rows
         .values()
         .map(|row| {
-            let mut record = Vec::with_capacity(60);
-            for value in row {
-                record.extend_from_slice(value);
-                if category && record.len() == 6 {
-                    continue;
-                }
-                if (!category && record.len() == 2) || (category && record.len() == 6) {
-                    continue;
-                }
+            let mut record = Vec::new();
+            for field in &layout.fields {
+                let index = definition
+                    .column_index(&field.column)
+                    .ok_or(HostProblem::Malformed)?;
+                record.extend(fixed(&row[index], field.width));
             }
-            if category {
-                let mut exact = Vec::new();
-                exact.extend(fixed(&row[0], 2));
-                exact.extend(fixed(&row[1], 4));
-                exact.extend(fixed(&row[2], 50));
-                exact.extend_from_slice(b"0000");
-                record = exact;
-            } else {
-                let mut exact = Vec::new();
-                exact.extend(fixed(&row[0], 2));
-                exact.extend(fixed(&row[1], 50));
-                exact.extend_from_slice(b"00000000");
-                record = exact;
-            }
-            Db2Row {
+            record.extend_from_slice(&layout.trailer);
+            Ok(Db2Row {
                 columns: vec![record],
-            }
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, HostProblem>>()?;
     Ok(success(0, "EXTRACT", rows))
 }
 
@@ -713,7 +1089,6 @@ fn write_table<'a>(
     state: &'a mut State,
     run: &str,
     table: &str,
-    columns: usize,
 ) -> Result<&'a mut Table, HostProblem> {
     let pending = state
         .pending
@@ -722,10 +1097,7 @@ fn write_table<'a>(
             base_catalog_version: state.catalog_version,
             tables: state.tables.clone(),
         });
-    Ok(pending.tables.entry(table.into()).or_insert(Table {
-        columns,
-        rows: BTreeMap::new(),
-    }))
+    pending.tables.get_mut(table).ok_or(HostProblem::NotFound)
 }
 
 fn clear_run_cursors(state: &mut State, run: &str) {
@@ -737,16 +1109,1002 @@ fn cursor_key(run: &str, cursor: &str) -> String {
     format!("{run}|{}", cursor.to_ascii_uppercase())
 }
 
-fn row_key(table: &str, values: &[String]) -> Result<String, HostProblem> {
-    match table {
-        "CARDDEMO.TRANSACTION_TYPE" => values.first().cloned().ok_or(HostProblem::Malformed),
-        "CARDDEMO.TRANSACTION_TYPE_CATEGORY" => Ok(format!(
-            "{}|{}",
-            values.first().ok_or(HostProblem::Malformed)?,
-            values.get(1).ok_or(HostProblem::Malformed)?
-        )),
-        _ => Err(HostProblem::Unsupported),
+fn row_key(definition: &Db2TableDefinition, values: &[Vec<u8>]) -> Result<String, HostProblem> {
+    definition
+        .primary_key_indices()?
+        .into_iter()
+        .map(|index| {
+            values
+                .get(index)
+                .filter(|value| !value.is_empty())
+                .map(|value| key_component(value))
+                .ok_or(HostProblem::Malformed)
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map(|parts| parts.join("|"))
+}
+
+fn key_component(value: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut encoded = String::with_capacity(16usize.saturating_add(value.len().saturating_mul(2)));
+    encoded.push_str(&format!("{:016x}:", value.len()));
+    for byte in value {
+        encoded.push(char::from(HEX[usize::from(byte >> 4)]));
+        encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
     }
+    encoded
+}
+
+fn rekey_state(state: &mut State) -> Result<(), HostProblem> {
+    rekey_table_map(&mut state.tables, &state.schemas)?;
+    for pending in state.pending.values_mut() {
+        rekey_table_map(&mut pending.tables, &state.schemas)?;
+    }
+    for generations in state.catalog_generations.values_mut() {
+        for snapshot in generations.values_mut() {
+            rekey_table_map(&mut snapshot.tables, &snapshot.schemas)?;
+        }
+    }
+    for snapshot in state.legacy_snapshots.values_mut() {
+        let mut rows = BTreeMap::new();
+        for row in snapshot.table.rows.values() {
+            let key = row_key(&snapshot.schema, row)?;
+            if rows.insert(key, row.clone()).is_some() {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+        }
+        snapshot.table.rows = rows;
+    }
+    Ok(())
+}
+
+fn migrate_table_provenance(state: &mut State) -> Result<(), HostProblem> {
+    let owners = state
+        .installations
+        .iter()
+        .flat_map(|(owner, installation)| {
+            installation.tables.iter().map(move |table| {
+                (
+                    table.clone(),
+                    TableProvenance::Application {
+                        owner: owner.clone(),
+                        generation: installation.generation,
+                    },
+                )
+            })
+        })
+        .collect::<BTreeMap<_, _>>();
+    for name in state.tables.keys() {
+        state
+            .table_provenance
+            .entry(name.clone())
+            .or_insert_with(|| owners.get(name).cloned().unwrap_or(TableProvenance::Legacy));
+    }
+    if state
+        .table_provenance
+        .keys()
+        .any(|name| !state.tables.contains_key(name))
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(())
+}
+
+fn rekey_table_map(
+    tables: &mut BTreeMap<String, Table>,
+    schemas: &BTreeMap<String, Db2TableDefinition>,
+) -> Result<(), HostProblem> {
+    for (name, table) in tables {
+        let Some(schema) = schemas.get(name) else {
+            continue;
+        };
+        let mut rows = BTreeMap::new();
+        for row in table.rows.values() {
+            let key = row_key(schema, row)?;
+            if rows.insert(key, row.clone()).is_some() {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+        }
+        table.rows = rows;
+    }
+    Ok(())
+}
+
+fn read_relation<'a>(
+    state: &'a State,
+    run: &str,
+    statement: &str,
+) -> Result<(String, &'a Db2TableDefinition, &'a Table), HostProblem> {
+    let name = table_for_operation(statement, "FROM")?;
+    let definition = state.schemas.get(&name).ok_or(HostProblem::NotFound)?;
+    let table = read_table(state, run, &name)?;
+    Ok((name, definition, table))
+}
+
+fn table_for_operation(statement: &str, keyword: &str) -> Result<String, HostProblem> {
+    identifier_after(statement, keyword)
+        .map(|value| value.to_ascii_uppercase())
+        .ok_or(HostProblem::Malformed)
+}
+
+fn identifier_after(statement: &str, keyword: &str) -> Option<String> {
+    let words = sql_words(statement);
+    words
+        .iter()
+        .position(|word| word.eq_ignore_ascii_case(keyword))
+        .and_then(|index| words.get(index + 1))
+        .map(|value| value.trim_matches('"').to_string())
+}
+
+fn sql_words(statement: &str) -> Vec<String> {
+    statement
+        .split(|character: char| {
+            !(character.is_ascii_alphanumeric()
+                || matches!(character, '_' | '.' | '$' | '#' | '@' | '-' | ':')
+                || matches!(character, '=' | '<' | '>'))
+        })
+        .filter(|word| !word.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+fn insert_columns(
+    statement: &str,
+    definition: &Db2TableDefinition,
+) -> Result<Vec<String>, HostProblem> {
+    let upper = statement.to_ascii_uppercase();
+    let into = upper.find("INTO").ok_or(HostProblem::Malformed)? + "INTO".len();
+    let Some(open_relative) = statement[into..].find('(') else {
+        return Ok(definition
+            .columns
+            .iter()
+            .map(|column| column.name.clone())
+            .collect());
+    };
+    let open = into + open_relative;
+    if upper[into..open].contains("SELECT") {
+        return Ok(definition
+            .columns
+            .iter()
+            .map(|column| column.name.clone())
+            .collect());
+    }
+    let close = matching_parenthesis(statement, open).ok_or(HostProblem::Malformed)?;
+    let body = &statement[open + 1..close];
+    if body.contains(',') {
+        body.split(',')
+            .map(|column| {
+                let column = column.trim().trim_matches('"').to_string();
+                definition
+                    .column_index(&column)
+                    .map(|_| column)
+                    .ok_or(HostProblem::Malformed)
+            })
+            .collect()
+    } else {
+        let columns = sql_words(body)
+            .into_iter()
+            .filter(|column| definition.column_index(column).is_some())
+            .collect::<Vec<_>>();
+        if columns.is_empty() {
+            Err(HostProblem::Malformed)
+        } else {
+            Ok(columns)
+        }
+    }
+}
+
+fn selected_column_indices(
+    statement: &str,
+    definition: &Db2TableDefinition,
+) -> Result<Vec<usize>, HostProblem> {
+    let upper = statement.to_ascii_uppercase();
+    let select = upper.find("SELECT").ok_or(HostProblem::Malformed)? + "SELECT".len();
+    let from = upper[select..]
+        .find("FROM")
+        .map(|offset| select + offset)
+        .ok_or(HostProblem::Malformed)?;
+    let mut expression = statement[select..from].trim();
+    if let Some(into) = expression.to_ascii_uppercase().find(" INTO ") {
+        expression = expression[..into].trim();
+    }
+    expression = expression
+        .strip_prefix("DISTINCT ")
+        .or_else(|| expression.strip_prefix("distinct "))
+        .unwrap_or(expression);
+    if expression.is_empty() || expression == "*" {
+        return Ok((0..definition.columns.len()).collect());
+    }
+    if expression.contains(',') {
+        expression
+            .split(',')
+            .map(|column| {
+                let column = column
+                    .split_whitespace()
+                    .last()
+                    .unwrap_or(column)
+                    .rsplit('.')
+                    .next()
+                    .unwrap_or(column)
+                    .trim_matches('"');
+                definition
+                    .column_index(column)
+                    .ok_or(HostProblem::Malformed)
+            })
+            .collect()
+    } else {
+        let mut columns = sql_words(expression)
+            .into_iter()
+            .filter_map(|column| definition.column_index(&column))
+            .collect::<Vec<_>>();
+        columns.dedup();
+        if columns.is_empty() {
+            Err(HostProblem::Malformed)
+        } else {
+            Ok(columns)
+        }
+    }
+}
+
+fn row_from_inputs(
+    definition: &Db2TableDefinition,
+    inputs: &BTreeMap<String, Db2HostVariable>,
+    limits: Db2Limits,
+) -> Result<Vec<Vec<u8>>, HostProblem> {
+    let row = definition
+        .columns
+        .iter()
+        .map(|column| match input_for_column(inputs, &column.name) {
+            Some(variable) if variable.indicator.is_some_and(|indicator| indicator < 0) => {
+                if column.nullable {
+                    Ok(Vec::new())
+                } else {
+                    Err(HostProblem::Malformed)
+                }
+            }
+            Some(variable) => decode_host_value(column, &variable.value),
+            None if column.default_value.is_some() => {
+                Ok(column.default_value.clone().unwrap_or_default())
+            }
+            None if column.nullable => Ok(Vec::new()),
+            None => Err(HostProblem::Malformed),
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    validate_row(definition, &row, limits)?;
+    Ok(row)
+}
+
+fn row_from_insert(
+    statement: &str,
+    definition: &Db2TableDefinition,
+    inputs: &BTreeMap<String, Db2HostVariable>,
+    limits: Db2Limits,
+) -> Result<Vec<Vec<u8>>, HostProblem> {
+    let upper = statement.to_ascii_uppercase();
+    let Some(values_offset) = upper.find("VALUES") else {
+        return row_from_inputs(definition, inputs, limits);
+    };
+    let columns = insert_columns(statement, definition)?;
+    let bindings = sql_words(&statement[values_offset + "VALUES".len()..])
+        .into_iter()
+        .filter_map(|word| word.strip_prefix(':').map(str::to_string))
+        .collect::<Vec<_>>();
+    if bindings.len() != columns.len() {
+        return row_from_inputs(definition, inputs, limits);
+    }
+    let mut row = definition
+        .columns
+        .iter()
+        .map(|column| column.default_value.clone().unwrap_or_default())
+        .collect::<Vec<_>>();
+    for (column, binding) in columns.iter().zip(bindings) {
+        let index = definition
+            .column_index(column)
+            .ok_or(HostProblem::Malformed)?;
+        let binding = normalize_identifier(&binding);
+        let variable = inputs
+            .iter()
+            .find(|(name, _)| normalize_identifier(name).ends_with(&binding))
+            .map(|(_, variable)| variable)
+            .ok_or(HostProblem::Malformed)?;
+        row[index] = decode_host_value(&definition.columns[index], &variable.value)?;
+    }
+    validate_row(definition, &row, limits)?;
+    Ok(row)
+}
+
+fn decode_host_value(column: &Db2ColumnDefinition, value: &[u8]) -> Result<Vec<u8>, HostProblem> {
+    let decoded = match column.result_encoding {
+        Db2ResultEncoding::Raw => value.to_vec(),
+        Db2ResultEncoding::Varchar => {
+            let declared =
+                (value.len() >= 2).then(|| u16::from_be_bytes([value[0], value[1]]) as usize);
+            if declared
+                .is_some_and(|declared| declared <= value.len() - 2 && declared <= column.max_bytes)
+            {
+                let declared = declared.expect("checked above");
+                let mut value = value[2..2 + declared].to_vec();
+                while value.last() == Some(&b' ') {
+                    value.pop();
+                }
+                value
+            } else if value.first() != Some(&0) && value.len() <= column.max_bytes {
+                value
+                    .iter()
+                    .rposition(|byte| *byte != b' ')
+                    .map_or_else(Vec::new, |end| value[..=end].to_vec())
+            } else {
+                return Err(HostProblem::Malformed);
+            }
+        }
+    };
+    if decoded.len() > column.max_bytes {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(decoded)
+    }
+}
+
+fn validate_row(
+    definition: &Db2TableDefinition,
+    row: &[Vec<u8>],
+    limits: Db2Limits,
+) -> Result<(), HostProblem> {
+    if row.len() != definition.columns.len()
+        || row.iter().zip(&definition.columns).any(|(value, column)| {
+            value.len() > column.max_bytes
+                || value.len() > limits.max_column_bytes
+                || value.is_empty() && !column.nullable && column.default_value.is_none()
+        })
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
+}
+
+fn key_from_inputs(
+    definition: &Db2TableDefinition,
+    inputs: &BTreeMap<String, Db2HostVariable>,
+) -> Result<Option<String>, HostProblem> {
+    let values = definition
+        .primary_key
+        .iter()
+        .map(|column| {
+            let index = definition
+                .column_index(column)
+                .ok_or(HostProblem::Malformed)?;
+            input_for_column(inputs, column)
+                .map(|variable| decode_host_value(&definition.columns[index], &variable.value))
+                .transpose()
+        })
+        .collect::<Result<Vec<_>, HostProblem>>()?;
+    if values.iter().all(Option::is_none) {
+        return Ok(None);
+    }
+    values
+        .into_iter()
+        .collect::<Option<Vec<_>>>()
+        .filter(|parts| parts.iter().all(|part| !part.is_empty()))
+        .map(|parts| {
+            parts
+                .iter()
+                .map(|part| key_component(part))
+                .collect::<Vec<_>>()
+                .join("|")
+        })
+        .map(Some)
+        .ok_or(HostProblem::Malformed)
+}
+
+fn key_from_statement_inputs(
+    statement: &str,
+    definition: &Db2TableDefinition,
+    inputs: &BTreeMap<String, Db2HostVariable>,
+) -> Result<Option<String>, HostProblem> {
+    let words = sql_words(statement);
+    let mut parts = Vec::new();
+    for column in &definition.primary_key {
+        let normalized_column = normalize_identifier(column);
+        let host = words.windows(3).find_map(|window| {
+            (normalize_identifier(window[0].rsplit('.').next().unwrap_or(&window[0]))
+                == normalized_column
+                && window[1] == "=")
+                .then(|| window[2].strip_prefix(':'))
+                .flatten()
+        });
+        let Some(host) = host else {
+            return key_from_inputs(definition, inputs);
+        };
+        let host = normalize_identifier(host);
+        let variable = inputs
+            .iter()
+            .find(|(name, _)| normalize_identifier(name).ends_with(&host))
+            .map(|(_, variable)| variable)
+            .ok_or(HostProblem::Malformed)?;
+        let index = definition
+            .column_index(column)
+            .ok_or(HostProblem::Malformed)?;
+        let value = decode_host_value(&definition.columns[index], &variable.value)?;
+        if value.is_empty() {
+            return Err(HostProblem::Malformed);
+        }
+        parts.push(key_component(&value));
+    }
+    Ok(Some(parts.join("|")))
+}
+
+fn result_row(
+    definition: &Db2TableDefinition,
+    row: &[Vec<u8>],
+    columns: &[usize],
+) -> Result<Db2Row, HostProblem> {
+    let columns = columns
+        .iter()
+        .map(|index| {
+            let column = definition
+                .columns
+                .get(*index)
+                .ok_or(HostProblem::Malformed)?;
+            let value = row.get(*index).ok_or(HostProblem::Malformed)?;
+            Ok(match column.result_encoding {
+                Db2ResultEncoding::Raw => value.clone(),
+                Db2ResultEncoding::Varchar => varchar(value, column.max_bytes),
+            })
+        })
+        .collect::<Result<Vec<_>, HostProblem>>()?;
+    Ok(Db2Row { columns })
+}
+
+fn update_assignments(
+    statement: &str,
+    definition: &Db2TableDefinition,
+    inputs: &BTreeMap<String, Db2HostVariable>,
+) -> Result<Vec<(usize, Vec<u8>)>, HostProblem> {
+    let upper = statement.to_ascii_uppercase();
+    let mut assignments = Vec::new();
+    if let Some(set) = upper.find(" SET ") {
+        let start = set + " SET ".len();
+        let end = upper[start..]
+            .find(" WHERE ")
+            .map_or(statement.len(), |offset| start + offset);
+        for assignment in split_top_level(&statement[start..end], ',') {
+            let (column, expression) = assignment.split_once('=').ok_or(HostProblem::Malformed)?;
+            let index = definition
+                .column_index(column.trim())
+                .ok_or(HostProblem::Malformed)?;
+            let value = if expression.trim().eq_ignore_ascii_case("CURRENT DATE") {
+                b"CURRENT DATE".to_vec()
+            } else {
+                let host = expression
+                    .split(':')
+                    .nth(1)
+                    .and_then(|tail| sql_words(tail).into_iter().next())
+                    .and_then(|name| {
+                        let name = normalize_identifier(&name);
+                        inputs
+                            .iter()
+                            .find(|(candidate, _)| normalize_identifier(candidate).ends_with(&name))
+                    })
+                    .map(|(_, variable)| variable)
+                    .or_else(|| input_for_column(inputs, &definition.columns[index].name))
+                    .ok_or(HostProblem::Malformed)?;
+                decode_host_value(&definition.columns[index], &host.value)?
+            };
+            assignments.push((index, value));
+        }
+    } else {
+        let keys = definition
+            .primary_key_indices()?
+            .into_iter()
+            .collect::<BTreeSet<_>>();
+        for (index, column) in definition.columns.iter().enumerate() {
+            if keys.contains(&index) {
+                continue;
+            }
+            if let Some(variable) = input_for_column(inputs, &column.name) {
+                assignments.push((index, decode_host_value(column, &variable.value)?));
+            }
+        }
+    }
+    if assignments.is_empty() {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(assignments)
+    }
+}
+
+#[derive(Clone, Copy)]
+enum PredicateKind {
+    Equal,
+    Contains,
+    AtLeast,
+    AtMost,
+}
+
+struct SqlPredicate {
+    column: usize,
+    kind: PredicateKind,
+    value: PredicateOperand,
+}
+
+impl SqlPredicate {
+    fn matches(&self, row: &[Vec<u8>]) -> bool {
+        let value = row.get(self.column).map(Vec::as_slice).unwrap_or_default();
+        self.value.bytes().is_empty()
+            || match self.kind {
+                PredicateKind::Equal => value == self.value.bytes(),
+                PredicateKind::Contains => value
+                    .windows(self.value.bytes().len())
+                    .any(|window| window == self.value.bytes()),
+                PredicateKind::AtLeast => value >= self.value.bytes(),
+                PredicateKind::AtMost => value <= self.value.bytes(),
+            }
+    }
+}
+
+enum PredicateOperand {
+    Raw(Vec<u8>),
+    Varchar(Vec<u8>),
+}
+
+impl PredicateOperand {
+    fn bytes(&self) -> &[u8] {
+        match self {
+            Self::Raw(value) | Self::Varchar(value) => value,
+        }
+    }
+}
+
+fn predicate_operand(
+    column: &Db2ColumnDefinition,
+    value: &[u8],
+) -> Result<PredicateOperand, HostProblem> {
+    let value = decode_host_value(column, value)?;
+    Ok(match column.result_encoding {
+        Db2ResultEncoding::Raw => PredicateOperand::Raw(value),
+        Db2ResultEncoding::Varchar => PredicateOperand::Varchar(value),
+    })
+}
+
+fn sql_predicates(
+    statement: &str,
+    definition: &Db2TableDefinition,
+    inputs: &BTreeMap<String, Db2HostVariable>,
+) -> Result<Vec<SqlPredicate>, HostProblem> {
+    let words = sql_words(statement);
+    let mut predicates = Vec::new();
+    for window in words.windows(3) {
+        let kind = match window[1].to_ascii_uppercase().as_str() {
+            "=" => PredicateKind::Equal,
+            "LIKE" => PredicateKind::Contains,
+            ">=" => PredicateKind::AtLeast,
+            "<=" => PredicateKind::AtMost,
+            _ => continue,
+        };
+        let Some(host) = window[2].strip_prefix(':') else {
+            continue;
+        };
+        let host = normalize_identifier(host);
+        let variable = inputs
+            .iter()
+            .find(|(name, _)| normalize_identifier(name).ends_with(&host))
+            .map(|(_, variable)| variable)
+            .ok_or(HostProblem::Malformed)?;
+        let column = definition
+            .column_index(window[0].rsplit('.').next().unwrap_or(&window[0]))
+            .ok_or(HostProblem::Malformed)?;
+        if matches!(kind, PredicateKind::Contains)
+            && definition.columns[column].result_encoding == Db2ResultEncoding::Raw
+        {
+            return Err(HostProblem::Malformed);
+        }
+        let mut value = predicate_operand(&definition.columns[column], &variable.value)?;
+        if matches!(kind, PredicateKind::Contains)
+            && let PredicateOperand::Varchar(bytes) = &mut value
+        {
+            if bytes.first() == Some(&b'%') {
+                bytes.remove(0);
+            }
+            if bytes.last() == Some(&b'%') {
+                bytes.pop();
+            }
+        }
+        predicates.push(SqlPredicate {
+            column,
+            kind,
+            value,
+        });
+    }
+    Ok(predicates)
+}
+
+fn delete_is_restricted(
+    state: &State,
+    run: &str,
+    table_name: &str,
+    target: &Db2TableDefinition,
+    target_row: &[Vec<u8>],
+) -> Result<bool, HostProblem> {
+    for (source_name, source) in &state.schemas {
+        let source_rows = read_table(state, run, source_name)?;
+        for foreign_key in source.foreign_keys.iter().filter(|foreign_key| {
+            foreign_key.delete_restrict
+                && foreign_key
+                    .referenced_table
+                    .eq_ignore_ascii_case(table_name)
+        }) {
+            let source_columns = foreign_key
+                .columns
+                .iter()
+                .map(|column| source.column_index(column).ok_or(HostProblem::Malformed))
+                .collect::<Result<Vec<_>, _>>()?;
+            let target_columns = foreign_key
+                .referenced_columns
+                .iter()
+                .map(|column| target.column_index(column).ok_or(HostProblem::Malformed))
+                .collect::<Result<Vec<_>, _>>()?;
+            if source_rows.rows.values().any(|row| {
+                source_columns
+                    .iter()
+                    .zip(&target_columns)
+                    .all(|(source, target)| row[*source] == target_row[*target])
+            }) {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
+fn validate_foreign_keys(state: &State) -> Result<(), HostProblem> {
+    for (source_name, source) in &state.schemas {
+        let source_rows = state
+            .tables
+            .get(source_name)
+            .ok_or(HostProblem::Malformed)?;
+        for foreign_key in &source.foreign_keys {
+            let target_name = foreign_key.referenced_table.to_ascii_uppercase();
+            let target = state
+                .schemas
+                .get(&target_name)
+                .ok_or(HostProblem::Malformed)?;
+            let target_rows = state
+                .tables
+                .get(&target_name)
+                .ok_or(HostProblem::Malformed)?;
+            let source_columns = foreign_key
+                .columns
+                .iter()
+                .map(|column| source.column_index(column).ok_or(HostProblem::Malformed))
+                .collect::<Result<Vec<_>, _>>()?;
+            let target_columns = foreign_key
+                .referenced_columns
+                .iter()
+                .map(|column| target.column_index(column).ok_or(HostProblem::Malformed))
+                .collect::<Result<Vec<_>, _>>()?;
+            for row in source_rows.rows.values() {
+                if source_columns.iter().all(|column| row[*column].is_empty()) {
+                    continue;
+                }
+                if !target_rows.rows.values().any(|target_row| {
+                    source_columns
+                        .iter()
+                        .zip(&target_columns)
+                        .all(|(source, target)| row[*source] == target_row[*target])
+                }) {
+                    return Err(HostProblem::Malformed);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn schemas_compatible(left: &Db2TableDefinition, right: &Db2TableDefinition) -> bool {
+    normalize_identifier(&left.name) == normalize_identifier(&right.name)
+        && left.columns.len() == right.columns.len()
+        && left
+            .columns
+            .iter()
+            .zip(&right.columns)
+            .all(|(left, right)| {
+                normalize_identifier(&left.name) == normalize_identifier(&right.name)
+                    && left.nullable == right.nullable
+                    && left.max_bytes == right.max_bytes
+                    && left.result_encoding == right.result_encoding
+                    && left.default_value == right.default_value
+            })
+        && left
+            .primary_key
+            .iter()
+            .map(|value| normalize_identifier(value))
+            .eq(right
+                .primary_key
+                .iter()
+                .map(|value| normalize_identifier(value)))
+        && left.foreign_keys.len() == right.foreign_keys.len()
+        && left
+            .foreign_keys
+            .iter()
+            .zip(&right.foreign_keys)
+            .all(|(left, right)| {
+                left.columns
+                    .iter()
+                    .map(|value| normalize_identifier(value))
+                    .eq(right
+                        .columns
+                        .iter()
+                        .map(|value| normalize_identifier(value)))
+                    && normalize_identifier(&left.referenced_table)
+                        == normalize_identifier(&right.referenced_table)
+                    && left
+                        .referenced_columns
+                        .iter()
+                        .map(|value| normalize_identifier(value))
+                        .eq(right
+                            .referenced_columns
+                            .iter()
+                            .map(|value| normalize_identifier(value)))
+                    && left.delete_restrict == right.delete_restrict
+            })
+        && extract_layouts_compatible(left.extract.as_ref(), right.extract.as_ref())
+}
+
+fn extract_layouts_compatible(
+    left: Option<&crate::Db2ExtractLayout>,
+    right: Option<&crate::Db2ExtractLayout>,
+) -> bool {
+    match (left, right) {
+        (None, None) => true,
+        (Some(left), Some(right)) => {
+            left.trailer == right.trailer
+                && left.fields.len() == right.fields.len()
+                && left.fields.iter().zip(&right.fields).all(|(left, right)| {
+                    normalize_identifier(&left.column) == normalize_identifier(&right.column)
+                        && left.width == right.width
+                })
+        }
+        _ => false,
+    }
+}
+
+fn ddl_redeclaration_compatible(
+    installed: &Db2TableDefinition,
+    declared: &Db2TableDefinition,
+) -> bool {
+    let mut declared = declared.clone();
+    // Static SQL DDL has no syntax for the package-owned extract projection.
+    // A redeclaration may preserve that field, but every SQL-expressible field
+    // must still be exactly compatible.
+    declared.extract = installed.extract.clone();
+    schemas_compatible(installed, &declared)
+}
+
+fn compare_primary_key_rows(
+    definition: &Db2TableDefinition,
+    left: &[Vec<u8>],
+    right: &[Vec<u8>],
+) -> Ordering {
+    definition
+        .primary_key_indices()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|index| left[index].cmp(&right[index]))
+        .find(|ordering| *ordering != Ordering::Equal)
+        .unwrap_or(Ordering::Equal)
+}
+
+fn parse_create_tables(
+    statement: &str,
+    limits: Db2Limits,
+) -> Result<Vec<Db2TableDefinition>, HostProblem> {
+    let upper = statement.to_ascii_uppercase();
+    let mut offset = 0_usize;
+    let mut definitions = Vec::new();
+    while let Some(relative) = upper[offset..].find("CREATE TABLE") {
+        let start = offset + relative;
+        let boundary = start + "CREATE TABLE".len();
+        if upper
+            .as_bytes()
+            .get(boundary)
+            .is_some_and(|byte| !byte.is_ascii_whitespace())
+        {
+            offset = boundary;
+            continue;
+        }
+        let tail = &statement[start..];
+        let name = identifier_after(tail, "TABLE").ok_or(HostProblem::Malformed)?;
+        let open = tail.find('(').ok_or(HostProblem::Malformed)?;
+        let close = matching_parenthesis(tail, open).ok_or(HostProblem::Malformed)?;
+        let body = &tail[open + 1..close];
+        let mut columns = Vec::new();
+        let mut primary_key = Vec::new();
+        let mut foreign_keys = Vec::new();
+        for item in split_top_level(body, ',') {
+            let item = item.trim();
+            let item_upper = item.to_ascii_uppercase();
+            if item_upper.contains("PRIMARY KEY") {
+                primary_key = constraint_columns(item, "PRIMARY KEY")?;
+                continue;
+            }
+            if item_upper.contains("FOREIGN KEY") {
+                let columns = constraint_columns(item, "FOREIGN KEY")?;
+                let referenced_table =
+                    identifier_after(item, "REFERENCES").ok_or(HostProblem::Malformed)?;
+                let references = item_upper
+                    .find("REFERENCES")
+                    .ok_or(HostProblem::Malformed)?;
+                let referenced_columns = constraint_columns(&item[references..], "REFERENCES")?;
+                foreign_keys.push(crate::Db2ForeignKeyDefinition {
+                    columns,
+                    referenced_table,
+                    referenced_columns,
+                    delete_restrict: !item_upper.contains("ON DELETE CASCADE"),
+                });
+                continue;
+            }
+            if item_upper.starts_with("CONSTRAINT ") {
+                continue;
+            }
+            let words = item.split_whitespace().collect::<Vec<_>>();
+            let name = words
+                .first()
+                .map(|value| value.trim_matches('"').to_string())
+                .ok_or(HostProblem::Malformed)?;
+            let max_bytes = sql_type_width(&item_upper).unwrap_or(limits.max_column_bytes.min(256));
+            let result_encoding = if item_upper.contains("VARCHAR") {
+                Db2ResultEncoding::Varchar
+            } else {
+                Db2ResultEncoding::Raw
+            };
+            columns.push(Db2ColumnDefinition {
+                name,
+                nullable: !item_upper.contains("NOT NULL"),
+                max_bytes,
+                result_encoding,
+                default_value: item_upper.contains("DEFAULT").then(Vec::new),
+            });
+        }
+        if columns.is_empty() || columns.len() > limits.max_columns {
+            return Err(HostProblem::Malformed);
+        }
+        if primary_key.is_empty() {
+            primary_key.push(columns[0].name.clone());
+        }
+        definitions.push(Db2TableDefinition {
+            name,
+            columns,
+            primary_key,
+            foreign_keys,
+            extract: None,
+        });
+        offset = start + close + 1;
+    }
+    apply_alter_foreign_keys(statement, &mut definitions, limits)?;
+    Ok(definitions)
+}
+
+fn apply_alter_foreign_keys(
+    statement: &str,
+    definitions: &mut [Db2TableDefinition],
+    limits: Db2Limits,
+) -> Result<(), HostProblem> {
+    let upper = statement.to_ascii_uppercase();
+    let mut offset = 0_usize;
+    while let Some(relative) = upper[offset..].find("ALTER TABLE") {
+        let start = offset + relative;
+        let tail = &statement[start..];
+        let end = tail.find(';').unwrap_or(tail.len());
+        let clause = &tail[..end];
+        let clause_upper = clause.to_ascii_uppercase();
+        if clause_upper.contains("FOREIGN KEY") {
+            let table = identifier_after(clause, "TABLE")
+                .ok_or(HostProblem::Malformed)?
+                .to_ascii_uppercase();
+            let columns = constraint_columns(clause, "FOREIGN KEY")?;
+            let referenced_table =
+                identifier_after(clause, "REFERENCES").ok_or(HostProblem::Malformed)?;
+            let references = clause_upper
+                .find("REFERENCES")
+                .ok_or(HostProblem::Malformed)?;
+            let referenced_columns = constraint_columns(&clause[references..], "REFERENCES")?;
+            let definition = definitions
+                .iter_mut()
+                .find(|definition| definition.normalized_name() == table)
+                .ok_or(HostProblem::Malformed)?;
+            if definition.foreign_keys.len() >= limits.max_foreign_keys_per_table {
+                return Err(HostProblem::ResourceExhausted);
+            }
+            definition
+                .foreign_keys
+                .push(crate::Db2ForeignKeyDefinition {
+                    columns,
+                    referenced_table,
+                    referenced_columns,
+                    delete_restrict: !clause_upper.contains("ON DELETE CASCADE"),
+                });
+        }
+        offset = start.saturating_add(end.max("ALTER TABLE".len()));
+        if offset >= statement.len() {
+            break;
+        }
+    }
+    Ok(())
+}
+
+fn constraint_columns(statement: &str, keyword: &str) -> Result<Vec<String>, HostProblem> {
+    let upper = statement.to_ascii_uppercase();
+    let keyword = upper.find(keyword).ok_or(HostProblem::Malformed)? + keyword.len();
+    let open = statement[keyword..]
+        .find('(')
+        .map(|offset| keyword + offset)
+        .ok_or(HostProblem::Malformed)?;
+    let close = matching_parenthesis(statement, open).ok_or(HostProblem::Malformed)?;
+    Ok(statement[open + 1..close]
+        .split(',')
+        .map(|column| column.trim().trim_matches('"').to_string())
+        .collect())
+}
+
+fn sql_type_width(definition: &str) -> Option<usize> {
+    for type_name in ["VARCHAR", "CHARACTER", "CHAR", "DECIMAL"] {
+        let Some(start) = definition.find(&format!("{type_name}(")) else {
+            continue;
+        };
+        let start = start + type_name.len() + 1;
+        let Some(end) = definition[start..].find(')').map(|end| start + end) else {
+            continue;
+        };
+        if let Some(width) = definition[start..end]
+            .split(',')
+            .next()
+            .and_then(|value| value.trim().parse().ok())
+        {
+            return Some(width);
+        }
+    }
+    None
+}
+
+fn matching_parenthesis(value: &str, open: usize) -> Option<usize> {
+    let mut depth = 0_usize;
+    let mut quote = false;
+    for (offset, character) in value[open..].char_indices() {
+        match character {
+            '\'' => quote = !quote,
+            '(' if !quote => depth += 1,
+            ')' if !quote => {
+                depth = depth.checked_sub(1)?;
+                if depth == 0 {
+                    return Some(open + offset);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn split_top_level(value: &str, separator: char) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let mut start = 0_usize;
+    let mut depth = 0_usize;
+    let mut quote = false;
+    for (offset, character) in value.char_indices() {
+        match character {
+            '\'' => quote = !quote,
+            '(' if !quote => depth += 1,
+            ')' if !quote => depth = depth.saturating_sub(1),
+            current if current == separator && !quote && depth == 0 => {
+                parts.push(&value[start..offset]);
+                start = offset + current.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    parts.push(&value[start..]);
+    parts
 }
 
 fn quoted_literals(statement: &str) -> Result<Vec<String>, HostProblem> {
@@ -779,54 +2137,12 @@ fn quoted_literals(statement: &str) -> Result<Vec<String>, HostProblem> {
     Ok(values)
 }
 
-fn key_input(inputs: &BTreeMap<String, Db2HostVariable>) -> Option<String> {
-    inputs
-        .iter()
-        .find(|(name, _)| {
-            !name.contains("DESC")
-                && (name.ends_with("TR-TYPE")
-                    || name.contains("TR-TYPE-")
-                    || name.contains("NUMBER"))
-        })
-        .or_else(|| inputs.iter().find(|(name, _)| !name.contains("DESC")))
-        .map(|(_, variable)| trimmed(&variable.value))
-}
-
-fn description_input(inputs: &BTreeMap<String, Db2HostVariable>) -> Option<String> {
-    inputs
-        .iter()
-        .find(|(name, _)| name.contains("DESC"))
-        .map(|(_, variable)| {
-            if variable.value.len() >= 52 {
-                let length = u16::from_be_bytes([variable.value[0], variable.value[1]]) as usize;
-                String::from_utf8_lossy(&variable.value[2..2 + length.min(50)])
-                    .trim_end()
-                    .to_string()
-            } else {
-                trimmed(&variable.value)
-            }
-        })
-}
-
-fn input_named<'a>(
-    inputs: &'a BTreeMap<String, Db2HostVariable>,
-    suffix: &str,
-) -> Option<&'a [u8]> {
-    inputs
-        .iter()
-        .find(|(name, _)| name.ends_with(suffix))
-        .map(|(_, variable)| variable.value.as_slice())
-}
-
-fn trimmed(value: &[u8]) -> String {
-    String::from_utf8_lossy(value).trim().to_string()
-}
-
-fn varchar(value: &[u8]) -> Vec<u8> {
-    let length = u16::try_from(value.len().min(50)).unwrap_or(50);
-    let mut output = Vec::with_capacity(52);
+fn varchar(value: &[u8], max_bytes: usize) -> Vec<u8> {
+    let width = max_bytes.min(u16::MAX as usize);
+    let length = u16::try_from(value.len().min(width)).unwrap_or(u16::MAX);
+    let mut output = Vec::with_capacity(width.saturating_add(2));
     output.extend_from_slice(&length.to_be_bytes());
-    output.extend(fixed(value, 50));
+    output.extend(fixed(value, width));
     output
 }
 
@@ -862,17 +2178,47 @@ fn request_digest(request: &Db2Request) -> [u8; 32] {
 
 fn validate_state(state: &State, limits: Db2Limits) -> Result<(), HostProblem> {
     if state.tables.len() > limits.max_tables
+        || state.schemas.len() > limits.max_tables
         || state.cursors.len() > limits.max_cursors
         || state.replay.len() > limits.max_replays
-        || state.tables.values().any(|table| {
-            table.columns == 0
-                || table.columns > limits.max_columns
-                || table.rows.len() > limits.max_rows_per_table
-                || table.rows.values().any(|row| {
-                    row.len() != table.columns
-                        || row
-                            .iter()
-                            .any(|column| column.len() > limits.max_column_bytes)
+        || state.table_provenance.keys().collect::<BTreeSet<_>>()
+            != state.tables.keys().collect::<BTreeSet<_>>()
+        || state.legacy_snapshots.len() > limits.max_tables
+        || state.legacy_snapshots.iter().any(|(name, snapshot)| {
+            !matches!(
+                state.table_provenance.get(name),
+                Some(TableProvenance::Legacy)
+            ) || snapshot.schema.normalized_name() != *name
+                || !table_map_is_valid(
+                    &BTreeMap::from([(name.clone(), snapshot.table.clone())]),
+                    &BTreeMap::from([(name.clone(), snapshot.schema.clone())]),
+                    limits,
+                )
+        })
+        || !table_map_is_valid(&state.tables, &state.schemas, limits)
+        || state
+            .pending
+            .values()
+            .any(|pending| !table_map_is_valid(&pending.tables, &state.schemas, limits))
+        || state.installations.values().any(|installation| {
+            installation.generation == 0
+                || installation.identity.len() != 71
+                || !installation.identity.starts_with("sha256:")
+                || installation
+                    .tables
+                    .iter()
+                    .any(|table| !state.schemas.contains_key(table))
+        })
+        || state.catalog_generations.values().any(|generations| {
+            generations.len() > MAX_RETAINED_CATALOG_GENERATIONS
+                || generations.iter().any(|(generation, snapshot)| {
+                    *generation == 0
+                        || *generation != snapshot.generation
+                        || snapshot.identity.len() != 71
+                        || !snapshot.identity.starts_with("sha256:")
+                        || snapshot.schemas.keys().collect::<BTreeSet<_>>()
+                            != snapshot.tables.keys().collect::<BTreeSet<_>>()
+                        || !table_map_is_valid(&snapshot.tables, &snapshot.schemas, limits)
                 })
         })
     {
@@ -880,6 +2226,30 @@ fn validate_state(state: &State, limits: Db2Limits) -> Result<(), HostProblem> {
     } else {
         Ok(())
     }
+}
+
+fn table_map_is_valid(
+    tables: &BTreeMap<String, Table>,
+    schemas: &BTreeMap<String, Db2TableDefinition>,
+    limits: Db2Limits,
+) -> bool {
+    tables.iter().all(|(name, table)| {
+        table.columns > 0
+            && table.columns <= limits.max_columns
+            && table.rows.len() <= limits.max_rows_per_table
+            && schemas
+                .get(name)
+                .is_none_or(|schema| schema.columns.len() == table.columns)
+            && table.rows.iter().all(|(key, row)| {
+                row.len() == table.columns
+                    && row
+                        .iter()
+                        .all(|column| column.len() <= limits.max_column_bytes)
+                    && schemas
+                        .get(name)
+                        .is_none_or(|schema| row_key(schema, row).as_ref() == Ok(key))
+            })
+    })
 }
 
 fn store_error(problem: StoreError) -> HostProblem {
@@ -1015,12 +2385,921 @@ mod tests {
         }
     }
 
+    fn varchar_variable(value: &str) -> Db2HostVariable {
+        let mut bytes = u16::try_from(value.len()).unwrap().to_be_bytes().to_vec();
+        bytes.extend_from_slice(value.as_bytes());
+        Db2HostVariable {
+            value: bytes,
+            indicator: None,
+        }
+    }
+
+    fn installed_catalog(identity_byte: u8) -> Db2CatalogGeneration {
+        let parent = Db2TableDefinition {
+            name: "APP.CODE".into(),
+            columns: vec![
+                Db2ColumnDefinition {
+                    name: "CODE".into(),
+                    nullable: false,
+                    max_bytes: 2,
+                    result_encoding: Db2ResultEncoding::Raw,
+                    default_value: None,
+                },
+                Db2ColumnDefinition {
+                    name: "DESCRIPTION".into(),
+                    nullable: false,
+                    max_bytes: 50,
+                    result_encoding: Db2ResultEncoding::Varchar,
+                    default_value: None,
+                },
+            ],
+            primary_key: vec!["CODE".into()],
+            foreign_keys: Vec::new(),
+            extract: Some(crate::Db2ExtractLayout {
+                fields: vec![
+                    crate::Db2ExtractField {
+                        column: "CODE".into(),
+                        width: 2,
+                    },
+                    crate::Db2ExtractField {
+                        column: "DESCRIPTION".into(),
+                        width: 50,
+                    },
+                ],
+                trailer: b"00000000".to_vec(),
+            }),
+        };
+        let child = Db2TableDefinition {
+            name: "APP.CODE_DETAIL".into(),
+            columns: vec![
+                Db2ColumnDefinition {
+                    name: "CODE".into(),
+                    nullable: false,
+                    max_bytes: 2,
+                    result_encoding: Db2ResultEncoding::Raw,
+                    default_value: None,
+                },
+                Db2ColumnDefinition {
+                    name: "DETAIL".into(),
+                    nullable: false,
+                    max_bytes: 8,
+                    result_encoding: Db2ResultEncoding::Raw,
+                    default_value: None,
+                },
+            ],
+            primary_key: vec!["CODE".into(), "DETAIL".into()],
+            foreign_keys: vec![crate::Db2ForeignKeyDefinition {
+                columns: vec!["CODE".into()],
+                referenced_table: "APP.CODE".into(),
+                referenced_columns: vec!["CODE".into()],
+                delete_restrict: true,
+            }],
+            extract: None,
+        };
+        Db2CatalogGeneration {
+            application: "GENERIC-FIXTURE".into(),
+            generation: 1,
+            identity: format!("sha256:{identity_byte:064x}"),
+            tables: vec![parent, child],
+            rows: vec![
+                crate::Db2SeedRow {
+                    table: "APP.CODE".into(),
+                    values: BTreeMap::from([
+                        ("CODE".into(), b"01".to_vec()),
+                        ("DESCRIPTION".into(), b"GENERIC".to_vec()),
+                    ]),
+                },
+                crate::Db2SeedRow {
+                    table: "APP.CODE_DETAIL".into(),
+                    values: BTreeMap::from([
+                        ("CODE".into(), b"01".to_vec()),
+                        ("DETAIL".into(), b"D1".to_vec()),
+                    ]),
+                },
+            ],
+        }
+    }
+
+    fn binary_catalog() -> Db2CatalogGeneration {
+        Db2CatalogGeneration {
+            application: "BINARY-FIXTURE".into(),
+            generation: 1,
+            identity: format!("sha256:{:064x}", 777),
+            tables: vec![Db2TableDefinition {
+                name: "APP.BINARY".into(),
+                columns: vec![
+                    Db2ColumnDefinition {
+                        name: "KEY_BYTES".into(),
+                        nullable: false,
+                        max_bytes: 4,
+                        result_encoding: Db2ResultEncoding::Raw,
+                        default_value: None,
+                    },
+                    Db2ColumnDefinition {
+                        name: "PAYLOAD".into(),
+                        nullable: false,
+                        max_bytes: 8,
+                        result_encoding: Db2ResultEncoding::Raw,
+                        default_value: Some(vec![b' ', 0xff, b' ']),
+                    },
+                    Db2ColumnDefinition {
+                        name: "LABEL".into(),
+                        nullable: false,
+                        max_bytes: 8,
+                        result_encoding: Db2ResultEncoding::Varchar,
+                        default_value: Some(b" D ".to_vec()),
+                    },
+                ],
+                primary_key: vec!["KEY_BYTES".into()],
+                foreign_keys: Vec::new(),
+                extract: None,
+            }],
+            rows: vec![crate::Db2SeedRow {
+                table: "APP.BINARY".into(),
+                values: BTreeMap::from([("KEY_BYTES".into(), vec![0xff, b' '])]),
+            }],
+        }
+    }
+
+    #[test]
+    fn selected_package_catalog_installs_generic_schema_rows_and_layout_atomically() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = Db2Service::open(store.clone(), Db2Limits::default()).unwrap();
+        let catalog = installed_catalog(1);
+        service.install_catalog(catalog.clone()).unwrap();
+        service.install_catalog(catalog).unwrap();
+        assert_eq!(service.table_rows("app.code").unwrap().len(), 1);
+        let run = invocation("catalog");
+        let extracted = service
+            .execute(
+                &run,
+                &request(
+                    Db2Operation::Extract,
+                    100,
+                    "SELECT CODE, DESCRIPTION FROM APP.CODE",
+                    BTreeMap::new(),
+                ),
+            )
+            .unwrap();
+        assert_eq!(extracted.rows[0].columns[0].len(), 60);
+        let restricted = service
+            .execute(
+                &run,
+                &request(
+                    Db2Operation::Delete,
+                    101,
+                    "DELETE FROM APP.CODE",
+                    BTreeMap::from([("HOST-CODE".into(), variable("01"))]),
+                ),
+            )
+            .unwrap();
+        assert_eq!(restricted.sqlcode, -532);
+        assert_eq!(
+            service.install_catalog(installed_catalog(2)),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        drop(service);
+        assert_eq!(
+            Db2Service::open(store, Db2Limits::default())
+                .unwrap()
+                .table_rows("APP.CODE")
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn compatible_legacy_rows_survive_install_upgrade_restart_and_rollback() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = Db2Service::open(store.clone(), Db2Limits::default()).unwrap();
+        let admin = invocation("legacy-catalog");
+        let ddl = "CREATE TABLE APP.CODE (CODE CHAR(2) NOT NULL, DESCRIPTION VARCHAR(50) NOT NULL, PRIMARY KEY (CODE)); CREATE TABLE APP.CODE_DETAIL (CODE CHAR(2) NOT NULL, DETAIL CHAR(8) NOT NULL, PRIMARY KEY (CODE, DETAIL), FOREIGN KEY (CODE) REFERENCES APP.CODE (CODE)); INSERT INTO APP.CODE (CODE,DESCRIPTION) SELECT '99','LEGACY' FROM SYSIBM.SYSDUMMY1 COMMIT;";
+        service
+            .execute(
+                &admin,
+                &request(Db2Operation::ExecuteScript, 200, ddl, BTreeMap::new()),
+            )
+            .unwrap();
+        let definitions = vec![
+            service.table_definition("APP.CODE").unwrap(),
+            service.table_definition("APP.CODE_DETAIL").unwrap(),
+        ];
+        let generation = |number, identity, extra: Option<(&str, &str)>| {
+            let mut rows = vec![crate::Db2SeedRow {
+                table: "APP.CODE".into(),
+                values: BTreeMap::from([
+                    ("CODE".into(), b"01".to_vec()),
+                    ("DESCRIPTION".into(), b"GENERIC".to_vec()),
+                ]),
+            }];
+            if let Some((code, description)) = extra {
+                rows.push(crate::Db2SeedRow {
+                    table: "APP.CODE".into(),
+                    values: BTreeMap::from([
+                        ("CODE".into(), code.as_bytes().to_vec()),
+                        ("DESCRIPTION".into(), description.as_bytes().to_vec()),
+                    ]),
+                });
+            }
+            Db2CatalogGeneration {
+                application: "GENERIC-FIXTURE".into(),
+                generation: number,
+                identity: format!("sha256:{identity:064x}"),
+                tables: definitions.clone(),
+                rows,
+            }
+        };
+        service.install_catalog(generation(1, 1, None)).unwrap();
+        assert_eq!(service.table_rows("APP.CODE").unwrap().len(), 2);
+        service
+            .install_catalog(generation(2, 2, Some(("02", "UPGRADE"))))
+            .unwrap();
+        assert_eq!(service.table_rows("APP.CODE").unwrap().len(), 3);
+        drop(service);
+
+        let restarted = Db2Service::open(store.clone(), Db2Limits::default()).unwrap();
+        assert_eq!(restarted.table_rows("APP.CODE").unwrap().len(), 3);
+        restarted.rollback_catalog("GENERIC-FIXTURE", 1).unwrap();
+        assert_eq!(restarted.table_rows("APP.CODE").unwrap().len(), 2);
+        drop(restarted);
+
+        let rolled_back = Db2Service::open(store, Db2Limits::default()).unwrap();
+        let rows = rolled_back.table_rows("APP.CODE").unwrap();
+        assert_eq!(rows.len(), 2);
+        assert!(
+            rows.iter()
+                .any(|row| row[0] == b"99" && row[1] == b"LEGACY")
+        );
+        assert!(!rows.iter().any(|row| row[0] == b"02"));
+    }
+
+    #[test]
+    fn primary_key_updates_are_rejected_without_rekey_or_duplicate_corruption() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = Db2Service::open(store, Db2Limits::default()).unwrap();
+        service.install_catalog(installed_catalog(1)).unwrap();
+        let run = invocation("primary-key-update");
+        service
+            .execute(
+                &run,
+                &request(
+                    Db2Operation::Insert,
+                    210,
+                    "INSERT INTO APP.CODE",
+                    BTreeMap::from([
+                        ("CODE".into(), variable("02")),
+                        ("DESCRIPTION".into(), varchar_variable("SECOND")),
+                    ]),
+                ),
+            )
+            .unwrap();
+        service
+            .execute(
+                &run,
+                &request(Db2Operation::Commit, 211, "COMMIT", BTreeMap::new()),
+            )
+            .unwrap();
+
+        let rejected = service
+            .execute(
+                &run,
+                &request(
+                    Db2Operation::Update,
+                    212,
+                    "UPDATE APP.CODE SET CODE = :NEW-CODE WHERE CODE = :OLD-CODE",
+                    BTreeMap::from([
+                        ("NEW-CODE".into(), variable("02")),
+                        ("OLD-CODE".into(), variable("01")),
+                    ]),
+                ),
+            )
+            .unwrap();
+        assert_eq!(
+            (rejected.sqlcode, rejected.sqlstate.as_str()),
+            (-798, "428C9")
+        );
+        assert_eq!(service.pending_units().unwrap(), 0);
+        for code in ["01", "02"] {
+            let selected = service
+                .execute(
+                    &run,
+                    &request(
+                        Db2Operation::Select,
+                        213 + u64::from(code == "02"),
+                        "SELECT CODE, DESCRIPTION FROM APP.CODE WHERE CODE = :LOOKUP-CODE",
+                        BTreeMap::from([("LOOKUP-CODE".into(), variable(code))]),
+                    ),
+                )
+                .unwrap();
+            assert_eq!(selected.sqlcode, 0);
+            assert_eq!(selected.rows[0].columns[0], code.as_bytes());
+        }
+        assert_eq!(service.table_rows("APP.CODE").unwrap().len(), 2);
+    }
+
+    #[test]
+    fn raw_host_bytes_and_catalog_defaults_survive_insert_update_read_and_restart() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = Db2Service::open(store.clone(), Db2Limits::default()).unwrap();
+        service.install_catalog(binary_catalog()).unwrap();
+        let run = invocation("binary-raw");
+
+        let seeded = service
+            .execute(
+                &run,
+                &request(
+                    Db2Operation::Select,
+                    220,
+                    "SELECT KEY_BYTES, PAYLOAD, LABEL FROM APP.BINARY WHERE KEY_BYTES = :LOOKUP",
+                    BTreeMap::from([(
+                        "LOOKUP".into(),
+                        Db2HostVariable {
+                            value: vec![0xff, b' '],
+                            indicator: None,
+                        },
+                    )]),
+                ),
+            )
+            .unwrap();
+        assert_eq!(seeded.rows[0].columns[0], vec![0xff, b' ']);
+        assert_eq!(seeded.rows[0].columns[1], vec![b' ', 0xff, b' ']);
+        assert_eq!(&seeded.rows[0].columns[2][..5], &[0, 3, b' ', b'D', b' ']);
+
+        let key = vec![b' ', 0xfe, b' '];
+        let inserted_payload = vec![0, 0xff, b' ', b'A', b' '];
+        service
+            .execute(
+                &run,
+                &request(
+                    Db2Operation::Insert,
+                    221,
+                    "INSERT INTO APP.BINARY",
+                    BTreeMap::from([
+                        (
+                            "KEY_BYTES".into(),
+                            Db2HostVariable {
+                                value: key.clone(),
+                                indicator: None,
+                            },
+                        ),
+                        (
+                            "PAYLOAD".into(),
+                            Db2HostVariable {
+                                value: inserted_payload.clone(),
+                                indicator: None,
+                            },
+                        ),
+                        (
+                            "LABEL".into(),
+                            Db2HostVariable {
+                                value: vec![0, 3, b'X', b' ', b'Y'],
+                                indicator: None,
+                            },
+                        ),
+                    ]),
+                ),
+            )
+            .unwrap();
+        service
+            .execute(
+                &run,
+                &request(Db2Operation::Commit, 222, "COMMIT", BTreeMap::new()),
+            )
+            .unwrap();
+        let selected = service
+            .execute(
+                &run,
+                &request(
+                    Db2Operation::Select,
+                    223,
+                    "SELECT KEY_BYTES, PAYLOAD FROM APP.BINARY WHERE KEY_BYTES = :LOOKUP",
+                    BTreeMap::from([(
+                        "LOOKUP".into(),
+                        Db2HostVariable {
+                            value: key.clone(),
+                            indicator: None,
+                        },
+                    )]),
+                ),
+            )
+            .unwrap();
+        assert_eq!(
+            selected.rows[0].columns,
+            vec![key.clone(), inserted_payload]
+        );
+
+        let updated_payload = vec![b' ', 0x80, b' '];
+        service
+            .execute(
+                &run,
+                &request(
+                    Db2Operation::Update,
+                    224,
+                    "UPDATE APP.BINARY SET PAYLOAD = :NEW_PAYLOAD WHERE KEY_BYTES = :LOOKUP",
+                    BTreeMap::from([
+                        (
+                            "LOOKUP".into(),
+                            Db2HostVariable {
+                                value: key.clone(),
+                                indicator: None,
+                            },
+                        ),
+                        (
+                            "NEW_PAYLOAD".into(),
+                            Db2HostVariable {
+                                value: updated_payload.clone(),
+                                indicator: None,
+                            },
+                        ),
+                    ]),
+                ),
+            )
+            .unwrap();
+        service
+            .execute(
+                &run,
+                &request(Db2Operation::Commit, 225, "COMMIT", BTreeMap::new()),
+            )
+            .unwrap();
+        drop(service);
+
+        let restarted = Db2Service::open(store, Db2Limits::default()).unwrap();
+        let selected = restarted
+            .execute(
+                &run,
+                &request(
+                    Db2Operation::Select,
+                    226,
+                    "SELECT KEY_BYTES, PAYLOAD FROM APP.BINARY WHERE KEY_BYTES = :LOOKUP",
+                    BTreeMap::from([(
+                        "LOOKUP".into(),
+                        Db2HostVariable {
+                            value: key.clone(),
+                            indicator: None,
+                        },
+                    )]),
+                ),
+            )
+            .unwrap();
+        assert_eq!(selected.rows[0].columns, vec![key, updated_payload]);
+    }
+
+    #[test]
+    fn rollback_removes_newer_owned_dependents_and_restart_remains_referentially_valid() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = Db2Service::open(store.clone(), Db2Limits::default()).unwrap();
+        let mut first = installed_catalog(31);
+        first.tables.truncate(1);
+        first.rows.truncate(1);
+        service.install_catalog(first).unwrap();
+
+        let mut second = installed_catalog(32);
+        second.generation = 2;
+        second.rows.extend([
+            crate::Db2SeedRow {
+                table: "APP.CODE".into(),
+                values: BTreeMap::from([
+                    ("CODE".into(), b"02".to_vec()),
+                    ("DESCRIPTION".into(), b"SECOND".to_vec()),
+                ]),
+            },
+            crate::Db2SeedRow {
+                table: "APP.CODE_DETAIL".into(),
+                values: BTreeMap::from([
+                    ("CODE".into(), b"02".to_vec()),
+                    ("DETAIL".into(), b"D2".to_vec()),
+                ]),
+            },
+        ]);
+        service.install_catalog(second).unwrap();
+        assert_eq!(service.table_rows("APP.CODE_DETAIL").unwrap().len(), 2);
+        service.rollback_catalog("GENERIC-FIXTURE", 1).unwrap();
+        assert_eq!(
+            service.table_rows("APP.CODE_DETAIL"),
+            Err(HostProblem::NotFound)
+        );
+        drop(service);
+
+        let restarted = Db2Service::open(store, Db2Limits::default()).unwrap();
+        assert_eq!(restarted.table_rows("APP.CODE").unwrap().len(), 1);
+        assert_eq!(
+            restarted.table_rows("APP.CODE_DETAIL"),
+            Err(HostProblem::NotFound)
+        );
+    }
+
+    #[test]
+    fn rollback_restores_adopted_legacy_data_but_removes_new_owned_dependents() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = Db2Service::open(store.clone(), Db2Limits::default()).unwrap();
+        let admin = invocation("legacy-owner");
+        service
+            .execute(
+                &admin,
+                &request(
+                    Db2Operation::ExecuteScript,
+                    300,
+                    "CREATE TABLE LEGACY.PARENT (ID CHAR(2) NOT NULL, VALUE CHAR(8) NOT NULL, PRIMARY KEY (ID)); INSERT INTO LEGACY.PARENT (ID,VALUE) VALUES ('01','ORIGINAL');",
+                    BTreeMap::new(),
+                ),
+            )
+            .unwrap();
+        let legacy_definition = service.table_definition("LEGACY.PARENT").unwrap();
+
+        let mut first = installed_catalog(41);
+        first.tables.truncate(1);
+        first.rows.truncate(1);
+        service.install_catalog(first.clone()).unwrap();
+
+        let dependent = Db2TableDefinition {
+            name: "APP.LEGACY_CHILD".into(),
+            columns: vec![Db2ColumnDefinition {
+                name: "PARENT_ID".into(),
+                nullable: false,
+                max_bytes: 2,
+                result_encoding: Db2ResultEncoding::Raw,
+                default_value: None,
+            }],
+            primary_key: vec!["PARENT_ID".into()],
+            foreign_keys: vec![crate::Db2ForeignKeyDefinition {
+                columns: vec!["PARENT_ID".into()],
+                referenced_table: "LEGACY.PARENT".into(),
+                referenced_columns: vec!["ID".into()],
+                delete_restrict: true,
+            }],
+            extract: None,
+        };
+        let mut second = first;
+        second.generation = 2;
+        second.identity = format!("sha256:{:064x}", 42);
+        second.tables.extend([legacy_definition, dependent]);
+        second.rows.push(crate::Db2SeedRow {
+            table: "APP.LEGACY_CHILD".into(),
+            values: BTreeMap::from([("PARENT_ID".into(), b"01".to_vec())]),
+        });
+        service.install_catalog(second).unwrap();
+
+        service
+            .execute(
+                &admin,
+                &request(
+                    Db2Operation::Update,
+                    301,
+                    "UPDATE LEGACY.PARENT SET VALUE = :VALUE WHERE ID = :ID",
+                    BTreeMap::from([
+                        ("ID".into(), variable("01")),
+                        ("VALUE".into(), variable("CHANGED")),
+                    ]),
+                ),
+            )
+            .unwrap();
+        service
+            .execute(
+                &admin,
+                &request(Db2Operation::Commit, 302, "COMMIT", BTreeMap::new()),
+            )
+            .unwrap();
+
+        service.rollback_catalog("GENERIC-FIXTURE", 1).unwrap();
+        assert_eq!(
+            service.table_rows("LEGACY.PARENT").unwrap()[0][1],
+            b"ORIGINAL"
+        );
+        assert_eq!(
+            service.table_rows("APP.LEGACY_CHILD"),
+            Err(HostProblem::NotFound)
+        );
+        drop(service);
+
+        let restarted = Db2Service::open(store, Db2Limits::default()).unwrap();
+        assert_eq!(
+            restarted.table_rows("LEGACY.PARENT").unwrap()[0][1],
+            b"ORIGINAL"
+        );
+        assert_eq!(
+            restarted.table_rows("APP.LEGACY_CHILD"),
+            Err(HostProblem::NotFound)
+        );
+    }
+
+    #[test]
+    fn raw_predicates_and_cursor_positions_are_byte_exact() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = Db2Service::open(store.clone(), Db2Limits::default()).unwrap();
+        let mut catalog = binary_catalog();
+        catalog.rows = [vec![0xfe], vec![0xff], b"A".to_vec(), b" A ".to_vec()]
+            .into_iter()
+            .map(|key| crate::Db2SeedRow {
+                table: "APP.BINARY".into(),
+                values: BTreeMap::from([("KEY_BYTES".into(), key)]),
+            })
+            .collect();
+        service.install_catalog(catalog).unwrap();
+        drop(service);
+
+        let service = Db2Service::open(store, Db2Limits::default()).unwrap();
+        let run = invocation("raw-query");
+        for key in [vec![0xfe], vec![0xff], b"A".to_vec(), b" A ".to_vec()] {
+            let counted = service
+                .execute(
+                    &run,
+                    &request(
+                        Db2Operation::Count,
+                        310 + u64::from(key[0]),
+                        "SELECT COUNT(*) FROM APP.BINARY WHERE KEY_BYTES = :LOOKUP",
+                        BTreeMap::from([(
+                            "LOOKUP".into(),
+                            Db2HostVariable {
+                                value: key,
+                                indicator: None,
+                            },
+                        )]),
+                    ),
+                )
+                .unwrap();
+            assert_eq!(counted.rows[0].columns[0], b"1");
+        }
+        for (operator, expected) in [(">=", b"2".as_slice()), ("<=", b"3".as_slice())] {
+            let counted = service
+                .execute(
+                    &run,
+                    &request(
+                        Db2Operation::Count,
+                        600 + u64::from(operator.as_bytes()[0]),
+                        &format!(
+                            "SELECT COUNT(*) FROM APP.BINARY WHERE KEY_BYTES {operator} :LOOKUP"
+                        ),
+                        BTreeMap::from([(
+                            "LOOKUP".into(),
+                            Db2HostVariable {
+                                value: vec![0xfe],
+                                indicator: None,
+                            },
+                        )]),
+                    ),
+                )
+                .unwrap();
+            assert_eq!(counted.rows[0].columns[0], expected);
+        }
+        assert_eq!(
+            service.execute(
+                &run,
+                &request(
+                    Db2Operation::Count,
+                    699,
+                    "SELECT COUNT(*) FROM APP.BINARY WHERE LABEL = :LABEL",
+                    BTreeMap::from([(
+                        "LABEL".into(),
+                        Db2HostVariable {
+                            value: b"malformed-varchar".to_vec(),
+                            indicator: None,
+                        },
+                    )]),
+                ),
+            ),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            service.execute(
+                &run,
+                &request(
+                    Db2Operation::Count,
+                    697,
+                    "SELECT COUNT(*) FROM APP.BINARY WHERE LABEL = :LABEL",
+                    BTreeMap::from([(
+                        "LABEL".into(),
+                        Db2HostVariable {
+                            value: vec![0, 9, b'X'],
+                            indicator: None,
+                        },
+                    )]),
+                ),
+            ),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            service
+                .execute(
+                    &run,
+                    &request(
+                        Db2Operation::Count,
+                        698,
+                        "SELECT COUNT(*) FROM APP.BINARY WHERE LABEL = :LABEL",
+                        BTreeMap::from([(
+                            "LABEL".into(),
+                            Db2HostVariable {
+                                value: b"FIXED   ".to_vec(),
+                                indicator: None,
+                            },
+                        )]),
+                    ),
+                )
+                .unwrap()
+                .rows[0]
+                .columns[0],
+            b"0"
+        );
+
+        let updated = service
+            .execute(
+                &run,
+                &request(
+                    Db2Operation::Update,
+                    704,
+                    "UPDATE APP.BINARY SET PAYLOAD = :PAYLOAD WHERE KEY_BYTES = :KEY_BYTES",
+                    BTreeMap::from([
+                        (
+                            "KEY_BYTES".into(),
+                            Db2HostVariable {
+                                value: vec![0xfe],
+                                indicator: None,
+                            },
+                        ),
+                        (
+                            "PAYLOAD".into(),
+                            Db2HostVariable {
+                                value: vec![b' ', 0xfe, b' '],
+                                indicator: None,
+                            },
+                        ),
+                    ]),
+                ),
+            )
+            .unwrap();
+        assert_eq!(updated.affected_rows, 1);
+        service
+            .execute(
+                &run,
+                &request(Db2Operation::Commit, 705, "COMMIT", BTreeMap::new()),
+            )
+            .unwrap();
+        let selected = service
+            .execute(
+                &run,
+                &request(
+                    Db2Operation::Select,
+                    706,
+                    "SELECT PAYLOAD FROM APP.BINARY WHERE KEY_BYTES = :KEY_BYTES",
+                    BTreeMap::from([(
+                        "KEY_BYTES".into(),
+                        Db2HostVariable {
+                            value: vec![0xfe],
+                            indicator: None,
+                        },
+                    )]),
+                ),
+            )
+            .unwrap();
+        assert_eq!(selected.rows[0].columns[0], vec![b' ', 0xfe, b' ']);
+
+        let mut open = request(
+            Db2Operation::OpenCursor,
+            700,
+            "SELECT KEY_BYTES FROM APP.BINARY ORDER BY KEY_BYTES",
+            BTreeMap::from([(
+                "START".into(),
+                Db2HostVariable {
+                    value: vec![0xff],
+                    indicator: None,
+                },
+            )]),
+        );
+        open.cursor = Some("RAW-FORWARD".into());
+        service.execute(&run, &open).unwrap();
+        let mut fetch = request(Db2Operation::FetchCursor, 701, "FETCH", BTreeMap::new());
+        fetch.cursor = Some("RAW-FORWARD".into());
+        assert_eq!(
+            service.execute(&run, &fetch).unwrap().rows[0].columns[0],
+            vec![0xff]
+        );
+
+        let mut backward = request(
+            Db2Operation::OpenCursor,
+            702,
+            "SELECT KEY_BYTES FROM APP.BINARY ORDER BY KEY_BYTES DESC",
+            BTreeMap::from([(
+                "START".into(),
+                Db2HostVariable {
+                    value: vec![0xfe],
+                    indicator: None,
+                },
+            )]),
+        );
+        backward.cursor = Some("RAW-BACKWARD".into());
+        service.execute(&run, &backward).unwrap();
+        fetch = request(Db2Operation::FetchCursor, 703, "FETCH", BTreeMap::new());
+        fetch.cursor = Some("RAW-BACKWARD".into());
+        assert_eq!(
+            service.execute(&run, &fetch).unwrap().rows[0].columns[0],
+            vec![0xfe]
+        );
+    }
+
+    #[test]
+    fn schema_compatibility_covers_every_semantic_field() {
+        let original = installed_catalog(51).tables;
+        let assert_incompatible = |mut changed: Vec<Db2TableDefinition>| {
+            assert!(!schemas_compatible(&original[0], &changed.remove(0)));
+        };
+
+        let mut changed = original.clone();
+        changed[0].columns[0].name = "RENAMED".into();
+        assert_incompatible(changed);
+        let mut changed = original.clone();
+        changed[0].columns[0].nullable = true;
+        assert_incompatible(changed);
+        let mut changed = original.clone();
+        changed[0].columns[0].max_bytes += 1;
+        assert_incompatible(changed);
+        let mut changed = original.clone();
+        changed[0].columns[1].result_encoding = Db2ResultEncoding::Raw;
+        assert_incompatible(changed);
+        let mut changed = original.clone();
+        changed[0].columns[1].default_value = Some(b"DEFAULT".to_vec());
+        assert_incompatible(changed);
+        let mut changed = original.clone();
+        changed[0].primary_key = vec!["DESCRIPTION".into()];
+        assert_incompatible(changed);
+        let mut changed = original.clone();
+        changed[0].extract.as_mut().unwrap().fields[0].column = "DESCRIPTION".into();
+        assert_incompatible(changed);
+        let mut changed = original.clone();
+        changed[0].extract.as_mut().unwrap().fields[0].width += 1;
+        assert_incompatible(changed);
+        let mut changed = original.clone();
+        changed[0].extract.as_mut().unwrap().trailer.push(b'X');
+        assert_incompatible(changed);
+        let mut changed = original.clone();
+        changed[0].extract = None;
+        assert_incompatible(changed);
+
+        let assert_child_incompatible = |changed: Db2TableDefinition| {
+            assert!(!schemas_compatible(&original[1], &changed));
+        };
+        let mut changed = original[1].clone();
+        changed.foreign_keys[0].columns = vec!["DETAIL".into()];
+        assert_child_incompatible(changed);
+        let mut changed = original[1].clone();
+        changed.foreign_keys[0].referenced_table = "APP.CODE_DETAIL".into();
+        assert_child_incompatible(changed);
+        let mut changed = original[1].clone();
+        changed.foreign_keys[0].referenced_columns = vec!["DESCRIPTION".into()];
+        assert_child_incompatible(changed);
+        let mut changed = original[1].clone();
+        changed.foreign_keys[0].delete_restrict = false;
+        assert_child_incompatible(changed);
+
+        let mut normalized_case = original[0].clone();
+        normalized_case.name = normalized_case.name.to_ascii_lowercase();
+        normalized_case.columns[0].name = normalized_case.columns[0].name.to_ascii_lowercase();
+        normalized_case.primary_key[0] = normalized_case.primary_key[0].to_ascii_lowercase();
+        assert!(schemas_compatible(&original[0], &normalized_case));
+    }
+
+    #[test]
+    fn ddl_redeclaration_preserves_extract_only_after_full_sql_semantic_match() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = Db2Service::open(store, Db2Limits::default()).unwrap();
+        service.install_catalog(installed_catalog(61)).unwrap();
+        let admin = invocation("ddl-redeclaration");
+        let exact = "CREATE TABLE APP.CODE (CODE CHAR(2) NOT NULL, DESCRIPTION VARCHAR(50) NOT NULL, PRIMARY KEY (CODE)); \
+                     CREATE TABLE APP.CODE_DETAIL (CODE CHAR(2) NOT NULL, DETAIL CHAR(8) NOT NULL, PRIMARY KEY (CODE, DETAIL)); \
+                     ALTER TABLE APP.CODE_DETAIL FOREIGN KEY (CODE) REFERENCES APP.CODE (CODE) ON DELETE RESTRICT;";
+        assert_eq!(
+            service
+                .execute(
+                    &admin,
+                    &request(Db2Operation::ExecuteScript, 810, exact, BTreeMap::new())
+                )
+                .unwrap()
+                .sqlcode,
+            0
+        );
+        assert!(
+            service
+                .table_definition("APP.CODE")
+                .unwrap()
+                .extract
+                .is_some()
+        );
+
+        let changed = exact.replace("DESCRIPTION VARCHAR(50) NOT NULL", "DESCRIPTION CHAR(50)");
+        assert_eq!(
+            service.execute(
+                &admin,
+                &request(Db2Operation::ExecuteScript, 811, &changed, BTreeMap::new())
+            ),
+            Err(HostProblem::IdempotencyConflict)
+        );
+    }
+
     #[test]
     fn ddl_crud_cursor_commit_rollback_conflict_and_restart_are_durable() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = Db2Service::open(store.clone(), Db2Limits::default()).unwrap();
         let admin = invocation("admin");
-        let ddl = "CREATE TABLE CARDDEMO.TRANSACTION_TYPE (TR_TYPE CHAR(2), TR_DESCRIPTION VARCHAR(50)); CREATE TABLE CARDDEMO.TRANSACTION_TYPE_CATEGORY (TRC_TYPE_CODE CHAR(2), TRC_TYPE_CATEGORY CHAR(4), TRC_CAT_DATA VARCHAR(50)); INSERT INTO CARDDEMO.TRANSACTION_TYPE (TR_TYPE,TR_DESCRIPTION) SELECT '01','PURCHASE' FROM SYSIBM.SYSDUMMY1 UNION ALL SELECT '02','PAYMENT' FROM SYSIBM.SYSDUMMY1 COMMIT; INSERT INTO CARDDEMO.TRANSACTION_TYPE_CATEGORY (TRC_TYPE_CODE,TRC_TYPE_CATEGORY,TRC_CAT_DATA) SELECT '01','0001','SALES' FROM SYSIBM.SYSDUMMY1 COMMIT;";
+        let ddl = "CREATE TABLE CARDDEMO.TRANSACTION_TYPE (TR_TYPE CHAR(2) NOT NULL, TR_DESCRIPTION VARCHAR(50), PRIMARY KEY (TR_TYPE)); CREATE TABLE CARDDEMO.TRANSACTION_TYPE_CATEGORY (TRC_TYPE_CODE CHAR(2) NOT NULL, TRC_TYPE_CATEGORY CHAR(4) NOT NULL, TRC_CAT_DATA VARCHAR(50), PRIMARY KEY (TRC_TYPE_CODE, TRC_TYPE_CATEGORY), FOREIGN KEY (TRC_TYPE_CODE) REFERENCES CARDDEMO.TRANSACTION_TYPE (TR_TYPE)); INSERT INTO CARDDEMO.TRANSACTION_TYPE (TR_TYPE,TR_DESCRIPTION) SELECT '01','PURCHASE' FROM SYSIBM.SYSDUMMY1 UNION ALL SELECT '02','PAYMENT' FROM SYSIBM.SYSDUMMY1 COMMIT; INSERT INTO CARDDEMO.TRANSACTION_TYPE_CATEGORY (TRC_TYPE_CODE,TRC_TYPE_CATEGORY,TRC_CAT_DATA) SELECT '01','0001','SALES' FROM SYSIBM.SYSDUMMY1 COMMIT;";
         assert_eq!(
             service
                 .execute(
@@ -1042,13 +3321,18 @@ mod tests {
         let first = invocation("first");
         let values = BTreeMap::from([
             ("DCL-TR-TYPE".into(), variable("99")),
-            ("DCL-TR-DESCRIPTION".into(), variable("TEMPORARY")),
+            ("DCL-TR-DESCRIPTION".into(), varchar_variable("TEMPORARY")),
         ]);
         assert_eq!(
             service
                 .execute(
                     &first,
-                    &request(Db2Operation::Insert, 2, "INSERT", values.clone())
+                    &request(
+                        Db2Operation::Insert,
+                        2,
+                        "INSERT INTO CARDDEMO.TRANSACTION_TYPE",
+                        values.clone(),
+                    )
                 )
                 .unwrap()
                 .sqlcode,
@@ -1096,7 +3380,12 @@ mod tests {
         service
             .execute(
                 &first,
-                &request(Db2Operation::Insert, 6, "INSERT", values.clone()),
+                &request(
+                    Db2Operation::Insert,
+                    6,
+                    "INSERT INTO CARDDEMO.TRANSACTION_TYPE",
+                    values.clone(),
+                ),
             )
             .unwrap();
         service
@@ -1134,18 +3423,28 @@ mod tests {
         let right = invocation("right");
         let update_values = BTreeMap::from([
             ("DCL-TR-TYPE".into(), variable("02")),
-            ("DCL-TR-DESCRIPTION".into(), variable("UPDATED")),
+            ("DCL-TR-DESCRIPTION".into(), varchar_variable("UPDATED")),
         ]);
         restarted
             .execute(
                 &left,
-                &request(Db2Operation::Update, 10, "UPDATE", update_values.clone()),
+                &request(
+                    Db2Operation::Update,
+                    10,
+                    "UPDATE CARDDEMO.TRANSACTION_TYPE SET TR_DESCRIPTION = :DCL-TR-DESCRIPTION",
+                    update_values.clone(),
+                ),
             )
             .unwrap();
         restarted
             .execute(
                 &right,
-                &request(Db2Operation::Update, 11, "UPDATE", update_values),
+                &request(
+                    Db2Operation::Update,
+                    11,
+                    "UPDATE CARDDEMO.TRANSACTION_TYPE SET TR_DESCRIPTION = :DCL-TR-DESCRIPTION",
+                    update_values,
+                ),
             )
             .unwrap();
         assert_eq!(
@@ -1175,7 +3474,7 @@ mod tests {
                     &request(
                         Db2Operation::Delete,
                         14,
-                        "DELETE",
+                        "DELETE FROM CARDDEMO.TRANSACTION_TYPE",
                         BTreeMap::from([("DCL-TR-TYPE".into(), variable("01"))]),
                     )
                 )

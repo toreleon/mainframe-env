@@ -1,0 +1,150 @@
+# Implementation prompts for IBM coverage minor releases
+
+Status: **Prepared prompts; implementation and release remain separate actions**
+
+Use one prompt from the repository root for the corresponding minor release.
+The prompts cover `0.2.0` through `0.17.0`. `1.0.0` is intentionally excluded:
+it is a promotion/release gate, not a minor implementation program.
+
+## Prompt index
+
+| Minor | Prompt | Dependency gate |
+|---|---|---|
+| 0.2.0 | [Implement 0.2.0](IMPLEMENT_0_2_0.md) | none beyond the accepted 0.1.1 baseline |
+| 0.3.0 | [Implement 0.3.0](IMPLEMENT_0_3_0.md) | 0.2.0 |
+| 0.4.0 | [Implement 0.4.0](IMPLEMENT_0_4_0.md) | 0.3.0 |
+| 0.5.0 | [Implement 0.5.0](IMPLEMENT_0_5_0.md) | 0.2.0 |
+| 0.6.0 | [Implement 0.6.0](IMPLEMENT_0_6_0.md) | 0.2.0 |
+| 0.7.0 | [Implement 0.7.0](IMPLEMENT_0_7_0.md) | 0.2.0 |
+| 0.8.0 | [Implement 0.8.0](IMPLEMENT_0_8_0.md) | 0.5.0, 0.6.0, 0.7.0 |
+| 0.9.0 | [Implement 0.9.0](IMPLEMENT_0_9_0.md) | 0.4.0, 0.5.0, 0.6.0 |
+| 0.10.0 | [Implement 0.10.0](IMPLEMENT_0_10_0.md) | 0.9.0 |
+| 0.11.0 | [Implement 0.11.0](IMPLEMENT_0_11_0.md) | 0.5.0, 0.6.0, 0.8.0, 0.10.0 |
+| 0.12.0 | [Implement 0.12.0](IMPLEMENT_0_12_0.md) | 0.2.0, 0.4.0, 0.5.0 |
+| 0.13.0 | [Implement 0.13.0](IMPLEMENT_0_13_0.md) | 0.12.0 |
+| 0.14.0 | [Implement 0.14.0](IMPLEMENT_0_14_0.md) | 0.4.0, 0.5.0, 0.6.0 |
+| 0.15.0 | [Implement 0.15.0](IMPLEMENT_0_15_0.md) | 0.4.0, 0.5.0 |
+| 0.16.0 | [Implement 0.16.0](IMPLEMENT_0_16_0.md) | 0.8.0, 0.10.0, 0.13.0, 0.14.0, 0.15.0 |
+| 0.17.0 | [Implement 0.17.0](IMPLEMENT_0_17_0.md) | 0.11.0, 0.16.0 |
+
+The release dossiers are indexed in
+[`docs/delivery/coverage-versions/README.md`](../../delivery/coverage-versions/README.md).
+The dependency and concurrency rules are in
+[`PARALLEL-IMPLEMENTATION.md`](../../delivery/coverage-versions/PARALLEL-IMPLEMENTATION.md).
+
+## Common execution contract
+
+Every prompt in this directory incorporates this contract by reference. Read it
+completely before editing.
+
+### Authority and entry
+
+1. Work from the `mainframe-env` repository root.
+2. Read `AGENTS.md` and any more-local instructions when present.
+3. Read the target release dossier, this contract, the research roadmap, the
+   machine roadmap, accepted ADRs, architecture contracts, version/release
+   policy, and relevant package READMEs before editing.
+4. Inspect the current source and tests; do not assume the roadmap's snapshot
+   still describes the tree exactly.
+5. Verify each completion dependency from checked-in evidence. A version may
+   prepare private catalogs, parsers, fixtures, and oracle harnesses early only
+   where its prompt permits. It may not merge or advertise public behavior
+   whose dependency gate has not passed.
+
+### Persistent program control
+
+Before broad implementation, create and maintain:
+
+- `docs/delivery/coverage-versions/status/<target-version>.md`; and
+- `conformance/<minor-line>/evidence/program-status.json`, with its schema and
+  deterministic validation command.
+
+Record the target/source identity, dependency receipts, current work package,
+completed work, commands and exit codes, evidence paths, dirty-tree identity,
+open decisions, blockers, and next smallest executable step. Read these ledgers
+at every continuation; never restart completed discovery after compaction.
+
+### Implementation discipline
+
+- Work one named work package at a time. Start with a focused failing test or
+  inventory/gate failure, implement real behavior, run narrow validation, then
+  update derived evidence.
+- After a work package passes its focused and affected gates, create one local
+  commit before starting the next package. Use a subject beginning
+  `Complete <WORK-PACKAGE-ID>` and include these trailers:
+
+  ```text
+  Work-Package: <WORK-PACKAGE-ID>=pass
+  Target-Version: <target-version>
+  Evidence-Digest: sha256:<canonical-work-package-digest>
+  ```
+
+  Do not combine two named work packages in one completion commit. Focused
+  repair commits are allowed but do not replace the completion commit.
+- Preserve user-owned changes and keep unrelated files out of the task diff.
+- Production behavior must be generic and selected through typed contracts.
+  Do not add application-name, program-name, table-name, transaction-name,
+  dataset-name, queue-name, map-name, or principal-name dispatch.
+- Generated catalogs prove identity and exhaustiveness, not semantic completion.
+  A row is complete only when every applicable `recognized`, `validated`,
+  `executed`, `conditioned`, `recovered`, and `differential` gate passes.
+- Do not ship placeholders, `todo!()`, generic-success handlers, silent operand
+  drops, test-only authorities, fixture-output shortcuts, or fallback to oracle
+  binaries/native IBM code.
+- Keep deterministic semantic kernels separate from asynchronous infrastructure
+  and keep one authority for each public route, mutable state, security decision,
+  transaction protocol, generated catalog, and durable schema.
+- Bound input, output, collections, queues, recursion, concurrency, retries,
+  retained state, and evidence. Fail closed on malformed, unauthorized,
+  unsupported, unavailable, saturated, cancelled, or indeterminate operations.
+- Never fabricate official coverage or licensed IBM differential results. Mark
+  `differential=pending` until a pinned licensed oracle actually passes.
+- Add migrations, backup/restore, restart, rollback, compatibility, and
+  corruption/failure evidence whenever durable state or public schemas change.
+
+### Validation and evidence
+
+For every work package, run focused package tests and affected architecture,
+profile, schema, inventory, and evidence checks. Before declaring the minor
+complete, run the repository's current full validation floor on one unchanged
+candidate, including formatting, workspace check/tests, strict Clippy, docs,
+architecture/runtime-architecture, profiles, schemas, inventories, evidence,
+conformance, dependency/license/advisory checks, release-mode bounded load, and
+`git diff --check`. Use actual commands discovered in the current repository;
+record commands, versions, exit codes, source digest, and artifact digest.
+
+Direct unit tests supplement but never replace public selected-route evidence.
+Every failure must preserve the correct diagnostic/status/condition and prove
+that forbidden state changes did not occur.
+
+### Change and release boundary
+
+Implement the target minor only. A future-version capability may not leak into
+an earlier public profile. Do not weaken earlier released behavior, rewrite
+historical evidence, or silently change a durable/public contract.
+
+This managed implementation program authorizes implementation edits, local
+validation, the work-package commits above, pushing only the assigned isolated
+implementation branch, and opening one pull request against `main` after the
+entire minor exit gate passes. The pull request must list every work-package
+commit and evidence digest and must not claim the minor is released.
+
+It does not authorize destructive migration, force-push, merge, tag,
+publication, deployment, production cutover, or a compatibility claim. Version
+promotion occurs only after the target exit gate passes on the exact candidate;
+the controller reviews and merges the pull request separately.
+
+### Stop-the-line and handoff
+
+Stop and record a blocker only when a dependency receipt is invalid, an official
+baseline cannot be pinned safely, a required licensed environment is unavailable
+for the final gate, a security/durability contract cannot be preserved, a
+destructive decision needs authority, or user-owned changes cannot be isolated.
+Large scope, failing tests, or incomplete implementation are not blockers.
+
+At handoff, report completed and remaining work packages, exact validation
+commands/results, evidence paths, coverage numerators/denominators by gate,
+source identity, migrations/rollback status, known limitations, and the next
+smallest action. Never report the minor complete unless every exit condition in
+its dossier and prompt is satisfied. When complete, push the assigned branch and
+open the pull request; include its URL in the final response.

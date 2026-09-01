@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/migration-rollback-rollup@1",
+  "title": "mainframe-env 0.2 migration and rollback evidence rollup",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_version", "status", "migration_count", "destructive_migrations", "rollback_supported", "destructive_action_performed", "migrations"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.migration-rollback-rollup@1"},
+    "target_version": {"const": "0.2.0"},
+    "status": {"const": "pass"},
+    "migration_count": {"const": 5},
+    "destructive_migrations": {"const": 0},
+    "rollback_supported": {"const": 5},
+    "destructive_action_performed": {"const": false},
+    "migrations": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "path", "sha256", "destructive", "rollback_supported", "partial_state_selected", "evidence"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "path": {"type": "string", "pattern": "^conformance/0\\.2/migrations/.*\\.json$"},
+          "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "destructive": {"const": false},
+          "rollback_supported": {"const": true},
+          "partial_state_selected": {"const": false},
+          "evidence": {"type": "string", "pattern": "^conformance/0\\.2/evidence/work-packages/CV-20[4-8]\\.json$"}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,230 @@
+{
+  "baseline_inventory": {
+    "batch_hits": 3,
+    "db2_hits": 29,
+    "official_baselines": 9,
+    "official_mandatory_rows": 1506,
+    "production_h1_h3_hits": 32,
+    "tracked_files": 315,
+    "workspace_library_test_targets": 22,
+    "workspace_packages": 24,
+    "workspace_tests_floor": 260
+  },
+  "blockers": [],
+  "commands": [
+    {
+      "command": "git rev-parse mainframe-env-v0.1.1^{} && git rev-parse mainframe-env-v0.1.1^{tree}",
+      "exit_code": 0,
+      "result": "accepted release commit and tree matched the immutable 0.1.1 tag"
+    },
+    {
+      "command": "cargo test --workspace --all-features --locked --no-run",
+      "exit_code": 0,
+      "result": "accepted workspace compiled before 0.2 implementation"
+    },
+    {
+      "command": "cargo test -p xtask --locked",
+      "exit_code": 0,
+      "result": "5 tests passed after CV-201 validator addition"
+    },
+    {
+      "command": "cargo xtask coverage --check",
+      "exit_code": 0,
+      "result": "9 official baselines and 1506 immutable mandatory rows passed digest and denominator validation"
+    },
+    {
+      "command": "cargo xtask conformance --check",
+      "exit_code": 0,
+      "result": "versions, architecture, profiles, schemas, inventory, historical evidence, and 0.2 coverage passed"
+    },
+    {
+      "command": "cargo clippy -p mainframe-env-coverage --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "result": "initial CV-202 check found two double_must_use warnings; attributes were removed"
+    },
+    {
+      "command": "cargo test -p mainframe-env-coverage --locked && cargo clippy -p mainframe-env-coverage --all-targets --locked -- -D warnings",
+      "exit_code": 0,
+      "result": "4 coverage contract tests passed and strict Clippy passed after repair"
+    },
+    {
+      "command": "cargo xtask conformance --check",
+      "exit_code": 0,
+      "result": "CV-202 affected architecture, profile, schema, inventory, evidence, and coverage gates passed"
+    },
+    {
+      "command": "cargo clippy -p mainframe-env-host-api -p xtask --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "result": "initial CV-203 strict check exposed five owned JSON comparison allocations in the coverage validator; comparisons were made allocation-free"
+    },
+    {
+      "command": "cargo test -p mainframe-env-host-api -p xtask --locked && cargo xtask semantic-identities --check",
+      "exit_code": 0,
+      "result": "16 handler/identity tests, 5 tooling tests, and deterministic generation check passed"
+    },
+    {
+      "command": "cargo clippy -p mainframe-env-application -p xtask --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "result": "initial CV-204 strict check rejected a redundant map lookup; validation was made allocation-free"
+    },
+    {
+      "command": "cargo test -p mainframe-env-application --locked && cargo xtask application-packages --check",
+      "exit_code": 0,
+      "result": "8 package tests and the application-package contract/migration validator passed"
+    },
+    {
+      "command": "CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-db2 --check",
+      "exit_code": 1,
+      "result": "initial generic route exposed DDL TABLESPACE boundary, normalized cursor column separators, VARCHAR padding, and host-binding mapping defects; focused repairs followed"
+    },
+    {
+      "command": "CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-db2 --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-mq-authorization --check",
+      "exit_code": 0,
+      "result": "Db2 and authorization receipts passed with unchanged historical digests through selected package catalog data"
+    },
+    {
+      "command": "cargo xtask batch-controllers --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-db2 --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-ims --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-mq-authorization --check",
+      "exit_code": 0,
+      "result": "CV-206 typed package-installed controllers passed the three-to-zero production scan and all reached pinned workload routes with unchanged digests"
+    },
+    {
+      "command": "cargo xtask abi-libraries --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-closure --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-cics --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-db2 --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-ims --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-mq-authorization --check",
+      "exit_code": 0,
+      "result": "CV-207 moved all nine exact ABI members to three licensed subsystem libraries with zero compiler ownership and unchanged historical receipts/digests"
+    },
+    {
+      "command": "cargo xtask program-registry --check && cargo xtask route-registries --check && cargo xtask dehardcoding --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-utilities --check && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-base-batch --check",
+      "exit_code": 0,
+      "result": "CV-208 generated 21 typed program entries plus disjoint 23-official/7-custom routes and proved all production hardcode/string-dispatch targets zero with unchanged workload digests"
+    },
+    {
+      "command": "cargo test --workspace --all-features --locked --no-fail-fast && explicit PostgreSQL 18 controls && CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-full --check && Zowe CLI 8.36.0 live flow",
+      "exit_code": 0,
+      "result": "299 tests, 3 PostgreSQL controls, 20/20 CardDemo journeys, and 4 live Zowe routes passed on candidate sha256:cf745ecbfd6a0d8dac3e824174dd1c2a184e8c563fa1004d27809aec9827c6cc"
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings && cargo doc --workspace --all-features --no-deps --locked && cargo +1.95.0 check <contracts> && cargo deny check && cargo xtask runtime-architecture --check && cargo xtask certification --check && cargo xtask release --check --target aarch64-apple-darwin",
+      "exit_code": 0,
+      "result": "strict quality, MSRV, dependency policy, release-mode smoke, certification, and local unpublished 0.2 artifacts passed"
+    },
+    {
+      "command": "cargo xtask review-repair --check && cargo xtask review-repair-round-2 --check && cargo xtask schemas --check && cargo xtask conformance --check && cargo xtask full-regression --check",
+      "exit_code": 0,
+      "result": "the commit-bound round-1 receipt, all ten round-2 findings, compiled schemas, historical gates, and unchanged-candidate regression evidence pass"
+    }
+  ],
+  "current_work_package": null,
+  "dependency_receipts": [
+    {
+      "dependency": "accepted mainframe-env 0.1.1 release",
+      "evidence": "conformance/0.1.1/evidence/release-0.1.1.json",
+      "status": "pass"
+    }
+  ],
+  "dirty_tree_identity": {
+    "algorithm": "cargo xtask digest; length-delimited path and content over the repository excluding Git, target, raw historical evidence, phase/status/workload/full-regression/round-1/round-2/round-3/CV-209 derived ledgers, and the Markdown status ledger",
+    "digest": "sha256:0d173ca9f840eaa6d1ffa4d72cd04bf861ed75e65617d47e00e10c1f483d087d"
+  },
+  "evidence_corrections": [
+    {
+      "claim": "round-three exact-one-repair-commit terminal success",
+      "evidence": "conformance/0.2/evidence/review-repair-round-4.json",
+      "reason": "The round-three completion and two intermediate follow-ups failed CI; b61d604 is the accepted tested follow-up tip.",
+      "status": "superseded"
+    }
+  ],
+  "evidence_paths": [
+    "conformance/0.1.1/evidence/release-0.1.1.json",
+    "conformance/0.1.1/evidence/issues/CD-027.json",
+    "conformance/0.2/catalogs/index.json",
+    "conformance/0.2/evidence/work-packages/CV-201.json",
+    "conformance/0.2/evidence/work-packages/CV-202.json",
+    "conformance/0.2/evidence/work-packages/CV-203.json",
+    "conformance/0.2/evidence/work-packages/CV-204.json",
+    "conformance/0.2/evidence/work-packages/CV-205.json",
+    "conformance/0.2/evidence/work-packages/CV-206.json",
+    "conformance/0.2/evidence/work-packages/CV-207.json",
+    "conformance/0.2/evidence/work-packages/CV-208.json",
+    "conformance/0.2/evidence/work-packages/CV-209.json",
+    "conformance/0.2/evidence/hardcode/CV-205-db2.json",
+    "conformance/0.2/evidence/hardcode/CV-206-batch.json",
+    "conformance/0.2/evidence/hardcode/CV-207-abi.json",
+    "conformance/0.2/evidence/hardcode/no-application-hardcode.json",
+    "conformance/0.2/evidence/hardcode/no-string-dispatch.json",
+    "conformance/0.2/evidence/coverage-ledger.json",
+    "conformance/0.2/evidence/workload-ledger.json",
+    "conformance/0.2/evidence/migration-rollback-rollup.json",
+    "conformance/0.2/evidence/full-regression.json",
+    "conformance/0.2/evidence/review-repair.json",
+    "conformance/0.2/evidence/review-repair-round-2.json",
+    "conformance/0.2/evidence/review-repair-round-3.json",
+    "conformance/0.2/evidence/work-package-amendments.json",
+    "conformance/0.2/generated/semantic-identities.json",
+    "conformance/0.2/generated/subsystem-handlers.json",
+    "conformance/0.2/evidence/review-repair-round-4.json",
+    "conformance/0.2/evidence/review-repair-round-5.json"
+  ],
+  "implementation_status": "complete",
+  "next_smallest_executable_step": "Commit the generated round-five repair message, push impl/0.2.0, await the exact terminal CI job set, then capture callback JSON stdout without changing repository evidence.",
+  "open_decisions": [],
+  "schema_version": "mainframe-env.coverage-program-status@1",
+  "source_identity": {
+    "accepted_carddemo_candidate_commit": "857115b907ce7098c965a51117a079048ea8182e",
+    "accepted_carddemo_candidate_tree": "7e1fa73f4c808a89ddb4f98c0e3f7d0207f861ea",
+    "accepted_carddemo_evidence_digest": "sha256:cc7fbcd0867e0654c9f3cd937967c6776413759612ceb652eae2be7083f0b17d",
+    "accepted_release_commit": "44f3081eb2fdf22d09e1a97725f5a4163431ca70",
+    "accepted_release_evidence_digest": "sha256:e93c399eb48450ed9ad16a62a0d09fff1464987f777be57bbe992f48f4b46c92",
+    "accepted_release_tag": "mainframe-env-v0.1.1",
+    "accepted_release_tree": "3d504ece02f1c09e124606ded695b00ba984d104",
+    "implementation_start_commit": "1afbf402c56c085a46cc3599c91b1b77002b1e16",
+    "implementation_start_content_digest": "sha256:2add3a2f48b2a2017b1105d60183647855073baa4b99c6f6f599b8a605e30f6f"
+  },
+  "target_version": "0.2.0",
+  "work_packages": [
+    {
+      "evidence": "conformance/0.2/evidence/work-packages/CV-201.json",
+      "id": "CV-201",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/work-packages/CV-202.json",
+      "id": "CV-202",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/work-packages/CV-203.json",
+      "id": "CV-203",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/work-packages/CV-204.json",
+      "id": "CV-204",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/work-packages/CV-205.json",
+      "id": "CV-205",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/work-packages/CV-206.json",
+      "id": "CV-206",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/work-packages/CV-207.json",
+      "id": "CV-207",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/work-packages/CV-208.json",
+      "id": "CV-208",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/work-packages/CV-209.json",
+      "id": "CV-209",
+      "state": "pass"
+    }
+  ]
+}

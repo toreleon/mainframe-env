@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/coverage-work-package-evidence@1",
+  "title": "mainframe-env coverage work-package evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "derived", "status", "work_package", "evidence_digest", "receipt"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.coverage-work-package-evidence@1"},
+    "derived": {"const": true},
+    "status": {"enum": ["pass", "blocked"]},
+    "work_package": {"pattern": "^CV-20[1-9]$"},
+    "evidence_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "receipt": {
+      "type": "object",
+      "required": ["target_version", "deliverable", "source_identity", "commands", "artifacts", "invariants"],
+      "properties": {
+        "target_version": {"const": "0.2.0"},
+        "deliverable": {"type": "string", "minLength": 1},
+        "source_identity": {"type": "string", "minLength": 40},
+        "commands": {"type": "array", "minItems": 1},
+        "artifacts": {"type": "array", "minItems": 1},
+        "invariants": {"type": "object", "minProperties": 1}
+      }
+    }
+  }
+}

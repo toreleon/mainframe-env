@@ -1,6 +1,14 @@
+use crate::controller::{
+    BatchControllerRegistry, BatchControllerRegistryState, MAX_CONTROLLER_STATE_BYTES,
+    ResolvedBatchController,
+};
+use crate::program::{
+    ProgramExecution, TsoProgramExecution, program_execution, tso_program_execution,
+};
 use crate::{
-    Disposition, JclBundle, JclLimits, JobPlan, ProgramInput, StepPlan, UtilityDisposition,
-    decode_program_output, parse_jcl, utility_disposition,
+    BatchControllerGeneration, BatchControllerInstallReceipt, BatchControllerPlan,
+    BatchControllerSelector, Disposition, JclBundle, JclLimits, JobPlan, ProgramInput, StepPlan,
+    decode_program_output, parse_jcl,
 };
 use mainframe_env_execution_api::{
     BoundedPayload, IdempotencyKey, Invocation, InvocationLimits, PrincipalId,
@@ -16,6 +24,9 @@ use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreErro
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
+
+const CONTROLLER_STATE_NAMESPACE: &str = "batch-controller-state";
+const CONTROLLER_STATE_KEY: &str = "registry";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BatchLimits {
@@ -96,11 +107,17 @@ struct State {
     next_id: u64,
 }
 
+struct DurableControllers {
+    store_version: u64,
+    registry: BatchControllerRegistry,
+}
+
 pub struct BatchService {
     host: Arc<ScopedHostService>,
     store: Arc<dyn ProviderStateStore>,
     jcl_limits: JclLimits,
     limits: BatchLimits,
+    controllers: Mutex<DurableControllers>,
     state: Mutex<State>,
 }
 
@@ -154,17 +171,70 @@ impl BatchService {
             })
             .transpose()?
             .unwrap_or(1);
+        let (controller_store_version, controller_registry) = match store
+            .get_provider_state(CONTROLLER_STATE_NAMESPACE, CONTROLLER_STATE_KEY)
+            .map_err(store_error)?
+        {
+            Some(record) => {
+                if record.payload.len() > MAX_CONTROLLER_STATE_BYTES {
+                    return Err(HostProblem::ResourceExhausted);
+                }
+                let state: BatchControllerRegistryState =
+                    serde_json::from_slice(&record.payload)
+                        .map_err(|_| HostProblem::InfrastructureFailure)?;
+                (
+                    record.version,
+                    BatchControllerRegistry::from_state(state)
+                        .map_err(|_| HostProblem::InfrastructureFailure)?,
+                )
+            }
+            None => (0, BatchControllerRegistry::default()),
+        };
         Ok(Arc::new(Self {
             host,
             store,
             jcl_limits,
             limits,
+            controllers: Mutex::new(DurableControllers {
+                store_version: controller_store_version,
+                registry: controller_registry,
+            }),
             state: Mutex::new(State {
                 jobs,
                 replay,
                 next_id,
             }),
         }))
+    }
+
+    pub fn install_controllers(
+        &self,
+        generation: BatchControllerGeneration,
+    ) -> Result<BatchControllerInstallReceipt, HostProblem> {
+        let mut durable = self
+            .controllers
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        durable.registry.preflight_install(&generation)?;
+        let mut replacement = durable.registry.clone();
+        let receipt = replacement.install(generation)?;
+        self.persist_controllers(&mut durable, replacement)?;
+        Ok(receipt)
+    }
+
+    pub fn rollback_controllers(
+        &self,
+        application: &str,
+        generation: u64,
+    ) -> Result<BatchControllerInstallReceipt, HostProblem> {
+        let mut durable = self
+            .controllers
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let mut replacement = durable.registry.clone();
+        let receipt = replacement.select(application, generation)?;
+        self.persist_controllers(&mut durable, replacement)?;
+        Ok(receipt)
     }
 
     pub fn submit(
@@ -457,7 +527,8 @@ impl BatchService {
                     parameter: step.parameter.clone(),
                     dds,
                 };
-                if step.program.eq_ignore_ascii_case("IDCAMS") {
+                let execution = program_execution(&step.program);
+                if execution == ProgramExecution::Idcams {
                     self.execute_idcams(
                         invocation,
                         job,
@@ -467,54 +538,30 @@ impl BatchService {
                         &mut effect_sequence,
                     )?;
                 }
-                let output = if step.program.eq_ignore_ascii_case("SDSF") {
-                    self.execute_sdsf(invocation, job, step, &input, &mut effect_sequence)?
-                } else if step.program.eq_ignore_ascii_case("IKJEFT01") {
-                    self.execute_db2_tso(invocation, job, step, &input, &mut effect_sequence)?
-                } else if step.program.eq_ignore_ascii_case("DFSRRC00") {
-                    self.execute_ims_controller(
+                let output = match execution {
+                    ProgramExecution::Sdsf => {
+                        self.execute_sdsf(invocation, job, step, &input, &mut effect_sequence)?
+                    }
+                    ProgramExecution::Db2Tso => {
+                        self.execute_db2_tso(invocation, job, step, &input, &mut effect_sequence)?
+                    }
+                    ProgramExecution::ImsController => self.execute_ims_controller(
                         invocation,
                         job,
                         step,
                         &input,
                         &mut effect_sequence,
-                    )?
-                } else {
-                    let bytes =
-                        serde_json::to_vec(&input).map_err(|_| HostProblem::ProviderFailure)?;
-                    let payload = BoundedPayload::new(
-                        "mainframe-env.program.input@1",
-                        bytes,
-                        InvocationLimits::default(),
-                    )
-                    .map_err(|_| HostProblem::ResourceExhausted)?;
-                    if utility_disposition(&step.program)
-                        .is_some_and(|disposition| disposition != UtilityDisposition::Implemented)
-                    {
-                        return Err(HostProblem::Unsupported);
-                    }
-                    let program =
-                        ProgramName::new(&step.program, 128).map_err(|_| HostProblem::Malformed)?;
-                    let sequence = next_effect_sequence(invocation, &mut effect_sequence)?;
-                    let result = self.host.invoke(
-                        invocation,
-                        invocation.deadline_tick.saturating_sub(1),
-                        false,
-                        EffectRequest {
-                            run_unit: invocation.run_unit_id.clone(),
-                            sequence,
-                            deadline_tick: invocation.deadline_tick,
-                            idempotency_key: Some(effect_key(job, step, sequence)?),
-                            request: HostRequest::Program(ProgramRequest::Call {
-                                program,
-                                payload,
-                            }),
-                        },
-                    );
-                    match result.effect.outcome? {
-                        HostResult::Program(payload) => decode_program_output(&payload)?,
-                        _ => return Err(HostProblem::ProviderFailure),
-                    }
+                    )?,
+                    ProgramExecution::ProgramService | ProgramExecution::Idcams => self
+                        .execute_program_controller(
+                            invocation,
+                            job,
+                            step,
+                            &input,
+                            &mut effect_sequence,
+                            &step.program,
+                        )?,
+                    ProgramExecution::Unsupported => return Err(HostProblem::Unsupported),
                 };
                 self.write_dd_outputs(
                     invocation,
@@ -676,41 +723,27 @@ impl BatchService {
             });
         }
         let program = tso_run_program(&control)?;
-        if program == "COBTUPDT" {
-            let payload = BoundedPayload::new(
-                "mainframe-env.program.input@1",
-                serde_json::to_vec(input).map_err(|_| HostProblem::ProviderFailure)?,
-                InvocationLimits::default(),
-            )
-            .map_err(|_| HostProblem::ResourceExhausted)?;
-            let sequence = next_effect_sequence(invocation, effect_sequence)?;
-            let key = effect_key(job, step, sequence)?;
-            let result = self.host.invoke(
-                invocation,
-                invocation.deadline_tick.saturating_sub(1),
-                false,
-                EffectRequest {
-                    run_unit: invocation.run_unit_id.clone(),
-                    sequence,
-                    deadline_tick: invocation.deadline_tick,
-                    idempotency_key: Some(key),
-                    request: HostRequest::Program(ProgramRequest::Call {
-                        program: ProgramName::new(program, 128)
-                            .map_err(|_| HostProblem::Malformed)?,
-                        payload,
-                    }),
-                },
-            );
-            return match result.effect.outcome? {
-                HostResult::Program(payload) => decode_program_output(&payload),
+        let selector = BatchControllerSelector::tso(&program)?;
+        if let Some(controller) = self.resolve_controller(&selector)? {
+            return match controller.plan {
+                BatchControllerPlan::ProgramCall => {
+                    let program = self.verify_controller_program(&controller.program)?;
+                    self.execute_program_controller(
+                        invocation,
+                        job,
+                        step,
+                        input,
+                        effect_sequence,
+                        &program,
+                    )
+                }
                 _ => Err(HostProblem::ProviderFailure),
             };
         }
         let statement = input_dd_text(input, "SYSIN")?;
-        let operation = match program.as_str() {
-            "DSNTIAD" | "DSNTEP4" => Db2Operation::ExecuteScript,
-            "DSNTIAUL" => Db2Operation::Extract,
-            _ => return Err(HostProblem::Unsupported),
+        let operation = match tso_program_execution(&program).ok_or(HostProblem::Unsupported)? {
+            TsoProgramExecution::ExecuteScript => Db2Operation::ExecuteScript,
+            TsoProgramExecution::Extract => Db2Operation::Extract,
         };
         let result = self.db2_call(
             invocation,
@@ -769,6 +802,75 @@ impl BatchService {
         })
     }
 
+    fn resolve_controller(
+        &self,
+        selector: &BatchControllerSelector,
+    ) -> Result<Option<ResolvedBatchController>, HostProblem> {
+        self.controllers
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)
+            .map(|durable| durable.registry.resolve(selector))
+    }
+
+    fn verify_controller_program(
+        &self,
+        program: &crate::BatchControllerProgram,
+    ) -> Result<String, HostProblem> {
+        let name = program
+            .path
+            .rsplit('/')
+            .next()
+            .ok_or(HostProblem::InfrastructureFailure)?
+            .to_ascii_uppercase();
+        let record = self
+            .store
+            .get_provider_state("batch-program", &name)
+            .map_err(store_error)?
+            .ok_or(HostProblem::NotFound)?;
+        if record.payload != program.identity.as_bytes() {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        Ok(name)
+    }
+
+    fn execute_program_controller(
+        &self,
+        invocation: &Invocation,
+        job: &Job,
+        step: &StepPlan,
+        input: &ProgramInput,
+        effect_sequence: &mut u64,
+        program: &str,
+    ) -> Result<crate::ProgramOutput, HostProblem> {
+        let payload = BoundedPayload::new(
+            "mainframe-env.program.input@1",
+            serde_json::to_vec(input).map_err(|_| HostProblem::ProviderFailure)?,
+            InvocationLimits::default(),
+        )
+        .map_err(|_| HostProblem::ResourceExhausted)?;
+        let sequence = next_effect_sequence(invocation, effect_sequence)?;
+        let key = effect_key(job, step, sequence)?;
+        let result = self.host.invoke(
+            invocation,
+            invocation.deadline_tick.saturating_sub(1),
+            false,
+            EffectRequest {
+                run_unit: invocation.run_unit_id.clone(),
+                sequence,
+                deadline_tick: invocation.deadline_tick,
+                idempotency_key: Some(key),
+                request: HostRequest::Program(ProgramRequest::Call {
+                    program: ProgramName::new(program, 128).map_err(|_| HostProblem::Malformed)?,
+                    payload,
+                }),
+            },
+        );
+        match result.effect.outcome? {
+            HostResult::Program(payload) => decode_program_output(&payload),
+            _ => Err(HostProblem::ProviderFailure),
+        }
+    }
+
     fn execute_ims_controller(
         &self,
         invocation: &Invocation,
@@ -777,179 +879,231 @@ impl BatchService {
         input: &ProgramInput,
         effect_sequence: &mut u64,
     ) -> Result<crate::ProgramOutput, HostProblem> {
-        let parameter = input
-            .parameter
-            .as_deref()
-            .unwrap_or_default()
-            .trim_matches(['\'', '"'])
-            .to_ascii_uppercase();
-        if parameter.contains("PAUDBLOD") {
-            let roots = input_dd_records(input, "INFILE1")?;
-            let children = input_dd_records(input, "INFILE2")?;
-            let mut hierarchy = roots
-                .into_iter()
-                .map(|data| {
-                    if data.len() != 100 {
+        let selector = ims_controller_selector(input.parameter.as_deref().unwrap_or_default())?;
+        let controller = self
+            .resolve_controller(&selector)?
+            .ok_or(HostProblem::Unsupported)?;
+        let program = controller
+            .program
+            .path
+            .rsplit('/')
+            .next()
+            .ok_or(HostProblem::InfrastructureFailure)?
+            .to_string();
+        let mode = controller.selector.mode().unwrap_or_default().to_string();
+        match controller.plan {
+            BatchControllerPlan::ProgramCall => Err(HostProblem::ProviderFailure),
+            BatchControllerPlan::ImsLoad {
+                database,
+                root_dd,
+                child_dd,
+                root_record_bytes,
+                child_record_bytes,
+                parent_key_bytes,
+            } => {
+                let roots = input_dd_records(input, &root_dd)?;
+                let children = input_dd_records(input, &child_dd)?;
+                let mut hierarchy = roots
+                    .into_iter()
+                    .map(|data| {
+                        if data.len() != root_record_bytes || data.len() < parent_key_bytes {
+                            return Err(HostProblem::Malformed);
+                        }
+                        Ok((
+                            data[..parent_key_bytes].to_vec(),
+                            (data, Vec::<Vec<u8>>::new()),
+                        ))
+                    })
+                    .collect::<Result<BTreeMap<_, _>, _>>()?;
+                for record in children {
+                    if record.len() != child_record_bytes || record.len() < parent_key_bytes {
                         return Err(HostProblem::Malformed);
                     }
-                    Ok((data[..6].to_vec(), (data, Vec::<Vec<u8>>::new())))
-                })
-                .collect::<Result<BTreeMap<_, _>, _>>()?;
-            for record in children {
-                if record.len() != 206 {
-                    return Err(HostProblem::Malformed);
+                    hierarchy
+                        .get_mut(&record[..parent_key_bytes])
+                        .ok_or(HostProblem::Malformed)?
+                        .1
+                        .push(record[parent_key_bytes..].to_vec());
                 }
-                hierarchy
-                    .get_mut(&record[..6])
-                    .ok_or(HostProblem::Malformed)?
-                    .1
-                    .push(record[6..].to_vec());
+                let image = serde_json::json!({
+                    "database": database,
+                    "roots": hierarchy.into_values().map(|(data, children)| {
+                        serde_json::json!({"data": data, "children": children})
+                    }).collect::<Vec<_>>()
+                });
+                let result = self.ims_call(
+                    invocation,
+                    job,
+                    step,
+                    effect_sequence,
+                    ImsOperation::Load,
+                    Some(database),
+                    serde_json::to_vec(&image).map_err(|_| HostProblem::ProviderFailure)?,
+                    1,
+                )?;
+                Ok(crate::ProgramOutput {
+                    return_code: i32::from(result.status != "  ") * 8,
+                    records: vec![
+                        format!("DFSRRC00 LOAD SEGMENTS={}", result.affected_segments).into_bytes(),
+                    ],
+                    dd_outputs: BTreeMap::new(),
+                })
             }
-            let image = serde_json::json!({
-                "database":"DBPAUTP0",
-                "roots":hierarchy.into_values().map(|(data, children)| {
-                    serde_json::json!({"data":data,"children":children})
-                }).collect::<Vec<_>>()
-            });
-            let result = self.ims_call(
-                invocation,
-                job,
-                step,
-                effect_sequence,
-                ImsOperation::Load,
-                Some("DBPAUTP0".into()),
-                serde_json::to_vec(&image).map_err(|_| HostProblem::ProviderFailure)?,
-                1,
-            )?;
-            return Ok(crate::ProgramOutput {
-                return_code: i32::from(result.status != "  ") * 8,
-                records: vec![
-                    format!("DFSRRC00 LOAD SEGMENTS={}", result.affected_segments).into_bytes(),
-                ],
-                dd_outputs: BTreeMap::new(),
-            });
-        }
-        if parameter.contains("PAUDBUNL") || parameter.contains("DFSURGU0") {
-            let result = self.ims_call(
-                invocation,
-                job,
-                step,
-                effect_sequence,
-                ImsOperation::Unload,
-                Some("DBPAUTP0".into()),
-                Vec::new(),
-                4_096,
-            )?;
-            let mut roots = Vec::new();
-            let mut children = Vec::new();
-            for segment in &result.segments {
-                match segment.name.as_str() {
-                    "PAUTSUM0" => roots.push(segment.data.clone()),
-                    "PAUTDTL1" => {
+            BatchControllerPlan::ImsUnload {
+                database,
+                root_segment,
+                child_segment,
+                root_output_dd,
+                child_output_dd,
+                combined_output_dd,
+            } => {
+                let result = self.ims_call(
+                    invocation,
+                    job,
+                    step,
+                    effect_sequence,
+                    ImsOperation::Unload,
+                    Some(database),
+                    Vec::new(),
+                    4_096,
+                )?;
+                let mut roots = Vec::new();
+                let mut children = Vec::new();
+                for segment in &result.segments {
+                    if segment.name == root_segment {
+                        roots.push(segment.data.clone());
+                    } else if segment.name == child_segment {
                         let mut record = segment
                             .parent_key
                             .clone()
                             .ok_or(HostProblem::ProviderFailure)?;
                         record.extend_from_slice(&segment.data);
                         children.push(record);
+                    } else {
+                        return Err(HostProblem::ProviderFailure);
                     }
-                    _ => return Err(HostProblem::ProviderFailure),
                 }
+                let dd_outputs = if let Some(combined) = combined_output_dd {
+                    BTreeMap::from([(combined, roots.into_iter().chain(children).collect())])
+                } else {
+                    BTreeMap::from([
+                        (root_output_dd.ok_or(HostProblem::ProviderFailure)?, roots),
+                        (
+                            child_output_dd.ok_or(HostProblem::ProviderFailure)?,
+                            children,
+                        ),
+                    ])
+                };
+                Ok(crate::ProgramOutput {
+                    return_code: i32::from(result.status != "  ") * 8,
+                    records: vec![
+                        format!("DFSRRC00 UNLOAD SEGMENTS={}", result.segments.len()).into_bytes(),
+                    ],
+                    dd_outputs,
+                })
             }
-            let dd_outputs = if parameter.contains("PAUDBUNL") {
-                BTreeMap::from([("OUTFIL1".into(), roots), ("OUTFIL2".into(), children)])
-            } else {
-                BTreeMap::from([(
-                    "DFSURGU1".into(),
-                    roots.into_iter().chain(children).collect(),
-                )])
-            };
-            return Ok(crate::ProgramOutput {
-                return_code: i32::from(result.status != "  ") * 8,
-                records: vec![
-                    format!("DFSRRC00 UNLOAD SEGMENTS={}", result.segments.len()).into_bytes(),
-                ],
-                dd_outputs,
-            });
-        }
-        if parameter.contains("BMP") && parameter.contains("CBPAUP0C") {
-            let control = input_dd_records(input, "SYSIN")?;
-            let range = control
-                .first()
-                .ok_or(HostProblem::Malformed)
-                .and_then(|record| {
-                    std::str::from_utf8(record).map_err(|_| HostProblem::Malformed)
-                })?;
-            let fields = range.split(',').map(str::trim).collect::<Vec<_>>();
-            let expiry_days = fields.first().ok_or(HostProblem::Malformed)?;
-            if fields.len() != 4
-                || expiry_days.len() != 2
-                || fields[1].len() != 5
-                || fields[2].len() != 5
-                || !fields[..3]
-                    .iter()
-                    .all(|field| field.bytes().all(|byte| byte.is_ascii_digit()))
-                || !matches!(fields[3], "Y" | "N")
-            {
-                return Err(HostProblem::Malformed);
-            }
-            if *expiry_days != "00" {
-                return Err(HostProblem::Unsupported);
-            }
-            self.ims_dli_call(
-                invocation,
-                job,
-                step,
-                effect_sequence,
-                ImsOperation::Schedule,
-                Some("PSBPAUTB".into()),
-                Vec::new(),
-                Vec::new(),
-                Vec::new(),
-                None,
-                1,
-            )?;
-            let mut deleted_roots = 0u64;
-            let mut deleted_children = 0u64;
-            loop {
-                let root = self.ims_dli_call(
+            BatchControllerPlan::ImsPurge {
+                psb,
+                root_segment,
+                child_segment,
+                control_dd,
+                required_expiry_days,
+                checkpoint_prefix,
+                summary_field,
+            } => {
+                let control = input_dd_records(input, &control_dd)?;
+                let range = control
+                    .first()
+                    .ok_or(HostProblem::Malformed)
+                    .and_then(|record| {
+                        std::str::from_utf8(record).map_err(|_| HostProblem::Malformed)
+                    })?;
+                let fields = range.split(',').map(str::trim).collect::<Vec<_>>();
+                let expiry_days = fields.first().ok_or(HostProblem::Malformed)?;
+                if fields.len() != 4
+                    || expiry_days.len() != 2
+                    || fields[1].len() != 5
+                    || fields[2].len() != 5
+                    || !fields[..3]
+                        .iter()
+                        .all(|field| field.bytes().all(|byte| byte.is_ascii_digit()))
+                    || !matches!(fields[3], "Y" | "N")
+                {
+                    return Err(HostProblem::Malformed);
+                }
+                if *expiry_days != required_expiry_days {
+                    return Err(HostProblem::Unsupported);
+                }
+                self.ims_dli_call(
                     invocation,
                     job,
                     step,
                     effect_sequence,
-                    ImsOperation::GetNext,
-                    None,
-                    vec!["PAUTSUM0".into()],
+                    ImsOperation::Schedule,
+                    Some(psb),
+                    Vec::new(),
                     Vec::new(),
                     Vec::new(),
                     None,
                     1,
                 )?;
-                if root.status == "GB" {
-                    break;
-                }
-                if !root.status.trim().is_empty() {
-                    return Err(HostProblem::ProviderFailure);
-                }
+                let mut deleted_roots = 0u64;
+                let mut deleted_children = 0u64;
                 loop {
-                    let child = self.ims_dli_call(
+                    let root = self.ims_dli_call(
                         invocation,
                         job,
                         step,
                         effect_sequence,
-                        ImsOperation::GetNextParent,
+                        ImsOperation::GetNext,
                         None,
-                        vec!["PAUTDTL1".into()],
+                        vec![root_segment.clone()],
                         Vec::new(),
                         Vec::new(),
                         None,
                         1,
                     )?;
-                    if child.status == "GE" {
+                    if root.status == "GB" {
                         break;
                     }
-                    if !child.status.trim().is_empty() {
+                    if !root.status.trim().is_empty() {
                         return Err(HostProblem::ProviderFailure);
+                    }
+                    loop {
+                        let child = self.ims_dli_call(
+                            invocation,
+                            job,
+                            step,
+                            effect_sequence,
+                            ImsOperation::GetNextParent,
+                            None,
+                            vec![child_segment.clone()],
+                            Vec::new(),
+                            Vec::new(),
+                            None,
+                            1,
+                        )?;
+                        if child.status == "GE" {
+                            break;
+                        }
+                        if !child.status.trim().is_empty() {
+                            return Err(HostProblem::ProviderFailure);
+                        }
+                        let deleted = self.ims_dli_call(
+                            invocation,
+                            job,
+                            step,
+                            effect_sequence,
+                            ImsOperation::Delete,
+                            None,
+                            vec![child_segment.clone()],
+                            Vec::new(),
+                            Vec::new(),
+                            None,
+                            1,
+                        )?;
+                        deleted_children =
+                            deleted_children.saturating_add(deleted.affected_segments);
                     }
                     let deleted = self.ims_dli_call(
                         invocation,
@@ -958,53 +1112,41 @@ impl BatchService {
                         effect_sequence,
                         ImsOperation::Delete,
                         None,
-                        vec!["PAUTDTL1".into()],
+                        vec![root_segment.clone()],
                         Vec::new(),
                         Vec::new(),
                         None,
                         1,
                     )?;
-                    deleted_children = deleted_children.saturating_add(deleted.affected_segments);
+                    deleted_roots = deleted_roots.saturating_add(deleted.affected_segments);
                 }
-                let deleted = self.ims_dli_call(
+                let checkpoint = format!(
+                    "{checkpoint_prefix}{:0>3}",
+                    job.id.trim_start_matches("JOB")
+                );
+                self.ims_dli_call(
                     invocation,
                     job,
                     step,
                     effect_sequence,
-                    ImsOperation::Delete,
+                    ImsOperation::Checkpoint,
                     None,
-                    vec!["PAUTSUM0".into()],
                     Vec::new(),
                     Vec::new(),
-                    None,
+                    Vec::new(),
+                    Some(checkpoint.clone()),
                     1,
                 )?;
-                deleted_roots = deleted_roots.saturating_add(deleted.affected_segments);
+                Ok(crate::ProgramOutput {
+                    return_code: 0,
+                    records: vec![format!(
+                        "DFSRRC00 {mode} PROGRAM={program} EXPIRY-DAYS={expiry_days} ROOTS={deleted_roots} CHILDREN={deleted_children} CHECKPOINT={checkpoint} {summary_field}={deleted_roots}"
+                    )
+                    .into_bytes()],
+                    dd_outputs: BTreeMap::new(),
+                })
             }
-            let checkpoint = format!("CD026{:0>3}", job.id.trim_start_matches("JOB"));
-            self.ims_dli_call(
-                invocation,
-                job,
-                step,
-                effect_sequence,
-                ImsOperation::Checkpoint,
-                None,
-                Vec::new(),
-                Vec::new(),
-                Vec::new(),
-                Some(checkpoint.clone()),
-                1,
-            )?;
-            return Ok(crate::ProgramOutput {
-                return_code: 0,
-                records: vec![format!(
-                    "DFSRRC00 BMP PROGRAM=CBPAUP0C EXPIRY-DAYS={expiry_days} ROOTS={deleted_roots} CHILDREN={deleted_children} CHECKPOINT={checkpoint} SUMMARY-AUTHORIZATION-ADJUSTED={deleted_roots}"
-                )
-                .into_bytes()],
-                dd_outputs: BTreeMap::new(),
-            });
         }
-        Err(HostProblem::Unsupported)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -2041,6 +2183,32 @@ impl BatchService {
             .map_err(store_error)
     }
 
+    fn persist_controllers(
+        &self,
+        durable: &mut DurableControllers,
+        registry: BatchControllerRegistry,
+    ) -> Result<(), HostProblem> {
+        let payload = registry.state_payload()?;
+        let version = durable
+            .store_version
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: CONTROLLER_STATE_NAMESPACE.into(),
+                    key: CONTROLLER_STATE_KEY.into(),
+                    version,
+                    payload,
+                },
+                (durable.store_version != 0).then_some(durable.store_version),
+            )
+            .map_err(store_error)?;
+        durable.store_version = version;
+        durable.registry = registry;
+        Ok(())
+    }
+
     fn lock(&self) -> Result<std::sync::MutexGuard<'_, State>, HostProblem> {
         self.state
             .lock()
@@ -2193,6 +2361,17 @@ fn tso_run_program(control: &str) -> Result<String, HostProblem> {
     } else {
         Ok(program.into())
     }
+}
+
+fn ims_controller_selector(parameter: &str) -> Result<BatchControllerSelector, HostProblem> {
+    let normalized = parameter
+        .trim()
+        .trim_matches(|character| matches!(character, '\'' | '"' | '(' | ')'));
+    let fields = normalized.split(',').map(str::trim).collect::<Vec<_>>();
+    let mode = fields.first().copied().ok_or(HostProblem::Malformed)?;
+    let program = fields.get(1).copied().ok_or(HostProblem::Malformed)?;
+    let qualifier = fields.get(2).copied().filter(|value| !value.is_empty());
+    BatchControllerSelector::ims(mode, program, qualifier)
 }
 
 struct SdsfFileControl {
@@ -2812,6 +2991,26 @@ mod tests {
         ProgramRouter::with_builtins(InvocationLimits::default())
     }
 
+    fn controller_generation(generation: u64, program: &str) -> BatchControllerGeneration {
+        BatchControllerGeneration {
+            schema_version: crate::BATCH_CONTROLLER_REGISTRY_CONTRACT.into(),
+            application: "RESTART-FIXTURE".into(),
+            generation,
+            identity: format!("sha256:{generation:064x}"),
+            controllers: vec![crate::BatchControllerDefinition {
+                name: format!("CONTROLLER-{generation}"),
+                selector: BatchControllerSelector::TsoRun {
+                    program: program.into(),
+                },
+                program: crate::BatchControllerProgram {
+                    path: format!("program/{program}"),
+                    identity: format!("sha256:{:064x}", generation + 100),
+                },
+                plan: BatchControllerPlan::ProgramCall,
+            }],
+        }
+    }
+
     fn service_with_datasets(
         records: Arc<Mutex<BTreeMap<String, Vec<Vec<u8>>>>>,
     ) -> Arc<BatchService> {
@@ -2876,6 +3075,155 @@ mod tests {
         assert!(!more);
         service.purge(&submitted.id).unwrap();
         assert_eq!(service.get(&submitted.id), Err(HostProblem::NotFound));
+    }
+
+    #[test]
+    fn controller_generations_survive_restart_and_rollback_atomically() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let first = service(store.clone(), builtins());
+        first
+            .install_controllers(controller_generation(1, "FIRST"))
+            .unwrap();
+        first
+            .install_controllers(controller_generation(2, "SECOND"))
+            .unwrap();
+        drop(first);
+
+        let restarted = service(store.clone(), builtins());
+        assert!(
+            restarted
+                .resolve_controller(&BatchControllerSelector::tso("SECOND").unwrap())
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            restarted
+                .resolve_controller(&BatchControllerSelector::tso("FIRST").unwrap())
+                .unwrap()
+                .is_none()
+        );
+        restarted
+            .rollback_controllers("RESTART-FIXTURE", 1)
+            .unwrap();
+        drop(restarted);
+
+        let rolled_back = service(store, builtins());
+        let resolved = rolled_back
+            .resolve_controller(&BatchControllerSelector::tso("FIRST").unwrap())
+            .unwrap()
+            .unwrap();
+        assert_eq!(resolved.program.path, "program/FIRST");
+        assert!(
+            rolled_back
+                .resolve_controller(&BatchControllerSelector::tso("SECOND").unwrap())
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn empty_controller_generation_survives_restart_and_can_roll_back() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let first = service(store.clone(), builtins());
+        first
+            .install_controllers(controller_generation(1, "FIRST"))
+            .unwrap();
+        let mut empty = controller_generation(2, "UNUSED");
+        empty.controllers.clear();
+        assert_eq!(first.install_controllers(empty).unwrap().controllers, 0);
+        drop(first);
+
+        let restarted = service(store.clone(), builtins());
+        assert!(
+            restarted
+                .resolve_controller(&BatchControllerSelector::tso("FIRST").unwrap())
+                .unwrap()
+                .is_none()
+        );
+        restarted
+            .rollback_controllers("RESTART-FIXTURE", 1)
+            .unwrap();
+        drop(restarted);
+
+        let rolled_back = service(store, builtins());
+        assert!(
+            rolled_back
+                .resolve_controller(&BatchControllerSelector::tso("FIRST").unwrap())
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn controller_program_substitution_is_rejected_against_durable_mapping() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone(), builtins());
+        let generation = controller_generation(1, "SIGNEDPGM");
+        let signed = generation.controllers[0].program.clone();
+        service.install_controllers(generation).unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "batch-program".into(),
+                    key: "SIGNEDPGM".into(),
+                    version: 1,
+                    payload: format!("sha256:{:064x}", 999).into_bytes(),
+                },
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            service.verify_controller_program(&signed),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "batch-program".into(),
+                    key: "SIGNEDPGM".into(),
+                    version: 2,
+                    payload: signed.identity.as_bytes().to_vec(),
+                },
+                Some(1),
+            )
+            .unwrap();
+        assert_eq!(
+            service.verify_controller_program(&signed).unwrap(),
+            "SIGNEDPGM"
+        );
+    }
+
+    #[test]
+    fn retained_controller_generation_limit_fails_before_clone_and_survives_restart() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let initial = service(store.clone(), builtins());
+        for generation in 1..=64 {
+            initial
+                .install_controllers(controller_generation(
+                    generation,
+                    &format!("PROGRAM{generation}"),
+                ))
+                .unwrap();
+        }
+        assert_eq!(
+            initial.install_controllers(controller_generation(65, "PROGRAM65")),
+            Err(HostProblem::ResourceExhausted)
+        );
+        drop(initial);
+
+        let restarted = service(store, builtins());
+        assert!(
+            restarted
+                .resolve_controller(&BatchControllerSelector::tso("PROGRAM64").unwrap())
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            restarted
+                .resolve_controller(&BatchControllerSelector::tso("PROGRAM65").unwrap())
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]

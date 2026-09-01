@@ -2,8 +2,15 @@
 
 #![forbid(unsafe_code)]
 
+mod abi;
 mod bundle;
 mod identity;
+
+pub use abi::{
+    HOST_ABI_SOURCE_LIBRARY_CONTRACT, HOST_ABI_SOURCE_LICENSE, HOST_ABI_SOURCE_ORIGIN,
+    HostAbiLibraryDefinition, HostAbiMember, HostAbiProblem, HostAbiSubsystem,
+    MaterializedHostAbiLibraries, materialize_host_abi_libraries,
+};
 
 pub use bundle::{
     LibraryProblem, ProvenanceEdge, ProvenanceEdgeInput, ProvenanceKind, SourceBundle,

@@ -1,0 +1,40 @@
+{
+  "artifacts": [
+    {
+      "path": "bin/mainframe-env-server",
+      "sha256": "b44e108c10936e8e8d13afcb768f5fb6231ff31bb14f1e401b6cec4c3daf8ba9"
+    },
+    {
+      "path": "bin/mainframe-env",
+      "sha256": "32f477a7c8e12287415188ba4a349d61f84f1776842845cd9f6b14bd6ba77ece"
+    },
+    {
+      "path": "config/mainframe-env.toml",
+      "sha256": "08550c22ddc50eca95b10bf712ccdbb98f875393d72e9a524d1551ea435e7357"
+    },
+    {
+      "path": "migrations/sqlite/0001-durable-state.sql",
+      "sha256": "ba4897ba27dc962dad78d78ec457db0da78d446814592ca9c2eb81be455e2cc6"
+    },
+    {
+      "path": "migrations/postgres/0001-durable-state.sql",
+      "sha256": "66ce0416c5c43e2637a3d47d92a9b1bbaf3ecba805874a8d2490868a74de5804"
+    },
+    {
+      "path": "build-inputs.json",
+      "sha256": "3d62f7c5580384e181affad51ed04b17880f6cec06f534ce8c5b4a426af30abe"
+    }
+  ],
+  "channel": "stable",
+  "contracts": "conformance/0.2/inventory/versions.json",
+  "migration_head": "0001-durable-state",
+  "phase_base_revision": "c7f0c6d555709ec0bfb7f64866e29c7d2d04dece",
+  "product": "mainframe-env",
+  "profile": "release/core-server",
+  "published": false,
+  "schema_version": "mainframe-env.release-manifest@1",
+  "tag": "mainframe-env-v0.2.0",
+  "target": "aarch64-apple-darwin",
+  "toolchain": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+  "version": "0.2.0"
+}

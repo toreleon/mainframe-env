@@ -1,0 +1,8 @@
+{
+  "schema_version": "mainframe-env.subsystem-handler-registry@1",
+  "generation": 1,
+  "generated_identity_set_sha256": "sha256:b659a6e111609d2e03a831ab15995ed591caf66d36429ee940174036136ec974",
+  "automatic_registration": false,
+  "handlers": [],
+  "coverage_credit": 0
+}

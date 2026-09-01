@@ -1,0 +1,126 @@
+{
+  "coverage": {
+    "complete_rows": 0,
+    "generated_catalog_credit": 0,
+    "mandatory_rows": 1506,
+    "official_baselines": 9,
+    "official_compatibility_numerator": 0
+  },
+  "current_work_package": null,
+  "exit_gates": [
+    {
+      "evidence": "conformance/0.2/evidence/work-packages/CV-201.json",
+      "id": "official-catalogs",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/work-packages/CV-202.json",
+      "id": "coverage-contracts",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/work-packages/CV-208.json",
+      "id": "dehardcoding",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/migration-rollback-rollup.json",
+      "id": "migration-rollback",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/full-regression.json",
+      "id": "workspace-test-floor",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/full-regression.json",
+      "id": "postgresql-controls",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/full-regression.json",
+      "id": "carddemo-full",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/full-regression.json",
+      "id": "live-zowe-route",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/full-regression.json",
+      "id": "release-checks",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/review-repair-round-4.json",
+      "id": "evidence-sealing",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/review-repair-round-5.json",
+      "id": "content-evidence-sealing",
+      "state": "pass"
+    }
+  ],
+  "implementation_status": "complete",
+  "schema_version": "mainframe-env.coverage-workload-ledger@1",
+  "target_version": "0.2.0",
+  "work_packages": [
+    {
+      "evidence": "conformance/0.2/evidence/work-packages/CV-201.json",
+      "evidence_digest": "sha256:46241e6219392f492255e5a3932f699926b9bc0d38a555668f084157a42cb2ef",
+      "id": "CV-201",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/work-packages/CV-202.json",
+      "evidence_digest": "sha256:f4197a58b19b9e1e5fa97458e62f378afb3b084d06d77015943d1db81feb032d",
+      "id": "CV-202",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/work-packages/CV-203.json",
+      "evidence_digest": "sha256:b4c02f22c5f893eb486620aad5c7cb6961d96d221c55279ab69adf152010e9ce",
+      "id": "CV-203",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/work-packages/CV-204.json",
+      "evidence_digest": "sha256:6a75a4924da64db04f16100739c7b1e96a64d096418d901ba675a8406ab86c65",
+      "id": "CV-204",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/work-packages/CV-205.json",
+      "evidence_digest": "sha256:f1960dde919ba8a09c7838794a5b71b2c97253137041d67e3993d738bb0be31b",
+      "id": "CV-205",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/work-packages/CV-206.json",
+      "evidence_digest": "sha256:deb9c87b73f5f975c85f02648e1d6fc8ab493f128b0f9228db70a28f131ab111",
+      "id": "CV-206",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/work-packages/CV-207.json",
+      "evidence_digest": "sha256:80e485e98ff03287a3299252c25e97c710d7d6d4fea9c043f291e7beeeee3f32",
+      "id": "CV-207",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/work-packages/CV-208.json",
+      "evidence_digest": "sha256:552543d325c8e7e563063c34dd97f06cdb8135b4e7a3353262664e4d55b21644",
+      "id": "CV-208",
+      "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/work-packages/CV-209.json",
+      "evidence_digest": "sha256:4ad28e157b3b7d3eff94c673c0201920ff3920cecfa64f9dcd9821a2d4152a94",
+      "id": "CV-209",
+      "state": "pass"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": "mainframe-env.host-abi-migration@1",
+  "id": "host-abi-v0-to-v1",
+  "target_version": "0.2.0",
+  "from_state": "nine compatibility copybook byte constants owned by the COBOL compiler",
+  "to_state": "three ordered, versioned CICS, Db2, and MQ source libraries owned by their subsystem providers",
+  "destructive": false,
+  "compiler_asset_fallback_retained": false,
+  "old_source_bundle_receipts_reproducible": true,
+  "source_bytes_changed": false,
+  "license": "Apache-2.0",
+  "origin": "repository-authored behavioral compatibility definition; no vendor source text",
+  "installation": {
+    "bounded": true,
+    "all_libraries_validated_before_bundle_construction": true,
+    "library_precedence_explicit": true,
+    "identity_includes_metadata_and_exact_source_bytes": true
+  },
+  "rollback": {
+    "supported": true,
+    "method": "compose the retained prior subsystem ABI generation before constructing the immutable source bundle",
+    "partial_library_selected": false,
+    "compiler_asset_fallback_required": false
+  }
+}

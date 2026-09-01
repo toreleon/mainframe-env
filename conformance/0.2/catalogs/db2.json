@@ -1,0 +1,1066 @@
+{
+  "schema_version": "mainframe-env.official-catalog@1",
+  "baseline_id": "ibm-db2-for-zos-13-2026-08-13",
+  "subsystem": "db2",
+  "mandatory_rows": 174,
+  "units": [
+    {
+      "id": "sql-statements",
+      "denominator": 158,
+      "normalization": "normalized",
+      "rows": [
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0001",
+          "label": "ALLOCATE CURSOR",
+          "source_locator": "pdf-page:1169;outline:ALLOCATE CURSOR",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0002",
+          "label": "ALTER DATABASE",
+          "source_locator": "pdf-page:1170;outline:ALTER DATABASE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0003",
+          "label": "ALTER FUNCTION (external)",
+          "source_locator": "pdf-page:1172;outline:ALTER FUNCTION (external)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0004",
+          "label": "ALTER FUNCTION (compiled SQL scalar)",
+          "source_locator": "pdf-page:1186;outline:ALTER FUNCTION (compiled SQL scalar)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0005",
+          "label": "ALTER FUNCTION (inlined SQL scalar)",
+          "source_locator": "pdf-page:1214;outline:ALTER FUNCTION (inlined SQL scalar)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0006",
+          "label": "ALTER FUNCTION (SQL table)",
+          "source_locator": "pdf-page:1219;outline:ALTER FUNCTION (SQL table)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0007",
+          "label": "ALTER INDEX",
+          "source_locator": "pdf-page:1224;outline:ALTER INDEX",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0008",
+          "label": "ALTER MASK",
+          "source_locator": "pdf-page:1242;outline:ALTER MASK",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0009",
+          "label": "ALTER PERMISSION",
+          "source_locator": "pdf-page:1244;outline:ALTER PERMISSION",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0010",
+          "label": "ALTER PROCEDURE (external)",
+          "source_locator": "pdf-page:1247;outline:ALTER PROCEDURE (external)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0011",
+          "label": "ALTER PROCEDURE (SQL - external) (deprecated)",
+          "source_locator": "pdf-page:1256;outline:ALTER PROCEDURE (SQL - external) (deprecated)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0012",
+          "label": "ALTER PROCEDURE statement (SQL - native)",
+          "source_locator": "pdf-page:1262;outline:ALTER PROCEDURE statement (SQL - native)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0013",
+          "label": "ALTER SEQUENCE",
+          "source_locator": "pdf-page:1292;outline:ALTER SEQUENCE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0014",
+          "label": "ALTER STOGROUP",
+          "source_locator": "pdf-page:1297;outline:ALTER STOGROUP",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0015",
+          "label": "ALTER TABLE",
+          "source_locator": "pdf-page:1300;outline:ALTER TABLE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0016",
+          "label": "ALTER TABLESPACE",
+          "source_locator": "pdf-page:1392;outline:ALTER TABLESPACE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0017",
+          "label": "ALTER TRIGGER (advanced)",
+          "source_locator": "pdf-page:1414;outline:ALTER TRIGGER (advanced)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0018",
+          "label": "ALTER TRIGGER (basic)",
+          "source_locator": "pdf-page:1436;outline:ALTER TRIGGER (basic)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0019",
+          "label": "ALTER TRUSTED CONTEXT",
+          "source_locator": "pdf-page:1439;outline:ALTER TRUSTED CONTEXT",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0020",
+          "label": "ALTER VIEW",
+          "source_locator": "pdf-page:1449;outline:ALTER VIEW",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0021",
+          "label": "ASSOCIATE LOCATORS",
+          "source_locator": "pdf-page:1451;outline:ASSOCIATE LOCATORS",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0022",
+          "label": "BEGIN DECLARE SECTION",
+          "source_locator": "pdf-page:1454;outline:BEGIN DECLARE SECTION",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0023",
+          "label": "CALL",
+          "source_locator": "pdf-page:1455;outline:CALL",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0024",
+          "label": "CLOSE",
+          "source_locator": "pdf-page:1467;outline:CLOSE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0025",
+          "label": "COMMENT",
+          "source_locator": "pdf-page:1468;outline:COMMENT",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0026",
+          "label": "COMMIT",
+          "source_locator": "pdf-page:1478;outline:COMMIT",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0027",
+          "label": "CONNECT",
+          "source_locator": "pdf-page:1481;outline:CONNECT",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0028",
+          "label": "CREATE ALIAS",
+          "source_locator": "pdf-page:1487;outline:CREATE ALIAS",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0029",
+          "label": "CREATE AUXILIARY TABLE",
+          "source_locator": "pdf-page:1490;outline:CREATE AUXILIARY TABLE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0030",
+          "label": "CREATE DATABASE",
+          "source_locator": "pdf-page:1493;outline:CREATE DATABASE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0031",
+          "label": "CREATE FUNCTION (overview)",
+          "source_locator": "pdf-page:1496;outline:CREATE FUNCTION (overview)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0032",
+          "label": "CREATE FUNCTION (compiled SQL scalar)",
+          "source_locator": "pdf-page:1501;outline:CREATE FUNCTION (compiled SQL scalar)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0033",
+          "label": "CREATE FUNCTION (external scalar)",
+          "source_locator": "pdf-page:1526;outline:CREATE FUNCTION (external scalar)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0034",
+          "label": "CREATE FUNCTION (external table)",
+          "source_locator": "pdf-page:1546;outline:CREATE FUNCTION (external table)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0035",
+          "label": "CREATE FUNCTION (inlined SQL scalar)",
+          "source_locator": "pdf-page:1564;outline:CREATE FUNCTION (inlined SQL scalar)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0036",
+          "label": "CREATE FUNCTION (sourced)",
+          "source_locator": "pdf-page:1572;outline:CREATE FUNCTION (sourced)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0037",
+          "label": "CREATE FUNCTION (SQL table)",
+          "source_locator": "pdf-page:1584;outline:CREATE FUNCTION (SQL table)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0038",
+          "label": "CREATE GLOBAL TEMPORARY TABLE",
+          "source_locator": "pdf-page:1592;outline:CREATE GLOBAL TEMPORARY TABLE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0039",
+          "label": "CREATE INDEX",
+          "source_locator": "pdf-page:1598;outline:CREATE INDEX",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0040",
+          "label": "CREATE LOB TABLESPACE",
+          "source_locator": "pdf-page:1629;outline:CREATE LOB TABLESPACE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0041",
+          "label": "CREATE MASK",
+          "source_locator": "pdf-page:1639;outline:CREATE MASK",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0042",
+          "label": "CREATE PERMISSION",
+          "source_locator": "pdf-page:1648;outline:CREATE PERMISSION",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0043",
+          "label": "CREATE PROCEDURE (overview)",
+          "source_locator": "pdf-page:1655;outline:CREATE PROCEDURE (overview)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0044",
+          "label": "CREATE PROCEDURE (external)",
+          "source_locator": "pdf-page:1657;outline:CREATE PROCEDURE (external)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0045",
+          "label": "CREATE PROCEDURE (SQL - external) (deprecated)",
+          "source_locator": "pdf-page:1674;outline:CREATE PROCEDURE (SQL - external) (deprecated)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0046",
+          "label": "CREATE PROCEDURE (SQL - native)",
+          "source_locator": "pdf-page:1684;outline:CREATE PROCEDURE (SQL - native)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0047",
+          "label": "CREATE ROLE",
+          "source_locator": "pdf-page:1715;outline:CREATE ROLE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0048",
+          "label": "CREATE SEQUENCE",
+          "source_locator": "pdf-page:1716;outline:CREATE SEQUENCE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0049",
+          "label": "CREATE STOGROUP",
+          "source_locator": "pdf-page:1723;outline:CREATE STOGROUP",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0050",
+          "label": "CREATE TABLE",
+          "source_locator": "pdf-page:1727;outline:CREATE TABLE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0051",
+          "label": "CREATE TABLESPACE",
+          "source_locator": "pdf-page:1796;outline:CREATE TABLESPACE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0052",
+          "label": "CREATE TRIGGER (advanced)",
+          "source_locator": "pdf-page:1818;outline:CREATE TRIGGER (advanced)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0053",
+          "label": "CREATE TRIGGER (basic)",
+          "source_locator": "pdf-page:1847;outline:CREATE TRIGGER (basic)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0054",
+          "label": "CREATE TRUSTED CONTEXT",
+          "source_locator": "pdf-page:1865;outline:CREATE TRUSTED CONTEXT",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0055",
+          "label": "CREATE TYPE",
+          "source_locator": "pdf-page:1873;outline:CREATE TYPE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0056",
+          "label": "CREATE TYPE (array)",
+          "source_locator": "pdf-page:1874;outline:CREATE TYPE (array)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0057",
+          "label": "CREATE TYPE (distinct)",
+          "source_locator": "pdf-page:1879;outline:CREATE TYPE (distinct)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0058",
+          "label": "CREATE VARIABLE",
+          "source_locator": "pdf-page:1886;outline:CREATE VARIABLE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0059",
+          "label": "CREATE VIEW",
+          "source_locator": "pdf-page:1890;outline:CREATE VIEW",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0060",
+          "label": "DECLARE CURSOR",
+          "source_locator": "pdf-page:1897;outline:DECLARE CURSOR",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0061",
+          "label": "DECLARE GLOBAL TEMPORARY TABLE",
+          "source_locator": "pdf-page:1908;outline:DECLARE GLOBAL TEMPORARY TABLE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0062",
+          "label": "DECLARE STATEMENT",
+          "source_locator": "pdf-page:1922;outline:DECLARE STATEMENT",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0063",
+          "label": "DECLARE TABLE",
+          "source_locator": "pdf-page:1923;outline:DECLARE TABLE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0064",
+          "label": "DECLARE VARIABLE",
+          "source_locator": "pdf-page:1928;outline:DECLARE VARIABLE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0065",
+          "label": "DELETE",
+          "source_locator": "pdf-page:1931;outline:DELETE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0066",
+          "label": "DESCRIBE",
+          "source_locator": "pdf-page:1947;outline:DESCRIBE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0067",
+          "label": "DESCRIBE CURSOR",
+          "source_locator": "pdf-page:1947;outline:DESCRIBE CURSOR",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0068",
+          "label": "DESCRIBE INPUT",
+          "source_locator": "pdf-page:1949;outline:DESCRIBE INPUT",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0069",
+          "label": "DESCRIBE OUTPUT",
+          "source_locator": "pdf-page:1951;outline:DESCRIBE OUTPUT",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0070",
+          "label": "DESCRIBE PROCEDURE",
+          "source_locator": "pdf-page:1957;outline:DESCRIBE PROCEDURE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0071",
+          "label": "DESCRIBE TABLE",
+          "source_locator": "pdf-page:1960;outline:DESCRIBE TABLE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0072",
+          "label": "DROP",
+          "source_locator": "pdf-page:1965;outline:DROP",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0073",
+          "label": "END DECLARE SECTION",
+          "source_locator": "pdf-page:1986;outline:END DECLARE SECTION",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0074",
+          "label": "EXCHANGE",
+          "source_locator": "pdf-page:1987;outline:EXCHANGE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0075",
+          "label": "EXECUTE",
+          "source_locator": "pdf-page:1988;outline:EXECUTE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0076",
+          "label": "EXECUTE IMMEDIATE",
+          "source_locator": "pdf-page:1993;outline:EXECUTE IMMEDIATE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0077",
+          "label": "EXPLAIN",
+          "source_locator": "pdf-page:1996;outline:EXPLAIN",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0078",
+          "label": "FETCH",
+          "source_locator": "pdf-page:2003;outline:FETCH",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0079",
+          "label": "FREE LOCATOR",
+          "source_locator": "pdf-page:2028;outline:FREE LOCATOR",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0080",
+          "label": "GET DIAGNOSTICS",
+          "source_locator": "pdf-page:2028;outline:GET DIAGNOSTICS",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0081",
+          "label": "GRANT",
+          "source_locator": "pdf-page:2044;outline:GRANT",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0082",
+          "label": "GRANT (collection privileges)",
+          "source_locator": "pdf-page:2047;outline:GRANT (collection privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0083",
+          "label": "GRANT (database privileges)",
+          "source_locator": "pdf-page:2048;outline:GRANT (database privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0084",
+          "label": "GRANT (function or procedure privileges)",
+          "source_locator": "pdf-page:2050;outline:GRANT (function or procedure privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0085",
+          "label": "GRANT (package privileges)",
+          "source_locator": "pdf-page:2052;outline:GRANT (package privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0086",
+          "label": "GRANT (plan privileges)",
+          "source_locator": "pdf-page:2054;outline:GRANT (plan privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0087",
+          "label": "GRANT (schema privileges)",
+          "source_locator": "pdf-page:2055;outline:GRANT (schema privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0088",
+          "label": "GRANT (sequence privileges)",
+          "source_locator": "pdf-page:2056;outline:GRANT (sequence privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0089",
+          "label": "GRANT (system privileges)",
+          "source_locator": "pdf-page:2058;outline:GRANT (system privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0090",
+          "label": "GRANT (table or view privileges)",
+          "source_locator": "pdf-page:2065;outline:GRANT (table or view privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0091",
+          "label": "GRANT (type or JAR file privileges)",
+          "source_locator": "pdf-page:2068;outline:GRANT (type or JAR file privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0092",
+          "label": "GRANT (variable privileges)",
+          "source_locator": "pdf-page:2069;outline:GRANT (variable privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0093",
+          "label": "GRANT (use privileges)",
+          "source_locator": "pdf-page:2070;outline:GRANT (use privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0094",
+          "label": "HOLD LOCATOR",
+          "source_locator": "pdf-page:2071;outline:HOLD LOCATOR",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0095",
+          "label": "INCLUDE",
+          "source_locator": "pdf-page:2072;outline:INCLUDE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0096",
+          "label": "INSERT",
+          "source_locator": "pdf-page:2073;outline:INSERT",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0097",
+          "label": "LABEL",
+          "source_locator": "pdf-page:2092;outline:LABEL",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0098",
+          "label": "LOCK TABLE",
+          "source_locator": "pdf-page:2094;outline:LOCK TABLE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0099",
+          "label": "MERGE",
+          "source_locator": "pdf-page:2096;outline:MERGE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0100",
+          "label": "OPEN",
+          "source_locator": "pdf-page:2115;outline:OPEN",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0101",
+          "label": "PREPARE",
+          "source_locator": "pdf-page:2120;outline:PREPARE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0102",
+          "label": "REFRESH TABLE",
+          "source_locator": "pdf-page:2141;outline:REFRESH TABLE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0103",
+          "label": "RELEASE (connection)",
+          "source_locator": "pdf-page:2142;outline:RELEASE (connection)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0104",
+          "label": "RELEASE SAVEPOINT",
+          "source_locator": "pdf-page:2144;outline:RELEASE SAVEPOINT",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0105",
+          "label": "RENAME",
+          "source_locator": "pdf-page:2145;outline:RENAME",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0106",
+          "label": "REVOKE",
+          "source_locator": "pdf-page:2149;outline:REVOKE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0107",
+          "label": "REVOKE (collection privileges)",
+          "source_locator": "pdf-page:2155;outline:REVOKE (collection privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0108",
+          "label": "REVOKE (database privileges)",
+          "source_locator": "pdf-page:2157;outline:REVOKE (database privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0109",
+          "label": "REVOKE (function or procedure privileges)",
+          "source_locator": "pdf-page:2160;outline:REVOKE (function or procedure privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0110",
+          "label": "REVOKE (package privileges)",
+          "source_locator": "pdf-page:2163;outline:REVOKE (package privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0111",
+          "label": "REVOKE (plan privileges)",
+          "source_locator": "pdf-page:2165;outline:REVOKE (plan privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0112",
+          "label": "REVOKE (schema privileges)",
+          "source_locator": "pdf-page:2167;outline:REVOKE (schema privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0113",
+          "label": "REVOKE (sequence privileges)",
+          "source_locator": "pdf-page:2169;outline:REVOKE (sequence privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0114",
+          "label": "REVOKE (system privileges)",
+          "source_locator": "pdf-page:2172;outline:REVOKE (system privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0115",
+          "label": "REVOKE (table or view privileges)",
+          "source_locator": "pdf-page:2178;outline:REVOKE (table or view privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0116",
+          "label": "REVOKE (type or JAR file privileges)",
+          "source_locator": "pdf-page:2181;outline:REVOKE (type or JAR file privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0117",
+          "label": "REVOKE (variable privileges)",
+          "source_locator": "pdf-page:2183;outline:REVOKE (variable privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0118",
+          "label": "REVOKE (use privileges)",
+          "source_locator": "pdf-page:2185;outline:REVOKE (use privileges)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0119",
+          "label": "ROLLBACK",
+          "source_locator": "pdf-page:2187;outline:ROLLBACK",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0120",
+          "label": "SAVEPOINT",
+          "source_locator": "pdf-page:2190;outline:SAVEPOINT",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0121",
+          "label": "SELECT",
+          "source_locator": "pdf-page:2191;outline:SELECT",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0122",
+          "label": "SELECT INTO",
+          "source_locator": "pdf-page:2197;outline:SELECT INTO",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0123",
+          "label": "SET CONNECTION",
+          "source_locator": "pdf-page:2203;outline:SET CONNECTION",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0124",
+          "label": "SET assignment-statement",
+          "source_locator": "pdf-page:2204;outline:SET assignment-statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0125",
+          "label": "SET CURRENT ACCELERATOR",
+          "source_locator": "pdf-page:2210;outline:SET CURRENT ACCELERATOR",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0126",
+          "label": "SET CURRENT APPLICATION COMPATIBILITY",
+          "source_locator": "pdf-page:2211;outline:SET CURRENT APPLICATION COMPATIBILITY",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0127",
+          "label": "SET CURRENT APPLICATION ENCODING SCHEME",
+          "source_locator": "pdf-page:2213;outline:SET CURRENT APPLICATION ENCODING SCHEME",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0128",
+          "label": "SET CURRENT DEBUG MODE",
+          "source_locator": "pdf-page:2214;outline:SET CURRENT DEBUG MODE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0129",
+          "label": "SET CURRENT DECFLOAT ROUNDING MODE",
+          "source_locator": "pdf-page:2215;outline:SET CURRENT DECFLOAT ROUNDING MODE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0130",
+          "label": "SET CURRENT DEGREE",
+          "source_locator": "pdf-page:2217;outline:SET CURRENT DEGREE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0131",
+          "label": "SET CURRENT EXPLAIN MODE",
+          "source_locator": "pdf-page:2218;outline:SET CURRENT EXPLAIN MODE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0132",
+          "label": "SET CURRENT GET_ACCEL_ARCHIVE",
+          "source_locator": "pdf-page:2219;outline:SET CURRENT GET_ACCEL_ARCHIVE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0133",
+          "label": "SET CURRENT LOCAL LC_CTYPE",
+          "source_locator": "pdf-page:2220;outline:SET CURRENT LOCAL LC_CTYPE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0134",
+          "label": "SET CURRENT LOCK TIMEOUT",
+          "source_locator": "pdf-page:2221;outline:SET CURRENT LOCK TIMEOUT",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0135",
+          "label": "SET CURRENT MAINTAINED TABLE TYPES FOR OPTIMIZATION",
+          "source_locator": "pdf-page:2224;outline:SET CURRENT MAINTAINED TABLE TYPES FOR OPTIMIZATION",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0136",
+          "label": "SET CURRENT OPTIMIZATION HINT",
+          "source_locator": "pdf-page:2225;outline:SET CURRENT OPTIMIZATION HINT",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0137",
+          "label": "SET CURRENT PACKAGE PATH",
+          "source_locator": "pdf-page:2226;outline:SET CURRENT PACKAGE PATH",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0138",
+          "label": "SET CURRENT PACKAGESET",
+          "source_locator": "pdf-page:2229;outline:SET CURRENT PACKAGESET",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0139",
+          "label": "SET CURRENT PRECISION",
+          "source_locator": "pdf-page:2231;outline:SET CURRENT PRECISION",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0140",
+          "label": "SET CURRENT QUERY ACCELERATION",
+          "source_locator": "pdf-page:2231;outline:SET CURRENT QUERY ACCELERATION",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0141",
+          "label": "SET CURRENT QUERY ACCELERATION WAITFORDATA",
+          "source_locator": "pdf-page:2233;outline:SET CURRENT QUERY ACCELERATION WAITFORDATA",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0142",
+          "label": "SET CURRENT REFRESH AGE",
+          "source_locator": "pdf-page:2236;outline:SET CURRENT REFRESH AGE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0143",
+          "label": "SET CURRENT ROUTINE VERSION",
+          "source_locator": "pdf-page:2237;outline:SET CURRENT ROUTINE VERSION",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0144",
+          "label": "SET CURRENT RULES",
+          "source_locator": "pdf-page:2239;outline:SET CURRENT RULES",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0145",
+          "label": "SET CURRENT SQLID",
+          "source_locator": "pdf-page:2239;outline:SET CURRENT SQLID",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0146",
+          "label": "SET CURRENT TEMPORAL BUSINESS_TIME",
+          "source_locator": "pdf-page:2241;outline:SET CURRENT TEMPORAL BUSINESS_TIME",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0147",
+          "label": "SET CURRENT TEMPORAL SYSTEM_TIME",
+          "source_locator": "pdf-page:2243;outline:SET CURRENT TEMPORAL SYSTEM_TIME",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0148",
+          "label": "SET ENCRYPTION PASSWORD",
+          "source_locator": "pdf-page:2244;outline:SET ENCRYPTION PASSWORD",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0149",
+          "label": "SET PATH",
+          "source_locator": "pdf-page:2246;outline:SET PATH",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0150",
+          "label": "SET SCHEMA",
+          "source_locator": "pdf-page:2249;outline:SET SCHEMA",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0151",
+          "label": "SET SESSION TIME ZONE",
+          "source_locator": "pdf-page:2251;outline:SET SESSION TIME ZONE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0152",
+          "label": "SIGNAL",
+          "source_locator": "pdf-page:2252;outline:SIGNAL",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0153",
+          "label": "TRANSFER OWNERSHIP",
+          "source_locator": "pdf-page:2255;outline:TRANSFER OWNERSHIP",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0154",
+          "label": "TRUNCATE",
+          "source_locator": "pdf-page:2260;outline:TRUNCATE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0155",
+          "label": "UPDATE",
+          "source_locator": "pdf-page:2263;outline:UPDATE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0156",
+          "label": "VALUES",
+          "source_locator": "pdf-page:2284;outline:VALUES",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0157",
+          "label": "VALUES INTO",
+          "source_locator": "pdf-page:2285;outline:VALUES INTO",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0158",
+          "label": "WHENEVER",
+          "source_locator": "pdf-page:2289;outline:WHENEVER",
+          "mandatory": true
+        }
+      ]
+    },
+    {
+      "id": "sql-pl-statements",
+      "denominator": 16,
+      "normalization": "normalized",
+      "rows": [
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0001",
+          "label": "assignment-statement",
+          "source_locator": "pdf-page:2302;outline:assignment-statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0002",
+          "label": "CALL statement",
+          "source_locator": "pdf-page:2303;outline:CALL statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0003",
+          "label": "CASE statement",
+          "source_locator": "pdf-page:2305;outline:CASE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0004",
+          "label": "compound-statement",
+          "source_locator": "pdf-page:2307;outline:compound-statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0005",
+          "label": "FOR statement",
+          "source_locator": "pdf-page:2315;outline:FOR statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0006",
+          "label": "GET DIAGNOSTICS statement",
+          "source_locator": "pdf-page:2316;outline:GET DIAGNOSTICS statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0007",
+          "label": "GOTO statement",
+          "source_locator": "pdf-page:2317;outline:GOTO statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0008",
+          "label": "IF statement",
+          "source_locator": "pdf-page:2318;outline:IF statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0009",
+          "label": "ITERATE statement",
+          "source_locator": "pdf-page:2319;outline:ITERATE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0010",
+          "label": "LEAVE statement",
+          "source_locator": "pdf-page:2320;outline:LEAVE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0011",
+          "label": "LOOP statement",
+          "source_locator": "pdf-page:2322;outline:LOOP statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0012",
+          "label": "REPEAT statement",
+          "source_locator": "pdf-page:2323;outline:REPEAT statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0013",
+          "label": "RESIGNAL statement",
+          "source_locator": "pdf-page:2324;outline:RESIGNAL statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0014",
+          "label": "RETURN statement",
+          "source_locator": "pdf-page:2326;outline:RETURN statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0015",
+          "label": "SIGNAL statement (SQL PL)",
+          "source_locator": "pdf-page:2328;outline:SIGNAL statement (SQL PL)",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0016",
+          "label": "WHILE statement",
+          "source_locator": "pdf-page:2331;outline:WHILE statement",
+          "mandatory": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,101 @@
+{
+  "schema_version": "mainframe-env.coverage-work-package-evidence@1",
+  "derived": true,
+  "status": "pass",
+  "work_package": "CV-206",
+  "evidence_digest": "sha256:deb9c87b73f5f975c85f02648e1d6fc8ab493f128b0f9228db70a28f131ab111",
+  "receipt": {
+    "target_version": "0.2.0",
+    "deliverable": "Package-installed typed batch controllers replacing application-name TSO and IMS branches",
+    "source_identity": "7f97bd8f26270827dc4f03aba0b8e64666a16334",
+    "commands": [
+      {
+        "command": "cargo test -p mainframe-env-batch -p mainframe-env-server -p mainframe-env-conformance --locked --no-fail-fast",
+        "exit_code": 0,
+        "result": "31 batch, 16 server, and 71 conformance tests passed; 2 manual/environment conformance tests ignored"
+      },
+      {
+        "command": "cargo test -p mainframe-env-batch -p mainframe-env-server -p xtask --locked",
+        "exit_code": 0,
+        "result": "31 registry/runtime, 16 composition, and 5 tooling tests passed"
+      },
+      {
+        "command": "cargo clippy -p mainframe-env-batch -p mainframe-env-server -p mainframe-env-conformance -p xtask --all-targets --locked -- -D warnings",
+        "exit_code": 0,
+        "result": "pass"
+      },
+      {
+        "command": "cargo xtask batch-controllers --check",
+        "exit_code": 0,
+        "result": "pass; audited three batch H1/H3 lines and all reached IMS application identities are absent from production"
+      },
+      {
+        "command": "CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-db2 --check",
+        "exit_code": 0,
+        "result": "3 programs, 3 batch routes, 25 extraction records, and historical Db2 shape sha256:3a67d0aeba977ba039afd3a227ea97891976a2cafbd8c5d184823601ce955857 passed through the installed TSO controller"
+      },
+      {
+        "command": "CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-ims --check",
+        "exit_code": 0,
+        "result": "3 application routes, 2 selected job routes, load/unload, checkpoint, restart, malformed, resource, and failure controls passed through installed IMS controllers"
+      },
+      {
+        "command": "CARDDEMO_CORPUS_DIR=<clean-pin> cargo xtask carddemo-mq-authorization --check",
+        "exit_code": 0,
+        "result": "4 journeys and the package-installed purge controller passed with historical authorization shape sha256:f1d26e800741be38968d77a4be33d8dab9ca99a6f20d1842eea29bbb6653f451"
+      },
+      {
+        "command": "cargo xtask architecture --check && cargo xtask profiles --check && cargo xtask schemas --check && cargo xtask inventory --check && cargo xtask application-packages --check",
+        "exit_code": 0,
+        "result": "pass"
+      },
+      {
+        "command": "git diff --check",
+        "exit_code": 0,
+        "result": "pass"
+      }
+    ],
+    "artifacts": [
+      {
+        "path": "crates/apps/mainframe-env-batch/src/controller.rs",
+        "sha256": "sha256:ee006825bead50a977e04a80f64f02fa94e14caf3c99f1bf6b25063f3b7a01a7"
+      },
+      {
+        "path": "conformance/0.2/schemas/batch-controller-registry.schema.json",
+        "sha256": "sha256:7b5fec04a6f9e793342343b924e331faaf173d3ae870f6407873a27fb3864649"
+      },
+      {
+        "path": "conformance/0.2/migrations/batch-controller-v0-to-v1.json",
+        "sha256": "sha256:c2b026283741f93368c3b6fcd1ae753653c89d08c873c39eeeedf3c244462e9a"
+      },
+      {
+        "path": "conformance/0.2/evidence/hardcode/CV-206-batch.json",
+        "sha256": "sha256:eda946ee7ec381012f2a3d3cdfbf1596a66c4f87672b052c5be1c01fef29be7d"
+      },
+      {
+        "path": "docs/architecture/BATCH-CONTROLLER-REGISTRY.md",
+        "sha256": "sha256:f6ff7590300f79a3300b703c349389a616dd616fc95cd2d8ccda2e1e3058f09c"
+      }
+    ],
+    "invariants": {
+      "batch_h1_h3_lines_before": 3,
+      "batch_h1_h3_lines_after": 0,
+      "application_program_string_dispatch_after": 0,
+      "application_data_identities_in_production_after": 0,
+      "selected_package_identity_rechecked_at_composition": true,
+      "exact_typed_tso_and_ims_selectors": true,
+      "bounded_generation_validation": true,
+      "atomic_complete_generation_publication": true,
+      "same_generation_retry_idempotent": true,
+      "selector_conflicts_fail_closed": true,
+      "identity_equal_retained_generation_rollback": true,
+      "unseen_older_generation_rejected": true,
+      "missing_controller_unsupported": true,
+      "production_branch_fallback_retained": false,
+      "historical_carddemo_db2_digests_unchanged": true,
+      "historical_carddemo_ims_digests_unchanged": true,
+      "historical_carddemo_authorization_digest_unchanged": true,
+      "generated_or_installed_coverage_credit": 0
+    }
+  }
+}

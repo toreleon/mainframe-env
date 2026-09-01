@@ -1,0 +1,1088 @@
+{
+  "schema_version": "mainframe-env.official-catalog@1",
+  "baseline_id": "ibm-enterprise-cobol-6.5-2026-05-31",
+  "subsystem": "cobol",
+  "mandatory_rows": 173,
+  "units": [
+    {
+      "id": "procedure-statements",
+      "denominator": 44,
+      "normalization": "normalized",
+      "rows": [
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0001",
+          "label": "ACCEPT statement",
+          "source_locator": "pdf-page:339;outline:ACCEPT statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0002",
+          "label": "ADD statement",
+          "source_locator": "pdf-page:343;outline:ADD statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0003",
+          "label": "ALLOCATE statement",
+          "source_locator": "pdf-page:345;outline:ALLOCATE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0004",
+          "label": "ALTER statement",
+          "source_locator": "pdf-page:350;outline:ALTER statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0005",
+          "label": "CALL statement",
+          "source_locator": "pdf-page:351;outline:CALL statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0006",
+          "label": "CANCEL statement",
+          "source_locator": "pdf-page:359;outline:CANCEL statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0007",
+          "label": "CLOSE statement",
+          "source_locator": "pdf-page:360;outline:CLOSE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0008",
+          "label": "COMPUTE statement",
+          "source_locator": "pdf-page:363;outline:COMPUTE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0009",
+          "label": "CONTINUE statement",
+          "source_locator": "pdf-page:364;outline:CONTINUE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0010",
+          "label": "DELETE statement",
+          "source_locator": "pdf-page:364;outline:DELETE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0011",
+          "label": "DISPLAY statement",
+          "source_locator": "pdf-page:366;outline:DISPLAY statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0012",
+          "label": "DIVIDE statement",
+          "source_locator": "pdf-page:368;outline:DIVIDE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0013",
+          "label": "ENTRY statement",
+          "source_locator": "pdf-page:371;outline:ENTRY statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0014",
+          "label": "EVALUATE statement",
+          "source_locator": "pdf-page:372;outline:EVALUATE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0015",
+          "label": "EXIT statement",
+          "source_locator": "pdf-page:375;outline:EXIT statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0016",
+          "label": "FREE statement",
+          "source_locator": "pdf-page:378;outline:FREE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0017",
+          "label": "GOBACK statement",
+          "source_locator": "pdf-page:378;outline:GOBACK statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0018",
+          "label": "GO TO statement",
+          "source_locator": "pdf-page:379;outline:GO TO statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0019",
+          "label": "IF statement",
+          "source_locator": "pdf-page:381;outline:IF statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0020",
+          "label": "INITIALIZE statement",
+          "source_locator": "pdf-page:383;outline:INITIALIZE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0021",
+          "label": "INSPECT statement",
+          "source_locator": "pdf-page:386;outline:INSPECT statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0022",
+          "label": "INVOKE statement",
+          "source_locator": "pdf-page:395;outline:INVOKE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0023",
+          "label": "JSON GENERATE statement",
+          "source_locator": "pdf-page:402;outline:JSON GENERATE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
+          "label": "JSON PARSE statement",
+          "source_locator": "pdf-page:416;outline:JSON PARSE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0025",
+          "label": "MERGE statement",
+          "source_locator": "pdf-page:433;outline:MERGE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0026",
+          "label": "MOVE statement",
+          "source_locator": "pdf-page:437;outline:MOVE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0027",
+          "label": "MULTIPLY statement",
+          "source_locator": "pdf-page:443;outline:MULTIPLY statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0028",
+          "label": "OPEN statement",
+          "source_locator": "pdf-page:445;outline:OPEN statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0029",
+          "label": "PERFORM statement",
+          "source_locator": "pdf-page:449;outline:PERFORM statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0030",
+          "label": "READ statement",
+          "source_locator": "pdf-page:461;outline:READ statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0031",
+          "label": "RELEASE statement",
+          "source_locator": "pdf-page:466;outline:RELEASE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0032",
+          "label": "RETURN statement",
+          "source_locator": "pdf-page:467;outline:RETURN statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0033",
+          "label": "REWRITE statement",
+          "source_locator": "pdf-page:469;outline:REWRITE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0034",
+          "label": "SEARCH statement",
+          "source_locator": "pdf-page:471;outline:SEARCH statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0035",
+          "label": "SET statement",
+          "source_locator": "pdf-page:477;outline:SET statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0036",
+          "label": "SORT statement",
+          "source_locator": "pdf-page:484;outline:SORT statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0037",
+          "label": "START statement",
+          "source_locator": "pdf-page:492;outline:START statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0038",
+          "label": "STOP statement",
+          "source_locator": "pdf-page:494;outline:STOP statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0039",
+          "label": "STRING statement",
+          "source_locator": "pdf-page:494;outline:STRING statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0040",
+          "label": "SUBTRACT statement",
+          "source_locator": "pdf-page:499;outline:SUBTRACT statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0041",
+          "label": "UNSTRING statement",
+          "source_locator": "pdf-page:502;outline:UNSTRING statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0042",
+          "label": "WRITE statement",
+          "source_locator": "pdf-page:508;outline:WRITE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0043",
+          "label": "XML GENERATE statement",
+          "source_locator": "pdf-page:516;outline:XML GENERATE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044",
+          "label": "XML PARSE statement",
+          "source_locator": "pdf-page:526;outline:XML PARSE statement",
+          "mandatory": true
+        }
+      ]
+    },
+    {
+      "id": "intrinsic-functions",
+      "denominator": 82,
+      "normalization": "normalized",
+      "rows": [
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0001",
+          "label": "Chapter 31. ABS",
+          "source_locator": "pdf-page:555;outline:Chapter 31. ABS",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0002",
+          "label": "Chapter 32. ACOS",
+          "source_locator": "pdf-page:557;outline:Chapter 32. ACOS",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0003",
+          "label": "Chapter 33. ANNUITY",
+          "source_locator": "pdf-page:559;outline:Chapter 33. ANNUITY",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0004",
+          "label": "Chapter 34. ASIN",
+          "source_locator": "pdf-page:561;outline:Chapter 34. ASIN",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0005",
+          "label": "Chapter 35. ATAN",
+          "source_locator": "pdf-page:563;outline:Chapter 35. ATAN",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0006",
+          "label": "Chapter 36. BIT-OF",
+          "source_locator": "pdf-page:565;outline:Chapter 36. BIT-OF",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0007",
+          "label": "Chapter 37. BIT-TO-CHAR",
+          "source_locator": "pdf-page:567;outline:Chapter 37. BIT-TO-CHAR",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0008",
+          "label": "Chapter 38. BYTE-LENGTH",
+          "source_locator": "pdf-page:569;outline:Chapter 38. BYTE-LENGTH",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0009",
+          "label": "Chapter 39. CHAR",
+          "source_locator": "pdf-page:571;outline:Chapter 39. CHAR",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0010",
+          "label": "Chapter 40. COMBINED-DATETIME",
+          "source_locator": "pdf-page:573;outline:Chapter 40. COMBINED-DATETIME",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0011",
+          "label": "Chapter 41. CONTENT-OF",
+          "source_locator": "pdf-page:575;outline:Chapter 41. CONTENT-OF",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0012",
+          "label": "Chapter 42. COS",
+          "source_locator": "pdf-page:577;outline:Chapter 42. COS",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0013",
+          "label": "Chapter 43. CURRENT-DATE",
+          "source_locator": "pdf-page:579;outline:Chapter 43. CURRENT-DATE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0014",
+          "label": "Chapter 44. DATE-OF-INTEGER",
+          "source_locator": "pdf-page:581;outline:Chapter 44. DATE-OF-INTEGER",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0015",
+          "label": "Chapter 45. DATE-TO-YYYYMMDD",
+          "source_locator": "pdf-page:583;outline:Chapter 45. DATE-TO-YYYYMMDD",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0016",
+          "label": "Chapter 46. DAY-OF-INTEGER",
+          "source_locator": "pdf-page:585;outline:Chapter 46. DAY-OF-INTEGER",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0017",
+          "label": "Chapter 47. DAY-TO-YYYYDDD",
+          "source_locator": "pdf-page:587;outline:Chapter 47. DAY-TO-YYYYDDD",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0018",
+          "label": "Chapter 48. DISPLAY-OF",
+          "source_locator": "pdf-page:589;outline:Chapter 48. DISPLAY-OF",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0019",
+          "label": "Chapter 49. E",
+          "source_locator": "pdf-page:591;outline:Chapter 49. E",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0020",
+          "label": "Chapter 50. EXP",
+          "source_locator": "pdf-page:593;outline:Chapter 50. EXP",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0021",
+          "label": "Chapter 51. EXP10",
+          "source_locator": "pdf-page:595;outline:Chapter 51. EXP10",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0022",
+          "label": "Chapter 52. FACTORIAL",
+          "source_locator": "pdf-page:597;outline:Chapter 52. FACTORIAL",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0023",
+          "label": "Chapter 53. FORMATTED-CURRENT-DATE",
+          "source_locator": "pdf-page:599;outline:Chapter 53. FORMATTED-CURRENT-DATE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0024",
+          "label": "Chapter 54. FORMATTED-DATE",
+          "source_locator": "pdf-page:601;outline:Chapter 54. FORMATTED-DATE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0025",
+          "label": "Chapter 55. FORMATTED-DATETIME",
+          "source_locator": "pdf-page:603;outline:Chapter 55. FORMATTED-DATETIME",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0026",
+          "label": "Chapter 56. FORMATTED-TIME",
+          "source_locator": "pdf-page:605;outline:Chapter 56. FORMATTED-TIME",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0027",
+          "label": "Chapter 57. HEX-OF",
+          "source_locator": "pdf-page:607;outline:Chapter 57. HEX-OF",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0028",
+          "label": "Chapter 58. HEX-TO-CHAR",
+          "source_locator": "pdf-page:609;outline:Chapter 58. HEX-TO-CHAR",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0029",
+          "label": "Chapter 59. INTEGER",
+          "source_locator": "pdf-page:611;outline:Chapter 59. INTEGER",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0030",
+          "label": "Chapter 60. INTEGER-OF-DATE",
+          "source_locator": "pdf-page:613;outline:Chapter 60. INTEGER-OF-DATE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0031",
+          "label": "Chapter 61. INTEGER-OF-DAY",
+          "source_locator": "pdf-page:615;outline:Chapter 61. INTEGER-OF-DAY",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0032",
+          "label": "Chapter 62. INTEGER-OF-FORMATTED-DATE",
+          "source_locator": "pdf-page:617;outline:Chapter 62. INTEGER-OF-FORMATTED-DATE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0033",
+          "label": "Chapter 63. INTEGER-PART",
+          "source_locator": "pdf-page:619;outline:Chapter 63. INTEGER-PART",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0034",
+          "label": "Chapter 64. LENGTH",
+          "source_locator": "pdf-page:621;outline:Chapter 64. LENGTH",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0035",
+          "label": "Chapter 65. LOG",
+          "source_locator": "pdf-page:623;outline:Chapter 65. LOG",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0036",
+          "label": "Chapter 66. LOG10",
+          "source_locator": "pdf-page:625;outline:Chapter 66. LOG10",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0037",
+          "label": "Chapter 67. LOWER-CASE",
+          "source_locator": "pdf-page:627;outline:Chapter 67. LOWER-CASE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0038",
+          "label": "Chapter 68. MAX",
+          "source_locator": "pdf-page:629;outline:Chapter 68. MAX",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0039",
+          "label": "Chapter 69. MEAN",
+          "source_locator": "pdf-page:631;outline:Chapter 69. MEAN",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0040",
+          "label": "Chapter 70. MEDIAN",
+          "source_locator": "pdf-page:633;outline:Chapter 70. MEDIAN",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0041",
+          "label": "Chapter 71. MIDRANGE",
+          "source_locator": "pdf-page:635;outline:Chapter 71. MIDRANGE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0042",
+          "label": "Chapter 72. MIN",
+          "source_locator": "pdf-page:637;outline:Chapter 72. MIN",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0043",
+          "label": "Chapter 73. MOD",
+          "source_locator": "pdf-page:639;outline:Chapter 73. MOD",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0044",
+          "label": "Chapter 74. NATIONAL-OF",
+          "source_locator": "pdf-page:641;outline:Chapter 74. NATIONAL-OF",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0045",
+          "label": "Chapter 75. NUMVAL",
+          "source_locator": "pdf-page:643;outline:Chapter 75. NUMVAL",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0046",
+          "label": "Chapter 76. NUMVAL-C",
+          "source_locator": "pdf-page:645;outline:Chapter 76. NUMVAL-C",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0047",
+          "label": "Chapter 77. NUMVAL-F",
+          "source_locator": "pdf-page:647;outline:Chapter 77. NUMVAL-F",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0048",
+          "label": "Chapter 78. ORD",
+          "source_locator": "pdf-page:649;outline:Chapter 78. ORD",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0049",
+          "label": "Chapter 79. ORD-MAX",
+          "source_locator": "pdf-page:651;outline:Chapter 79. ORD-MAX",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0050",
+          "label": "Chapter 80. ORD-MIN",
+          "source_locator": "pdf-page:653;outline:Chapter 80. ORD-MIN",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0051",
+          "label": "Chapter 81. PI",
+          "source_locator": "pdf-page:655;outline:Chapter 81. PI",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0052",
+          "label": "Chapter 82. PRESENT-VALUE",
+          "source_locator": "pdf-page:657;outline:Chapter 82. PRESENT-VALUE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0053",
+          "label": "Chapter 83. RANDOM",
+          "source_locator": "pdf-page:659;outline:Chapter 83. RANDOM",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0054",
+          "label": "Chapter 84. RANGE",
+          "source_locator": "pdf-page:661;outline:Chapter 84. RANGE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0055",
+          "label": "Chapter 85. REM",
+          "source_locator": "pdf-page:663;outline:Chapter 85. REM",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0056",
+          "label": "Chapter 86. REVERSE",
+          "source_locator": "pdf-page:665;outline:Chapter 86. REVERSE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0057",
+          "label": "Chapter 87. SECONDS-FROM-FORMATTED-TIME",
+          "source_locator": "pdf-page:667;outline:Chapter 87. SECONDS-FROM-FORMATTED-TIME",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0058",
+          "label": "Chapter 88. SECONDS-PAST-MIDNIGHT",
+          "source_locator": "pdf-page:669;outline:Chapter 88. SECONDS-PAST-MIDNIGHT",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0059",
+          "label": "Chapter 89. SIGN",
+          "source_locator": "pdf-page:671;outline:Chapter 89. SIGN",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0060",
+          "label": "Chapter 90. SIN",
+          "source_locator": "pdf-page:673;outline:Chapter 90. SIN",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0061",
+          "label": "Chapter 91. SQRT",
+          "source_locator": "pdf-page:675;outline:Chapter 91. SQRT",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0062",
+          "label": "Chapter 92. STANDARD-DEVIATION",
+          "source_locator": "pdf-page:677;outline:Chapter 92. STANDARD-DEVIATION",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0063",
+          "label": "Chapter 93. SUM",
+          "source_locator": "pdf-page:679;outline:Chapter 93. SUM",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0064",
+          "label": "Chapter 94. TAN",
+          "source_locator": "pdf-page:681;outline:Chapter 94. TAN",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0065",
+          "label": "Chapter 95. TEST-DATE-YYYYMMDD",
+          "source_locator": "pdf-page:683;outline:Chapter 95. TEST-DATE-YYYYMMDD",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0066",
+          "label": "Chapter 96. TEST-DAY-YYYYDDD",
+          "source_locator": "pdf-page:685;outline:Chapter 96. TEST-DAY-YYYYDDD",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0067",
+          "label": "Chapter 97. TEST-FORMATTED-DATETIME",
+          "source_locator": "pdf-page:687;outline:Chapter 97. TEST-FORMATTED-DATETIME",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0068",
+          "label": "Chapter 98. TEST-NUMVAL",
+          "source_locator": "pdf-page:689;outline:Chapter 98. TEST-NUMVAL",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0069",
+          "label": "Chapter 99. TEST-NUMVAL-C",
+          "source_locator": "pdf-page:691;outline:Chapter 99. TEST-NUMVAL-C",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0070",
+          "label": "Chapter 100. TEST-NUMVAL-F",
+          "source_locator": "pdf-page:693;outline:Chapter 100. TEST-NUMVAL-F",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0071",
+          "label": "Chapter 101. TRIM",
+          "source_locator": "pdf-page:695;outline:Chapter 101. TRIM",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0072",
+          "label": "Chapter 102. ULENGTH",
+          "source_locator": "pdf-page:697;outline:Chapter 102. ULENGTH",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0073",
+          "label": "Chapter 103. UPOS",
+          "source_locator": "pdf-page:699;outline:Chapter 103. UPOS",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0074",
+          "label": "Chapter 104. UPPER-CASE",
+          "source_locator": "pdf-page:701;outline:Chapter 104. UPPER-CASE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0075",
+          "label": "Chapter 105. USUBSTR",
+          "source_locator": "pdf-page:703;outline:Chapter 105. USUBSTR",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0076",
+          "label": "Chapter 106. USUPPLEMENTARY",
+          "source_locator": "pdf-page:705;outline:Chapter 106. USUPPLEMENTARY",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0077",
+          "label": "Chapter 107. UUID4",
+          "source_locator": "pdf-page:707;outline:Chapter 107. UUID4",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0078",
+          "label": "Chapter 108. UVALID",
+          "source_locator": "pdf-page:709;outline:Chapter 108. UVALID",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0079",
+          "label": "Chapter 109. UWIDTH",
+          "source_locator": "pdf-page:713;outline:Chapter 109. UWIDTH",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0080",
+          "label": "Chapter 110. VARIANCE",
+          "source_locator": "pdf-page:715;outline:Chapter 110. VARIANCE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0081",
+          "label": "Chapter 111. WHEN-COMPILED",
+          "source_locator": "pdf-page:717;outline:Chapter 111. WHEN-COMPILED",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0082",
+          "label": "Chapter 112. YEAR-TO-YYYY",
+          "source_locator": "pdf-page:719;outline:Chapter 112. YEAR-TO-YYYY",
+          "mandatory": true
+        }
+      ]
+    },
+    {
+      "id": "compiler-directing-statements",
+      "denominator": 15,
+      "normalization": "normalized",
+      "rows": [
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0001",
+          "label": "BASIS statement",
+          "source_locator": "pdf-page:723;outline:BASIS statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0002",
+          "label": "PROCESS(CBL) statement",
+          "source_locator": "pdf-page:724;outline:PROCESS(CBL) statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0003",
+          "label": "*CONTROL (*CBL) statement",
+          "source_locator": "pdf-page:724;outline:*CONTROL (*CBL) statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0004",
+          "label": "COPY statement",
+          "source_locator": "pdf-page:726;outline:COPY statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0005",
+          "label": "DELETE statement",
+          "source_locator": "pdf-page:735;outline:DELETE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0006",
+          "label": "EJECT statement",
+          "source_locator": "pdf-page:736;outline:EJECT statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0007",
+          "label": "ENTER statement",
+          "source_locator": "pdf-page:736;outline:ENTER statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0008",
+          "label": "INSERT statement",
+          "source_locator": "pdf-page:737;outline:INSERT statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0009",
+          "label": "READY or RESET TRACE statement",
+          "source_locator": "pdf-page:737;outline:READY or RESET TRACE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0010",
+          "label": "REPLACE statement",
+          "source_locator": "pdf-page:738;outline:REPLACE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0011",
+          "label": "SERVICE LABEL statement",
+          "source_locator": "pdf-page:741;outline:SERVICE LABEL statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0012",
+          "label": "SERVICE RELOAD statement",
+          "source_locator": "pdf-page:742;outline:SERVICE RELOAD statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0013",
+          "label": "SKIP statements",
+          "source_locator": "pdf-page:742;outline:SKIP statements",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0014",
+          "label": "TITLE statement",
+          "source_locator": "pdf-page:742;outline:TITLE statement",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0015",
+          "label": "USE statement",
+          "source_locator": "pdf-page:743;outline:USE statement",
+          "mandatory": true
+        }
+      ]
+    },
+    {
+      "id": "compiler-directive-groups",
+      "denominator": 5,
+      "normalization": "normalized",
+      "rows": [
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0001",
+          "label": "CALLINTERFACE",
+          "source_locator": "pdf-page:747;outline:CALLINTERFACE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0002",
+          "label": "DATA",
+          "source_locator": "pdf-page:748;outline:DATA",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0003",
+          "label": "INLINE",
+          "source_locator": "pdf-page:748;outline:INLINE",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0004",
+          "label": "Conditional compilation",
+          "source_locator": "pdf-page:750;outline:Conditional compilation",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0005",
+          "label": "COBOL/Java interoperability",
+          "source_locator": "pdf-page:759;outline:COBOL/Java interoperability",
+          "mandatory": true
+        }
+      ]
+    },
+    {
+      "id": "file-description-clauses",
+      "denominator": 10,
+      "normalization": "normalized",
+      "rows": [
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0001",
+          "label": "EXTERNAL clause",
+          "source_locator": "pdf-page:214;outline:EXTERNAL clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0002",
+          "label": "GLOBAL clause",
+          "source_locator": "pdf-page:215;outline:GLOBAL clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0003",
+          "label": "BLOCK CONTAINS clause",
+          "source_locator": "pdf-page:215;outline:BLOCK CONTAINS clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0004",
+          "label": "RECORD clause",
+          "source_locator": "pdf-page:216;outline:RECORD clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0005",
+          "label": "LABEL RECORDS clause",
+          "source_locator": "pdf-page:218;outline:LABEL RECORDS clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0006",
+          "label": "VALUE OF clause",
+          "source_locator": "pdf-page:219;outline:VALUE OF clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0007",
+          "label": "DATA RECORDS clause",
+          "source_locator": "pdf-page:219;outline:DATA RECORDS clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0008",
+          "label": "LINAGE clause",
+          "source_locator": "pdf-page:219;outline:LINAGE clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0009",
+          "label": "RECORDING MODE clause",
+          "source_locator": "pdf-page:221;outline:RECORDING MODE clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0010",
+          "label": "CODE-SET clause",
+          "source_locator": "pdf-page:222;outline:CODE-SET clause",
+          "mandatory": true
+        }
+      ]
+    },
+    {
+      "id": "data-description-clauses",
+      "denominator": 17,
+      "normalization": "normalized",
+      "rows": [
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0001",
+          "label": "BLANK WHEN ZERO clause",
+          "source_locator": "pdf-page:226;outline:BLANK WHEN ZERO clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0002",
+          "label": "DYNAMIC LENGTH clause",
+          "source_locator": "pdf-page:226;outline:DYNAMIC LENGTH clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0003",
+          "label": "EXTERNAL clause",
+          "source_locator": "pdf-page:227;outline:EXTERNAL clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0004",
+          "label": "GLOBAL clause",
+          "source_locator": "pdf-page:228;outline:GLOBAL clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0005",
+          "label": "JUSTIFIED clause",
+          "source_locator": "pdf-page:228;outline:JUSTIFIED clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0006",
+          "label": "GROUP-USAGE clause",
+          "source_locator": "pdf-page:229;outline:GROUP-USAGE clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0007",
+          "label": "OCCURS clause",
+          "source_locator": "pdf-page:231;outline:OCCURS clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0008",
+          "label": "PICTURE clause",
+          "source_locator": "pdf-page:237;outline:PICTURE clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0009",
+          "label": "REDEFINES clause",
+          "source_locator": "pdf-page:255;outline:REDEFINES clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0010",
+          "label": "RENAMES clause",
+          "source_locator": "pdf-page:258;outline:RENAMES clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0011",
+          "label": "SIGN clause",
+          "source_locator": "pdf-page:260;outline:SIGN clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0012",
+          "label": "SYNCHRONIZED clause",
+          "source_locator": "pdf-page:261;outline:SYNCHRONIZED clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0013",
+          "label": "TYPEDEF clause",
+          "source_locator": "pdf-page:266;outline:TYPEDEF clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0014",
+          "label": "TYPE clause",
+          "source_locator": "pdf-page:267;outline:TYPE clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0015",
+          "label": "USAGE clause",
+          "source_locator": "pdf-page:269;outline:USAGE clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0016",
+          "label": "VALUE clause",
+          "source_locator": "pdf-page:277;outline:VALUE clause",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0017",
+          "label": "VOLATILE clause",
+          "source_locator": "pdf-page:284;outline:VOLATILE clause",
+          "mandatory": true
+        }
+      ]
+    }
+  ]
+}

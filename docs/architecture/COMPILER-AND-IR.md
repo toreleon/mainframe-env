@@ -34,6 +34,10 @@ Source identity is computed from exact bytes and declared semantic metadata.
 Physical absolute paths, timestamps, and directory enumeration order are not
 semantic identity.
 
+Host ABI copybooks are ordinary explicit source-library inputs. Their CICS,
+Db2, or MQ provider owns exact bytes, version, license, and provenance; the
+compiler neither embeds those assets nor chooses a subsystem generation.
+
 Decoding does not discard byte provenance. Mainframe sources may originate in
 EBCDIC or fixed-column formats, so diagnostics retain a mapping between logical
 characters, original byte ranges, and expansion origins.

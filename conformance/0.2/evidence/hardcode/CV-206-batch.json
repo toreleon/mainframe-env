@@ -1,0 +1,21 @@
+{
+  "schema_version": "mainframe-env.application-hardcode-scan@1",
+  "work_package": "CV-206",
+  "scope": "crates/apps/mainframe-env-batch/src/service.rs and controller.rs before the first cfg(test) marker",
+  "method": "case-insensitive line and token scan for the audited COBTUPDT/CBPAUP0C identities plus the reached application IMS programs, database, PSB, segments, and output label",
+  "before": {
+    "h1_h3_lines": 3,
+    "source": "docs/research/IBM-OFFICIAL-COVERAGE-ROADMAP.md"
+  },
+  "after": {
+    "h1_h3_lines": 0,
+    "application_program_identifiers": 0,
+    "application_data_identifiers": 0,
+    "application_string_dispatch": 0
+  },
+  "allowed_fixture_identity_locations": [
+    "crates/apps/mainframe-env-batch/src after cfg(test)",
+    "crates/tooling/mainframe-env-conformance",
+    "conformance"
+  ]
+}

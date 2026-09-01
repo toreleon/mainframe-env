@@ -13,9 +13,11 @@ directive authority, continuations retain exact decoded-source origins, and
 COPY expansion records both included bytes and directive origins. Verify with
 `cargo test -p mainframe-env-compiler`.
 
-The bounded owned definitions for reached DFHAID, DFHBMSCA, SQLCA, and MQ
-copybooks are documented in
-[`docs/compatibility/CARDDEMO-COPYBOOKS.md`](../../../docs/compatibility/CARDDEMO-COPYBOOKS.md).
+Host compatibility source is an explicit input, never compiler-owned data.
+CICS, Db2, and MQ expose versioned source libraries that the server, CLI, or
+conformance composer orders into `SourceBundle`; missing ABI members fail COPY
+resolution. The ownership contract is documented in
+[`docs/architecture/HOST-ABI-SOURCE-LIBRARIES.md`](../../../docs/architecture/HOST-ABI-SOURCE-LIBRARIES.md).
 
 The semantic data model uses unique qualified identities while retaining simple
 COBOL names for resolution. Recursive groups, sibling REDEFINES, levels

@@ -1,0 +1,24 @@
+{
+  "schema_version": "mainframe-env.no-string-dispatch@1",
+  "target_version": "0.2.0",
+  "scope": "batch program selection, nested TSO utilities, installed system services, z/OSMF route registration, and application program/table/transaction exceptions",
+  "before": {
+    "handwritten_program_dispatch_sites": 12,
+    "handwritten_route_registration_sites": 22,
+    "application_program_table_transaction_exception_lines": 32
+  },
+  "after": {
+    "handwritten_program_dispatch_sites": 0,
+    "handwritten_route_registration_sites": 0,
+    "application_program_table_transaction_exceptions": 0,
+    "official_generated_routes": 23,
+    "custom_generated_routes": 7,
+    "common_program_catalog_entries": 21,
+    "generated_coverage_credit": 0
+  },
+  "allowed_dispatch": [
+    "exact lookup in a generated immutable registry",
+    "typed enum dispatch after lookup",
+    "protocol grammar and opcode handling unrelated to application identity"
+  ]
+}

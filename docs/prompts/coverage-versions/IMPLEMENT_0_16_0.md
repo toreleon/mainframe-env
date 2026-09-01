@@ -1,0 +1,63 @@
+# Execution Prompt — Implement mainframe-env 0.16.0
+
+Target version: **0.16.0**
+Completion dependencies: 0.8.0, 0.10.0, 0.13.0, 0.14.0, 0.15.0
+
+Use this prompt from the repository root. The
+[common execution contract](README.md#common-execution-contract) is normative.
+
+---
+
+You are implementing **mainframe-env 0.16.0: complete cross-resource transaction,
+security, and failure semantics** across JES, CICS, datasets, Db2, IMS, and MQ.
+
+## Read and verify first
+
+Read `docs/prompts/coverage-versions/README.md`,
+`docs/delivery/coverage-versions/0.16.0.md`, all UOW/effect/principal/recovery/
+store contracts, and accepted evidence for 0.8.0, 0.10.0, 0.13.0, 0.14.0 and
+0.15.0. Verify exact provider state, transaction, migration, failure and
+capability versions before integrating adapters.
+
+Provider-specific adapter tests may be prepared as dependencies freeze, but the
+public mixed-state model cannot complete on partial or substituted providers.
+
+## Implement in this order
+
+1. Freeze **INT-1601** one common effect/UOW protocol and coordinator with
+   prepare, commit, rollback, compensation, in-doubt, heuristic and unknown
+   outcomes plus durable log/state/migration schemas.
+2. Implement **INT-1602/INT-1603** principal/delegation, authorization decision,
+   correlation/causality, deadlines, cancellation, idempotency, retry,
+   backpressure, overload and audit propagation.
+3. Implement **INT-1604** lock/effect ordering, crash points, recovery,
+   reconciliation, operator resolution and bounded retention.
+4. Implement **INT-1605** mixed-provider backup/restore, migration, replay,
+   compatibility and rollback.
+5. Implement **INT-1606** exhaustive mixed-resource commit/failure matrix, soak,
+   chaos, concurrency, 2x overload, restart and differential journeys.
+
+## Version-specific invariants
+
+- Exactly one coordinator owns cross-provider UOW state; no provider-private
+  shortcut may bypass common transactions or SAF authorities.
+- Preserve principal, delegation, authorization, correlation, causality,
+  deadline, cancellation, idempotency and audit across every boundary.
+- Define and test deterministic effect and lock order. Retries occur only at
+  documented safe boundaries and cannot silently duplicate committed effects.
+- Heuristic, in-doubt and unknown outcomes remain visible and recoverable; do not
+  turn partial success into success or claim universal atomic/exactly-once behavior.
+- Final evidence is produced from one candidate and one compatible state schema.
+
+## Completion gate
+
+Do not finish until the required mixed commit/rollback/compensation/heuristic/
+in-doubt/unknown-outcome matrix passes at every injected failure point; identity,
+deadline, cancellation, idempotency, audit and causality remain intact; restart,
+retry, migration, backup/restore, overload and concurrency preserve invariants;
+there is no cross-principal leak or UOW bypass; and full CardDemo journeys pass
+under mixed-resource fault injection.
+
+At handoff, provide the UOW state/effect/lock model, full matrix and crash-point
+results, provider adapter versions, migration/restore evidence, known outcome
+limits and full validation on the exact unchanged candidate.

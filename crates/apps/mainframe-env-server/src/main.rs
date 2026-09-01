@@ -1,6 +1,7 @@
 use mainframe_env_racf::MemorySecretResolver;
 use mainframe_env_server::{
-    ConfigOverrides, ProductServer, ServerConfig, StoreProfile, default_program_router,
+    ConfigOverrides, EnvironmentSecretResolver, HmacSha256PackageTrust, ProductServer,
+    ServerConfig, StoreProfile, default_program_router,
 };
 use mainframe_env_store::{MemoryStore, PostgresStateStore, SqliteStateStore};
 use mainframe_env_store_api::PlatformStore;
@@ -24,7 +25,9 @@ async fn run() -> Result<(), String> {
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("config/mainframe-env.toml"));
     let environment = std::env::vars()
-        .filter(|(name, _)| name.starts_with("MAINFRAME_ENV_"))
+        .filter(|(name, _)| {
+            name.starts_with("MAINFRAME_ENV_") && !name.starts_with("MAINFRAME_ENV_SECRET_")
+        })
         .collect::<BTreeMap<_, _>>();
     let config =
         ServerConfig::from_sources(Some(&config_path), &environment, ConfigOverrides::default())
@@ -45,11 +48,19 @@ async fn run() -> Result<(), String> {
             )
         }
     };
-    let server = ProductServer::open(
+    let package_trust = Arc::new(
+        HmacSha256PackageTrust::from_environment(
+            &environment,
+            Arc::new(EnvironmentSecretResolver::process()),
+        )
+        .map_err(|problem| problem.to_string())?,
+    );
+    let server = ProductServer::open_with_package_trust(
         config.clone(),
         store,
         Arc::new(MemorySecretResolver::default()),
         default_program_router(),
+        package_trust,
     )
     .map_err(|problem| problem.to_string())?;
     let address: SocketAddr = config

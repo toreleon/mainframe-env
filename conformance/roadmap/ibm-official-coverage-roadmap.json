@@ -1,0 +1,277 @@
+{
+  "schema_version": "mainframe-env.ibm-official-coverage-roadmap@1",
+  "status": "research-baseline",
+  "snapshot_date": "2026-08-31",
+  "repository": {
+    "product_version": "0.1.1",
+    "base_commit": "857115b907ce7098c965a51117a079048ea8182e",
+    "working_tree": "dirty-user-owned",
+    "claim": "CardDemo-compatible runtime; not IBM whole-product parity"
+  },
+  "coverage_gates": [
+    "recognized",
+    "validated",
+    "executed",
+    "conditioned",
+    "recovered",
+    "differential"
+  ],
+  "claim_policy": {
+    "partial_rows_round_up": false,
+    "catalog_presence_counts_as_execution": false,
+    "workload_pass_counts_as_official_conformance": false,
+    "licensed_ibm_oracle_required_for_differential_pass": true,
+    "whole_product_claim_allowed": false,
+    "whole_product_claim_blocker": "The ecosystem inventory for full DFSMS, CICS, Db2, IMS, MQ, sysplex, hardware, installation, and administration is not yet defined."
+  },
+  "hardcode_classes": {
+    "H1": "application identity in production logic",
+    "H2": "handwritten protocol or language catalog",
+    "H3": "semantic dispatch selected by raw string or application name",
+    "H4": "subsystem ABI or compatibility asset embedded in an unrelated kernel",
+    "H5": "topology or resource configuration fixed in code",
+    "H6": "exact conformance fixture identity; allowed only outside production"
+  },
+  "production_application_hardcode_audit": {
+    "method": "case-insensitive scan of production text before the first #[cfg(test)] marker for selected CardDemo application identities",
+    "total_hits": 32,
+    "target_hits": 0,
+    "locations": [
+      {
+        "package": "mainframe-env-db2",
+        "file": "crates/providers/mainframe-env-db2/src/service.rs",
+        "hits": 29,
+        "identities": [
+          "CARDDEMO.TRANSACTION_TYPE",
+          "CARDDEMO.TRANSACTION_TYPE_CATEGORY",
+          "CARDDEMO.AUTHFRDS"
+        ],
+        "classes": ["H1", "H3"]
+      },
+      {
+        "package": "mainframe-env-batch",
+        "file": "crates/apps/mainframe-env-batch/src/service.rs",
+        "hits": 3,
+        "identities": ["COBTUPDT", "CBPAUP0C"],
+        "classes": ["H1", "H3"]
+      }
+    ],
+    "allowed_fixture_areas": [
+      "crates/tooling/mainframe-env-conformance",
+      "conformance",
+      "tests",
+      "docs"
+    ]
+  },
+  "baselines": [
+    {
+      "id": "ibm-enterprise-cobol-6.5-2026-05-31",
+      "subsystem": "cobol",
+      "product": "Enterprise COBOL for z/OS",
+      "version": "6.5",
+      "source": {
+        "publication": "SC27-8713-04",
+        "edition_date": "2026-05-31",
+        "url": "https://www.ibm.com/docs/en/SS6SG3_6.5/pdf/lrmvs.pdf",
+        "sha256": "8b86cbd2d838d8f460dcbe8d1e74d2266799ce1534f4cfdbc08469c36748e85e"
+      },
+      "units": [
+        {"name": "procedure-statements", "total": 44, "current_recognized": 42, "current_executed": 37},
+        {"name": "intrinsic-functions", "total": 82, "current_recognized": 12, "current_executed": 12},
+        {"name": "compiler-directing-statements", "total": 15, "current_recognized": 3, "current_executed": 3},
+        {"name": "compiler-directive-groups", "total": 5, "current_recognized": 1, "current_executed": 1},
+        {"name": "file-description-clauses", "total": 10, "current_recognized": null, "current_executed": null},
+        {"name": "data-description-clauses", "total": 17, "current_recognized": null, "current_executed": null}
+      ],
+      "hardcode_classes": ["H2", "H3", "H4"],
+      "target_versions": ["0.3.0", "0.4.0"],
+      "confidence": "high for denominators and statement/function numerator; medium for directive numerator; data-clause numerator requires normalized inventory"
+    },
+    {
+      "id": "ibm-cics-ts-6x-2026-08-31",
+      "subsystem": "cics",
+      "product": "CICS Transaction Server for z/OS",
+      "version": "6.x documentation snapshot",
+      "source": {
+        "edition_date": "2026-08-31",
+        "url": "https://www.ibm.com/docs/en/cics-ts/6.x?topic=codes-function-exec-cics-commands",
+        "sha256": "cab6321d495098e133f92adeac154d643b022696967559d6c4485cad48fcb4b2"
+      },
+      "units": [
+        {"name": "api-commands", "total": 263, "current_typed_internal": 25, "current_official_mapping_estimate": 24},
+        {"name": "spi-commands-unique", "total": 269, "current_official_mapping_estimate": 1},
+        {"name": "fepi-commands", "total": 39, "current_official_mapping_estimate": 0}
+      ],
+      "hardcode_classes": ["H2", "H3", "H5"],
+      "target_versions": ["0.9.0", "0.10.0"],
+      "confidence": "high for official denominators; medium for current mapping until operation-to-command normalization"
+    },
+    {
+      "id": "ibm-zos-3.2-jcl-jes2-2026-06",
+      "subsystem": "jcl-jes2",
+      "product": "z/OS MVS JCL and JES2",
+      "version": "3.2",
+      "source": {
+        "publication": "SA23-1385-70",
+        "edition_date": "2026-06",
+        "url": "https://www.ibm.com/docs/en/SSLTBW_3.2.0/pdf/ieab600_v3r2.pdf",
+        "sha256": "8bc97add9d69609f303ee96a1fa094d755c8bca254fcf574c15c3380fe877c9b"
+      },
+      "units": [
+        {"name": "jcl-statements", "total": 20, "current_recognized": 14, "current_semantic_estimate": 10},
+        {"name": "jes2-jecl-statements", "total": 13, "current_recognized": 0, "current_executed": 0},
+        {"name": "dd-parameters", "total": 74, "current_recognized": 10, "current_executed": 10, "partial": true},
+        {"name": "exec-parameters", "total": 19, "current_recognized": 4, "current_executed": 4, "partial": true},
+        {"name": "job-parameters", "total": 35, "current_recognized": 3, "current_executed": 3},
+        {"name": "output-parameters", "total": 76, "current_recognized": 0, "current_executed": 0}
+      ],
+      "hardcode_classes": ["H1", "H2", "H3", "H5"],
+      "target_versions": ["0.7.0", "0.8.0"],
+      "confidence": "high"
+    },
+    {
+      "id": "ibm-zos-3.2-dfsms-ams-2026-06",
+      "subsystem": "dataset-vsam-ams",
+      "product": "z/OS DFSMS Access Method Services",
+      "version": "3.2",
+      "source": {
+        "publication": "SC23-6846-70",
+        "edition_date": "2026-06",
+        "url": "https://www.ibm.com/docs/en/SSLTBW_3.2.0/pdf/idai200_v3r2.pdf",
+        "sha256": "2d0c6bb05bc9ead70575a41bdd786f1ea7ad3f0ed1855ba9a2ec041eaec83c67"
+      },
+      "units": [
+        {"name": "ams-functional-commands", "total": 31, "current_recognized_estimate": 8, "current_executed_estimate": 8},
+        {"name": "vsam-primary-organizations", "total": 5, "current_recognized_estimate": 4, "current_executed_estimate": 4}
+      ],
+      "hardcode_classes": ["H2", "H3", "H5"],
+      "target_versions": ["0.6.0"],
+      "confidence": "high for AMS denominator; medium for normalized VSAM numerator"
+    },
+    {
+      "id": "ibm-zos-3.2-racf-saf-2026",
+      "subsystem": "racf-saf",
+      "product": "z/OS Security Server RACF and SAF",
+      "version": "3.2",
+      "source": {
+        "edition_date": "2026",
+        "url": "https://www.ibm.com/docs/en/SSLTBW_3.2.0/pdf/icha400_v3r2.pdf",
+        "sha256": "f4c8860aeb4d00b78f9257b28b2d880bd7571d74e2e00b2b1424b203801d5a46",
+        "racroute_url": "https://www.ibm.com/docs/en/zos/3.2.0?topic=macros-racroute-router-interface"
+      },
+      "units": [
+        {"name": "racf-command-families", "total": 34, "current_equivalent_estimate": 6},
+        {"name": "racroute-request-types", "total": 14, "current_equivalent": 3}
+      ],
+      "hardcode_classes": ["H2", "H3", "H5"],
+      "target_versions": ["0.5.0"],
+      "confidence": "high for denominator; medium for command-equivalent numerator"
+    },
+    {
+      "id": "ibm-zosmf-3.2-2026-07-27",
+      "subsystem": "zosmf",
+      "product": "IBM z/OS Management Facility",
+      "version": "3.2",
+      "source": {
+        "edition_date": "2026-07-27",
+        "url": "https://www.ibm.com/docs/en/SSLTBW_3.2.0/pdf/izua700_v3r2.pdf",
+        "sha256": "2c3dde7bd5f4f7e43b58b6be34997d336af26f9f82975bc8573f26ab723e1ebd"
+      },
+      "units": [
+        {"name": "rest-service-families", "total": 27, "current_recognized": 5, "current_executed": 5},
+        {"name": "direct-guide-operation-headings", "total": 189, "current_declared_routes": 23, "normalization_required": true}
+      ],
+      "hardcode_classes": ["H2", "H3"],
+      "target_versions": ["0.11.0"],
+      "confidence": "high for service-family denominator; endpoint denominator must be normalized in 0.2.0"
+    },
+    {
+      "id": "ibm-db2-for-zos-13-2026-08-13",
+      "subsystem": "db2",
+      "product": "Db2 13 for z/OS",
+      "version": "13",
+      "source": {
+        "edition_date": "2026-08-13",
+        "url": "https://www.ibm.com/docs/en/SSEPEK_13.0.0/pdf/db2z_13_sqlrefbook.pdf",
+        "sha256": "34c575200ec4fcbe389364a375ef1ee2161ffdceb8a2dc6de90df0fe9377b212"
+      },
+      "units": [
+        {"name": "sql-statements", "total": 158, "current_internal_operations": 14, "current_statement_equivalent_estimate": 12, "comparable": false},
+        {"name": "sql-pl-statements", "total": null, "current_statement_equivalent_estimate": 0, "normalization_required": true}
+      ],
+      "production_application_hardcode_hits": 29,
+      "hardcode_classes": ["H1", "H2", "H3", "H4", "H5"],
+      "target_versions": ["0.12.0", "0.13.0"],
+      "confidence": "high for SQL statement denominator and hardcode count; current operations are not semantically comparable to complete SQL statements"
+    },
+    {
+      "id": "ibm-ims-15.6-dli-2026-08-31",
+      "subsystem": "ims",
+      "product": "IBM IMS",
+      "version": "15.6",
+      "source": {
+        "edition_date": "2026-08-31",
+        "url": "https://www.ibm.com/docs/en/ims/15.6.0?topic=programs-comparing-exec-dli-commands-dli-calls",
+        "sha256": "3a843a493ee4676fe8b0bbf4cf7e9b255ab56ea3dc3e1a7c269c90bd00f9b12e"
+      },
+      "units": [
+        {"name": "dli-call-families", "total": 25, "current_equivalent_estimate": 9}
+      ],
+      "hardcode_classes": ["H2", "H3", "H4", "H5"],
+      "target_versions": ["0.14.0"],
+      "confidence": "high for call-family denominator; medium for current equivalent numerator"
+    },
+    {
+      "id": "ibm-mq-9.4-mqi-2026-08-31",
+      "subsystem": "mq",
+      "product": "IBM MQ",
+      "version": "9.4",
+      "source": {
+        "edition_date": "2026-08-31",
+        "url": "https://www.ibm.com/docs/en/ibm-mq/9.4.x?topic=calls-call-descriptions",
+        "sha256": "6b04a5194766eb9da79ddd33d57510db15baf7c085fe686ebdb6e372568bb9dc"
+      },
+      "units": [
+        {"name": "mqi-calls-unique", "total": 26, "documentation_rows": 27, "current_recognized": 7, "current_executed": 7}
+      ],
+      "hardcode_classes": ["H2", "H3", "H4", "H5"],
+      "target_versions": ["0.15.0"],
+      "confidence": "high"
+    }
+  ],
+  "milestones": [
+    {"version": "0.2.0", "objective": "official coverage authority and zero H1 production hardcode", "estimated_engineer_months": [6, 9], "dependencies": [], "exit": ["official catalogs pinned", "six-gate coverage schema", "generated dispatch available", "production H1 hits = 0", "CardDemo 20/20"]},
+    {"version": "0.3.0", "objective": "complete COBOL grammar, directives, clauses, type and layout system", "estimated_engineer_months": [10, 15], "dependencies": ["0.2.0"], "exit": ["44/44 statements recognized", "82/82 functions cataloged", "all pinned clauses and directives validated", "no compiler-owned host ABI assets"]},
+    {"version": "0.4.0", "objective": "complete COBOL execution and differential semantics", "estimated_engineer_months": [12, 18], "dependencies": ["0.3.0"], "exit": ["all COBOL rows executed", "all applicable COBOL rows recovered", "licensed COBOL differential pass"]},
+    {"version": "0.5.0", "objective": "complete RACF command language and SAF", "estimated_engineer_months": [16, 24], "dependencies": ["0.2.0"], "exit": ["34/34 RACF commands", "14/14 RACROUTE requests", "ACEE/token/policy/certificate/audit/recovery complete"]},
+    {"version": "0.6.0", "objective": "complete dataset, VSAM, catalog, locking and AMS programming surface", "estimated_engineer_months": [18, 30], "dependencies": ["0.2.0"], "exit": ["31/31 AMS functional commands", "all pinned dataset organizations and access modes", "RLS/TVS and restart matrix"]},
+    {"version": "0.7.0", "objective": "complete JCL converter and planner", "estimated_engineer_months": [10, 16], "dependencies": ["0.2.0"], "exit": ["20/20 JCL statements", "74/74 DD parameters", "19/19 EXEC parameters", "35/35 JOB parameters", "76/76 OUTPUT parameters", "13/13 JES2 JECL recognized"]},
+    {"version": "0.8.0", "objective": "complete JES2 execution, spool, NJE/MAS and utility semantics", "estimated_engineer_months": [14, 22], "dependencies": ["0.5.0", "0.6.0", "0.7.0"], "exit": ["no batch program-name dispatch", "no summary utility routes", "JES operational and differential pass"]},
+    {"version": "0.9.0", "objective": "complete CICS application API", "estimated_engineer_months": [18, 28], "dependencies": ["0.4.0", "0.5.0", "0.6.0"], "exit": ["263/263 API commands complete"]},
+    {"version": "0.10.0", "objective": "complete CICS SPI and FEPI", "estimated_engineer_months": [18, 30], "dependencies": ["0.9.0"], "exit": ["269/269 unique SPI commands complete", "39/39 FEPI commands complete"]},
+    {"version": "0.11.0", "objective": "complete z/OSMF 3.2 REST programming portfolio", "estimated_engineer_months": [12, 20], "dependencies": ["0.5.0", "0.6.0", "0.8.0", "0.10.0"], "exit": ["27/27 service families", "normalized route catalog complete", "exact protocol/security/error differential pass"]},
+    {"version": "0.12.0", "objective": "generic Db2 parser, catalog, relational executor and common SQL", "estimated_engineer_months": [24, 36], "dependencies": ["0.2.0", "0.4.0", "0.5.0"], "exit": ["Db2 production H1 hits = 0", "158 statements and SQL PL recognized", "common DDL/DML/query/transaction rows pass"]},
+    {"version": "0.13.0", "objective": "complete Db2 13 programming surface", "estimated_engineer_months": [24, 36], "dependencies": ["0.12.0"], "exit": ["all Db2 mandatory rows complete", "licensed Db2 differential pass"]},
+    {"version": "0.14.0", "objective": "complete IMS 15.6 programming surface", "estimated_engineer_months": [20, 32], "dependencies": ["0.4.0", "0.5.0", "0.6.0"], "exit": ["25/25 DL/I call families", "DBD/PSB/SSA and pinned organizations complete", "licensed IMS differential pass"]},
+    {"version": "0.15.0", "objective": "complete IBM MQ 9.4 programming surface", "estimated_engineer_months": [16, 26], "dependencies": ["0.4.0", "0.5.0"], "exit": ["26/26 unique MQI calls", "object/pubsub/property/callback/transaction/security/recovery rows complete", "licensed MQ differential pass"]},
+    {"version": "0.16.0", "objective": "complete cross-resource transactions, security and failure recovery", "estimated_engineer_months": [14, 22], "dependencies": ["0.8.0", "0.10.0", "0.13.0", "0.14.0", "0.15.0"], "exit": ["mixed commit/rollback/heuristic/unknown-outcome matrix", "restart and overload matrix", "no cross-principal leak"]},
+    {"version": "0.17.0", "objective": "licensed IBM differential certification and 1.0 rehearsal", "estimated_engineer_months": [12, 20], "dependencies": ["0.11.0", "0.16.0"], "exit": ["every mandatory programming-surface row complete in every applicable gate", "no accepted unsupported row", "reproducible certification pack"]},
+    {"version": "1.0.0", "objective": "stable pinned programming-surface release", "estimated_engineer_months": null, "dependencies": ["0.17.0"], "exit": ["unchanged certified source identity", "cutover and rollback rehearsal", "support and upgrade contracts"]}
+  ],
+  "estimated_total_engineer_months": [244, 384],
+  "immediate_0_2_work_items": [
+    "official source receipts and coverage schema",
+    "normalized official catalogs",
+    "generated semantic identities and handler registry",
+    "no-application-hardcode gate",
+    "no-string-dispatch gate",
+    "application package subsystem sections",
+    "generic Db2 schema and row engine replacing three named tables",
+    "installed typed controllers replacing COBTUPDT and CBPAUP0C JES branches",
+    "subsystem-owned ABI source libraries",
+    "registry-based utility routing",
+    "generated official z/OSMF router separated from custom routes",
+    "consistent workload and program-status ledgers",
+    "full unit, PostgreSQL, CardDemo, and live Zowe regression"
+  ]
+}

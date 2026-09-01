@@ -1,12 +1,14 @@
 # CardDemo reached compatibility copybooks
 
-Status: **Owned bounded compatibility contract for CD-003**
+Status: **Historical CD-003 contract; ownership migrated in 0.2.0**
 
 mainframe-env does not copy IBM product source. The compiler generates nine
-owned source-level definitions from the catalog in
-`mainframe-env-compiler::compatibility`. The definitions cover only symbols and
-layouts reached by the pinned CardDemo corpus and are not a general CICS, Db2,
-or MQ SDK.
+owned source-level definitions from the catalog in the accepted 0.1.1 receipt.
+For 0.2.0 the exact bytes moved without change: CICS owns DFHAID/DFHBMSCA, Db2
+owns SQLCA, and MQ owns the six CMQ* members. The compiler consumes their
+explicitly ordered source libraries and owns no compatibility bytes. These
+definitions cover only symbols and layouts reached by the pinned CardDemo
+corpus and are not a general CICS, Db2, or MQ SDK.
 
 ## Behavioral authorities
 
@@ -32,16 +34,18 @@ or MQ SDK.
 
 ## Boundary and verification
 
-Every definition is repository-owned UTF-8 source with a named
-behavioral disposition. Application libraries precede the compatibility
-library explicitly. A duplicate member within one library, missing member,
-unassigned file, invalid path, or changed library order fails before artifact
-publication. The conformance corpus remains external and no runtime archive or
-native object participates in compilation.
+Every definition is repository-owned UTF-8 source with a named behavioral
+disposition, Apache-2.0 license, version, provenance, and digest. Application
+libraries precede the ordered CICS, Db2, and MQ ABI libraries explicitly. A
+duplicate member, missing member, incompatible license, unassigned file,
+invalid path, or changed library order fails before artifact publication. The
+conformance corpus remains external and no runtime archive or native object
+participates in compilation.
 
 Verify with:
 
 ```text
-cargo test -p mainframe-env-source -p mainframe-env-compiler
+cargo test -p mainframe-env-source -p mainframe-env-cics -p mainframe-env-db2 -p mainframe-env-mq -p mainframe-env-compiler
+cargo xtask abi-libraries --check
 CARDDEMO_CORPUS_DIR=<local-clean-pin> cargo xtask carddemo-closure --check
 ```

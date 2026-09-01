@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/coverage-workload-ledger@1",
+  "title": "mainframe-env 0.2 work-package and exit-gate ledger",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_version", "implementation_status", "current_work_package", "work_packages", "exit_gates", "coverage"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.coverage-workload-ledger@1"},
+    "target_version": {"const": "0.2.0"},
+    "implementation_status": {"enum": ["in-progress", "complete", "blocked"]},
+    "current_work_package": {"type": ["string", "null"]},
+    "work_packages": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "state", "evidence", "evidence_digest"],
+        "properties": {
+          "id": {"pattern": "^CV-20[1-9]$"},
+          "state": {"enum": ["pending", "in-progress", "pass", "blocked"]},
+          "evidence": {"type": ["string", "null"]},
+          "evidence_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "exit_gates": {
+      "type": "array",
+      "minItems": 9,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "state", "evidence"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "state": {"enum": ["pending", "pass", "blocked"]},
+          "evidence": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["official_baselines", "mandatory_rows", "complete_rows", "official_compatibility_numerator", "generated_catalog_credit"],
+      "properties": {
+        "official_baselines": {"const": 9},
+        "mandatory_rows": {"const": 1506},
+        "complete_rows": {"const": 0},
+        "official_compatibility_numerator": {"const": 0},
+        "generated_catalog_credit": {"const": 0}
+      }
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/release-manifest@1",
+  "title": "mainframe-env target release manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "product", "version", "channel", "target", "profile", "artifacts", "tag", "published"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.release-manifest@1"},
+    "product": {"const": "mainframe-env"},
+    "version": {"const": "0.2.0"},
+    "channel": {"type": "string"},
+    "phase_base_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "toolchain": {"type": "string"},
+    "target": {"type": "string", "minLength": 1},
+    "profile": {"const": "release/core-server"},
+    "contracts": {"type": "string"},
+    "migration_head": {"type": "string"},
+    "artifacts": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "tag": {"const": "mainframe-env-v0.2.0"},
+    "published": {"const": false}
+  }
+}

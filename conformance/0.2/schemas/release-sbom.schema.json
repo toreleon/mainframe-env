@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/release-sbom@1",
+  "title": "mainframe-env CycloneDX release SBOM",
+  "type": "object",
+  "required": ["bomFormat", "specVersion", "version", "metadata", "components"],
+  "properties": {
+    "bomFormat": {"const": "CycloneDX"},
+    "specVersion": {"const": "1.6"},
+    "version": {"type": "integer", "minimum": 1},
+    "metadata": {"type": "object"},
+    "components": {"type": "array", "minItems": 1}
+  }
+}

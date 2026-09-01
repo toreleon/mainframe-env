@@ -1,13 +1,25 @@
 use crate::{DefaultProgramRouter, ServerConfig, default_program_router};
 use axum::http::StatusCode;
 use base64::Engine;
-use mainframe_env_application::ApplicationInstaller;
-use mainframe_env_batch::{BatchService, JclBundle};
+use mainframe_env_application::{
+    ApplicationGenerationRecord, ApplicationInstaller, ApplicationInstallerV2,
+    ApplicationPackageV2, BatchController as ApplicationBatchController, BatchControllerKind,
+    EntryKind, InstallProblem, InstallState, PackageLimits, PackageSignatureVerifier,
+    SelectedApplicationGeneration,
+};
+use mainframe_env_batch::{
+    BATCH_CONTROLLER_REGISTRY_CONTRACT, BatchControllerDefinition, BatchControllerGeneration,
+    BatchControllerInstallReceipt, BatchControllerPlan, BatchControllerProgram,
+    BatchControllerSelector, BatchService, JclBundle,
+};
 use mainframe_env_cics::{
     BmsMapDefinition, CicsService, CicsTerminalSnapshot, CicsTraceEntry, cics_provider,
 };
 use mainframe_env_dataset::{DatasetService, dataset_providers};
-use mainframe_env_db2::{Db2Service, db2_providers};
+use mainframe_env_db2::{
+    Db2CatalogGeneration, Db2Limits, Db2SeedRow, Db2Service, db2_providers,
+    decode_table_definitions_bounded,
+};
 use mainframe_env_encoding::CodePage;
 use mainframe_env_execution_api::{
     ArtifactRef, BoundedPayload, CapabilityId, ExecutionId, ExecutionOutcome, IdempotencyKey,
@@ -27,7 +39,7 @@ use mainframe_env_interpreter::{
 };
 use mainframe_env_ir::CodecLimits;
 use mainframe_env_mq::{MqService, mq_providers};
-use mainframe_env_racf::{MemorySecretResolver, RacfService, racf_providers};
+use mainframe_env_racf::{MemorySecretResolver, RacfService, SecretResolver, racf_providers};
 use mainframe_env_store::{LocalArtifactStore, MemoryStore};
 use mainframe_env_store_api::{
     ArtifactRecord, ArtifactStore, PlatformStore, ProviderStateRecord, ProviderStateStore,
@@ -36,8 +48,10 @@ use mainframe_env_store_api::{
 use mainframe_env_zosmf::{
     Authentication, GatewayProblem, GatewayRequest, GatewayResponse, ZosmfBackend, ZosmfLimits,
 };
+use ring::hmac;
 use ring::rand::{SecureRandom, SystemRandom};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -76,6 +90,50 @@ pub struct BatchInstallReceipt {
     pub programs: usize,
     pub identity: String,
     pub replayed: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ApplicationPublicationReceipt {
+    pub package: String,
+    pub generation: u64,
+    pub identity: String,
+    pub controllers: usize,
+    pub db2_catalog: bool,
+    pub replayed: bool,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+enum PublicationSectionState {
+    NotApplicable,
+    Pending,
+    Applying,
+    Applied,
+    Failed,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+enum PublicationAction {
+    Install,
+    Rollback,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+struct ApplicationPublicationState {
+    schema_version: String,
+    package: String,
+    generation: u64,
+    identity: String,
+    action: PublicationAction,
+    controllers: PublicationSectionState,
+    db2: PublicationSectionState,
+    complete: bool,
+}
+
+struct DurableApplicationPublication {
+    store_version: u64,
+    state: ApplicationPublicationState,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -130,6 +188,8 @@ pub struct ProductServer {
     artifacts: LocalArtifactStore,
     host: Arc<ScopedHostService>,
     applications: ApplicationInstaller,
+    applications_v2: Mutex<DurableApplicationsV2>,
+    application_publication: Mutex<()>,
     online_programs: Mutex<BTreeMap<String, ArtifactRef>>,
     online_transactions: Mutex<BTreeMap<String, String>>,
     online_traces: Mutex<BTreeMap<String, Vec<CicsTraceEntry>>>,
@@ -143,12 +203,117 @@ pub struct ProductServer {
     outbox_delivered: AtomicU64,
 }
 
+const APPLICATION_V2_STATE_NAMESPACE: &str = "application-package-v2";
+const APPLICATION_V2_STATE_KEY: &str = "registry";
+const APPLICATION_PUBLICATION_NAMESPACE: &str = "application-publication-v2";
+const APPLICATION_PUBLICATION_CONTRACT: &str = "mainframe-env.application-publication@1";
+
+struct DurableApplicationsV2 {
+    installer: ApplicationInstallerV2,
+    store_version: u64,
+    verifier: Arc<dyn PackageSignatureVerifier>,
+}
+
+pub struct HmacSha256PackageTrust {
+    references: BTreeMap<String, SecretRef>,
+    secrets: Arc<dyn SecretResolver>,
+}
+
+impl HmacSha256PackageTrust {
+    pub fn new(
+        references: BTreeMap<String, SecretRef>,
+        secrets: Arc<dyn SecretResolver>,
+    ) -> Result<Self, HostProblem> {
+        if references.len() > 1_024
+            || references.iter().any(|(key_id, _)| {
+                key_id.is_empty() || key_id.len() > 128 || key_id.chars().any(char::is_control)
+            })
+        {
+            return Err(HostProblem::Malformed);
+        }
+        Ok(Self {
+            references,
+            secrets,
+        })
+    }
+
+    pub fn from_environment(
+        environment: &BTreeMap<String, String>,
+        secrets: Arc<dyn SecretResolver>,
+    ) -> Result<Self, HostProblem> {
+        let Some(encoded) = environment.get("MAINFRAME_ENV_PACKAGE_HMAC_KEY_REFS") else {
+            return Self::new(BTreeMap::new(), secrets);
+        };
+        let encoded: BTreeMap<String, String> =
+            serde_json::from_str(encoded).map_err(|_| HostProblem::Malformed)?;
+        let references = encoded
+            .into_iter()
+            .map(|(key_id, reference)| {
+                SecretRef::new(reference, HostLimits::default())
+                    .map(|reference| (key_id, reference))
+            })
+            .collect::<Result<BTreeMap<_, _>, _>>()?;
+        Self::new(references, secrets)
+    }
+}
+
+impl PackageSignatureVerifier for HmacSha256PackageTrust {
+    fn verify(&self, key_id: &str, algorithm: &str, identity: &str, signature: &str) -> bool {
+        if algorithm != "hmac-sha256@1" {
+            return false;
+        }
+        let Some(reference) = self.references.get(key_id) else {
+            return false;
+        };
+        let Ok(key) = self.secrets.resolve(reference) else {
+            return false;
+        };
+        if key.len() < 32 || key.len() > 4_096 {
+            return false;
+        }
+        let Ok(signature) = base64::engine::general_purpose::STANDARD_NO_PAD.decode(signature)
+        else {
+            return false;
+        };
+        hmac::verify(
+            &hmac::Key::new(hmac::HMAC_SHA256, &key),
+            identity.as_bytes(),
+            &signature,
+        )
+        .is_ok()
+    }
+}
+
+struct RejectPackageTrust;
+
+impl PackageSignatureVerifier for RejectPackageTrust {
+    fn verify(&self, _: &str, _: &str, _: &str, _: &str) -> bool {
+        false
+    }
+}
+
 impl ProductServer {
     pub fn open(
         config: ServerConfig,
         store: Arc<dyn PlatformStore>,
         secrets: Arc<MemorySecretResolver>,
         program: Arc<DefaultProgramRouter>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_with_package_trust(
+            config,
+            store,
+            secrets,
+            program,
+            Arc::new(RejectPackageTrust),
+        )
+    }
+
+    pub fn open_with_package_trust(
+        config: ServerConfig,
+        store: Arc<dyn PlatformStore>,
+        secrets: Arc<MemorySecretResolver>,
+        program: Arc<DefaultProgramRouter>,
+        package_trust: Arc<dyn PackageSignatureVerifier>,
     ) -> Result<Arc<Self>, HostProblem> {
         config.validate()?;
         let artifacts = LocalArtifactStore::open(&config.artifact_root, 64 * 1024 * 1024)
@@ -191,6 +356,29 @@ impl ProductServer {
             Default::default(),
             Default::default(),
         )?;
+        let (application_store_version, applications_v2) = match store
+            .get_provider_state(APPLICATION_V2_STATE_NAMESPACE, APPLICATION_V2_STATE_KEY)
+            .map_err(store_error)?
+        {
+            Some(record) => (
+                record.version,
+                ApplicationInstallerV2::from_state_payload(
+                    "0.2.0",
+                    PackageLimits::default(),
+                    package_trust.clone(),
+                    &record.payload,
+                )
+                .map_err(application_install_problem)?,
+            ),
+            None => (
+                0,
+                ApplicationInstallerV2::new(
+                    "0.2.0",
+                    PackageLimits::default(),
+                    package_trust.clone(),
+                ),
+            ),
+        };
         let mut sessions = BTreeMap::new();
         for row in store
             .list_provider_state("auth-session", 65536)
@@ -313,6 +501,12 @@ impl ProductServer {
             artifacts,
             host,
             applications: ApplicationInstaller::new("0.1.1"),
+            applications_v2: Mutex::new(DurableApplicationsV2 {
+                installer: applications_v2,
+                store_version: application_store_version,
+                verifier: package_trust,
+            }),
+            application_publication: Mutex::new(()),
             online_programs: Mutex::new(online_programs),
             online_transactions: Mutex::new(online_transactions),
             online_traces: Mutex::new(BTreeMap::new()),
@@ -325,6 +519,7 @@ impl ProductServer {
             active: AtomicUsize::new(0),
             outbox_delivered: AtomicU64::new(0),
         });
+        product.recover_application_publications()?;
         product.recover_local_wakeups()?;
         Ok(product)
     }
@@ -334,6 +529,16 @@ impl ProductServer {
         let secrets = Arc::new(MemorySecretResolver::default());
         let program = default_program_router();
         Self::open(config, store, secrets, program)
+    }
+
+    pub fn memory_with_package_trust(
+        config: ServerConfig,
+        package_trust: Arc<dyn PackageSignatureVerifier>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        let store: Arc<dyn PlatformStore> = Arc::new(MemoryStore::new(Default::default()));
+        let secrets = Arc::new(MemorySecretResolver::default());
+        let program = default_program_router();
+        Self::open_with_package_trust(config, store, secrets, program, package_trust)
     }
 
     #[must_use]
@@ -577,6 +782,562 @@ impl ProductServer {
             identity: format!("sha256:{:x}", identity.finalize()),
             replayed,
         })
+    }
+
+    pub fn install_application_package_v2(
+        &self,
+        package: &ApplicationPackageV2,
+    ) -> Result<ApplicationGenerationRecord, HostProblem> {
+        let _publication = self
+            .application_publication
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let mut durable = self
+            .applications_v2
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let before = durable
+            .installer
+            .state_payload()
+            .map_err(application_install_problem)?;
+        let record = durable
+            .installer
+            .stage(package)
+            .map_err(application_install_problem)?;
+        if let Err(problem) = self.persist_application_installer(&mut durable) {
+            let verifier = durable.verifier.clone();
+            durable.installer = ApplicationInstallerV2::from_state_payload(
+                "0.2.0",
+                PackageLimits::default(),
+                verifier,
+                &before,
+            )
+            .map_err(application_install_problem)?;
+            return Err(problem);
+        }
+        Ok(record)
+    }
+
+    pub fn publish_application_generation(
+        &self,
+        expected: &ApplicationGenerationRecord,
+    ) -> Result<ApplicationPublicationReceipt, HostProblem> {
+        let _publication = self
+            .application_publication
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let selected = self.application_generation_v2(expected)?;
+        let package = selected.package().clone();
+        let key = package.base.manifest.name.to_ascii_uppercase();
+        let db2_applicable = package
+            .base
+            .manifest
+            .entries
+            .iter()
+            .any(|entry| entry.kind == EntryKind::Data && entry.path == "data/db2/catalog");
+        let existing = self
+            .store
+            .get_provider_state(APPLICATION_PUBLICATION_NAMESPACE, &key)
+            .map_err(store_error)?;
+        let mut durable = match existing {
+            Some(record) => {
+                let state: ApplicationPublicationState = serde_json::from_slice(&record.payload)
+                    .map_err(|_| HostProblem::InfrastructureFailure)?;
+                if state.schema_version != APPLICATION_PUBLICATION_CONTRACT
+                    || state.package.to_ascii_uppercase() != key
+                {
+                    return Err(HostProblem::InfrastructureFailure);
+                }
+                if state.action == PublicationAction::Install
+                    && state.generation == expected.generation
+                    && state.identity == expected.identity
+                {
+                    DurableApplicationPublication {
+                        store_version: record.version,
+                        state,
+                    }
+                } else if state.complete && state.generation < expected.generation {
+                    let mut durable = DurableApplicationPublication {
+                        store_version: record.version,
+                        state: install_publication_state(&package, expected, db2_applicable),
+                    };
+                    self.persist_application_publication(&mut durable)?;
+                    durable
+                } else {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+            }
+            None => {
+                let mut durable = DurableApplicationPublication {
+                    store_version: 0,
+                    state: install_publication_state(&package, expected, db2_applicable),
+                };
+                self.persist_application_publication(&mut durable)?;
+                durable
+            }
+        };
+        if durable.state.complete {
+            self.selected_application_v2(expected)?;
+            return Ok(ApplicationPublicationReceipt {
+                package: package.base.manifest.name,
+                generation: package.generation,
+                identity: expected.identity.clone(),
+                controllers: package.sections.batch_controllers.len(),
+                db2_catalog: db2_applicable,
+                replayed: true,
+            });
+        }
+
+        let controllers = if durable.state.controllers == PublicationSectionState::Applied {
+            package.sections.batch_controllers.len()
+        } else {
+            durable.state.controllers = PublicationSectionState::Applying;
+            self.persist_application_publication(&mut durable)?;
+            match self.apply_application_batch_controllers(&selected) {
+                Ok(receipt) => {
+                    durable.state.controllers = PublicationSectionState::Applied;
+                    self.persist_application_publication(&mut durable)?;
+                    receipt.controllers
+                }
+                Err(problem) => {
+                    durable.state.controllers = PublicationSectionState::Failed;
+                    self.persist_application_publication(&mut durable)?;
+                    return Err(problem);
+                }
+            }
+        };
+
+        if db2_applicable && durable.state.db2 != PublicationSectionState::Applied {
+            durable.state.db2 = PublicationSectionState::Applying;
+            self.persist_application_publication(&mut durable)?;
+            if let Err(problem) = self.apply_application_db2_catalog(&selected) {
+                durable.state.db2 = PublicationSectionState::Failed;
+                self.persist_application_publication(&mut durable)?;
+                return Err(problem);
+            }
+            durable.state.db2 = PublicationSectionState::Applied;
+            self.persist_application_publication(&mut durable)?;
+        }
+
+        self.commit_application_generation(&package)?;
+        durable.state.complete = true;
+        self.persist_application_publication(&mut durable)?;
+        Ok(ApplicationPublicationReceipt {
+            package: package.base.manifest.name,
+            generation: package.generation,
+            identity: expected.identity.clone(),
+            controllers,
+            db2_catalog: db2_applicable,
+            replayed: false,
+        })
+    }
+
+    pub fn rollback_application_generation(
+        &self,
+        expected: &ApplicationGenerationRecord,
+    ) -> Result<ApplicationPublicationReceipt, HostProblem> {
+        let _publication = self
+            .application_publication
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let selected = self
+            .applications_v2
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .installer
+            .retained_generation(&expected.package, expected.generation, &expected.identity)
+            .map_err(application_install_problem)?
+            .ok_or(HostProblem::NotFound)?;
+        if selected.record().version != expected.version {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        let package = selected.package().clone();
+        let key = package.base.manifest.name.to_ascii_uppercase();
+        let db2_applicable = package
+            .base
+            .manifest
+            .entries
+            .iter()
+            .any(|entry| entry.kind == EntryKind::Data && entry.path == "data/db2/catalog");
+        let existing = self
+            .store
+            .get_provider_state(APPLICATION_PUBLICATION_NAMESPACE, &key)
+            .map_err(store_error)?;
+        let mut durable = if let Some(record) = existing {
+            let state: ApplicationPublicationState = serde_json::from_slice(&record.payload)
+                .map_err(|_| HostProblem::InfrastructureFailure)?;
+            if state.action == PublicationAction::Rollback
+                && state.generation == expected.generation
+                && state.identity == expected.identity
+            {
+                DurableApplicationPublication {
+                    store_version: record.version,
+                    state,
+                }
+            } else {
+                DurableApplicationPublication {
+                    store_version: record.version,
+                    state: rollback_publication_state(&package, expected, db2_applicable),
+                }
+            }
+        } else {
+            DurableApplicationPublication {
+                store_version: 0,
+                state: rollback_publication_state(&package, expected, db2_applicable),
+            }
+        };
+        if durable.state.complete {
+            self.selected_application_v2(expected)?;
+            return Ok(ApplicationPublicationReceipt {
+                package: package.base.manifest.name,
+                generation: package.generation,
+                identity: expected.identity.clone(),
+                controllers: package.sections.batch_controllers.len(),
+                db2_catalog: db2_applicable,
+                replayed: true,
+            });
+        }
+        self.persist_application_publication(&mut durable)?;
+
+        if durable.state.controllers != PublicationSectionState::Applied {
+            durable.state.controllers = PublicationSectionState::Applying;
+            self.persist_application_publication(&mut durable)?;
+            if let Err(problem) = self
+                .batch
+                .rollback_controllers(&package.base.manifest.name, package.generation)
+            {
+                durable.state.controllers = PublicationSectionState::Failed;
+                self.persist_application_publication(&mut durable)?;
+                return Err(problem);
+            }
+            durable.state.controllers = PublicationSectionState::Applied;
+            self.persist_application_publication(&mut durable)?;
+        }
+        if db2_applicable && durable.state.db2 != PublicationSectionState::Applied {
+            durable.state.db2 = PublicationSectionState::Applying;
+            self.persist_application_publication(&mut durable)?;
+            if let Err(problem) = self
+                .db2
+                .rollback_catalog(&package.base.manifest.name, package.generation)
+            {
+                durable.state.db2 = PublicationSectionState::Failed;
+                self.persist_application_publication(&mut durable)?;
+                return Err(problem);
+            }
+            durable.state.db2 = PublicationSectionState::Applied;
+            self.persist_application_publication(&mut durable)?;
+        }
+        self.select_application_generation(&package.base.manifest.name, package.generation)?;
+        durable.state.complete = true;
+        self.persist_application_publication(&mut durable)?;
+        Ok(ApplicationPublicationReceipt {
+            package: package.base.manifest.name,
+            generation: package.generation,
+            identity: expected.identity.clone(),
+            controllers: package.sections.batch_controllers.len(),
+            db2_catalog: db2_applicable,
+            replayed: false,
+        })
+    }
+
+    fn apply_application_batch_controllers(
+        &self,
+        selected: &SelectedApplicationGeneration,
+    ) -> Result<BatchControllerInstallReceipt, HostProblem> {
+        let package = selected.package();
+        let controllers = package
+            .sections
+            .batch_controllers
+            .iter()
+            .map(|controller| decode_application_batch_controller(package, controller))
+            .collect::<Result<Vec<_>, _>>()?;
+        self.batch.install_controllers(BatchControllerGeneration {
+            schema_version: BATCH_CONTROLLER_REGISTRY_CONTRACT.into(),
+            application: package.base.manifest.name.clone(),
+            generation: package.generation,
+            identity: selected.record().identity.clone(),
+            controllers,
+        })
+    }
+
+    fn apply_application_db2_catalog(
+        &self,
+        selected: &SelectedApplicationGeneration,
+    ) -> Result<(), HostProblem> {
+        let package = selected.package();
+        let catalog_entry = package
+            .base
+            .manifest
+            .entries
+            .iter()
+            .find(|entry| entry.kind == EntryKind::Data && entry.path == "data/db2/catalog")
+            .ok_or(HostProblem::Malformed)?;
+        let catalog_blob = package
+            .base
+            .blobs
+            .get(&catalog_entry.sha256)
+            .ok_or(HostProblem::Malformed)?;
+        let tables = decode_table_definitions_bounded(catalog_blob, Db2Limits::default())?;
+        let declared = package
+            .sections
+            .sql_tables
+            .iter()
+            .map(|table| {
+                (
+                    table.name.to_ascii_uppercase(),
+                    table
+                        .columns
+                        .iter()
+                        .map(|column| (column.name.to_ascii_uppercase(), column.nullable))
+                        .collect::<Vec<_>>(),
+                    table
+                        .primary_key
+                        .iter()
+                        .map(|column| column.to_ascii_uppercase())
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect::<BTreeSet<_>>();
+        let signed = tables
+            .iter()
+            .map(|table| {
+                (
+                    table.name.to_ascii_uppercase(),
+                    table
+                        .columns
+                        .iter()
+                        .map(|column| (column.name.to_ascii_uppercase(), column.nullable))
+                        .collect::<Vec<_>>(),
+                    table
+                        .primary_key
+                        .iter()
+                        .map(|column| column.to_ascii_uppercase())
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect::<BTreeSet<_>>();
+        if declared != signed {
+            return Err(HostProblem::Malformed);
+        }
+        let rows = package
+            .sections
+            .sql_rows
+            .iter()
+            .map(|row| Db2SeedRow {
+                table: row.table.clone(),
+                values: row
+                    .values
+                    .iter()
+                    .map(|(name, value)| (name.clone(), value.as_bytes().to_vec()))
+                    .collect(),
+            })
+            .collect();
+        self.db2.install_catalog(Db2CatalogGeneration {
+            application: package.base.manifest.name.clone(),
+            generation: package.generation,
+            identity: selected.record().identity.clone(),
+            tables,
+            rows,
+        })
+    }
+
+    fn application_generation_v2(
+        &self,
+        expected: &ApplicationGenerationRecord,
+    ) -> Result<SelectedApplicationGeneration, HostProblem> {
+        let generation = self
+            .applications_v2
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .installer
+            .generation(&expected.package, expected.generation, &expected.identity)
+            .map_err(application_install_problem)?
+            .ok_or(HostProblem::NotFound)?;
+        if generation.record().package != expected.package
+            || generation.record().version != expected.version
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        Ok(generation)
+    }
+
+    fn commit_application_generation(
+        &self,
+        package: &ApplicationPackageV2,
+    ) -> Result<(), HostProblem> {
+        let mut durable = self
+            .applications_v2
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let before = durable
+            .installer
+            .state_payload()
+            .map_err(application_install_problem)?;
+        durable
+            .installer
+            .commit(package)
+            .map_err(application_install_problem)?;
+        if let Err(problem) = self.persist_application_installer(&mut durable) {
+            let verifier = durable.verifier.clone();
+            durable.installer = ApplicationInstallerV2::from_state_payload(
+                "0.2.0",
+                PackageLimits::default(),
+                verifier,
+                &before,
+            )
+            .map_err(application_install_problem)?;
+            return Err(problem);
+        }
+        Ok(())
+    }
+
+    fn select_application_generation(
+        &self,
+        application: &str,
+        generation: u64,
+    ) -> Result<(), HostProblem> {
+        let mut durable = self
+            .applications_v2
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let before = durable
+            .installer
+            .state_payload()
+            .map_err(application_install_problem)?;
+        durable
+            .installer
+            .rollback(application, generation)
+            .map_err(application_install_problem)?;
+        if let Err(problem) = self.persist_application_installer(&mut durable) {
+            let verifier = durable.verifier.clone();
+            durable.installer = ApplicationInstallerV2::from_state_payload(
+                "0.2.0",
+                PackageLimits::default(),
+                verifier,
+                &before,
+            )
+            .map_err(application_install_problem)?;
+            return Err(problem);
+        }
+        Ok(())
+    }
+
+    fn persist_application_installer(
+        &self,
+        durable: &mut DurableApplicationsV2,
+    ) -> Result<(), HostProblem> {
+        let payload = durable
+            .installer
+            .state_payload()
+            .map_err(application_install_problem)?;
+        let version = durable
+            .store_version
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: APPLICATION_V2_STATE_NAMESPACE.into(),
+                    key: APPLICATION_V2_STATE_KEY.into(),
+                    version,
+                    payload,
+                },
+                (durable.store_version != 0).then_some(durable.store_version),
+            )
+            .map_err(store_error)?;
+        durable.store_version = version;
+        Ok(())
+    }
+
+    fn persist_application_publication(
+        &self,
+        durable: &mut DurableApplicationPublication,
+    ) -> Result<(), HostProblem> {
+        let payload =
+            serde_json::to_vec(&durable.state).map_err(|_| HostProblem::InfrastructureFailure)?;
+        if payload.len() > 64 * 1024 {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let version = durable
+            .store_version
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: APPLICATION_PUBLICATION_NAMESPACE.into(),
+                    key: durable.state.package.to_ascii_uppercase(),
+                    version,
+                    payload,
+                },
+                (durable.store_version != 0).then_some(durable.store_version),
+            )
+            .map_err(store_error)?;
+        durable.store_version = version;
+        Ok(())
+    }
+
+    fn recover_application_publications(&self) -> Result<(), HostProblem> {
+        for record in self
+            .store
+            .list_provider_state(APPLICATION_PUBLICATION_NAMESPACE, 1_024)
+            .map_err(store_error)?
+        {
+            if record.payload.len() > 64 * 1024 {
+                return Err(HostProblem::ResourceExhausted);
+            }
+            let state: ApplicationPublicationState = serde_json::from_slice(&record.payload)
+                .map_err(|_| HostProblem::InfrastructureFailure)?;
+            if state.schema_version != APPLICATION_PUBLICATION_CONTRACT
+                || state.package.to_ascii_uppercase() != record.key
+            {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            let retained = self
+                .applications_v2
+                .lock()
+                .map_err(|_| HostProblem::InfrastructureFailure)?
+                .installer
+                .generation(&state.package, state.generation, &state.identity)
+                .map_err(application_install_problem)?
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            let expected = retained.record().clone();
+            drop(retained);
+            if !state.complete {
+                match state.action {
+                    PublicationAction::Install => {
+                        self.publish_application_generation(&expected)?;
+                    }
+                    PublicationAction::Rollback => {
+                        self.rollback_application_generation(&expected)?;
+                    }
+                }
+            } else {
+                self.selected_application_v2(&expected)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn selected_application_v2(
+        &self,
+        expected: &ApplicationGenerationRecord,
+    ) -> Result<SelectedApplicationGeneration, HostProblem> {
+        let selected = self
+            .applications_v2
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .installer
+            .selected_generation(&expected.package)
+            .map_err(application_install_problem)?
+            .ok_or(HostProblem::NotFound)?;
+        if selected.record().generation != expected.generation
+            || selected.record().identity != expected.identity
+            || selected.record().state != InstallState::Ready
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        Ok(selected)
     }
 
     fn online_machine_continuation(
@@ -2520,6 +3281,191 @@ fn secure_random_token(kind: &str) -> Result<String, HostProblem> {
     ))
 }
 
+fn decode_application_batch_controller(
+    package: &ApplicationPackageV2,
+    controller: &ApplicationBatchController,
+) -> Result<BatchControllerDefinition, HostProblem> {
+    let launcher = controller_property(controller, "launcher")?;
+    let program = controller_property(controller, "selector-program")?.to_string();
+    let selector = match launcher {
+        "tso-run" => BatchControllerSelector::TsoRun { program },
+        "ims-controller" => BatchControllerSelector::ImsController {
+            mode: controller_property(controller, "selector-mode")?.to_string(),
+            program,
+            qualifier: controller.properties.get("selector-qualifier").cloned(),
+        },
+        _ => return Err(HostProblem::Malformed),
+    };
+    let behavior = controller_property(controller, "behavior")?;
+    let artifact = package
+        .base
+        .manifest
+        .entries
+        .iter()
+        .find(|entry| entry.kind == EntryKind::Program && entry.path == controller.program)
+        .ok_or(HostProblem::Malformed)?;
+    let artifact_program = artifact
+        .path
+        .rsplit('/')
+        .next()
+        .filter(|name| name.eq_ignore_ascii_case(selector.program()))
+        .ok_or(HostProblem::Malformed)?;
+    if artifact_program.is_empty() {
+        return Err(HostProblem::Malformed);
+    }
+    let plan = match behavior {
+        "program-call" if controller.kind == BatchControllerKind::CobolProgram => {
+            validate_controller_properties(
+                controller,
+                &["behavior", "launcher", "selector-program"],
+                &[],
+            )?;
+            BatchControllerPlan::ProgramCall
+        }
+        "ims-load" if controller.kind == BatchControllerKind::ImsMessageProcessing => {
+            validate_controller_properties(
+                controller,
+                &[
+                    "behavior",
+                    "launcher",
+                    "selector-program",
+                    "selector-mode",
+                    "selector-qualifier",
+                    "database",
+                    "root-dd",
+                    "child-dd",
+                    "root-record-bytes",
+                    "child-record-bytes",
+                    "parent-key-bytes",
+                ],
+                &[],
+            )?;
+            BatchControllerPlan::ImsLoad {
+                database: controller_property(controller, "database")?.into(),
+                root_dd: controller_property(controller, "root-dd")?.into(),
+                child_dd: controller_property(controller, "child-dd")?.into(),
+                root_record_bytes: controller_usize(controller, "root-record-bytes")?,
+                child_record_bytes: controller_usize(controller, "child-record-bytes")?,
+                parent_key_bytes: controller_usize(controller, "parent-key-bytes")?,
+            }
+        }
+        "ims-unload"
+            if matches!(
+                controller.kind,
+                BatchControllerKind::ImsMessageProcessing | BatchControllerKind::DeclarativeUtility
+            ) =>
+        {
+            validate_controller_properties(
+                controller,
+                &[
+                    "behavior",
+                    "launcher",
+                    "selector-program",
+                    "selector-mode",
+                    "selector-qualifier",
+                    "database",
+                    "root-segment",
+                    "child-segment",
+                ],
+                &["root-output-dd", "child-output-dd", "combined-output-dd"],
+            )?;
+            BatchControllerPlan::ImsUnload {
+                database: controller_property(controller, "database")?.into(),
+                root_segment: controller_property(controller, "root-segment")?.into(),
+                child_segment: controller_property(controller, "child-segment")?.into(),
+                root_output_dd: controller.properties.get("root-output-dd").cloned(),
+                child_output_dd: controller.properties.get("child-output-dd").cloned(),
+                combined_output_dd: controller.properties.get("combined-output-dd").cloned(),
+            }
+        }
+        "ims-purge" if controller.kind == BatchControllerKind::ImsMessageProcessing => {
+            validate_controller_properties(
+                controller,
+                &[
+                    "behavior",
+                    "launcher",
+                    "selector-program",
+                    "selector-mode",
+                    "selector-qualifier",
+                    "psb",
+                    "root-segment",
+                    "child-segment",
+                    "control-dd",
+                    "required-expiry-days",
+                    "checkpoint-prefix",
+                    "summary-field",
+                ],
+                &[],
+            )?;
+            BatchControllerPlan::ImsPurge {
+                psb: controller_property(controller, "psb")?.into(),
+                root_segment: controller_property(controller, "root-segment")?.into(),
+                child_segment: controller_property(controller, "child-segment")?.into(),
+                control_dd: controller_property(controller, "control-dd")?.into(),
+                required_expiry_days: controller_property(controller, "required-expiry-days")?
+                    .into(),
+                checkpoint_prefix: controller_property(controller, "checkpoint-prefix")?.into(),
+                summary_field: controller_property(controller, "summary-field")?.into(),
+            }
+        }
+        _ => return Err(HostProblem::Malformed),
+    };
+    Ok(BatchControllerDefinition {
+        name: controller.name.clone(),
+        selector,
+        program: BatchControllerProgram {
+            path: artifact.path.clone(),
+            identity: artifact.sha256.clone(),
+        },
+        plan,
+    })
+}
+
+fn controller_property<'a>(
+    controller: &'a ApplicationBatchController,
+    name: &str,
+) -> Result<&'a str, HostProblem> {
+    controller
+        .properties
+        .get(name)
+        .map(String::as_str)
+        .filter(|value| !value.is_empty())
+        .ok_or(HostProblem::Malformed)
+}
+
+fn controller_usize(
+    controller: &ApplicationBatchController,
+    name: &str,
+) -> Result<usize, HostProblem> {
+    controller_property(controller, name)?
+        .parse()
+        .map_err(|_| HostProblem::Malformed)
+}
+
+fn validate_controller_properties(
+    controller: &ApplicationBatchController,
+    required: &[&str],
+    optional: &[&str],
+) -> Result<(), HostProblem> {
+    let accepted = required
+        .iter()
+        .chain(optional)
+        .copied()
+        .collect::<BTreeSet<_>>();
+    if required
+        .iter()
+        .any(|name| !controller.properties.contains_key(*name))
+        || controller
+            .properties
+            .keys()
+            .any(|name| !accepted.contains(name.as_str()))
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
+}
+
 fn normalize_online_name(value: &str, max: usize) -> Result<String, HostProblem> {
     let normalized = value.trim().to_ascii_uppercase();
     if normalized.is_empty()
@@ -2866,6 +3812,69 @@ fn store_error(error: StoreError) -> HostProblem {
     }
 }
 
+fn application_install_problem(problem: InstallProblem) -> HostProblem {
+    match problem {
+        InstallProblem::IdentityConflict | InstallProblem::StaleGeneration => {
+            HostProblem::IdempotencyConflict
+        }
+        InstallProblem::UnknownStage => HostProblem::NotFound,
+        InstallProblem::Poisoned => HostProblem::InfrastructureFailure,
+        InstallProblem::LimitExceeded => HostProblem::ResourceExhausted,
+        InstallProblem::InvalidIdentity
+        | InstallProblem::InvalidPath
+        | InstallProblem::DuplicateEntry
+        | InstallProblem::MissingKind
+        | InstallProblem::MissingBlob
+        | InstallProblem::ContentMismatch
+        | InstallProblem::OrphanDependency
+        | InstallProblem::IncompatibleProduct
+        | InstallProblem::InvalidSignature
+        | InstallProblem::MissingReference => HostProblem::Malformed,
+    }
+}
+
+fn rollback_publication_state(
+    package: &ApplicationPackageV2,
+    expected: &ApplicationGenerationRecord,
+    db2_applicable: bool,
+) -> ApplicationPublicationState {
+    ApplicationPublicationState {
+        schema_version: APPLICATION_PUBLICATION_CONTRACT.into(),
+        package: package.base.manifest.name.clone(),
+        generation: package.generation,
+        identity: expected.identity.clone(),
+        action: PublicationAction::Rollback,
+        controllers: PublicationSectionState::Pending,
+        db2: if db2_applicable {
+            PublicationSectionState::Pending
+        } else {
+            PublicationSectionState::NotApplicable
+        },
+        complete: false,
+    }
+}
+
+fn install_publication_state(
+    package: &ApplicationPackageV2,
+    expected: &ApplicationGenerationRecord,
+    db2_applicable: bool,
+) -> ApplicationPublicationState {
+    ApplicationPublicationState {
+        schema_version: APPLICATION_PUBLICATION_CONTRACT.into(),
+        package: package.base.manifest.name.clone(),
+        generation: package.generation,
+        identity: expected.identity.clone(),
+        action: PublicationAction::Install,
+        controllers: PublicationSectionState::Pending,
+        db2: if db2_applicable {
+            PublicationSectionState::Pending
+        } else {
+            PublicationSectionState::NotApplicable
+        },
+        complete: false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2877,6 +3886,7 @@ mod tests {
         CompilationMode, CompileOptions, CompileTarget, CompilerRequest, CompilerResult,
         CompilerService,
     };
+    use mainframe_env_db2::Db2TableDefinition;
     use mainframe_env_source::{
         LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
     };
@@ -2913,6 +3923,501 @@ mod tests {
             )),
             ..ServerConfig::default()
         }
+    }
+
+    const TEST_PACKAGE_KEY: &[u8] = b"test-production-package-trust-key";
+
+    fn test_package_trust() -> HmacSha256PackageTrust {
+        let resolver = Arc::new(MemorySecretResolver::default());
+        resolver.insert("secret:package-test-key", TEST_PACKAGE_KEY.to_vec());
+        HmacSha256PackageTrust::new(
+            BTreeMap::from([(
+                "test-production-key".into(),
+                SecretRef::new("secret:package-test-key", HostLimits::default()).unwrap(),
+            )]),
+            resolver,
+        )
+        .unwrap()
+    }
+
+    fn sign_test_package_identity(identity: &str) -> String {
+        sign_package_identity_with_key(TEST_PACKAGE_KEY, identity)
+    }
+
+    fn sign_package_identity_with_key(key: &[u8], identity: &str) -> String {
+        base64::engine::general_purpose::STANDARD_NO_PAD.encode(hmac::sign(
+            &hmac::Key::new(hmac::HMAC_SHA256, key),
+            identity.as_bytes(),
+        ))
+    }
+
+    #[test]
+    fn package_trust_resolves_verification_only_secrets_with_rotation_and_revocation() {
+        let resolver = Arc::new(MemorySecretResolver::default());
+        let reference =
+            SecretRef::new("secret:rotating-package-key", HostLimits::default()).unwrap();
+        resolver.insert(reference.as_str(), TEST_PACKAGE_KEY.to_vec());
+        let trust = HmacSha256PackageTrust::new(
+            BTreeMap::from([("key-1".into(), reference.clone())]),
+            resolver.clone(),
+        )
+        .unwrap();
+        let identity = format!("sha256:{:064x}", 71);
+        let first = sign_package_identity_with_key(TEST_PACKAGE_KEY, &identity);
+        assert!(trust.verify("key-1", "hmac-sha256@1", &identity, &first));
+        assert!(!trust.verify("missing", "hmac-sha256@1", &identity, &first));
+
+        resolver.remove(reference.as_str());
+        assert!(!trust.verify("key-1", "hmac-sha256@1", &identity, &first));
+        let rotated = b"rotated-production-package-key-0002";
+        resolver.insert(reference.as_str(), rotated.to_vec());
+        assert!(!trust.verify("key-1", "hmac-sha256@1", &identity, &first));
+        let second = sign_package_identity_with_key(rotated, &identity);
+        assert!(trust.verify("key-1", "hmac-sha256@1", &identity, &second));
+
+        let environment = BTreeMap::from([(
+            "MAINFRAME_ENV_PACKAGE_HMAC_KEYS".into(),
+            "plaintext-must-not-be-a-production-input".into(),
+        )]);
+        let empty = HmacSha256PackageTrust::from_environment(&environment, resolver).unwrap();
+        assert!(!empty.verify("key-1", "hmac-sha256@1", &identity, &second));
+        assert!(!format!("{reference:?}").contains("rotated-production-package-key"));
+    }
+
+    fn signed_controller_package(
+        _trust: &HmacSha256PackageTrust,
+    ) -> mainframe_env_application::ApplicationPackageV2 {
+        use mainframe_env_application::{
+            APPLICATION_PACKAGE_V2_CONTRACT, ApplicationManifest, ApplicationPackage,
+            ApplicationSections, BatchController, EntryKind, PackageEntry, PackageSignature,
+        };
+        let definitions = [
+            (EntryKind::Source, "source/manifest"),
+            (EntryKind::Resource, "resource/manifest"),
+            (EntryKind::Program, "program/REALPGM"),
+            (EntryKind::Data, "data/manifest"),
+            (EntryKind::Profile, "profile/manifest"),
+            (EntryKind::Migration, "migration/manifest"),
+        ];
+        let mut entries = Vec::new();
+        let mut blobs = BTreeMap::new();
+        for (kind, path) in definitions {
+            let bytes = path.as_bytes().to_vec();
+            let sha256 = format!("sha256:{:x}", Sha256::digest(&bytes));
+            blobs.insert(sha256.clone(), bytes.clone());
+            entries.push(PackageEntry {
+                path: path.into(),
+                kind,
+                sha256,
+                bytes: bytes.len(),
+                depends_on: (kind != EntryKind::Source)
+                    .then(|| "source/manifest".into())
+                    .into_iter()
+                    .collect(),
+            });
+        }
+        let mut package = ApplicationPackageV2 {
+            base: ApplicationPackage {
+                manifest: ApplicationManifest {
+                    name: "TRUSTED-APPLICATION".into(),
+                    version: "0.2.0".into(),
+                    target_product: "0.2.0".into(),
+                    entries,
+                },
+                blobs,
+            },
+            generation: 1,
+            sections: ApplicationSections {
+                schema_version: APPLICATION_PACKAGE_V2_CONTRACT.into(),
+                host_abi_libraries: Vec::new(),
+                sql_tables: Vec::new(),
+                sql_rows: Vec::new(),
+                ims_definitions: Vec::new(),
+                ims_rows: Vec::new(),
+                mq_resources: Vec::new(),
+                batch_controllers: vec![BatchController {
+                    name: "TRUSTED-CONTROLLER".into(),
+                    program: "program/REALPGM".into(),
+                    kind: BatchControllerKind::CobolProgram,
+                    properties: BTreeMap::from([
+                        ("launcher".into(), "tso-run".into()),
+                        ("selector-program".into(), "REALPGM".into()),
+                        ("behavior".into(), "program-call".into()),
+                    ]),
+                }],
+                security_resources: Vec::new(),
+            },
+            signature: PackageSignature {
+                algorithm: "hmac-sha256@1".into(),
+                key_id: "test-production-key".into(),
+                value: "invalid".into(),
+            },
+        };
+        let identity = mainframe_env_application::package_v2_identity(&package).unwrap();
+        package.signature.value = sign_test_package_identity(&identity);
+        package
+    }
+
+    fn resign_package(
+        package: &mut mainframe_env_application::ApplicationPackageV2,
+        _trust: &HmacSha256PackageTrust,
+    ) {
+        let identity = mainframe_env_application::package_v2_identity(package).unwrap();
+        package.signature.value = sign_test_package_identity(&identity);
+    }
+
+    fn signed_db2_package(
+        trust: &HmacSha256PackageTrust,
+    ) -> (
+        mainframe_env_application::ApplicationPackageV2,
+        Vec<Db2TableDefinition>,
+    ) {
+        use mainframe_env_application::{SqlColumn, SqlTable};
+        use mainframe_env_db2::{
+            Db2ColumnDefinition, Db2ExtractField, Db2ExtractLayout, Db2ForeignKeyDefinition,
+            Db2ResultEncoding,
+        };
+        let definitions = vec![
+            Db2TableDefinition {
+                name: "SIGNED.PARENT".into(),
+                columns: vec![
+                    Db2ColumnDefinition {
+                        name: "ID".into(),
+                        nullable: false,
+                        max_bytes: 4,
+                        result_encoding: Db2ResultEncoding::Raw,
+                        default_value: None,
+                    },
+                    Db2ColumnDefinition {
+                        name: "VALUE".into(),
+                        nullable: false,
+                        max_bytes: 37,
+                        result_encoding: Db2ResultEncoding::Varchar,
+                        default_value: Some(b"SIGNED-DEFAULT".to_vec()),
+                    },
+                ],
+                primary_key: vec!["ID".into()],
+                foreign_keys: Vec::new(),
+                extract: Some(Db2ExtractLayout {
+                    fields: vec![Db2ExtractField {
+                        column: "VALUE".into(),
+                        width: 41,
+                    }],
+                    trailer: b"SIGNED".to_vec(),
+                }),
+            },
+            Db2TableDefinition {
+                name: "SIGNED.CHILD".into(),
+                columns: vec![
+                    Db2ColumnDefinition {
+                        name: "PARENT_ID".into(),
+                        nullable: false,
+                        max_bytes: 4,
+                        result_encoding: Db2ResultEncoding::Raw,
+                        default_value: None,
+                    },
+                    Db2ColumnDefinition {
+                        name: "DETAIL".into(),
+                        nullable: false,
+                        max_bytes: 16,
+                        result_encoding: Db2ResultEncoding::Raw,
+                        default_value: Some(b"DETAIL".to_vec()),
+                    },
+                ],
+                primary_key: vec!["PARENT_ID".into(), "DETAIL".into()],
+                foreign_keys: vec![Db2ForeignKeyDefinition {
+                    columns: vec!["PARENT_ID".into()],
+                    referenced_table: "SIGNED.PARENT".into(),
+                    referenced_columns: vec!["ID".into()],
+                    delete_restrict: true,
+                }],
+                extract: None,
+            },
+        ];
+        let mut package = signed_controller_package(trust);
+        package.base.manifest.name = "SIGNED-DB2-APPLICATION".into();
+        package.sections.sql_tables = definitions
+            .iter()
+            .map(|table| SqlTable {
+                name: table.name.clone(),
+                columns: table
+                    .columns
+                    .iter()
+                    .map(|column| SqlColumn {
+                        name: column.name.clone(),
+                        nullable: column.nullable,
+                    })
+                    .collect(),
+                primary_key: table.primary_key.clone(),
+            })
+            .collect();
+        let bytes = serde_json::to_vec(&definitions).unwrap();
+        let sha256 = format!("sha256:{:x}", Sha256::digest(&bytes));
+        let entry = package
+            .base
+            .manifest
+            .entries
+            .iter_mut()
+            .find(|entry| entry.kind == EntryKind::Data)
+            .unwrap();
+        package.base.blobs.remove(&entry.sha256);
+        entry.path = "data/db2/catalog".into();
+        entry.sha256 = sha256.clone();
+        entry.bytes = bytes.len();
+        package.base.blobs.insert(sha256, bytes);
+        let identity = mainframe_env_application::package_v2_identity(&package).unwrap();
+        package.signature.value = sign_test_package_identity(&identity);
+        (package, definitions)
+    }
+
+    #[test]
+    fn subsystem_publication_requires_server_verified_selected_package_handle() {
+        let trust = Arc::new(test_package_trust());
+        let server = ProductServer::memory_with_package_trust(config(), trust.clone()).unwrap();
+        let missing = ApplicationGenerationRecord {
+            package: "TRUSTED-APPLICATION".into(),
+            version: "0.2.0".into(),
+            generation: 1,
+            identity: format!("sha256:{:064x}", 1),
+            state: InstallState::Ready,
+        };
+        assert_eq!(
+            server.publish_application_generation(&missing),
+            Err(HostProblem::NotFound)
+        );
+
+        let mut package = signed_controller_package(&trust);
+        package.signature.value = "caller-supplied-digest-is-not-trust".into();
+        assert_eq!(
+            server.install_application_package_v2(&package),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            server.publish_application_generation(&missing),
+            Err(HostProblem::NotFound)
+        );
+
+        let package = signed_controller_package(&trust);
+        let staged = server.install_application_package_v2(&package).unwrap();
+        assert_eq!(staged.state, InstallState::Staged);
+        let published = server.publish_application_generation(&staged).unwrap();
+        assert_eq!(published.identity, staged.identity);
+        assert_eq!(published.controllers, 1);
+    }
+
+    #[test]
+    fn verified_package_selection_survives_restart_before_publication_retry() {
+        let trust = Arc::new(test_package_trust());
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let server = ProductServer::open_with_package_trust(
+            config(),
+            store.clone(),
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+            trust.clone(),
+        )
+        .unwrap();
+        let package = signed_controller_package(&trust);
+        let installed = server.install_application_package_v2(&package).unwrap();
+        drop(server);
+
+        let restarted = ProductServer::open_with_package_trust(
+            config(),
+            store,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+            trust,
+        )
+        .unwrap();
+        let replayed = restarted
+            .publish_application_generation(&installed)
+            .unwrap();
+        assert_eq!(replayed.identity, installed.identity);
+        assert!(!replayed.replayed);
+        assert!(
+            restarted
+                .publish_application_generation(&installed)
+                .unwrap()
+                .replayed
+        );
+    }
+
+    #[test]
+    fn partial_publication_recovers_without_mixed_generation_and_rollback_is_durable() {
+        let trust = Arc::new(test_package_trust());
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let server = ProductServer::open_with_package_trust(
+            config(),
+            store.clone(),
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+            trust.clone(),
+        )
+        .unwrap();
+        let (first_package, _) = signed_db2_package(&trust);
+        let first = server
+            .install_application_package_v2(&first_package)
+            .unwrap();
+        let retained = server.application_generation_v2(&first).unwrap();
+        server
+            .apply_application_batch_controllers(&retained)
+            .unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: APPLICATION_PUBLICATION_NAMESPACE.into(),
+                    key: first.package.to_ascii_uppercase(),
+                    version: 1,
+                    payload: serde_json::to_vec(&ApplicationPublicationState {
+                        schema_version: APPLICATION_PUBLICATION_CONTRACT.into(),
+                        package: first.package.clone(),
+                        generation: first.generation,
+                        identity: first.identity.clone(),
+                        action: PublicationAction::Install,
+                        controllers: PublicationSectionState::Applied,
+                        db2: PublicationSectionState::Applying,
+                        complete: false,
+                    })
+                    .unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        drop(server);
+
+        let restarted = ProductServer::open_with_package_trust(
+            config(),
+            store.clone(),
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+            trust.clone(),
+        )
+        .unwrap();
+        assert!(
+            restarted
+                .publish_application_generation(&first)
+                .unwrap()
+                .replayed
+        );
+        assert!(
+            restarted
+                .db2_service()
+                .table_definition("SIGNED.PARENT")
+                .is_ok()
+        );
+
+        let mut second_package = first_package.clone();
+        second_package.generation = 2;
+        second_package.sections.batch_controllers[0].name = "SECOND-CONTROLLER".into();
+        resign_package(&mut second_package, &trust);
+        let second = restarted
+            .install_application_package_v2(&second_package)
+            .unwrap();
+        restarted.publish_application_generation(&second).unwrap();
+        assert_eq!(
+            restarted.publish_application_generation(&first),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        restarted.rollback_application_generation(&first).unwrap();
+        drop(restarted);
+
+        let rolled_back = ProductServer::open_with_package_trust(
+            config(),
+            store,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+            trust,
+        )
+        .unwrap();
+        assert_eq!(
+            rolled_back
+                .selected_application_v2(&first)
+                .unwrap()
+                .record()
+                .generation,
+            1
+        );
+    }
+
+    #[test]
+    fn signed_hostile_db2_catalog_is_bounded_before_provider_mutation() {
+        let trust = Arc::new(test_package_trust());
+        let server = ProductServer::memory_with_package_trust(config(), trust.clone()).unwrap();
+        let (mut package, definitions) = signed_db2_package(&trust);
+        let hostile = (0..=Db2Limits::default().max_tables)
+            .map(|index| {
+                let mut table = definitions[0].clone();
+                table.name = format!("SIGNED.HOSTILE{index}");
+                table
+            })
+            .collect::<Vec<_>>();
+        let bytes = serde_json::to_vec(&hostile).unwrap();
+        let digest = format!("sha256:{:x}", Sha256::digest(&bytes));
+        let entry = package
+            .base
+            .manifest
+            .entries
+            .iter_mut()
+            .find(|entry| entry.path == "data/db2/catalog")
+            .unwrap();
+        package.base.blobs.remove(&entry.sha256);
+        entry.sha256 = digest.clone();
+        entry.bytes = bytes.len();
+        package.base.blobs.insert(digest, bytes);
+        resign_package(&mut package, &trust);
+
+        let staged = server.install_application_package_v2(&package).unwrap();
+        assert_eq!(
+            server.publish_application_generation(&staged),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            server.db2_service().table_definition("SIGNED.HOSTILE0"),
+            Err(HostProblem::NotFound)
+        );
+    }
+
+    #[test]
+    fn db2_publication_derives_every_definition_field_from_the_signed_blob() {
+        let trust = Arc::new(test_package_trust());
+        let server = ProductServer::memory_with_package_trust(config(), trust.clone()).unwrap();
+        let (package, signed) = signed_db2_package(&trust);
+        let installed = server.install_application_package_v2(&package).unwrap();
+
+        let mut untrusted_caller_copy = signed.clone();
+        untrusted_caller_copy[0].columns[1].max_bytes = 1;
+        untrusted_caller_copy[0].columns[1].result_encoding =
+            mainframe_env_db2::Db2ResultEncoding::Raw;
+        untrusted_caller_copy[0].columns[1].default_value = Some(b"TAMPERED".to_vec());
+        untrusted_caller_copy[1].foreign_keys[0].referenced_columns = vec!["VALUE".into()];
+        untrusted_caller_copy[1].foreign_keys[0].delete_restrict = false;
+        untrusted_caller_copy[0].extract = None;
+
+        server.publish_application_generation(&installed).unwrap();
+        let installed_parent = server
+            .db2_service()
+            .table_definition("SIGNED.PARENT")
+            .unwrap();
+        let installed_child = server
+            .db2_service()
+            .table_definition("SIGNED.CHILD")
+            .unwrap();
+        assert_eq!(installed_parent, signed[0]);
+        assert_eq!(installed_child, signed[1]);
+        assert_ne!(installed_parent, untrusted_caller_copy[0]);
+        assert_ne!(installed_child, untrusted_caller_copy[1]);
+        assert_eq!(installed_parent.columns[1].max_bytes, 37);
+        assert_eq!(
+            installed_parent.columns[1].result_encoding,
+            mainframe_env_db2::Db2ResultEncoding::Varchar
+        );
+        assert_eq!(
+            installed_parent.columns[1].default_value.as_deref(),
+            Some(b"SIGNED-DEFAULT".as_slice())
+        );
+        assert!(installed_child.foreign_keys[0].delete_restrict);
+        assert_eq!(installed_child.foreign_keys[0].referenced_columns, ["ID"]);
+        assert_eq!(installed_parent.extract, signed[0].extract);
     }
 
     fn basic() -> String {

@@ -10,38 +10,65 @@ use mainframe_env_store_api::{
     ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
 };
 use std::collections::{BTreeMap, BTreeSet};
+use std::ops::Deref;
 use std::sync::{Arc, Mutex};
+use zeroize::Zeroizing;
 
 pub trait SecretResolver: Send + Sync {
-    fn resolve(&self, reference: &SecretRef) -> Result<Vec<u8>, HostProblem>;
+    fn resolve(&self, reference: &SecretRef) -> Result<ResolvedSecret, HostProblem>;
 }
+
+pub struct ResolvedSecret(Zeroizing<Vec<u8>>);
+
+impl ResolvedSecret {
+    pub fn new(value: Vec<u8>) -> Result<Self, HostProblem> {
+        Self::from_zeroizing(Zeroizing::new(value))
+    }
+
+    pub fn from_zeroizing(value: Zeroizing<Vec<u8>>) -> Result<Self, HostProblem> {
+        if value.is_empty() || value.len() > 4_096 {
+            Err(HostProblem::Malformed)
+        } else {
+            Ok(Self(value))
+        }
+    }
+}
+
+impl Deref for ResolvedSecret {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[derive(Default)]
 pub struct MemorySecretResolver {
-    values: Mutex<BTreeMap<String, Vec<u8>>>,
+    values: Mutex<BTreeMap<String, Zeroizing<Vec<u8>>>>,
 }
 impl MemorySecretResolver {
     pub fn insert(&self, reference: &str, value: Vec<u8>) {
         self.values
             .lock()
             .expect("secret resolver mutex")
-            .insert(reference.into(), value);
+            .insert(reference.into(), Zeroizing::new(value));
     }
     pub fn remove(&self, reference: &str) {
-        if let Ok(mut values) = self.values.lock()
-            && let Some(mut value) = values.remove(reference)
-        {
-            value.fill(0);
+        if let Ok(mut values) = self.values.lock() {
+            values.remove(reference);
         }
     }
 }
 impl SecretResolver for MemorySecretResolver {
-    fn resolve(&self, reference: &SecretRef) -> Result<Vec<u8>, HostProblem> {
-        self.values
+    fn resolve(&self, reference: &SecretRef) -> Result<ResolvedSecret, HostProblem> {
+        let values = self
+            .values
             .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let value = values
             .get(reference.as_str())
-            .cloned()
-            .ok_or(HostProblem::NotFound)
+            .ok_or(HostProblem::NotFound)?;
+        ResolvedSecret::new(value.as_slice().to_vec())
     }
 }
 
@@ -203,11 +230,11 @@ impl RacfService {
             if !user_groups.is_subset(&groups) {
                 return Err(HostProblem::NotFound);
             }
-            let mut secret = self.secrets.resolve(&definition.credential)?;
+            let secret = self.secrets.resolve(&definition.credential)?;
             let hash_result = Argon2::default()
                 .hash_password_with_salt(&secret, format!("mainframe-env:{user}").as_bytes())
                 .map(|hash| hash.to_string());
-            secret.fill(0);
+            drop(secret);
             let record = User {
                 hash: hash_result.map_err(|_| HostProblem::ProviderFailure)?,
                 expired: false,
@@ -393,11 +420,11 @@ impl RacfService {
     }
     pub fn add_user(&self, user: &str, credential: &SecretRef) -> Result<(), HostProblem> {
         let user = normalize(user, 8)?;
-        let mut secret = self.secrets.resolve(credential)?;
+        let secret = self.secrets.resolve(credential)?;
         let hash_result = Argon2::default()
             .hash_password_with_salt(&secret, format!("mainframe-env:{user}").as_bytes())
             .map(|hash| hash.to_string());
-        secret.fill(0);
+        drop(secret);
         let hash = hash_result.map_err(|_| HostProblem::ProviderFailure)?;
         let record = User {
             hash,
@@ -606,10 +633,10 @@ impl RacfService {
         }
         let hash = record.hash.clone();
         drop(state);
-        let mut secret = self.secrets.resolve(reference)?;
+        let secret = self.secrets.resolve(reference)?;
         let parsed = PasswordHash::new(&hash).map_err(|_| HostProblem::ProviderFailure)?;
         let valid = Argon2::default().verify_password(&secret, &parsed).is_ok();
-        secret.fill(0);
+        drop(secret);
         Ok(if valid {
             SecurityDecision::Allow
         } else {
@@ -1116,6 +1143,16 @@ mod tests {
     use super::*;
     use mainframe_env_host_api::SecretRef;
     use mainframe_env_store::{MemoryStore, SqliteStateStore};
+    use static_assertions::assert_not_impl_any;
+
+    assert_not_impl_any!(ResolvedSecret: Clone, std::fmt::Debug, std::fmt::Display, std::ops::DerefMut, serde::Serialize);
+
+    #[test]
+    fn resolved_secret_has_no_clone_debug_display_or_mutable_access() {
+        let secret = ResolvedSecret::new(b"compile-time-zeroizing-secret".to_vec()).unwrap();
+        assert_eq!(&*secret, b"compile-time-zeroizing-secret");
+    }
+
     fn setup() -> (Arc<RacfService>, Arc<MemorySecretResolver>) {
         let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
         let resolver = Arc::new(MemorySecretResolver::default());

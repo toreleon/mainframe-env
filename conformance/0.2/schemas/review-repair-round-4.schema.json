@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/review-repair-round-4@1",
+  "title": "mainframe-env 0.2 fourth-review repair evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "derived", "status", "evidence_digest", "receipt"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.review-repair-round-4@1"},
+    "derived": {"const": true},
+    "status": {"const": "pass"},
+    "evidence_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target_version", "accepted_parent", "candidate_source_digest", "branch", "base", "pull_request", "round_three_supersession", "findings", "commands", "toolchains", "artifacts", "sealing", "future_ci_success_claimed", "remote_actions"],
+      "properties": {
+        "target_version": {"const": "0.2.0"},
+        "accepted_parent": {"const": "b61d604fbdf4867154f235d45fd4453ef7e3b79d"},
+        "candidate_source_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "branch": {"const": "impl/0.2.0"},
+        "base": {"const": "main"},
+        "pull_request": {"const": 1},
+        "round_three_supersession": {
+          "type": "object",
+          "required": ["status", "original", "reason", "failed_candidates", "accepted_follow_up", "source_provenance"],
+          "properties": {
+            "status": {"const": "superseded"},
+            "original": {"type": "object"},
+            "reason": {"type": "string", "minLength": 1},
+            "failed_candidates": {"type": "array", "minItems": 3, "maxItems": 3},
+            "accepted_follow_up": {"type": "object"},
+            "source_provenance": {"type": "object"}
+          }
+        },
+        "findings": {"type": "array", "minItems": 3, "maxItems": 3},
+        "commands": {"type": "array", "minItems": 1},
+        "toolchains": {"type": "object"},
+        "artifacts": {
+          "type": "array", "minItems": 20,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["path", "sha256"],
+            "properties": {"path": {"type": "string", "minLength": 1}, "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}
+          }
+        },
+        "sealing": {"type": "object"},
+        "future_ci_success_claimed": {"const": false},
+        "remote_actions": {"type": "object"}
+      }
+    }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/coverage-evidence@1",
+  "title": "mainframe-env immutable coverage evidence record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "identity", "row_id", "gate", "sequence", "outcome", "producer", "artifact_digest", "source_identity", "oracle"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.coverage-evidence@1"},
+    "identity": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "row_id": {"type": "string", "minLength": 12},
+    "gate": {"enum": ["recognized", "validated", "executed", "conditioned", "recovered", "differential"]},
+    "sequence": {"type": "integer", "minimum": 1},
+    "outcome": {"enum": ["pass", "fail"]},
+    "producer": {"type": "string", "minLength": 1},
+    "artifact_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "source_identity": {"type": "string", "minLength": 1},
+    "oracle": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["environment_identity", "product_identity", "source_digest"],
+          "properties": {
+            "environment_identity": {"type": "string", "minLength": 1},
+            "product_identity": {"type": "string", "minLength": 1},
+            "source_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+          }
+        }
+      ]
+    }
+  }
+}

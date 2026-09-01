@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+mainframe-env-source.workspace = true
 mainframe-env-execution-api.workspace = true
 mainframe-env-host-api.workspace = true
 mainframe-env-store-api.workspace = true

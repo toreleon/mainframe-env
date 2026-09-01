@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/host-abi-inventory@1",
+  "title": "mainframe-env subsystem-owned host ABI source-library inventory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "contract", "ordered_subsystems", "libraries", "total_members", "compiler_owned_members", "generated_coverage_credit"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.host-abi-inventory@1"},
+    "status": {"const": "pass"},
+    "contract": {"const": "mainframe-env.host-abi-source-library@1"},
+    "ordered_subsystems": {"const": ["cics", "db2", "mq"]},
+    "libraries": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "library_name", "subsystem", "version", "license", "origin", "identity", "members"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1, "maxLength": 128},
+          "library_name": {"type": "string", "pattern": "^[A-Za-z0-9._-]+$"},
+          "subsystem": {"enum": ["cics", "db2", "mq"]},
+          "version": {"type": "string", "minLength": 1, "maxLength": 64},
+          "license": {"const": "Apache-2.0"},
+          "origin": {"const": "repository-authored behavioral compatibility definition; no vendor source text"},
+          "identity": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "members": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "path", "sha256", "bytes"],
+              "properties": {
+                "name": {"type": "string", "pattern": "^[A-Z0-9_-]+$"},
+                "path": {"type": "string", "pattern": "^compatibility/[A-Z0-9_-]+\\.cpy$"},
+                "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+                "bytes": {"type": "integer", "minimum": 1, "maximum": 4194304}
+              }
+            }
+          }
+        }
+      }
+    },
+    "total_members": {"const": 9},
+    "compiler_owned_members": {"const": 0},
+    "generated_coverage_credit": {"const": 0}
+  }
+}

@@ -6,23 +6,39 @@ on:
 
 jobs:
   v0-foundation:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    container: rust:1.98.0-bookworm@sha256:82150a52ec202c1b14d7817e14516c392bb7f5cfebd88f1ed531cb37ebd39922
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.98.0
-          components: rustfmt,clippy
+          # Conformance verifies the accepted release tag and historical
+          # phase/remediation commit trailers. The default one-commit checkout
+          # omits both the required history and tags.
+          fetch-depth: 0
+          fetch-tags: true
+      # checkout's container-safe setting is written under a temporary HOME;
+      # conformance invokes Git later from the job shell's persistent HOME.
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - run: cargo fmt --all -- --check
       - run: cargo check --workspace --all-targets --all-features --locked
       - run: cargo test --workspace --all-features --locked --no-fail-fast
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - run: RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --locked
       - run: cargo xtask conformance --check
+      - run: cargo xtask evidence seal --check
       - run: cargo xtask runtime-architecture --check
+      - run: cargo xtask release --target x86_64-unknown-linux-gnu
+      - run: git diff --exit-code -- release/0.2.0/targets/x86_64-unknown-linux-gnu
+      - run: cargo xtask release --check --target x86_64-unknown-linux-gnu
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-release-evidence
+          path: release/0.2.0/targets/x86_64-unknown-linux-gnu
+          if-no-files-found: error
 
   contract-msrv:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master

@@ -1,0 +1,30 @@
+{
+  "schema_version": "mainframe-env.zosmf-official-route-bindings@1",
+  "catalog": "conformance/0.1/inventory/zosmf-routes.json",
+  "namespace": "official-zosmf",
+  "routes": [
+    {"id": "GET /zosmf/info", "handler": "info"},
+    {"id": "POST /zosmf/services/authenticate", "handler": "authenticate"},
+    {"id": "DELETE /zosmf/services/authenticate", "handler": "logout"},
+    {"id": "GET /zosmf/restfiles/ds", "handler": "dataset_list"},
+    {"id": "GET /zosmf/restfiles/ds/{dsn}", "handler": "dataset_read"},
+    {"id": "PUT /zosmf/restfiles/ds/{dsn}", "handler": "dataset_write"},
+    {"id": "POST /zosmf/restfiles/ds/{dsn}", "handler": "dataset_create"},
+    {"id": "DELETE /zosmf/restfiles/ds/{dsn}", "handler": "dataset_delete"},
+    {"id": "GET /zosmf/restfiles/ds/{dsn}/member", "handler": "member_list"},
+    {"id": "GET /zosmf/restfiles/ds/{dsn}/search", "handler": "dataset_search"},
+    {"id": "PUT /zosmf/restfiles/ams", "handler": "ams"},
+    {"id": "GET /zosmf/restjobs/jobs", "handler": "job_list"},
+    {"id": "PUT /zosmf/restjobs/jobs", "handler": "job_submit"},
+    {"id": "GET /zosmf/restjobs/jobs/{jobname}/{jobid}", "handler": "job_status"},
+    {"id": "PUT /zosmf/restjobs/jobs/{jobname}/{jobid}", "handler": "job_cancel"},
+    {"id": "DELETE /zosmf/restjobs/jobs/{jobname}/{jobid}", "handler": "job_purge"},
+    {"id": "GET /zosmf/restjobs/jobs/{jobname}/{jobid}/files", "handler": "spool_list"},
+    {"id": "GET /zosmf/restjobs/jobs/{jobname}/{jobid}/files/{id}/records", "handler": "spool_read"},
+    {"id": "PUT /zosmf/restconsoles/consoles/{name}", "handler": "console_issue"},
+    {"id": "GET /zosmf/restconsoles/consoles/{name}/solmsgs/{key}", "handler": "console_solicited"},
+    {"id": "GET /zosmf/restconsoles/consoles/{name}/detections/{key}", "handler": "console_detection"},
+    {"id": "GET /zosmf/logs", "handler": "console_logs"},
+    {"id": "GET /zosmf/restconsoles/v1/log", "handler": "console_log"}
+  ]
+}

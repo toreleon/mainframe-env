@@ -1,9 +1,11 @@
 use clap::{Parser, Subcommand, ValueEnum};
-use mainframe_env_compiler::{CobolCompiler, CobolCompilerLimits, owned_compatibility_library};
+use mainframe_env_cics::cics_abi_library;
+use mainframe_env_compiler::{CobolCompiler, CobolCompilerLimits};
 use mainframe_env_compiler_api::{
     CompilationMode, CompileOptions, CompileTarget, CompilerRequest, CompilerResult,
     CompilerService,
 };
+use mainframe_env_db2::db2_abi_library;
 use mainframe_env_execution_api::{
     ArtifactRef, ExecutionId, ExecutionOutcome, IdempotencyKey, Invocation, InvocationLimits,
     Principal, PrincipalId, RequestId, ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
@@ -12,9 +14,10 @@ use mainframe_env_interpreter::{
     CoordinatorLimits, ExecutionControl, ExecutionCoordinator, ReferenceMachine,
 };
 use mainframe_env_ir::CodecLimits;
+use mainframe_env_mq::mq_abi_library;
 use mainframe_env_source::{
     LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLibrary,
-    SourceLimits,
+    SourceLimits, materialize_host_abi_libraries,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -218,10 +221,13 @@ fn bundle(
         );
         files.extend(loaded.into_iter().map(|(_, file)| file));
     }
-    let (compatibility, compatibility_library) =
-        owned_compatibility_library(limits).map_err(|error| error.to_string())?;
-    files.extend(compatibility);
-    libraries.push(compatibility_library);
+    let abi = materialize_host_abi_libraries(
+        &[cics_abi_library(), db2_abi_library(), mq_abi_library()],
+        limits,
+    )
+    .map_err(|error| error.to_string())?;
+    files.extend(abi.files);
+    libraries.extend(abi.libraries);
     SourceBundle::with_libraries(
         &logical,
         files,
@@ -356,7 +362,7 @@ mod tests {
     }
 
     #[test]
-    fn cli_builds_ordered_fixed_libraries_with_owned_compatibility() {
+    fn cli_builds_ordered_fixed_libraries_with_subsystem_abi_sources() {
         let fixture = Fixture::new();
         let source = fixture.0.join("MAIN.cbl");
         let first = fixture.0.join("first");
@@ -367,7 +373,7 @@ mod tests {
         fs::write(first.join("REC.cpy"), b"       01 FIRST-VALUE PIC X.\n").unwrap();
         fs::write(second.join("REC.cpy"), b"       01 SECOND-VALUE PIC X.\n").unwrap();
         let bundle = bundle(&source, Format::Fixed, &[first, second]).unwrap();
-        assert_eq!(bundle.libraries().len(), 3);
+        assert_eq!(bundle.libraries().len(), 5);
         assert!(
             String::from_utf8_lossy(bundle.resolve_library_member("REC").unwrap().bytes())
                 .contains("FIRST-VALUE")

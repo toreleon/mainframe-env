@@ -1,0 +1,165 @@
+{
+  "schema_version": "mainframe-env.official-catalog@1",
+  "baseline_id": "ibm-ims-15.6-dli-2026-08-31",
+  "subsystem": "ims",
+  "mandatory_rows": 25,
+  "units": [
+    {
+      "id": "dli-call-families",
+      "denominator": 25,
+      "normalization": "normalized",
+      "rows": [
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0001",
+          "label": "INIT call",
+          "source_locator": "html-table:comparison;row:1;command:ACCEPT command",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0002",
+          "label": "CHKP call (basic)",
+          "source_locator": "html-table:comparison;row:2;command:CHKP command",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0003",
+          "label": "DEQ call",
+          "source_locator": "html-table:comparison;row:3;command:DEQ command",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004",
+          "label": "DLET call",
+          "source_locator": "html-table:comparison;row:4;command:DLET command",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+          "label": "GU, GN, and GNP calls",
+          "source_locator": "html-table:comparison;row:5;command:GU, GN, and GNP commands",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+          "label": "GHU, GHN, and GHNP calls",
+          "source_locator": "html-table:comparison;row:6;command:GU, GN, and GNP commands",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0007",
+          "label": "GSCD call",
+          "source_locator": "html-table:comparison;row:7;command:GSCD call",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0008",
+          "label": "ISRT call",
+          "source_locator": "html-table:comparison;row:8;command:ISRT command",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0009",
+          "label": "ISRT call",
+          "source_locator": "html-table:comparison;row:9;command:LOAD command",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0010",
+          "label": "LOG call",
+          "source_locator": "html-table:comparison;row:10;command:LOG command",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0011",
+          "label": "POS call",
+          "source_locator": "html-table:comparison;row:11;command:POS command",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0012",
+          "label": "INIT call",
+          "source_locator": "html-table:comparison;row:12;command:ACCEPT command",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0013",
+          "label": "INIT call",
+          "source_locator": "html-table:comparison;row:13;command:QUERY command",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0014",
+          "label": "INIT call",
+          "source_locator": "html-table:comparison;row:14;command:REFRESH command",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+          "label": "REPL call",
+          "source_locator": "html-table:comparison;row:15;command:REPL command",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0016",
+          "label": "XRST call",
+          "source_locator": "html-table:comparison;row:16;command:RETRIEVE command",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0017",
+          "label": "ROLL or ROLB call",
+          "source_locator": "html-table:comparison;row:17;command:ROLL or ROLB command",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0018",
+          "label": "ROLS call",
+          "source_locator": "html-table:comparison;row:18;command:ROLS command",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0019",
+          "label": "PCB call",
+          "source_locator": "html-table:comparison;row:19;command:SCHD command",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0020",
+          "label": "SETS call",
+          "source_locator": "html-table:comparison;row:20;command:SETS command",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0021",
+          "label": "SETU call",
+          "source_locator": "html-table:comparison;row:21;command:SETU command",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0022",
+          "label": "STAT call",
+          "source_locator": "html-table:comparison;row:22;command:STAT command",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0023",
+          "label": "CHKP call (extended)",
+          "source_locator": "html-table:comparison;row:23;command:SYMCHKP command",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0024",
+          "label": "TERM call",
+          "source_locator": "html-table:comparison;row:24;command:TERM command",
+          "mandatory": true
+        },
+        {
+          "id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0025",
+          "label": "XRST call",
+          "source_locator": "html-table:comparison;row:25;command:XRST command",
+          "mandatory": true
+        }
+      ]
+    }
+  ]
+}

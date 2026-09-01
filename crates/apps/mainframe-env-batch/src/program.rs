@@ -9,6 +9,14 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+#[path = "generated/common_programs.rs"]
+mod common_programs;
+pub use common_programs::SystemServiceProgram;
+pub(crate) use common_programs::TsoProgramExecution;
+use common_programs::{
+    BuiltinProgram, COMMON_PROGRAM_CATALOG_SHA256, COMMON_PROGRAMS, SYSTEM_SERVICES, TSO_PROGRAMS,
+};
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ProgramInput {
     pub parameter: Option<String>,
@@ -41,17 +49,57 @@ pub enum UtilityDisposition {
     ImsController,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ProgramExecution {
+    ProgramService,
+    Idcams,
+    Sdsf,
+    Db2Tso,
+    ImsController,
+    Unsupported,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct CommonProgramEntry {
+    pub name: &'static str,
+    pub disposition: UtilityDisposition,
+    pub execution: ProgramExecution,
+    pub builtin: Option<BuiltinProgram>,
+}
+
+#[must_use]
+pub const fn common_program_catalog_sha256() -> &'static str {
+    COMMON_PROGRAM_CATALOG_SHA256
+}
+
+fn common_program(program: &str) -> Option<&'static CommonProgramEntry> {
+    COMMON_PROGRAMS
+        .iter()
+        .find(|entry| entry.name.eq_ignore_ascii_case(program))
+}
+
+pub(crate) fn program_execution(program: &str) -> ProgramExecution {
+    common_program(program).map_or(ProgramExecution::ProgramService, |entry| entry.execution)
+}
+
+pub(crate) fn tso_program_execution(program: &str) -> Option<TsoProgramExecution> {
+    TSO_PROGRAMS
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case(program))
+        .map(|(_, execution)| *execution)
+}
+
+#[must_use]
+pub fn system_service_program(program: &str) -> Option<SystemServiceProgram> {
+    SYSTEM_SERVICES
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case(program))
+        .map(|(_, service)| *service)
+}
+
 #[must_use]
 pub fn utility_disposition(program: &str) -> Option<UtilityDisposition> {
-    Some(match program.to_ascii_uppercase().as_str() {
-        "IDCAMS" | "IEBGENER" | "SORT" | "IEFBR14" => UtilityDisposition::Implemented,
-        "SDSF" => UtilityDisposition::CicsFileControl,
-        "FTP" => UtilityDisposition::NetworkFtp,
-        "IKJEFT1B" => UtilityDisposition::ReportRexx,
-        "IKJEFT01" => UtilityDisposition::Db2Tso,
-        "DFSRRC00" => UtilityDisposition::ImsController,
-        _ => return None,
-    })
+    common_program(program).map(|entry| entry.disposition)
 }
 
 pub struct ProgramRouter {
@@ -98,12 +146,12 @@ impl ProgramRouter {
         mut programs: BTreeMap<String, Arc<dyn Program>>,
         limits: InvocationLimits,
     ) -> Result<Arc<Self>, HostProblem> {
-        for name in [
-            "IEFBR14", "IEBGENER", "IEBCOPY", "IEBCOMPR", "IEBDG", "IEBEDIT", "IEBUPDTE", "IDCAMS",
-            "SORT",
-        ] {
+        for entry in COMMON_PROGRAMS
+            .iter()
+            .filter(|entry| entry.builtin.is_some())
+        {
             if programs
-                .insert(name.to_string(), Arc::new(Builtin(name)))
+                .insert(entry.name.to_string(), Arc::new(Builtin(entry)))
                 .is_some()
             {
                 return Err(HostProblem::IdempotencyConflict);
@@ -178,18 +226,18 @@ pub fn decode_program_output(payload: &BoundedPayload) -> Result<ProgramOutput, 
     serde_json::from_slice(payload.bytes()).map_err(|_| HostProblem::Malformed)
 }
 
-struct Builtin(&'static str);
+struct Builtin(&'static CommonProgramEntry);
 
 impl Program for Builtin {
     fn execute(&self, _: &Invocation, input: &ProgramInput) -> Result<ProgramOutput, HostProblem> {
-        match self.0 {
-            "IEFBR14" => output(0, vec![b"IEFBR14".to_vec()]),
-            "IEBGENER" => {
+        match self.0.builtin.ok_or(HostProblem::InfrastructureFailure)? {
+            BuiltinProgram::Iefbr14 => output(0, vec![self.0.name.as_bytes().to_vec()]),
+            BuiltinProgram::Iebgener => {
                 let records = dd_records(input, "SYSUT1")?;
                 output_to(0, records, "SYSUT2")
             }
-            "IEBCOPY" => output(0, vec![summary("IEBCOPY", input)]),
-            "IEBCOMPR" => {
+            BuiltinProgram::Iebcopy => output(0, vec![summary(self.0.name, input)]),
+            BuiltinProgram::Iebcompr => {
                 let left = dd_records(input, "SYSUT1")?;
                 let right = dd_records(input, "SYSUT2")?;
                 output(
@@ -201,10 +249,10 @@ impl Program for Builtin {
                     }],
                 )
             }
-            "IEBDG" => output(0, vec![summary("IEBDG", input)]),
-            "IEBEDIT" => output(0, vec![summary("IEBEDIT", input)]),
-            "IEBUPDTE" => output(0, vec![summary("IEBUPDTE", input)]),
-            "IDCAMS" => {
+            BuiltinProgram::Iebdg | BuiltinProgram::Iebedit | BuiltinProgram::Iebupdte => {
+                output(0, vec![summary(self.0.name, input)])
+            }
+            BuiltinProgram::Idcams => {
                 let control = input
                     .dds
                     .iter()
@@ -229,14 +277,13 @@ impl Program for Builtin {
                 }
                 output(0, vec![format!("IDCAMS {command}").into_bytes()])
             }
-            "SORT" => {
+            BuiltinProgram::Sort => {
                 let mut records = dd_records(input, "SORTIN")?;
                 records.sort();
                 records = sort_outrec(input, records)?;
                 fit_sortout_records(input, &mut records)?;
                 output_to(0, records, "SORTOUT")
             }
-            _ => Err(HostProblem::Unsupported),
         }
     }
 }
@@ -651,13 +698,22 @@ mod tests {
             utility_disposition("IKJEFT1B"),
             Some(UtilityDisposition::ReportRexx)
         );
+        assert_eq!(
+            tso_program_execution("DSNTIAUL"),
+            Some(TsoProgramExecution::Extract)
+        );
+        assert_eq!(
+            system_service_program("ceedays"),
+            Some(SystemServiceProgram::Ceedays)
+        );
+        assert!(common_program_catalog_sha256().starts_with("sha256:"));
         assert_eq!(utility_disposition("UNKNOWN"), None);
     }
 
     #[test]
     fn generate_and_sort_transform_exact_records() {
         assert_eq!(
-            Builtin("IEBGENER")
+            Builtin(common_program("IEBGENER").unwrap())
                 .execute(&invocation(), &input("SYSUT1", b"B\nA\n"))
                 .unwrap()
                 .records,
@@ -667,7 +723,7 @@ mod tests {
         let mut sort_output = input("SORTOUT", b"");
         sort_input.dds.append(&mut sort_output.dds);
         assert_eq!(
-            Builtin("SORT")
+            Builtin(common_program("SORT").unwrap())
                 .execute(&invocation(), &sort_input)
                 .unwrap()
                 .records,
@@ -709,7 +765,8 @@ mod tests {
     #[test]
     fn idcams_unknown_command_is_not_generic_success() {
         assert_eq!(
-            Builtin("IDCAMS").execute(&invocation(), &input("SYSIN", b"UNKNOWN THING")),
+            Builtin(common_program("IDCAMS").unwrap())
+                .execute(&invocation(), &input("SYSIN", b"UNKNOWN THING")),
             Err(HostProblem::Unsupported)
         );
     }

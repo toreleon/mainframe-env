@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/application-installer@1",
+  "title": "Bounded durable retained application package state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "applications"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.application-installer@1"},
+    "applications": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["application", "selected", "generations"],
+        "properties": {
+          "application": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Z0-9._@$#-]+$"},
+          "selected": {"type": ["integer", "null"], "minimum": 1},
+          "generations": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["package", "state"],
+              "properties": {
+                "package": {"type": "object"},
+                "state": {"enum": ["Staged", "Ready"]}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

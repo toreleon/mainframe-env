@@ -4,27 +4,33 @@ use axum::body::{Body, to_bytes};
 use axum::http::{Method, Request, StatusCode};
 use base64::Engine;
 use mainframe_env_application::{
-    ApplicationInstaller, ApplicationManifest, ApplicationPackage, DatasetCatalog,
-    DatasetCatalogEntry, DatasetDefinition, EntryKind, GenerationGroupDefinition, InstallProblem,
-    InstallState, PackageEntry, ProgramArtifact, ProgramCatalog, ProgramFrame, ProgramFrames,
-    package_identity, parse_bms, parse_csd,
+    APPLICATION_PACKAGE_V2_CONTRACT, ApplicationInstaller, ApplicationManifest, ApplicationPackage,
+    ApplicationPackageV2, ApplicationSections, BatchController, BatchControllerKind,
+    DatasetCatalog, DatasetCatalogEntry, DatasetDefinition, EntryKind, GenerationGroupDefinition,
+    InstallProblem, InstallState, PackageEntry, PackageSignature, ProgramArtifact, ProgramCatalog,
+    ProgramFrame, ProgramFrames, SqlColumn, SqlTable, package_identity, package_v2_identity,
+    parse_bms, parse_csd,
 };
 use mainframe_env_batch::{
     JclBundle, JclLimits, JobPlan, JobState, StepCondition, UtilityDisposition, parse_jcl,
     utility_disposition, validate_idcams_control,
 };
 use mainframe_env_cics::{
-    BmsFieldDefinition, BmsMapDefinition, CicsFileDefinition, CicsFileStatus,
+    BmsFieldDefinition, BmsMapDefinition, CicsFileDefinition, CicsFileStatus, cics_abi_library,
 };
 use mainframe_env_compiler::{
     CobolCompiler, ControlEdgeKind, ControlRole, DataCategory, SemanticModel, StatementKind,
-    StorageSection, compatibility_copybooks, owned_compatibility_library,
+    StorageSection,
 };
 use mainframe_env_compiler_api::{
     CompilationMode, CompileOptions, CompileTarget, CompilerRequest, CompilerResult,
     CompilerService,
 };
 use mainframe_env_dataset::{DatasetLimits, DatasetSeedObject, DatasetService};
+use mainframe_env_db2::{
+    Db2ColumnDefinition, Db2ExtractField, Db2ExtractLayout, Db2ForeignKeyDefinition,
+    Db2ResultEncoding, Db2TableDefinition, db2_abi_library,
+};
 use mainframe_env_diagnostics::Completeness;
 use mainframe_env_encoding::CodePage;
 use mainframe_env_execution_api::{
@@ -43,19 +49,22 @@ use mainframe_env_ims::{
     ImsApplicationDefinition, ImsDatabaseDefinition, ImsLimits, ImsLoadImage, ImsLoadRoot,
     ImsPcbDefinition, ImsPsbDefinition, ImsSegmentDefinition, ImsService, ims_providers,
 };
-use mainframe_env_mq::{MqQueueDefinition, MqService, mq_providers};
+use mainframe_env_mq::{MqQueueDefinition, MqService, mq_abi_library, mq_providers};
 use mainframe_env_racf::{
     MemorySecretResolver, RacfManifest, RacfProfileDefinition, RacfService, RacfUserDefinition,
 };
 use mainframe_env_server::{
-    BatchProgramDefinition, OnlineApplicationDefinition, OnlineProgramDefinition, ProductServer,
-    ServerConfig, StoreProfile, TlsConfig, compatible_system_services, default_program_router,
+    BatchProgramDefinition, HmacSha256PackageTrust, OnlineApplicationDefinition,
+    OnlineProgramDefinition, ProductServer, ServerConfig, StoreProfile, TlsConfig,
+    compatible_system_services, default_program_router,
 };
 use mainframe_env_source::{
-    LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLibrary,
-    SourceLimits,
+    HostAbiLibraryDefinition, LogicalPath, MaterializedHostAbiLibraries, SourceBundle,
+    SourceEncoding, SourceFile, SourceFormat, SourceLibrary, SourceLimits,
+    materialize_host_abi_libraries,
 };
 use mainframe_env_store::{MemoryStore, PostgresStateStore, SqliteStateStore};
+use ring::hmac;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -1096,9 +1105,10 @@ pub fn verify_carddemo_source_closures_from_env(
             "explicit source closure counts differ from the pinned inventory",
         ));
     }
-    let owned_names = compatibility_copybooks()
+    let owned_names = subsystem_abi_definitions()
         .iter()
-        .map(|copybook| copybook.name.to_string())
+        .flat_map(|library| library.members.iter())
+        .map(|member| member.name.to_string())
         .collect::<BTreeSet<_>>();
     if contract
         .external_compatibility_copybooks
@@ -1117,13 +1127,22 @@ pub fn verify_carddemo_source_closures_from_env(
         .iter()
         .map(|path| source_file(corpus_dir, path, limits))
         .collect::<Result<Vec<_>, _>>()?;
-    let (compatibility, compatibility_library) =
-        owned_compatibility_library(limits).map_err(|error| {
-            CorpusProblem::new(
-                "carddemo.closure.compatibility_invalid",
-                format!("owned compatibility catalog is invalid: {error}"),
-            )
-        })?;
+    let abi = subsystem_abi_libraries(limits)?;
+    let compatibility = abi.files;
+    let compatibility_library = SourceLibrary::new(
+        "owned-compatibility",
+        compatibility
+            .iter()
+            .map(|file| file.path().clone())
+            .collect(),
+        limits,
+    )
+    .map_err(|error| {
+        CorpusProblem::new(
+            "carddemo.closure.compatibility_invalid",
+            format!("legacy compatibility projection is invalid: {error}"),
+        )
+    })?;
     let placeholder_content_present = compatibility.iter().any(|file| {
         String::from_utf8_lossy(file.bytes())
             .to_ascii_lowercase()
@@ -1221,7 +1240,7 @@ pub fn verify_carddemo_source_closures_from_env(
         status: "pass".into(),
         corpus_commit: corpus.commit,
         source_library_contract: mainframe_env_source::SOURCE_LIBRARY_CONTRACT.into(),
-        compatibility_contract: mainframe_env_compiler::COMPATIBILITY_COPYBOOK_CONTRACT.into(),
+        compatibility_contract: LEGACY_COMPATIBILITY_COPYBOOK_CONTRACT.into(),
         programs_checked: source_paths.len(),
         application_copybooks: copybooks.len(),
         owned_compatibility_copybooks: compatibility.len(),
@@ -4642,6 +4661,369 @@ pub fn verify_carddemo_db2_from_env(
     })
 }
 
+fn carddemo_package_trust() -> Result<Arc<HmacSha256PackageTrust>, CorpusProblem> {
+    let resolver = Arc::new(MemorySecretResolver::default());
+    resolver.insert(
+        "secret:carddemo-package-key",
+        b"carddemo-conformance-hmac-key-0001".to_vec(),
+    );
+    HmacSha256PackageTrust::new(
+        BTreeMap::from([(
+            "carddemo-conformance-key".into(),
+            SecretRef::new("secret:carddemo-package-key", Default::default())
+                .map_err(terminal_problem)?,
+        )]),
+        resolver,
+    )
+    .map(Arc::new)
+    .map_err(terminal_problem)
+}
+
+fn sign_carddemo_package_identity(identity: &str) -> String {
+    base64::engine::general_purpose::STANDARD_NO_PAD.encode(hmac::sign(
+        &hmac::Key::new(hmac::HMAC_SHA256, b"carddemo-conformance-hmac-key-0001"),
+        identity.as_bytes(),
+    ))
+}
+
+fn carddemo_db2_column(
+    name: &str,
+    nullable: bool,
+    max_bytes: usize,
+    result_encoding: Db2ResultEncoding,
+) -> Db2ColumnDefinition {
+    Db2ColumnDefinition {
+        name: name.into(),
+        nullable,
+        max_bytes,
+        result_encoding,
+        default_value: None,
+    }
+}
+
+fn carddemo_db2_definitions() -> Vec<Db2TableDefinition> {
+    let transaction = Db2TableDefinition {
+        name: "CARDDEMO.TRANSACTION_TYPE".into(),
+        columns: vec![
+            carddemo_db2_column("TR_TYPE", false, 2, Db2ResultEncoding::Raw),
+            carddemo_db2_column("TR_DESCRIPTION", false, 50, Db2ResultEncoding::Varchar),
+        ],
+        primary_key: vec!["TR_TYPE".into()],
+        foreign_keys: Vec::new(),
+        extract: Some(Db2ExtractLayout {
+            fields: vec![
+                Db2ExtractField {
+                    column: "TR_TYPE".into(),
+                    width: 2,
+                },
+                Db2ExtractField {
+                    column: "TR_DESCRIPTION".into(),
+                    width: 50,
+                },
+            ],
+            trailer: b"00000000".to_vec(),
+        }),
+    };
+    let category = Db2TableDefinition {
+        name: "CARDDEMO.TRANSACTION_TYPE_CATEGORY".into(),
+        columns: vec![
+            carddemo_db2_column("TRC_TYPE_CODE", false, 2, Db2ResultEncoding::Raw),
+            carddemo_db2_column("TRC_TYPE_CATEGORY", false, 4, Db2ResultEncoding::Raw),
+            carddemo_db2_column("TRC_CAT_DATA", false, 50, Db2ResultEncoding::Varchar),
+        ],
+        primary_key: vec!["TRC_TYPE_CODE".into(), "TRC_TYPE_CATEGORY".into()],
+        foreign_keys: vec![Db2ForeignKeyDefinition {
+            columns: vec!["TRC_TYPE_CODE".into()],
+            referenced_table: "CARDDEMO.TRANSACTION_TYPE".into(),
+            referenced_columns: vec!["TR_TYPE".into()],
+            delete_restrict: true,
+        }],
+        extract: Some(Db2ExtractLayout {
+            fields: vec![
+                Db2ExtractField {
+                    column: "TRC_TYPE_CODE".into(),
+                    width: 2,
+                },
+                Db2ExtractField {
+                    column: "TRC_TYPE_CATEGORY".into(),
+                    width: 4,
+                },
+                Db2ExtractField {
+                    column: "TRC_CAT_DATA".into(),
+                    width: 50,
+                },
+            ],
+            trailer: b"0000".to_vec(),
+        }),
+    };
+    let authorization_columns = [
+        ("CARD_NUM", 16, Db2ResultEncoding::Raw),
+        ("AUTH_TS", 256, Db2ResultEncoding::Raw),
+        ("AUTH_TYPE", 4, Db2ResultEncoding::Raw),
+        ("CARD_EXPIRY_DATE", 4, Db2ResultEncoding::Raw),
+        ("MESSAGE_TYPE", 6, Db2ResultEncoding::Raw),
+        ("MESSAGE_SOURCE", 6, Db2ResultEncoding::Raw),
+        ("AUTH_ID_CODE", 6, Db2ResultEncoding::Raw),
+        ("AUTH_RESP_CODE", 2, Db2ResultEncoding::Raw),
+        ("AUTH_RESP_REASON", 4, Db2ResultEncoding::Raw),
+        ("PROCESSING_CODE", 6, Db2ResultEncoding::Raw),
+        ("TRANSACTION_AMT", 12, Db2ResultEncoding::Raw),
+        ("APPROVED_AMT", 12, Db2ResultEncoding::Raw),
+        ("MERCHANT_CATAGORY_CODE", 4, Db2ResultEncoding::Raw),
+        ("ACQR_COUNTRY_CODE", 3, Db2ResultEncoding::Raw),
+        ("POS_ENTRY_MODE", 256, Db2ResultEncoding::Raw),
+        ("MERCHANT_ID", 15, Db2ResultEncoding::Raw),
+        ("MERCHANT_NAME", 22, Db2ResultEncoding::Varchar),
+        ("MERCHANT_CITY", 13, Db2ResultEncoding::Raw),
+        ("MERCHANT_STATE", 2, Db2ResultEncoding::Raw),
+        ("MERCHANT_ZIP", 9, Db2ResultEncoding::Raw),
+        ("TRANSACTION_ID", 15, Db2ResultEncoding::Raw),
+        ("MATCH_STATUS", 1, Db2ResultEncoding::Raw),
+        ("AUTH_FRAUD", 1, Db2ResultEncoding::Raw),
+        ("FRAUD_RPT_DATE", 256, Db2ResultEncoding::Raw),
+        ("ACCT_ID", 11, Db2ResultEncoding::Raw),
+        ("CUST_ID", 9, Db2ResultEncoding::Raw),
+    ];
+    let authorization = Db2TableDefinition {
+        name: "CARDDEMO.AUTHFRDS".into(),
+        columns: authorization_columns
+            .into_iter()
+            .map(|(name, max_bytes, encoding)| {
+                carddemo_db2_column(
+                    name,
+                    !matches!(name, "CARD_NUM" | "AUTH_TS"),
+                    max_bytes,
+                    encoding,
+                )
+            })
+            .collect(),
+        primary_key: vec!["CARD_NUM".into(), "AUTH_TS".into()],
+        foreign_keys: Vec::new(),
+        extract: None,
+    };
+    vec![transaction, category, authorization]
+}
+
+fn carddemo_batch_controller(
+    name: &str,
+    kind: BatchControllerKind,
+    properties: &[(&str, &str)],
+) -> BatchController {
+    let program = properties
+        .iter()
+        .find_map(|(name, value)| (*name == "selector-program").then_some(*value))
+        .expect("every CardDemo controller has a selector program");
+    BatchController {
+        name: name.into(),
+        program: format!("program/{program}"),
+        kind,
+        properties: properties
+            .iter()
+            .map(|(name, value)| ((*name).into(), (*value).into()))
+            .collect(),
+    }
+}
+
+fn carddemo_batch_controllers() -> Vec<BatchController> {
+    vec![
+        carddemo_batch_controller(
+            "TRANSACTION-TYPE-MAINTENANCE",
+            BatchControllerKind::CobolProgram,
+            &[
+                ("launcher", "tso-run"),
+                ("selector-program", "COBTUPDT"),
+                ("behavior", "program-call"),
+            ],
+        ),
+        carddemo_batch_controller(
+            "AUTHORIZATION-IMS-LOAD",
+            BatchControllerKind::ImsMessageProcessing,
+            &[
+                ("launcher", "ims-controller"),
+                ("selector-mode", "BMP"),
+                ("selector-program", "PAUDBLOD"),
+                ("selector-qualifier", "PSBPAUTB"),
+                ("behavior", "ims-load"),
+                ("database", "DBPAUTP0"),
+                ("root-dd", "INFILE1"),
+                ("child-dd", "INFILE2"),
+                ("root-record-bytes", "100"),
+                ("child-record-bytes", "206"),
+                ("parent-key-bytes", "6"),
+            ],
+        ),
+        carddemo_batch_controller(
+            "AUTHORIZATION-IMS-UNLOAD",
+            BatchControllerKind::ImsMessageProcessing,
+            &[
+                ("launcher", "ims-controller"),
+                ("selector-mode", "DLI"),
+                ("selector-program", "PAUDBUNL"),
+                ("selector-qualifier", "PAUTBUNL"),
+                ("behavior", "ims-unload"),
+                ("database", "DBPAUTP0"),
+                ("root-segment", "PAUTSUM0"),
+                ("child-segment", "PAUTDTL1"),
+                ("root-output-dd", "OUTFIL1"),
+                ("child-output-dd", "OUTFIL2"),
+            ],
+        ),
+        carddemo_batch_controller(
+            "AUTHORIZATION-EXPIRY-PURGE",
+            BatchControllerKind::ImsMessageProcessing,
+            &[
+                ("launcher", "ims-controller"),
+                ("selector-mode", "BMP"),
+                ("selector-program", "CBPAUP0C"),
+                ("selector-qualifier", "PSBPAUTB"),
+                ("behavior", "ims-purge"),
+                ("psb", "PSBPAUTB"),
+                ("root-segment", "PAUTSUM0"),
+                ("child-segment", "PAUTDTL1"),
+                ("control-dd", "SYSIN"),
+                ("required-expiry-days", "00"),
+                ("checkpoint-prefix", "CD026"),
+                ("summary-field", "SUMMARY-AUTHORIZATION-ADJUSTED"),
+            ],
+        ),
+        carddemo_batch_controller(
+            "AUTHORIZATION-IMS-IMAGE-UNLOAD",
+            BatchControllerKind::DeclarativeUtility,
+            &[
+                ("launcher", "ims-controller"),
+                ("selector-mode", "ULU"),
+                ("selector-program", "DFSURGU0"),
+                ("selector-qualifier", "DBPAUTP0"),
+                ("behavior", "ims-unload"),
+                ("database", "DBPAUTP0"),
+                ("root-segment", "PAUTSUM0"),
+                ("child-segment", "PAUTDTL1"),
+                ("combined-output-dd", "DFSURGU1"),
+            ],
+        ),
+    ]
+}
+
+fn install_carddemo_db2_package(
+    server: &Arc<ProductServer>,
+    batch_programs: &[BatchProgramDefinition],
+) -> Result<(), CorpusProblem> {
+    let definitions = carddemo_db2_definitions();
+    let batch_controllers = carddemo_batch_controllers();
+    let catalog_bytes = serde_json::to_vec(&definitions)
+        .map_err(|error| CorpusProblem::new("carddemo.db2.package", error.to_string()))?;
+    let mut payloads: Vec<(EntryKind, String, Vec<u8>)> = vec![
+        (
+            EntryKind::Source,
+            "source/manifest".into(),
+            b"source".to_vec(),
+        ),
+        (
+            EntryKind::Resource,
+            "resource/manifest".into(),
+            b"resource".to_vec(),
+        ),
+        (EntryKind::Data, "data/db2/catalog".into(), catalog_bytes),
+        (
+            EntryKind::Profile,
+            "profile/manifest".into(),
+            b"profile".to_vec(),
+        ),
+        (
+            EntryKind::Migration,
+            "migration/manifest".into(),
+            b"application-package-v1-to-v2".to_vec(),
+        ),
+    ];
+    for controller in &batch_controllers {
+        let program = controller
+            .program
+            .rsplit('/')
+            .next()
+            .ok_or_else(|| CorpusProblem::new("carddemo.db2.package", "program is missing"))?;
+        let payload = if controller.kind == BatchControllerKind::CobolProgram
+            && controller.properties.get("behavior").map(String::as_str) == Some("program-call")
+        {
+            batch_programs
+                .iter()
+                .find(|definition| definition.name.eq_ignore_ascii_case(program))
+                .map(|definition| definition.payload.clone())
+                .unwrap_or_else(|| format!("carddemo-controller:{program}").into_bytes())
+        } else {
+            format!("carddemo-controller:{program}").into_bytes()
+        };
+        payloads.push((EntryKind::Program, controller.program.clone(), payload));
+    }
+    let mut entries = Vec::new();
+    let mut blobs = BTreeMap::new();
+    for (kind, path, bytes) in payloads {
+        let digest = format!("sha256:{:x}", Sha256::digest(&bytes));
+        entries.push(PackageEntry {
+            path,
+            kind,
+            sha256: digest.clone(),
+            bytes: bytes.len(),
+            depends_on: (kind != EntryKind::Source)
+                .then(|| "source/manifest".into())
+                .into_iter()
+                .collect(),
+        });
+        blobs.insert(digest, bytes);
+    }
+    let sql_tables = definitions
+        .iter()
+        .map(|table| SqlTable {
+            name: table.name.clone(),
+            columns: table
+                .columns
+                .iter()
+                .map(|column| SqlColumn {
+                    name: column.name.clone(),
+                    nullable: column.nullable,
+                })
+                .collect(),
+            primary_key: table.primary_key.clone(),
+        })
+        .collect();
+    let mut package = ApplicationPackageV2 {
+        base: ApplicationPackage {
+            manifest: ApplicationManifest {
+                name: "AWS-CARDDEMO".into(),
+                version: "0.2.0".into(),
+                target_product: "0.2.0".into(),
+                entries,
+            },
+            blobs,
+        },
+        generation: 1,
+        sections: ApplicationSections {
+            schema_version: APPLICATION_PACKAGE_V2_CONTRACT.into(),
+            host_abi_libraries: Vec::new(),
+            sql_tables,
+            sql_rows: Vec::new(),
+            ims_definitions: Vec::new(),
+            ims_rows: Vec::new(),
+            mq_resources: Vec::new(),
+            batch_controllers,
+            security_resources: Vec::new(),
+        },
+        signature: PackageSignature {
+            algorithm: "hmac-sha256@1".into(),
+            key_id: "carddemo-conformance-key".into(),
+            value: "pending".into(),
+        },
+    };
+    let identity = package_v2_identity(&package).map_err(package_problem)?;
+    package.signature.value = sign_carddemo_package_identity(&identity);
+    let installed = server
+        .install_application_package_v2(&package)
+        .map_err(terminal_problem)?;
+    server
+        .publish_application_generation(&installed)
+        .map(|_| ())
+        .map_err(terminal_problem)
+}
+
 async fn exercise_db2_routes(
     corpus_dir: &Path,
     online: OnlineApplicationDefinition,
@@ -4661,22 +5043,24 @@ async fn exercise_db2_routes(
     };
     let store = Arc::new(MemoryStore::new(Default::default()));
     let secrets = Arc::new(MemorySecretResolver::default());
-    let server = ProductServer::open(
+    let server = ProductServer::open_with_package_trust(
         config.clone(),
         store.clone(),
         secrets.clone(),
         default_program_router(),
+        carddemo_package_trust()?,
     )
     .map_err(terminal_problem)?;
+    server
+        .install_batch_programs(definitions.clone())
+        .map_err(terminal_problem)?;
+    install_carddemo_db2_package(&server, &definitions)?;
     server
         .bootstrap_user("IBMUSER", b"TESTPASS")
         .map_err(terminal_problem)?;
     install_base_online_authorities(&server, corpus_dir, &online)?;
     server
         .install_online_application(online)
-        .map_err(terminal_problem)?;
-    server
-        .install_batch_programs(definitions)
         .map_err(terminal_problem)?;
     let racf = server.racf_service();
     racf.define_profile("DATASET", "AWS.M2.CARDDEMO.**", "IBMUSER", None)
@@ -4988,7 +5372,13 @@ async fn exercise_db2_routes(
         0x7d,
         BTreeMap::from([("OPTION".into(), "6".into())]),
     )
-    .await?;
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.maintenance_failed",
+            format!("edit launch: {}", problem.detail),
+        )
+    })?;
     require_online_mapset(&edit_screen, "COTRTUP", "Db2 update route")?;
     let selected = carddemo_terminal_exchange(
         &app,
@@ -4997,7 +5387,13 @@ async fn exercise_db2_routes(
         0x7d,
         BTreeMap::from([("TRTYPCD".into(), "99".into())]),
     )
-    .await?;
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.maintenance_failed",
+            format!("edit lookup: {}", problem.detail),
+        )
+    })?;
     require_online_mapset(&selected, "COTRTUP", "Db2 update lookup")?;
     let reviewed = carddemo_terminal_exchange(
         &app,
@@ -5006,7 +5402,13 @@ async fn exercise_db2_routes(
         0x7d,
         BTreeMap::from([("TRTYDSC".into(), "ONLINE UPDATED".into())]),
     )
-    .await?;
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.maintenance_failed",
+            format!("edit validation: {}", problem.detail),
+        )
+    })?;
     require_online_mapset(&reviewed, "COTRTUP", "Db2 update validation")?;
     let updated = carddemo_terminal_exchange(
         &app,
@@ -5015,7 +5417,13 @@ async fn exercise_db2_routes(
         0xf5,
         BTreeMap::new(),
     )
-    .await?;
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.maintenance_failed",
+            format!("edit commit: {}", problem.detail),
+        )
+    })?;
     require_online_mapset(&updated, "COTRTUP", "Db2 online update")?;
     if !server
         .db2_service()
@@ -5052,7 +5460,13 @@ async fn exercise_db2_routes(
         0x7d,
         BTreeMap::from([("OPTION".into(), "6".into())]),
     )
-    .await?;
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.maintenance_failed",
+            format!("delete launch: {}", problem.detail),
+        )
+    })?;
     require_online_mapset(&delete_screen, "COTRTUP", "Db2 delete route")?;
     let selected = carddemo_terminal_exchange(
         &app,
@@ -5061,7 +5475,13 @@ async fn exercise_db2_routes(
         0x7d,
         BTreeMap::from([("TRTYPCD".into(), "99".into())]),
     )
-    .await?;
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.maintenance_failed",
+            format!("delete lookup: {}", problem.detail),
+        )
+    })?;
     require_online_mapset(&selected, "COTRTUP", "Db2 delete lookup")?;
     let confirmed = carddemo_terminal_exchange(
         &app,
@@ -5070,7 +5490,13 @@ async fn exercise_db2_routes(
         0xf4,
         BTreeMap::new(),
     )
-    .await?;
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.maintenance_failed",
+            format!("delete confirmation: {}", problem.detail),
+        )
+    })?;
     require_online_mapset(&confirmed, "COTRTUP", "Db2 delete confirmation")?;
     let deleted = carddemo_terminal_exchange(
         &app,
@@ -5079,7 +5505,13 @@ async fn exercise_db2_routes(
         0xf4,
         BTreeMap::new(),
     )
-    .await?;
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.maintenance_failed",
+            format!("delete commit: {}", problem.detail),
+        )
+    })?;
     require_online_mapset(&deleted, "COTRTUP", "Db2 online delete")?;
     if server
         .db2_service()
@@ -5104,7 +5536,10 @@ async fn exercise_db2_routes(
                 50_001,
                 BTreeMap::from([
                     ("DCL-TR-TYPE".into(), db2_variable("97")),
-                    ("DCL-TR-DESCRIPTION".into(), db2_variable("ROLLBACK")),
+                    (
+                        "DCL-TR-DESCRIPTION".into(),
+                        db2_varchar_variable("ROLLBACK"),
+                    ),
                 ]),
             )?,
         )
@@ -5141,7 +5576,10 @@ async fn exercise_db2_routes(
                     sequence,
                     BTreeMap::from([
                         ("DCL-TR-TYPE".into(), db2_variable("02")),
-                        ("DCL-TR-DESCRIPTION".into(), db2_variable(description)),
+                        (
+                            "DCL-TR-DESCRIPTION".into(),
+                            db2_varchar_variable(description),
+                        ),
                     ]),
                 )?,
             )
@@ -5177,7 +5615,10 @@ async fn exercise_db2_routes(
                 50_007,
                 BTreeMap::from([
                     ("DCL-TR-TYPE".into(), db2_variable("01")),
-                    ("DCL-TR-DESCRIPTION".into(), db2_variable("DUPLICATE")),
+                    (
+                        "DCL-TR-DESCRIPTION".into(),
+                        db2_varchar_variable("DUPLICATE"),
+                    ),
                 ]),
             )?,
         )
@@ -5277,8 +5718,19 @@ async fn exercise_db2_routes(
     }
     drop(racf);
     drop(server);
-    let restarted = ProductServer::open(config, store, secrets, default_program_router())
-        .map_err(terminal_problem)?;
+    let restarted = ProductServer::open_with_package_trust(
+        config,
+        store,
+        secrets,
+        default_program_router(),
+        carddemo_package_trust()?,
+    )
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.restart_open",
+            format!("package-verified reopen failed: {problem}"),
+        )
+    })?;
     if db2_table_digests(&restarted)? != table_sha256
         || db2_dataset_digests(&restarted)? != dataset_sha256
         || base_batch_spool_digests(&restarted, &job_ids)? != spool_sha256
@@ -5296,7 +5748,13 @@ async fn exercise_db2_routes(
         0xf8,
         BTreeMap::new(),
     )
-    .await?;
+    .await
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.db2.restart_failed",
+            format!("cursor resume: {}", problem.detail),
+        )
+    })?;
     require_online_mapset(&resumed, "COTRTLI", "Db2 cursor restart")?;
     let _ = restarted.graceful_shutdown().await;
     drop(restarted);
@@ -6447,13 +6905,15 @@ async fn exercise_mq_authorization_routes(
         ..ServerConfig::default()
     };
     let store = Arc::new(MemoryStore::new(Default::default()));
-    let server = ProductServer::open(
+    let server = ProductServer::open_with_package_trust(
         config.clone(),
         store.clone(),
         Arc::new(MemorySecretResolver::default()),
         default_program_router(),
+        carddemo_package_trust()?,
     )
     .map_err(terminal_problem)?;
+    install_carddemo_db2_package(&server, &[])?;
     server
         .bootstrap_user("IBMUSER", b"TESTPASS")
         .map_err(terminal_problem)?;
@@ -7034,7 +7494,7 @@ async fn exercise_mq_authorization_routes(
         &authorization_db2_request(
             Db2Operation::Update,
             305,
-            "UPDATE CARDDEMO.AUTHFRDS SET AUTH_FRAUD",
+            "UPDATE CARDDEMO.AUTHFRDS SET AUTH_FRAUD = :AUTH-FRAUD, FRAUD_RPT_DATE = CURRENT DATE",
             update_inputs,
         )?,
     )
@@ -7157,13 +7617,19 @@ async fn exercise_mq_authorization_routes(
     drop(ims);
     drop(mq);
     drop(server);
-    let restarted = ProductServer::open(
+    let restarted = ProductServer::open_with_package_trust(
         config,
         store,
         Arc::new(MemorySecretResolver::default()),
         default_program_router(),
+        carddemo_package_trust()?,
     )
-    .map_err(terminal_problem)?;
+    .map_err(|problem| {
+        CorpusProblem::new(
+            "carddemo.mq.restart_open",
+            format!("package-verified reopen failed: {problem}"),
+        )
+    })?;
     if mq_queue_digests(&restarted.mq_service())? != queue_sha256
         || restarted
             .ims_service()
@@ -7529,13 +7995,15 @@ async fn exercise_ims_routes(
         ..ServerConfig::default()
     };
     let store = Arc::new(MemoryStore::new(Default::default()));
-    let server = ProductServer::open(
+    let server = ProductServer::open_with_package_trust(
         config.clone(),
         store.clone(),
         Arc::new(MemorySecretResolver::default()),
         default_program_router(),
+        carddemo_package_trust()?,
     )
     .map_err(terminal_problem)?;
+    install_carddemo_db2_package(&server, &[])?;
     let ims = server.ims_service();
     let install = ims.install(definition.clone()).map_err(terminal_problem)?;
     if !ims
@@ -7997,11 +8465,12 @@ async fn exercise_ims_routes(
     }
     drop(ims);
     drop(server);
-    let restarted = ProductServer::open(
+    let restarted = ProductServer::open_with_package_trust(
         config,
         store,
         Arc::new(MemorySecretResolver::default()),
         default_program_router(),
+        carddemo_package_trust()?,
     )
     .map_err(terminal_problem)?;
     if ims_hierarchy_digest(
@@ -8334,6 +8803,18 @@ fn db2_control_invocation(run: &str) -> Result<Invocation, CorpusProblem> {
 fn db2_variable(value: &str) -> Db2HostVariable {
     Db2HostVariable {
         value: value.as_bytes().to_vec(),
+        indicator: None,
+    }
+}
+
+fn db2_varchar_variable(value: &str) -> Db2HostVariable {
+    let mut bytes = u16::try_from(value.len())
+        .expect("CardDemo VARCHAR control is bounded")
+        .to_be_bytes()
+        .to_vec();
+    bytes.extend_from_slice(value.as_bytes());
+    Db2HostVariable {
+        value: bytes,
         indicator: None,
     }
 }
@@ -13159,6 +13640,24 @@ fn digest_field(digest: &mut Sha256, bytes: &[u8]) {
     digest.update(bytes);
 }
 
+const LEGACY_COMPATIBILITY_COPYBOOK_CONTRACT: &str =
+    "mainframe-env.cobol-compatibility-copybooks@1";
+
+fn subsystem_abi_definitions() -> [HostAbiLibraryDefinition; 3] {
+    [cics_abi_library(), db2_abi_library(), mq_abi_library()]
+}
+
+fn subsystem_abi_libraries(
+    limits: SourceLimits,
+) -> Result<MaterializedHostAbiLibraries, CorpusProblem> {
+    materialize_host_abi_libraries(&subsystem_abi_definitions(), limits).map_err(|error| {
+        CorpusProblem::new(
+            "carddemo.abi.invalid",
+            format!("subsystem ABI source libraries are invalid: {error}"),
+        )
+    })
+}
+
 fn explicit_carddemo_bundles(
     corpus_dir: &Path,
 ) -> Result<Vec<(String, SourceBundle)>, CorpusProblem> {
@@ -13186,13 +13685,9 @@ fn explicit_carddemo_bundles(
         .iter()
         .map(|path| source_file(corpus_dir, path, limits))
         .collect::<Result<Vec<_>, _>>()?;
-    let (compatibility, compatibility_library) =
-        owned_compatibility_library(limits).map_err(|error| {
-            CorpusProblem::new(
-                "carddemo.layout.closure_invalid",
-                format!("owned compatibility catalog is invalid: {error}"),
-            )
-        })?;
+    let abi = subsystem_abi_libraries(limits)?;
+    let compatibility = abi.files;
+    let compatibility_libraries = abi.libraries;
     let mut libraries = Vec::new();
     for (index, root) in copy_roots.iter().enumerate() {
         let members = collect_paths(corpus_dir, &[*root], "cpy")?
@@ -13216,7 +13711,7 @@ fn explicit_carddemo_bundles(
             )?,
         );
     }
-    libraries.push(compatibility_library);
+    libraries.extend(compatibility_libraries);
     let mut bundles = Vec::new();
     for primary_path in source_paths {
         let primary = source_file(corpus_dir, &primary_path, limits)?;
