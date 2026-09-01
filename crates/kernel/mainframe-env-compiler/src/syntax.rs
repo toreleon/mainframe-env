@@ -2,7 +2,7 @@ mod directives;
 
 pub use directives::{
     CompilerDirectingNode, CompilerDirectiveNode, CompilerOption, CompilerOptionSet,
-    EffectiveArithmeticMode, EffectiveCompilerOptions,
+    EffectiveArithmeticMode, EffectiveCompilerOptions, EffectiveDisplaySign,
 };
 
 use crate::generated::cobol_language::CompilerDirectingKind;

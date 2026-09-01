@@ -193,12 +193,29 @@ impl DirectiveCursor {
 pub struct EffectiveCompilerOptions {
     lp: u8,
     arithmetic_mode: EffectiveArithmeticMode,
+    display_sign: EffectiveDisplaySign,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EffectiveArithmeticMode {
     Compatible,
     Extended,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EffectiveDisplaySign {
+    Compatible,
+    Separate,
+}
+
+impl EffectiveDisplaySign {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Compatible => "compatible",
+            Self::Separate => "separate",
+        }
+    }
 }
 
 impl EffectiveArithmeticMode {
@@ -215,6 +232,7 @@ impl EffectiveCompilerOptions {
     pub(super) const DEFAULT: Self = Self {
         lp: 32,
         arithmetic_mode: EffectiveArithmeticMode::Extended,
+        display_sign: EffectiveDisplaySign::Compatible,
     };
 
     pub(super) fn resolve(
@@ -259,11 +277,33 @@ impl EffectiveCompilerOptions {
         {
             return Err(SyntaxProblem::ConflictingCompilerOption("ARITH".into()));
         }
+        let source_display_sign = options
+            .value("DISPSIGN")
+            .map(|value| {
+                value
+                    .and_then(display_sign_value)
+                    .ok_or(SyntaxProblem::InvalidCompilerOption)
+            })
+            .transpose()?;
+        let bundle_display_sign = bundle
+            .options()
+            .get("cobol.dispsign")
+            .map(|value| display_sign_value(value).ok_or(SyntaxProblem::InvalidCompilerOption))
+            .transpose()?;
+        if source_display_sign
+            .zip(bundle_display_sign)
+            .is_some_and(|(source, bundle)| source != bundle)
+        {
+            return Err(SyntaxProblem::ConflictingCompilerOption("DISPSIGN".into()));
+        }
         Ok(Self {
             lp: source_lp.or(bundle_lp).unwrap_or(32),
             arithmetic_mode: source_arithmetic
                 .or(bundle_arithmetic)
                 .unwrap_or(EffectiveArithmeticMode::Extended),
+            display_sign: source_display_sign
+                .or(bundle_display_sign)
+                .unwrap_or(EffectiveDisplaySign::Compatible),
         })
     }
 
@@ -280,6 +320,11 @@ impl EffectiveCompilerOptions {
     #[must_use]
     pub const fn arithmetic_mode(self) -> EffectiveArithmeticMode {
         self.arithmetic_mode
+    }
+
+    #[must_use]
+    pub const fn display_sign(self) -> EffectiveDisplaySign {
+        self.display_sign
     }
 }
 
@@ -917,6 +962,20 @@ fn arithmetic_mode_value(value: &str) -> Option<EffectiveArithmeticMode> {
     match value.to_ascii_uppercase().as_str() {
         "COMPAT" | "COMPATIBLE" => Some(EffectiveArithmeticMode::Compatible),
         "EXTEND" | "EXTENDED" => Some(EffectiveArithmeticMode::Extended),
+        _ => None,
+    }
+}
+
+fn display_sign_value(value: &str) -> Option<EffectiveDisplaySign> {
+    let trimmed = value.trim();
+    let value = if trimmed.starts_with('(') && trimmed.ends_with(')') {
+        trimmed.get(1..trimmed.len().checked_sub(1)?)?.trim()
+    } else {
+        trimmed
+    };
+    match value.to_ascii_uppercase().as_str() {
+        "COMPAT" | "COMPATIBLE" => Some(EffectiveDisplaySign::Compatible),
+        "SEP" | "SEPARATE" => Some(EffectiveDisplaySign::Separate),
         _ => None,
     }
 }

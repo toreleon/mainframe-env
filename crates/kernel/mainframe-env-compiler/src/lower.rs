@@ -38,6 +38,7 @@ pub const PUBLISHABLE_LAYOUT_CATEGORIES: &[&str] = &[
 pub(crate) fn lower_to_core(
     hir: &CobolHir,
     arithmetic_mode: &str,
+    display_sign: &str,
     declaratives: &[(String, Vec<String>)],
     limits: IrLimits,
 ) -> Result<Module, LowerProblem> {
@@ -126,6 +127,7 @@ pub(crate) fn lower_to_core(
                     "arithmetic_mode".into(),
                     Attribute::Text(arithmetic_mode.into()),
                 ),
+                ("display_sign".into(), Attribute::Text(display_sign.into())),
                 (
                     "declaratives".into(),
                     Attribute::Text(

@@ -243,6 +243,20 @@
         "response": 13,
         "response2": 0
       }
+    },
+    {
+      "id": "display-internal-numeric-compatible-sign",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0011",
+      "obligation_id": "phrase-internal-numeric-compatible-sign",
+      "source": "PROCESS DISPSIGN(COMPAT)\nIDENTIFICATION DIVISION. PROGRAM-ID. DISPLAYCOMPAT. DATA DIVISION. WORKING-STORAGE SECTION. 01 PACKED-X PIC S9(3) COMP-3 VALUE -12. 01 BINARY-X PIC S9(3) COMP VALUE 7. PROCEDURE DIVISION. DISPLAY PACKED-X. DISPLAY BINARY-X. STOP RUN.",
+      "expected_output": "01K\n00G\n"
+    },
+    {
+      "id": "display-internal-numeric-separate-sign",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0011",
+      "obligation_id": "phrase-internal-numeric-separate-sign",
+      "source": "PROCESS DISPSIGN(SEP)\nIDENTIFICATION DIVISION. PROGRAM-ID. DISPLAYSEP. DATA DIVISION. WORKING-STORAGE SECTION. 01 PACKED-X PIC S9(3) COMP-3 VALUE -12. 01 BINARY-X PIC S9(3) COMP VALUE 7. PROCEDURE DIVISION. DISPLAY PACKED-X. DISPLAY BINARY-X. STOP RUN.",
+      "expected_output": "-012\n+007\n"
     }
   ]
 }

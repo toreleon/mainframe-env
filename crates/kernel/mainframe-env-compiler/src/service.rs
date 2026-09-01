@@ -258,6 +258,7 @@ impl CompilerService for CobolCompiler {
         let mir = lower_to_core(
             hir,
             effective_options.arithmetic_mode().as_str(),
+            effective_options.display_sign().as_str(),
             &declaratives,
             self.limits.ir,
         )
@@ -279,6 +280,10 @@ impl CompilerService for CobolCompiler {
         manifest_options.insert(
             "cobol.effective-arith".into(),
             effective_options.arithmetic_mode().as_str().into(),
+        );
+        manifest_options.insert(
+            "cobol.effective-dispsign".into(),
+            effective_options.display_sign().as_str().into(),
         );
         let manifest = ArtifactManifest {
             compiler_generation: format!("mainframe-env-cobol-{}", env!("CARGO_PKG_VERSION")),
@@ -447,6 +452,37 @@ mod tests {
         assert_eq!(
             config.attributes.get("arithmetic_mode"),
             Some(&Attribute::Text("compatible".into()))
+        );
+    }
+    #[test]
+    fn display_sign_is_embedded_in_manifest_and_executable_payload() {
+        let source = format!("PROCESS DISPSIGN(SEP)\n{HELLO}");
+        let result = CobolCompiler::default()
+            .compile(request(&source, CompilationMode::Executable))
+            .unwrap();
+        let CompilerResult::Published { artifact, .. } = result else {
+            panic!("DISPSIGN(SEP) did not publish: {result:?}");
+        };
+        assert_eq!(
+            artifact
+                .manifest()
+                .options
+                .values()
+                .get("cobol.effective-dispsign")
+                .map(String::as_str),
+            Some("separate")
+        );
+        let module = decode_binary(artifact.payload(), CodecLimits::default()).unwrap();
+        let config = module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .find(|operation| operation.identity.name() == "config")
+            .expect("runtime config operation");
+        assert_eq!(
+            config.attributes.get("display_sign"),
+            Some(&Attribute::Text("separate".into()))
         );
     }
     #[test]

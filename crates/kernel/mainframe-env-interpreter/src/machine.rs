@@ -358,6 +358,7 @@ pub struct ReferenceMachine {
     invocation: Invocation,
     operations: Vec<Operation>,
     arithmetic_mode: CobolArithmeticMode,
+    display_sign_separate: bool,
     bases: Vec<Vec<u8>>,
     static_base_count: usize,
     views: BTreeMap<String, StorageView>,
@@ -611,6 +612,20 @@ impl ReferenceMachine {
                 ));
             }
         };
+        let display_signs = operations
+            .iter()
+            .filter(|operation| operation.identity.name() == "config")
+            .map(|operation| optional_text_attribute(operation, "display_sign"))
+            .collect::<Vec<_>>();
+        let display_sign_separate = match display_signs.as_slice() {
+            [] | [None] | [Some("compatible")] => false,
+            [Some("separate")] => true,
+            _ => {
+                return Err(MachineProblem::InvalidArtifact(
+                    "invalid COBOL display-sign config".into(),
+                ));
+            }
+        };
         let declaratives = operations
             .iter()
             .find(|operation| operation.identity.name() == "config")
@@ -689,6 +704,7 @@ impl ReferenceMachine {
             invocation,
             operations,
             arithmetic_mode,
+            display_sign_separate,
             bases,
             static_base_count,
             views,
@@ -1744,7 +1760,7 @@ impl ReferenceMachine {
                                 .map(|reference| (end, reference))
                         })
                     {
-                        line.extend(self.read_reference(&reference)?);
+                        line.extend(self.display_reference(&reference)?);
                         at = end;
                     } else if args[at] == "FUNCTION" {
                         let end = (at + 1..=operand_end)
@@ -6873,6 +6889,25 @@ impl ReferenceMachine {
             .map(|value| value.unwrap_or(37))
     }
 
+    fn display_reference(&self, reference: &ResolvedReference) -> Result<Vec<u8>, MachineProblem> {
+        if reference.length != reference.layout.length {
+            return self.read_reference(reference);
+        }
+        match reference.layout.category {
+            LayoutCategory::PackedDecimal | LayoutCategory::Binary => display_internal_numeric(
+                &reference.layout,
+                decode_decimal(&reference.layout, &self.read_reference(reference)?)?,
+                self.display_sign_separate,
+            ),
+            LayoutCategory::FloatShort | LayoutCategory::FloatLong => {
+                decode_decimal(&reference.layout, &self.read_reference(reference)?)
+                    .map(decimal_string)
+                    .map(String::into_bytes)
+            }
+            _ => self.read_reference(reference),
+        }
+    }
+
     fn reapply_entry_context(&mut self) -> Result<(), MachineProblem> {
         let entry_initials = self
             .entry_initials
@@ -9863,6 +9898,39 @@ fn decimal_string(value: Decimal) -> String {
         digits.insert(0, '-');
     }
     digits
+}
+
+fn display_internal_numeric(
+    layout: &LayoutMetadata,
+    value: Decimal,
+    separate: bool,
+) -> Result<Vec<u8>, MachineProblem> {
+    let mut digits = value.coefficient.unsigned_abs().to_string();
+    if digits.len() > layout.digits {
+        return Err(MachineProblem::SizeError);
+    }
+    if digits.len() < layout.digits {
+        digits.insert_str(0, &"0".repeat(layout.digits - digits.len()));
+    }
+    let mut bytes = digits.into_bytes();
+    if !layout.signed {
+        return Ok(bytes);
+    }
+    if separate {
+        bytes.insert(0, if value.coefficient < 0 { b'-' } else { b'+' });
+        return Ok(bytes);
+    }
+    let last = bytes.last_mut().ok_or(MachineProblem::DataException)?;
+    let digit = usize::from(last.saturating_sub(b'0'));
+    if digit > 9 {
+        return Err(MachineProblem::DataException);
+    }
+    *last = if value.coefficient < 0 {
+        b"}JKLMNOPQR"[digit]
+    } else {
+        b"{ABCDEFGHI"[digit]
+    };
+    Ok(bytes)
 }
 
 fn decimal_aligned(left: Decimal, right: Decimal) -> Result<(Decimal, Decimal), MachineProblem> {
