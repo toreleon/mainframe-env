@@ -1636,8 +1636,15 @@ fn check_cobol_function_bindings(
             expected_obligations.insert("runtime-condition");
         }
         match row.row_id().as_str().rsplit(':').next() {
+            Some("0006") => {
+                expected_obligations.insert("boundary-packed-storage-bits");
+            }
             Some("0008") => {
                 expected_obligations.insert("boundary-national-byte-count");
+                expected_obligations.insert("boundary-packed-storage-byte-count");
+            }
+            Some("0011") => {
+                expected_obligations.insert("boundary-numeric-type-preservation");
             }
             Some("0015" | "0017") => {
                 expected_obligations.insert("boundary-sliding-century");
@@ -1645,8 +1652,12 @@ fn check_cobol_function_bindings(
             Some("0018") => {
                 expected_obligations.insert("boundary-explicit-output-ccsid");
             }
+            Some("0027") => {
+                expected_obligations.insert("boundary-packed-storage-hex");
+            }
             Some("0034") => {
                 expected_obligations.insert("boundary-national-character-count");
+                expected_obligations.insert("boundary-packed-storage-length");
             }
             Some("0037" | "0074") => {
                 expected_obligations.insert("boundary-national-case-map");

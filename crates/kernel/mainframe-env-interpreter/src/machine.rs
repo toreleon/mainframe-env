@@ -6253,6 +6253,12 @@ impl ReferenceMachine {
         let bytes = |index: usize| -> Result<Vec<u8>, MachineProblem> {
             value_bytes(self.eval_value(argument(index)?)?)
         };
+        let raw_bytes = |index: usize| -> Result<Vec<u8>, MachineProblem> {
+            let argument = argument(index)?;
+            self.reference(argument)
+                .and_then(|reference| self.read_reference(&reference))
+                .or_else(|_| bytes(index))
+        };
         let national = |index: usize| -> Result<bool, MachineProblem> {
             Ok(self
                 .reference(argument(index)?)
@@ -6291,13 +6297,13 @@ impl ReferenceMachine {
                 decimal_from_f64(libm::atan(decimal_f64(decimal(0)?)?)).map(CobolValue::Decimal)
             }
             "BIT-OF" => Ok(CobolValue::Bytes(
-                bytes(0)?
+                raw_bytes(0)?
                     .into_iter()
                     .flat_map(|byte| (0..8).rev().map(move |bit| b'0' + ((byte >> bit) & 1)))
                     .collect(),
             )),
             "BIT-TO-CHAR" => bit_to_char(&bytes(0)?).map(CobolValue::Bytes),
-            "BYTE-LENGTH" => Ok(integer_value(bytes(0)?.len() as i128)),
+            "BYTE-LENGTH" => Ok(integer_value(raw_bytes(0)?.len() as i128)),
             "CHAR" => {
                 let ordinal = integer(0)?;
                 if !(1..=256).contains(&ordinal) {
@@ -6321,7 +6327,7 @@ impl ReferenceMachine {
                 )?;
                 decimal_add(self.arithmetic_mode, date, time).map(CobolValue::Decimal)
             }
-            "CONTENT-OF" => bytes(0).map(CobolValue::Bytes),
+            "CONTENT-OF" => self.eval_value(argument(0)?),
             "COS" => {
                 decimal_from_f64(libm::cos(decimal_f64(decimal(0)?)?)).map(CobolValue::Decimal)
             }
@@ -6380,7 +6386,7 @@ impl ReferenceMachine {
                 integer(2)?,
             )
             .map(CobolValue::Bytes),
-            "HEX-OF" => Ok(CobolValue::Bytes(hex_upper(&bytes(0)?))),
+            "HEX-OF" => Ok(CobolValue::Bytes(hex_upper(&raw_bytes(0)?))),
             "HEX-TO-CHAR" => hex_to_char(&bytes(0)?).map(CobolValue::Bytes),
             "INTEGER" => decimal_floor(self.arithmetic_mode, decimal(0)?).map(CobolValue::Decimal),
             "INTEGER-OF-DAY" => integer_of_day(integer(0)?).map(CobolValue::Decimal),
@@ -6418,7 +6424,7 @@ impl ReferenceMachine {
                                 .map(Iterator::count)
                                 .unwrap_or(value.len())
                         }
-                        _ => value.len(),
+                        _ => reference.length,
                     },
                 );
                 Ok(integer_value(length as i128))

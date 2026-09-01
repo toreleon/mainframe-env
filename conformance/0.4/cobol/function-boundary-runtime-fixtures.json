@@ -162,6 +162,41 @@
       "obligation_id": "boundary-national-space-trim",
       "source": "IDENTIFICATION DIVISION. PROGRAM-ID. TRIMNATIONAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 NAT-X PIC N(4) NATIONAL. 01 HEX-X PIC X(4). PROCEDURE DIVISION. MOVE '  A ' TO NAT-X. MOVE FUNCTION HEX-OF(FUNCTION TRIM(NAT-X)) TO HEX-X. DISPLAY HEX-X. STOP RUN.",
       "expected_output": "0041\n"
+    },
+    {
+      "id": "bit-of-packed-storage",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0006",
+      "obligation_id": "boundary-packed-storage-bits",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. BITPACKED. DATA DIVISION. WORKING-STORAGE SECTION. 01 PACKED-X PIC S9(3) COMP-3 VALUE -12. 01 OUT-X PIC X(16). PROCEDURE DIVISION. MOVE FUNCTION BIT-OF(PACKED-X) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "0000000100101101\n"
+    },
+    {
+      "id": "byte-length-packed-storage",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0008",
+      "obligation_id": "boundary-packed-storage-byte-count",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. BYTEPACKED. DATA DIVISION. WORKING-STORAGE SECTION. 01 PACKED-X PIC S9(3) COMP-3 VALUE -12. 01 OUT-X PIC 9. PROCEDURE DIVISION. MOVE FUNCTION BYTE-LENGTH(PACKED-X) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "2\n"
+    },
+    {
+      "id": "content-of-preserves-numeric-type",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0011",
+      "obligation_id": "boundary-numeric-type-preservation",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. CONTENTNUMERIC. DATA DIVISION. WORKING-STORAGE SECTION. 01 PACKED-X PIC S9(3) COMP-3 VALUE -12. 01 TARGET-X PIC S9(3) COMP-3. 01 OUT-X PIC X(4). PROCEDURE DIVISION. MOVE FUNCTION CONTENT-OF(PACKED-X) TO TARGET-X. MOVE FUNCTION HEX-OF(TARGET-X) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "012D\n"
+    },
+    {
+      "id": "hex-of-packed-storage",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0027",
+      "obligation_id": "boundary-packed-storage-hex",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. HEXPACKED. DATA DIVISION. WORKING-STORAGE SECTION. 01 PACKED-X PIC S9(3) COMP-3 VALUE -12. 01 OUT-X PIC X(4). PROCEDURE DIVISION. MOVE FUNCTION HEX-OF(PACKED-X) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "012D\n"
+    },
+    {
+      "id": "length-packed-storage",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0034",
+      "obligation_id": "boundary-packed-storage-length",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. LENPACKED. DATA DIVISION. WORKING-STORAGE SECTION. 01 PACKED-X PIC S9(3) COMP-3 VALUE -12. 01 OUT-X PIC 9. PROCEDURE DIVISION. MOVE FUNCTION LENGTH(PACKED-X) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "2\n"
     }
   ]
 }
