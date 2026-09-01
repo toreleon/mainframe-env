@@ -1325,6 +1325,7 @@ fn check_cobol_statement_bindings(
                 expected_obligations.insert("phrase-advancing-end-page");
             }
             Some("0044") => {
+                expected_obligations.insert("phrase-group-hierarchy");
                 expected_obligations.insert("phrase-processing-procedure-through");
             }
             _ => {}

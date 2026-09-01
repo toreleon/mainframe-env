@@ -150,6 +150,13 @@ struct SortWorkspace {
     cursor: usize,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct XmlNode {
+    name: String,
+    text: String,
+    children: Vec<XmlNode>,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SortProcedurePhase {
     Input,
@@ -6188,6 +6195,20 @@ impl ReferenceMachine {
             }
         } else {
             let source = source.trim();
+            if let Some(layout) = self.layout(target).cloned()
+                && is_group(layout.category)
+            {
+                let document = xml_document(source)?;
+                if document.name != layout.simple_name {
+                    return Err(MachineProblem::DataException);
+                }
+                let mut assignments = Vec::new();
+                self.stage_xml_group(&layout, &document, &mut assignments)?;
+                for (reference, bytes) in assignments {
+                    self.write_reference(&reference, &bytes)?;
+                }
+                return Ok(());
+            }
             let open_end = source.find('>').ok_or(MachineProblem::DataException)?;
             let name = source
                 .get(1..open_end)
@@ -6201,6 +6222,74 @@ impl ReferenceMachine {
             xml_unescape(body)?
         };
         self.write(target, value.as_bytes())
+    }
+
+    fn stage_xml_group(
+        &self,
+        layout: &LayoutMetadata,
+        node: &XmlNode,
+        assignments: &mut Vec<(ResolvedReference, Vec<u8>)>,
+    ) -> Result<(), MachineProblem> {
+        let mut children = self
+            .layouts
+            .values()
+            .filter(|candidate| candidate.parent.as_deref() == Some(layout.name.as_str()))
+            .filter(|candidate| {
+                candidate.simple_name != "FILLER"
+                    && !matches!(
+                        candidate.category,
+                        LayoutCategory::Condition | LayoutCategory::Rename
+                    )
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        children.sort_by(|left, right| {
+            left.offset
+                .cmp(&right.offset)
+                .then_with(|| left.name.cmp(&right.name))
+        });
+        for child in children {
+            let matches = node
+                .children
+                .iter()
+                .filter(|node| node.name == child.simple_name)
+                .collect::<Vec<_>>();
+            if matches.len() != 1 {
+                return Err(MachineProblem::DataException);
+            }
+            let node = matches[0];
+            if is_group(child.category) {
+                self.stage_xml_group(&child, node, assignments)?;
+                continue;
+            }
+            if !node.children.is_empty() {
+                return Err(MachineProblem::DataException);
+            }
+            let reference = self.reference(std::slice::from_ref(&child.name))?;
+            let bytes = if is_numeric(child.category) {
+                encode_decimal(
+                    &child,
+                    decimal_rescale(
+                        decimal_text(&node.text).ok_or(MachineProblem::DataException)?,
+                        child.scale,
+                    )?,
+                )?
+            } else {
+                let bytes = if matches!(
+                    child.category,
+                    LayoutCategory::National | LayoutCategory::NationalEdited
+                ) {
+                    utf8_to_national(node.text.as_bytes())?
+                } else {
+                    node.text.as_bytes().to_vec()
+                };
+                FixedValue::fit(&bytes, reference.length, child.justified_right)
+                    .bytes()
+                    .to_vec()
+            };
+            assignments.push((reference, bytes));
+        }
+        Ok(())
     }
 
     fn stage_json_group(
@@ -10835,6 +10924,57 @@ fn xml_unescape(value: &str) -> Result<String, MachineProblem> {
     }
     output.push_str(rest);
     Ok(output)
+}
+
+fn xml_document(source: &str) -> Result<XmlNode, MachineProblem> {
+    let mut at = 0usize;
+    let node = xml_node(source, &mut at, 0)?;
+    (at == source.len())
+        .then_some(node)
+        .ok_or(MachineProblem::DataException)
+}
+
+fn xml_node(source: &str, at: &mut usize, depth: usize) -> Result<XmlNode, MachineProblem> {
+    if depth >= 64 || !source[*at..].starts_with('<') || source[*at..].starts_with("</") {
+        return Err(MachineProblem::DataException);
+    }
+    let open_end = source[*at..]
+        .find('>')
+        .map(|offset| *at + offset)
+        .ok_or(MachineProblem::DataException)?;
+    let name = source
+        .get(*at + 1..open_end)
+        .filter(|name| !name.is_empty() && !name.contains(['<', '>', ' ', '/', '\t', '\r', '\n']))
+        .ok_or(MachineProblem::DataException)?
+        .to_string();
+    *at = open_end + 1;
+    let mut text = String::new();
+    let mut children = Vec::new();
+    loop {
+        let rest = source.get(*at..).ok_or(MachineProblem::DataException)?;
+        if rest.starts_with("</") {
+            let close_end = rest.find('>').ok_or(MachineProblem::DataException)?;
+            if rest.get(2..close_end) != Some(name.as_str()) {
+                return Err(MachineProblem::DataException);
+            }
+            *at += close_end + 1;
+            if !children.is_empty() && !text.trim().is_empty() {
+                return Err(MachineProblem::DataException);
+            }
+            return Ok(XmlNode {
+                name,
+                text: xml_unescape(&text)?,
+                children,
+            });
+        }
+        if rest.starts_with('<') {
+            children.push(xml_node(source, at, depth + 1)?);
+            continue;
+        }
+        let next = rest.find('<').ok_or(MachineProblem::DataException)?;
+        text.push_str(&rest[..next]);
+        *at += next;
+    }
 }
 
 fn xml_processing_target(args: &[String]) -> Option<&str> {
