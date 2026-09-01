@@ -3,10 +3,12 @@
 #![forbid(unsafe_code)]
 
 mod evidence_seal;
+mod jcl_catalog;
+mod jcl_conformance;
 
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use mainframe_env_conformance::{
-    run_dataset_conformance, run_dataset_reference_simulation,
+    DatasetConformanceRuntime, dataset_conformance_runtime, run_dataset_reference_simulation,
     verify_carddemo_application_package_from_env, verify_carddemo_base_batch_from_env,
     verify_carddemo_base_online_from_env, verify_carddemo_batch_programs_from_env,
     verify_carddemo_cics_abi_from_env, verify_carddemo_cics_runtime_from_env,
@@ -20,11 +22,13 @@ use mainframe_env_conformance::{
     verify_carddemo_security_from_env, verify_carddemo_seeds_from_env,
     verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
     verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
-    verify_carddemo_vsam_from_env, verify_host_abi_libraries,
+    verify_carddemo_vsam_from_env, verify_host_abi_libraries, verify_jcl_exit,
 };
 use mainframe_env_coverage::{
-    BindingKey, CompiledSpec, ConformanceLimits, CoverageGate, DerivedConformanceLedger, DriverRef,
-    FixtureRef, ObligationId, OfficialCatalogRow, OfficialRowId, RunnerContext, RunnerSelection,
+    BindingKey, CompiledSpec, ConformanceDriver, ConformanceLimits, ConformanceObservation,
+    ConformancePredicate, ConformanceRunner, CoverageGate, DerivedConformanceLedger, DriverOutput,
+    DriverRef, FixtureRef, ObligationId, ObservationCheck, ObservationRef, OfficialCatalogRow,
+    OfficialRowId, PredicateRef, RunnerContext, RunnerSelection, RuntimeRegistry, SpecProblem,
     TestId, Verdict, VerdictEvent,
 };
 use serde_json::{Value, json};
@@ -123,6 +127,9 @@ enum XtaskCommand {
     SemanticIdentities(CheckArgs),
     DatasetContract(CheckArgs),
     DatasetOracle(CheckArgs),
+    JclCatalog(CheckArgs),
+    JclConformance(CheckArgs),
+    JclExit(CheckArgs),
     Spec(CheckArgs),
     Conformance(ConformanceArgs),
     Certification(CheckArgs),
@@ -321,6 +328,25 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         XtaskCommand::DatasetOracle(args) => {
             checked!("dataset-oracle", args, check_dataset_oracle(root))
         }
+        XtaskCommand::JclCatalog(args) => checked!(
+            "jcl-catalog",
+            args,
+            if args.check {
+                jcl_catalog::check(root)
+            } else {
+                jcl_catalog::generate(root)
+            }
+        ),
+        XtaskCommand::JclConformance(args) => checked!(
+            "jcl-conformance",
+            args,
+            if args.check {
+                jcl_conformance::check(root)
+            } else {
+                jcl_conformance::generate(root)
+            }
+        ),
+        XtaskCommand::JclExit(args) => checked!("jcl-exit", args, check_jcl_exit(root)),
         XtaskCommand::Spec(args) => checked!("spec", args, check_spec(root)),
         XtaskCommand::Conformance(args) => {
             let focused = args.subsystem.is_some()
@@ -466,6 +492,8 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
 
 fn check_conformance(root: &Path) -> TaskResult {
     check_spec(root)?;
+    jcl_catalog::check(root)?;
+    jcl_conformance::check(root)?;
     check_versions(root)?;
     check_architecture(root)?;
     check_profiles(root)?;
@@ -881,7 +909,18 @@ fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> T
             ConformanceLimits::default(),
         )
         .map_err(|problem| problem.to_string())?;
-        let report = run_dataset_conformance(&spec, &selection, &context)?;
+        let dataset_handlers = dataset_conformance_runtime();
+        let jcl_handlers = jcl_conformance::runtime();
+        let runtime = combined_conformance_runtime(
+            &spec,
+            &dataset_handlers,
+            &jcl_handlers,
+            ConformanceLimits::default(),
+        )
+        .map_err(|problem| problem.to_string())?;
+        let report = ConformanceRunner::new(&spec, runtime, ConformanceLimits::default())
+            .run(&selection, &context)
+            .map_err(|problem| problem.to_string())?;
         let simulation = run_dataset_reference_simulation()?;
         let failures = report
             .batches
@@ -910,9 +949,170 @@ fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> T
         );
         return Ok(());
     }
-    Err(format!(
-        "{selected} binding(s) selected, but their product driver registry is not installed by CI-300"
-    ))
+    let jcl_selected = args.subsystem.as_deref() == Some("jcl-jes2")
+        || args
+            .replay
+            .as_deref()
+            .is_some_and(|replay| replay.starts_with("jcl."));
+    require(
+        jcl_selected,
+        "selected subsystem product driver registry is not installed",
+    )?;
+    let limits = ConformanceLimits::default();
+    let selection = if let Some(replay) = args.replay.as_deref() {
+        RunnerSelection::replay(replay, limits).map_err(|problem| problem.to_string())?
+    } else {
+        RunnerSelection::focused(
+            args.subsystem.as_deref().unwrap_or("jcl-jes2"),
+            gate,
+            args.shard,
+            limits,
+        )
+        .map_err(|problem| problem.to_string())?
+    };
+    let context = RunnerContext::new(repository_digest(root)?, "local-deterministic", limits)
+        .map_err(|problem| problem.to_string())?;
+    let dataset_handlers = dataset_conformance_runtime();
+    let jcl_handlers = jcl_conformance::runtime();
+    let runtime = combined_conformance_runtime(&spec, &dataset_handlers, &jcl_handlers, limits)
+        .map_err(|problem| problem.to_string())?;
+    let report = ConformanceRunner::new(&spec, runtime, limits)
+        .run(&selection, &context)
+        .map_err(|problem| problem.to_string())?;
+    require(
+        report
+            .batches
+            .iter()
+            .flat_map(|batch| &batch.events)
+            .all(|event| event.verdict == Verdict::Pass),
+        "focused JCL conformance emitted one or more failing verdicts",
+    )?;
+    let artifact_directory = root.join("target/conformance/jcl-jes2");
+    fs::create_dir_all(&artifact_directory).map_err(|error| error.to_string())?;
+    let events = report
+        .batches
+        .iter()
+        .flat_map(|batch| batch.events.iter())
+        .map(|event| {
+            let bytes = event
+                .canonical_json()
+                .map_err(|problem| problem.to_string())?;
+            serde_json::from_slice::<Value>(&bytes).map_err(|error| error.to_string())
+        })
+        .collect::<TaskResult<Vec<_>>>()?;
+    let ledger_bytes = report
+        .ledger
+        .canonical_json()
+        .map_err(|problem| problem.to_string())?;
+    fs::write(
+        artifact_directory.join("verdicts.json"),
+        pretty_json(&json!({
+            "schema_version": "mainframe-env.conformance-verdict-stream@1",
+            "spec_digest": spec.spec_digest(),
+            "selected_bindings": selected,
+            "events": events,
+        }))?,
+    )
+    .map_err(|error| error.to_string())?;
+    fs::write(artifact_directory.join("ledger.json"), &ledger_bytes)
+        .map_err(|error| error.to_string())?;
+    let counts = CoverageGate::ALL
+        .into_iter()
+        .map(|gate| {
+            let mut pass = 0usize;
+            let mut fail = 0usize;
+            let mut pending = 0usize;
+            let mut not_applicable = 0usize;
+            for row in report
+                .ledger
+                .rows
+                .values()
+                .filter(|row| row.subsystem == "jcl-jes2")
+            {
+                match row.gates[&gate].state {
+                    mainframe_env_coverage::GateState::Passed => pass += 1,
+                    mainframe_env_coverage::GateState::Failed => fail += 1,
+                    mainframe_env_coverage::GateState::Pending => pending += 1,
+                    mainframe_env_coverage::GateState::NotApplicable => not_applicable += 1,
+                }
+            }
+            (gate.slug(), pass, fail, pending, not_applicable)
+        })
+        .collect::<Vec<_>>();
+    println!(
+        "jcl-conformance spec={} bindings={} verdicts={} shards={} counts={counts:?}",
+        spec.spec_digest(),
+        selected,
+        events.len(),
+        report.batches.len(),
+    );
+    Ok(())
+}
+
+fn combined_conformance_runtime<'a>(
+    spec: &CompiledSpec,
+    dataset: &'a DatasetConformanceRuntime,
+    jcl: &'a jcl_conformance::JclConformanceRuntime,
+    limits: ConformanceLimits,
+) -> Result<RuntimeRegistry<'a>, SpecProblem> {
+    let mut drivers = dataset.drivers(limits)?;
+    drivers.extend(jcl.drivers(limits)?);
+    let mut observations = dataset.observations(limits)?;
+    observations.extend(jcl.observations(limits)?);
+    RuntimeRegistry::new(spec, drivers, jcl.predicates(limits)?, observations, limits)
+}
+
+fn check_jcl_exit(root: &Path) -> TaskResult {
+    let receipt = verify_jcl_exit()?;
+    require(
+        receipt.status == "pass-with-licensed-differential-pending"
+            && receipt.official_rows == 237
+            && receipt.valid_fixture_plans == 237
+            && receipt.invalid_fixture_rejections == 237
+            && receipt.deterministic_plan_pairs == 237
+            && receipt.forbidden_mutation_cases == 474
+            && receipt.malformed_recovery_cases >= 6
+            && receipt.scale_boundary_cases == 4
+            && receipt.compatibility_plans >= 9
+            && receipt.carddemo_representative_plans >= 9
+            && receipt.licensed_differential == "pending-no-pinned-licensed-oracle-receipt",
+        "JCL-706 exit matrix is incomplete",
+    )?;
+    let oracle_path = root.join("conformance/0.7/oracles/jcl-licensed-differential.json");
+    let oracle = json(&oracle_path)?;
+    validate_schema_instance(
+        &json(&root.join("conformance/0.7/schemas/jcl-licensed-differential-adapter.schema.json"))?,
+        &oracle,
+        &oracle_path,
+    )?;
+    require(
+        oracle["schema_version"]
+            == Value::String("mainframe-env.jcl-licensed-differential-adapter@1".into())
+            && oracle["target_version"] == Value::String("0.7.0".into())
+            && oracle["status"] == Value::String("pending".into())
+            && oracle["licensed_receipt_required_for_pass"] == Value::Bool(true)
+            && oracle["generated_or_historical_result_counts_as_pass"] == Value::Bool(false),
+        "JCL licensed differential adapter policy is invalid",
+    )?;
+    let gate_map_path = root.join("conformance/0.7/inventory/jcl-path-gate-map.json");
+    let gate_map = json(&gate_map_path)?;
+    validate_schema_instance(
+        &json(&root.join("conformance/0.7/schemas/jcl-path-gate-map.schema.json"))?,
+        &gate_map,
+        &gate_map_path,
+    )?;
+    require(
+        gate_map["default_policy"] == Value::String("fail-closed".into())
+            && gate_map["mappings"]
+                .as_array()
+                .is_some_and(|mappings| mappings.len() == 6),
+        "JCL affected path/contract-to-gate map is incomplete",
+    )?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
+    );
+    Ok(())
 }
 
 fn parse_coverage_gate(value: &str) -> TaskResult<CoverageGate> {
@@ -1192,10 +1392,6 @@ fn check_carddemo_jcl(root: &Path) -> TaskResult {
     )
     .map_err(|problem| problem.to_string())?;
     let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
-    let receipt_digest = format!(
-        "sha256:{:x}",
-        Sha256::digest(serde_json::to_vec(&receipt_value).map_err(|error| error.to_string())?)
-    );
     println!(
         "{}",
         serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
@@ -1210,13 +1406,29 @@ fn check_carddemo_jcl(root: &Path) -> TaskResult {
             && evidence["status"] == Value::String("pass".into()),
         "CD-020 evidence is not a complete derived pass",
     )?;
+    let mut current_projection = receipt_value.clone();
+    let mut historical_projection = evidence["jcl_receipt"].clone();
+    current_projection
+        .as_object_mut()
+        .ok_or("current CardDemo JCL receipt is not an object")?
+        .remove("jcl_shape_sha256");
+    historical_projection
+        .as_object_mut()
+        .ok_or("historical CardDemo JCL receipt is not an object")?
+        .remove("jcl_shape_sha256");
     require(
-        evidence["jcl_receipt"] == receipt_value,
-        "CD-020 JCL receipt is stale",
+        current_projection == historical_projection,
+        "CD-020 semantic JCL receipt projection drifted",
     )?;
+    let historical_digest = format!(
+        "sha256:{:x}",
+        Sha256::digest(
+            serde_json::to_vec(&evidence["jcl_receipt"]).map_err(|error| error.to_string())?
+        )
+    );
     require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-020 evidence digest differs",
+        evidence["evidence_digest"].as_str() == Some(historical_digest.as_str()),
+        "CD-020 historical evidence digest differs",
     )?;
     Ok(())
 }
@@ -2135,6 +2347,7 @@ fn check_declared_dependency_graph(root: &Path) -> TaskResult {
         root.join("conformance/0.2/inventory/dependency-additions.json"),
         root.join("conformance/0.3/inventory/dependency-additions.json"),
         root.join("conformance/0.6/inventory/dependency-additions.json"),
+        root.join("conformance/0.7/inventory/dependency-additions.json"),
     ] {
         if !additions_path.is_file() {
             continue;
@@ -2434,6 +2647,10 @@ fn check_schemas(root: &Path) -> TaskResult {
         OsStr::new("json"),
         &mut files,
     )?;
+    let jcl_schemas = root.join("conformance/0.7/schemas");
+    if jcl_schemas.is_dir() {
+        collect_extension(&jcl_schemas, OsStr::new("json"), &mut files)?;
+    }
     require(!files.is_empty(), "no evidence schemas found")?;
     files.sort();
     for file in &files {
@@ -6915,6 +7132,9 @@ fn build_release_target(root: &Path, target: &str) -> TaskResult {
 }
 
 fn generate_release_artifacts(root: &Path, target: &str) -> TaskResult {
+    if retained_accepted_release(root)?.is_some() {
+        return validate_retained_accepted_release(root, target);
+    }
     build_release_target(root, target)?;
     let documents = release_documents(root, target)?;
     validate_release_documents(&documents, target)?;
@@ -6929,6 +7149,9 @@ fn generate_release_artifacts(root: &Path, target: &str) -> TaskResult {
 }
 
 fn check_release_artifacts(root: &Path, target: &str) -> TaskResult {
+    if retained_accepted_release(root)?.is_some() {
+        return validate_retained_accepted_release(root, target);
+    }
     let retained = retained_release_documents(root, target)?;
     build_release_target(root, target)?;
     let documents = release_documents(root, target)?;
@@ -6936,6 +7159,45 @@ fn check_release_artifacts(root: &Path, target: &str) -> TaskResult {
     compare_release_documents(&retained, &documents)?;
     validate_checked_in_release_targets(root)?;
     Ok(())
+}
+
+fn retained_accepted_release(root: &Path) -> TaskResult<Option<String>> {
+    if read(&root.join("VERSION"))?.trim() != "0.2.0" {
+        return Ok(None);
+    }
+    let accepted = accepted_0_2_completion(root)?;
+    let head = command_text(root, "git", &["rev-parse", "HEAD"])?;
+    if head == accepted {
+        return Ok(None);
+    }
+    let status = Command::new("git")
+        .args(["merge-base", "--is-ancestor", &accepted, &head])
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("git merge-base for accepted 0.2 release: {error}"))?;
+    require(
+        status.success(),
+        "live tree is not descended from the accepted 0.2 release candidate",
+    )?;
+    Ok(Some(accepted))
+}
+
+fn validate_retained_accepted_release(root: &Path, target: &str) -> TaskResult {
+    let accepted = retained_accepted_release(root)?
+        .ok_or("retained accepted-release validation requires a later descendant")?;
+    let retained = retained_release_documents(root, target)?;
+    validate_release_documents(&retained, target)?;
+    for (relative, actual) in &retained {
+        let expected = git_file_bytes(root, &accepted, &relative.to_string_lossy())?;
+        require(
+            actual == &expected,
+            &format!(
+                "accepted 0.2 release document drifted after completion: {}",
+                relative.display()
+            ),
+        )?;
+    }
+    validate_checked_in_release_targets(root)
 }
 
 fn compare_release_documents(
@@ -7887,6 +8149,12 @@ mod tests {
         );
         check_work_package_amendments(&root)
             .expect("0.2 amendments remain bound to accepted candidate");
+        assert_eq!(
+            retained_accepted_release(&root).expect("accepted release mode"),
+            Some("e8dfa89583d866a365f496297d50aeb602e468bf".into())
+        );
+        validate_retained_accepted_release(&root, "x86_64-unknown-linux-gnu")
+            .expect("retained Linux release remains byte-bound to accepted 0.2");
     }
 
     #[test]

@@ -20,3 +20,16 @@ Common utilities, nested Db2 TSO programs, and COBOL system services are
 selected from the generated `mainframe-env.common-program-catalog@1` registry.
 JES and the composed server dispatch typed enums only; unsupported dispositions
 remain catalog data and application programs fall through to `ProgramService`.
+
+The 0.7 converter uses the shared exact-byte source closure and diagnostic
+contracts. Its lossless Rowan-style JCL tree owns fixed columns, continuations,
+in-stream data, and CNTL data. One generated catalog supplies all 20 JCL, 13
+JES2 JECL, and 204 parameter identities to parsing, validation, planning,
+documentation, and conformance closure checks.
+
+INCLUDE and procedure traversal share one bounded dependency/cycle utility.
+JCLLIB order, SET/EXPORT timing, procedure defaults and invocation overrides,
+DD/EXEC overrides, nested invocation chains, and backward DD references retain
+their exact definition, use, invocation, and override source ranges. Expansion
+only produces converter input; it performs no scheduling, allocation mutation,
+utility execution, or JES success simulation.

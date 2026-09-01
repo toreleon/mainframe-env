@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.example/schemas/jcl-conformance-fixtures.schema.json",
+  "title": "Generated JCL conformance fixtures",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_version", "source_catalog_sha256", "fixtures"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.jcl-conformance-fixtures@1"},
+    "target_version": {"const": "0.7.0"},
+    "source_catalog_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "fixtures": {
+      "type": "array",
+      "minItems": 474,
+      "maxItems": 474,
+      "items": {"$ref": "#/$defs/fixture"}
+    }
+  },
+  "$defs": {
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "target", "primary", "includes", "cataloged_procedures", "procedure_libraries", "symbols"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^jcl\\.fixture\\.[a-z0-9-]+\\.[0-9]{4}\\.(valid|invalid)$"},
+        "target": {"$ref": "#/$defs/target"},
+        "primary": {"type": "string", "minLength": 1, "maxLength": 1048576},
+        "includes": {"type": "object", "maxProperties": 32, "additionalProperties": {"type": "string", "maxLength": 1048576}},
+        "cataloged_procedures": {"type": "object", "maxProperties": 32, "additionalProperties": {"type": "string", "maxLength": 1048576}},
+        "procedure_libraries": {"type": "object", "maxProperties": 32, "additionalProperties": {"type": "object", "maxProperties": 32, "additionalProperties": {"type": "string", "maxLength": 1048576}}},
+        "symbols": {"type": "object", "maxProperties": 32, "additionalProperties": {"type": "string", "maxLength": 65536}}
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family", "row_id", "keyword", "support", "capability", "source_line", "expected_error"],
+      "properties": {
+        "family": {"enum": ["jcl-statements", "jes2-jecl-statements", "dd-parameters", "exec-parameters", "job-parameters", "output-parameters"]},
+        "row_id": {"type": "string", "pattern": "^ibm-zos-3\\.2-jcl-jes2-2026-06:[a-z0-9-]+:[0-9]{4}$"},
+        "keyword": {"type": "string", "minLength": 1, "maxLength": 64},
+        "support": {"enum": ["available", "deferred"]},
+        "capability": {"type": "string", "pattern": "^[a-z][a-z0-9.-]+$"},
+        "source_line": {"type": "integer", "minimum": 1, "maximum": 65536},
+        "expected_error": {
+          "oneOf": [
+            {"type": "null"},
+            {"type": "string", "pattern": "^MEJCL[0-9]{4}$"}
+          ]
+        }
+      }
+    }
+  }
+}

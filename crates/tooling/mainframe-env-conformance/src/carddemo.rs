@@ -12,7 +12,8 @@ use mainframe_env_application::{
     parse_bms, parse_csd,
 };
 use mainframe_env_batch::{
-    JclBundle, JclLimits, JobPlan, JobState, StepCondition, UtilityDisposition, parse_jcl,
+    JclBundle, JclConversionLimits, JclLimits, JclRecordKind, JclStatementId, JobPlan, JobState,
+    StepCondition, UtilityDisposition, analyze_jcl_syntax, convert_jcl, parse_jcl,
     utility_disposition, validate_idcams_control,
 };
 use mainframe_env_cics::{
@@ -4049,9 +4050,57 @@ pub fn verify_carddemo_jcl_from_env(
                 digest_field(&mut shape, b"pinned-orphan-dd-continuation");
             }
             Err(problem) => {
+                let syntax = analyze_jcl_syntax(
+                    &JclBundle {
+                        primary: source.clone(),
+                        cataloged_procedures: procedures.clone(),
+                        ..Default::default()
+                    },
+                    JclConversionLimits::default().syntax,
+                )
+                .ok();
+                let unknown_records = syntax
+                    .as_ref()
+                    .into_iter()
+                    .flat_map(|analysis| analysis.syntax().records())
+                    .filter(|record| record.kind() == JclRecordKind::Statement)
+                    .filter_map(|record| {
+                        let fields = record.fields()?;
+                        let operation = syntax
+                            .as_ref()?
+                            .syntax()
+                            .text()
+                            .get(fields.operation().clone())?;
+                        JclStatementId::from_keyword(operation)
+                            .is_none()
+                            .then(|| format!("{}:{operation}", record.line()))
+                    })
+                    .collect::<Vec<_>>();
+                let diagnostics = convert_jcl(
+                    &JclBundle {
+                        primary: source.clone(),
+                        cataloged_procedures: procedures.clone(),
+                        ..Default::default()
+                    },
+                    JclConversionLimits::default(),
+                )
+                .map(|conversion| {
+                    conversion
+                        .diagnostics()
+                        .iter()
+                        .map(|diagnostic| {
+                            format!(
+                                "{}:{}",
+                                diagnostic.code().as_str(),
+                                diagnostic.public_message()
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
                 return Err(CorpusProblem::new(
                     "carddemo.jcl.parse_failed",
-                    format!("JCL {relative} failed with {problem:?}"),
+                    format!("JCL {relative} failed with {problem:?}; diagnostics={diagnostics:?}; unknown_records={unknown_records:?}"),
                 ));
             }
         }
@@ -4077,7 +4126,9 @@ pub fn verify_carddemo_jcl_from_env(
     {
         return Err(CorpusProblem::new(
             "carddemo.jcl.coverage_drift",
-            "JCL parsing observations differ from the bounded corpus contract",
+            format!(
+                "JCL parsing observations differ: parsed={parsed_files} unsupported={accepted_unsupported_files} jobs={jobs} steps={steps} dds={dds} continuations={continuation_lines} symbols={symbols} conditions={conditions} procedure_libraries={procedure_libraries} procedure_steps={procedure_steps} procedure_overrides={procedure_overrides} concatenations={dd_concatenations} instream_dds={instream_dds} instream_records={instream_records} provenance={provenance_spans} negative={negative_controls}"
+            ),
         ));
     }
     Ok(CardDemoJclReceipt {

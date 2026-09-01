@@ -23,6 +23,7 @@ mod abi;
 mod carddemo;
 mod dataset;
 mod dataset_reference;
+mod jcl;
 
 pub use abi::{
     HostAbiInventoryReceipt, HostAbiLibraryReceipt, HostAbiMemberReceipt, verify_host_abi_libraries,
@@ -53,8 +54,11 @@ pub use carddemo::{
     verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
     verify_carddemo_vsam_from_env,
 };
-pub use dataset::run_dataset_conformance;
+pub use dataset::{
+    DatasetConformanceRuntime, dataset_conformance_runtime, run_dataset_conformance,
+};
 pub use dataset_reference::{DatasetReferenceSimulationReport, run_dataset_reference_simulation};
+pub use jcl::{JclExitReceipt, JclFixtureRuntime, jcl_fixture_runtime, verify_jcl_exit};
 
 pub const HELLO_SOURCE: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. HELLO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MSG PIC X(12) VALUE 'HELLO WORLD!'.\nPROCEDURE DIVISION.\nDISPLAY MSG.\nSTOP RUN.\n";
 

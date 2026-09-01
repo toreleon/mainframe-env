@@ -5,7 +5,7 @@ use mainframe_env_batch::{
 use mainframe_env_coverage::{
     CompiledSpec, ConformanceDriver, ConformanceLimits, ConformanceObservation,
     ConformanceRunReport, ConformanceRunner, DriverOutput, DriverRef, FixtureRef, ObservationCheck,
-    ObservationRef, RunnerContext, RunnerSelection, RuntimeRegistry,
+    ObservationRef, RunnerContext, RunnerSelection, RuntimeRegistry, SpecProblem,
 };
 use mainframe_env_dataset::{DatasetLimits, DatasetService, dataset_providers};
 use mainframe_env_execution_api::{
@@ -89,44 +89,74 @@ pub fn run_dataset_conformance(
         return Err("dataset reference simulation denominator or evidence boundary drifted".into());
     }
     let limits = ConformanceLimits::default();
-    let driver = DatasetOrganizationDriver;
-    let ams_driver = AmsCommandDriver;
-    let observations = FIXTURE_IDS
-        .into_iter()
-        .chain(AMS_FIXTURE_IDS)
-        .map(|fixture| ExpectedObservation { fixture })
-        .collect::<Vec<_>>();
+    let handlers = dataset_conformance_runtime();
     let runtime = RuntimeRegistry::new(
         spec,
-        vec![
-            (
-                DriverRef::new("dataset.organization.driver", limits)
-                    .map_err(|problem| problem.to_string())?,
-                &driver as &dyn ConformanceDriver,
-            ),
-            (
-                DriverRef::new("dataset.ams.driver", limits)
-                    .map_err(|problem| problem.to_string())?,
-                &ams_driver as &dyn ConformanceDriver,
-            ),
-        ],
+        handlers
+            .drivers(limits)
+            .map_err(|problem| problem.to_string())?,
         Vec::new(),
-        observations
-            .iter()
-            .map(|observation| {
-                Ok((
-                    ObservationRef::new(format!("observe.{}", observation.fixture), limits)
-                        .map_err(|problem| problem.to_string())?,
-                    observation as &dyn ConformanceObservation,
-                ))
-            })
-            .collect::<Result<Vec<_>, String>>()?,
+        handlers
+            .observations(limits)
+            .map_err(|problem| problem.to_string())?,
         limits,
     )
     .map_err(|problem| problem.to_string())?;
     ConformanceRunner::new(spec, runtime, limits)
         .run(selection, context)
         .map_err(|problem| problem.to_string())
+}
+
+#[must_use]
+pub fn dataset_conformance_runtime() -> DatasetConformanceRuntime {
+    DatasetConformanceRuntime {
+        organization: DatasetOrganizationDriver,
+        ams: AmsCommandDriver,
+        observations: FIXTURE_IDS
+            .into_iter()
+            .chain(AMS_FIXTURE_IDS)
+            .map(|fixture| ExpectedObservation { fixture })
+            .collect(),
+    }
+}
+
+pub struct DatasetConformanceRuntime {
+    organization: DatasetOrganizationDriver,
+    ams: AmsCommandDriver,
+    observations: Vec<ExpectedObservation>,
+}
+
+impl DatasetConformanceRuntime {
+    pub fn drivers(
+        &self,
+        limits: ConformanceLimits,
+    ) -> Result<Vec<(DriverRef, &dyn ConformanceDriver)>, SpecProblem> {
+        Ok(vec![
+            (
+                DriverRef::new("dataset.organization.driver", limits)?,
+                &self.organization as &dyn ConformanceDriver,
+            ),
+            (
+                DriverRef::new("dataset.ams.driver", limits)?,
+                &self.ams as &dyn ConformanceDriver,
+            ),
+        ])
+    }
+
+    pub fn observations(
+        &self,
+        limits: ConformanceLimits,
+    ) -> Result<Vec<(ObservationRef, &dyn ConformanceObservation)>, SpecProblem> {
+        self.observations
+            .iter()
+            .map(|observation| {
+                Ok((
+                    ObservationRef::new(format!("observe.{}", observation.fixture), limits)?,
+                    observation as &dyn ConformanceObservation,
+                ))
+            })
+            .collect()
+    }
 }
 
 struct DatasetOrganizationDriver;
