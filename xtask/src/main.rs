@@ -3800,6 +3800,7 @@ fn check_coverage_work_package_evidence(root: &Path) -> TaskResult {
 fn check_work_package_amendments(root: &Path) -> TaskResult {
     let path = root.join("conformance/0.2/evidence/work-package-amendments.json");
     let evidence = json(&path)?;
+    let repair_completion = accepted_0_2_completion(root)?;
     require(
         evidence["schema_version"]
             == Value::String("mainframe-env.work-package-amendments@1".into())
@@ -3848,7 +3849,11 @@ fn check_work_package_amendments(root: &Path) -> TaskResult {
             require(
                 !relative.contains("..")
                     && !Path::new(relative).is_absolute()
-                    && expected == format!("sha256:{}", file_digest(&root.join(relative))?),
+                    && expected
+                        == format!(
+                            "sha256:{}",
+                            git_file_digest(root, &repair_completion, relative)?
+                        ),
                 &format!("{work_package} repair artifact drifted: {relative}"),
             )?;
         }
@@ -3962,8 +3967,8 @@ fn check_coverage_program_status(root: &Path) -> TaskResult {
         .as_str()
         .ok_or("0.2 program status dirty-tree digest is missing")?;
     require(
-        recorded_digest == repository_digest(root)?,
-        "0.2 program status dirty-tree digest is stale",
+        recorded_digest == accepted_0_2_candidate_digest(root)?,
+        "0.2 program status accepted-candidate digest drifted",
     )?;
     require(
         root.join("docs/delivery/coverage-versions/status/0.2.0.md")
@@ -4220,8 +4225,9 @@ fn check_full_regression(root: &Path) -> TaskResult {
         "full regression receipt header is invalid",
     )?;
     let candidate = &receipt["candidate"];
+    let accepted_candidate_digest = accepted_0_2_candidate_digest(root)?;
     require(
-        candidate["source_digest"].as_str() == Some(repository_digest(root)?.as_str())
+        candidate["source_digest"].as_str() == Some(accepted_candidate_digest.as_str())
             && candidate["work_package_base_commit"]
                 == Value::String("edb4558c987a56ee9f0c96438f756d663199942f".into())
             && candidate["accepted_release_commit"]
@@ -5538,6 +5544,23 @@ fn print_digest(root: &Path) -> TaskResult {
     Ok(())
 }
 
+fn accepted_0_2_candidate_digest(root: &Path) -> TaskResult<String> {
+    repository_digest_at_commit(root, &accepted_0_2_completion(root)?)
+}
+
+fn accepted_0_2_completion(root: &Path) -> TaskResult<String> {
+    let evidence = json(&root.join("conformance/0.2/evidence/review-repair-round-5.json"))?;
+    let evidence_digest = evidence["evidence_digest"]
+        .as_str()
+        .ok_or("round-five accepted-candidate evidence digest is missing")?;
+    let completions = evidence_seal::round_five_completion_commits(root, Some(evidence_digest))?;
+    match completions.as_slice() {
+        [completion] => Ok(completion.clone()),
+        [] => return Err("round-five accepted-candidate completion is missing".into()),
+        _ => return Err("round-five accepted-candidate completion is duplicated".into()),
+    }
+}
+
 fn repository_digest(root: &Path) -> TaskResult<String> {
     let mut files = Vec::new();
     collect_files(root, &mut files)?;
@@ -5598,12 +5621,16 @@ fn repository_digest_excluded(relative: &Path) -> bool {
 }
 
 fn release_source_digest(root: &Path) -> TaskResult<String> {
-    let mut files = Vec::new();
-    collect_files(root, &mut files)?;
+    let accepted_candidate = accepted_0_2_completion(root)?;
+    let listing = command_text(
+        root,
+        "git",
+        &["ls-tree", "-r", "--name-only", &accepted_candidate],
+    )?;
+    let mut files = listing.lines().map(PathBuf::from).collect::<Vec<_>>();
     files.sort();
     let mut digest = Sha256::new();
-    for file in files {
-        let relative = file.strip_prefix(root).map_err(|error| error.to_string())?;
+    for relative in files {
         if relative.starts_with(".git")
             || relative.starts_with("target")
             || relative.starts_with("release")
@@ -5627,20 +5654,18 @@ fn release_source_digest(root: &Path) -> TaskResult<String> {
         {
             continue;
         }
-        let bytes = if matches!(
-            relative,
-            path if path == Path::new("xtask/src/main.rs")
-                || path == Path::new("xtask/src/evidence_seal.rs")
-                || path == Path::new("docs/releases/0.2.md")
-                || path == Path::new("conformance/0.2/evidence/work-package-amendments.json")
-        ) {
+        let bytes = if relative == Path::new("xtask/src/main.rs")
+            || relative == Path::new("xtask/src/evidence_seal.rs")
+            || relative == Path::new("docs/releases/0.2.md")
+            || relative == Path::new("conformance/0.2/evidence/work-package-amendments.json")
+        {
             git_file_bytes(
                 root,
                 "36344c542e82a4174f5be7da6038f7095ce6cba8",
                 &relative.to_string_lossy(),
             )?
         } else {
-            fs::read(&file).map_err(|error| format!("{}: {error}", file.display()))?
+            git_file_bytes(root, &accepted_candidate, &relative.to_string_lossy())?
         };
         let path = relative.to_string_lossy();
         digest.update((path.len() as u64).to_be_bytes());
@@ -6699,6 +6724,24 @@ mod tests {
             )
         );
         fs::remove_dir_all(root).expect("temporary repository cleanup");
+    }
+
+    #[test]
+    fn accepted_0_2_candidate_receipts_survive_later_versions() {
+        let root = repository_root().expect("repository root");
+        let accepted = accepted_0_2_candidate_digest(&root).expect("accepted 0.2 candidate");
+        let status = json(&root.join("conformance/0.2/evidence/program-status.json"))
+            .expect("0.2 program status");
+        let regression = json(&root.join("conformance/0.2/evidence/full-regression.json"))
+            .expect("0.2 full regression");
+        assert_eq!(status["dirty_tree_identity"]["digest"], accepted);
+        assert_eq!(regression["candidate"]["source_digest"], accepted);
+        assert_ne!(
+            repository_digest(&root).expect("later live digest"),
+            accepted
+        );
+        check_work_package_amendments(&root)
+            .expect("0.2 amendments remain bound to accepted candidate");
     }
 
     #[test]
