@@ -1,3 +1,4 @@
+use crate::cobol::bind_compatible_runtime_services;
 use crate::{DefaultProgramRouter, ServerConfig, default_program_router};
 use axum::http::StatusCode;
 use base64::Engine;
@@ -1442,6 +1443,7 @@ impl ProductServer {
             )
             .map_err(|_| HostProblem::ResourceExhausted)?,
         );
+        bind_compatible_runtime_services(&mut invocation)?;
         let saved = self.online_machine_continuation(session)?;
         let mut saved_version = saved.as_ref().map(|saved| saved.version);
         let mut saved_checkpoint = saved.as_ref().map(|saved| saved.checkpoint.clone());

@@ -55,6 +55,9 @@ fn resource(value: &str) -> bool {
 host_name!(DatasetName, qualified);
 host_name!(MemberName, simple);
 host_name!(ProgramName, simple);
+host_name!(ClassName, simple);
+host_name!(MethodName, simple);
+host_name!(RuntimeServiceName, simple);
 host_name!(JobName, simple);
 host_name!(SessionId, simple);
 host_name!(ResourceName, resource);

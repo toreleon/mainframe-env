@@ -190,7 +190,14 @@ impl HostProvider for ProgramRouter {
                 .map_err(|_| HostProblem::ResourceExhausted);
             }
             let (program, payload) = match effect.request {
-                HostRequest::Program(ProgramRequest::Call { program, payload })
+                HostRequest::Program(ProgramRequest::Call {
+                    service: Some(_), ..
+                }) => return Err(HostProblem::Unsupported),
+                HostRequest::Program(ProgramRequest::Call {
+                    program,
+                    payload,
+                    service: None,
+                })
                 | HostRequest::Program(ProgramRequest::Link { program, payload })
                 | HostRequest::Program(ProgramRequest::Xctl { program, payload }) => {
                     (program, payload)

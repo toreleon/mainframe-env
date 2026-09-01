@@ -1,4 +1,7 @@
-use crate::{DatasetName, JobName, MemberName, ProgramName, ResourceName, SessionId};
+use crate::{
+    ClassName, DatasetName, JobName, MemberName, MethodName, ProgramName, ResourceName,
+    RuntimeServiceName, SessionId,
+};
 use mainframe_env_execution_api::{
     BoundedPayload, CapabilityId, IdempotencyKey, InvocationLimits, PrincipalId, RunUnitId,
 };
@@ -43,6 +46,15 @@ pub enum RecordFormat {
     VariableBlocked,
     Undefined,
     Line,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum KeyRelation {
+    Equal,
+    Greater,
+    GreaterOrEqual,
+    Less,
+    LessOrEqual,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AccessIntent {
@@ -253,6 +265,7 @@ pub enum DatasetRequest {
     StartBrowse {
         dataset: DatasetName,
         key: Vec<u8>,
+        relation: KeyRelation,
     },
     ReadNext {
         dataset: DatasetName,
@@ -315,6 +328,13 @@ pub enum ProgramRequest {
     Call {
         program: ProgramName,
         payload: BoundedPayload,
+        service: Option<RuntimeServiceSelector>,
+    },
+    Invoke {
+        class: ClassName,
+        method: MethodName,
+        receiver: BoundedPayload,
+        payload: BoundedPayload,
     },
     Link {
         program: ProgramName,
@@ -329,11 +349,24 @@ pub enum ProgramRequest {
         payload: BoundedPayload,
     },
     Cancel {
-        program: ProgramName,
+        programs: Vec<ProgramName>,
     },
     Abend {
         code: String,
     },
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum RuntimeServiceKind {
+    LanguageEnvironment,
+    HostExtension,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeServiceSelector {
+    pub kind: RuntimeServiceKind,
+    pub name: RuntimeServiceName,
+    pub abi_version: u16,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -838,6 +871,7 @@ impl HostRequest {
                     | SpoolRequest::Purge { .. }
             ) | Self::Program(
                 ProgramRequest::Call { .. }
+                    | ProgramRequest::Invoke { .. }
                     | ProgramRequest::Link { .. }
                     | ProgramRequest::Xctl { .. }
                     | ProgramRequest::Return { .. }
@@ -888,6 +922,15 @@ impl HostRequest {
     pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
         match self {
             Self::Dataset(request) => validate_dataset(request, limits),
+            Self::Program(ProgramRequest::Call {
+                service: Some(service),
+                ..
+            }) if service.abi_version == 0 => Err(HostProblem::Malformed),
+            Self::Program(ProgramRequest::Cancel { programs })
+                if programs.is_empty() || programs.len() > limits.max_fields =>
+            {
+                Err(HostProblem::ResourceExhausted)
+            }
             Self::Spool(SpoolRequest::Append {
                 records, mutation, ..
             }) => {

@@ -1539,10 +1539,31 @@ impl DatasetService {
                     })
                 }
             }
-            DatasetRequest::StartBrowse { dataset, key } => {
+            DatasetRequest::StartBrowse {
+                dataset,
+                key,
+                relation,
+            } => {
                 let identities = browse_identities(state, dataset)?;
-                let index =
+                let lower =
                     identities.partition_point(|(logical, _)| logical.as_slice() < key.as_slice());
+                let upper =
+                    identities.partition_point(|(logical, _)| logical.as_slice() <= key.as_slice());
+                let index = match relation {
+                    mainframe_env_host_api::KeyRelation::Equal if lower < upper => lower,
+                    mainframe_env_host_api::KeyRelation::Greater => upper,
+                    mainframe_env_host_api::KeyRelation::GreaterOrEqual => lower,
+                    mainframe_env_host_api::KeyRelation::Less if lower > 0 => lower - 1,
+                    mainframe_env_host_api::KeyRelation::LessOrEqual if upper > 0 => upper - 1,
+                    mainframe_env_host_api::KeyRelation::Equal
+                    | mainframe_env_host_api::KeyRelation::Less
+                    | mainframe_env_host_api::KeyRelation::LessOrEqual => {
+                        return Err(condition("NOTFND", 13));
+                    }
+                };
+                if index >= identities.len() {
+                    return Err(condition("NOTFND", 13));
+                }
                 let active_identities = state
                     .cursors
                     .values()
@@ -3290,6 +3311,7 @@ mod tests {
             .invoke(DatasetRequest::StartBrowse {
                 dataset: base.clone(),
                 key: b"CC".to_vec(),
+                relation: mainframe_env_host_api::KeyRelation::GreaterOrEqual,
             })
             .unwrap()
         {
@@ -3351,6 +3373,7 @@ mod tests {
             .invoke(DatasetRequest::StartBrowse {
                 dataset: duplicate_aix.clone(),
                 key: b"X".to_vec(),
+                relation: mainframe_env_host_api::KeyRelation::GreaterOrEqual,
             })
             .unwrap()
         {
@@ -3598,5 +3621,73 @@ mod tests {
             Err(HostProblem::Condition { response: 22, .. })
         ));
         let _ = HostLimits::default();
+    }
+
+    #[test]
+    fn relational_start_positions_exactly_and_missing_equal_is_conditioned() {
+        use mainframe_env_host_api::KeyRelation;
+
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let dataset = DatasetName::new("USER.INDEXED", 44).unwrap();
+        service
+            .invoke(DatasetRequest::Create {
+                dataset: dataset.clone(),
+                attributes: attrs(DatasetOrganization::KeySequenced),
+                mutation: mutation(1),
+            })
+            .unwrap();
+        service
+            .invoke(DatasetRequest::Write {
+                dataset: dataset.clone(),
+                member: None,
+                records: vec![b"AA01".to_vec(), b"BB02".to_vec(), b"CC03".to_vec()],
+                expected_version: Some(1),
+                mutation: mutation(2),
+            })
+            .unwrap();
+
+        for (relation, key, expected) in [
+            (KeyRelation::Equal, b"BB".as_slice(), b"BB02".as_slice()),
+            (KeyRelation::Greater, b"BB".as_slice(), b"CC03".as_slice()),
+            (
+                KeyRelation::GreaterOrEqual,
+                b"BA".as_slice(),
+                b"BB02".as_slice(),
+            ),
+            (KeyRelation::Less, b"BB".as_slice(), b"AA01".as_slice()),
+            (
+                KeyRelation::LessOrEqual,
+                b"BC".as_slice(),
+                b"BB02".as_slice(),
+            ),
+        ] {
+            let cursor = match service
+                .invoke(DatasetRequest::StartBrowse {
+                    dataset: dataset.clone(),
+                    key: key.to_vec(),
+                    relation,
+                })
+                .unwrap()
+            {
+                DatasetResult::Browse { cursor, .. } => cursor,
+                other => panic!("unexpected browse result: {other:?}"),
+            };
+            assert!(matches!(
+                service.invoke(DatasetRequest::ReadNext {
+                    dataset: dataset.clone(),
+                    cursor,
+                    reverse: false,
+                }),
+                Ok(DatasetResult::Browse { record: Some(record), .. }) if record == expected
+            ));
+        }
+        assert!(matches!(
+            service.invoke(DatasetRequest::StartBrowse {
+                dataset,
+                key: b"BD".to_vec(),
+                relation: KeyRelation::Equal,
+            }),
+            Err(HostProblem::Condition { ref name, response: 13, .. }) if name == "NOTFND"
+        ));
     }
 }

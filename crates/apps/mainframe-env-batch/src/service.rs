@@ -862,6 +862,7 @@ impl BatchService {
                 request: HostRequest::Program(ProgramRequest::Call {
                     program: ProgramName::new(program, 128).map_err(|_| HostProblem::Malformed)?,
                     payload,
+                    service: None,
                 }),
             },
         );

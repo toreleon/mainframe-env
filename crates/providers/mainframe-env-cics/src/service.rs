@@ -2276,6 +2276,7 @@ impl CicsService {
                     ccsid,
                     &argument_bytes(request, "RIDFLD").unwrap_or_default(),
                 )?,
+                relation: mainframe_env_host_api::KeyRelation::GreaterOrEqual,
             },
             CicsOperation::ReadNext | CicsOperation::ReadPrev => DatasetRequest::ReadNext {
                 dataset: dataset.clone(),
