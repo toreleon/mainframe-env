@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/cobol-function-fixtures-v1.json",
+  "title": "mainframe-env COBOL intrinsic and special-register fixtures",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_version", "fixtures", "special_registers"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.cobol-function-fixtures@1"},
+    "target_version": {"const": "0.3.0"},
+    "fixtures": {"type": "array", "minItems": 82, "maxItems": 82, "items": {"$ref": "#/$defs/function"}},
+    "special_registers": {"type": "array", "minItems": 28, "maxItems": 28, "items": {"$ref": "#/$defs/register"}}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$", "maxLength": 64},
+    "row_id": {"type": "string", "pattern": "^ibm-enterprise-cobol-6\\.5-2026-05-31:intrinsic-functions:[0-9]{4}$"},
+    "function": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "row_id", "name", "valid_expression", "invalid_expression", "result_type", "fixed_length"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"}, "row_id": {"$ref": "#/$defs/row_id"},
+        "name": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]*$", "maxLength": 64},
+        "valid_expression": {"type": "string", "pattern": "^FUNCTION [A-Z]", "maxLength": 512},
+        "invalid_expression": {"type": "string", "pattern": "^FUNCTION [A-Z]", "maxLength": 512},
+        "result_type": {"enum": ["alphanumeric", "integer", "national", "numeric", "utf8"]},
+        "fixed_length": {"anyOf": [{"type": "integer", "minimum": 1, "maximum": 1024}, {"type": "null"}]}
+      }
+    },
+    "register": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "name", "value_type", "length_kind", "fixed_length", "writable"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "name": {"type": "string", "pattern": "^[A-Z][A-Z0-9 -]*$", "maxLength": 64},
+        "value_type": {"enum": ["alphanumeric", "integer", "national", "other", "group"]},
+        "length_kind": {"enum": ["fixed", "lp", "dynamic", "dependent"]},
+        "fixed_length": {"anyOf": [{"type": "integer", "minimum": 1, "maximum": 1024}, {"type": "null"}]},
+        "writable": {"type": "boolean"}
+      }
+    }
+  }
+}

@@ -1,9 +1,15 @@
-use crate::{CobolFileBinding, CobolLayout, LosslessSyntax, SemanticModel};
+use crate::{
+    CobolFileBinding, CobolLayout, LosslessSyntax, ProcedureStatementKind, SemanticModel,
+    SourceSpan,
+};
 use mainframe_env_ir::{
     Attribute, Effect, IrLimits, Module, ModuleBuilder, OperationCatalog, OperationIdentity,
     OperationSchema, StorageReference,
 };
 use std::collections::{BTreeMap, BTreeSet};
+use std::ops::Range;
+
+mod statement_grammar;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum StatementKind {
@@ -16,6 +22,7 @@ pub enum StatementKind {
     Close,
     Compute,
     Continue,
+    Delete,
     Display,
     Divide,
     DuplicateLabel,
@@ -47,6 +54,7 @@ pub enum StatementKind {
     Search,
     Set,
     Sort,
+    Start,
     StopRun,
     StructuredControl,
     String,
@@ -72,6 +80,7 @@ impl StatementKind {
             Self::Close => "close",
             Self::Compute => "compute",
             Self::Continue => "continue",
+            Self::Delete => "delete",
             Self::Display => "display",
             Self::Divide => "divide",
             Self::DuplicateLabel => "duplicate_label",
@@ -103,6 +112,7 @@ impl StatementKind {
             Self::Search => "search",
             Self::Set => "set",
             Self::Sort => "sort",
+            Self::Start => "start",
             Self::StopRun => "stop_run",
             Self::StructuredControl => "structured_control",
             Self::String => "string",
@@ -126,12 +136,14 @@ impl StatementKind {
                 | Self::Release
                 | Self::ReturnStatement
                 | Self::Sort
+                | Self::Delete
+                | Self::Start
                 | Self::StructuredControl
         )
     }
 
     #[must_use]
-    pub const fn frozen() -> [Self; 43] {
+    pub const fn official() -> [Self; 44] {
         [
             Self::Accept,
             Self::Add,
@@ -142,12 +154,11 @@ impl StatementKind {
             Self::Close,
             Self::Compute,
             Self::Continue,
+            Self::Delete,
             Self::Display,
             Self::Divide,
             Self::Entry,
             Self::Evaluate,
-            Self::ExecCics,
-            Self::ExecSql,
             Self::Exit,
             Self::Free,
             Self::GoBack,
@@ -166,9 +177,11 @@ impl StatementKind {
             Self::Read,
             Self::Release,
             Self::ReturnStatement,
+            Self::Rewrite,
             Self::Search,
             Self::Set,
             Self::Sort,
+            Self::Start,
             Self::StopRun,
             Self::String,
             Self::Subtract,
@@ -178,13 +191,96 @@ impl StatementKind {
             Self::XmlParse,
         ]
     }
+
+    #[must_use]
+    pub const fn official_kind(self) -> Option<ProcedureStatementKind> {
+        use ProcedureStatementKind as P;
+        Some(match self {
+            Self::Accept => P::Accept,
+            Self::Add => P::Add,
+            Self::Allocate => P::Allocate,
+            Self::Alter => P::Alter,
+            Self::Call => P::Call,
+            Self::Cancel => P::Cancel,
+            Self::Close => P::Close,
+            Self::Compute => P::Compute,
+            Self::Continue => P::Continue,
+            Self::Delete => P::Delete,
+            Self::Display => P::Display,
+            Self::Divide => P::Divide,
+            Self::Entry => P::Entry,
+            Self::Evaluate => P::Evaluate,
+            Self::Exit => P::Exit,
+            Self::Free => P::Free,
+            Self::GoBack => P::Goback,
+            Self::GoTo => P::GoTo,
+            Self::If => P::If,
+            Self::Initialize => P::Initialize,
+            Self::Inspect => P::Inspect,
+            Self::Invoke => P::Invoke,
+            Self::JsonGenerate => P::JsonGenerate,
+            Self::JsonParse => P::JsonParse,
+            Self::Merge => P::Merge,
+            Self::Move => P::Move,
+            Self::Multiply => P::Multiply,
+            Self::Open => P::Open,
+            Self::Perform => P::Perform,
+            Self::Read => P::Read,
+            Self::Release => P::Release,
+            Self::ReturnStatement => P::Return,
+            Self::Rewrite => P::Rewrite,
+            Self::Search => P::Search,
+            Self::Set => P::Set,
+            Self::Sort => P::Sort,
+            Self::Start => P::Start,
+            Self::StopRun => P::Stop,
+            Self::String => P::String,
+            Self::Subtract => P::Subtract,
+            Self::Unstring => P::Unstring,
+            Self::Write => P::Write,
+            Self::XmlGenerate => P::XmlGenerate,
+            Self::XmlParse => P::XmlParse,
+            _ => return None,
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum StatementOptionKind {
+    AtEnd,
+    NotAtEnd,
+    InvalidKey,
+    NotInvalidKey,
+    OnException,
+    NotOnException,
+    OnOverflow,
+    NotOnOverflow,
+    OnSizeError,
+    NotOnSizeError,
+    Rounded,
+    Giving,
+    Remainder,
+    Returning,
+    Using,
+    Into,
+    From,
+    ExplicitTerminator,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StatementOption {
+    pub kind: StatementOptionKind,
+    pub operands: Vec<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HirStatement {
     pub kind: StatementKind,
+    pub official: Option<ProcedureStatementKind>,
     pub arguments: Vec<String>,
+    pub options: Vec<StatementOption>,
     pub line: usize,
+    pub source: Vec<SourceSpan>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -217,6 +313,7 @@ pub struct ControlNode {
     pub parent: Option<usize>,
     pub statement: Option<usize>,
     pub text: String,
+    pub source: Vec<SourceSpan>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -255,17 +352,35 @@ impl CobolHir {
         semantic: &SemanticModel,
         limits: IrLimits,
     ) -> Result<Self, HirProblem> {
-        let procedure =
+        let (procedure_offset, procedure) =
             procedure_text(syntax.semantic_text()).ok_or(HirProblem::MissingProcedure)?;
-        let parsed = parse_procedure(procedure, limits.max_operations.saturating_sub(1))?;
+        let mut parsed = parse_procedure(procedure, limits.max_operations.saturating_sub(1))?;
+        for (statement, range) in parsed.statements.iter_mut().zip(&parsed.statement_ranges) {
+            statement.source = source_spans_for_range(syntax, procedure_offset, range);
+        }
+        for (node, range) in parsed.nodes.iter_mut().zip(&parsed.node_ranges) {
+            node.source = source_spans_for_range(syntax, procedure_offset, range);
+        }
         let mut statements = parsed.statements;
         if statements.len() > limits.max_operations.saturating_sub(1) {
             return Err(HirProblem::StatementLimitExceeded);
         }
         statements.push(HirStatement {
             kind: StatementKind::ProgramEnd,
+            official: None,
             arguments: Vec::new(),
+            options: Vec::new(),
             line: syntax.semantic_text().lines().count(),
+            source: syntax
+                .semantic_text()
+                .len()
+                .checked_sub(1)
+                .map_or_else(Vec::new, |start| {
+                    crate::syntax::source_spans(
+                        syntax.semantic_origins(),
+                        start..syntax.semantic_text().len(),
+                    )
+                }),
         });
         let module = build_module(&statements, &semantic.layouts, limits)?;
         Ok(Self {
@@ -287,14 +402,109 @@ impl CobolHir {
             .map(|statement| statement.kind)
             .collect()
     }
+
+    #[must_use]
+    pub fn execution_incomplete_arithmetic_receivers(&self) -> BTreeSet<(StatementKind, usize)> {
+        self.statements
+            .iter()
+            .filter(|statement| {
+                matches!(statement.kind, StatementKind::Add | StatementKind::Subtract)
+                    && has_multiple_arithmetic_receivers(statement)
+            })
+            .map(|statement| (statement.kind, statement.line))
+            .collect()
+    }
+}
+
+fn has_multiple_arithmetic_receivers(statement: &HirStatement) -> bool {
+    let separator = match statement.kind {
+        StatementKind::Add => statement
+            .arguments
+            .iter()
+            .position(|argument| argument == "TO")
+            .or_else(|| {
+                statement
+                    .arguments
+                    .iter()
+                    .position(|argument| argument == "GIVING")
+            }),
+        StatementKind::Subtract => statement
+            .arguments
+            .iter()
+            .position(|argument| argument == "FROM"),
+        _ => None,
+    };
+    let Some(separator) = separator else {
+        return false;
+    };
+    let giving = statement
+        .arguments
+        .iter()
+        .enumerate()
+        .skip(separator + 1)
+        .find_map(|(index, argument)| (argument == "GIVING").then_some(index));
+    let primary_start = separator + 1;
+    let primary_end = giving.unwrap_or(statement.arguments.len());
+    arithmetic_receiver_count(&statement.arguments[primary_start..primary_end]) > 1
+        || giving
+            .is_some_and(|giving| arithmetic_receiver_count(&statement.arguments[giving + 1..]) > 1)
+}
+
+fn arithmetic_receiver_count(tokens: &[String]) -> usize {
+    let mut count = 0usize;
+    let mut position = 0usize;
+    while position < tokens.len() {
+        if matches!(tokens[position].as_str(), "," | "ROUNDED") {
+            position += 1;
+            continue;
+        }
+        count += 1;
+        position += 1;
+        while position < tokens.len() {
+            if tokens[position] == "(" {
+                let mut depth = 1usize;
+                position += 1;
+                while position < tokens.len() && depth > 0 {
+                    match tokens[position].as_str() {
+                        "(" => depth += 1,
+                        ")" => depth = depth.saturating_sub(1),
+                        _ => {}
+                    }
+                    position += 1;
+                }
+            } else if matches!(tokens[position].as_str(), "OF" | "IN")
+                && position + 1 < tokens.len()
+            {
+                position += 2;
+            } else {
+                break;
+            }
+        }
+    }
+    count
+}
+
+fn source_spans_for_range(
+    syntax: &LosslessSyntax,
+    procedure_offset: usize,
+    range: &Range<usize>,
+) -> Vec<SourceSpan> {
+    if range.start >= range.end {
+        return Vec::new();
+    }
+    crate::syntax::source_spans(
+        syntax.semantic_origins(),
+        procedure_offset + range.start..procedure_offset + range.end,
+    )
 }
 
 pub fn cobol_hir_catalog() -> OperationCatalog {
     let mut catalog = OperationCatalog::default();
-    for kind in StatementKind::frozen().into_iter().chain([
+    for kind in StatementKind::official().into_iter().chain([
         StatementKind::NextSentence,
+        StatementKind::ExecCics,
         StatementKind::ExecDli,
-        StatementKind::Rewrite,
+        StatementKind::ExecSql,
         StatementKind::DuplicateLabel,
         StatementKind::StructuredControl,
         StatementKind::Label,
@@ -320,6 +530,7 @@ fn build_module(
     let mut storage = BTreeMap::new();
     let mut backing_lengths = layouts
         .iter()
+        .filter(|layout| layout.allocated)
         .map(|layout| (layout.qualified_name.clone(), layout.length))
         .collect::<BTreeMap<_, _>>();
     for layout in layouts {
@@ -328,7 +539,10 @@ fn build_module(
             *required = (*required).max(layout.length);
         }
     }
-    for layout in layouts.iter().filter(|layout| layout.length > 0) {
+    for layout in layouts
+        .iter()
+        .filter(|layout| layout.allocated && layout.length > 0)
+    {
         let alias = layout
             .alias_of
             .as_ref()
@@ -408,8 +622,8 @@ pub(crate) fn effects(kind: StatementKind) -> Vec<Effect> {
         | K::Entry
         | K::Exit
         | K::StopRun => vec![Effect::ProgramControl],
-        K::Open | K::Close | K::Read => vec![Effect::DatasetRead],
-        K::Rewrite | K::Write => vec![Effect::DatasetWrite],
+        K::Open | K::Close | K::Read | K::Start => vec![Effect::DatasetRead],
+        K::Delete | K::Rewrite | K::Write => vec![Effect::DatasetWrite],
         K::ExecCics | K::ExecDli | K::ExecSql => {
             vec![
                 Effect::ProgramControl,
@@ -437,18 +651,76 @@ pub(crate) fn effects(kind: StatementKind) -> Vec<Effect> {
     }
 }
 
-fn procedure_text(source: &str) -> Option<&str> {
+fn procedure_text(source: &str) -> Option<(usize, &str)> {
     let upper = source.to_ascii_uppercase();
     let start = upper.find("PROCEDURE DIVISION")?;
     let rest = &source[start..];
     let dot = rest.find('.')?;
-    Some(&rest[dot + 1..])
+    Some((start + dot + 1, &rest[dot + 1..]))
+}
+
+fn statement_options(kind: StatementKind, text: &str) -> Vec<StatementOption> {
+    if kind.official_kind().is_none() {
+        return Vec::new();
+    }
+    let upper = text.to_ascii_uppercase();
+    let tokens = semantic_tokens(text, 1);
+    let mut options = Vec::new();
+    for (phrase, kind) in [
+        ("NOT AT END", StatementOptionKind::NotAtEnd),
+        ("AT END", StatementOptionKind::AtEnd),
+        ("NOT INVALID KEY", StatementOptionKind::NotInvalidKey),
+        ("INVALID KEY", StatementOptionKind::InvalidKey),
+        ("NOT ON EXCEPTION", StatementOptionKind::NotOnException),
+        ("ON EXCEPTION", StatementOptionKind::OnException),
+        ("NOT ON OVERFLOW", StatementOptionKind::NotOnOverflow),
+        ("ON OVERFLOW", StatementOptionKind::OnOverflow),
+        ("NOT ON SIZE ERROR", StatementOptionKind::NotOnSizeError),
+        ("ON SIZE ERROR", StatementOptionKind::OnSizeError),
+    ] {
+        if upper.contains(phrase) {
+            options.push(StatementOption {
+                kind,
+                operands: Vec::new(),
+            });
+        }
+    }
+    for (word, kind) in [
+        ("ROUNDED", StatementOptionKind::Rounded),
+        ("GIVING", StatementOptionKind::Giving),
+        ("REMAINDER", StatementOptionKind::Remainder),
+        ("RETURNING", StatementOptionKind::Returning),
+        ("USING", StatementOptionKind::Using),
+        ("INTO", StatementOptionKind::Into),
+        ("FROM", StatementOptionKind::From),
+    ] {
+        if let Some(index) = tokens.iter().position(|token| token == word) {
+            options.push(StatementOption {
+                kind,
+                operands: tokens.get(index + 1).into_iter().cloned().collect(),
+            });
+        }
+    }
+    if upper
+        .split_whitespace()
+        .any(|word| word.starts_with("END-"))
+    {
+        options.push(StatementOption {
+            kind: StatementOptionKind::ExplicitTerminator,
+            operands: Vec::new(),
+        });
+    }
+    options.sort_by_key(|option| option.kind);
+    options.dedup_by_key(|option| option.kind);
+    options
 }
 
 #[derive(Debug)]
 struct ParsedProcedure {
     statements: Vec<HirStatement>,
+    statement_ranges: Vec<Range<usize>>,
     nodes: Vec<ControlNode>,
+    node_ranges: Vec<Range<usize>>,
     edges: Vec<ControlEdge>,
 }
 
@@ -475,7 +747,9 @@ struct NextSentenceTransfer {
 #[derive(Debug)]
 struct ProcedureParser {
     statements: Vec<HirStatement>,
+    statement_ranges: Vec<Range<usize>>,
     nodes: Vec<ControlNode>,
+    node_ranges: Vec<Range<usize>>,
     edges: Vec<ControlEdge>,
     scopes: Vec<ScopeFrame>,
     branch_tails: BTreeMap<usize, Vec<usize>>,
@@ -485,6 +759,7 @@ struct ProcedureParser {
     sentence_first_nodes: Vec<Option<usize>>,
     last_node: Option<usize>,
     fallthrough_open: bool,
+    condition_parent: Option<usize>,
     has_unsupported_include: bool,
     max_statements: usize,
 }
@@ -493,7 +768,9 @@ impl ProcedureParser {
     fn new(max_statements: usize, sentence_count: usize) -> Self {
         Self {
             statements: Vec::new(),
+            statement_ranges: Vec::new(),
             nodes: Vec::new(),
+            node_ranges: Vec::new(),
             edges: Vec::new(),
             scopes: Vec::new(),
             branch_tails: BTreeMap::new(),
@@ -503,17 +780,15 @@ impl ProcedureParser {
             sentence_first_nodes: vec![None; sentence_count],
             last_node: None,
             fallthrough_open: true,
+            condition_parent: None,
             has_unsupported_include: false,
             max_statements,
         }
     }
 
     fn finish(mut self) -> Result<ParsedProcedure, HirProblem> {
-        if !self.scopes.is_empty() {
+        if !self.scopes.is_empty() || self.condition_parent.is_some() {
             return Err(HirProblem::UnmatchedScope);
-        }
-        for statement in &self.statements {
-            validate_form(statement.kind, &statement.arguments)?;
         }
         let mut labels = BTreeMap::new();
         let mut label_order = Vec::new();
@@ -569,7 +844,9 @@ impl ProcedureParser {
                     parent: None,
                     statement: None,
                     text: target.clone(),
+                    source: Vec::new(),
                 });
+                self.node_ranges.push(0..0);
                 labels.insert(target.clone(), id);
                 label_order.push((target, id));
             }
@@ -627,7 +904,9 @@ impl ProcedureParser {
         self.edges.dedup();
         Ok(ParsedProcedure {
             statements: self.statements,
+            statement_ranges: self.statement_ranges,
             nodes: self.nodes,
+            node_ranges: self.node_ranges,
             edges: self.edges,
         })
     }
@@ -640,9 +919,14 @@ impl ProcedureParser {
         scope: Option<ControlScope>,
         statement: Option<usize>,
         text: String,
+        range: Range<usize>,
     ) -> usize {
         let id = self.nodes.len();
-        let parent = self.scopes.last().map(|frame| frame.start);
+        let parent = self
+            .scopes
+            .last()
+            .map(|frame| frame.start)
+            .or(self.condition_parent);
         if self.sentence_first_nodes[sentence].is_none() {
             self.sentence_first_nodes[sentence] = Some(id);
         }
@@ -672,7 +956,9 @@ impl ProcedureParser {
             parent,
             statement,
             text,
+            source: Vec::new(),
         });
+        self.node_ranges.push(range);
         self.last_node = Some(id);
         self.fallthrough_open = true;
         id
@@ -682,13 +968,34 @@ impl ProcedureParser {
         &mut self,
         sentence: usize,
         line: usize,
-        text: &str,
+        header_text: &str,
+        range: Range<usize>,
         kind: StatementKind,
+        options: Vec<StatementOption>,
+        scope: Option<ControlScope>,
     ) -> Result<usize, HirProblem> {
         if self.statements.len() >= self.max_statements {
             return Err(HirProblem::StatementLimitExceeded);
         }
-        let arguments = semantic_tokens(text);
+        let keyword_words = match kind {
+            StatementKind::GoTo
+            | StatementKind::NextSentence
+            | StatementKind::JsonGenerate
+            | StatementKind::JsonParse
+            | StatementKind::XmlGenerate
+            | StatementKind::XmlParse
+            | StatementKind::StopRun => 2,
+            StatementKind::GoBack
+                if header_text
+                    .trim_start()
+                    .to_ascii_uppercase()
+                    .starts_with("GO ") =>
+            {
+                2
+            }
+            _ => 1,
+        };
+        let arguments = semantic_tokens(header_text, keyword_words);
         if kind == StatementKind::ExecSql
             && arguments
                 .iter()
@@ -699,10 +1006,13 @@ impl ProcedureParser {
         let statement = self.statements.len();
         self.statements.push(HirStatement {
             kind,
+            official: kind.official_kind(),
             arguments,
+            options,
             line,
+            source: Vec::new(),
         });
-        let scope = scope_for(kind, text);
+        self.statement_ranges.push(range.clone());
         let role = statement_role(kind, scope);
         let node = self.push_node(
             sentence,
@@ -710,14 +1020,15 @@ impl ProcedureParser {
             role,
             scope,
             Some(statement),
-            text.trim().to_string(),
+            header_text.trim().to_string(),
+            range,
         );
         if let Some(scope) = scope {
             self.scopes.push(ScopeFrame { scope, start: node });
         }
         match kind {
             StatementKind::GoTo => {
-                let target = go_to_target(text).ok_or(HirProblem::UnsupportedForm)?;
+                let target = go_to_target(header_text).ok_or(HirProblem::UnsupportedForm)?;
                 self.transfers.push(InternalTransfer {
                     node,
                     target,
@@ -727,7 +1038,8 @@ impl ProcedureParser {
                 self.fallthrough_open = false;
             }
             StatementKind::Perform if scope.is_none() => {
-                let (target, through) = perform_targets(text).ok_or(HirProblem::UnsupportedForm)?;
+                let (target, through) =
+                    perform_targets(header_text).ok_or(HirProblem::UnsupportedForm)?;
                 self.transfers.push(InternalTransfer {
                     node,
                     target,
@@ -753,6 +1065,7 @@ impl ProcedureParser {
         sentence: usize,
         line: usize,
         text: &str,
+        range: Range<usize>,
         expected: &[ControlScope],
         kind: ControlEdgeKind,
     ) -> Result<usize, HirProblem> {
@@ -772,6 +1085,7 @@ impl ProcedureParser {
             Some(frame.scope),
             None,
             text.trim().to_string(),
+            range,
         );
         self.nodes[node].parent = Some(frame.start);
         *self.branch_counts.entry(frame.start).or_default() += 1;
@@ -789,6 +1103,7 @@ impl ProcedureParser {
         line: usize,
         scope: ControlScope,
         text: &str,
+        range: Range<usize>,
     ) -> Result<(), HirProblem> {
         let frame = self.scopes.pop().ok_or(HirProblem::UnmatchedScope)?;
         if frame.scope != scope {
@@ -803,48 +1118,96 @@ impl ProcedureParser {
             Some(scope),
             None,
             text.trim().to_string(),
+            range,
         );
         self.nodes[node].parent = Some(frame.start);
         self.connect_scope_end(frame, node);
         Ok(())
     }
 
-    fn close_sentence_scopes(
-        &mut self,
-        sentence: usize,
-        line: usize,
-        depth: usize,
-    ) -> Result<(), HirProblem> {
-        if self.scopes.len() < depth {
-            return Err(HirProblem::UnmatchedScope);
-        }
-        while self.scopes.len() > depth {
-            let frame = self.scopes.pop().ok_or(HirProblem::UnmatchedScope)?;
-            self.record_branch_tail(frame.start);
+    fn push_terminator(&mut self, sentence: usize, line: usize, text: &str, range: Range<usize>) {
+        if let Some(owner) = self.condition_parent.take() {
+            self.record_branch_tail(owner);
             self.fallthrough_open = false;
             let node = self.push_node(
                 sentence,
                 line,
-                ControlRole::BlockEnd,
-                Some(frame.scope),
+                ControlRole::Terminator,
                 None,
-                ".".to_string(),
+                None,
+                text.trim().to_string(),
+                range,
             );
-            self.nodes[node].parent = Some(frame.start);
-            self.connect_scope_end(frame, node);
+            self.nodes[node].parent = Some(owner);
+            for tail in self.branch_tails.remove(&owner).unwrap_or_default() {
+                self.edges.push(ControlEdge {
+                    from: tail,
+                    to: node,
+                    kind: ControlEdgeKind::Fallthrough,
+                });
+            }
+        } else {
+            self.push_node(
+                sentence,
+                line,
+                ControlRole::Terminator,
+                None,
+                None,
+                text.trim().to_string(),
+                range,
+            );
         }
-        Ok(())
     }
 
-    fn push_terminator(&mut self, sentence: usize, line: usize, text: &str) {
+    fn push_label(&mut self, sentence: usize, line: usize, name: &str, range: Range<usize>) {
+        let statement = self.statements.len();
+        self.statements.push(HirStatement {
+            kind: StatementKind::Label,
+            official: None,
+            arguments: vec![name.to_string()],
+            options: Vec::new(),
+            line,
+            source: Vec::new(),
+        });
+        self.statement_ranges.push(range.clone());
         self.push_node(
             sentence,
             line,
-            ControlRole::Terminator,
+            ControlRole::Label,
+            None,
+            Some(statement),
+            name.to_string(),
+            range,
+        );
+    }
+
+    fn push_condition_branch(
+        &mut self,
+        sentence: usize,
+        line: usize,
+        text: &str,
+        range: Range<usize>,
+        owner: usize,
+    ) {
+        self.condition_parent = None;
+        self.record_branch_tail(owner);
+        self.fallthrough_open = false;
+        let node = self.push_node(
+            sentence,
+            line,
+            ControlRole::Branch,
             None,
             None,
             text.trim().to_string(),
+            range,
         );
+        self.nodes[node].parent = Some(owner);
+        self.edges.push(ControlEdge {
+            from: owner,
+            to: node,
+            kind: ControlEdgeKind::Branch,
+        });
+        self.condition_parent = Some(owner);
     }
 
     fn record_branch_tail(&mut self, start: usize) {
@@ -907,351 +1270,71 @@ fn paragraph_end(start: usize, labels: &[(String, usize)], node_count: usize) ->
 }
 
 fn parse_procedure(source: &str, max_statements: usize) -> Result<ParsedProcedure, HirProblem> {
-    let sentences = split_sentences(source);
-    let mut parser = ProcedureParser::new(max_statements, sentences.len());
-    for (sentence_index, (start_line, sentence)) in sentences.iter().enumerate() {
-        let depth = parser.scopes.len();
-        let mut exec: Option<(usize, String)> = None;
-        let mut extendable_statement = None;
-        let mut extendable_control = None;
-        for (offset, raw) in sentence.lines().enumerate() {
-            let line_number = start_line.saturating_add(offset);
-            let line = raw.trim();
-            if line.is_empty() || line.starts_with("*>") {
-                continue;
-            }
-            let upper = line.to_ascii_uppercase();
-            if let Some((exec_line, exec_text)) = &mut exec {
-                exec_text.push(' ');
-                exec_text.push_str(line);
-                if contains_word(&upper, "END-EXEC") {
-                    let text = std::mem::take(exec_text);
-                    let kind = classify(&text).ok_or(HirProblem::UnknownStatement(*exec_line))?;
-                    parser.push_statement(sentence_index, *exec_line, &text, kind)?;
-                    exec = None;
-                }
-                continue;
-            }
-            if is_exec_start(&upper) {
-                if contains_word(&upper, "END-EXEC") {
-                    let kind = classify(line).ok_or(HirProblem::UnknownStatement(line_number))?;
-                    parser.push_statement(sentence_index, line_number, line, kind)?;
-                } else {
-                    exec = Some((line_number, line.to_string()));
-                }
-                extendable_statement = None;
-                extendable_control = None;
-                continue;
-            }
-            if let Some(scope) = explicit_scope_end(&upper) {
-                parser.close_scope(sentence_index, line_number, scope, line)?;
-                extendable_statement = None;
-                extendable_control = None;
-            } else if is_terminator(&upper) {
-                parser.push_terminator(sentence_index, line_number, line);
-                extendable_statement = None;
-                extendable_control = None;
-            } else if upper == "ELSE" || upper.starts_with("ELSE ") {
-                let node = parser.push_branch(
-                    sentence_index,
-                    line_number,
+    use statement_grammar::ProcedureEvent;
+
+    let syntax = statement_grammar::parse(source, max_statements)?;
+    let mut parser = ProcedureParser::new(max_statements, syntax.sentence_count);
+    let mut event_nodes = BTreeMap::new();
+    for (event_index, (event, sentence)) in syntax
+        .events
+        .into_iter()
+        .zip(syntax.event_sentences)
+        .enumerate()
+    {
+        match event {
+            ProcedureEvent::Statement {
+                kind,
+                header,
+                range,
+                line,
+                options,
+                scope,
+            } => {
+                let node = parser.push_statement(
+                    sentence,
                     line,
-                    &[ControlScope::If],
-                    ControlEdgeKind::False,
+                    &source[header],
+                    range,
+                    kind,
+                    options,
+                    scope,
                 )?;
-                extendable_statement = None;
-                extendable_control = Some(node);
-            } else if upper == "WHEN" || upper.starts_with("WHEN ") {
-                let node = parser.push_branch(
-                    sentence_index,
-                    line_number,
+                event_nodes.insert(event_index, node);
+            }
+            ProcedureEvent::Branch {
+                range,
+                line,
+                expected,
+                edge,
+            } => {
+                parser.push_branch(
+                    sentence,
                     line,
-                    &[ControlScope::Evaluate, ControlScope::Search],
-                    ControlEdgeKind::Branch,
+                    &source[range.clone()],
+                    range,
+                    &expected,
+                    edge,
                 )?;
-                extendable_statement = None;
-                extendable_control = Some(node);
-            } else if let Some((condition, action)) = conditional_branch_parts(line) {
-                let node = parser.push_node(
-                    sentence_index,
-                    line_number,
-                    ControlRole::Branch,
-                    None,
-                    None,
-                    condition,
-                );
-                if action.is_empty() {
-                    extendable_statement = None;
-                    extendable_control = Some(node);
-                } else {
-                    let kind =
-                        classify(&action).ok_or(HirProblem::UnknownStatement(line_number))?;
-                    let action_node =
-                        parser.push_statement(sentence_index, line_number, &action, kind)?;
-                    extendable_statement = parser.nodes[action_node].statement;
-                    extendable_control = None;
-                    add_inline_markers(
-                        &mut parser,
-                        sentence_index,
-                        line_number,
-                        &action.to_ascii_uppercase(),
-                        kind,
-                    )?;
-                }
-            } else if extendable_statement.is_none()
-                && extendable_control.is_none()
-                && classify(line).is_none()
-                && is_paragraph_header(&upper)
-            {
-                let statement = parser.statements.len();
-                if statement >= max_statements {
-                    return Err(HirProblem::StatementLimitExceeded);
-                }
-                let label = upper
-                    .split_whitespace()
-                    .next()
-                    .ok_or(HirProblem::UnknownStatement(line_number))?;
-                parser.statements.push(HirStatement {
-                    kind: StatementKind::Label,
-                    arguments: vec![label.to_string()],
-                    line: line_number,
-                });
-                parser.push_node(
-                    sentence_index,
-                    line_number,
-                    ControlRole::Label,
-                    None,
-                    Some(statement),
-                    label.to_string(),
-                );
-                extendable_statement = None;
-                extendable_control = None;
-            } else if let Some(kind) = classify(line) {
-                let node = parser.push_statement(sentence_index, line_number, line, kind)?;
-                extendable_statement = parser.nodes[node].statement;
-                extendable_control = None;
-                add_inline_markers(&mut parser, sentence_index, line_number, &upper, kind)?;
-            } else if let Some(statement) = extendable_statement {
-                let extra = semantic_tokens_continuation(line);
-                if extra.is_empty() {
-                    return Err(HirProblem::UnknownStatement(line_number));
-                }
-                parser.statements[statement].arguments.extend(extra);
-                if let Some(node) = parser
-                    .nodes
-                    .iter_mut()
-                    .rev()
-                    .find(|node| node.statement == Some(statement))
-                {
-                    node.text.push(' ');
-                    node.text.push_str(line);
-                }
-            } else if let Some(node) = extendable_control {
-                parser.nodes[node].text.push(' ');
-                parser.nodes[node].text.push_str(line);
-            } else {
-                return Err(HirProblem::UnknownStatement(line_number));
+            }
+            ProcedureEvent::ConditionBranch { range, line, owner } => {
+                let owner = event_nodes
+                    .get(&owner)
+                    .copied()
+                    .ok_or(HirProblem::UnmatchedScope)?;
+                parser.push_condition_branch(sentence, line, &source[range.clone()], range, owner);
+            }
+            ProcedureEvent::ScopeEnd { scope, range, line } => {
+                parser.close_scope(sentence, line, scope, &source[range.clone()], range)?;
+            }
+            ProcedureEvent::Terminator { range, line } => {
+                parser.push_terminator(sentence, line, &source[range.clone()], range);
+            }
+            ProcedureEvent::Label { name, range, line } => {
+                parser.push_label(sentence, line, &name, range);
             }
         }
-        if exec.is_some() {
-            return Err(HirProblem::UnterminatedExec);
-        }
-        let end_line = start_line.saturating_add(sentence.lines().count().saturating_sub(1));
-        parser.close_sentence_scopes(sentence_index, end_line, depth)?;
     }
     parser.finish()
-}
-
-fn add_inline_markers(
-    parser: &mut ProcedureParser,
-    sentence: usize,
-    line: usize,
-    upper: &str,
-    kind: StatementKind,
-) -> Result<(), HirProblem> {
-    if kind == StatementKind::If && contains_word_after_first(upper, "ELSE") {
-        parser.push_branch(
-            sentence,
-            line,
-            "ELSE",
-            &[ControlScope::If],
-            ControlEdgeKind::False,
-        )?;
-    }
-    if matches!(kind, StatementKind::Evaluate | StatementKind::Search)
-        && contains_word_after_first(upper, "WHEN")
-    {
-        parser.push_branch(
-            sentence,
-            line,
-            "WHEN",
-            &[ControlScope::Evaluate, ControlScope::Search],
-            ControlEdgeKind::Branch,
-        )?;
-    }
-    if let Some(scope) = inline_scope_end(upper) {
-        parser.close_scope(sentence, line, scope, scope_end_text(scope))?;
-    }
-    Ok(())
-}
-
-fn scope_end_text(scope: ControlScope) -> &'static str {
-    match scope {
-        ControlScope::If => "END-IF",
-        ControlScope::Evaluate => "END-EVALUATE",
-        ControlScope::Search => "END-SEARCH",
-        ControlScope::Perform => "END-PERFORM",
-    }
-}
-
-fn split_sentences(source: &str) -> Vec<(usize, String)> {
-    let mut result = Vec::new();
-    let mut current = String::new();
-    let mut quote = None;
-    let mut comment = false;
-    let mut in_exec = false;
-    let mut word = String::new();
-    let mut previous_word = String::new();
-    let mut line = 1usize;
-    let mut start_line = 1usize;
-    let chars: Vec<char> = source.chars().collect();
-    for (index, ch) in chars.iter().enumerate() {
-        if comment {
-            if *ch == '\n' {
-                comment = false;
-                current.push(*ch);
-                line += 1;
-                if current.trim().is_empty() {
-                    start_line = line;
-                }
-            }
-            continue;
-        }
-        if quote.is_none() && *ch == '*' && chars.get(index.saturating_add(1)) == Some(&'>') {
-            comment = true;
-            word.clear();
-            previous_word.clear();
-            continue;
-        }
-        if quote.is_none() {
-            if ch.is_ascii_alphanumeric() || *ch == '-' {
-                word.push(ch.to_ascii_uppercase());
-            } else if !word.is_empty() {
-                let completed = std::mem::take(&mut word);
-                if previous_word == "EXEC" && matches!(completed.as_str(), "CICS" | "SQL" | "DLI") {
-                    in_exec = true;
-                }
-                if completed == "END-EXEC" {
-                    in_exec = false;
-                }
-                previous_word = completed;
-            }
-        }
-        if matches!(*ch, '\'' | '"') {
-            if quote == Some(*ch) {
-                quote = None;
-            } else if quote.is_none() {
-                quote = Some(*ch);
-            }
-        }
-        let decimal = *ch == '.'
-            && index > 0
-            && index + 1 < chars.len()
-            && chars[index - 1].is_ascii_digit()
-            && chars[index + 1].is_ascii_digit();
-        if *ch == '.' && quote.is_none() && !decimal && !in_exec {
-            result.push((start_line, current.trim().to_string()));
-            current.clear();
-            start_line = line;
-        } else {
-            current.push(*ch);
-        }
-        if *ch == '\n' {
-            line += 1;
-            if current.trim().is_empty() {
-                start_line = line;
-            }
-        }
-    }
-    if !current.trim().is_empty() {
-        result.push((start_line, current.trim().to_string()));
-    }
-    result
-}
-fn classify(sentence: &str) -> Option<StatementKind> {
-    let upper = sentence.trim().to_ascii_uppercase();
-    let pairs = [
-        ("STOP RUN", StatementKind::StopRun),
-        ("GO BACK", StatementKind::GoBack),
-        ("GOBACK", StatementKind::GoBack),
-        ("GO TO", StatementKind::GoTo),
-        ("EXEC CICS", StatementKind::ExecCics),
-        ("EXEC DLI", StatementKind::ExecDli),
-        ("EXEC SQL", StatementKind::ExecSql),
-        ("NEXT SENTENCE", StatementKind::NextSentence),
-        ("JSON GENERATE", StatementKind::JsonGenerate),
-        ("JSON PARSE", StatementKind::JsonParse),
-        ("XML GENERATE", StatementKind::XmlGenerate),
-        ("XML PARSE", StatementKind::XmlParse),
-    ];
-    for (prefix, kind) in pairs {
-        if upper.starts_with(prefix) {
-            return Some(kind);
-        }
-    }
-    let first = upper.split_whitespace().next()?;
-    Some(match first {
-        "ACCEPT" => StatementKind::Accept,
-        "ADD" => StatementKind::Add,
-        "ALLOCATE" => StatementKind::Allocate,
-        "ALTER" => StatementKind::Alter,
-        "CALL" => StatementKind::Call,
-        "CANCEL" => StatementKind::Cancel,
-        "CLOSE" => StatementKind::Close,
-        "COMPUTE" => StatementKind::Compute,
-        "CONTINUE" => StatementKind::Continue,
-        "DISPLAY" => StatementKind::Display,
-        "DIVIDE" => StatementKind::Divide,
-        "ENTRY" => StatementKind::Entry,
-        "EVALUATE" => StatementKind::Evaluate,
-        "EXIT" => StatementKind::Exit,
-        "FREE" => StatementKind::Free,
-        "IF" => StatementKind::If,
-        "INITIALIZE" => StatementKind::Initialize,
-        "INSPECT" => StatementKind::Inspect,
-        "INVOKE" => StatementKind::Invoke,
-        "MERGE" => StatementKind::Merge,
-        "MOVE" => StatementKind::Move,
-        "MULTIPLY" => StatementKind::Multiply,
-        "OPEN" => StatementKind::Open,
-        "PERFORM" => StatementKind::Perform,
-        "READ" => StatementKind::Read,
-        "RELEASE" => StatementKind::Release,
-        "REWRITE" => StatementKind::Rewrite,
-        "RETURN" => StatementKind::ReturnStatement,
-        "SEARCH" => StatementKind::Search,
-        "SET" => StatementKind::Set,
-        "SORT" => StatementKind::Sort,
-        "STRING" => StatementKind::String,
-        "SUBTRACT" => StatementKind::Subtract,
-        "UNSTRING" => StatementKind::Unstring,
-        "WRITE" => StatementKind::Write,
-        _ => return None,
-    })
-}
-
-fn semantic_tokens_continuation(text: &str) -> Vec<String> {
-    semantic_tokens(&format!("_ {text}"))
-}
-
-fn scope_for(kind: StatementKind, text: &str) -> Option<ControlScope> {
-    match kind {
-        StatementKind::If => Some(ControlScope::If),
-        StatementKind::Evaluate => Some(ControlScope::Evaluate),
-        StatementKind::Search => Some(ControlScope::Search),
-        StatementKind::Perform if is_inline_perform(text) => Some(ControlScope::Perform),
-        _ => None,
-    }
 }
 
 fn statement_role(kind: StatementKind, scope: Option<ControlScope>) -> ControlRole {
@@ -1270,19 +1353,6 @@ fn statement_role(kind: StatementKind, scope: Option<ControlScope>) -> ControlRo
         ControlRole::Transfer
     } else {
         ControlRole::Statement
-    }
-}
-
-fn is_inline_perform(text: &str) -> bool {
-    let upper = text.trim().to_ascii_uppercase();
-    let mut words = upper.split_whitespace();
-    if words.next() != Some("PERFORM") {
-        return false;
-    }
-    match words.next() {
-        None | Some("UNTIL" | "VARYING" | "WITH") => true,
-        Some(first) if first.chars().all(|ch| ch.is_ascii_digit()) => true,
-        Some(_) => false,
     }
 }
 
@@ -1310,118 +1380,7 @@ fn go_to_target(text: &str) -> Option<String> {
         .map(|pair| pair[1].clone())
 }
 
-fn is_exec_start(upper: &str) -> bool {
-    ["EXEC CICS", "EXEC SQL", "EXEC DLI"]
-        .iter()
-        .any(|prefix| upper.starts_with(prefix))
-}
-
-fn is_paragraph_header(upper: &str) -> bool {
-    let words: Vec<&str> = upper.split_whitespace().collect();
-    let candidate = match words.as_slice() {
-        [name] => *name,
-        [name, "SECTION"] => *name,
-        _ => return false,
-    };
-    !candidate.is_empty()
-        && candidate.chars().any(|ch| ch.is_ascii_alphabetic())
-        && candidate
-            .chars()
-            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_'))
-}
-
-fn explicit_scope_end(upper: &str) -> Option<ControlScope> {
-    if upper == "END-IF" {
-        Some(ControlScope::If)
-    } else if upper == "END-EVALUATE" {
-        Some(ControlScope::Evaluate)
-    } else if upper == "END-SEARCH" {
-        Some(ControlScope::Search)
-    } else if upper == "END-PERFORM" {
-        Some(ControlScope::Perform)
-    } else {
-        None
-    }
-}
-
-fn inline_scope_end(upper: &str) -> Option<ControlScope> {
-    [
-        ("END-IF", ControlScope::If),
-        ("END-EVALUATE", ControlScope::Evaluate),
-        ("END-SEARCH", ControlScope::Search),
-        ("END-PERFORM", ControlScope::Perform),
-    ]
-    .into_iter()
-    .find(|(marker, _)| contains_word_after_first(upper, marker))
-    .map(|(_, scope)| scope)
-}
-
-fn is_terminator(upper: &str) -> bool {
-    upper.split_whitespace().next().is_some_and(|word| {
-        matches!(
-            word,
-            "END-ACCEPT"
-                | "END-ADD"
-                | "END-CALL"
-                | "END-COMPUTE"
-                | "END-DELETE"
-                | "END-DISPLAY"
-                | "END-DIVIDE"
-                | "END-INVOKE"
-                | "END-MULTIPLY"
-                | "END-READ"
-                | "END-RECEIVE"
-                | "END-RETURN"
-                | "END-REWRITE"
-                | "END-START"
-                | "END-STRING"
-                | "END-SUBTRACT"
-                | "END-UNSTRING"
-                | "END-WRITE"
-                | "END-XML"
-        )
-    })
-}
-
-fn conditional_branch_parts(line: &str) -> Option<(String, String)> {
-    let trimmed = line.trim();
-    let upper = trimmed.to_ascii_uppercase();
-    [
-        "NOT AT END",
-        "AT END",
-        "NOT INVALID KEY",
-        "INVALID KEY",
-        "NOT ON EXCEPTION",
-        "ON EXCEPTION",
-        "NOT ON SIZE ERROR",
-        "ON SIZE ERROR",
-        "NOT ON OVERFLOW",
-        "ON OVERFLOW",
-        "OVERFLOW",
-    ]
-    .iter()
-    .find_map(|prefix| {
-        (upper == *prefix || upper.starts_with(&format!("{prefix} "))).then(|| {
-            (
-                (*prefix).to_string(),
-                trimmed[prefix.len()..].trim_start().to_string(),
-            )
-        })
-    })
-}
-
-fn contains_word(text: &str, needle: &str) -> bool {
-    text.split(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '-'))
-        .any(|word| word == needle)
-}
-
-fn contains_word_after_first(text: &str, needle: &str) -> bool {
-    text.split_whitespace()
-        .skip(1)
-        .map(|word| word.trim_matches(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '-')))
-        .any(|word| word == needle)
-}
-fn semantic_tokens(sentence: &str) -> Vec<String> {
+fn semantic_tokens(sentence: &str, keyword_words: usize) -> Vec<String> {
     let mut tokens = Vec::new();
     let mut current = String::new();
     let mut quote = None;
@@ -1461,7 +1420,7 @@ fn semantic_tokens(sentence: &str) -> Vec<String> {
     }
     tokens
         .into_iter()
-        .skip(1)
+        .skip(keyword_words)
         .map(|token| {
             if token.starts_with(['\'', '"']) {
                 token
@@ -1472,51 +1431,16 @@ fn semantic_tokens(sentence: &str) -> Vec<String> {
         .collect()
 }
 
-fn validate_form(kind: StatementKind, arguments: &[String]) -> Result<(), HirProblem> {
-    use StatementKind as K;
-    let contains = |value: &str| arguments.iter().any(|argument| argument == value);
-    let valid = match kind {
-        K::Perform => !arguments.is_empty(),
-        K::If | K::Evaluate | K::Search => !arguments.is_empty(),
-        K::JsonParse | K::XmlParse => contains("INTO"),
-        K::Move => contains("TO"),
-        K::Add => contains("TO"),
-        K::Subtract => contains("FROM"),
-        K::Multiply => contains("BY"),
-        K::Divide => contains("INTO") || contains("BY"),
-        K::Compute => contains("="),
-        K::String | K::Unstring => contains("INTO"),
-        K::GoTo
-        | K::Call
-        | K::Cancel
-        | K::Accept
-        | K::Display
-        | K::Initialize
-        | K::Inspect
-        | K::Allocate
-        | K::Free
-        | K::Set
-        | K::Open
-        | K::Close
-        | K::Read
-        | K::Rewrite
-        | K::Write
-        | K::ExecCics
-        | K::ExecDli
-        | K::ExecSql => !arguments.is_empty(),
-        _ => true,
-    };
-    if valid {
-        Ok(())
-    } else {
-        Err(HirProblem::UnsupportedForm)
-    }
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum HirProblem {
     MissingProcedure,
     UnknownStatement(usize),
+    InvalidStatement {
+        kind: StatementKind,
+        line: usize,
+        detail: &'static str,
+    },
+    MalformedToken(usize),
     StatementLimitExceeded,
     InvalidLayout,
     UnsupportedForm,
@@ -1530,27 +1454,145 @@ mod tests {
     use super::*;
 
     #[test]
-    fn registry_freezes_43_statement_variants() {
-        assert_eq!(StatementKind::frozen().len(), 43);
+    fn generated_registry_closes_all_44_official_statement_families() {
+        assert_eq!(StatementKind::official().len(), 44);
+        assert_eq!(ProcedureStatementKind::ALL.len(), 44);
         assert_eq!(
-            StatementKind::frozen()
+            StatementKind::official()
+                .iter()
+                .filter_map(|kind| kind.official_kind())
+                .collect::<BTreeSet<_>>(),
+            ProcedureStatementKind::ALL.into_iter().collect()
+        );
+        assert_eq!(
+            StatementKind::official()
                 .iter()
                 .filter(|kind| !kind.supported())
                 .count(),
-            5
+            7
         );
+        assert!(crate::PROCEDURE_STATEMENTS.iter().all(|descriptor| {
+            !descriptor.grammar_keywords.is_empty()
+                && descriptor
+                    .grammar_keywords
+                    .windows(2)
+                    .all(|pair| pair[0] < pair[1])
+                && descriptor.grammar_keywords.iter().all(|keyword| {
+                    keyword.bytes().any(|byte| byte.is_ascii_alphabetic())
+                        && keyword
+                            .bytes()
+                            .filter(|byte| byte.is_ascii_alphabetic())
+                            .all(|byte| byte.is_ascii_uppercase())
+                })
+        }));
     }
     #[test]
-    fn sentence_split_does_not_split_decimal() {
-        assert_eq!(split_sentences("COMPUTE A = 1.5. STOP RUN.").len(), 2);
+    fn token_parser_does_not_split_decimal() {
+        let parsed = parse_procedure("COMPUTE A = 1.5. STOP RUN.", 16).unwrap();
+        assert_eq!(parsed.statements[0].kind, StatementKind::Compute);
+        assert_eq!(parsed.statements[1].kind, StatementKind::StopRun);
     }
 
     #[test]
-    fn sentence_split_ignores_comment_and_embedded_host_periods() {
+    fn token_parser_ignores_comment_and_embedded_host_periods() {
         let source = "*> sentence. comment\nEXEC SQL SELECT A.COL FROM T END-EXEC. STOP RUN.";
-        let sentences = split_sentences(source);
-        assert_eq!(sentences.len(), 2);
-        assert!(sentences[0].1.contains("A.COL"));
+        let parsed = parse_procedure(source, 16).unwrap();
+        assert_eq!(parsed.statements[0].kind, StatementKind::ExecSql);
+        assert_eq!(parsed.statements[1].kind, StatementKind::StopRun);
+        assert!(parsed.nodes[0].text.contains("A.COL"));
+    }
+
+    #[test]
+    fn optional_xml_parse_and_host_dialect_operands_remain_compatible() {
+        let parsed = parse_procedure(
+            "ACCEPT A FROM SYSIN. XML PARSE J INTO A. EXEC CICS WRITEQ TD FROM(A) END-EXEC. EXEC DLI GU INTO(A) END-EXEC. STOP RUN.",
+            16,
+        )
+        .unwrap();
+        assert!(
+            parsed
+                .statements
+                .iter()
+                .any(|statement| statement.kind == StatementKind::XmlParse)
+        );
+        assert!(parsed.statements.iter().all(|statement| {
+            !matches!(
+                statement.kind,
+                StatementKind::ExecCics | StatementKind::ExecDli
+            ) || statement.options.is_empty()
+        }));
+    }
+
+    #[test]
+    fn same_line_and_inline_statements_have_distinct_nodes() {
+        let source =
+            "MOVE A TO B DISPLAY B. IF A = B DISPLAY 'YES' ELSE DISPLAY 'NO' END-IF. STOP RUN.";
+        let parsed = parse_procedure(source, 32).unwrap();
+        assert_eq!(
+            parsed
+                .statements
+                .iter()
+                .map(|statement| statement.kind)
+                .collect::<Vec<_>>(),
+            [
+                StatementKind::Move,
+                StatementKind::Display,
+                StatementKind::If,
+                StatementKind::Display,
+                StatementKind::Display,
+                StatementKind::StopRun,
+            ]
+        );
+        assert_eq!(&source[parsed.statement_ranges[0].clone()], "MOVE A TO B");
+        assert_eq!(&source[parsed.statement_ranges[1].clone()], "DISPLAY B");
+        assert!(parsed.statement_ranges[0].end <= parsed.statement_ranges[1].start);
+        assert!(
+            parsed
+                .node_ranges
+                .iter()
+                .all(|range| range.start < range.end)
+        );
+    }
+
+    #[test]
+    fn grammar_boundaries_ignore_line_breaks_but_retain_nested_statement_identity() {
+        let parsed = parse_procedure(
+            "MOVE A\n TO B DISPLAY B. EVALUATE A WHEN 1 DISPLAY 'ONE' WHEN OTHER CONTINUE END-EVALUATE. PERFORM UNTIL A = B\n DISPLAY A\nEND-PERFORM. STOP RUN.",
+            64,
+        )
+        .unwrap();
+        assert_eq!(
+            parsed
+                .statements
+                .iter()
+                .map(|statement| statement.kind)
+                .collect::<Vec<_>>(),
+            [
+                StatementKind::Move,
+                StatementKind::Display,
+                StatementKind::Evaluate,
+                StatementKind::Display,
+                StatementKind::Continue,
+                StatementKind::Perform,
+                StatementKind::Display,
+                StatementKind::StopRun,
+            ]
+        );
+        assert_eq!(
+            parsed
+                .nodes
+                .iter()
+                .filter_map(|node| node.scope)
+                .collect::<Vec<_>>(),
+            [
+                ControlScope::Evaluate,
+                ControlScope::Evaluate,
+                ControlScope::Evaluate,
+                ControlScope::Evaluate,
+                ControlScope::Perform,
+                ControlScope::Perform,
+            ]
+        );
     }
 
     #[test]

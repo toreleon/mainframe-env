@@ -8,8 +8,8 @@ mod value;
 
 pub use coordinator::{CoordinatorLimits, ExecutionControl, ExecutionCoordinator};
 pub use machine::{
-    MachineProblem, MachineSnapshot, ReferenceMachine, encode_cobol_call_result,
-    supported_operations,
+    MachineProblem, MachineSnapshot, ReferenceMachine, SUPPORTED_LAYOUT_CATEGORIES,
+    encode_cobol_call_result, supported_operations,
 };
 pub use value::{FixedValue, ValueProblem};
 
