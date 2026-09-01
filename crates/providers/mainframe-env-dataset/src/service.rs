@@ -1,4 +1,4 @@
-use crate::codec::{Entry, MemberGeneration, decode, encode, encode_definition_digest_v2};
+use crate::codec::{Entry, MemberGeneration, decode, encode, encode_definition_digest_v3};
 use crate::dependency::{DependencyGraph, DependencyLimits};
 use mainframe_env_execution_api::{CapabilityId, Invocation, InvocationLimits};
 use mainframe_env_host_api::{
@@ -678,17 +678,7 @@ impl DatasetService {
                 return Err(HostProblem::InfrastructureFailure);
             }
             let definition = entry.definition();
-            definition
-                .validate(
-                    mainframe_env_host_api::HostLimits {
-                        max_record_bytes: limits.max_record_bytes,
-                        max_records: limits.max_records,
-                        ..Default::default()
-                    },
-                    dataset_capabilities(),
-                )
-                .map_err(|_| HostProblem::InfrastructureFailure)?;
-            validate_provider_definition(&definition)
+            validate_dataset_definition(&definition, limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?;
             validate_entry_shape(&entry, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
             if entry.attributes.organization
@@ -1128,6 +1118,10 @@ impl DatasetService {
             };
             validate_alternate_index(entry, index)?;
             let mut updated = index.clone();
+            if updated.upgrade {
+                updated.identities = build_alternate_identities(entry, &updated)?;
+            }
+            validate_index_identities(entry, &updated)?;
             updated.version = updated
                 .version
                 .checked_add(1)
@@ -1161,11 +1155,16 @@ impl DatasetService {
                 .map_or(1, |selection| selection.version.saturating_add(1)),
         };
         let mut dependencies = state.dependencies.clone();
-        for name in &previous_entries {
-            dependencies.remove_node(name);
-        }
-        for name in installed.keys() {
-            dependencies.add_node(name, dependency_limits(self.limits))?;
+        for (name, entry) in &installed {
+            dependencies.set_direct_dependencies(
+                name,
+                entry
+                    .catalog
+                    .catalog
+                    .iter()
+                    .map(|catalog| catalog.as_str().to_string()),
+                dependency_limits(self.limits),
+            )?;
         }
         writes.push(ProviderStateWrite {
             record: ProviderStateRecord {
@@ -1210,6 +1209,14 @@ impl DatasetService {
     }
 
     pub fn invoke(&self, request: DatasetRequest) -> Result<DatasetResult, HostProblem> {
+        self.invoke_checked(None, request)
+    }
+
+    fn invoke_checked(
+        &self,
+        principal: Option<&mainframe_env_execution_api::PrincipalId>,
+        request: DatasetRequest,
+    ) -> Result<DatasetResult, HostProblem> {
         HostRequest::Dataset(request.clone()).validate(mainframe_env_host_api::HostLimits {
             max_record_bytes: self.limits.max_record_bytes,
             max_records: self.limits.max_records,
@@ -1220,11 +1227,17 @@ impl DatasetService {
             .state
             .lock()
             .map_err(|_| HostProblem::InfrastructureFailure)?;
+        if let Some(principal) = principal {
+            authorize_principal(&state, principal, &request)?;
+        }
         let digest = request_digest(&request)?;
         if let Some(key) = mutation.map(|value| value.idempotency_key.as_str())
             && let Some(replay) = state.replay.get(key)
         {
-            if replay.request_digest != digest {
+            if replay.request_digest != digest
+                && !(replay.request_digest == legacy_request_digest(&request)?
+                    && legacy_creation_date_replay_matches(&state, &request, replay))
+            {
                 return Err(HostProblem::IdempotencyConflict);
             }
             if let Some(result) = &replay.result {
@@ -1312,85 +1325,7 @@ impl DatasetService {
         principal: &mainframe_env_execution_api::PrincipalId,
         request: DatasetRequest,
     ) -> Result<DatasetResult, HostProblem> {
-        if let Some(owner) = request_owner(&request)
-            && owner != principal
-        {
-            return Err(HostProblem::Unauthorized);
-        }
-        if let DatasetRequest::Define { definition, .. } | DatasetRequest::Alter { definition, .. } =
-            &request
-            && definition
-                .catalog
-                .owner
-                .as_deref()
-                .is_some_and(|owner| owner != principal.as_str())
-        {
-            return Err(HostProblem::Unauthorized);
-        }
-        if let DatasetRequest::Restore { snapshot, .. } = &request
-            && snapshot
-                .definition
-                .catalog
-                .owner
-                .as_deref()
-                .is_some_and(|owner| owner != principal.as_str())
-        {
-            return Err(HostProblem::Unauthorized);
-        }
-        if let Some(dataset) = owned_mutation_dataset(&request) {
-            let state = self
-                .state
-                .lock()
-                .map_err(|_| HostProblem::InfrastructureFailure)?;
-            if state
-                .entries
-                .get(dataset.as_str())
-                .and_then(|entry| entry.catalog.owner.as_deref())
-                .is_some_and(|owner| owner != principal.as_str())
-            {
-                return Err(HostProblem::Unauthorized);
-            }
-        }
-        if let DatasetRequest::CompleteTvs { transaction, .. }
-        | DatasetRequest::ReconcileTvs { transaction, .. } = &request
-        {
-            let state = self
-                .state
-                .lock()
-                .map_err(|_| HostProblem::InfrastructureFailure)?;
-            if state.tvs_units.get(transaction).is_some_and(|unit| {
-                unit.operations.iter().any(|operation| {
-                    state
-                        .entries
-                        .get(tvs_operation_dataset(operation).as_str())
-                        .and_then(|entry| entry.catalog.owner.as_deref())
-                        .is_some_and(|owner| owner != principal.as_str())
-                })
-            }) {
-                return Err(HostProblem::Unauthorized);
-            }
-        }
-        if let Some((dataset, mutation)) = rls_request_context(&request) {
-            let state = self
-                .state
-                .lock()
-                .map_err(|_| HostProblem::InfrastructureFailure)?;
-            let current = entry(&state, dataset)?;
-            if current.vsam.access_mode == mainframe_env_host_api::VsamAccessMode::Rls {
-                let lock_id = mutation
-                    .transaction
-                    .as_deref()
-                    .ok_or_else(|| condition("LOCKED", 16))?;
-                if state
-                    .locks
-                    .get(lock_id)
-                    .is_none_or(|lock| lock.owner != *principal)
-                {
-                    return Err(HostProblem::Unauthorized);
-                }
-            }
-        }
-        self.invoke(request)
+        self.invoke_checked(Some(principal), request)
     }
 
     fn apply(
@@ -2111,10 +2046,7 @@ impl DatasetService {
                 attributes,
                 ..
             } => {
-                attributes.validate(mainframe_env_host_api::HostLimits {
-                    max_record_bytes: self.limits.max_record_bytes,
-                    ..Default::default()
-                })?;
+                let definition = validated_compatibility_definition(attributes, self.limits)?;
                 if state
                     .entries
                     .len()
@@ -2129,10 +2061,8 @@ impl DatasetService {
                 {
                     return Err(condition("DUPREC", 14));
                 }
-                let created = Entry::from_definition(
-                    mainframe_env_host_api::DatasetDefinition::compatibility(attributes.clone()),
-                    1,
-                );
+                let created = Entry::from_definition(definition, 1);
+                validate_entry_shape(&created, self.limits)?;
                 let mut dependencies = state.dependencies.clone();
                 dependencies.add_node(dataset.as_str(), dependency_limits(self.limits))?;
                 self.persist(dataset.as_str(), &created, None)?;
@@ -2145,13 +2075,7 @@ impl DatasetService {
                 definition,
                 mutation,
             } => {
-                let limits = mainframe_env_host_api::HostLimits {
-                    max_record_bytes: self.limits.max_record_bytes,
-                    max_records: self.limits.max_records,
-                    ..Default::default()
-                };
-                definition.validate(limits, dataset_capabilities())?;
-                validate_provider_definition(definition)?;
+                validate_dataset_definition(definition, self.limits)?;
                 if definition.lifecycle.migration_level != 0
                     || definition.lifecycle.backup_generation != 0
                     || !matches!(
@@ -2246,15 +2170,7 @@ impl DatasetService {
                 expected_version,
                 mutation,
             } => {
-                definition.validate(
-                    mainframe_env_host_api::HostLimits {
-                        max_record_bytes: self.limits.max_record_bytes,
-                        max_records: self.limits.max_records,
-                        ..Default::default()
-                    },
-                    dataset_capabilities(),
-                )?;
-                validate_provider_definition(definition)?;
+                validate_dataset_definition(definition, self.limits)?;
                 if let Some(catalog) = &definition.catalog.catalog
                     && !state
                         .catalogs
@@ -2432,15 +2348,7 @@ impl DatasetService {
                 mutation,
             } => {
                 let definition = &snapshot.definition;
-                definition.validate(
-                    mainframe_env_host_api::HostLimits {
-                        max_record_bytes: self.limits.max_record_bytes,
-                        max_records: self.limits.max_records,
-                        ..Default::default()
-                    },
-                    dataset_capabilities(),
-                )?;
-                validate_provider_definition(definition)?;
+                validate_dataset_definition(definition, self.limits)?;
                 if matches!(
                     definition.lifecycle.state,
                     mainframe_env_host_api::DatasetLifecycleState::Migrated
@@ -3731,10 +3639,7 @@ impl DatasetService {
                 records,
                 mutation,
             } => {
-                attributes.validate(mainframe_env_host_api::HostLimits {
-                    max_record_bytes: self.limits.max_record_bytes,
-                    ..Default::default()
-                })?;
+                let definition = validated_compatibility_definition(attributes, self.limits)?;
                 validate_records(records, attributes, self.limits)?;
                 let current = state
                     .generation_groups
@@ -3750,10 +3655,7 @@ impl DatasetService {
                 if state.entries.contains_key(name.as_str()) {
                     return Err(condition("DUPREC", 14));
                 }
-                let mut entry = Entry::from_definition(
-                    mainframe_env_host_api::DatasetDefinition::compatibility(attributes.clone()),
-                    1,
-                );
+                let mut entry = Entry::from_definition(definition, 1);
                 entry.records = records.clone();
                 validate_entry_shape(&entry, self.limits)?;
                 let mut next = current.clone();
@@ -6216,12 +6118,7 @@ fn build_seed_generation(
         {
             return Err(HostProblem::Malformed);
         }
-        object
-            .attributes
-            .validate(mainframe_env_host_api::HostLimits {
-                max_record_bytes: limits.max_record_bytes,
-                ..Default::default()
-            })?;
+        let definition = validated_compatibility_definition(&object.attributes, limits)?;
         let actual = format!("sha256:{:x}", Sha256::digest(&object.bytes));
         if object.sha256 != actual {
             return Err(HostProblem::IdempotencyConflict);
@@ -6237,10 +6134,7 @@ fn build_seed_generation(
             .chunks_exact(object.record_length as usize)
             .map(<[u8]>::to_vec)
             .collect::<Vec<_>>();
-        let mut entry = Entry::from_definition(
-            mainframe_env_host_api::DatasetDefinition::compatibility(object.attributes.clone()),
-            1,
-        );
+        let mut entry = Entry::from_definition(definition, 1);
         entry.records = records;
         validate_entry_shape(&entry, limits)?;
         if entry.attributes.organization
@@ -6510,6 +6404,76 @@ fn request_owner(request: &DatasetRequest) -> Option<&mainframe_env_execution_ap
         | DatasetRequest::ReconcileTvs { owner, .. } => Some(owner),
         _ => None,
     }
+}
+
+fn authorize_principal(
+    state: &State,
+    principal: &mainframe_env_execution_api::PrincipalId,
+    request: &DatasetRequest,
+) -> Result<(), HostProblem> {
+    if request_owner(request).is_some_and(|owner| owner != principal) {
+        return Err(HostProblem::Unauthorized);
+    }
+    if let DatasetRequest::Define { definition, .. } | DatasetRequest::Alter { definition, .. } =
+        request
+        && definition
+            .catalog
+            .owner
+            .as_deref()
+            .is_some_and(|owner| owner != principal.as_str())
+    {
+        return Err(HostProblem::Unauthorized);
+    }
+    if let DatasetRequest::Restore { snapshot, .. } = request
+        && snapshot
+            .definition
+            .catalog
+            .owner
+            .as_deref()
+            .is_some_and(|owner| owner != principal.as_str())
+    {
+        return Err(HostProblem::Unauthorized);
+    }
+    if let Some(dataset) = owned_mutation_dataset(request)
+        && state
+            .entries
+            .get(dataset.as_str())
+            .and_then(|entry| entry.catalog.owner.as_deref())
+            .is_some_and(|owner| owner != principal.as_str())
+    {
+        return Err(HostProblem::Unauthorized);
+    }
+    if let DatasetRequest::CompleteTvs { transaction, .. }
+    | DatasetRequest::ReconcileTvs { transaction, .. } = request
+        && state.tvs_units.get(transaction).is_some_and(|unit| {
+            unit.operations.iter().any(|operation| {
+                state
+                    .entries
+                    .get(tvs_operation_dataset(operation).as_str())
+                    .and_then(|entry| entry.catalog.owner.as_deref())
+                    .is_some_and(|owner| owner != principal.as_str())
+            })
+        })
+    {
+        return Err(HostProblem::Unauthorized);
+    }
+    if let Some((dataset, mutation)) = rls_request_context(request) {
+        let current = entry(state, dataset)?;
+        if current.vsam.access_mode == mainframe_env_host_api::VsamAccessMode::Rls {
+            let lock_id = mutation
+                .transaction
+                .as_deref()
+                .ok_or_else(|| condition("LOCKED", 16))?;
+            if state
+                .locks
+                .get(lock_id)
+                .is_none_or(|lock| lock.owner != *principal)
+            {
+                return Err(HostProblem::Unauthorized);
+            }
+        }
+    }
+    Ok(())
 }
 
 fn owned_mutation_dataset(request: &DatasetRequest) -> Option<&DatasetName> {
@@ -7437,6 +7401,30 @@ fn validate_provider_definition(
     }
 }
 
+fn validate_dataset_definition(
+    definition: &mainframe_env_host_api::DatasetDefinition,
+    limits: DatasetLimits,
+) -> Result<(), HostProblem> {
+    definition.validate(
+        mainframe_env_host_api::HostLimits {
+            max_record_bytes: limits.max_record_bytes,
+            max_records: limits.max_records,
+            ..Default::default()
+        },
+        dataset_capabilities(),
+    )?;
+    validate_provider_definition(definition)
+}
+
+fn validated_compatibility_definition(
+    attributes: &mainframe_env_host_api::DatasetAttributes,
+    limits: DatasetLimits,
+) -> Result<mainframe_env_host_api::DatasetDefinition, HostProblem> {
+    let definition = mainframe_env_host_api::DatasetDefinition::compatibility(attributes.clone());
+    validate_dataset_definition(&definition, limits)?;
+    Ok(definition)
+}
+
 fn store_error(error: StoreError) -> HostProblem {
     match error {
         StoreError::Conflict => HostProblem::IdempotencyConflict,
@@ -8056,6 +8044,50 @@ fn request_digest(request: &DatasetRequest) -> Result<[u8; 32], HostProblem> {
     Ok(digest.finalize().into())
 }
 
+fn legacy_request_digest(request: &DatasetRequest) -> Result<[u8; 32], HostProblem> {
+    let mut legacy = request.clone();
+    match &mut legacy {
+        DatasetRequest::Define { definition, .. } | DatasetRequest::Alter { definition, .. } => {
+            definition.catalog.creation_date = None;
+        }
+        DatasetRequest::Restore { snapshot, .. } => {
+            snapshot.definition.catalog.creation_date = None;
+        }
+        _ => {}
+    }
+    request_digest(&legacy)
+}
+
+fn legacy_creation_date_replay_matches(
+    state: &State,
+    request: &DatasetRequest,
+    replay: &Replay,
+) -> bool {
+    let (dataset, definition) = match request {
+        DatasetRequest::Define {
+            dataset,
+            definition,
+            ..
+        }
+        | DatasetRequest::Alter {
+            dataset,
+            definition,
+            ..
+        } => (dataset, definition.as_ref()),
+        _ => return false,
+    };
+    let Some(entry) = state.entries.get(dataset.as_str()) else {
+        return false;
+    };
+    let replay_version = match &replay.result {
+        Some(DatasetResult::Created { version }) | Some(DatasetResult::Mutated { version }) => {
+            *version
+        }
+        _ => return false,
+    };
+    entry.version == replay_version && entry.definition() == *definition
+}
+
 fn digest_field(digest: &mut Sha256, value: &[u8]) {
     digest.update((value.len() as u64).to_be_bytes());
     digest.update(value);
@@ -8168,7 +8200,7 @@ fn digest_definition(
     definition: &mainframe_env_host_api::DatasetDefinition,
 ) -> Result<(), HostProblem> {
     let bytes =
-        encode_definition_digest_v2(definition).map_err(|_| HostProblem::ResourceExhausted)?;
+        encode_definition_digest_v3(definition).map_err(|_| HostProblem::ResourceExhausted)?;
     digest_field(digest, &bytes);
     if definition.vsam.access_mode != mainframe_env_host_api::VsamAccessMode::NonRls {
         digest_field(
@@ -8464,11 +8496,15 @@ pub fn dataset_providers(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mainframe_env_execution_api::IdempotencyKey;
+    use mainframe_env_execution_api::{
+        ArtifactRef, ExecutionId, IdempotencyKey, Principal, RequestId, ResourceLimits, RunUnitId,
+        Selector, ServiceClass, TraceId,
+    };
     use mainframe_env_host_api::{
         DatasetAttributes, DatasetOrganization, HostLimits, Mutation, RecordFormat,
     };
     use mainframe_env_store::{MemoryStore, SqliteStateStore, StoreLimits};
+    use std::sync::Barrier;
     use std::sync::atomic::{AtomicBool, Ordering};
     fn mutation(n: u64) -> Mutation {
         Mutation {
@@ -8491,6 +8527,66 @@ mod tests {
     }
     fn principal(value: &str) -> mainframe_env_execution_api::PrincipalId {
         mainframe_env_execution_api::PrincipalId::new(value, InvocationLimits::default()).unwrap()
+    }
+
+    fn invocation_for(value: &str) -> Invocation {
+        let limits = InvocationLimits::default();
+        let slug = value.to_ascii_lowercase();
+        Invocation::new(
+            RequestId::new(format!("dataset-review-{slug}-request"), limits).unwrap(),
+            ExecutionId::new(format!("dataset-review-{slug}-execution"), limits).unwrap(),
+            RunUnitId::new(format!("dataset-review-{slug}-run"), limits).unwrap(),
+            None,
+            Selector::new("dataset:review", limits).unwrap(),
+            ArtifactRef::new("dataset-review-artifact", limits).unwrap(),
+            Principal::new(
+                principal(value),
+                ["host.dataset.read", "host.dataset.write"]
+                    .into_iter()
+                    .map(|capability| CapabilityId::new(capability, limits).unwrap())
+                    .collect(),
+                limits,
+            )
+            .unwrap(),
+            ServiceClass::System,
+            0,
+            u64::MAX,
+            TraceId::new(format!("dataset-review-{slug}-trace"), limits).unwrap(),
+            IdempotencyKey::new(format!("dataset-review-{slug}-invocation"), limits).unwrap(),
+            1,
+            ResourceLimits::default(),
+            BTreeMap::new(),
+            limits,
+        )
+        .unwrap()
+    }
+
+    fn public_invoke(
+        service: Arc<DatasetService>,
+        principal: &str,
+        request: DatasetRequest,
+    ) -> Result<DatasetResult, HostProblem> {
+        let provider = dataset_providers(service, InvocationLimits::default())
+            .into_iter()
+            .find(|provider| provider.descriptor().capability.as_str() == "host.dataset.write")
+            .unwrap();
+        let invocation = invocation_for(principal);
+        let request_mutation = super::mutation(&request);
+        let result = provider.invoke(
+            &invocation,
+            EffectRequest {
+                run_unit: invocation.run_unit_id.clone(),
+                sequence: request_mutation.map_or(1, |mutation| mutation.sequence),
+                deadline_tick: u64::MAX,
+                idempotency_key: request_mutation.map(|mutation| mutation.idempotency_key.clone()),
+                request: HostRequest::Dataset(request),
+            },
+        );
+        match result.outcome {
+            Ok(HostResult::Dataset(result)) => Ok(result),
+            Ok(_) => Err(HostProblem::InfrastructureFailure),
+            Err(problem) => Err(problem),
+        }
     }
 
     struct FailAtomicOnceStore {
@@ -8600,6 +8696,16 @@ mod tests {
             source_id: source.into(),
             dataset: DatasetName::new(dataset, 128).unwrap(),
             attributes: attrs(DatasetOrganization::Sequential),
+            record_length: 4,
+            sha256: format!("sha256:{:x}", Sha256::digest(bytes)),
+            bytes: bytes.to_vec(),
+        }
+    }
+    fn seed_ksds_object(source: &str, dataset: &str, bytes: &[u8]) -> DatasetSeedObject {
+        DatasetSeedObject {
+            source_id: source.into(),
+            dataset: DatasetName::new(dataset, 128).unwrap(),
+            attributes: attrs(DatasetOrganization::KeySequenced),
             record_length: 4,
             sha256: format!("sha256:{:x}", Sha256::digest(bytes)),
             bytes: bytes.to_vec(),
@@ -9766,6 +9872,359 @@ mod tests {
         assert!(matches!(
             DatasetService::open(corrupt_store, DatasetLimits::default()),
             Err(HostProblem::InfrastructureFailure)
+        ));
+    }
+
+    #[test]
+    fn seed_upgrade_and_rollback_rebuild_upgrade_indexes_and_preserve_dependencies() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let dataset = service(store.clone());
+        let base = DatasetName::new("SEED.BASE", 44).unwrap();
+        let upgrade = DatasetName::new("SEED.BASE.UPGRADE", 44).unwrap();
+        let upgrade_path = DatasetName::new("SEED.BASE.UPATH", 44).unwrap();
+        let no_upgrade = DatasetName::new("SEED.BASE.NOUP", 44).unwrap();
+        let no_upgrade_path = DatasetName::new("SEED.BASE.NPATH", 44).unwrap();
+        let alias = DatasetName::new("SEED.BASE.ALIAS", 44).unwrap();
+        dataset
+            .install_seed_generation(
+                "AIXSEED",
+                "g1",
+                vec![seed_ksds_object("seed/base", base.as_str(), b"AA11BB22")],
+            )
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::DefineAlternateIndex {
+                base: base.clone(),
+                index: upgrade.clone(),
+                key_offset: 2,
+                key_length: 2,
+                allow_duplicates: false,
+                upgrade: true,
+                mutation: mutation(22_000),
+            })
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::DefinePath {
+                path: upgrade_path.clone(),
+                index: upgrade.clone(),
+                mutation: mutation(22_001),
+            })
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::DefineAlternateIndex {
+                base: base.clone(),
+                index: no_upgrade.clone(),
+                key_offset: 2,
+                key_length: 2,
+                allow_duplicates: false,
+                upgrade: false,
+                mutation: mutation(22_002),
+            })
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::DefinePath {
+                path: no_upgrade_path.clone(),
+                index: no_upgrade.clone(),
+                mutation: mutation(22_003),
+            })
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::DefineAlias {
+                alias: alias.clone(),
+                target: base.clone(),
+                mutation: mutation(22_004),
+            })
+            .unwrap();
+
+        dataset
+            .install_seed_generation(
+                "AIXSEED",
+                "g2",
+                vec![seed_ksds_object("seed/base", base.as_str(), b"CC33DD44")],
+            )
+            .unwrap();
+        drop(dataset);
+        let forward = service(store.clone());
+        for selected in [&upgrade, &upgrade_path] {
+            assert!(matches!(
+                forward.invoke(DatasetRequest::Read {
+                    dataset: selected.clone(),
+                    member: None,
+                    key: Some(b"33".to_vec()),
+                    max_records: 1,
+                }),
+                Ok(DatasetResult::Records { records, identities, version: 2 })
+                    if records == [b"CC33".to_vec()] && identities == [b"CC".to_vec()]
+            ));
+        }
+        for selected in [&no_upgrade, &no_upgrade_path] {
+            assert!(matches!(
+                forward.invoke(DatasetRequest::Read {
+                    dataset: selected.clone(),
+                    member: None,
+                    key: Some(b"33".to_vec()),
+                    max_records: 1,
+                }),
+                Err(HostProblem::Condition { ref name, response: 13, .. }) if name == "NOTFND"
+            ));
+        }
+        assert!(matches!(
+            forward.invoke(DatasetRequest::ResolveCatalog {
+                name: alias.clone(),
+            }),
+            Ok(DatasetResult::Catalog(resolution)) if resolution.resolved == base
+        ));
+        assert!(matches!(
+            forward.invoke(DatasetRequest::Delete {
+                dataset: base.clone(),
+                member: None,
+                expected_version: Some(2),
+                purge: true,
+                current_date: None,
+                mutation: mutation(22_005),
+            }),
+            Err(HostProblem::Condition { ref name, response: 16, .. }) if name == "INUSE"
+        ));
+
+        forward.rollback_seed_generation("AIXSEED", "g1").unwrap();
+        for selected in [&upgrade, &upgrade_path, &no_upgrade, &no_upgrade_path] {
+            assert!(matches!(
+                forward.invoke(DatasetRequest::Read {
+                    dataset: selected.clone(),
+                    member: None,
+                    key: Some(b"11".to_vec()),
+                    max_records: 1,
+                }),
+                Ok(DatasetResult::Records { records, identities, version: 3 })
+                    if records == [b"AA11".to_vec()] && identities == [b"AA".to_vec()]
+            ));
+        }
+        assert!(matches!(
+            forward.invoke(DatasetRequest::Delete {
+                dataset: base.clone(),
+                member: None,
+                expected_version: Some(3),
+                purge: true,
+                current_date: None,
+                mutation: mutation(22_006),
+            }),
+            Err(HostProblem::Condition { ref name, response: 16, .. }) if name == "INUSE"
+        ));
+        drop(forward);
+        let reopened = service(store);
+        assert!(matches!(
+            reopened.invoke(DatasetRequest::Read {
+                dataset: upgrade_path,
+                member: None,
+                key: Some(b"11".to_vec()),
+                max_records: 1,
+            }),
+            Ok(DatasetResult::Records { records, version: 3, .. })
+                if records == [b"AA11".to_vec()]
+        ));
+        assert!(matches!(
+            reopened.invoke(DatasetRequest::ResolveCatalog { name: alias }),
+            Ok(DatasetResult::Catalog(resolution)) if resolution.resolved == base
+        ));
+    }
+
+    #[test]
+    fn compatibility_create_generation_and_seed_paths_reject_invalid_definitions_before_store() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let dataset = service(store.clone());
+        let mut ksds = attrs(DatasetOrganization::KeySequenced);
+        ksds.key_offset = None;
+        ksds.key_length = None;
+        let mut esds = attrs(DatasetOrganization::EntrySequenced);
+        esds.key_offset = Some(0);
+        esds.key_length = Some(1);
+        let lds = DatasetAttributes {
+            organization: DatasetOrganization::Linear,
+            record_format: RecordFormat::Fixed,
+            logical_record_length: 4,
+            key_offset: None,
+            key_length: None,
+            ccsid: Some(37),
+        };
+        let mut rrds = attrs(DatasetOrganization::Relative);
+        rrds.key_offset = Some(0);
+        rrds.key_length = Some(1);
+        let vrrds = attrs(DatasetOrganization::VariableRelative);
+        let mut zero_ccsid = attrs(DatasetOrganization::EntrySequenced);
+        zero_ccsid.ccsid = Some(0);
+        let invalid = [
+            ("USER.BAD.KSDS", ksds),
+            ("USER.BAD.ESDS", esds),
+            ("USER.BAD.LDS", lds.clone()),
+            ("USER.BAD.RRDS", rrds),
+            ("USER.BAD.VRRDS", vrrds),
+            ("USER.BAD.CCSID", zero_ccsid),
+        ];
+        for (position, (name, attributes)) in invalid.into_iter().enumerate() {
+            let sequence = 23_000 + position as u64;
+            let name = DatasetName::new(name, 44).unwrap();
+            assert_eq!(
+                public_invoke(
+                    dataset.clone(),
+                    "OWNER1",
+                    DatasetRequest::Create {
+                        dataset: name.clone(),
+                        attributes,
+                        mutation: mutation(sequence),
+                    },
+                ),
+                Err(HostProblem::Malformed)
+            );
+            assert!(
+                store
+                    .get_provider_state("dataset", name.as_str())
+                    .unwrap()
+                    .is_none()
+            );
+            assert!(
+                store
+                    .get_provider_state("dataset-replay", &format!("id-{sequence}"))
+                    .unwrap()
+                    .is_none()
+            );
+        }
+
+        let group = DatasetName::new("USER.BAD.GDG", 44).unwrap();
+        public_invoke(
+            dataset.clone(),
+            "OWNER1",
+            DatasetRequest::DefineGenerationGroup {
+                base: group.clone(),
+                limit: 2,
+                scratch: true,
+                empty: false,
+                mutation: mutation(23_010),
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            public_invoke(
+                dataset.clone(),
+                "OWNER1",
+                DatasetRequest::CreateGeneration {
+                    base: group,
+                    attributes: lds.clone(),
+                    records: vec![b"DATA".to_vec()],
+                    mutation: mutation(23_011),
+                },
+            ),
+            Err(HostProblem::Malformed)
+        );
+        assert!(
+            store
+                .get_provider_state("dataset", "USER.BAD.GDG.G0001V00")
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            store
+                .get_provider_state("dataset-replay", "id-23011")
+                .unwrap()
+                .is_none()
+        );
+
+        let bad_seed = DatasetSeedObject {
+            source_id: "seed/bad-lds".into(),
+            dataset: DatasetName::new("USER.BAD.SEED", 44).unwrap(),
+            attributes: lds,
+            record_length: 4,
+            sha256: format!("sha256:{:x}", Sha256::digest(b"DATA")),
+            bytes: b"DATA".to_vec(),
+        };
+        assert_eq!(
+            dataset.install_seed_generation("BADSEED", "g1", vec![bad_seed]),
+            Err(HostProblem::Malformed)
+        );
+        assert!(
+            store
+                .get_provider_state("dataset", "USER.BAD.SEED")
+                .unwrap()
+                .is_none()
+        );
+        drop(dataset);
+        let reopened = service(store);
+        assert!(matches!(
+            reopened.invoke(DatasetRequest::List {
+                pattern: "USER.BAD.*".into(),
+                start: None,
+                max_items: 32,
+            }),
+            Ok(DatasetResult::Listed { names, more: false })
+                if names == [DatasetName::new("USER.BAD.GDG", 44).unwrap()]
+        ));
+    }
+
+    #[test]
+    fn creation_date_participates_in_idempotency_across_public_replay_and_restart() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let dataset = service(store.clone());
+        let name = DatasetName::new("USER.DATE.DIGEST", 44).unwrap();
+        let mut first = mainframe_env_host_api::DatasetDefinition::compatibility(attrs(
+            DatasetOrganization::Sequential,
+        ));
+        first.catalog.owner = Some("OWNER1".into());
+        first.catalog.creation_date = Some(2_026_001);
+        let request = DatasetRequest::Define {
+            dataset: name.clone(),
+            definition: Box::new(first.clone()),
+            mutation: mutation(24_000),
+        };
+        assert_eq!(
+            public_invoke(dataset.clone(), "OWNER1", request.clone()),
+            Ok(DatasetResult::Created { version: 1 })
+        );
+        assert_eq!(
+            public_invoke(dataset.clone(), "OWNER1", request.clone()),
+            Ok(DatasetResult::Created { version: 1 })
+        );
+        let mut second = first.clone();
+        second.catalog.creation_date = Some(2_026_002);
+        let changed = DatasetRequest::Define {
+            dataset: name.clone(),
+            definition: Box::new(second),
+            mutation: mutation(24_000),
+        };
+        assert_eq!(
+            public_invoke(dataset.clone(), "OWNER1", changed.clone()),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        let legacy_digest = legacy_request_digest(&request).unwrap();
+        assert_ne!(legacy_digest, request_digest(&request).unwrap());
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "dataset-replay".into(),
+                    key: "id-24000".into(),
+                    version: 3,
+                    payload: encode_replay(&Replay {
+                        request_digest: legacy_digest,
+                        result: Some(DatasetResult::Created { version: 1 }),
+                    })
+                    .unwrap(),
+                },
+                Some(2),
+            )
+            .unwrap();
+        drop(dataset);
+        let reopened = service(store);
+        assert_eq!(
+            public_invoke(reopened.clone(), "OWNER1", request),
+            Ok(DatasetResult::Created { version: 1 })
+        );
+        assert_eq!(
+            public_invoke(reopened.clone(), "OWNER1", changed),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        assert!(matches!(
+            reopened.invoke(DatasetRequest::Describe { dataset: name }),
+            Ok(DatasetResult::Description(description))
+                if description.definition.catalog.creation_date == Some(2_026_001)
+                    && description.version == 1
         ));
     }
 
@@ -11621,6 +12080,346 @@ mod tests {
                 },
             ),
             Ok(DatasetResult::Mutated { version: 2 })
+        ));
+    }
+
+    #[test]
+    fn public_unowned_claim_and_write_race_is_linearizable_and_restart_safe() {
+        for iteration in 0..32u64 {
+            let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+            let dataset = service(store.clone());
+            let name = DatasetName::new(format!("USER.RACE{iteration}"), 44).unwrap();
+            let definition = mainframe_env_host_api::DatasetDefinition::compatibility(attrs(
+                DatasetOrganization::Sequential,
+            ));
+            public_invoke(
+                dataset.clone(),
+                "OWNER1",
+                DatasetRequest::Define {
+                    dataset: name.clone(),
+                    definition: Box::new(definition.clone()),
+                    mutation: mutation(20_000 + iteration * 10),
+                },
+            )
+            .unwrap();
+
+            let barrier = Arc::new(Barrier::new(3));
+            let writer_service = dataset.clone();
+            let writer_name = name.clone();
+            let writer_barrier = barrier.clone();
+            let writer = std::thread::spawn(move || {
+                writer_barrier.wait();
+                public_invoke(
+                    writer_service,
+                    "OWNER1",
+                    DatasetRequest::Write {
+                        dataset: writer_name,
+                        member: None,
+                        records: vec![b"DATA".to_vec()],
+                        expected_version: Some(1),
+                        mutation: mutation(20_001 + iteration * 10),
+                    },
+                )
+            });
+            let claimant_service = dataset.clone();
+            let claimant_name = name.clone();
+            let claimant_barrier = barrier.clone();
+            let mut claimed_definition = definition.clone();
+            claimed_definition.catalog.owner = Some("OWNER2".into());
+            let claimant_definition = claimed_definition.clone();
+            let claimant = std::thread::spawn(move || {
+                claimant_barrier.wait();
+                public_invoke(
+                    claimant_service,
+                    "OWNER2",
+                    DatasetRequest::Alter {
+                        dataset: claimant_name,
+                        definition: Box::new(claimant_definition),
+                        expected_version: Some(1),
+                        mutation: mutation(20_002 + iteration * 10),
+                    },
+                )
+            });
+            barrier.wait();
+            let write_result = writer.join().unwrap();
+            let claim_result = claimant.join().unwrap();
+
+            let (records, writer_committed) = match (write_result, claim_result) {
+                (
+                    Ok(DatasetResult::Mutated { version: 2 }),
+                    Err(HostProblem::IdempotencyConflict),
+                ) => {
+                    assert_eq!(
+                        public_invoke(
+                            dataset.clone(),
+                            "OWNER2",
+                            DatasetRequest::Alter {
+                                dataset: name.clone(),
+                                definition: Box::new(claimed_definition),
+                                expected_version: Some(2),
+                                mutation: mutation(20_003 + iteration * 10),
+                            },
+                        ),
+                        Ok(DatasetResult::Mutated { version: 3 })
+                    );
+                    (vec![b"DATA".to_vec()], true)
+                }
+                (Err(HostProblem::Unauthorized), Ok(DatasetResult::Mutated { version: 2 })) => {
+                    (Vec::new(), false)
+                }
+                outcomes => panic!("non-linearizable ownership race: {outcomes:?}"),
+            };
+            assert_eq!(
+                store
+                    .get_provider_state(
+                        "dataset-replay",
+                        &format!("id-{}", 20_001 + iteration * 10),
+                    )
+                    .unwrap()
+                    .is_some(),
+                writer_committed
+            );
+
+            let version = match dataset
+                .invoke(DatasetRequest::Describe {
+                    dataset: name.clone(),
+                })
+                .unwrap()
+            {
+                DatasetResult::Description(description) => {
+                    assert_eq!(
+                        description.definition.catalog.owner.as_deref(),
+                        Some("OWNER2")
+                    );
+                    description.version
+                }
+                result => panic!("unexpected description: {result:?}"),
+            };
+            let denied_key = 20_004 + iteration * 10;
+            assert_eq!(
+                public_invoke(
+                    dataset.clone(),
+                    "OWNER1",
+                    DatasetRequest::Write {
+                        dataset: name.clone(),
+                        member: None,
+                        records: vec![b"EVIL".to_vec()],
+                        expected_version: Some(version),
+                        mutation: mutation(denied_key),
+                    },
+                ),
+                Err(HostProblem::Unauthorized)
+            );
+            assert!(
+                store
+                    .get_provider_state("dataset-replay", &format!("id-{denied_key}"))
+                    .unwrap()
+                    .is_none()
+            );
+            drop(dataset);
+            let reopened = service(store);
+            assert!(matches!(
+                reopened.invoke(DatasetRequest::Read {
+                    dataset: name,
+                    member: None,
+                    key: None,
+                    max_records: 8,
+                }),
+                Ok(DatasetResult::Records { records: actual, .. }) if actual == records
+            ));
+        }
+    }
+
+    #[test]
+    fn public_rls_and_tvs_authority_changes_deny_without_durable_side_effects() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let dataset = service(store.clone());
+        let rls = DatasetName::new("USER.AUTH.RLS", 44).unwrap();
+        let mut rls_definition = mainframe_env_host_api::DatasetDefinition::compatibility(attrs(
+            DatasetOrganization::KeySequenced,
+        ));
+        rls_definition.catalog.owner = Some("OWNER2".into());
+        rls_definition.vsam.access_mode = mainframe_env_host_api::VsamAccessMode::Rls;
+        public_invoke(
+            dataset.clone(),
+            "OWNER2",
+            DatasetRequest::Define {
+                dataset: rls.clone(),
+                definition: Box::new(rls_definition.clone()),
+                mutation: mutation(21_000),
+            },
+        )
+        .unwrap();
+        let lock_id = match public_invoke(
+            dataset.clone(),
+            "OWNER2",
+            DatasetRequest::AcquireLock {
+                dataset: rls.clone(),
+                target: mainframe_env_host_api::DatasetLockTarget::Dataset,
+                owner: principal("OWNER2"),
+                mode: mainframe_env_host_api::DatasetLockMode::Exclusive,
+                now_tick: 21_001,
+                lease_ticks: 100,
+                transaction: None,
+                mutation: mutation(21_001),
+            },
+        )
+        .unwrap()
+        {
+            DatasetResult::Locks { locks } => locks[0].lock_id.clone(),
+            result => panic!("unexpected lock result: {result:?}"),
+        };
+        rls_definition.catalog.owner = None;
+        public_invoke(
+            dataset.clone(),
+            "OWNER2",
+            DatasetRequest::Alter {
+                dataset: rls.clone(),
+                definition: Box::new(rls_definition.clone()),
+                expected_version: Some(1),
+                mutation: mutation(21_002),
+            },
+        )
+        .unwrap();
+        rls_definition.catalog.owner = Some("OWNER1".into());
+        public_invoke(
+            dataset.clone(),
+            "OWNER1",
+            DatasetRequest::Alter {
+                dataset: rls.clone(),
+                definition: Box::new(rls_definition),
+                expected_version: Some(2),
+                mutation: mutation(21_003),
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            public_invoke(
+                dataset.clone(),
+                "OWNER1",
+                DatasetRequest::Write {
+                    dataset: rls.clone(),
+                    member: None,
+                    records: vec![b"AA11".to_vec()],
+                    expected_version: Some(3),
+                    mutation: transaction_mutation(21_004, &lock_id),
+                },
+            ),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(
+            store
+                .get_provider_state("dataset-replay", &format!("id-21004-{lock_id}"))
+                .unwrap()
+                .is_none()
+        );
+
+        let tvs = DatasetName::new("USER.AUTH.TVS", 44).unwrap();
+        let mut tvs_definition = mainframe_env_host_api::DatasetDefinition::compatibility(attrs(
+            DatasetOrganization::KeySequenced,
+        ));
+        tvs_definition.catalog.owner = Some("OWNER2".into());
+        tvs_definition.vsam.access_mode = mainframe_env_host_api::VsamAccessMode::Tvs;
+        public_invoke(
+            dataset.clone(),
+            "OWNER2",
+            DatasetRequest::Define {
+                dataset: tvs.clone(),
+                definition: Box::new(tvs_definition.clone()),
+                mutation: mutation(21_010),
+            },
+        )
+        .unwrap();
+        public_invoke(
+            dataset.clone(),
+            "OWNER2",
+            DatasetRequest::BeginTvs {
+                transaction: "TVS-AUTH".into(),
+                owner: principal("OWNER2"),
+                mutation: mutation(21_011),
+            },
+        )
+        .unwrap();
+        public_invoke(
+            dataset.clone(),
+            "OWNER2",
+            DatasetRequest::StageTvs {
+                transaction: "TVS-AUTH".into(),
+                owner: principal("OWNER2"),
+                operation: mainframe_env_host_api::TvsRecordOperation::Insert {
+                    dataset: tvs.clone(),
+                    record: b"AA11".to_vec(),
+                },
+                mutation: mutation(21_012),
+            },
+        )
+        .unwrap();
+        tvs_definition.catalog.owner = None;
+        public_invoke(
+            dataset.clone(),
+            "OWNER2",
+            DatasetRequest::Alter {
+                dataset: tvs.clone(),
+                definition: Box::new(tvs_definition.clone()),
+                expected_version: Some(1),
+                mutation: mutation(21_013),
+            },
+        )
+        .unwrap();
+        tvs_definition.catalog.owner = Some("OWNER1".into());
+        public_invoke(
+            dataset.clone(),
+            "OWNER1",
+            DatasetRequest::Alter {
+                dataset: tvs.clone(),
+                definition: Box::new(tvs_definition),
+                expected_version: Some(2),
+                mutation: mutation(21_014),
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            public_invoke(
+                dataset.clone(),
+                "OWNER2",
+                DatasetRequest::CompleteTvs {
+                    transaction: "TVS-AUTH".into(),
+                    owner: principal("OWNER2"),
+                    commit: true,
+                    mutation: mutation(21_015),
+                },
+            ),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(
+            store
+                .get_provider_state("dataset-replay", "id-21015")
+                .unwrap()
+                .is_none()
+        );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Read {
+                dataset: tvs.clone(),
+                member: None,
+                key: None,
+                max_records: 8,
+            }),
+            Ok(DatasetResult::Records { records, version: 3, .. }) if records.is_empty()
+        ));
+        drop(dataset);
+        let reopened = service(store);
+        assert!(matches!(
+            public_invoke(
+                reopened,
+                "OWNER2",
+                DatasetRequest::TvsStatus {
+                    transaction: "TVS-AUTH".into(),
+                    owner: principal("OWNER2"),
+                },
+            ),
+            Ok(DatasetResult::Tvs(receipt))
+                if receipt.state == mainframe_env_host_api::TvsUnitOfWorkState::Active
+                    && receipt.staged_operations == 1
         ));
     }
 

@@ -156,6 +156,15 @@ pub(crate) fn encode_definition_digest_v2(definition: &DatasetDefinition) -> Res
     u32v(&mut out, 0);
     Ok(out)
 }
+
+pub(crate) fn encode_definition_digest_v3(definition: &DatasetDefinition) -> Result<Vec<u8>, ()> {
+    let mut out = encode_definition_digest_v2(definition)?;
+    if let Some(creation_date) = definition.catalog.creation_date {
+        out.extend_from_slice(b"MECRD1");
+        u32v(&mut out, creation_date);
+    }
+    Ok(out)
+}
 pub(crate) fn decode(
     bytes_in: &[u8],
     max_records: usize,
@@ -881,5 +890,28 @@ mod tests {
         let encoded = encode(&entry).unwrap();
         assert_eq!(&encoded[..5], b"MEDS6");
         assert_eq!(decode(&encoded, 8, 80, 8).unwrap(), entry);
+    }
+
+    #[test]
+    fn definition_digest_v3_adds_creation_date_without_drifting_legacy_no_date_bytes() {
+        let mut definition = DatasetDefinition::compatibility(DatasetAttributes {
+            organization: DatasetOrganization::Sequential,
+            record_format: RecordFormat::Fixed,
+            logical_record_length: 4,
+            key_offset: None,
+            key_length: None,
+            ccsid: Some(37),
+        });
+        assert_eq!(
+            encode_definition_digest_v3(&definition).unwrap(),
+            encode_definition_digest_v2(&definition).unwrap()
+        );
+        definition.catalog.creation_date = Some(2_026_001);
+        let first = encode_definition_digest_v3(&definition).unwrap();
+        definition.catalog.creation_date = Some(2_026_002);
+        let second = encode_definition_digest_v3(&definition).unwrap();
+        assert_ne!(first, second);
+        assert_eq!(&first[..5], b"MEDS3");
+        assert_eq!(&second[..5], b"MEDS3");
     }
 }

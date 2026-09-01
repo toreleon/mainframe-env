@@ -114,6 +114,7 @@ impl DatasetAttributes {
                 })
             || self.key_offset.is_some() != self.key_length.is_some()
             || (self.organization == DatasetOrganization::KeySequenced) != self.key_offset.is_some()
+            || self.ccsid == Some(0)
         {
             Err(HostProblem::Malformed)
         } else {
