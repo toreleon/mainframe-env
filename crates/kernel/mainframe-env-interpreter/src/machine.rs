@@ -6300,9 +6300,27 @@ impl ReferenceMachine {
             "COS" => {
                 decimal_from_f64(libm::cos(decimal_f64(decimal(0)?)?)).map(CobolValue::Decimal)
             }
-            "DATE-TO-YYYYMMDD" => window_year(integer(0)?, integer(1)?, false),
+            "DATE-TO-YYYYMMDD" => windowed_year(
+                integer(0)?,
+                arguments
+                    .get(1)
+                    .map(|_| integer(1))
+                    .transpose()?
+                    .unwrap_or(50),
+                current_year(&clock()?)?,
+                4,
+            ),
             "DAY-OF-INTEGER" => day_of_integer(integer(0)?).map(CobolValue::Decimal),
-            "DAY-TO-YYYYDDD" => window_year(integer(0)?, integer(1)?, true),
+            "DAY-TO-YYYYDDD" => windowed_year(
+                integer(0)?,
+                arguments
+                    .get(1)
+                    .map(|_| integer(1))
+                    .transpose()?
+                    .unwrap_or(50),
+                current_year(&clock()?)?,
+                3,
+            ),
             "DISPLAY-OF" => national_to_utf8(&bytes(0)?).map(CobolValue::Bytes),
             "EXP" => {
                 decimal_from_f64(libm::exp(decimal_f64(decimal(0)?)?)).map(CobolValue::Decimal)
@@ -6454,12 +6472,8 @@ impl ReferenceMachine {
             "TAN" => {
                 decimal_from_f64(libm::tan(decimal_f64(decimal(0)?)?)).map(CobolValue::Decimal)
             }
-            "TEST-DATE-YYYYMMDD" => Ok(integer_value(i128::from(
-                split_yyyymmdd(integer(0)?).is_err(),
-            ))),
-            "TEST-DAY-YYYYDDD" => Ok(integer_value(i128::from(
-                integer_of_day(integer(0)?).is_err(),
-            ))),
+            "TEST-DATE-YYYYMMDD" => Ok(integer_value(test_date_yyyymmdd(integer(0)?))),
+            "TEST-DAY-YYYYDDD" => Ok(integer_value(test_day_yyyyddd(integer(0)?))),
             "TEST-FORMATTED-DATETIME" => Ok(integer_value(test_formatted_datetime(
                 &String::from_utf8_lossy(&bytes(0)?),
                 &String::from_utf8_lossy(&bytes(1)?),
@@ -6507,7 +6521,16 @@ impl ReferenceMachine {
             "UVALID" => Ok(integer_value(test_utf8(&bytes(0)?) as i128)),
             "UWIDTH" => unicode_width(&bytes(0)?, integer(1)?).map(CobolValue::Decimal),
             "VARIANCE" => variance(&numeric()?, false).map(CobolValue::Decimal),
-            "YEAR-TO-YYYY" => window_year(integer(0)?, integer(1)?, false),
+            "YEAR-TO-YYYY" => windowed_year(
+                integer(0)?,
+                arguments
+                    .get(1)
+                    .map(|_| integer(1))
+                    .transpose()?
+                    .unwrap_or(50),
+                current_year(&clock()?)?,
+                0,
+            ),
             "INTEGER-OF-DATE" => {
                 let value = integer(0)?;
                 let (year, month, day) = split_yyyymmdd(value)?;
@@ -10460,22 +10483,73 @@ fn integer_of_day(value: i128) -> Result<Decimal, MachineProblem> {
     })
 }
 
-fn window_year(value: i128, window: i128, ordinal: bool) -> Result<CobolValue, MachineProblem> {
-    let divisor = if ordinal { 1_000 } else { 10_000 };
+fn current_year(current_date: &[u8]) -> Result<i128, MachineProblem> {
+    let year = current_date
+        .get(..4)
+        .and_then(|value| std::str::from_utf8(value).ok())
+        .and_then(|value| value.parse::<i128>().ok())
+        .ok_or(MachineProblem::DataException)?;
+    (1_601..=9_999)
+        .contains(&year)
+        .then_some(year)
+        .ok_or(MachineProblem::DataException)
+}
+
+fn windowed_year(
+    value: i128,
+    offset: i128,
+    current_year: i128,
+    trailing_digits: u32,
+) -> Result<CobolValue, MachineProblem> {
+    let divisor = 10i128
+        .checked_pow(trailing_digits)
+        .ok_or(MachineProblem::SizeError)?;
+    if value < 0 {
+        return Err(MachineProblem::DataException);
+    }
     let short_year = value / divisor;
     if !(0..=99).contains(&short_year) {
         return Err(MachineProblem::DataException);
     }
-    let base = if window >= 1_000 {
-        window
-    } else {
-        1_900 + window
-    };
-    let mut year = (base / 100) * 100 + short_year;
-    if year < base {
-        year += 100;
+    let ending_year = current_year
+        .checked_add(offset)
+        .filter(|year| (1_700..=9_999).contains(year))
+        .ok_or(MachineProblem::DataException)?;
+    let mut year = (ending_year / 100) * 100 + short_year;
+    if year > ending_year {
+        year -= 100;
     }
     Ok(integer_value(year * divisor + value % divisor))
+}
+
+fn test_date_yyyymmdd(value: i128) -> i128 {
+    if !(16_010_000..=99_999_999).contains(&value) {
+        return 1;
+    }
+    let year = (value / 10_000) as i32;
+    let month_day = value % 10_000;
+    if !(100..=1_299).contains(&month_day) {
+        return 2;
+    }
+    let month = (month_day / 100) as u32;
+    let day = (month_day % 100) as u32;
+    if !valid_date(year, month, day) {
+        return 3;
+    }
+    0
+}
+
+fn test_day_yyyyddd(value: i128) -> i128 {
+    if !(1_601_000..=9_999_999).contains(&value) {
+        return 1;
+    }
+    let year = (value / 1_000) as i32;
+    let day = value % 1_000;
+    let maximum = if valid_date(year, 2, 29) { 366 } else { 365 };
+    if !(1..=maximum).contains(&day) {
+        return 2;
+    }
+    0
 }
 
 fn parse_hhmmss(bytes: &[u8]) -> Result<u32, MachineProblem> {

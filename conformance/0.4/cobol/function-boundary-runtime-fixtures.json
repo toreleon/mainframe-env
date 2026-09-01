@@ -71,6 +71,41 @@
       "obligation_id": "boundary-multibyte-width",
       "source": "IDENTIFICATION DIVISION. PROGRAM-ID. UWIDTHBOUND. DATA DIVISION. WORKING-STORAGE SECTION. 01 UTF-X PIC U(4) BYTE-LENGTH 16 UTF-8. 01 OUT-X PIC 99. PROCEDURE DIVISION. MOVE 'Aé🙂' TO UTF-X. MOVE FUNCTION UWIDTH(UTF-X, 3) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
       "expected_output": "04\n"
+    },
+    {
+      "id": "date-to-yyyymmdd-sliding-window",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0015",
+      "obligation_id": "boundary-sliding-century",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. DATEWINDOW. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUT-X PIC 9(8). PROCEDURE DIVISION. MOVE FUNCTION DATE-TO-YYYYMMDD(240229, 50) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "19240229\n"
+    },
+    {
+      "id": "day-to-yyyyddd-sliding-window",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0017",
+      "obligation_id": "boundary-sliding-century",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. DAYWINDOW. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUT-X PIC 9(7). PROCEDURE DIVISION. MOVE FUNCTION DAY-TO-YYYYDDD(24060, 50) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "1924060\n"
+    },
+    {
+      "id": "year-to-yyyy-default-window",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0082",
+      "obligation_id": "boundary-default-sliding-century",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. YEARWINDOW. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUT-X PIC 9(4). PROCEDURE DIVISION. MOVE FUNCTION YEAR-TO-YYYY(24) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "1924\n"
+    },
+    {
+      "id": "test-date-yyyymmdd-error-fields",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0065",
+      "obligation_id": "boundary-error-subfield",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. TESTDATEFIELDS. DATA DIVISION. WORKING-STORAGE SECTION. 01 YEAR-X PIC 9. 01 MONTH-X PIC 9. 01 DAY-X PIC 9. PROCEDURE DIVISION. MOVE FUNCTION TEST-DATE-YYYYMMDD(12950215) TO YEAR-X. MOVE FUNCTION TEST-DATE-YYYYMMDD(19921415) TO MONTH-X. MOVE FUNCTION TEST-DATE-YYYYMMDD(19950240) TO DAY-X. DISPLAY YEAR-X MONTH-X DAY-X. STOP RUN.",
+      "expected_output": "123\n"
+    },
+    {
+      "id": "test-day-yyyyddd-error-fields",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0066",
+      "obligation_id": "boundary-error-subfield",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. TESTDAYFIELDS. DATA DIVISION. WORKING-STORAGE SECTION. 01 YEAR-X PIC 9. 01 DAY-X PIC 9. PROCEDURE DIVISION. MOVE FUNCTION TEST-DAY-YYYYDDD(1295146) TO YEAR-X. MOVE FUNCTION TEST-DAY-YYYYDDD(1995446) TO DAY-X. DISPLAY YEAR-X DAY-X. STOP RUN.",
+      "expected_output": "12\n"
     }
   ]
 }

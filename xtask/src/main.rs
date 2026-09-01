@@ -1636,6 +1636,9 @@ fn check_cobol_function_bindings(
             Some("0008") => {
                 expected_obligations.insert("boundary-national-byte-count");
             }
+            Some("0015" | "0017") => {
+                expected_obligations.insert("boundary-sliding-century");
+            }
             Some("0034") => {
                 expected_obligations.insert("boundary-national-character-count");
             }
@@ -1644,6 +1647,9 @@ fn check_cobol_function_bindings(
             }
             Some("0067" | "0068") => {
                 expected_obligations.insert("boundary-error-position");
+            }
+            Some("0065" | "0066") => {
+                expected_obligations.insert("boundary-error-subfield");
             }
             Some("0069") => {
                 expected_obligations.insert("boundary-currency-position");
@@ -1659,6 +1665,9 @@ fn check_cobol_function_bindings(
             }
             Some("0079") => {
                 expected_obligations.insert("boundary-multibyte-width");
+            }
+            Some("0082") => {
+                expected_obligations.insert("boundary-default-sliding-century");
             }
             _ => {}
         }

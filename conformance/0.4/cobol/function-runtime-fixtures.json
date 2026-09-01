@@ -99,7 +99,7 @@
       "setup": ""
     },
     {
-      "expression": "FUNCTION DATE-TO-YYYYMMDD(240229, 1950)",
+      "expression": "FUNCTION DATE-TO-YYYYMMDD(240229, 50)",
       "id": "date-to-yyyymmdd",
       "name": "DATE-TO-YYYYMMDD",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0015",
@@ -113,7 +113,7 @@
       "setup": ""
     },
     {
-      "expression": "FUNCTION DAY-TO-YYYYDDD(24060, 1950)",
+      "expression": "FUNCTION DAY-TO-YYYYDDD(24060, 50)",
       "id": "day-to-yyyyddd",
       "name": "DAY-TO-YYYYDDD",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0017",
@@ -568,7 +568,7 @@
       "setup": ""
     },
     {
-      "expression": "FUNCTION YEAR-TO-YYYY(24, 1950)",
+      "expression": "FUNCTION YEAR-TO-YYYY(24, 50)",
       "id": "year-to-yyyy",
       "name": "YEAR-TO-YYYY",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0082",
