@@ -3,6 +3,8 @@
 #![forbid(unsafe_code)]
 
 mod authority;
+mod command;
+mod command_processor;
 mod database;
 mod model;
 
@@ -10,6 +12,12 @@ pub use authority::{
     MemorySecretResolver, RacfInstallReceipt, RacfLimits, RacfManifest, RacfProfileDefinition,
     RacfService, RacfUserDefinition, ResolvedSecret, SecretResolver, racf_providers,
 };
+pub use command::{
+    CommandDescriptor, CommandDiagnostic, CommandDiagnosticCode, CommandDomain, CommandFamily,
+    CommandLanguageLimits, ValidatedCommand, command_descriptors, recognize_command,
+    validate_command,
+};
+pub use command_processor::{CommandContext, CommandObjectKind, CommandRecord, CommandResult};
 pub use database::{SecurityDatabase, SecurityDatabaseSummary};
 pub use model::{
     AccessCondition, AccessControlEntry, AccessLevel, Acee, AceeState, AuditFieldValue,

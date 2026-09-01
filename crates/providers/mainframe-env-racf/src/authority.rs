@@ -1,3 +1,4 @@
+use crate::command::CommandDiagnostic;
 use crate::database::SecurityDatabase;
 use crate::model::{
     AccessControlEntry, AccessLevel, AuditFieldValue, AuditPolicy, ClassDescriptor,
@@ -151,9 +152,9 @@ pub struct RacfInstallReceipt {
 }
 
 pub struct RacfService {
-    database: Arc<SecurityDatabase>,
-    secrets: Arc<dyn SecretResolver>,
-    limits: RacfLimits,
+    pub(crate) database: Arc<SecurityDatabase>,
+    pub(crate) secrets: Arc<dyn SecretResolver>,
+    pub(crate) limits: RacfLimits,
 }
 
 impl RacfService {
@@ -299,6 +300,33 @@ impl RacfService {
             permissions,
             replayed,
         })
+    }
+
+    pub fn bootstrap_administrator(
+        &self,
+        user: &str,
+        credential: &SecretRef,
+    ) -> Result<(), HostProblem> {
+        let user = normalize(user, 8)?;
+        let mut principal = self.password_principal(&user, credential)?;
+        principal.attributes =
+            BTreeSet::from(["AUDITOR".into(), "OPERATIONS".into(), "SPECIAL".into()]);
+        self.database.mutate(|snapshot| {
+            if !snapshot.principals.is_empty() {
+                return Err(HostProblem::Unauthorized);
+            }
+            snapshot.principals.insert(user, principal);
+            Ok(())
+        })?;
+        Ok(())
+    }
+
+    pub fn execute_command(
+        &self,
+        context: &crate::command_processor::CommandContext,
+        input: &str,
+    ) -> Result<crate::command_processor::CommandResult, CommandDiagnostic> {
+        crate::command_processor::execute(self, context, input)
     }
 
     pub fn add_group(&self, name: &str) -> Result<(), HostProblem> {
@@ -624,11 +652,20 @@ impl RacfService {
         credential: &SecretRef,
     ) -> Result<PrincipalProfile, HostProblem> {
         let secret = self.secrets.resolve(credential)?;
+        let principal = self.password_principal_from_bytes(user, &secret)?;
+        drop(secret);
+        Ok(principal)
+    }
+
+    pub(crate) fn password_principal_from_bytes(
+        &self,
+        user: &str,
+        secret: &[u8],
+    ) -> Result<PrincipalProfile, HostProblem> {
         let verifier = Argon2::default()
-            .hash_password_with_salt(&secret, format!("mainframe-env:{user}").as_bytes())
+            .hash_password_with_salt(secret, format!("mainframe-env:{user}").as_bytes())
             .map(|hash| hash.to_string())
             .map_err(|_| HostProblem::ProviderFailure)?;
-        drop(secret);
         Ok(PrincipalProfile {
             id: user.into(),
             kind: PrincipalKind::User,

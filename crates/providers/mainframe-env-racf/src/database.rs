@@ -161,6 +161,48 @@ impl SecurityDatabase {
         Ok((result, snapshot.generation))
     }
 
+    pub(crate) fn mutate_retry<T>(
+        &self,
+        mut change: impl FnMut(&mut SecurityDatabaseSnapshot) -> Result<(T, bool), HostProblem>,
+    ) -> Result<(T, u64), HostProblem> {
+        const MAX_ATTEMPTS: usize = 4;
+        let _writer = self
+            .writer
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        for attempt in 0..MAX_ATTEMPTS {
+            let record = self
+                .store
+                .get_provider_state(DATABASE_NAMESPACE, DATABASE_KEY)
+                .map_err(store_problem)?
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            let mut snapshot = decode_snapshot(&record, self.limits)?;
+            let (result, changed) = change(&mut snapshot)?;
+            if !changed {
+                return Ok((result, snapshot.generation));
+            }
+            snapshot.generation = snapshot
+                .generation
+                .checked_add(1)
+                .ok_or(HostProblem::ResourceExhausted)?;
+            let payload = encode_snapshot(&snapshot, self.limits)?;
+            match self.store.put_provider_state(
+                ProviderStateRecord {
+                    namespace: DATABASE_NAMESPACE.into(),
+                    key: DATABASE_KEY.into(),
+                    version: snapshot.generation,
+                    payload,
+                },
+                Some(record.version),
+            ) {
+                Ok(()) => return Ok((result, snapshot.generation)),
+                Err(StoreError::Conflict) if attempt + 1 < MAX_ATTEMPTS => {}
+                Err(problem) => return Err(store_problem(problem)),
+            }
+        }
+        Err(HostProblem::IdempotencyConflict)
+    }
+
     fn initialize(&self) -> Result<(), HostProblem> {
         if self
             .store

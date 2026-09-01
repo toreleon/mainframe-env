@@ -3,29 +3,30 @@
 #![forbid(unsafe_code)]
 
 mod evidence_seal;
+mod racf_catalog;
 mod work_package_seal;
 
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use mainframe_env_conformance::{
-    verify_carddemo_application_package_from_env, verify_carddemo_base_batch_from_env,
-    verify_carddemo_base_online_from_env, verify_carddemo_batch_programs_from_env,
-    verify_carddemo_cics_abi_from_env, verify_carddemo_cics_runtime_from_env,
-    verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
-    verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
-    verify_carddemo_dataset_catalog_from_env, verify_carddemo_db2_from_env,
-    verify_carddemo_file_call_semantics_from_env, verify_carddemo_full_from_env,
-    verify_carddemo_host_operands_from_env, verify_carddemo_ims_from_env,
-    verify_carddemo_jcl_from_env, verify_carddemo_mq_authorization_from_env,
-    verify_carddemo_program_routing_from_env, verify_carddemo_resources_from_env,
-    verify_carddemo_security_from_env, verify_carddemo_seeds_from_env,
-    verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
-    verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
-    verify_carddemo_vsam_from_env, verify_host_abi_libraries,
+    racf_runtime, verify_carddemo_application_package_from_env,
+    verify_carddemo_base_batch_from_env, verify_carddemo_base_online_from_env,
+    verify_carddemo_batch_programs_from_env, verify_carddemo_cics_abi_from_env,
+    verify_carddemo_cics_runtime_from_env, verify_carddemo_control_flow_from_env,
+    verify_carddemo_core_semantics_from_env, verify_carddemo_corpus_from_env,
+    verify_carddemo_data_layouts_from_env, verify_carddemo_dataset_catalog_from_env,
+    verify_carddemo_db2_from_env, verify_carddemo_file_call_semantics_from_env,
+    verify_carddemo_full_from_env, verify_carddemo_host_operands_from_env,
+    verify_carddemo_ims_from_env, verify_carddemo_jcl_from_env,
+    verify_carddemo_mq_authorization_from_env, verify_carddemo_program_routing_from_env,
+    verify_carddemo_resources_from_env, verify_carddemo_security_from_env,
+    verify_carddemo_seeds_from_env, verify_carddemo_source_closures_from_env,
+    verify_carddemo_source_preprocessing_from_env, verify_carddemo_terminal_from_env,
+    verify_carddemo_utilities_from_env, verify_carddemo_vsam_from_env, verify_host_abi_libraries,
 };
 use mainframe_env_coverage::{
-    BindingKey, CompiledSpec, ConformanceLimits, CoverageGate, DerivedConformanceLedger, DriverRef,
-    FixtureRef, ObligationId, OfficialCatalogRow, OfficialRowId, RunnerContext, TestId, Verdict,
-    VerdictEvent,
+    BindingKey, CompiledSpec, ConformanceLimits, ConformanceRunner, CoverageGate,
+    DerivedConformanceLedger, DriverRef, FixtureRef, ObligationId, OfficialCatalogRow,
+    OfficialRowId, RunnerContext, RunnerSelection, TestId, Verdict, VerdictEvent,
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -133,6 +134,7 @@ enum XtaskCommand {
     #[command(name = "review-repair-round-5")]
     ReviewRepairRound5(CheckArgs),
     SemanticIdentities(CheckArgs),
+    RacfCatalog(CheckArgs),
     Spec(CheckArgs),
     WorkPackageSeal(WorkPackageSealArgs),
     Conformance(ConformanceArgs),
@@ -320,6 +322,15 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
                 generate_semantic_identities(root)
             }
         ),
+        XtaskCommand::RacfCatalog(args) => (
+            "racf-catalog",
+            args.check,
+            if args.check {
+                racf_catalog::check(root)
+            } else {
+                racf_catalog::generate(root)
+            },
+        ),
         XtaskCommand::Spec(args) => checked!("spec", args, check_spec(root)),
         XtaskCommand::Conformance(args) => {
             let focused = args.subsystem.is_some()
@@ -470,6 +481,7 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
 
 fn check_conformance(root: &Path) -> TaskResult {
     check_spec(root)?;
+    racf_catalog::check(root)?;
     check_versions(root)?;
     check_architecture(root)?;
     check_profiles(root)?;
@@ -545,7 +557,7 @@ fn validate_conformance_projections(schema_directory: &Path, spec: &CompiledSpec
         limits,
     )
     .map_err(|problem| problem.to_string())?;
-    let ledger = DerivedConformanceLedger::derive_complete(spec, &context, Vec::new())
+    let ledger = DerivedConformanceLedger::derive_partial(spec, &context, Vec::new())
         .map_err(|problem| problem.to_string())?;
     let ledger_path = schema_directory.join("derived-ledger.schema.json");
     let ledger_bytes = ledger
@@ -700,9 +712,62 @@ fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> T
         selected > 0,
         "focused conformance selection has no executable bindings",
     )?;
-    Err(format!(
-        "{selected} binding(s) selected, but their product driver registry is not installed by CI-300"
-    ))
+    let selection = if let Some(replay) = args.replay.as_deref() {
+        RunnerSelection::replay(replay, ConformanceLimits::default())
+            .map_err(|problem| problem.to_string())?
+    } else {
+        let subsystem = args
+            .subsystem
+            .as_deref()
+            .ok_or("focused conformance subsystem is missing")?;
+        require(
+            subsystem == "racf-saf",
+            "the selected subsystem product driver registry is not installed yet",
+        )?;
+        RunnerSelection::focused(subsystem, gate, args.shard, ConformanceLimits::default())
+            .map_err(|problem| problem.to_string())?
+    };
+    let context = RunnerContext::new(
+        repository_digest(root)?,
+        "local-deterministic",
+        ConformanceLimits::default(),
+    )
+    .map_err(|problem| problem.to_string())?;
+    let runtime = racf_runtime(&spec).map_err(|problem| problem.to_string())?;
+    let report = ConformanceRunner::new(&spec, runtime, ConformanceLimits::default())
+        .run(&selection, &context)
+        .map_err(|problem| problem.to_string())?;
+    if let Some(failure) = report
+        .batches
+        .iter()
+        .flat_map(|batch| &batch.events)
+        .find(|event| event.verdict == Verdict::Fail)
+    {
+        return Err(format!(
+            "{} failed: expected={} actual={} replay={}",
+            failure.test_id.as_str(),
+            failure.expected,
+            failure.actual,
+            failure.replay
+        ));
+    }
+    let counts = CoverageGate::ALL
+        .into_iter()
+        .map(|gate| {
+            let count = &report.ledger.counts[&gate];
+            format!(
+                "{}={}/{}/{}/{}",
+                gate.slug(),
+                count.pass,
+                count.fail,
+                count.pending,
+                count.non_applicable
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    println!("bindings={selected} {counts}");
+    Ok(())
 }
 
 fn parse_coverage_gate(value: &str) -> TaskResult<CoverageGate> {

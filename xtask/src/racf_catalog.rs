@@ -1,0 +1,395 @@
+use super::*;
+
+const CATALOG_PATH: &str = "conformance/0.5/racf/command-language.json";
+const SCHEMA_PATH: &str = "conformance/0.5/schemas/racf-command-catalog.schema.json";
+const GENERATED_PATH: &str =
+    "crates/providers/mainframe-env-racf/src/generated/racf_command_catalog.rs";
+const SPEC_PATH: &str = "conformance/spec/v1/spec.json";
+const RACF_ROW_PREFIX: &str = "ibm-zos-3.2-racf-saf-2026:racf-command-families:";
+
+pub(super) fn generate(root: &Path) -> TaskResult {
+    let generated = render(root)?;
+    let path = root.join(GENERATED_PATH);
+    fs::create_dir_all(path.parent().ok_or("generated RACF path has no parent")?)
+        .map_err(|error| format!("{}: {error}", path.display()))?;
+    fs::write(&path, generated).map_err(|error| format!("{}: {error}", path.display()))?;
+    let spec_path = root.join(SPEC_PATH);
+    fs::write(&spec_path, project_spec(root)?)
+        .map_err(|error| format!("{}: {error}", spec_path.display()))
+}
+
+pub(super) fn check(root: &Path) -> TaskResult {
+    let expected = render(root)?;
+    let path = root.join(GENERATED_PATH);
+    let actual = fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?;
+    require(
+        actual == expected,
+        "generated RACF command catalog is stale; run cargo xtask racf-catalog",
+    )?;
+    let spec_path = root.join(SPEC_PATH);
+    let actual_spec =
+        fs::read(&spec_path).map_err(|error| format!("{}: {error}", spec_path.display()))?;
+    require(
+        actual_spec == project_spec(root)?,
+        "shared Conformance IR RACF projection is stale; run cargo xtask racf-catalog",
+    )
+}
+
+fn project_spec(root: &Path) -> TaskResult<Vec<u8>> {
+    let catalog_path = root.join(CATALOG_PATH);
+    let catalog = json(&catalog_path)?;
+    let families = array(&catalog, "families", &catalog_path)?;
+    let spec_path = root.join(SPEC_PATH);
+    let mut spec = json(&spec_path)?;
+    {
+        let registries = spec["registries"]
+            .as_object_mut()
+            .ok_or("shared Conformance IR registries are not an object")?;
+        for (name, values) in [
+            ("operations", vec!["racf.command"]),
+            ("input_shapes", vec!["racf.command.text"]),
+            ("predicates", vec!["racf.authority.ready"]),
+            ("transitions", vec!["racf.command.transition"]),
+            ("observations", vec!["racf.command.passed"]),
+            ("conditions", vec!["racf.command.diagnostic"]),
+            ("recoveries", Vec::new()),
+            ("drivers", vec!["racf.command.driver"]),
+            ("scenario_steps", Vec::new()),
+            ("failure_points", Vec::new()),
+        ] {
+            replace_string_registry(registries, name, &values)?;
+        }
+        replace_artifact_registry(registries, "oracles", &[])?;
+    }
+
+    let mut rows = spec["rows"]
+        .as_array()
+        .cloned()
+        .ok_or("shared Conformance IR rows are not an array")?;
+    rows.retain(|row| {
+        !row["row_id"]
+            .as_str()
+            .is_some_and(|row_id| row_id.starts_with(RACF_ROW_PREFIX))
+    });
+    let mut obligations = spec["obligations"]
+        .as_array()
+        .cloned()
+        .ok_or("shared Conformance IR obligations are not an array")?;
+    obligations.retain(|obligation| {
+        !obligation["row_id"]
+            .as_str()
+            .is_some_and(|row_id| row_id.starts_with(RACF_ROW_PREFIX))
+    });
+    let mut cases = spec["cases"]
+        .as_array()
+        .cloned()
+        .ok_or("shared Conformance IR cases are not an array")?;
+    cases.retain(|case| {
+        !case["row_id"]
+            .as_str()
+            .is_some_and(|row_id| row_id.starts_with(RACF_ROW_PREFIX))
+    });
+
+    let mut fixtures = Vec::new();
+    for (index, family) in families.iter().enumerate() {
+        let row_id = text(family, "row_id", &catalog_path)?;
+        let sequence = index + 1;
+        let sec_502 = text(family, "work_package", &catalog_path)? == "SEC-502";
+        let mut obligation_ids = vec!["syntax", "malformed"];
+        if sec_502 {
+            obligation_ids.extend(["authorized", "unauthorized"]);
+        }
+        rows.push(json!({
+            "row_id": row_id,
+            "operation": "racf.command",
+            "input": "racf.command.text",
+            "preconditions": ["racf.authority.ready"],
+            "transition": "racf.command.transition",
+            "postconditions": ["racf.command.passed"],
+            "conditions": ["racf.command.diagnostic"],
+            "recovery": Value::Null,
+            "oracle": Value::Null,
+            "applicable_gates": ["recognized", "validated", "executed", "conditioned", "recovered", "differential"],
+            "obligations": obligation_ids
+        }));
+        for (obligation, gates) in [
+            ("syntax", vec!["recognized", "validated"]),
+            ("malformed", vec!["conditioned"]),
+        ] {
+            obligations.push(json!({
+                "row_id": row_id,
+                "obligation_id": obligation,
+                "applicable_gates": gates,
+            }));
+            for gate in gates {
+                push_case(
+                    &mut cases,
+                    &mut fixtures,
+                    row_id,
+                    sequence,
+                    obligation,
+                    gate,
+                );
+            }
+        }
+        if sec_502 {
+            obligations.push(json!({
+                "row_id": row_id,
+                "obligation_id": "authorized",
+                "applicable_gates": ["executed"],
+            }));
+            push_case(
+                &mut cases,
+                &mut fixtures,
+                row_id,
+                sequence,
+                "authorized",
+                "executed",
+            );
+            obligations.push(json!({
+                "row_id": row_id,
+                "obligation_id": "unauthorized",
+                "applicable_gates": ["executed", "conditioned"],
+            }));
+            for gate in ["executed", "conditioned"] {
+                push_case(
+                    &mut cases,
+                    &mut fixtures,
+                    row_id,
+                    sequence,
+                    "unauthorized",
+                    gate,
+                );
+            }
+        }
+    }
+    spec["rows"] = Value::Array(rows);
+    spec["obligations"] = Value::Array(obligations);
+    spec["cases"] = Value::Array(cases);
+    let registries = spec["registries"]
+        .as_object_mut()
+        .ok_or("shared Conformance IR registries are not an object")?;
+    replace_artifact_registry(registries, "fixtures", &fixtures)?;
+    let mut bytes = serde_json::to_vec_pretty(&spec).map_err(|error| error.to_string())?;
+    bytes.push(b'\n');
+    Ok(bytes)
+}
+
+fn push_case(
+    cases: &mut Vec<Value>,
+    fixtures: &mut Vec<(String, String)>,
+    row_id: &str,
+    sequence: usize,
+    obligation: &str,
+    gate: &str,
+) {
+    let test_id = format!("racf.command.{sequence:04}.{obligation}.{gate}");
+    let fixture = format!("{test_id}.fixture");
+    let digest = format!("sha256:{:x}", Sha256::digest(fixture.as_bytes()));
+    fixtures.push((fixture.clone(), digest));
+    cases.push(json!({
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": row_id,
+        "obligation_id": obligation,
+        "gate": gate,
+        "test_id": test_id,
+        "driver": "racf.command.driver",
+        "input": fixture,
+        "preconditions": ["racf.authority.ready"],
+        "expected": ["racf.command.passed"],
+        "recovery": Value::Null,
+        "oracle": Value::Null,
+    }));
+}
+
+fn replace_string_registry(
+    registries: &mut serde_json::Map<String, Value>,
+    name: &str,
+    additions: &[&str],
+) -> TaskResult {
+    let values = registries
+        .get_mut(name)
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| format!("shared Conformance IR registry {name} is not an array"))?;
+    values.retain(|value| {
+        !value
+            .as_str()
+            .is_some_and(|value| value.starts_with("racf."))
+    });
+    values.extend(additions.iter().map(|value| Value::String((*value).into())));
+    values.sort_by(|left, right| left.as_str().cmp(&right.as_str()));
+    Ok(())
+}
+
+fn replace_artifact_registry(
+    registries: &mut serde_json::Map<String, Value>,
+    name: &str,
+    additions: &[(String, String)],
+) -> TaskResult {
+    let values = registries
+        .get_mut(name)
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| format!("shared Conformance IR registry {name} is not an array"))?;
+    values.retain(|value| {
+        !value["id"]
+            .as_str()
+            .is_some_and(|value| value.starts_with("racf."))
+    });
+    values.extend(
+        additions
+            .iter()
+            .map(|(id, digest)| json!({"id": id, "digest": digest})),
+    );
+    values.sort_by(|left, right| left["id"].as_str().cmp(&right["id"].as_str()));
+    Ok(())
+}
+
+fn render(root: &Path) -> TaskResult<Vec<u8>> {
+    let catalog_path = root.join(CATALOG_PATH);
+    let catalog = json(&catalog_path)?;
+    validate_schema_instance(&json(&root.join(SCHEMA_PATH))?, &catalog, &catalog_path)?;
+    let families = array(&catalog, "families", &catalog_path)?;
+    require(
+        families.len() == 34,
+        "RACF command catalog must contain 34 families",
+    )?;
+    let official_path = root.join("conformance/0.2/catalogs/racf-saf.json");
+    let official = json(&official_path)?;
+    let units = array(&official, "units", &official_path)?;
+    let official_rows = array(&units[0], "rows", &official_path)?;
+    require(
+        official_rows.len() == families.len(),
+        "RACF generated/official command denominators differ",
+    )?;
+
+    let mut variants = BTreeSet::new();
+    let mut selectors = BTreeSet::new();
+    for (index, family) in families.iter().enumerate() {
+        let variant = text(family, "variant", &catalog_path)?;
+        let keyword = text(family, "keyword", &catalog_path)?;
+        require(
+            variants.insert(variant),
+            &format!("duplicate RACF command variant {variant}"),
+        )?;
+        require(
+            selectors.insert(keyword),
+            &format!("duplicate RACF command keyword {keyword}"),
+        )?;
+        for alias in string_array(family, "aliases", &catalog_path)? {
+            require(
+                selectors.insert(alias),
+                &format!("duplicate RACF command selector {alias}"),
+            )?;
+        }
+        let row_id = text(family, "row_id", &catalog_path)?;
+        require(
+            text(&official_rows[index], "id", &official_path)? == row_id,
+            &format!("RACF command row order/identity drifted at {row_id}"),
+        )?;
+        let official_keyword = text(&official_rows[index], "label", &official_path)?
+            .split_whitespace()
+            .next()
+            .ok_or("official RACF label is empty")?;
+        require(
+            official_keyword == keyword,
+            &format!("RACF command keyword differs from official row {row_id}"),
+        )?;
+        let min = integer(family, "min_positionals", &catalog_path)?;
+        let max = integer(family, "max_positionals", &catalog_path)?;
+        require(
+            min <= max,
+            &format!("RACF positional bounds invert for {keyword}"),
+        )?;
+        let operands = string_array(family, "operands", &catalog_path)?;
+        let unique = operands.iter().copied().collect::<BTreeSet<_>>();
+        require(
+            unique.len() == operands.len(),
+            &format!("duplicate RACF operand for {keyword}"),
+        )?;
+    }
+
+    let mut out = String::from(
+        "// @generated by `cargo xtask racf-catalog`; do not edit.\n\n\
+         #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]\n\
+         pub enum CommandFamily {\n",
+    );
+    for family in families {
+        out.push_str("    ");
+        out.push_str(text(family, "variant", &catalog_path)?);
+        out.push_str(",\n");
+    }
+    out.push_str("}\n\npub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[\n");
+    for family in families {
+        out.push_str("    CommandDescriptor {\n");
+        out.push_str(&format!(
+            "        family: CommandFamily::{},\n        row_id: {:?},\n        keyword: {:?},\n",
+            text(family, "variant", &catalog_path)?,
+            text(family, "row_id", &catalog_path)?,
+            text(family, "keyword", &catalog_path)?,
+        ));
+        out.push_str("        aliases: &[");
+        separated_strings(&mut out, string_array(family, "aliases", &catalog_path)?);
+        out.push_str("],\n");
+        out.push_str(&format!(
+            "        domain: CommandDomain::{},\n        work_package: {:?},\n        mutating: {},\n        command_direction: {},\n        min_positionals: {},\n        max_positionals: {},\n",
+            rust_domain(text(family, "domain", &catalog_path)?)?,
+            text(family, "work_package", &catalog_path)?,
+            boolean(family, "mutating", &catalog_path)?,
+            boolean(family, "command_direction", &catalog_path)?,
+            integer(family, "min_positionals", &catalog_path)?,
+            integer(family, "max_positionals", &catalog_path)?,
+        ));
+        out.push_str("        operands: &[");
+        separated_strings(&mut out, string_array(family, "operands", &catalog_path)?);
+        out.push_str("],\n    },\n");
+    }
+    out.push_str("];\n");
+    Ok(out.into_bytes())
+}
+
+fn string_array<'a>(value: &'a Value, field: &str, path: &Path) -> TaskResult<Vec<&'a str>> {
+    array(value, field, path)?
+        .iter()
+        .map(|entry| {
+            entry
+                .as_str()
+                .ok_or_else(|| format!("{} {field} contains a non-string", path.display()))
+        })
+        .collect()
+}
+
+fn integer(value: &Value, field: &str, path: &Path) -> TaskResult<u64> {
+    value[field]
+        .as_u64()
+        .ok_or_else(|| format!("{} {field} is not an unsigned integer", path.display()))
+}
+
+fn boolean(value: &Value, field: &str, path: &Path) -> TaskResult<bool> {
+    value[field]
+        .as_bool()
+        .ok_or_else(|| format!("{} {field} is not a boolean", path.display()))
+}
+
+fn separated_strings(out: &mut String, values: Vec<&str>) {
+    for (index, value) in values.into_iter().enumerate() {
+        if index > 0 {
+            out.push_str(", ");
+        }
+        out.push_str(&format!("{value:?}"));
+    }
+}
+
+fn rust_domain(value: &str) -> TaskResult<&'static str> {
+    match value {
+        "group" => Ok("Group"),
+        "dataset" => Ok("Dataset"),
+        "user" => Ok("User"),
+        "connection" => Ok("Connection"),
+        "resource" => Ok("Resource"),
+        "query" => Ok("Query"),
+        "policy" => Ok("Policy"),
+        "identity" => Ok("Identity"),
+        "operations" => Ok("Operations"),
+        _ => Err(format!("unknown RACF command domain {value}")),
+    }
+}
