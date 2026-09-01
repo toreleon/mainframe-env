@@ -4,13 +4,17 @@ use crate::command::{
     ParsedOperand, diagnostic, parse_command,
 };
 use crate::model::{
-    AccessControlEntry, AccessLevel, AuditFieldValue, AuditPolicy, ClassDescriptor,
-    DatabaseSharingMode, DecisionOutcome, DecisionReason, GroupAuthority, GroupConnection,
-    GroupProfile, PrincipalKind, PrincipalProfile, PrincipalState, ProfileSegment, ProfileTemplate,
-    RaclistCache, ResourceProfile, SafStatus, SecurityAuditRecord, SecurityDatabaseSnapshot,
-    SecurityTransaction, SegmentFieldKind, SegmentFieldSchema, SegmentTemplate, SegmentValue,
-    TransactionState, connection_key, profile_key,
+    AccessControlEntry, AccessLevel, AssociationState, AuditFieldValue, AuditPolicy,
+    CertificateReference, ClassDescriptor, DatabaseSharingMode, DecisionOutcome, DecisionReason,
+    GroupAuthority, GroupConnection, GroupProfile, IdentityMapping, KeyReference, KeyRing,
+    MfaFactor, MfaFactorKind, PrincipalKind, PrincipalProfile, PrincipalState, ProfileSegment,
+    ProfileTemplate, RaclistCache, ResourceProfile, RrsfNode, RrsfNodeState, SafStatus,
+    SecurityAuditRecord, SecurityDatabaseSnapshot, SecurityTransaction, SegmentFieldKind,
+    SegmentFieldSchema, SegmentTemplate, SegmentValue, SignonSessionState, TransactionState,
+    UserAssociation, connection_key, keyring_key, profile_key,
 };
+use argon2::Argon2;
+use argon2::password_hash::{PasswordVerifier, phc::PasswordHash};
 use mainframe_env_execution_api::PrincipalId;
 use mainframe_env_host_api::HostProblem;
 use sha2::{Digest, Sha256};
@@ -143,6 +147,51 @@ pub enum CommandRecord {
         database_active: bool,
         database_sharing: DatabaseSharingMode,
     },
+    Certificate {
+        id: String,
+        owner: String,
+        label: String,
+        fingerprint_sha256: String,
+        trusted: bool,
+        active: bool,
+        version: u64,
+    },
+    Keyring {
+        owner: String,
+        name: String,
+        certificates: BTreeSet<String>,
+        default_certificate: Option<String>,
+        version: u64,
+    },
+    IdentityMapping {
+        id: String,
+        registry: String,
+        distributed_identity: String,
+        local_user: String,
+        version: u64,
+    },
+    Association {
+        id: String,
+        local_user: String,
+        node: String,
+        remote_user: String,
+        active: bool,
+        version: u64,
+    },
+    RrsfNode {
+        name: String,
+        operative: bool,
+        description: Option<String>,
+        protocol: Option<String>,
+        version: u64,
+    },
+    Session {
+        id: String,
+        user: String,
+        node: Option<String>,
+        active: bool,
+        version: u64,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -173,7 +222,10 @@ pub(crate) fn execute(
     input: &str,
 ) -> Result<CommandResult, CommandDiagnostic> {
     let parsed = parse_command(input, CommandLanguageLimits::default())?;
-    if !matches!(parsed.descriptor.work_package(), "SEC-502" | "SEC-503") {
+    if !matches!(
+        parsed.descriptor.work_package(),
+        "SEC-502" | "SEC-503" | "SEC-505"
+    ) {
         return Err(diagnostic(CommandDiagnosticCode::UnsupportedFamily, 0));
     }
     let request_digest = format!("sha256:{:x}", Sha256::digest(input.as_bytes()));
@@ -307,6 +359,12 @@ fn apply_mutation(
         CommandFamily::Set => set_operational_options(snapshot, context, command),
         CommandFamily::Setropts => setropts(snapshot, context, command),
         CommandFamily::Stop => stop(snapshot, context),
+        CommandFamily::Password => password(service, snapshot, context, command),
+        CommandFamily::Racdcert => racdcert(snapshot, context, command),
+        CommandFamily::Raclink => raclink(snapshot, context, command),
+        CommandFamily::Racmap => racmap(snapshot, context, command),
+        CommandFamily::Signoff => signoff(snapshot, context, command),
+        CommandFamily::Target => target(snapshot, context, command),
         _ => Err(SemanticProblem::Invalid(0)),
     }
 }
@@ -318,12 +376,7 @@ fn apply_query(
 ) -> Result<Vec<CommandRecord>, SemanticProblem> {
     require_active(snapshot, context)?;
     match command.descriptor.family() {
-        CommandFamily::Display => Ok(vec![CommandRecord::Summary {
-            users: snapshot.principals.len(),
-            groups: snapshot.groups.len(),
-            profiles: snapshot.profiles.len(),
-            generation: snapshot.generation,
-        }]),
+        CommandFamily::Display => display(snapshot, context, command),
         CommandFamily::ListUser => list_users(snapshot, context, command),
         CommandFamily::ListGrp => list_groups(snapshot, command),
         CommandFamily::ListDsd => list_profiles(snapshot, "DATASET", command, 0),
@@ -335,6 +388,578 @@ fn apply_query(
         CommandFamily::Racprmck => validate_parmlib_members(command),
         _ => Err(SemanticProblem::Invalid(0)),
     }
+}
+
+fn password(
+    service: &RacfService,
+    snapshot: &mut SecurityDatabaseSnapshot,
+    context: &CommandContext,
+    command: &ParsedCommand,
+) -> Result<Vec<CommandRecord>, SemanticProblem> {
+    let target =
+        operand_principal(command, "USER")?.unwrap_or_else(|| context.actor().as_str().to_string());
+    if target != context.actor().as_str() && !is_special(snapshot, context) {
+        return Err(SemanticProblem::Unauthorized);
+    }
+    let operand = command
+        .operand("PASSWORD")
+        .or_else(|| command.operand("PHRASE"))
+        .ok_or(SemanticProblem::Invalid(0))?;
+    let values = operand.values().collect::<Vec<_>>();
+    if values.is_empty() || values.len() > 2 {
+        return Err(SemanticProblem::Invalid(operand.offset));
+    }
+    let current = snapshot
+        .principals
+        .get(&target)
+        .cloned()
+        .ok_or(SemanticProblem::NotFound)?;
+    let changing_self = target == context.actor().as_str();
+    if changing_self {
+        let old = (values.len() == 2)
+            .then_some(values[0])
+            .ok_or(SemanticProblem::Invalid(operand.offset))?;
+        let credential = current
+            .credential
+            .as_ref()
+            .ok_or(SemanticProblem::Invalid(operand.offset))?;
+        let parsed = PasswordHash::new(&credential.encoded_verifier)
+            .map_err(|_| SemanticProblem::Conflict)?;
+        if Argon2::default()
+            .verify_password(old.as_bytes(), &parsed)
+            .is_err()
+        {
+            return Err(SemanticProblem::Unauthorized);
+        }
+    }
+    let new_secret = values[values.len() - 1];
+    let minimum = if command.operand("PHRASE").is_some() {
+        snapshot.policy.phrase_minimum
+    } else {
+        snapshot.policy.password_minimum
+    };
+    if new_secret.len() < minimum || new_secret.len() > snapshot.policy.password_maximum {
+        return Err(SemanticProblem::Invalid(operand.offset));
+    }
+    let replacement = service
+        .password_principal_from_bytes(&target, new_secret.as_bytes())
+        .map_err(|_| SemanticProblem::Invalid(operand.offset))?;
+    let mut next = current;
+    let new_credential = replacement
+        .credential
+        .ok_or(SemanticProblem::Invalid(operand.offset))?;
+    let new_digest = verifier_digest(&new_credential.encoded_verifier);
+    if next.credential.as_ref().is_some_and(|credential| {
+        credential.encoded_verifier == new_credential.encoded_verifier
+            || credential.history_digests.contains(&new_digest)
+    }) {
+        return Err(SemanticProblem::Conflict);
+    }
+    let mut history = next
+        .credential
+        .as_ref()
+        .map_or_else(Vec::new, |credential| credential.history_digests.clone());
+    if let Some(credential) = &next.credential {
+        history.push(verifier_digest(&credential.encoded_verifier));
+    }
+    let retain = snapshot.policy.password_history;
+    if history.len() > retain {
+        history.drain(..history.len() - retain);
+    }
+    next.credential = Some(crate::model::CredentialVerifier {
+        algorithm: new_credential.algorithm,
+        encoded_verifier: new_credential.encoded_verifier,
+        changed_tick: context.tick(),
+        history_digests: history,
+    });
+    next.state = PrincipalState::Active;
+    next.version = checked_version(next.version)?;
+    snapshot.principals.insert(target.clone(), next);
+    Ok(vec![CommandRecord::Name {
+        kind: CommandObjectKind::User,
+        name: target,
+    }])
+}
+
+fn racdcert(
+    snapshot: &mut SecurityDatabaseSnapshot,
+    context: &CommandContext,
+    command: &ParsedCommand,
+) -> Result<Vec<CommandRecord>, SemanticProblem> {
+    let owner =
+        operand_principal(command, "ID")?.unwrap_or_else(|| context.actor().as_str().to_string());
+    if owner != context.actor().as_str() && !is_special(snapshot, context) {
+        return Err(SemanticProblem::Unauthorized);
+    }
+    require_principal(snapshot, &owner)?;
+    let actions = [
+        "ADD",
+        "ALTER",
+        "CHECKCERT",
+        "CONNECT",
+        "DELETE",
+        "DISCONNECT",
+        "EXPORT",
+        "GENCERT",
+        "GENREQ",
+        "IMPORT",
+        "LIST",
+        "LISTCHAIN",
+        "START",
+        "STOP",
+    ]
+    .into_iter()
+    .filter_map(|name| command.operand(name).map(|operand| (name, operand)))
+    .collect::<Vec<_>>();
+    if actions.len() != 1 {
+        return Err(SemanticProblem::Invalid(0));
+    }
+    let (action, operand) = actions[0];
+    match action {
+        "ADD" | "GENCERT" | "IMPORT" => {
+            require_special(snapshot, context)?;
+            let id = inner_first_name(operand)?;
+            let certificate_reference =
+                inner_value(operand, "CERTREF").ok_or(SemanticProblem::Invalid(operand.offset))?;
+            let fingerprint = inner_value(operand, "FINGERPRINT")
+                .ok_or(SemanticProblem::Invalid(operand.offset))?;
+            let fingerprint = normalized_digest(fingerprint)?;
+            let reference = normalized_reference(certificate_reference)?;
+            let label = inner_value(operand, "LABEL").unwrap_or(&id).to_string();
+            if snapshot.certificates.contains_key(&id) {
+                return Err(SemanticProblem::Conflict);
+            }
+            snapshot.certificates.insert(
+                id.clone(),
+                CertificateReference {
+                    id: id.clone(),
+                    owner: owner.clone(),
+                    label,
+                    certificate_reference: reference,
+                    fingerprint_sha256: fingerprint,
+                    trusted: inner_flag(operand, "TRUST"),
+                    active: true,
+                    not_before_tick: None,
+                    not_after_tick: None,
+                    version: 1,
+                },
+            );
+            if let (Some(key_id), Some(key_reference)) = (
+                inner_value(operand, "KEYID"),
+                inner_value(operand, "KEYREF"),
+            ) {
+                let key_id = bounded_upper(key_id, 246, false)?;
+                if snapshot.keys.contains_key(&key_id) {
+                    return Err(SemanticProblem::Conflict);
+                }
+                snapshot.keys.insert(
+                    key_id.clone(),
+                    KeyReference {
+                        id: key_id,
+                        owner: owner.clone(),
+                        key_reference: normalized_reference(key_reference)?,
+                        algorithm: inner_value(operand, "ALGORITHM")
+                            .unwrap_or("REFERENCE")
+                            .to_string(),
+                        exportable: inner_flag(operand, "EXPORTABLE"),
+                        version: 1,
+                    },
+                );
+            }
+            Ok(vec![certificate_record(&snapshot.certificates[&id])])
+        }
+        "DELETE" => {
+            let id = inner_first_name(operand)?;
+            let certificate = snapshot
+                .certificates
+                .get(&id)
+                .ok_or(SemanticProblem::NotFound)?;
+            if certificate.owner != owner && !is_special(snapshot, context) {
+                return Err(SemanticProblem::Unauthorized);
+            }
+            if snapshot
+                .keyrings
+                .values()
+                .any(|ring| ring.certificates.contains(&id))
+            {
+                return Err(SemanticProblem::Conflict);
+            }
+            snapshot.certificates.remove(&id);
+            Ok(vec![CommandRecord::Name {
+                kind: CommandObjectKind::ResourceProfile,
+                name: id,
+            }])
+        }
+        "CONNECT" | "DISCONNECT" => {
+            let certificate_id = inner_first_name(operand)?;
+            let ring_name = inner_value(operand, "RING")
+                .or_else(|| command.operand("RING").and_then(ParsedOperand::first))
+                .ok_or(SemanticProblem::Invalid(operand.offset))?;
+            let ring_name = bounded_upper(ring_name, 246, false)?;
+            if !snapshot.certificates.contains_key(&certificate_id) {
+                return Err(SemanticProblem::NotFound);
+            }
+            let key = keyring_key(&owner, &ring_name);
+            let ring = snapshot.keyrings.entry(key).or_insert(KeyRing {
+                owner: owner.clone(),
+                name: ring_name.clone(),
+                certificates: BTreeSet::new(),
+                default_certificate: None,
+                version: 1,
+            });
+            if action == "CONNECT" {
+                ring.certificates.insert(certificate_id.clone());
+                if inner_flag(operand, "DEFAULT") {
+                    ring.default_certificate = Some(certificate_id);
+                }
+            } else {
+                ring.certificates.remove(&certificate_id);
+                if ring.default_certificate.as_ref() == Some(&certificate_id) {
+                    ring.default_certificate = None;
+                }
+            }
+            ring.version = checked_version(ring.version)?;
+            Ok(vec![keyring_record(ring)])
+        }
+        "START" | "STOP" | "ALTER" => {
+            let id = inner_first_name(operand)?;
+            let special = is_special(snapshot, context);
+            let certificate = snapshot
+                .certificates
+                .get_mut(&id)
+                .ok_or(SemanticProblem::NotFound)?;
+            if certificate.owner != owner && !special {
+                return Err(SemanticProblem::Unauthorized);
+            }
+            if action == "START" {
+                certificate.active = true;
+            } else if action == "STOP" {
+                certificate.active = false;
+            }
+            if action == "ALTER" {
+                if inner_flag(operand, "TRUST") {
+                    certificate.trusted = true;
+                }
+                if inner_flag(operand, "NOTRUST") {
+                    certificate.trusted = false;
+                }
+            }
+            certificate.version = checked_version(certificate.version)?;
+            Ok(vec![certificate_record(certificate)])
+        }
+        "CHECKCERT" | "EXPORT" | "GENREQ" => {
+            let id = inner_first_name(operand)?;
+            let certificate = snapshot
+                .certificates
+                .get(&id)
+                .ok_or(SemanticProblem::NotFound)?;
+            Ok(vec![certificate_record(certificate)])
+        }
+        "LIST" | "LISTCHAIN" => Ok(snapshot
+            .certificates
+            .values()
+            .filter(|certificate| certificate.owner == owner)
+            .map(certificate_record)
+            .collect()),
+        _ => Err(SemanticProblem::Invalid(operand.offset)),
+    }
+}
+
+fn raclink(
+    snapshot: &mut SecurityDatabaseSnapshot,
+    context: &CommandContext,
+    command: &ParsedCommand,
+) -> Result<Vec<CommandRecord>, SemanticProblem> {
+    let local_user = upper_principal(command.positional(0).ok_or(SemanticProblem::Invalid(0))?)?;
+    if local_user != context.actor().as_str() && !is_special(snapshot, context) {
+        return Err(SemanticProblem::Unauthorized);
+    }
+    require_principal(snapshot, &local_user)?;
+    if let Some(operand) = command.operand("DEFINE") {
+        let values = operand.values().collect::<Vec<_>>();
+        if values.len() < 2 {
+            return Err(SemanticProblem::Invalid(operand.offset));
+        }
+        let node = bounded_upper(values[0], 32, false)?;
+        let remote_user = upper_principal(values[1])?;
+        if !snapshot.rrsf_nodes.contains_key(&node) {
+            return Err(SemanticProblem::NotFound);
+        }
+        let id = format!("{local_user}:{node}");
+        if snapshot.user_associations.contains_key(&id) {
+            return Err(SemanticProblem::Conflict);
+        }
+        let association = UserAssociation {
+            id: id.clone(),
+            local_user: local_user.clone(),
+            node: node.clone(),
+            remote_user: remote_user.clone(),
+            peer: command.has_operand("PEER"),
+            password_sync: command.has_operand("PWDONLY"),
+            state: AssociationState::Active,
+            version: 1,
+        };
+        snapshot.user_associations.insert(id, association.clone());
+        return Ok(vec![association_record(&association)]);
+    }
+    if let Some(operand) = command.operand("UNDEFINE") {
+        let node = bounded_upper(
+            operand
+                .first()
+                .ok_or(SemanticProblem::Invalid(operand.offset))?,
+            32,
+            false,
+        )?;
+        let id = format!("{local_user}:{node}");
+        if snapshot.user_associations.remove(&id).is_none() {
+            return Err(SemanticProblem::NotFound);
+        }
+        return Ok(vec![CommandRecord::Name {
+            kind: CommandObjectKind::Connection,
+            name: id,
+        }]);
+    }
+    if command.has_operand("LIST") {
+        return Ok(snapshot
+            .user_associations
+            .values()
+            .filter(|association| association.local_user == local_user)
+            .map(association_record)
+            .collect());
+    }
+    Err(SemanticProblem::Invalid(0))
+}
+
+fn racmap(
+    snapshot: &mut SecurityDatabaseSnapshot,
+    context: &CommandContext,
+    command: &ParsedCommand,
+) -> Result<Vec<CommandRecord>, SemanticProblem> {
+    let local_user =
+        operand_principal(command, "ID")?.unwrap_or_else(|| context.actor().as_str().to_string());
+    if local_user != context.actor().as_str() && !is_special(snapshot, context) {
+        return Err(SemanticProblem::Unauthorized);
+    }
+    require_principal(snapshot, &local_user)?;
+    if let Some(operand) = command.operand("MAP") {
+        let id = inner_first_name(operand)?;
+        let registry =
+            inner_value(operand, "REGISTRY").ok_or(SemanticProblem::Invalid(operand.offset))?;
+        let distributed_identity =
+            inner_value(operand, "NAME").ok_or(SemanticProblem::Invalid(operand.offset))?;
+        let mapping = IdentityMapping {
+            id: id.clone(),
+            registry: normalized_text(registry, 4096)?,
+            distributed_identity: normalized_text(distributed_identity, 4096)?,
+            local_user,
+            label: inner_value(operand, "LABEL").map(str::to_string),
+            version: 1,
+        };
+        if snapshot
+            .identity_mappings
+            .insert(id, mapping.clone())
+            .is_some()
+        {
+            return Err(SemanticProblem::Conflict);
+        }
+        return Ok(vec![mapping_record(&mapping)]);
+    }
+    for delete in ["DELAPPLE", "DELCERT", "DELDN", "DELNMAP", "DELREGISTRY"] {
+        if let Some(operand) = command.operand(delete) {
+            let id = inner_first_name(operand)?;
+            if snapshot.identity_mappings.remove(&id).is_none() {
+                return Err(SemanticProblem::NotFound);
+            }
+            return Ok(vec![CommandRecord::Name {
+                kind: CommandObjectKind::ResourceProfile,
+                name: id,
+            }]);
+        }
+    }
+    if command.has_operand("LIST") || command.has_operand("QUERY") {
+        return Ok(snapshot
+            .identity_mappings
+            .values()
+            .filter(|mapping| mapping.local_user == local_user)
+            .map(mapping_record)
+            .collect());
+    }
+    Err(SemanticProblem::Invalid(0))
+}
+
+fn signoff(
+    snapshot: &mut SecurityDatabaseSnapshot,
+    context: &CommandContext,
+    command: &ParsedCommand,
+) -> Result<Vec<CommandRecord>, SemanticProblem> {
+    let users = operand_names(command, "USER", 8)?;
+    let everyone = command.has_operand("EVERYONE");
+    if everyone || users.iter().any(|user| user != context.actor().as_str()) {
+        require_special(snapshot, context)?;
+    }
+    let node = operand_name(command, "AT", 32)?;
+    if command.has_operand("LIST") {
+        return Ok(snapshot
+            .signon_sessions
+            .values()
+            .filter(|session| {
+                session.state == SignonSessionState::Active
+                    && (everyone
+                        || if users.is_empty() {
+                            session.user == context.actor().as_str()
+                        } else {
+                            users.contains(&session.user)
+                        })
+                    && node
+                        .as_ref()
+                        .is_none_or(|node| session.node.as_ref() == Some(node))
+            })
+            .map(session_record)
+            .collect());
+    }
+    let mut records = Vec::new();
+    let session_ids = snapshot
+        .signon_sessions
+        .values()
+        .filter(|session| {
+            session.state == SignonSessionState::Active
+                && (everyone
+                    || if users.is_empty() {
+                        session.user == context.actor().as_str()
+                    } else {
+                        users.contains(&session.user)
+                    })
+                && node
+                    .as_ref()
+                    .is_none_or(|node| session.node.as_ref() == Some(node))
+        })
+        .map(|session| session.id.clone())
+        .collect::<Vec<_>>();
+    for session_id in session_ids {
+        let (acee_id, record) = {
+            let session = snapshot
+                .signon_sessions
+                .get_mut(&session_id)
+                .ok_or(SemanticProblem::NotFound)?;
+            let acee_id = session.acee_id.clone();
+            session.state = SignonSessionState::SignedOff;
+            session.version = checked_version(session.version)?;
+            (acee_id, session_record(session))
+        };
+        if let Some(acee) = snapshot.acees.get_mut(&acee_id) {
+            acee.state = crate::AceeState::Deleted;
+            acee.version = checked_version(acee.version)?;
+        }
+        records.push(record);
+    }
+    if records.is_empty() {
+        return Err(SemanticProblem::NotFound);
+    }
+    Ok(records)
+}
+
+fn target(
+    snapshot: &mut SecurityDatabaseSnapshot,
+    context: &CommandContext,
+    command: &ParsedCommand,
+) -> Result<Vec<CommandRecord>, SemanticProblem> {
+    require_special(snapshot, context)?;
+    if let Some(operand) = command.operand("DELETE") {
+        let node = bounded_upper(
+            operand
+                .first()
+                .ok_or(SemanticProblem::Invalid(operand.offset))?,
+            32,
+            false,
+        )?;
+        if snapshot
+            .user_associations
+            .values()
+            .any(|association| association.node == node)
+        {
+            return Err(SemanticProblem::Conflict);
+        }
+        if snapshot.rrsf_nodes.remove(&node).is_none() {
+            return Err(SemanticProblem::NotFound);
+        }
+        return Ok(vec![CommandRecord::Name {
+            kind: CommandObjectKind::Database,
+            name: node,
+        }]);
+    }
+    if let Some(operand) = command.operand("NODE") {
+        let node = bounded_upper(
+            operand
+                .first()
+                .ok_or(SemanticProblem::Invalid(operand.offset))?,
+            32,
+            false,
+        )?;
+        let current_version = snapshot.rrsf_nodes.get(&node).map(|node| node.version);
+        let record = RrsfNode {
+            name: node.clone(),
+            description: command
+                .operand("DESCRIPTION")
+                .and_then(ParsedOperand::first)
+                .map(str::to_string),
+            protocol: command
+                .operand("PROTOCOL")
+                .and_then(ParsedOperand::first)
+                .map(str::to_ascii_uppercase),
+            prefix: command
+                .operand("PREFIX")
+                .and_then(ParsedOperand::first)
+                .map(str::to_ascii_uppercase),
+            workspace_limit: command
+                .operand("WORKSPACE")
+                .and_then(ParsedOperand::first)
+                .map_or(Ok(0), |value| {
+                    value
+                        .parse()
+                        .map_err(|_| SemanticProblem::Invalid(operand.offset))
+                })?,
+            state: if command.has_operand("DORMANT") {
+                RrsfNodeState::Dormant
+            } else {
+                RrsfNodeState::Operative
+            },
+            version: current_version.map_or(Ok(1), checked_version)?,
+        };
+        snapshot.rrsf_nodes.insert(node, record.clone());
+        return Ok(vec![node_record(&record)]);
+    }
+    if command.has_operand("LIST") {
+        return Ok(snapshot.rrsf_nodes.values().map(node_record).collect());
+    }
+    Err(SemanticProblem::Invalid(0))
+}
+
+fn display(
+    snapshot: &SecurityDatabaseSnapshot,
+    context: &CommandContext,
+    command: &ParsedCommand,
+) -> Result<Vec<CommandRecord>, SemanticProblem> {
+    if command.has_operand("SIGNON") || command.has_operand("USER") {
+        let users = operand_names(command, "USER", 8)?;
+        let special = is_auditor_or_special(snapshot, context);
+        let records = snapshot
+            .signon_sessions
+            .values()
+            .filter(|session| {
+                (special && (users.is_empty() || users.contains(&session.user))
+                    || session.user == context.actor().as_str())
+                    && session.state == SignonSessionState::Active
+            })
+            .map(session_record)
+            .collect();
+        return Ok(records);
+    }
+    Ok(vec![CommandRecord::Summary {
+        users: snapshot.principals.len(),
+        groups: snapshot.groups.len(),
+        profiles: snapshot.profiles.len(),
+        generation: snapshot.generation,
+    }])
 }
 
 fn racpriv(
@@ -544,6 +1169,38 @@ fn setropts(
         snapshot.raclist_caches.remove(&class);
     }
     if command.has_operand("REFRESH") && raclist.is_empty() {
+        return Err(SemanticProblem::Invalid(0));
+    }
+    if let Some(operand) = command.operand("PASSWORD") {
+        if let Some(value) = inner_value(operand, "MINIMUM") {
+            snapshot.policy.password_minimum = value
+                .parse()
+                .map_err(|_| SemanticProblem::Invalid(operand.offset))?;
+        }
+        if let Some(value) = inner_value(operand, "MAXIMUM") {
+            snapshot.policy.password_maximum = value
+                .parse()
+                .map_err(|_| SemanticProblem::Invalid(operand.offset))?;
+        }
+        if let Some(value) = inner_value(operand, "HISTORY") {
+            snapshot.policy.password_history = value
+                .parse()
+                .map_err(|_| SemanticProblem::Invalid(operand.offset))?;
+        }
+    }
+    if let Some(operand) = command.operand("PHRASE")
+        && let Some(value) = inner_value(operand, "MINIMUM")
+    {
+        snapshot.policy.phrase_minimum = value
+            .parse()
+            .map_err(|_| SemanticProblem::Invalid(operand.offset))?;
+    }
+    if snapshot.policy.password_minimum == 0
+        || snapshot.policy.password_minimum > snapshot.policy.password_maximum
+        || snapshot.policy.phrase_minimum < snapshot.policy.password_minimum
+        || snapshot.policy.phrase_minimum > snapshot.policy.password_maximum
+        || snapshot.policy.password_history > 128
+    {
         return Err(SemanticProblem::Invalid(0));
     }
     let consumed = [
@@ -787,6 +1444,7 @@ fn add_user(
         &principal_consumed_operands(),
     )?;
     snapshot.principals.insert(user.clone(), principal);
+    apply_mfa(snapshot, &user, command, context.tick())?;
     if let Some(group) = snapshot.principals[&user].default_group.clone() {
         snapshot.connections.insert(
             connection_key(&user, &group),
@@ -907,6 +1565,7 @@ fn alter_user(
     )?;
     next.version = checked_version(next.version)?;
     snapshot.principals.insert(user.clone(), next);
+    apply_mfa(snapshot, &user, command, context.tick())?;
     Ok(vec![CommandRecord::Name {
         kind: CommandObjectKind::User,
         name: user,
@@ -1055,6 +1714,31 @@ fn delete_users(
             || snapshot.groups.values().any(|group| group.owner == user)
             || snapshot.acees.values().any(|acee| acee.principal == user)
             || snapshot.tokens.values().any(|token| token.owner == user)
+            || snapshot
+                .certificates
+                .values()
+                .any(|certificate| certificate.owner == user)
+            || snapshot.keys.values().any(|key| key.owner == user)
+            || snapshot
+                .keyrings
+                .values()
+                .any(|keyring| keyring.owner == user)
+            || snapshot
+                .mfa_factors
+                .values()
+                .any(|factor| factor.owner == user)
+            || snapshot
+                .identity_mappings
+                .values()
+                .any(|mapping| mapping.local_user == user)
+            || snapshot
+                .user_associations
+                .values()
+                .any(|association| association.local_user == user)
+            || snapshot
+                .signon_sessions
+                .values()
+                .any(|session| session.user == user)
         {
             return Err(SemanticProblem::Conflict);
         }
@@ -1850,6 +2534,70 @@ fn update_principal_flags(principal: &mut PrincipalProfile, command: &ParsedComm
     }
 }
 
+fn apply_mfa(
+    snapshot: &mut SecurityDatabaseSnapshot,
+    owner: &str,
+    command: &ParsedCommand,
+    tick: u64,
+) -> Result<(), SemanticProblem> {
+    let Some(operand) = command.operand("MFA") else {
+        return Ok(());
+    };
+    let id = inner_first_name(operand)?;
+    if inner_flag(operand, "DELETE") || inner_flag(operand, "INACTIVE") {
+        let factor = snapshot
+            .mfa_factors
+            .get(&id)
+            .ok_or(SemanticProblem::NotFound)?;
+        if factor.owner != owner {
+            return Err(SemanticProblem::Unauthorized);
+        }
+        if inner_flag(operand, "DELETE") {
+            snapshot.mfa_factors.remove(&id);
+        } else {
+            let factor = snapshot
+                .mfa_factors
+                .get_mut(&id)
+                .ok_or(SemanticProblem::NotFound)?;
+            factor.active = false;
+            factor.version = checked_version(factor.version)?;
+        }
+        return Ok(());
+    }
+    let reference = inner_value(operand, "REF")
+        .or_else(|| inner_value(operand, "REFERENCE"))
+        .ok_or(SemanticProblem::Invalid(operand.offset))?;
+    let kind = match inner_value(operand, "TYPE")
+        .unwrap_or("TOTP")
+        .to_ascii_uppercase()
+        .as_str()
+    {
+        "TOTP" => MfaFactorKind::Totp,
+        "WEBAUTHN" => MfaFactorKind::Webauthn,
+        "PASSCODE" => MfaFactorKind::Passcode,
+        "CUSTOM" => MfaFactorKind::Custom,
+        _ => return Err(SemanticProblem::Invalid(operand.offset)),
+    };
+    let version = match snapshot.mfa_factors.get(&id) {
+        Some(factor) if factor.owner != owner => return Err(SemanticProblem::Conflict),
+        Some(factor) => checked_version(factor.version)?,
+        None => 1,
+    };
+    snapshot.mfa_factors.insert(
+        id.clone(),
+        MfaFactor {
+            id,
+            owner: owner.into(),
+            kind,
+            secret_reference: normalized_reference(reference)?,
+            active: !inner_flag(operand, "DORMANT"),
+            created_tick: tick,
+            version,
+        },
+    );
+    Ok(())
+}
+
 fn principal_consumed_operands() -> Vec<&'static str> {
     vec![
         "OWNER",
@@ -1867,6 +2615,7 @@ fn principal_consumed_operands() -> Vec<&'static str> {
         "NORESTRICTED",
         "REVOKE",
         "RESUME",
+        "MFA",
     ]
 }
 
@@ -1912,6 +2661,62 @@ fn operand_text(operand: &ParsedOperand) -> String {
     } else {
         operand.values().collect::<Vec<_>>().join(" ")
     }
+}
+
+fn verifier_digest(value: &str) -> String {
+    format!("sha256:{:x}", Sha256::digest(value.as_bytes()))
+}
+
+fn normalized_digest(value: &str) -> Result<String, SemanticProblem> {
+    if value.len() == 71
+        && value.starts_with("sha256:")
+        && value[7..].bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        Ok(value.to_ascii_lowercase())
+    } else {
+        Err(SemanticProblem::Invalid(0))
+    }
+}
+
+fn normalized_reference(value: &str) -> Result<String, SemanticProblem> {
+    if value.is_empty()
+        || value.len() > 4096
+        || !value.contains(':')
+        || value.contains(char::is_whitespace)
+        || value.to_ascii_uppercase().contains("BEGIN ")
+    {
+        Err(SemanticProblem::Invalid(0))
+    } else {
+        Ok(value.into())
+    }
+}
+
+fn normalized_text(value: &str, max: usize) -> Result<String, SemanticProblem> {
+    if value.is_empty() || value.len() > max || value.chars().any(char::is_control) {
+        Err(SemanticProblem::Invalid(0))
+    } else {
+        Ok(value.into())
+    }
+}
+
+fn inner_first_name(operand: &ParsedOperand) -> Result<String, SemanticProblem> {
+    operand
+        .first()
+        .ok_or(SemanticProblem::Invalid(operand.offset))
+        .and_then(|value| bounded_upper(value, 246, false))
+}
+
+fn inner_value<'a>(operand: &'a ParsedOperand, name: &str) -> Option<&'a str> {
+    let values = operand.values().collect::<Vec<_>>();
+    values
+        .windows(2)
+        .find_map(|pair| pair[0].eq_ignore_ascii_case(name).then_some(pair[1]))
+}
+
+fn inner_flag(operand: &ParsedOperand, name: &str) -> bool {
+    operand
+        .values()
+        .any(|value| value.eq_ignore_ascii_case(name))
 }
 
 fn operand_principal(
@@ -2041,6 +2846,69 @@ fn profile_record(profile: &ResourceProfile) -> CommandRecord {
         access_entries: profile.access_list.len(),
         segments: profile.segments.keys().cloned().collect(),
         version: profile.version,
+    }
+}
+
+fn certificate_record(certificate: &CertificateReference) -> CommandRecord {
+    CommandRecord::Certificate {
+        id: certificate.id.clone(),
+        owner: certificate.owner.clone(),
+        label: certificate.label.clone(),
+        fingerprint_sha256: certificate.fingerprint_sha256.clone(),
+        trusted: certificate.trusted,
+        active: certificate.active,
+        version: certificate.version,
+    }
+}
+
+fn keyring_record(keyring: &KeyRing) -> CommandRecord {
+    CommandRecord::Keyring {
+        owner: keyring.owner.clone(),
+        name: keyring.name.clone(),
+        certificates: keyring.certificates.clone(),
+        default_certificate: keyring.default_certificate.clone(),
+        version: keyring.version,
+    }
+}
+
+fn mapping_record(mapping: &IdentityMapping) -> CommandRecord {
+    CommandRecord::IdentityMapping {
+        id: mapping.id.clone(),
+        registry: mapping.registry.clone(),
+        distributed_identity: mapping.distributed_identity.clone(),
+        local_user: mapping.local_user.clone(),
+        version: mapping.version,
+    }
+}
+
+fn association_record(association: &UserAssociation) -> CommandRecord {
+    CommandRecord::Association {
+        id: association.id.clone(),
+        local_user: association.local_user.clone(),
+        node: association.node.clone(),
+        remote_user: association.remote_user.clone(),
+        active: association.state == AssociationState::Active,
+        version: association.version,
+    }
+}
+
+fn node_record(node: &RrsfNode) -> CommandRecord {
+    CommandRecord::RrsfNode {
+        name: node.name.clone(),
+        operative: node.state == RrsfNodeState::Operative,
+        description: node.description.clone(),
+        protocol: node.protocol.clone(),
+        version: node.version,
+    }
+}
+
+fn session_record(session: &crate::model::SignonSession) -> CommandRecord {
+    CommandRecord::Session {
+        id: session.id.clone(),
+        user: session.user.clone(),
+        node: session.node.clone(),
+        active: session.state == SignonSessionState::Active,
+        version: session.version,
     }
 }
 
@@ -2274,18 +3142,91 @@ mod tests {
     }
 
     #[test]
-    fn sec_505_families_are_recognized_but_not_executed_early() {
+    fn every_sec_505_family_reaches_its_owned_handler_without_exposing_references() {
         let (service, context) = setup();
-        for form in ["PASSWORD USER(RACFADM)", "RACDCERT LIST", "TARGET LIST"] {
-            assert_ne!(
-                crate::recognize_command(form, Default::default()).unwrap(),
-                CommandFamily::AddUser
-            );
-            assert_eq!(
-                service.execute_command(&context, form).unwrap_err().code,
-                CommandDiagnosticCode::UnsupportedFamily
-            );
+        let fingerprint = format!("sha256:{}", "a".repeat(64));
+        let commands = [
+            "ADDUSER USER1 PASSWORD('USER-PASSWORD') MFA(FACTOR1 REF secret:mfa TYPE TOTP)"
+                .to_string(),
+            "PASSWORD USER(USER1) PASSWORD('NEW-USER-PASSWORD')".into(),
+            "TARGET NODE(NODE1) DESCRIPTION('REMOTE NODE') PROTOCOL(TCP)".into(),
+            "RACLINK USER1 DEFINE(NODE1 REMOTE1)".into(),
+            "RACMAP ID(USER1) MAP(MAP1 REGISTRY LDAP NAME user@example.com LABEL MAPONE)".into(),
+            format!(
+                "RACDCERT ID(USER1) ADD(CERT1 CERTREF secret:cert1 FINGERPRINT {fingerprint} LABEL CERTONE KEYID KEY1 KEYREF secret:key1)"
+            ),
+            "RACDCERT ID(USER1) CONNECT(CERT1 RING RING1 DEFAULT)".into(),
+            "SIGNOFF LIST".into(),
+        ];
+        let mut reached = BTreeSet::new();
+        for (index, command) in commands.iter().enumerate() {
+            let result = service
+                .execute_command(&next(&context, &format!("SEC505-{index}")), command)
+                .unwrap_or_else(|problem| panic!("{command}: {problem}"));
+            reached.insert(result.family);
+            let public = format!("{:?}", result.records);
+            assert!(!public.contains("secret:mfa"));
+            assert!(!public.contains("secret:cert1"));
+            assert!(!public.contains("secret:key1"));
         }
+        assert_eq!(
+            reached,
+            BTreeSet::from([
+                CommandFamily::AddUser,
+                CommandFamily::Password,
+                CommandFamily::Racdcert,
+                CommandFamily::Raclink,
+                CommandFamily::Racmap,
+                CommandFamily::Signoff,
+                CommandFamily::Target,
+            ])
+        );
+        assert_eq!(
+            service
+                .execute_command(
+                    &next(&context, "SEC505-HISTORY"),
+                    "PASSWORD USER(USER1) PASSWORD('USER-PASSWORD')",
+                )
+                .unwrap_err()
+                .code,
+            CommandDiagnosticCode::Conflict
+        );
+        let snapshot = service.database.read().unwrap();
+        let verifier = PasswordHash::new(
+            &snapshot.principals["USER1"]
+                .credential
+                .as_ref()
+                .unwrap()
+                .encoded_verifier,
+        )
+        .unwrap();
+        assert!(
+            Argon2::default()
+                .verify_password(b"NEW-USER-PASSWORD", &verifier)
+                .is_ok()
+        );
+        assert!(
+            Argon2::default()
+                .verify_password(b"USER-PASSWORD", &verifier)
+                .is_err()
+        );
+        assert_eq!(
+            snapshot.mfa_factors["FACTOR1"].secret_reference,
+            "secret:mfa"
+        );
+        assert_eq!(
+            snapshot.certificates["CERT1"].certificate_reference,
+            "secret:cert1"
+        );
+        assert_eq!(snapshot.keys["KEY1"].key_reference, "secret:key1");
+        assert_eq!(
+            snapshot.keyrings[&keyring_key("USER1", "RING1")].default_certificate,
+            Some("CERT1".into())
+        );
+        let audits = format!("{:?}", snapshot.audits);
+        assert!(!audits.contains("secret:mfa"));
+        assert!(!audits.contains("secret:cert1"));
+        assert!(!audits.contains("secret:key1"));
     }
 
     #[test]
@@ -2482,6 +3423,31 @@ mod tests {
                 .unwrap(),
             SecurityDecision::Allow
         );
+        service
+            .execute_command(
+                &next(&context, "POLICY-CREDENTIALS"),
+                "SETROPTS PASSWORD(MINIMUM(10) MAXIMUM(80) HISTORY(4)) PHRASE(MINIMUM(20))",
+            )
+            .unwrap();
+        let snapshot = service.database.read().unwrap();
+        let policy = &snapshot.policy;
+        assert_eq!(policy.password_minimum, 10);
+        assert_eq!(policy.password_maximum, 80);
+        assert_eq!(policy.phrase_minimum, 20);
+        assert_eq!(policy.password_history, 4);
+        assert_eq!(
+            service
+                .execute_command(
+                    &next(&context, "POLICY-CREDENTIALS-INVALID"),
+                    "SETROPTS PASSWORD(MINIMUM(90) MAXIMUM(20))",
+                )
+                .unwrap_err()
+                .code,
+            CommandDiagnosticCode::InvalidValue
+        );
+        let after = service.database.read().unwrap();
+        assert_eq!(after.policy.password_minimum, 10);
+        assert_eq!(after.policy.password_maximum, 80);
     }
 
     #[test]

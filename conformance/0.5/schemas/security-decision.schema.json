@@ -15,7 +15,7 @@
         "saf_return_code": {"type": "integer", "minimum": 0, "maximum": 4294967295},
         "racf_return_code": {"type": "integer", "minimum": 0, "maximum": 4294967295},
         "racf_reason_code": {"type": "integer", "minimum": 0, "maximum": 4294967295},
-        "reason": {"enum": ["granted", "default-deny", "class-inactive", "profile-not-found", "principal-not-found", "principal-inactive", "insufficient-access", "security-label-mismatch", "condition-not-satisfied", "token-invalid", "acee-invalid", "credential-invalid", "policy-unavailable", "store-unavailable", "malformed-request", "unsupported-request", "resource-exhausted", "cancelled", "timed-out", "recovery-required"]}
+        "reason": {"enum": ["granted", "default-deny", "class-inactive", "profile-not-found", "principal-not-found", "principal-inactive", "insufficient-access", "security-label-mismatch", "condition-not-satisfied", "token-invalid", "acee-invalid", "credential-invalid", "mfa-invalid", "policy-unavailable", "store-unavailable", "malformed-request", "unsupported-request", "resource-exhausted", "cancelled", "timed-out", "recovery-required"]}
       }
     },
     "granted_access": {"enum": ["NONE", "EXECUTE", "READ", "UPDATE", "CONTROL", "ALTER"]},

@@ -113,7 +113,7 @@ fn project_spec(root: &Path) -> TaskResult<Vec<u8>> {
         let sequence = index + 1;
         let executable = matches!(
             text(family, "work_package", &catalog_path)?,
-            "SEC-502" | "SEC-503"
+            "SEC-502" | "SEC-503" | "SEC-505"
         );
         let mut obligation_ids = vec!["syntax", "malformed"];
         if executable {

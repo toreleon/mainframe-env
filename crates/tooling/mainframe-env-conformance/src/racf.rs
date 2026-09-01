@@ -464,6 +464,7 @@ fn allowed_request(
             user: principal.clone(),
             credential_reference: SecretRef::new("secret:admin", Default::default())
                 .expect("static secret reference"),
+            mfa_reference: None,
             action: SafVerifyAction::CreateAcee,
             acee_id: None,
             parent_acee: Some(parent_acee.into()),
@@ -549,6 +550,7 @@ fn malformed_request(
             user: principal.clone(),
             credential_reference: SecretRef::new("secret:bad", Default::default())
                 .expect("static secret reference"),
+            mfa_reference: None,
             action: SafVerifyAction::CreateAcee,
             acee_id: None,
             parent_acee: Some(parent_acee.into()),
@@ -645,6 +647,13 @@ fn command_matrix() -> &'static [&'static str] {
         "RVARY LIST",
         "STOP",
         "RESTART",
+        "ADDUSER USER3 PASSWORD('USER-PASSWORD')",
+        "PASSWORD USER(USER3) PASSWORD('NEW-USER-PASSWORD')",
+        "TARGET NODE(NODE1) DESCRIPTION('REMOTE NODE') PROTOCOL(TCP)",
+        "RACLINK USER3 DEFINE(NODE1 REMOTE3)",
+        "RACMAP ID(USER3) MAP(MAP1 REGISTRY LDAP NAME user3@example.com)",
+        "RACDCERT ID(USER3) ADD(CERT1 CERTREF secret:cert1 FINGERPRINT sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)",
+        "SIGNOFF LIST",
     ]
 }
 
@@ -702,10 +711,9 @@ mod tests {
 
     #[test]
     fn all_enabled_command_families_have_executable_and_deny_routes() {
-        for descriptor in command_descriptors()
-            .iter()
-            .filter(|descriptor| matches!(descriptor.work_package(), "SEC-502" | "SEC-503"))
-        {
+        for descriptor in command_descriptors().iter().filter(|descriptor| {
+            matches!(descriptor.work_package(), "SEC-502" | "SEC-503" | "SEC-505")
+        }) {
             execute_matrix(descriptor.family()).unwrap();
             execute_denied(descriptor.family()).unwrap();
         }

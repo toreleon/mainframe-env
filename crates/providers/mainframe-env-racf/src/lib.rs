@@ -22,16 +22,18 @@ pub use command::{
 pub use command_processor::{CommandContext, CommandObjectKind, CommandRecord, CommandResult};
 pub use database::{SecurityDatabase, SecurityDatabaseSummary};
 pub use model::{
-    AccessCondition, AccessControlEntry, AccessLevel, Acee, AceeState, AuditFieldValue,
-    AuditPolicy, CertificateReference, ClassDescriptor, DatabaseSharingMode, DecisionOutcome,
-    DecisionReason, GroupAuthority, GroupConnection, GroupProfile, KeyReference, KeyRing,
-    MigrationState, PrincipalKind, PrincipalProfile, PrincipalState, ProfileSegment,
-    ProfileTemplate, RacfDatabaseStatus, RacfSubsystemState, RaclistCache, RecoveryRecord,
-    RecoveryState, ResourceProfile, SECURITY_DATABASE_SCHEMA, SECURITY_PROFILE_SCHEMA,
+    AccessCondition, AccessControlEntry, AccessLevel, Acee, AceeState, AssociationState,
+    AuditFieldValue, AuditPolicy, CertificateReference, ClassDescriptor, DatabaseSharingMode,
+    DecisionOutcome, DecisionReason, GroupAuthority, GroupConnection, GroupProfile,
+    IdentityMapping, KeyReference, KeyRing, MfaFactor, MfaFactorKind, MigrationState,
+    PrincipalKind, PrincipalProfile, PrincipalState, ProfileSegment, ProfileTemplate,
+    RacfDatabaseStatus, RacfSubsystemState, RaclistCache, RecoveryRecord, RecoveryState,
+    ResourceProfile, RrsfNode, RrsfNodeState, SECURITY_DATABASE_SCHEMA, SECURITY_PROFILE_SCHEMA,
     SECURITY_TRANSACTION_SCHEMA, SafDecision, SafStatus, SecurityAuditRecord,
     SecurityDatabaseLimits, SecurityMigration, SecurityPolicyOptions, SecuritySchemaProblem,
     SecurityToken, SecurityTransaction, SegmentFieldKind, SegmentFieldSchema, SegmentTemplate,
-    SegmentValue, TokenKind, TokenState, TransactionState,
+    SegmentValue, SignonSession, SignonSessionState, TokenKind, TokenState, TransactionState,
+    UserAssociation,
 };
 pub use saf::{
     AccessEnvironment, AceeSummary, ExtractedSecurityRecord, RacrouteOutcome, RacrouteRequest,

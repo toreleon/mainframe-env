@@ -24,6 +24,11 @@ pub struct SecurityDatabaseLimits {
     pub max_tokens: usize,
     pub max_certificates: usize,
     pub max_keyrings: usize,
+    pub max_mfa_factors: usize,
+    pub max_identity_mappings: usize,
+    pub max_user_associations: usize,
+    pub max_rrsf_nodes: usize,
+    pub max_signon_sessions: usize,
     pub max_audits: usize,
     pub max_transactions: usize,
     pub max_recovery_records: usize,
@@ -50,6 +55,11 @@ impl Default for SecurityDatabaseLimits {
             max_tokens: 65_536,
             max_certificates: 65_536,
             max_keyrings: 4096,
+            max_mfa_factors: 16_384,
+            max_identity_mappings: 65_536,
+            max_user_associations: 65_536,
+            max_rrsf_nodes: 4096,
+            max_signon_sessions: 65_536,
             max_audits: 65_536,
             max_transactions: 65_536,
             max_recovery_records: 4096,
@@ -339,6 +349,14 @@ pub struct SecurityPolicyOptions {
     pub set_flags: BTreeMap<String, bool>,
     #[serde(default)]
     pub values: BTreeMap<String, String>,
+    #[serde(default = "default_password_minimum")]
+    pub password_minimum: usize,
+    #[serde(default = "default_password_maximum")]
+    pub password_maximum: usize,
+    #[serde(default = "default_phrase_minimum")]
+    pub phrase_minimum: usize,
+    #[serde(default = "default_password_history")]
+    pub password_history: usize,
 }
 
 impl Default for SecurityPolicyOptions {
@@ -356,6 +374,10 @@ impl Default for SecurityPolicyOptions {
             write_down: false,
             set_flags: BTreeMap::new(),
             values: BTreeMap::new(),
+            password_minimum: default_password_minimum(),
+            password_maximum: default_password_maximum(),
+            phrase_minimum: default_phrase_minimum(),
+            password_history: default_password_history(),
         }
     }
 }
@@ -483,6 +505,8 @@ pub struct CertificateReference {
     pub certificate_reference: String,
     pub fingerprint_sha256: String,
     pub trusted: bool,
+    #[serde(default = "default_true")]
+    pub active: bool,
     pub not_before_tick: Option<u64>,
     pub not_after_tick: Option<u64>,
     pub version: u64,
@@ -511,6 +535,96 @@ pub struct KeyRing {
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
+pub enum MfaFactorKind {
+    Totp,
+    Webauthn,
+    Passcode,
+    Custom,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct MfaFactor {
+    pub id: String,
+    pub owner: String,
+    pub kind: MfaFactorKind,
+    pub secret_reference: String,
+    pub active: bool,
+    pub created_tick: u64,
+    pub version: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct IdentityMapping {
+    pub id: String,
+    pub registry: String,
+    pub distributed_identity: String,
+    pub local_user: String,
+    pub label: Option<String>,
+    pub version: u64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AssociationState {
+    Active,
+    Dormant,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct UserAssociation {
+    pub id: String,
+    pub local_user: String,
+    pub node: String,
+    pub remote_user: String,
+    pub peer: bool,
+    pub password_sync: bool,
+    pub state: AssociationState,
+    pub version: u64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RrsfNodeState {
+    Operative,
+    Dormant,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RrsfNode {
+    pub name: String,
+    pub description: Option<String>,
+    pub protocol: Option<String>,
+    pub prefix: Option<String>,
+    pub workspace_limit: u64,
+    pub state: RrsfNodeState,
+    pub version: u64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SignonSessionState {
+    Active,
+    SignedOff,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SignonSession {
+    pub id: String,
+    pub user: String,
+    pub node: Option<String>,
+    pub acee_id: String,
+    pub created_tick: u64,
+    pub state: SignonSessionState,
+    pub version: u64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum DecisionOutcome {
     Allow,
     Deny,
@@ -532,6 +646,7 @@ pub enum DecisionReason {
     TokenInvalid,
     AceeInvalid,
     CredentialInvalid,
+    MfaInvalid,
     PolicyUnavailable,
     StoreUnavailable,
     MalformedRequest,
@@ -672,6 +787,16 @@ pub(crate) struct SecurityDatabaseSnapshot {
     pub certificates: BTreeMap<String, CertificateReference>,
     pub keys: BTreeMap<String, KeyReference>,
     pub keyrings: BTreeMap<String, KeyRing>,
+    #[serde(default)]
+    pub mfa_factors: BTreeMap<String, MfaFactor>,
+    #[serde(default)]
+    pub identity_mappings: BTreeMap<String, IdentityMapping>,
+    #[serde(default)]
+    pub user_associations: BTreeMap<String, UserAssociation>,
+    #[serde(default)]
+    pub rrsf_nodes: BTreeMap<String, RrsfNode>,
+    #[serde(default)]
+    pub signon_sessions: BTreeMap<String, SignonSession>,
     pub audits: Vec<SecurityAuditRecord>,
     pub transactions: BTreeMap<String, SecurityTransaction>,
     pub recovery: BTreeMap<String, RecoveryRecord>,
@@ -698,6 +823,11 @@ impl Default for SecurityDatabaseSnapshot {
             certificates: BTreeMap::new(),
             keys: BTreeMap::new(),
             keyrings: BTreeMap::new(),
+            mfa_factors: BTreeMap::new(),
+            identity_mappings: BTreeMap::new(),
+            user_associations: BTreeMap::new(),
+            rrsf_nodes: BTreeMap::new(),
+            signon_sessions: BTreeMap::new(),
             audits: Vec::new(),
             transactions: BTreeMap::new(),
             recovery: BTreeMap::new(),
@@ -734,6 +864,11 @@ impl SecurityDatabaseSnapshot {
             (self.tokens.len(), limits.max_tokens),
             (self.certificates.len(), limits.max_certificates),
             (self.keyrings.len(), limits.max_keyrings),
+            (self.mfa_factors.len(), limits.max_mfa_factors),
+            (self.identity_mappings.len(), limits.max_identity_mappings),
+            (self.user_associations.len(), limits.max_user_associations),
+            (self.rrsf_nodes.len(), limits.max_rrsf_nodes),
+            (self.signon_sessions.len(), limits.max_signon_sessions),
             (self.audits.len(), limits.max_audits),
             (self.transactions.len(), limits.max_transactions),
             (self.recovery.len(), limits.max_recovery_records),
@@ -1055,6 +1190,14 @@ impl SecurityDatabaseSnapshot {
             {
                 return Err(SecuritySchemaProblem::MissingReference);
             }
+            if certificate
+                .not_before_tick
+                .zip(certificate.not_after_tick)
+                .is_some_and(|(start, end)| start >= end)
+            {
+                return Err(SecuritySchemaProblem::Malformed);
+            }
+            bounded(&certificate.label, limits.max_value_bytes)?;
             secret_reference(&certificate.certificate_reference, limits.max_value_bytes)?;
             digest_sha256(&certificate.fingerprint_sha256)?;
         }
@@ -1064,8 +1207,12 @@ impl SecurityDatabaseSnapshot {
                 return Err(SecuritySchemaProblem::MissingReference);
             }
             secret_reference(&key.key_reference, limits.max_value_bytes)?;
+            bounded(&key.algorithm, limits.max_value_bytes)?;
         }
         for (id, keyring) in &self.keyrings {
+            identifier(id, limits.max_name_bytes)?;
+            principal_name(&keyring.owner)?;
+            identifier(&keyring.name, limits.max_name_bytes)?;
             if *id != keyring_key(&keyring.owner, &keyring.name)
                 || keyring.version == 0
                 || !self.principals.contains_key(&keyring.owner)
@@ -1077,6 +1224,70 @@ impl SecurityDatabaseSnapshot {
                     .default_certificate
                     .as_ref()
                     .is_some_and(|certificate| !keyring.certificates.contains(certificate))
+            {
+                return Err(SecuritySchemaProblem::MissingReference);
+            }
+        }
+        for (id, factor) in &self.mfa_factors {
+            identifier(id, limits.max_name_bytes)?;
+            if factor.id != *id
+                || factor.version == 0
+                || !self.principals.contains_key(&factor.owner)
+            {
+                return Err(SecuritySchemaProblem::MissingReference);
+            }
+            secret_reference(&factor.secret_reference, limits.max_value_bytes)?;
+        }
+        for (id, mapping) in &self.identity_mappings {
+            identifier(id, limits.max_name_bytes)?;
+            if mapping.id != *id
+                || mapping.version == 0
+                || !self.principals.contains_key(&mapping.local_user)
+            {
+                return Err(SecuritySchemaProblem::MissingReference);
+            }
+            bounded(&mapping.registry, limits.max_value_bytes)?;
+            bounded(&mapping.distributed_identity, limits.max_value_bytes)?;
+            if let Some(label) = &mapping.label {
+                bounded(label, limits.max_value_bytes)?;
+            }
+        }
+        for (id, association) in &self.user_associations {
+            identifier(id, limits.max_name_bytes)?;
+            if association.id != *id
+                || association.version == 0
+                || !self.principals.contains_key(&association.local_user)
+                || !self.rrsf_nodes.contains_key(&association.node)
+            {
+                return Err(SecuritySchemaProblem::MissingReference);
+            }
+            principal_name(&association.remote_user)?;
+        }
+        for (name, node) in &self.rrsf_nodes {
+            identifier(name, limits.max_name_bytes)?;
+            if node.name != *name || node.version == 0 {
+                return Err(SecuritySchemaProblem::Malformed);
+            }
+            if let Some(value) = &node.description {
+                bounded(value, limits.max_value_bytes)?;
+            }
+            if let Some(value) = &node.protocol {
+                identifier(value, limits.max_name_bytes)?;
+            }
+            if let Some(value) = &node.prefix {
+                identifier(value, limits.max_name_bytes)?;
+            }
+        }
+        for (id, session) in &self.signon_sessions {
+            identifier(id, limits.max_name_bytes)?;
+            if session.id != *id
+                || session.version == 0
+                || !self.principals.contains_key(&session.user)
+                || !self.acees.contains_key(&session.acee_id)
+                || session
+                    .node
+                    .as_ref()
+                    .is_some_and(|node| !self.rrsf_nodes.contains_key(node))
             {
                 return Err(SecuritySchemaProblem::MissingReference);
             }
@@ -1112,6 +1323,15 @@ impl SecurityDatabaseSnapshot {
         if self.database_status.switch_generation == 0 || self.subsystem.restart_generation == 0 {
             return Err(SecuritySchemaProblem::Malformed);
         }
+        if self.policy.password_minimum == 0
+            || self.policy.password_minimum > self.policy.password_maximum
+            || self.policy.password_maximum > limits.max_value_bytes
+            || self.policy.phrase_minimum < self.policy.password_minimum
+            || self.policy.phrase_minimum > self.policy.password_maximum
+            || self.policy.password_history > 128
+        {
+            return Err(SecuritySchemaProblem::LimitExceeded);
+        }
         for name in self.policy.set_flags.keys() {
             identifier(name, limits.max_name_bytes)?;
         }
@@ -1144,6 +1364,22 @@ impl SecurityDatabaseSnapshot {
 
 const fn default_true() -> bool {
     true
+}
+
+const fn default_password_minimum() -> usize {
+    8
+}
+
+const fn default_password_maximum() -> usize {
+    100
+}
+
+const fn default_phrase_minimum() -> usize {
+    14
+}
+
+const fn default_password_history() -> usize {
+    8
 }
 
 fn validate_segment_value(

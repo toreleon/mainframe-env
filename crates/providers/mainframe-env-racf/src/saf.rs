@@ -3,8 +3,8 @@ use crate::command::{RacrouteRequestType, racroute_descriptors};
 use crate::model::{
     AccessCondition, AccessLevel, Acee, AceeState, AuditFieldValue, AuditPolicy, DecisionOutcome,
     DecisionReason, PrincipalState, RaclistCache, ResourceProfile, SafDecision, SafStatus,
-    SecurityAuditRecord, SecurityDatabaseSnapshot, SecurityToken, TokenKind, TokenState,
-    profile_key,
+    SecurityAuditRecord, SecurityDatabaseSnapshot, SecurityToken, SignonSession,
+    SignonSessionState, TokenKind, TokenState, profile_key,
 };
 use argon2::Argon2;
 use argon2::password_hash::{PasswordVerifier, phc::PasswordHash};
@@ -187,6 +187,7 @@ pub enum RacrouteRequest {
     Verifyx {
         user: PrincipalId,
         credential_reference: SecretRef,
+        mfa_reference: Option<SecretRef>,
         action: SafVerifyAction,
         acee_id: Option<String>,
         parent_acee: Option<String>,
@@ -323,6 +324,50 @@ pub struct RacrouteOutcome {
     pub generation: u64,
 }
 
+struct MfaProof {
+    factor_id: String,
+    factor_reference: String,
+    valid: bool,
+}
+
+fn build_mfa_proof(
+    service: &RacfService,
+    user: &str,
+    supplied_reference: Option<&SecretRef>,
+) -> Result<Option<MfaProof>, HostProblem> {
+    let snapshot = service.database.read()?;
+    let Some(factor) = snapshot
+        .mfa_factors
+        .values()
+        .find(|factor| factor.owner == user && factor.active)
+        .cloned()
+    else {
+        return Ok(None);
+    };
+    let valid = supplied_reference.is_some_and(|supplied_reference| {
+        let expected_reference = SecretRef::new(&factor.secret_reference, Default::default());
+        expected_reference.is_ok_and(|expected_reference| {
+            service
+                .secrets
+                .resolve(&expected_reference)
+                .ok()
+                .zip(service.secrets.resolve(supplied_reference).ok())
+                .is_some_and(|(expected, supplied)| {
+                    let expected_key = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, &expected);
+                    let supplied_key = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, &supplied);
+                    let supplied_tag = ring::hmac::sign(&supplied_key, b"racf-mfa-proof");
+                    ring::hmac::verify(&expected_key, b"racf-mfa-proof", supplied_tag.as_ref())
+                        .is_ok()
+                })
+        })
+    });
+    Ok(Some(MfaProof {
+        factor_id: factor.id,
+        factor_reference: factor.secret_reference,
+        valid,
+    }))
+}
+
 pub(crate) fn execute(
     service: &RacfService,
     context: &SafRequestContext,
@@ -348,6 +393,14 @@ pub(crate) fn execute(
         } => Some(service.secrets.resolve(credential_reference)?),
         _ => None,
     };
+    let mfa_proof = match &request {
+        RacrouteRequest::Verifyx {
+            user,
+            mfa_reference,
+            ..
+        } => build_mfa_proof(service, user.as_str(), mfa_reference.as_ref())?,
+        _ => None,
+    };
     let request_digest = request_digest(context, &request);
     let ((status, result, mut states), generation) = service.database.mutate_retry(|snapshot| {
         let mut states = vec![RacrouteState::Received, RacrouteState::Validated];
@@ -357,6 +410,7 @@ pub(crate) fn execute(
             context,
             &request,
             secret.as_deref(),
+            mfa_proof.as_ref(),
             &mut states,
         );
         match applied {
@@ -408,6 +462,7 @@ fn apply_request(
     context: &SafRequestContext,
     request: &RacrouteRequest,
     secret: Option<&[u8]>,
+    mfa_proof: Option<&MfaProof>,
     states: &mut Vec<RacrouteState>,
 ) -> Result<(SafStatus, RacrouteResult), DecisionReason> {
     if !snapshot.principals.contains_key(context.caller().as_str()) {
@@ -635,6 +690,7 @@ fn apply_request(
             None,
             None,
             secret,
+            None,
             states,
             true,
         ),
@@ -758,6 +814,7 @@ fn apply_request(
             acee_id.as_deref(),
             None,
             secret,
+            None,
             states,
             false,
         ),
@@ -775,6 +832,7 @@ fn apply_request(
             acee_id.as_deref(),
             parent_acee.as_deref(),
             secret,
+            mfa_proof,
             states,
             false,
         ),
@@ -790,6 +848,7 @@ fn verify_request(
     acee_id: Option<&str>,
     parent_acee: Option<&str>,
     secret: Option<&[u8]>,
+    mfa_proof: Option<&MfaProof>,
     states: &mut Vec<RacrouteState>,
     signon: bool,
 ) -> Result<(SafStatus, RacrouteResult), DecisionReason> {
@@ -811,6 +870,17 @@ fn verify_request(
             .version
             .checked_add(1)
             .ok_or(DecisionReason::ResourceExhausted)?;
+        for session in snapshot
+            .signon_sessions
+            .values_mut()
+            .filter(|session| session.acee_id == id)
+        {
+            session.state = SignonSessionState::SignedOff;
+            session.version = session
+                .version
+                .checked_add(1)
+                .ok_or(DecisionReason::ResourceExhausted)?;
+        }
         states.push(RacrouteState::AceeResolved);
         let decision = decision(DecisionReason::Granted, AccessLevel::None, None, None);
         return Ok((
@@ -821,11 +891,26 @@ fn verify_request(
             },
         ));
     }
-    let reason = verify_credential(
+    let mut reason = verify_credential(
         snapshot,
         user.as_str(),
         secret.ok_or(DecisionReason::CredentialInvalid)?,
     )?;
+    if reason == DecisionReason::Granted {
+        let configured = snapshot
+            .mfa_factors
+            .values()
+            .find(|factor| factor.owner == user.as_str() && factor.active);
+        if let Some(configured) = configured
+            && !mfa_proof.is_some_and(|proof| {
+                proof.valid
+                    && proof.factor_id == configured.id
+                    && proof.factor_reference == configured.secret_reference
+            })
+        {
+            reason = DecisionReason::MfaInvalid;
+        }
+    }
     let mut acee = None;
     if reason == DecisionReason::Granted && action == SafVerifyAction::CreateAcee {
         let created = create_acee(
@@ -840,7 +925,25 @@ fn verify_request(
     }
     let decision = decision(reason, AccessLevel::None, None, None);
     let result = if signon && reason == DecisionReason::Granted {
-        RacrouteResult::SignedOn(acee.clone().ok_or(DecisionReason::AceeInvalid)?)
+        let signed_on = acee.clone().ok_or(DecisionReason::AceeInvalid)?;
+        let session_id = next_id(
+            "SESSION",
+            snapshot.generation,
+            snapshot.signon_sessions.len(),
+        );
+        snapshot.signon_sessions.insert(
+            session_id.clone(),
+            SignonSession {
+                id: session_id,
+                user: signed_on.principal.clone(),
+                node: None,
+                acee_id: signed_on.id.clone(),
+                created_tick: context.tick(),
+                state: SignonSessionState::Active,
+                version: 1,
+            },
+        );
+        RacrouteResult::SignedOn(signed_on)
     } else {
         RacrouteResult::Verified {
             decision: decision.clone(),
@@ -1772,6 +1875,7 @@ mod tests {
                     user: admin.clone(),
                     credential_reference: SecretRef::new("secret:admin", Default::default())
                         .unwrap(),
+                    mfa_reference: None,
                     action: SafVerifyAction::CreateAcee,
                     acee_id: None,
                     parent_acee: Some(admin_acee.clone()),
@@ -1832,6 +1936,109 @@ mod tests {
                 .fields["PASSWORD"],
             AuditFieldValue::Redacted
         );
+    }
+
+    #[test]
+    fn mfa_proofs_and_signoff_sessions_are_durable_and_redacted() {
+        let (service, resolver, admin) = setup();
+        resolver.insert("secret:mfa-enrolled", b"123456".to_vec());
+        resolver.insert("secret:mfa-good", b"123456".to_vec());
+        resolver.insert("secret:mfa-bad", b"654321".to_vec());
+        resolver.insert("secret:user2", b"SECOND-PASSWORD".to_vec());
+        for (index, command) in [
+            "ADDUSER USER1 PASSWORD('USER-PASSWORD') MFA(FACTOR1 REF secret:mfa-enrolled TYPE TOTP)",
+            "ADDUSER USER2 PASSWORD('SECOND-PASSWORD')",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            service
+                .execute_command(
+                    &command_context(&admin, &format!("MFA-SETUP-{index}"), index as u64 + 1),
+                    command,
+                )
+                .unwrap();
+        }
+        let user1 = PrincipalId::new("USER1", InvocationLimits::default()).unwrap();
+        let verifyx = |id: &str, reference: &str, tick: u64| {
+            service
+                .racroute(
+                    &saf_context(&admin, None, id, tick),
+                    RacrouteRequest::Verifyx {
+                        user: user1.clone(),
+                        credential_reference: SecretRef::new("secret:user1", Default::default())
+                            .unwrap(),
+                        mfa_reference: Some(SecretRef::new(reference, Default::default()).unwrap()),
+                        action: SafVerifyAction::CreateAcee,
+                        acee_id: None,
+                        parent_acee: None,
+                    },
+                )
+                .unwrap()
+        };
+        let granted = verifyx("MFA-GOOD", "secret:mfa-good", 10);
+        assert_eq!(granted.status.reason, DecisionReason::Granted);
+        let denied = verifyx("MFA-BAD", "secret:mfa-bad", 11);
+        assert_eq!(denied.status.reason, DecisionReason::MfaInvalid);
+        assert!(matches!(denied.states.last(), Some(RacrouteState::Denied)));
+
+        let user2 = PrincipalId::new("USER2", InvocationLimits::default()).unwrap();
+        let signed_on = service
+            .racroute(
+                &saf_context(&admin, None, "SESSION-SIGNON", 12),
+                RacrouteRequest::Signon {
+                    user: user2,
+                    credential_reference: SecretRef::new("secret:user2", Default::default())
+                        .unwrap(),
+                },
+            )
+            .unwrap();
+        let acee_id = extract_acee(&signed_on);
+        let listed = service
+            .execute_command(
+                &command_context(&admin, "SESSION-LIST", 13),
+                "SIGNOFF USER(USER2) LIST",
+            )
+            .unwrap();
+        assert!(matches!(
+            listed.records.as_slice(),
+            [crate::CommandRecord::Session { active: true, .. }]
+        ));
+        let listed_snapshot = service.database.read().unwrap();
+        assert!(
+            listed_snapshot
+                .signon_sessions
+                .values()
+                .all(|session| session.state == SignonSessionState::Active)
+        );
+        assert_eq!(listed_snapshot.acees[&acee_id].state, AceeState::Active);
+        let result = service
+            .execute_command(
+                &command_context(&admin, "SESSION-SIGNOFF", 14),
+                "SIGNOFF USER(USER2)",
+            )
+            .unwrap();
+        assert!(matches!(
+            result.records.as_slice(),
+            [crate::CommandRecord::Session { active: false, .. }]
+        ));
+        let snapshot = service.database.read().unwrap();
+        assert!(
+            snapshot
+                .signon_sessions
+                .values()
+                .all(|session| session.state == SignonSessionState::SignedOff)
+        );
+        assert_eq!(snapshot.acees[&acee_id].state, AceeState::Deleted);
+        let audits = format!("{:?}", snapshot.audits);
+        for reference in [
+            "secret:mfa-enrolled",
+            "secret:mfa-good",
+            "secret:mfa-bad",
+            "secret:user2",
+        ] {
+            assert!(!audits.contains(reference));
+        }
     }
 
     #[test]

@@ -4,7 +4,7 @@
   "title": "mainframe-env RACF security database v2",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "generation", "classes", "templates", "principals", "groups", "connections", "profiles", "raclist_caches", "policy", "database_status", "subsystem", "acees", "tokens", "certificates", "keys", "keyrings", "audits", "transactions", "recovery", "migrations"],
+  "required": ["schema_version", "generation", "classes", "templates", "principals", "groups", "connections", "profiles", "raclist_caches", "policy", "database_status", "subsystem", "acees", "tokens", "certificates", "keys", "keyrings", "mfa_factors", "identity_mappings", "user_associations", "rrsf_nodes", "signon_sessions", "audits", "transactions", "recovery", "migrations"],
   "properties": {
     "schema_version": {"const": "mainframe-env.racf-database@2"},
     "generation": {"$ref": "#/$defs/version"},
@@ -23,6 +23,11 @@
     "certificates": {"$ref": "#/$defs/certificate_map"},
     "keys": {"$ref": "#/$defs/key_map"},
     "keyrings": {"$ref": "#/$defs/keyring_map"},
+    "mfa_factors": {"$ref": "#/$defs/mfa_factor_map"},
+    "identity_mappings": {"$ref": "#/$defs/identity_mapping_map"},
+    "user_associations": {"$ref": "#/$defs/user_association_map"},
+    "rrsf_nodes": {"$ref": "#/$defs/rrsf_node_map"},
+    "signon_sessions": {"$ref": "#/$defs/signon_session_map"},
     "audits": {"type": "array", "maxItems": 65536, "items": {"$ref": "#/$defs/audit"}},
     "transactions": {"$ref": "#/$defs/transaction_map"},
     "recovery": {"$ref": "#/$defs/recovery_map"},
@@ -221,7 +226,7 @@
     },
     "policy": {
       "type": "object", "additionalProperties": false,
-      "required": ["add_creator", "command_violations_audited", "jes_batch_all_racf", "ml_active", "program_control", "rules", "security_level_audit", "security_label_audit", "when_program", "write_down", "set_flags", "values"],
+      "required": ["add_creator", "command_violations_audited", "jes_batch_all_racf", "ml_active", "program_control", "rules", "security_level_audit", "security_label_audit", "when_program", "write_down", "set_flags", "values", "password_minimum", "password_maximum", "phrase_minimum", "password_history"],
       "properties": {
         "add_creator": {"type": "boolean"},
         "command_violations_audited": {"type": "boolean"},
@@ -234,7 +239,11 @@
         "when_program": {"type": "boolean"},
         "write_down": {"type": "boolean"},
         "set_flags": {"type": "object", "maxProperties": 256, "additionalProperties": {"type": "boolean"}},
-        "values": {"type": "object", "maxProperties": 256, "additionalProperties": {"$ref": "#/$defs/text"}}
+        "values": {"type": "object", "maxProperties": 256, "additionalProperties": {"$ref": "#/$defs/text"}},
+        "password_minimum": {"type": "integer", "minimum": 1, "maximum": 4096},
+        "password_maximum": {"type": "integer", "minimum": 1, "maximum": 4096},
+        "phrase_minimum": {"type": "integer", "minimum": 1, "maximum": 4096},
+        "password_history": {"type": "integer", "minimum": 0, "maximum": 128}
       }
     },
     "database_status": {
@@ -296,7 +305,7 @@
     },
     "certificate": {
       "type": "object", "additionalProperties": false,
-      "required": ["id", "owner", "label", "certificate_reference", "fingerprint_sha256", "trusted", "not_before_tick", "not_after_tick", "version"],
+      "required": ["id", "owner", "label", "certificate_reference", "fingerprint_sha256", "trusted", "active", "not_before_tick", "not_after_tick", "version"],
       "properties": {
         "id": {"$ref": "#/$defs/name"},
         "owner": {"$ref": "#/$defs/principal_name"},
@@ -304,6 +313,7 @@
         "certificate_reference": {"$ref": "#/$defs/reference"},
         "fingerprint_sha256": {"$ref": "#/$defs/digest"},
         "trusted": {"type": "boolean"},
+        "active": {"type": "boolean"},
         "not_before_tick": {"anyOf": [{"$ref": "#/$defs/tick"}, {"type": "null"}]},
         "not_after_tick": {"anyOf": [{"$ref": "#/$defs/tick"}, {"type": "null"}]},
         "version": {"$ref": "#/$defs/version"}
@@ -332,6 +342,71 @@
         "version": {"$ref": "#/$defs/version"}
       }
     },
+    "mfa_factor": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "owner", "kind", "secret_reference", "active", "created_tick", "version"],
+      "properties": {
+        "id": {"$ref": "#/$defs/name"},
+        "owner": {"$ref": "#/$defs/principal_name"},
+        "kind": {"enum": ["totp", "webauthn", "passcode", "custom"]},
+        "secret_reference": {"$ref": "#/$defs/reference"},
+        "active": {"type": "boolean"},
+        "created_tick": {"$ref": "#/$defs/tick"},
+        "version": {"$ref": "#/$defs/version"}
+      }
+    },
+    "identity_mapping": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "registry", "distributed_identity", "local_user", "label", "version"],
+      "properties": {
+        "id": {"$ref": "#/$defs/name"},
+        "registry": {"$ref": "#/$defs/text"},
+        "distributed_identity": {"$ref": "#/$defs/text"},
+        "local_user": {"$ref": "#/$defs/principal_name"},
+        "label": {"anyOf": [{"$ref": "#/$defs/text"}, {"type": "null"}]},
+        "version": {"$ref": "#/$defs/version"}
+      }
+    },
+    "user_association": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "local_user", "node", "remote_user", "peer", "password_sync", "state", "version"],
+      "properties": {
+        "id": {"$ref": "#/$defs/name"},
+        "local_user": {"$ref": "#/$defs/principal_name"},
+        "node": {"$ref": "#/$defs/name"},
+        "remote_user": {"$ref": "#/$defs/principal_name"},
+        "peer": {"type": "boolean"},
+        "password_sync": {"type": "boolean"},
+        "state": {"enum": ["active", "dormant"]},
+        "version": {"$ref": "#/$defs/version"}
+      }
+    },
+    "rrsf_node": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "description", "protocol", "prefix", "workspace_limit", "state", "version"],
+      "properties": {
+        "name": {"$ref": "#/$defs/name"},
+        "description": {"anyOf": [{"$ref": "#/$defs/text"}, {"type": "null"}]},
+        "protocol": {"anyOf": [{"$ref": "#/$defs/name"}, {"type": "null"}]},
+        "prefix": {"anyOf": [{"$ref": "#/$defs/name"}, {"type": "null"}]},
+        "workspace_limit": {"type": "integer", "minimum": 0},
+        "state": {"enum": ["operative", "dormant"]},
+        "version": {"$ref": "#/$defs/version"}
+      }
+    },
+    "signon_session": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "user", "node", "acee_id", "created_tick", "state", "version"],
+      "properties": {
+        "id": {"$ref": "#/$defs/name"},
+        "user": {"$ref": "#/$defs/principal_name"},
+        "node": {"anyOf": [{"$ref": "#/$defs/name"}, {"type": "null"}]},
+        "acee_id": {"$ref": "#/$defs/name"},
+        "created_tick": {"$ref": "#/$defs/tick"},
+        "state": {"enum": ["active", "signed-off"]},
+        "version": {"$ref": "#/$defs/version"}
+      }
+    },
     "saf_status": {
       "type": "object", "additionalProperties": false,
       "required": ["saf_return_code", "racf_return_code", "racf_reason_code", "reason"],
@@ -339,7 +414,7 @@
         "saf_return_code": {"type": "integer", "minimum": 0, "maximum": 4294967295},
         "racf_return_code": {"type": "integer", "minimum": 0, "maximum": 4294967295},
         "racf_reason_code": {"type": "integer", "minimum": 0, "maximum": 4294967295},
-        "reason": {"enum": ["granted", "default-deny", "class-inactive", "profile-not-found", "principal-not-found", "principal-inactive", "insufficient-access", "security-label-mismatch", "condition-not-satisfied", "token-invalid", "acee-invalid", "credential-invalid", "policy-unavailable", "store-unavailable", "malformed-request", "unsupported-request", "resource-exhausted", "cancelled", "timed-out", "recovery-required"]}
+        "reason": {"enum": ["granted", "default-deny", "class-inactive", "profile-not-found", "principal-not-found", "principal-inactive", "insufficient-access", "security-label-mismatch", "condition-not-satisfied", "token-invalid", "acee-invalid", "credential-invalid", "mfa-invalid", "policy-unavailable", "store-unavailable", "malformed-request", "unsupported-request", "resource-exhausted", "cancelled", "timed-out", "recovery-required"]}
       }
     },
     "audit_field": {
@@ -417,6 +492,11 @@
     "certificate_map": {"type": "object", "maxProperties": 65536, "additionalProperties": {"$ref": "#/$defs/certificate"}},
     "key_map": {"type": "object", "maxProperties": 65536, "additionalProperties": {"$ref": "#/$defs/key"}},
     "keyring_map": {"type": "object", "maxProperties": 4096, "additionalProperties": {"$ref": "#/$defs/keyring"}},
+    "mfa_factor_map": {"type": "object", "maxProperties": 16384, "additionalProperties": {"$ref": "#/$defs/mfa_factor"}},
+    "identity_mapping_map": {"type": "object", "maxProperties": 65536, "additionalProperties": {"$ref": "#/$defs/identity_mapping"}},
+    "user_association_map": {"type": "object", "maxProperties": 65536, "additionalProperties": {"$ref": "#/$defs/user_association"}},
+    "rrsf_node_map": {"type": "object", "maxProperties": 4096, "additionalProperties": {"$ref": "#/$defs/rrsf_node"}},
+    "signon_session_map": {"type": "object", "maxProperties": 65536, "additionalProperties": {"$ref": "#/$defs/signon_session"}},
     "transaction_map": {"type": "object", "maxProperties": 65536, "additionalProperties": {"$ref": "#/$defs/transaction"}},
     "recovery_map": {"type": "object", "maxProperties": 4096, "additionalProperties": {"$ref": "#/$defs/recovery_record"}}
   }

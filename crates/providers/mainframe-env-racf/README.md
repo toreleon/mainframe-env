@@ -6,7 +6,7 @@ certificate/key references, audit, transaction/recovery records, and
 persistence authority. Non-goals: exposing credentials, database handles,
 crypto-library values, or ambient global policy. Allowed production
 dependencies are owned host/execution/store contracts, Argon2id, zeroization,
-and the workspace serialization stack.
+Ring HMAC comparison, and the workspace serialization stack.
 
 Invariants: missing users/profiles/grants and provider errors deny; plaintext
 secrets are resolved only inside an authentication scope and cleared after
@@ -42,3 +42,12 @@ conditional access, labels/levels/categories, RACLIST generations, PROGRAM
 control, and return/reason mapping. ACEEs, nesting/delegation, and token
 metadata remain bounded owned records; raw credentials and token material do
 not enter results or audit.
+
+SEC-505 completes PASSWORD/PHRASE, RACDCERT, RACLINK, RACMAP, SIGNOFF, and
+TARGET through that same transaction authority. Certificates, keys, MFA
+factors, and tokens persist only safe references and digests; public results
+and audits expose no referenced material. Distributed identity mappings, RRSF
+nodes/associations, durable sign-on sessions, MFA proof comparison, password
+history, keyrings, and certificate lifecycle operations are bounded by the v2
+database schema. The shared Conformance IR now executes all 34 command families
+and all 14 RACROUTE request types.
