@@ -31,6 +31,16 @@
             "maxProperties": 32,
             "propertyNames": { "type": "string", "maxLength": 128 },
             "additionalProperties": { "type": "string", "maxLength": 1024 }
+          },
+          "host_condition": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "response", "response2"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1, "maxLength": 32 },
+              "response": { "type": "integer" },
+              "response2": { "type": "integer" }
+            }
           }
         }
       }

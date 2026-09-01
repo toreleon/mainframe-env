@@ -228,6 +228,21 @@
       "obligation_id": "phrase-processing-procedure-through",
       "source": "IDENTIFICATION DIVISION. PROGRAM-ID. XMLPROCESS. DATA DIVISION. WORKING-STORAGE SECTION. 01 XML-X PIC X(32) VALUE '<ROOT>A&amp;B</ROOT>'. PROCEDURE DIVISION. XML PARSE XML-X PROCESSING PROCEDURE HANDLE THRU HANDLE-END. DISPLAY 'DONE'. STOP RUN. HANDLE. DISPLAY XML-EVENT ':' XML-TEXT. HANDLE-END. EXIT. NEXT-P. DISPLAY 'BAD'.",
       "expected_output": "START-OF-DOCUMENT:\nSTART-OF-ELEMENT:ROOT\nCONTENT-CHARACTERS:A&B\nEND-OF-ELEMENT:ROOT\nEND-OF-DOCUMENT:\nDONE\n"
+    },
+    {
+      "id": "read-declarative-error",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0030",
+      "obligation_id": "phrase-declarative-error",
+      "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. DECLERR.\nENVIRONMENT DIVISION.\nINPUT-OUTPUT SECTION.\nFILE-CONTROL.\nSELECT TEST-FILE ASSIGN TO TESTDD ORGANIZATION IS INDEXED ACCESS MODE IS RANDOM RECORD KEY IS REC-KEY.\nDATA DIVISION.\nFILE SECTION.\nFD TEST-FILE.\n01 TEST-REC.\n05 REC-KEY PIC X VALUE 'A'.\n05 DATA-X PIC X.\nPROCEDURE DIVISION.\nDECLARATIVES.\nERROR-HANDLER SECTION.\nUSE AFTER STANDARD ERROR PROCEDURE ON TEST-FILE.\nHANDLE-P.\nDISPLAY 'DECL'.\nEXIT.\nEND DECLARATIVES.\nMAIN-P.\nREAD TEST-FILE RECORD KEY IS REC-KEY.\nDISPLAY 'DONE'.\nSTOP RUN.\n",
+      "expected_output": "DECL\nDONE\n",
+      "expected_effects": [
+        "dataset.read:lock=default,wait=default"
+      ],
+      "host_condition": {
+        "name": "NOTFND",
+        "response": 13,
+        "response2": 0
+      }
     }
   ]
 }

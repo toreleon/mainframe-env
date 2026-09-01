@@ -1293,6 +1293,7 @@ fn check_cobol_statement_bindings(
                 expected_obligations.insert("phrase-multiple-files-and-modes");
             }
             Some("0030") => {
+                expected_obligations.insert("phrase-declarative-error");
                 expected_obligations.insert("phrase-lock-wait");
                 expected_obligations.insert("phrase-next-record");
             }

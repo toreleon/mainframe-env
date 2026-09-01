@@ -34662,6 +34662,23 @@
       ],
       "oracle": "cobol.enterprise-6.5.licensed",
       "recovery": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0030",
+      "gate": "executed",
+      "obligation_id": "phrase-declarative-error",
+      "test_id": "cobol.statement-phrase-runtime.read-declarative-error",
+      "input": "cobol.statement-phrase-runtime.read-declarative-error",
+      "driver": "cobol.statement-phrase-runtime.driver",
+      "preconditions": [
+        "cobol.statement-phrase-runtime.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement-phrase-runtime.executed"
+      ],
+      "oracle": "cobol.enterprise-6.5.licensed",
+      "recovery": null
     }
   ],
   "catalog_digest": "sha256:074f7385b1d1e1127f9cf83dbbc4e0bc46903cfa7739a2515c4085f7d2037f01",
@@ -47516,6 +47533,13 @@
       "applicable_gates": [
         "recovered"
       ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0030",
+      "obligation_id": "phrase-declarative-error",
+      "applicable_gates": [
+        "executed"
+      ]
     }
   ],
   "registries": {
@@ -49087,71 +49111,71 @@
         "id": "cobol.semantic.file-value-of.valid"
       },
       {
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300",
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb",
         "id": "cobol.statement-phrase-runtime.add-corresponding"
       },
       {
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300",
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb",
         "id": "cobol.statement-phrase-runtime.display-upon-no-advancing"
       },
       {
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300",
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb",
         "id": "cobol.statement-phrase-runtime.exit-paragraph"
       },
       {
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300",
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb",
         "id": "cobol.statement-phrase-runtime.exit-perform"
       },
       {
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300",
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb",
         "id": "cobol.statement-phrase-runtime.initialize-with-filler"
       },
       {
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300",
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb",
         "id": "cobol.statement-phrase-runtime.json-generate-count"
       },
       {
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300",
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb",
         "id": "cobol.statement-phrase-runtime.move-corresponding"
       },
       {
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300",
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb",
         "id": "cobol.statement-phrase-runtime.perform-inline-varying"
       },
       {
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300",
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb",
         "id": "cobol.statement-phrase-runtime.perform-through"
       },
       {
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300",
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb",
         "id": "cobol.statement-phrase-runtime.read-next-record"
       },
       {
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300",
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb",
         "id": "cobol.statement-phrase-runtime.release-from"
       },
       {
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300",
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb",
         "id": "cobol.statement-phrase-runtime.return-into-at-end"
       },
       {
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300",
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb",
         "id": "cobol.statement-phrase-runtime.search-all"
       },
       {
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300",
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb",
         "id": "cobol.statement-phrase-runtime.set-up-down-by"
       },
       {
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300",
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb",
         "id": "cobol.statement-phrase-runtime.string-with-pointer"
       },
       {
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300",
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb",
         "id": "cobol.statement-phrase-runtime.unstring-pointer-tally"
       },
       {
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300",
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb",
         "id": "cobol.statement-phrase-runtime.xml-generate-count"
       },
       {
@@ -51580,47 +51604,47 @@
       },
       {
         "id": "cobol.statement-phrase-runtime.allocate-initialized-linkage",
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300"
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb"
       },
       {
         "id": "cobol.statement-phrase-runtime.exit-section",
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300"
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb"
       },
       {
         "id": "cobol.statement-phrase-runtime.initialize-replacing-default",
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300"
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb"
       },
       {
         "id": "cobol.statement-phrase-runtime.inspect-modes-and-ranges",
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300"
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb"
       },
       {
         "id": "cobol.statement-phrase-runtime.open-multiple-files",
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300"
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb"
       },
       {
         "id": "cobol.statement-phrase-runtime.close-multiple-with-lock",
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300"
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb"
       },
       {
         "id": "cobol.statement-phrase-runtime.read-lock-no-wait",
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300"
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb"
       },
       {
         "id": "cobol.statement-phrase-runtime.set-multiple-to",
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300"
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb"
       },
       {
         "id": "cobol.statement-phrase-runtime.json-parse-with-detail",
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300"
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb"
       },
       {
         "id": "cobol.statement-phrase-runtime.write-advancing-end-page",
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300"
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb"
       },
       {
         "id": "cobol.statement-phrase-runtime.xml-parse-processing-procedure",
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300"
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb"
       },
       {
         "id": "cobol.function-boundary-runtime.byte-length-national-bytes",
@@ -51676,7 +51700,7 @@
       },
       {
         "id": "cobol.statement-phrase-runtime.perform-out-of-line-repetition",
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300"
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb"
       },
       {
         "id": "cobol.recovery.perform-repetition",
@@ -51684,15 +51708,19 @@
       },
       {
         "id": "cobol.statement-phrase-runtime.entry-alternate-selection",
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300"
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb"
       },
       {
         "id": "cobol.statement-phrase-runtime.close-reel-dispositions",
-        "digest": "sha256:ca60efc282f2f602a3ce5aa666cee73fe3ed31e36a9a9ac09de853a32b11f300"
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb"
       },
       {
         "id": "cobol.recovery.xml-events",
         "digest": "sha256:cd1a8a845faafd674b6383a8b6d4ca2151a91cf632e8e518b37e44efb49d14ad"
+      },
+      {
+        "id": "cobol.statement-phrase-runtime.read-declarative-error",
+        "digest": "sha256:4da4a10ec9fd4b47e96710cf568a57d7cc7410d273f2193322f740ce894ca1bb"
       }
     ],
     "input_shapes": [
@@ -58731,6 +58759,7 @@
         "checkpoint-identity",
         "invalid-forms",
         "licensed-equivalence",
+        "phrase-declarative-error",
         "phrase-lock-wait",
         "phrase-next-record",
         "quantum-identity",

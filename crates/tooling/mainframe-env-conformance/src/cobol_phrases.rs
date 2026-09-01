@@ -7,7 +7,8 @@ use mainframe_env_execution_api::{
     BoundedPayload, InvocationLimits, Machine, MachineDrive, MachineResume, Quantum,
 };
 use mainframe_env_host_api::{
-    DatasetLockMode, DatasetReadControl, DatasetReelUnit, DatasetRequest, HostRequest,
+    DatasetLockMode, DatasetReadControl, DatasetReelUnit, DatasetRequest, EffectResult,
+    HostProblem, HostRequest,
 };
 use mainframe_env_interpreter::ReferenceMachine;
 use mainframe_env_ir::CodecLimits;
@@ -36,6 +37,15 @@ struct Fixture {
     expected_output: String,
     expected_effects: Option<Vec<String>>,
     bindings: Option<BTreeMap<String, String>>,
+    host_condition: Option<HostCondition>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HostCondition {
+    name: String,
+    response: i32,
+    response2: i32,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -83,6 +93,10 @@ pub fn verify_cobol_statement_phrase_runtime_fixtures() -> Result<(), String> {
                         .iter()
                         .any(|(name, value)| name.len() > 128 || value.len() > 1024)
             })
+            || fixture
+                .host_condition
+                .as_ref()
+                .is_some_and(|condition| condition.name.is_empty() || condition.name.len() > 32)
         {
             return Err(format!(
                 "invalid COBOL statement phrase fixture {}",
@@ -192,6 +206,7 @@ fn execute(fixture: &Fixture) -> Result<Output, String> {
             .map_err(|error| format!("{error:?}"))?;
     let mut resume = MachineResume::Start;
     let mut effects = Vec::new();
+    let mut host_condition = fixture.host_condition.as_ref();
     let completion = loop {
         match machine.drive(
             resume,
@@ -200,7 +215,19 @@ fn execute(fixture: &Fixture) -> Result<Output, String> {
             MachineDrive::Continue => resume = MachineResume::Start,
             MachineDrive::HostCall(effect) => {
                 effects.push(phrase_effect(&effect.request));
-                resume = MachineResume::HostResult(crate::cobol_runtime::effect_result(&effect)?)
+                let result = if let Some(condition) = host_condition.take() {
+                    EffectResult {
+                        sequence: effect.sequence,
+                        outcome: Err(HostProblem::Condition {
+                            name: condition.name.clone(),
+                            response: condition.response,
+                            response2: condition.response2,
+                        }),
+                    }
+                } else {
+                    crate::cobol_runtime::effect_result(&effect)?
+                };
+                resume = MachineResume::HostResult(result)
             }
             MachineDrive::Completed(completion) => break completion,
             other => return Err(format!("terminal={other:?};{}", machine.position_summary())),
