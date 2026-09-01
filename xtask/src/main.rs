@@ -1645,6 +1645,9 @@ fn check_cobol_function_bindings(
             Some("0046") => {
                 expected_obligations.insert("boundary-currency-symbol");
             }
+            Some("0053") => {
+                expected_obligations.insert("boundary-sequence-and-reseed");
+            }
             Some("0067" | "0068") => {
                 expected_obligations.insert("boundary-error-position");
                 if row.row_id().as_str().ends_with(":0067") {

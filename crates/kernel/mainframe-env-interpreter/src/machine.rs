@@ -23,6 +23,7 @@ use mainframe_env_ir::{
     Attribute, CodecLimits, Module, Operation, OperationIdentity, StorageId, decode_binary,
 };
 use sha2::{Digest as _, Sha256};
+use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::OnceLock;
 
@@ -382,6 +383,7 @@ pub struct ReferenceMachine {
     search_results: BTreeMap<usize, bool>,
     linkage_addresses: BTreeMap<String, Option<StorageView>>,
     freed_allocations: BTreeSet<usize>,
+    random_state: Cell<Option<u64>>,
     pc: usize,
     output: Vec<u8>,
     effect_sequence: u64,
@@ -712,6 +714,7 @@ impl ReferenceMachine {
             search_results: BTreeMap::new(),
             linkage_addresses: BTreeMap::new(),
             freed_allocations: BTreeSet::new(),
+            random_state: Cell::new(None),
             pc: 0,
             output: Vec::new(),
             effect_sequence: 0,
@@ -6199,6 +6202,7 @@ impl ReferenceMachine {
                         scale: 0,
                     }))
                 }
+                "RANDOM" => self.random(None),
                 "UUID4" => Ok(CobolValue::Bytes(deterministic_uuid4(
                     self.invocation.execution_id.as_str(),
                     self.invocation.run_unit_id.as_str(),
@@ -6445,7 +6449,7 @@ impl ReferenceMachine {
                 Ok(integer_value((selected.0 + 1) as i128))
             }
             "PRESENT-VALUE" => present_value(&numeric()?).map(CobolValue::Decimal),
-            "RANDOM" => deterministic_random(integer(0)?).map(CobolValue::Decimal),
+            "RANDOM" => self.random(arguments.first().map(|_| integer(0)).transpose()?),
             "RANGE" => decimal_range(&numeric()?).map(CobolValue::Decimal),
             "REM" => decimal_mod(decimal(0)?, decimal(1)?, false).map(CobolValue::Decimal),
             "REVERSE" => Ok(CobolValue::Bytes(
@@ -6802,6 +6806,18 @@ impl ReferenceMachine {
                 }
             }
         }
+    }
+
+    fn random(&self, seed: Option<i128>) -> Result<CobolValue, MachineProblem> {
+        let state = match seed {
+            Some(seed) => {
+                u64::try_from(seed).map_err(|_| MachineProblem::DataException)? % 2_147_483_646
+            }
+            None => self.random_state.get().unwrap_or(0),
+        };
+        let (state, value) = deterministic_random(state);
+        self.random_state.set(Some(state));
+        Ok(CobolValue::Decimal(value))
     }
 
     fn reapply_entry_context(&mut self) -> Result<(), MachineProblem> {
@@ -9267,16 +9283,18 @@ fn decimal_mod(left: Decimal, right: Decimal, floor: bool) -> Result<Decimal, Ma
     })
 }
 
-fn deterministic_random(seed: i128) -> Result<Decimal, MachineProblem> {
-    let mut value = u64::try_from(seed).map_err(|_| MachineProblem::DataException)?;
-    value ^= value >> 12;
-    value ^= value << 25;
-    value ^= value >> 27;
-    let value = value.wrapping_mul(2_685_821_657_736_338_717);
-    Ok(Decimal {
-        coefficient: i128::from(value % 1_000_000_000_000_000_000),
-        scale: 18,
-    })
+fn deterministic_random(state: u64) -> (u64, Decimal) {
+    let state = state
+        .wrapping_mul(6_364_136_223_846_793_005)
+        .wrapping_add(1_442_695_040_888_963_407);
+    let coefficient = state % 999_999_999_999_999_999 + 1;
+    (
+        state,
+        Decimal {
+            coefficient: i128::from(coefficient),
+            scale: 18,
+        },
+    )
 }
 
 fn factorial(value: i128) -> Result<Decimal, MachineProblem> {
