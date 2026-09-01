@@ -161,6 +161,8 @@ struct XmlNode {
 struct JsonClauses {
     names: BTreeMap<String, Option<String>>,
     suppressed: BTreeSet<String>,
+    conditional_suppressions: BTreeMap<String, Vec<String>>,
+    generic_suppressions: Vec<(Option<bool>, Vec<String>)>,
     conversions: BTreeMap<String, JsonConversion>,
     ignore_null_all: bool,
     ignored_nulls: BTreeSet<String>,
@@ -6139,6 +6141,13 @@ impl ReferenceMachine {
         if !root && clauses.suppressed(layout) {
             return Ok(None);
         }
+        if !root
+            && layout.occurs <= 1
+            && !is_group(layout.category)
+            && self.json_suppression_matches(layout, clauses, indexes)?
+        {
+            return Ok(None);
+        }
         if layout.occurs > 1 {
             let mut values = Vec::new();
             for occurrence in 1..=self.active_occurs(layout)? {
@@ -6663,6 +6672,41 @@ impl ReferenceMachine {
             return Ok(actual == expected);
         }
         Ok(actual == self.resolve(expected)?)
+    }
+
+    fn json_suppression_matches(
+        &self,
+        layout: &LayoutMetadata,
+        clauses: &JsonClauses,
+        indexes: &[usize],
+    ) -> Result<bool, MachineProblem> {
+        let reference = self.layout_occurrence_reference(layout, indexes)?;
+        let actual = self.read_reference(&reference)?;
+        if let Some(values) = clauses.conditional_suppression(layout)
+            && values
+                .iter()
+                .map(|value| self.json_value_matches(layout, &actual, value))
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .any(|matched| matched)
+        {
+            return Ok(true);
+        }
+        for (numeric, values) in &clauses.generic_suppressions {
+            if numeric.is_some_and(|numeric| numeric != is_numeric(layout.category)) {
+                continue;
+            }
+            if values
+                .iter()
+                .map(|value| self.json_value_matches(layout, &actual, value))
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .any(|matched| matched)
+            {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     fn json_conversion_bytes(
@@ -11432,15 +11476,44 @@ impl JsonClauses {
                 at += 1;
             }
         }
-        if let Some(at) = position(args, "SUPPRESS") {
-            for token in &args[at + 1..] {
-                if matches!(token.as_str(), "OF" | "IN") {
+        if let Some(mut at) = position(args, "SUPPRESS").map(|position| position + 1) {
+            while at < args.len() && args[at] != "CONVERTING" {
+                if args[at] == "EVERY" {
+                    if parsing {
+                        return Err(MachineProblem::InvalidOperation);
+                    }
+                    at += 1;
+                    let class = match args.get(at).map(String::as_str) {
+                        Some("NUMERIC") => {
+                            at += 1;
+                            Some(true)
+                        }
+                        Some("NONNUMERIC") => {
+                            at += 1;
+                            Some(false)
+                        }
+                        _ => None,
+                    };
+                    if args.get(at).is_none_or(|token| token != "WHEN") {
+                        return Err(MachineProblem::InvalidOperation);
+                    }
+                    let (values, next) = json_when_values(args, at + 1)?;
+                    clauses.generic_suppressions.push((class, values));
+                    at = next;
                     continue;
                 }
-                if matches!(token.as_str(), "CONVERTING" | "ON" | "NOT" | "END-JSON") {
-                    break;
+                let target = normalize(args.get(at).ok_or(MachineProblem::InvalidOperation)?);
+                at += 1;
+                if args.get(at).is_some_and(|token| token == "WHEN") {
+                    if parsing {
+                        return Err(MachineProblem::InvalidOperation);
+                    }
+                    let (values, next) = json_when_values(args, at + 1)?;
+                    clauses.conditional_suppressions.insert(target, values);
+                    at = next;
+                } else {
+                    clauses.suppressed.insert(target);
                 }
-                clauses.suppressed.insert(normalize(token));
             }
         }
         if let Some(mut at) = position(args, "CONVERTING").map(|position| position + 1) {
@@ -11523,6 +11596,12 @@ impl JsonClauses {
         self.suppressed.contains(&layout.name) || self.suppressed.contains(&layout.simple_name)
     }
 
+    fn conditional_suppression(&self, layout: &LayoutMetadata) -> Option<&Vec<String>> {
+        self.conditional_suppressions
+            .get(&layout.name)
+            .or_else(|| self.conditional_suppressions.get(&layout.simple_name))
+    }
+
     fn conversion(&self, layout: &LayoutMetadata) -> Option<&JsonConversion> {
         self.conversions
             .get(&layout.name)
@@ -11545,6 +11624,27 @@ impl JsonClauses {
         self.indicator_items.contains(&layout.name)
             || self.indicator_items.contains(&layout.simple_name)
     }
+}
+
+fn json_when_values(
+    args: &[String],
+    mut at: usize,
+) -> Result<(Vec<String>, usize), MachineProblem> {
+    let mut values = vec![
+        args.get(at)
+            .cloned()
+            .ok_or(MachineProblem::InvalidOperation)?,
+    ];
+    at += 1;
+    while args.get(at).is_some_and(|token| token == "OR") {
+        values.push(
+            args.get(at + 1)
+                .cloned()
+                .ok_or(MachineProblem::InvalidOperation)?,
+        );
+        at += 2;
+    }
+    Ok((values, at))
 }
 
 fn is_json_figurative(value: &str) -> bool {

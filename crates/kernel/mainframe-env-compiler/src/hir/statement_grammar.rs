@@ -621,7 +621,7 @@ impl<'a> GrammarParser<'a> {
                 .iter()
                 .any(|word| self.tokens[index].is(word));
             if depth == 0
-                && (self.at_simple_stop(kind, index)
+                && (self.at_simple_stop(kind, start, index)
                     || (!exit_qualifier && self.classify_at(index).is_some()))
             {
                 return validate_simple_header(kind, &self.tokens[start..index])
@@ -831,13 +831,33 @@ impl<'a> GrammarParser<'a> {
         }
     }
 
-    fn at_simple_stop(&self, kind: StatementKind, index: usize) -> bool {
+    fn at_simple_stop(&self, kind: StatementKind, start: usize, index: usize) -> bool {
+        let json_suppression_when = kind == StatementKind::JsonGenerate
+            && self.tokens[index].is("WHEN")
+            && self.tokens[start..index]
+                .iter()
+                .any(|token| token.is("SUPPRESS"))
+            && self.tokens.get(index + 1).is_some_and(|token| {
+                [
+                    "SPACE",
+                    "SPACES",
+                    "ZERO",
+                    "ZEROES",
+                    "ZEROS",
+                    "LOW-VALUE",
+                    "LOW-VALUES",
+                    "HIGH-VALUE",
+                    "HIGH-VALUES",
+                ]
+                .iter()
+                .any(|value| token.is(value))
+            });
         self.is_period_at(index)
             || self.branch_at(kind, index).is_some()
             || self.at_terminator_at(kind, index)
             || self.at_any_terminator_at(index)
             || self.tokens[index].is("ELSE")
-            || self.tokens[index].is("WHEN")
+            || (self.tokens[index].is("WHEN") && !json_suppression_when)
     }
 
     fn is_label(&self) -> bool {
@@ -1760,7 +1780,7 @@ fn validate_generate(tokens: &[Token<'_>]) -> Result<(), &'static str> {
     validate_json_indicating(&mut cursor, false)?;
     validate_json_encoding(&mut cursor)?;
     validate_json_names(&mut cursor)?;
-    validate_json_suppress(&mut cursor)?;
+    validate_json_suppress(&mut cursor, false)?;
     validate_json_converting(&mut cursor, false)?;
     cursor.finish()
 }
@@ -1777,7 +1797,7 @@ fn validate_json_parse(tokens: &[Token<'_>]) -> Result<(), &'static str> {
     validate_json_indicating(&mut cursor, true)?;
     validate_json_encoding(&mut cursor)?;
     validate_json_names(&mut cursor)?;
-    validate_json_suppress(&mut cursor)?;
+    validate_json_suppress(&mut cursor, true)?;
     validate_json_converting(&mut cursor, true)?;
     cursor.finish()
 }
@@ -1854,13 +1874,34 @@ fn validate_json_names(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
         .ok_or("NAME requires a data item and replacement")
 }
 
-fn validate_json_suppress(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
+fn validate_json_suppress(cursor: &mut Cursor<'_>, parsing: bool) -> Result<(), &'static str> {
     if !cursor.eat("SUPPRESS") {
         return Ok(());
     }
     let mut count = 0usize;
     while !cursor.done() && !cursor.at("CONVERTING") {
-        cursor.operand()?;
+        let generic = cursor.eat("EVERY");
+        if generic {
+            if parsing {
+                return Err("JSON PARSE SUPPRESS requires a data item");
+            }
+            if !cursor.eat("NUMERIC") {
+                cursor.eat("NONNUMERIC");
+            }
+        } else {
+            cursor.operand()?;
+        }
+        if cursor.eat("WHEN") {
+            if parsing {
+                return Err("JSON PARSE SUPPRESS cannot use WHEN");
+            }
+            cursor.json_conversion_value()?;
+            while cursor.eat("OR") {
+                cursor.json_conversion_value()?;
+            }
+        } else if generic {
+            return Err("generic SUPPRESS requires WHEN");
+        }
         count += 1;
     }
     (count > 0)

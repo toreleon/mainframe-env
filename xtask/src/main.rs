@@ -1282,6 +1282,7 @@ fn check_cobol_statement_bindings(
             }
             Some("0023") => {
                 expected_obligations.insert("phrase-boolean-null-converting");
+                expected_obligations.insert("phrase-conditional-suppress");
                 expected_obligations.insert("phrase-count-in");
                 expected_obligations.insert("phrase-count-modes");
                 expected_obligations.insert("phrase-ebcdic-encoding");
