@@ -7,6 +7,7 @@ license.workspace = true
 publish = false
 
 [dependencies]
+mainframe-env-coverage.workspace = true
 mainframe-env-source.workspace = true
 mainframe-env-diagnostics.workspace = true
 mainframe-env-encoding.workspace = true

@@ -1188,6 +1188,7 @@ dependencies = [
  "mainframe-env-cics",
  "mainframe-env-compiler",
  "mainframe-env-compiler-api",
+ "mainframe-env-coverage",
  "mainframe-env-dataset",
  "mainframe-env-db2",
  "mainframe-env-diagnostics",

@@ -1,0 +1,33 @@
+{
+  "schema_version": "mainframe-env.cobol-language@1",
+  "target_version": "0.3.0",
+  "baseline_id": "ibm-enterprise-cobol-6.5-2026-05-31",
+  "source": {
+    "publication": "SC27-8713-04",
+    "sha256": "sha256:8b86cbd2d838d8f460dcbe8d1e74d2266799ce1534f4cfdbc08469c36748e85e"
+  },
+  "compiler_directing_statements": [
+    {"id":"basis","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0001","label":"BASIS statement","source_locator":"pdf-page:723;outline:BASIS statement","forms":["BASIS basis-name"],"placement":"control-deck","effect":"extended-source-basis"},
+    {"id":"process","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0002","label":"PROCESS(CBL) statement","source_locator":"pdf-page:724;outline:PROCESS(CBL) statement","forms":["PROCESS options-list","CBL options-list"],"placement":"before-outermost-identification","effect":"compiler-options"},
+    {"id":"control","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0003","label":"*CONTROL (*CBL) statement","source_locator":"pdf-page:724;outline:*CONTROL (*CBL) statement","forms":["*CONTROL listing-options","*CBL listing-options"],"placement":"embedded-line-only","effect":"listing-control"},
+    {"id":"copy","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0004","label":"COPY statement","source_locator":"pdf-page:726;outline:COPY statement","forms":["COPY text-name [OF library-name] [SUPPRESS] [REPLACING operands] ."],"placement":"character-string-boundary","effect":"source-expansion"},
+    {"id":"delete","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0005","label":"DELETE statement","source_locator":"pdf-page:735;outline:DELETE statement","forms":["DELETE sequence-number-field"],"placement":"basis-control-deck","effect":"extended-source-delete"},
+    {"id":"eject","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0006","label":"EJECT statement","source_locator":"pdf-page:736;outline:EJECT statement","forms":["EJECT [.]"],"placement":"embedded-line-only","effect":"listing-control"},
+    {"id":"enter","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0007","label":"ENTER statement","source_locator":"pdf-page:736;outline:ENTER statement","forms":["ENTER language-name [routine-name] ."],"placement":"procedure-division","effect":"syntax-only"},
+    {"id":"insert","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0008","label":"INSERT statement","source_locator":"pdf-page:737;outline:INSERT statement","forms":["INSERT sequence-number"],"placement":"basis-control-deck","effect":"extended-source-insert"},
+    {"id":"trace","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0009","label":"READY or RESET TRACE statement","source_locator":"pdf-page:737;outline:READY or RESET TRACE statement","forms":["READY TRACE .","RESET TRACE ."],"placement":"procedure-division","effect":"syntax-only"},
+    {"id":"replace","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0010","label":"REPLACE statement","source_locator":"pdf-page:738;outline:REPLACE statement","forms":["REPLACE replacement-pairs .","REPLACE OFF ."],"placement":"character-string-boundary","effect":"source-replacement"},
+    {"id":"service-label","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0011","label":"SERVICE LABEL statement","source_locator":"pdf-page:741;outline:SERVICE LABEL statement","forms":["SERVICE LABEL"],"placement":"procedure-division-nondeclarative","effect":"control-flow-marker"},
+    {"id":"service-reload","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0012","label":"SERVICE RELOAD statement","source_locator":"pdf-page:742;outline:SERVICE RELOAD statement","forms":["SERVICE RELOAD identifier"],"placement":"procedure-division","effect":"syntax-only"},
+    {"id":"skip","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0013","label":"SKIP statements","source_locator":"pdf-page:742;outline:SKIP statements","forms":["SKIP1 [.]","SKIP2 [.]","SKIP3 [.]"],"placement":"embedded-line-only","effect":"listing-control"},
+    {"id":"title","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0014","label":"TITLE statement","source_locator":"pdf-page:742;outline:TITLE statement","forms":["TITLE literal [.]"],"placement":"embedded-line-only","effect":"listing-control"},
+    {"id":"use","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0015","label":"USE statement","source_locator":"pdf-page:743;outline:USE statement","forms":["USE [GLOBAL] AFTER [STANDARD] EXCEPTION|ERROR PROCEDURE ON targets","USE FOR DEBUGGING ON procedures"],"placement":"procedure-declaratives","effect":"declarative-registration"}
+  ],
+  "compiler_directive_groups": [
+    {"id":"callinterface","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0001","label":"CALLINTERFACE","source_locator":"pdf-page:747;outline:CALLINTERFACE","directives":["callinterface","callint"],"placement":"procedure-division","effect":"call-interface-selection"},
+    {"id":"data","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0002","label":"DATA","source_locator":"pdf-page:748;outline:DATA","directives":["data"],"placement":"working-storage-lp64","effect":"data-location-selection"},
+    {"id":"inline","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0003","label":"INLINE","source_locator":"pdf-page:748;outline:INLINE","directives":["inline"],"placement":"compilation-unit-line","effect":"inline-eligibility"},
+    {"id":"conditional","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0004","label":"Conditional compilation","source_locator":"pdf-page:750;outline:Conditional compilation","directives":["define","evaluate","when","when-other","end-evaluate","if","else","end-if"],"placement":"compilation-group-line","effect":"conditional-source-selection"},
+    {"id":"java-interop","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0005","label":"COBOL/Java interoperability","source_locator":"pdf-page:759;outline:COBOL/Java interoperability","directives":["java-callable","java-shareable"],"placement":"java-interop-context","effect":"java-interop-metadata"}
+  ]
+}

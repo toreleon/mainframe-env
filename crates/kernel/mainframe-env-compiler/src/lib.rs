@@ -2,11 +2,19 @@
 
 #![forbid(unsafe_code)]
 
+mod generated;
 mod hir;
 mod lower;
 mod semantic;
 mod service;
 mod syntax;
+
+pub use generated::cobol_language::{
+    COMPILER_DIRECTING_STATEMENTS, COMPILER_DIRECTIVE_GROUPS, COMPILER_DIRECTIVES,
+    CompilerDirectingDescriptor, CompilerDirectingKind, CompilerDirectiveDescriptor,
+    CompilerDirectiveGroup, CompilerDirectiveGroupDescriptor, CompilerDirectiveKind,
+    compiler_directing_descriptor, compiler_directive_descriptor,
+};
 
 pub use hir::{
     CobolHir, ControlEdge, ControlEdgeKind, ControlNode, ControlRole, ControlScope, HirStatement,
@@ -19,8 +27,9 @@ pub use semantic::{
 };
 pub use service::{CobolAnalysis, CobolCompiler, CobolCompilerLimits};
 pub use syntax::{
-    CobolLanguage, CobolSyntaxKind, Expansion, LosslessSyntax, SourceOrigin, SourceSpan,
-    SyntaxLimits,
+    CobolLanguage, CobolSyntaxKind, CompilerDirectingNode, CompilerDirectiveNode, CompilerOption,
+    CompilerOptionSet, Expansion, LosslessSyntax, SourceOrigin, SourceSpan, SyntaxLimits,
+    SyntaxToken, SyntaxTokenId,
 };
 
 pub const COBOL_HIR_DIALECT: &str = "cobol.hir@1";

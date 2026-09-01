@@ -6,25 +6,26 @@ mod evidence_seal;
 
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use mainframe_env_conformance::{
-    verify_carddemo_application_package_from_env, verify_carddemo_base_batch_from_env,
-    verify_carddemo_base_online_from_env, verify_carddemo_batch_programs_from_env,
-    verify_carddemo_cics_abi_from_env, verify_carddemo_cics_runtime_from_env,
-    verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
-    verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
-    verify_carddemo_dataset_catalog_from_env, verify_carddemo_db2_from_env,
-    verify_carddemo_file_call_semantics_from_env, verify_carddemo_full_from_env,
-    verify_carddemo_host_operands_from_env, verify_carddemo_ims_from_env,
-    verify_carddemo_jcl_from_env, verify_carddemo_mq_authorization_from_env,
-    verify_carddemo_program_routing_from_env, verify_carddemo_resources_from_env,
-    verify_carddemo_security_from_env, verify_carddemo_seeds_from_env,
-    verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
-    verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
-    verify_carddemo_vsam_from_env, verify_host_abi_libraries,
+    cobol_frontend_runtime, verify_carddemo_application_package_from_env,
+    verify_carddemo_base_batch_from_env, verify_carddemo_base_online_from_env,
+    verify_carddemo_batch_programs_from_env, verify_carddemo_cics_abi_from_env,
+    verify_carddemo_cics_runtime_from_env, verify_carddemo_control_flow_from_env,
+    verify_carddemo_core_semantics_from_env, verify_carddemo_corpus_from_env,
+    verify_carddemo_data_layouts_from_env, verify_carddemo_dataset_catalog_from_env,
+    verify_carddemo_db2_from_env, verify_carddemo_file_call_semantics_from_env,
+    verify_carddemo_full_from_env, verify_carddemo_host_operands_from_env,
+    verify_carddemo_ims_from_env, verify_carddemo_jcl_from_env,
+    verify_carddemo_mq_authorization_from_env, verify_carddemo_program_routing_from_env,
+    verify_carddemo_resources_from_env, verify_carddemo_security_from_env,
+    verify_carddemo_seeds_from_env, verify_carddemo_source_closures_from_env,
+    verify_carddemo_source_preprocessing_from_env, verify_carddemo_terminal_from_env,
+    verify_carddemo_utilities_from_env, verify_carddemo_vsam_from_env,
+    verify_cobol_frontend_fixtures, verify_host_abi_libraries,
 };
 use mainframe_env_coverage::{
-    BindingKey, CompiledSpec, ConformanceLimits, CoverageGate, DerivedConformanceLedger, DriverRef,
-    FixtureRef, ObligationId, OfficialCatalogRow, OfficialRowId, RunnerContext, TestId, Verdict,
-    VerdictEvent,
+    BindingKey, CompiledSpec, ConformanceLimits, ConformanceRunner, CoverageGate,
+    DerivedConformanceLedger, DriverRef, FixtureRef, ObligationId, OfficialCatalogRow,
+    OfficialRowId, RunnerContext, RunnerSelection, TestId, Verdict, VerdictEvent,
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -120,6 +121,7 @@ enum XtaskCommand {
     #[command(name = "review-repair-round-5")]
     ReviewRepairRound5(CheckArgs),
     SemanticIdentities(CheckArgs),
+    CobolLanguage(CheckArgs),
     Spec(CheckArgs),
     Conformance(ConformanceArgs),
     Certification(CheckArgs),
@@ -306,6 +308,15 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
                 generate_semantic_identities(root)
             }
         ),
+        XtaskCommand::CobolLanguage(args) => checked!(
+            "cobol-language",
+            args,
+            if args.check {
+                check_cobol_language_generated(root)
+            } else {
+                generate_cobol_language(root)
+            }
+        ),
         XtaskCommand::Spec(args) => checked!("spec", args, check_spec(root)),
         XtaskCommand::Conformance(args) => {
             let focused = args.subsystem.is_some()
@@ -479,9 +490,21 @@ fn check_spec(root: &Path) -> TaskResult {
     let mut schemas = Vec::new();
     collect_extension(&schema_directory, OsStr::new("json"), &mut schemas)?;
     schemas.sort();
+    let schema_names = schemas
+        .iter()
+        .filter_map(|path| path.file_name().and_then(OsStr::to_str))
+        .collect::<BTreeSet<_>>();
     require(
-        schemas.len() == 4,
-        "Conformance IR v1 must expose exactly spec, verdict, ledger, and inventory schemas",
+        schema_names
+            == BTreeSet::from([
+                "cobol-language.schema.json",
+                "cobol-frontend-fixtures.schema.json",
+                "conformance-inventory.schema.json",
+                "conformance-spec.schema.json",
+                "derived-ledger.schema.json",
+                "verdict-event.schema.json",
+            ]),
+        "Conformance IR/Cobol v1 schema set is incomplete or unexpected",
     )?;
     for schema_path in &schemas {
         let schema = json(schema_path)?;
@@ -498,7 +521,21 @@ fn check_spec(root: &Path) -> TaskResult {
         &json(&inventory_path)?,
         &inventory_path,
     )?;
+    let cobol_path = root.join("conformance/0.3/cobol/language.json");
+    let cobol_schema_path = schema_directory.join("cobol-language.schema.json");
+    validate_schema_instance(&json(&cobol_schema_path)?, &json(&cobol_path)?, &cobol_path)?;
+    check_cobol_language_catalog(root, &cobol_path)?;
+    let frontend_path = root.join("conformance/0.3/cobol/frontend-fixtures.json");
+    let frontend_schema_path = schema_directory.join("cobol-frontend-fixtures.schema.json");
+    validate_schema_instance(
+        &json(&frontend_schema_path)?,
+        &json(&frontend_path)?,
+        &frontend_path,
+    )?;
+    verify_cobol_frontend_fixtures()?;
+    check_cobol_language_generated(root)?;
     let spec = compile_shared_spec(root)?;
+    check_cobol_frontend_bindings(root, &spec, &frontend_path)?;
     validate_conformance_projections(&schema_directory, &spec)?;
     require(
         !root.join("conformance/spec/verdicts").exists()
@@ -526,7 +563,7 @@ fn validate_conformance_projections(schema_directory: &Path, spec: &CompiledSpec
         limits,
     )
     .map_err(|problem| problem.to_string())?;
-    let ledger = DerivedConformanceLedger::derive_complete(spec, &context, Vec::new())
+    let ledger = DerivedConformanceLedger::derive_partial(spec, &context, Vec::new())
         .map_err(|problem| problem.to_string())?;
     let ledger_path = schema_directory.join("derived-ledger.schema.json");
     let ledger_bytes = ledger
@@ -565,6 +602,356 @@ fn validate_conformance_projections(schema_directory: &Path, spec: &CompiledSpec
     let verdict_value: Value = serde_json::from_slice(&verdict_bytes)
         .map_err(|error| format!("verdict projection: {error}"))?;
     validate_schema_instance(&json(&verdict_path)?, &verdict_value, &verdict_path)
+}
+
+fn check_cobol_language_catalog(root: &Path, path: &Path) -> TaskResult {
+    let language = json(path)?;
+    let official_path = root.join("conformance/0.2/catalogs/cobol.json");
+    let official = json(&official_path)?;
+    let units = array(&official, "units", &official_path)?;
+    let mut official_rows = BTreeMap::new();
+    for unit in units {
+        let unit_id = text(unit, "id", &official_path)?;
+        for row in array(unit, "rows", &official_path)? {
+            official_rows.insert(
+                text(row, "id", &official_path)?.to_string(),
+                (
+                    unit_id.to_string(),
+                    text(row, "label", &official_path)?.to_string(),
+                    text(row, "source_locator", &official_path)?.to_string(),
+                ),
+            );
+        }
+    }
+    let mut ids = BTreeSet::new();
+    for (field, unit, expected) in [
+        (
+            "compiler_directing_statements",
+            "compiler-directing-statements",
+            15,
+        ),
+        ("compiler_directive_groups", "compiler-directive-groups", 5),
+    ] {
+        let entries = array(&language, field, path)?;
+        require(
+            entries.len() == expected,
+            &format!("COBOL catalog {field} denominator drifted"),
+        )?;
+        for entry in entries {
+            let id = text(entry, "id", path)?;
+            require(
+                ids.insert(id.to_string()),
+                &format!("COBOL catalog repeats identity {id}"),
+            )?;
+            let row_id = text(entry, "row_id", path)?;
+            let Some((official_unit, label, locator)) = official_rows.get(row_id) else {
+                return Err(format!(
+                    "COBOL catalog references unknown official row {row_id}"
+                ));
+            };
+            require(
+                official_unit == unit
+                    && entry["label"].as_str() == Some(label)
+                    && entry["source_locator"].as_str() == Some(locator),
+                &format!("COBOL catalog drifted from official row {row_id}"),
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn check_cobol_frontend_bindings(
+    root: &Path,
+    spec: &CompiledSpec,
+    fixture_path: &Path,
+) -> TaskResult {
+    let fixtures = json(fixture_path)?;
+    let language_path = root.join("conformance/0.3/cobol/language.json");
+    let language = json(&language_path)?;
+    let mut catalog_targets = BTreeMap::new();
+    for entry in array(&language, "compiler_directing_statements", &language_path)? {
+        catalog_targets.insert(
+            text(entry, "row_id", &language_path)?.to_string(),
+            (
+                "directing".to_string(),
+                text(entry, "id", &language_path)?.to_string(),
+            ),
+        );
+    }
+    for entry in array(&language, "compiler_directive_groups", &language_path)? {
+        catalog_targets.insert(
+            text(entry, "row_id", &language_path)?.to_string(),
+            (
+                "directive-group".to_string(),
+                text(entry, "id", &language_path)?.to_string(),
+            ),
+        );
+    }
+    let digest = format!("sha256:{}", file_digest(fixture_path)?);
+    let mut expected_rows = BTreeSet::new();
+    let mut expected_fixtures = BTreeSet::new();
+    for fixture in array(&fixtures, "fixtures", fixture_path)? {
+        let id = text(fixture, "id", fixture_path)?;
+        let row_id = text(fixture, "row_id", fixture_path)?;
+        require(
+            expected_rows.insert(row_id.to_string()),
+            &format!("COBOL frontend repeats official row {row_id}"),
+        )?;
+        let target = (
+            text(fixture, "target_kind", fixture_path)?.to_string(),
+            text(fixture, "target_id", fixture_path)?.to_string(),
+        );
+        require(
+            catalog_targets.get(row_id) == Some(&target),
+            &format!("COBOL frontend target drifts from generated catalog for {row_id}"),
+        )?;
+        for suffix in ["valid", "invalid"] {
+            expected_fixtures.insert(format!("cobol.frontend.{id}.{suffix}"));
+        }
+    }
+    let actual_rows = spec
+        .rows()
+        .filter(|row| expected_rows.contains(row.row_id().as_str()))
+        .map(|row| row.row_id().as_str().to_string())
+        .collect::<BTreeSet<_>>();
+    require(
+        actual_rows == expected_rows,
+        "COBOL frontend fixtures and row specifications are not closed",
+    )?;
+    for row in spec
+        .rows()
+        .filter(|row| expected_rows.contains(row.row_id().as_str()))
+    {
+        let obligations = row
+            .obligations()
+            .iter()
+            .map(|obligation| obligation.as_str())
+            .collect::<BTreeSet<_>>();
+        require(
+            obligations == BTreeSet::from(["valid-forms", "invalid-forms"]),
+            &format!("COBOL frontend obligations drifted for {}", row.row_id()),
+        )?;
+    }
+    let actual_fixtures = spec
+        .registries()
+        .fixtures()
+        .iter()
+        .filter(|(fixture, _)| fixture.as_str().starts_with("cobol.frontend."))
+        .map(|(fixture, fixture_digest)| {
+            require(
+                fixture_digest == &digest,
+                &format!("COBOL frontend fixture digest drifted for {fixture}"),
+            )?;
+            Ok(fixture.as_str().to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        actual_fixtures == expected_fixtures,
+        "COBOL frontend fixture registry is incomplete or contains stale entries",
+    )?;
+    let actual_cases = spec
+        .cases()
+        .filter(|case| case.test_id().as_str().starts_with("cobol.frontend."))
+        .map(|case| {
+            require(
+                case.driver().as_str() == "cobol.frontend.driver"
+                    && case.input().as_str() == case.test_id().as_str()
+                    && case.preconditions().len() == 1
+                    && case.preconditions()[0].as_str() == "cobol.fixture.available"
+                    && case.expected().len() == 1,
+                &format!("COBOL frontend binding drifted for {}", case.test_id()),
+            )?;
+            let expected_observation = if case.key().gate == CoverageGate::Recognized {
+                "cobol.frontend.accepted"
+            } else if case.key().gate == CoverageGate::Validated {
+                "cobol.frontend.rejected"
+            } else {
+                return Err(format!(
+                    "COBOL frontend case claims a later gate: {}",
+                    case.test_id()
+                ));
+            };
+            require(
+                case.expected()[0].as_str() == expected_observation,
+                &format!("COBOL frontend expectation drifted for {}", case.test_id()),
+            )?;
+            Ok(case.test_id().as_str().to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        actual_cases == expected_fixtures,
+        "COBOL frontend executable bindings are incomplete or stale",
+    )
+}
+
+fn generate_cobol_language(root: &Path) -> TaskResult {
+    let path = root.join("crates/kernel/mainframe-env-compiler/src/generated/cobol_language.rs");
+    fs::create_dir_all(path.parent().ok_or("generated COBOL path has no parent")?)
+        .map_err(|error| error.to_string())?;
+    fs::write(&path, render_cobol_language(root)?)
+        .map_err(|error| format!("{}: {error}", path.display()))
+}
+
+fn check_cobol_language_generated(root: &Path) -> TaskResult {
+    let path = root.join("crates/kernel/mainframe-env-compiler/src/generated/cobol_language.rs");
+    let actual = fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?;
+    require(
+        actual == render_cobol_language(root)?,
+        "generated COBOL language identities are stale; run cargo xtask cobol-language",
+    )
+}
+
+fn render_cobol_language(root: &Path) -> TaskResult<Vec<u8>> {
+    let path = root.join("conformance/0.3/cobol/language.json");
+    let language = json(&path)?;
+    check_cobol_language_catalog(root, &path)?;
+    let statements = array(&language, "compiler_directing_statements", &path)?;
+    let groups = array(&language, "compiler_directive_groups", &path)?;
+    let literal = |value: &str| serde_json::to_string(value).map_err(|error| error.to_string());
+    let mut source =
+        String::from("// @generated by `cargo xtask cobol-language`; do not edit.\n\n");
+    source.push_str("#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]\n");
+    source.push_str("pub enum CompilerDirectingKind {\n");
+    for entry in statements {
+        source.push_str(&format!(
+            "    {},\n",
+            rust_variant(text(entry, "id", &path)?)?
+        ));
+    }
+    source.push_str("}\n\n");
+    source.push_str("#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]\n");
+    source.push_str("pub enum CompilerDirectiveGroup {\n");
+    for entry in groups {
+        source.push_str(&format!(
+            "    {},\n",
+            rust_variant(text(entry, "id", &path)?)?
+        ));
+    }
+    source.push_str("}\n\n");
+    let mut directives = Vec::new();
+    for group in groups {
+        let group_variant = rust_variant(text(group, "id", &path)?)?;
+        for directive in array(group, "directives", &path)? {
+            let id = directive
+                .as_str()
+                .ok_or_else(|| format!("{} directive ID is not a string", path.display()))?;
+            directives.push((id.to_string(), group_variant.clone()));
+        }
+    }
+    source.push_str("#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]\n");
+    source.push_str("pub enum CompilerDirectiveKind {\n");
+    for (id, _) in &directives {
+        source.push_str(&format!("    {},\n", rust_variant(id)?));
+    }
+    source.push_str("}\n\n");
+    source.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
+    source.push_str("pub struct CompilerDirectingDescriptor {\n");
+    source.push_str("    pub kind: CompilerDirectingKind,\n    pub id: &'static str,\n    pub row_id: &'static str,\n    pub label: &'static str,\n    pub source_locator: &'static str,\n    pub forms: &'static [&'static str],\n    pub placement: &'static str,\n    pub effect: &'static str,\n}\n\n");
+    source.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
+    source.push_str("pub struct CompilerDirectiveGroupDescriptor {\n");
+    source.push_str("    pub group: CompilerDirectiveGroup,\n    pub id: &'static str,\n    pub row_id: &'static str,\n    pub label: &'static str,\n    pub source_locator: &'static str,\n    pub placement: &'static str,\n    pub effect: &'static str,\n}\n\n");
+    source.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
+    source.push_str("pub struct CompilerDirectiveDescriptor {\n");
+    source.push_str("    pub kind: CompilerDirectiveKind,\n    pub group: CompilerDirectiveGroup,\n    pub id: &'static str,\n}\n\n");
+    source.push_str(
+        "pub static COMPILER_DIRECTING_STATEMENTS: &[CompilerDirectingDescriptor] = &[\n",
+    );
+    for entry in statements {
+        let id = text(entry, "id", &path)?;
+        source.push_str("    CompilerDirectingDescriptor {\n");
+        source.push_str(&format!(
+            "        kind: CompilerDirectingKind::{},\n",
+            rust_variant(id)?
+        ));
+        for field in ["id", "row_id", "label", "source_locator"] {
+            source.push_str(&format!(
+                "        {field}: {},\n",
+                literal(text(entry, field, &path)?)?
+            ));
+        }
+        source.push_str("        forms: &[");
+        for form in array(entry, "forms", &path)? {
+            source.push_str(&literal(
+                form.as_str().ok_or("COBOL form is not a string")?,
+            )?);
+            source.push(',');
+        }
+        source.push_str("],\n");
+        for field in ["placement", "effect"] {
+            source.push_str(&format!(
+                "        {field}: {},\n",
+                literal(text(entry, field, &path)?)?
+            ));
+        }
+        source.push_str("    },\n");
+    }
+    source.push_str("];\n\n");
+    source.push_str(
+        "pub static COMPILER_DIRECTIVE_GROUPS: &[CompilerDirectiveGroupDescriptor] = &[\n",
+    );
+    for entry in groups {
+        let id = text(entry, "id", &path)?;
+        source.push_str("    CompilerDirectiveGroupDescriptor {\n");
+        source.push_str(&format!(
+            "        group: CompilerDirectiveGroup::{},\n",
+            rust_variant(id)?
+        ));
+        for field in [
+            "id",
+            "row_id",
+            "label",
+            "source_locator",
+            "placement",
+            "effect",
+        ] {
+            source.push_str(&format!(
+                "        {field}: {},\n",
+                literal(text(entry, field, &path)?)?
+            ));
+        }
+        source.push_str("    },\n");
+    }
+    source.push_str("];\n\n");
+    source.push_str("pub static COMPILER_DIRECTIVES: &[CompilerDirectiveDescriptor] = &[\n");
+    for (id, group) in directives {
+        source.push_str(&format!(
+            "    CompilerDirectiveDescriptor {{ kind: CompilerDirectiveKind::{}, group: CompilerDirectiveGroup::{group}, id: {} }},\n",
+            rust_variant(&id)?,
+            literal(&id)?
+        ));
+    }
+    source.push_str("];\n\n");
+    source.push_str("pub fn compiler_directing_descriptor(kind: CompilerDirectingKind) -> &'static CompilerDirectingDescriptor {\n    COMPILER_DIRECTING_STATEMENTS.iter().find(|entry| entry.kind == kind).expect(\"generated directing kind\")\n}\n\n");
+    source.push_str("pub fn compiler_directive_descriptor(kind: CompilerDirectiveKind) -> &'static CompilerDirectiveDescriptor {\n    COMPILER_DIRECTIVES.iter().find(|entry| entry.kind == kind).expect(\"generated directive kind\")\n}\n");
+    format_generated_rust(root, source.into_bytes())
+}
+
+fn format_generated_rust(root: &Path, source: Vec<u8>) -> TaskResult<Vec<u8>> {
+    let mut child = Command::new("rustfmt")
+        .args(["--edition", "2024", "--emit", "stdout"])
+        .current_dir(root)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("spawn rustfmt for generated COBOL: {error}"))?;
+    child
+        .stdin
+        .take()
+        .ok_or("rustfmt stdin is unavailable")?
+        .write_all(&source)
+        .map_err(|error| format!("write generated COBOL to rustfmt: {error}"))?;
+    let output = child
+        .wait_with_output()
+        .map_err(|error| format!("wait for generated COBOL rustfmt: {error}"))?;
+    require(
+        output.status.success(),
+        &format!(
+            "rustfmt rejected generated COBOL: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ),
+    )?;
+    Ok(output.stdout)
 }
 
 fn compile_shared_spec(root: &Path) -> TaskResult<CompiledSpec> {
@@ -653,37 +1040,89 @@ fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> T
         args.replay.is_none() || (args.gate.is_none() && args.shard.is_none()),
         "--replay cannot be combined with --gate or --shard",
     )?;
+    let limits = ConformanceLimits::default();
     let gate = args.gate.as_deref().map(parse_coverage_gate).transpose()?;
     let spec = compile_shared_spec(root)?;
-    let selected = spec
-        .cases()
-        .filter(|case| {
-            if let Some(replay) = args.replay.as_deref() {
-                return case.test_id().as_str() == replay;
-            }
-            let Some(row) = spec.catalog_row(&case.key().row_id) else {
-                return false;
-            };
-            let subsystem_matches = args
-                .subsystem
+    let selection = if let Some(replay) = args.replay.as_deref() {
+        RunnerSelection::replay(replay, limits).map_err(|problem| problem.to_string())?
+    } else {
+        RunnerSelection::focused(
+            args.subsystem
                 .as_deref()
-                .is_some_and(|subsystem| subsystem == row.subsystem());
-            let gate_matches = gate.is_none_or(|gate| gate == case.key().gate);
-            let shard_matches = args.shard.is_none_or(|bucket| {
-                spec.expected_shards().iter().any(|(shard, bindings)| {
-                    shard.bucket == bucket && bindings.contains(case.key())
-                })
-            });
-            subsystem_matches && gate_matches && shard_matches
-        })
-        .count();
+                .ok_or("focused conformance requires --subsystem")?,
+            gate,
+            args.shard,
+            limits,
+        )
+        .map_err(|problem| problem.to_string())?
+    };
+    let runtime = cobol_frontend_runtime(&spec, limits)?;
+    let context = RunnerContext::new(candidate_digest(root)?, "local", limits)
+        .map_err(|problem| problem.to_string())?;
+    let report = ConformanceRunner::new(&spec, runtime, limits)
+        .run(&selection, &context)
+        .map_err(|problem| problem.to_string())?;
+    let mut passed = 0usize;
+    let mut failed = 0usize;
+    for event in report.batches.iter().flat_map(|batch| batch.events.iter()) {
+        println!(
+            "{}",
+            String::from_utf8(
+                event
+                    .canonical_json()
+                    .map_err(|problem| problem.to_string())?
+            )
+            .map_err(|error| error.to_string())?
+        );
+        match event.verdict {
+            Verdict::Pass => passed += 1,
+            Verdict::Fail => failed += 1,
+        }
+    }
+    println!(
+        "conformance-ledger spec-digest={} batches={} verdicts={} pass={} fail={}",
+        spec.spec_digest(),
+        report.batches.len(),
+        passed + failed,
+        passed,
+        failed
+    );
+    require(failed == 0, "focused conformance produced failing verdicts")
+}
+
+fn candidate_digest(root: &Path) -> TaskResult<String> {
+    let output = Command::new("git")
+        .args([
+            "ls-files",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "-z",
+        ])
+        .current_dir(root)
+        .output()
+        .map_err(|error| format!("list candidate files: {error}"))?;
     require(
-        selected > 0,
-        "focused conformance selection has no executable bindings",
+        output.status.success(),
+        "git ls-files failed for candidate identity",
     )?;
-    Err(format!(
-        "{selected} binding(s) selected, but their product driver registry is not installed by CI-300"
-    ))
+    let mut files = output
+        .stdout
+        .split(|byte| *byte == 0)
+        .filter(|path| !path.is_empty())
+        .map(|path| String::from_utf8(path.to_vec()).map_err(|error| error.to_string()))
+        .collect::<TaskResult<Vec<_>>>()?;
+    files.sort();
+    let mut digest = Sha256::new();
+    for relative in files {
+        let bytes = fs::read(root.join(&relative))
+            .map_err(|error| format!("candidate file {relative}: {error}"))?;
+        digest.update((relative.len() as u64).to_be_bytes());
+        digest.update(relative.as_bytes());
+        digest.update((bytes.len() as u64).to_be_bytes());
+        digest.update(bytes);
+    }
+    Ok(format!("sha256:{:x}", digest.finalize()))
 }
 
 fn parse_coverage_gate(value: &str) -> TaskResult<CoverageGate> {
@@ -2111,6 +2550,40 @@ fn check_profiles(root: &Path) -> TaskResult {
         .filter_map(|row| row.get("name").and_then(Value::as_str))
         .collect();
     let excluded = excluded_names(root)?;
+    let additions_path = root.join("conformance/0.3/inventory/dependency-additions.json");
+    let additions = json(&additions_path)?;
+    let mut profile_additions = BTreeMap::<String, BTreeSet<String>>::new();
+    for addition in array(&additions, "profile_additions", &additions_path)? {
+        let values = addition.as_array().ok_or_else(|| {
+            format!(
+                "{} contains a malformed profile addition",
+                additions_path.display()
+            )
+        })?;
+        let profile = values.first().and_then(Value::as_str).ok_or_else(|| {
+            format!(
+                "{} profile addition has no profile",
+                additions_path.display()
+            )
+        })?;
+        let package = values.get(1).and_then(Value::as_str).ok_or_else(|| {
+            format!(
+                "{} profile addition has no package",
+                additions_path.display()
+            )
+        })?;
+        require(
+            matches!(profile, "core-server" | "conformance") && package == "mainframe-env-coverage",
+            "0.3 profile addition is outside the reviewed coverage boundary",
+        )?;
+        require(
+            profile_additions
+                .entry(profile.into())
+                .or_default()
+                .insert(package.into()),
+            "0.3 profile addition is duplicated",
+        )?;
+    }
 
     for profile in array(&profiles, "profiles", &profiles_path)? {
         let id = text(profile, "id", &profiles_path)?;
@@ -2154,7 +2627,7 @@ fn check_profiles(root: &Path) -> TaskResult {
             ],
         ),
     ] {
-        let declared = array(&profiles, "profiles", &profiles_path)?
+        let mut declared = array(&profiles, "profiles", &profiles_path)?
             .iter()
             .find(|profile| profile["id"].as_str() == Some(profile_id))
             .ok_or_else(|| format!("profile {profile_id} is missing"))?["packages"]
@@ -2168,6 +2641,13 @@ fn check_profiles(root: &Path) -> TaskResult {
                     .ok_or_else(|| format!("profile {profile_id} has a non-string package"))
             })
             .collect::<TaskResult<BTreeSet<_>>>()?;
+        declared.extend(
+            profile_additions
+                .get(profile_id)
+                .into_iter()
+                .flatten()
+                .cloned(),
+        );
         let mut closure = BTreeSet::new();
         let mut pending = roots.into_iter().map(str::to_string).collect::<Vec<_>>();
         while let Some(package) = pending.pop() {
