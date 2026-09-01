@@ -121,6 +121,7 @@ enum XtaskCommand {
     ReviewRepairRound5(CheckArgs),
     SemanticIdentities(CheckArgs),
     DatasetContract(CheckArgs),
+    DatasetOracle(CheckArgs),
     Spec(CheckArgs),
     Conformance(ConformanceArgs),
     Certification(CheckArgs),
@@ -316,6 +317,9 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
                 generate_dataset_contract(root)
             }
         ),
+        XtaskCommand::DatasetOracle(args) => {
+            checked!("dataset-oracle", args, check_dataset_oracle(root))
+        }
         XtaskCommand::Spec(args) => checked!("spec", args, check_spec(root)),
         XtaskCommand::Conformance(args) => {
             let focused = args.subsystem.is_some()
@@ -2476,7 +2480,15 @@ fn check_schemas(root: &Path) -> TaskResult {
     )?;
     let ams_fixture = root.join("conformance/0.6/fixtures/ams-commands.json");
     let ams_schema = root.join("conformance/0.6/schemas/ams-command-fixtures.schema.json");
-    validate_schema_instance(&json(&ams_schema)?, &json(&ams_fixture)?, &ams_fixture)
+    validate_schema_instance(&json(&ams_schema)?, &json(&ams_fixture)?, &ams_fixture)?;
+    let certification = root.join("conformance/0.6/evidence/dataset-certification.json");
+    let certification_schema =
+        root.join("conformance/0.6/schemas/dataset-certification.schema.json");
+    validate_schema_instance(
+        &json(&certification_schema)?,
+        &json(&certification)?,
+        &certification,
+    )
 }
 
 fn compile_draft_2020_12_schema(schema: &Value, path: &Path) -> TaskResult<jsonschema::Validator> {
@@ -2486,6 +2498,30 @@ fn compile_draft_2020_12_schema(schema: &Value, path: &Path) -> TaskResult<jsons
         .offline()
         .build(schema)
         .map_err(|error| format!("{} did not compile: {error}", path.display()))
+}
+
+fn check_dataset_oracle(root: &Path) -> TaskResult {
+    let receipt_path = env::var_os("MAINFRAME_ENV_ZOS_AMS_ORACLE_RECEIPT")
+        .map(PathBuf::from)
+        .ok_or(
+            "licensed z/OS 3.2 differential is pending; set MAINFRAME_ENV_ZOS_AMS_ORACLE_RECEIPT to a reviewed receipt",
+        )?;
+    require(
+        receipt_path.is_file(),
+        "MAINFRAME_ENV_ZOS_AMS_ORACLE_RECEIPT is not a readable file",
+    )?;
+    let schema_path = root.join("conformance/0.6/schemas/dataset-oracle-receipt.schema.json");
+    let receipt = json(&receipt_path)?;
+    validate_schema_instance(&json(&schema_path)?, &receipt, &receipt_path)?;
+    let candidate = repository_digest(root)?;
+    require(
+        receipt["candidate_digest"].as_str() == Some(candidate.as_str()),
+        "licensed dataset oracle receipt was produced from a different candidate",
+    )?;
+    println!(
+        "dataset-oracle baseline=ibm-zos-3.2-dfsms-ams-2026-06 cases=36 status=pass candidate={candidate}"
+    );
+    Ok(())
 }
 
 fn validate_schema_instance(schema: &Value, instance: &Value, path: &Path) -> TaskResult {
@@ -6443,6 +6479,8 @@ fn repository_digest_excluded(relative: &Path) -> bool {
         || relative == Path::new("conformance/0.2/evidence/review-repair-round-5.json")
         || relative == Path::new("conformance/0.2/evidence/work-packages/CV-209.json")
         || relative == Path::new("docs/delivery/coverage-versions/status/0.2.0.md")
+        || relative == Path::new("conformance/0.6/evidence/dataset-certification.json")
+        || relative == Path::new("docs/delivery/coverage-versions/status/0.6.0.md")
         || (relative_text.starts_with("conformance/0.1/evidence/phase-v")
             && relative.extension() == Some(OsStr::new("json")))
 }

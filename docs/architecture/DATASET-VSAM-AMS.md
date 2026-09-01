@@ -175,12 +175,12 @@ IDCAMS program return code rather than an infrastructure failure.
 
 AMS dataset operands are authorized through the shared principal/resource
 authority before host effects. `BLDINDEX` is a durable AIX rebuild/version
-transition rather than a no-op. `UPGRADE` is represented in the typed AIX state;
-`NOUPGRADE` currently returns the explicit `alternate-index-no-upgrade`
-capability until a materialized stale-index adapter exists. Export/import uses a
-bounded provider-neutral header followed by exact records and never exposes the
-provider codec. Export-disconnect/import-connect atomically use catalog
-connection transitions.
+transition rather than a no-op. `UPGRADE` and `NOUPGRADE` are represented in
+typed `MEAIX4` state: upgrading indexes are atomically rebuilt with base
+mutation, while non-upgrading indexes retain their materialized identity map
+until `BLDINDEX`. Export/import uses a bounded provider-neutral header followed
+by exact records and never exposes the provider codec. Export-disconnect/
+import-connect atomically use catalog connection transitions.
 
 ## Evolution rules
 

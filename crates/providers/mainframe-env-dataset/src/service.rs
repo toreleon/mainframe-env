@@ -442,9 +442,11 @@ impl DatasetService {
             if let Some((_, entry)) = updated_entries
                 .iter()
                 .find(|(dataset, _)| dataset == &index.base)
+                && index.upgrade
             {
                 validate_alternate_index(entry, index)?;
                 let mut updated = index.clone();
+                updated.identities = build_alternate_identities(entry, &updated)?;
                 updated.version = updated
                     .version
                     .checked_add(1)
@@ -589,6 +591,7 @@ struct AlternateIndex {
     key_length: u32,
     allow_duplicates: bool,
     upgrade: bool,
+    identities: Vec<BrowseIdentity>,
     version: u64,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -696,12 +699,22 @@ impl DatasetService {
             .list_provider_state("dataset-aix", limits.max_datasets)
             .map_err(store_error)?
         {
-            let index = decode_alternate_index(&row.payload, row.version)?;
+            let mut index = decode_alternate_index(&row.payload, row.version)?;
             let base = entries
                 .get(&index.base)
                 .ok_or(HostProblem::InfrastructureFailure)?;
             validate_alternate_index(base, &index)
                 .map_err(|_| HostProblem::InfrastructureFailure)?;
+            let rebuilt = build_alternate_identities(base, &index)
+                .map_err(|_| HostProblem::InfrastructureFailure)?;
+            if index.identities.is_empty() {
+                index.identities = rebuilt.clone();
+            }
+            validate_index_identities(base, &index)
+                .map_err(|_| HostProblem::InfrastructureFailure)?;
+            if index.upgrade && index.identities != rebuilt {
+                return Err(HostProblem::InfrastructureFailure);
+            }
             DatasetName::new(&row.key, 128).map_err(|_| HostProblem::InfrastructureFailure)?;
             alternate_indexes.insert(row.key, index);
         }
@@ -1523,6 +1536,7 @@ impl DatasetService {
                     let selected = ordered
                         .into_iter()
                         .filter(|(alternate, _)| key.as_ref().is_none_or(|key| alternate == key))
+                        .filter(|(_, identity)| keyed_record(base, identity).is_some())
                         .take(*max_records as usize)
                         .collect::<Vec<_>>();
                     if key.is_some() && selected.is_empty() {
@@ -2771,13 +2785,6 @@ impl DatasetService {
                 upgrade,
                 mutation,
             } => {
-                if !upgrade {
-                    return Err(HostProblem::UnsupportedCapability {
-                        capability: "alternate-index-no-upgrade".into(),
-                        detail: "NOUPGRADE requires a materialized non-upgrading AIX adapter"
-                            .into(),
-                    });
-                }
                 if state
                     .entries
                     .len()
@@ -2803,9 +2810,12 @@ impl DatasetService {
                     key_length: *key_length,
                     allow_duplicates: *allow_duplicates,
                     upgrade: *upgrade,
+                    identities: Vec::new(),
                     version: 1,
                 };
                 validate_alternate_index(base_entry, &definition)?;
+                let mut definition = definition;
+                definition.identities = build_alternate_identities(base_entry, &definition)?;
                 let mut dependencies = state.dependencies.clone();
                 dependencies.add_dependency(
                     index.as_str(),
@@ -2875,7 +2885,8 @@ impl DatasetService {
                 if current.base != base.as_str() {
                     return Err(condition("INVREQ", 16));
                 }
-                validate_alternate_index(entry_text(state, &current.base)?, &current)?;
+                let base_entry = entry_text(state, &current.base)?;
+                validate_alternate_index(base_entry, &current)?;
                 let mut updates = state
                     .alternate_indexes
                     .iter()
@@ -2884,6 +2895,7 @@ impl DatasetService {
                     })
                     .map(|(name, candidate)| {
                         let mut next = candidate.clone();
+                        next.identities = build_alternate_identities(base_entry, &next)?;
                         next.version = next
                             .version
                             .checked_add(1)
@@ -3678,10 +3690,11 @@ impl DatasetService {
         for (name, index) in state
             .alternate_indexes
             .iter()
-            .filter(|(_, index)| index.base == dataset)
+            .filter(|(_, index)| index.base == dataset && index.upgrade)
         {
             validate_alternate_index(next, index)?;
             let mut updated = index.clone();
+            updated.identities = build_alternate_identities(next, &updated)?;
             updated.version = updated
                 .version
                 .checked_add(1)
@@ -4634,6 +4647,13 @@ fn alternate_key(index: &AlternateIndex, record: &[u8]) -> Result<Vec<u8>, HostP
 }
 
 fn alternate_identities(
+    _base: &Entry,
+    index: &AlternateIndex,
+) -> Result<Vec<BrowseIdentity>, HostProblem> {
+    Ok(index.identities.clone())
+}
+
+fn build_alternate_identities(
     base: &Entry,
     index: &AlternateIndex,
 ) -> Result<Vec<BrowseIdentity>, HostProblem> {
@@ -4657,6 +4677,30 @@ fn alternate_identities(
         .collect())
 }
 
+fn validate_index_identities(base: &Entry, index: &AlternateIndex) -> Result<(), HostProblem> {
+    let primary_length = usize::try_from(
+        base.attributes
+            .key_length
+            .ok_or(HostProblem::InfrastructureFailure)?,
+    )
+    .map_err(|_| HostProblem::ResourceExhausted)?;
+    let alternate_length =
+        usize::try_from(index.key_length).map_err(|_| HostProblem::ResourceExhausted)?;
+    if index.identities.iter().any(|(alternate, primary)| {
+        alternate.len() != alternate_length || primary.len() != primary_length
+    }) || index.identities.windows(2).any(|pair| pair[0] > pair[1])
+        || (!index.allow_duplicates
+            && index
+                .identities
+                .windows(2)
+                .any(|pair| pair[0].0 == pair[1].0))
+    {
+        Err(HostProblem::InfrastructureFailure)
+    } else {
+        Ok(())
+    }
+}
+
 fn validate_alternate_index(base: &Entry, index: &AlternateIndex) -> Result<(), HostProblem> {
     validate_key_range(base, index.key_offset, index.key_length)?;
     if index.allow_duplicates {
@@ -4678,7 +4722,11 @@ fn browse_identities(
     dataset: &DatasetName,
 ) -> Result<Vec<BrowseIdentity>, HostProblem> {
     if let Some(index) = state.alternate_indexes.get(dataset.as_str()) {
-        return alternate_identities(entry_text(state, &index.base)?, index);
+        let base = entry_text(state, &index.base)?;
+        return Ok(alternate_identities(base, index)?
+            .into_iter()
+            .filter(|(_, identity)| keyed_record(base, identity).is_some())
+            .collect());
     }
     let entry = entry(state, dataset)?;
     ordered_records(entry)?
@@ -4986,7 +5034,7 @@ fn decode_catalog_alias(payload: &[u8], version: u64) -> Result<CatalogAlias, Ho
 }
 
 fn encode_alternate_index(index: &AlternateIndex) -> Result<Vec<u8>, HostProblem> {
-    let mut payload = b"MEAIX3".to_vec();
+    let mut payload = b"MEAIX4".to_vec();
     dataset_field(&mut payload, index.base.as_bytes())?;
     dataset_field(&mut payload, index.parent.as_bytes())?;
     payload.push(u8::from(index.is_path));
@@ -4994,18 +5042,32 @@ fn encode_alternate_index(index: &AlternateIndex) -> Result<Vec<u8>, HostProblem
     payload.extend_from_slice(&index.key_length.to_be_bytes());
     payload.push(u8::from(index.allow_duplicates));
     payload.push(u8::from(index.upgrade));
+    payload.extend_from_slice(
+        &u32::try_from(index.identities.len())
+            .map_err(|_| HostProblem::ResourceExhausted)?
+            .to_be_bytes(),
+    );
+    for (alternate, primary) in &index.identities {
+        dataset_field(&mut payload, alternate)?;
+        dataset_field(&mut payload, primary)?;
+    }
     Ok(payload)
 }
 
 fn decode_alternate_index(payload: &[u8], version: u64) -> Result<AlternateIndex, HostProblem> {
     let schema = payload.get(..6);
-    if !matches!(schema, Some(b"MEAIX1") | Some(b"MEAIX2") | Some(b"MEAIX3")) || version == 0 {
+    if !matches!(
+        schema,
+        Some(b"MEAIX1") | Some(b"MEAIX2") | Some(b"MEAIX3") | Some(b"MEAIX4")
+    ) || version == 0
+    {
         return Err(HostProblem::InfrastructureFailure);
     }
     let mut at = 6usize;
     let base = String::from_utf8(dataset_take_field(payload, &mut at, 128)?)
         .map_err(|_| HostProblem::InfrastructureFailure)?;
-    let (parent, is_path) = if matches!(schema, Some(b"MEAIX2") | Some(b"MEAIX3")) {
+    let (parent, is_path) = if matches!(schema, Some(b"MEAIX2") | Some(b"MEAIX3") | Some(b"MEAIX4"))
+    {
         let parent = String::from_utf8(dataset_take_field(payload, &mut at, 128)?)
             .map_err(|_| HostProblem::InfrastructureFailure)?;
         let is_path = match payload.get(at) {
@@ -5040,7 +5102,7 @@ fn decode_alternate_index(payload: &[u8], version: u64) -> Result<AlternateIndex
         _ => return Err(HostProblem::InfrastructureFailure),
     };
     at += 1;
-    let upgrade = if schema == Some(b"MEAIX3") {
+    let upgrade = if matches!(schema, Some(b"MEAIX3") | Some(b"MEAIX4")) {
         let value = match payload.get(at) {
             Some(0) => false,
             Some(1) => true,
@@ -5051,6 +5113,27 @@ fn decode_alternate_index(payload: &[u8], version: u64) -> Result<AlternateIndex
     } else {
         true
     };
+    let mut identities = Vec::new();
+    if schema == Some(b"MEAIX4") {
+        let count = usize::try_from(u32::from_be_bytes(
+            payload
+                .get(at..at + 4)
+                .ok_or(HostProblem::InfrastructureFailure)?
+                .try_into()
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+        ))
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+        at += 4;
+        if count > 65_536 {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        for _ in 0..count {
+            identities.push((
+                dataset_take_field(payload, &mut at, 1024 * 1024)?,
+                dataset_take_field(payload, &mut at, 1024 * 1024)?,
+            ));
+        }
+    }
     if at != payload.len() || base.is_empty() || key_length == 0 {
         return Err(HostProblem::InfrastructureFailure);
     }
@@ -5062,6 +5145,7 @@ fn decode_alternate_index(payload: &[u8], version: u64) -> Result<AlternateIndex
         key_length,
         allow_duplicates,
         upgrade,
+        identities,
         version,
     })
 }
@@ -6942,6 +7026,10 @@ mod tests {
         fn arm(&self) {
             self.fail_next.store(true, Ordering::SeqCst);
         }
+
+        fn fail_now(&self) -> bool {
+            self.fail_next.swap(false, Ordering::SeqCst)
+        }
     }
 
     impl ProviderStateStore for FailAtomicOnceStore {
@@ -6993,14 +7081,18 @@ mod tests {
             &self,
             writes: Vec<ProviderStateWrite>,
         ) -> Result<(), StoreError> {
-            self.inner.put_provider_states_atomic(writes)
+            if self.fail_now() {
+                Err(StoreError::Infrastructure("injected-before-commit".into()))
+            } else {
+                self.inner.put_provider_states_atomic(writes)
+            }
         }
 
         fn mutate_provider_states_atomic(
             &self,
             mutations: Vec<ProviderStateMutation>,
         ) -> Result<(), StoreError> {
-            if self.fail_next.swap(false, Ordering::SeqCst) {
+            if self.fail_now() {
                 Err(StoreError::Infrastructure("injected-before-commit".into()))
             } else {
                 self.inner.mutate_provider_states_atomic(mutations)
@@ -8440,18 +8532,64 @@ mod tests {
             }),
             Ok(DatasetResult::Mutated { version: 5 })
         );
-        assert!(matches!(
+        let stale = DatasetName::new("USER.BASE.STALE", 44).unwrap();
+        assert_eq!(
             restarted.invoke(DatasetRequest::DefineAlternateIndex {
-                base,
-                index: DatasetName::new("USER.BASE.STALE", 44).unwrap(),
+                base: base.clone(),
+                index: stale.clone(),
                 key_offset: 2,
                 key_length: 1,
                 allow_duplicates: true,
                 upgrade: false,
                 mutation: mutation(11),
             }),
-            Err(HostProblem::UnsupportedCapability { ref capability, .. })
-                if capability == "alternate-index-no-upgrade"
+            Ok(DatasetResult::Created { version: 1 })
+        );
+        restarted
+            .invoke(DatasetRequest::RewriteRecord {
+                dataset: base.clone(),
+                key: b"AA".to_vec(),
+                record: b"AAY7".to_vec(),
+                expected_version: Some(5),
+                mutation: mutation(12),
+            })
+            .unwrap();
+        assert!(matches!(
+            restarted.invoke(DatasetRequest::Read {
+                dataset: stale.clone(),
+                member: None,
+                key: Some(b"Z".to_vec()),
+                max_records: 1,
+            }),
+            Ok(DatasetResult::Records { records, version: 1, .. })
+                if records == [b"AAY7".to_vec()]
+        ));
+        assert!(matches!(
+            restarted.invoke(DatasetRequest::Read {
+                dataset: stale.clone(),
+                member: None,
+                key: Some(b"Y".to_vec()),
+                max_records: 1,
+            }),
+            Err(HostProblem::Condition { ref name, .. }) if name == "NOTFND"
+        ));
+        assert_eq!(
+            restarted.invoke(DatasetRequest::BuildAlternateIndex {
+                base,
+                index: stale.clone(),
+                mutation: mutation(13),
+            }),
+            Ok(DatasetResult::Mutated { version: 2 })
+        );
+        assert!(matches!(
+            restarted.invoke(DatasetRequest::Read {
+                dataset: stale,
+                member: None,
+                key: Some(b"Y".to_vec()),
+                max_records: 1,
+            }),
+            Ok(DatasetResult::Records { records, version: 2, .. })
+                if records == [b"AAY7".to_vec()]
         ));
     }
     #[test]
@@ -8967,6 +9105,381 @@ mod tests {
             Ok(DatasetResult::Records { records, version: 2, .. })
                 if records == [b"AA11".to_vec()]
         ));
+    }
+
+    #[test]
+    fn injected_base_aix_and_gdg_failures_retry_without_partial_publication() {
+        let store = Arc::new(FailAtomicOnceStore::new());
+        let dataset = service(store.clone());
+        let base = DatasetName::new("FAIL.BASE", 44).unwrap();
+        let index = DatasetName::new("FAIL.BASE.AIX", 44).unwrap();
+        dataset
+            .invoke(DatasetRequest::Create {
+                dataset: base.clone(),
+                attributes: attrs(DatasetOrganization::KeySequenced),
+                mutation: mutation(560),
+            })
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::Write {
+                dataset: base.clone(),
+                member: None,
+                records: vec![b"AA11".to_vec()],
+                expected_version: Some(1),
+                mutation: mutation(561),
+            })
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::DefineAlternateIndex {
+                base: base.clone(),
+                index: index.clone(),
+                key_offset: 2,
+                key_length: 2,
+                allow_duplicates: false,
+                upgrade: true,
+                mutation: mutation(562),
+            })
+            .unwrap();
+        let rewrite = DatasetRequest::RewriteRecord {
+            dataset: base.clone(),
+            key: b"AA".to_vec(),
+            record: b"AA22".to_vec(),
+            expected_version: Some(2),
+            mutation: mutation(563),
+        };
+        store.arm();
+        assert_eq!(
+            dataset.invoke(rewrite.clone()),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Read {
+                dataset: index.clone(),
+                member: None,
+                key: Some(b"11".to_vec()),
+                max_records: 1,
+            }),
+            Ok(DatasetResult::Records { records, version: 1, .. })
+                if records == [b"AA11".to_vec()]
+        ));
+        assert_eq!(
+            dataset.invoke(rewrite),
+            Ok(DatasetResult::Mutated { version: 3 })
+        );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Read {
+                dataset: index,
+                member: None,
+                key: Some(b"22".to_vec()),
+                max_records: 1,
+            }),
+            Ok(DatasetResult::Records { records, version: 2, .. })
+                if records == [b"AA22".to_vec()]
+        ));
+
+        let gdg = DatasetName::new("FAIL.GDG", 44).unwrap();
+        dataset
+            .invoke(DatasetRequest::DefineGenerationGroup {
+                base: gdg.clone(),
+                limit: 2,
+                scratch: true,
+                empty: false,
+                mutation: mutation(564),
+            })
+            .unwrap();
+        let generation = DatasetRequest::CreateGeneration {
+            base: gdg.clone(),
+            attributes: attrs(DatasetOrganization::Sequential),
+            records: vec![b"GEN1".to_vec()],
+            mutation: mutation(565),
+        };
+        store.arm();
+        assert_eq!(
+            dataset.invoke(generation.clone()),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(
+            dataset.invoke(DatasetRequest::ResolveGeneration {
+                base: gdg.clone(),
+                relative: 0,
+            }),
+            Err(HostProblem::NotFound)
+        );
+        assert!(matches!(
+            dataset.invoke(generation),
+            Ok(DatasetResult::Generation {
+                absolute_generation: 1,
+                version: 2,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn corruption_matrix_rejects_every_dataset_authority_before_publication() {
+        for (namespace, key) in [
+            ("dataset-replay", "bad-replay"),
+            ("dataset", "USER.BAD"),
+            ("dataset-aix", "USER.BAD.AIX"),
+            ("dataset-gdg", "USER.BAD.GDG"),
+            ("dataset-catalog", "USER.BAD.CAT"),
+            ("dataset-catalog-alias", "USER.BAD.ALIAS"),
+            ("dataset-lock", "bad-lock"),
+            ("dataset-tvs", "bad-uow"),
+        ] {
+            let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+            store
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: namespace.into(),
+                        key: key.into(),
+                        version: 1,
+                        payload: b"corrupt".to_vec(),
+                    },
+                    None,
+                )
+                .unwrap();
+            assert!(matches!(
+                DatasetService::open(store, DatasetLimits::default()),
+                Err(HostProblem::InfrastructureFailure)
+            ));
+        }
+    }
+
+    #[test]
+    fn sqlite_dataset_backup_restores_one_integrity_checked_snapshot() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-dataset-backup-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let source_path = directory.join("source.db");
+        let backup_path = directory.join("backup.db");
+        let source = Arc::new(
+            SqliteStateStore::open(
+                &format!("sqlite://{}?mode=rwc", source_path.display()),
+                2 * 1024 * 1024,
+                65_536,
+            )
+            .unwrap(),
+        );
+        let store: Arc<dyn ProviderStateStore> = source.clone();
+        let dataset = service(store);
+        let name = DatasetName::new("USER.BACKUP", 44).unwrap();
+        dataset
+            .invoke(DatasetRequest::Create {
+                dataset: name.clone(),
+                attributes: attrs(DatasetOrganization::Sequential),
+                mutation: mutation(600),
+            })
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::Write {
+                dataset: name.clone(),
+                member: None,
+                records: vec![b"OLD1".to_vec()],
+                expected_version: Some(1),
+                mutation: mutation(601),
+            })
+            .unwrap();
+        source.integrity_check().unwrap();
+        source.backup_to(&backup_path).unwrap();
+        dataset
+            .invoke(DatasetRequest::Append {
+                dataset: name.clone(),
+                member: None,
+                records: vec![b"NEW2".to_vec()],
+                expected_version: Some(2),
+                mutation: mutation(602),
+            })
+            .unwrap();
+        drop(dataset);
+        drop(source);
+
+        let restored = Arc::new(
+            SqliteStateStore::open(
+                &format!("sqlite://{}?mode=rw", backup_path.display()),
+                2 * 1024 * 1024,
+                65_536,
+            )
+            .unwrap(),
+        );
+        restored.integrity_check().unwrap();
+        let restored_store: Arc<dyn ProviderStateStore> = restored.clone();
+        let restored_dataset = service(restored_store);
+        assert!(matches!(
+            restored_dataset.invoke(DatasetRequest::Read {
+                dataset: name,
+                member: None,
+                key: None,
+                max_records: 8,
+            }),
+            Ok(DatasetResult::Records { records, version: 2, .. })
+                if records == [b"OLD1".to_vec()]
+        ));
+        drop(restored_dataset);
+        drop(restored);
+        let _ = std::fs::remove_file(source_path);
+        let _ = std::fs::remove_file(backup_path);
+        let _ = std::fs::remove_dir(directory);
+    }
+
+    #[test]
+    fn scale_limit_and_sorted_restart_are_deterministic() {
+        let limits = DatasetLimits {
+            max_datasets: 64,
+            max_records: 1_024,
+            ..DatasetLimits::default()
+        };
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let dataset = DatasetService::open(store.clone(), limits).unwrap();
+        for sequence in 0..64u64 {
+            dataset
+                .invoke(DatasetRequest::Create {
+                    dataset: DatasetName::new(format!("SCALE.D{sequence:04}"), 44).unwrap(),
+                    attributes: attrs(DatasetOrganization::Sequential),
+                    mutation: mutation(700 + sequence),
+                })
+                .unwrap();
+        }
+        assert_eq!(
+            dataset.invoke(DatasetRequest::Create {
+                dataset: DatasetName::new("SCALE.OVER", 44).unwrap(),
+                attributes: attrs(DatasetOrganization::Sequential),
+                mutation: mutation(800),
+            }),
+            Err(HostProblem::ResourceExhausted)
+        );
+        let restarted = DatasetService::open(store, limits).unwrap();
+        let DatasetResult::Listed { names, more } = restarted
+            .invoke(DatasetRequest::List {
+                pattern: "SCALE.*".into(),
+                start: None,
+                max_items: 64,
+            })
+            .unwrap()
+        else {
+            panic!("expected scale listing");
+        };
+        assert!(!more);
+        assert_eq!(names.len(), 64);
+        assert!(
+            names
+                .windows(2)
+                .all(|pair| pair[0].as_str() < pair[1].as_str())
+        );
+    }
+
+    #[test]
+    fn concurrent_mutation_and_lock_races_have_one_deterministic_winner() {
+        let dataset = service(Arc::new(MemoryStore::new(Default::default())));
+        let keyed = DatasetName::new("RACE.KSDS", 44).unwrap();
+        dataset
+            .invoke(DatasetRequest::Create {
+                dataset: keyed.clone(),
+                attributes: attrs(DatasetOrganization::KeySequenced),
+                mutation: mutation(820),
+            })
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::Write {
+                dataset: keyed.clone(),
+                member: None,
+                records: vec![b"AA11".to_vec()],
+                expected_version: Some(1),
+                mutation: mutation(821),
+            })
+            .unwrap();
+        let barrier = Arc::new(std::sync::Barrier::new(3));
+        let mut handles = Vec::new();
+        for (sequence, record) in [(822, b"AA22".to_vec()), (823, b"AA33".to_vec())] {
+            let service = dataset.clone();
+            let dataset = keyed.clone();
+            let barrier = barrier.clone();
+            handles.push(std::thread::spawn(move || {
+                barrier.wait();
+                service.invoke(DatasetRequest::RewriteRecord {
+                    dataset,
+                    key: b"AA".to_vec(),
+                    record,
+                    expected_version: Some(2),
+                    mutation: mutation(sequence),
+                })
+            }));
+        }
+        barrier.wait();
+        let outcomes = handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            outcomes
+                .iter()
+                .filter(|outcome| matches!(outcome, Ok(DatasetResult::Mutated { version: 3 })))
+                .count(),
+            1
+        );
+        assert_eq!(
+            outcomes
+                .iter()
+                .filter(|outcome| **outcome == Err(HostProblem::IdempotencyConflict))
+                .count(),
+            1
+        );
+
+        let rls = DatasetName::new("RACE.RLS", 44).unwrap();
+        let mut definition = mainframe_env_host_api::DatasetDefinition::compatibility(attrs(
+            DatasetOrganization::KeySequenced,
+        ));
+        definition.vsam.access_mode = mainframe_env_host_api::VsamAccessMode::Rls;
+        definition.vsam.share_options.cross_region = 2;
+        dataset
+            .invoke(DatasetRequest::Define {
+                dataset: rls.clone(),
+                definition: Box::new(definition),
+                mutation: mutation(824),
+            })
+            .unwrap();
+        let barrier = Arc::new(std::sync::Barrier::new(3));
+        let mut handles = Vec::new();
+        for (sequence, owner) in [(825, "RACE1"), (826, "RACE2")] {
+            let service = dataset.clone();
+            let dataset = rls.clone();
+            let barrier = barrier.clone();
+            handles.push(std::thread::spawn(move || {
+                barrier.wait();
+                service.invoke(DatasetRequest::AcquireLock {
+                    dataset,
+                    target: mainframe_env_host_api::DatasetLockTarget::Dataset,
+                    owner: principal(owner),
+                    mode: mainframe_env_host_api::DatasetLockMode::Exclusive,
+                    now_tick: sequence,
+                    lease_ticks: 100,
+                    transaction: None,
+                    mutation: mutation(sequence),
+                })
+            }));
+        }
+        barrier.wait();
+        let outcomes = handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            outcomes
+                .iter()
+                .filter(|outcome| matches!(outcome, Ok(DatasetResult::Locks { locks }) if locks.len() == 1))
+                .count(),
+            1
+        );
+        assert_eq!(
+            outcomes
+                .iter()
+                .filter(|outcome| matches!(outcome, Err(HostProblem::Condition { name, .. }) if name == "LOCKED"))
+                .count(),
+            1
+        );
     }
 
     #[test]

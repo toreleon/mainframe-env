@@ -1,0 +1,47 @@
+{
+  "schema_version": "mainframe-env.dataset-certification@1",
+  "target_version": "0.6.0",
+  "baseline_id": "ibm-zos-3.2-dfsms-ams-2026-06",
+  "surface": {
+    "official_rows": 36,
+    "ams_commands": 31,
+    "organizations": 5,
+    "detailed_descriptors": 131,
+    "local_bindings": 118
+  },
+  "state": {
+    "writer": "MEDS5",
+    "readers": ["MEDS1", "MEDS2", "MEDS3", "MEDS4", "MEDS5"],
+    "aix_writer": "MEAIX4",
+    "migrations": ["2-to-3", "3-to-4", "4-to-5"]
+  },
+  "matrices": {
+    "base_aix_atomicity": "pass",
+    "gdg_atomicity": "pass",
+    "disp_cleanup": "pass",
+    "locks": "pass",
+    "rls_tvs": "pass",
+    "restart": "pass",
+    "unknown_outcome": "pass",
+    "concurrent_mutation": "pass",
+    "corruption": "pass",
+    "backup_restore": "pass",
+    "migration": "pass",
+    "scale": "pass",
+    "carddemo_exactness": "pass"
+  },
+  "validation": [
+    "cargo test --workspace --all-targets",
+    "cargo clippy --workspace --all-targets -- -D warnings",
+    "cargo xtask schemas --check",
+    "cargo xtask dataset-contract --check",
+    "cargo xtask spec --check",
+    "cargo xtask conformance --subsystem dataset-vsam-ams --check",
+    "cargo xtask full-regression --check"
+  ],
+  "oracle": {
+    "status": "pending",
+    "required_environment": "licensed-zos-3.2",
+    "receipt": null
+  }
+}

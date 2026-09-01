@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/dataset-certification.schema.json",
+  "title": "Dataset VSAM AMS local certification evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_version", "baseline_id", "surface", "state", "matrices", "validation", "oracle"],
+  "properties": {
+    "schema_version": { "const": "mainframe-env.dataset-certification@1" },
+    "target_version": { "const": "0.6.0" },
+    "baseline_id": { "const": "ibm-zos-3.2-dfsms-ams-2026-06" },
+    "surface": {
+      "type": "object", "additionalProperties": false,
+      "required": ["official_rows", "ams_commands", "organizations", "detailed_descriptors", "local_bindings"],
+      "properties": {
+        "official_rows": { "const": 36 },
+        "ams_commands": { "const": 31 },
+        "organizations": { "const": 5 },
+        "detailed_descriptors": { "const": 131 },
+        "local_bindings": { "const": 118 }
+      }
+    },
+    "state": {
+      "type": "object", "additionalProperties": false,
+      "required": ["writer", "readers", "aix_writer", "migrations"],
+      "properties": {
+        "writer": { "const": "MEDS5" },
+        "readers": { "const": ["MEDS1", "MEDS2", "MEDS3", "MEDS4", "MEDS5"] },
+        "aix_writer": { "const": "MEAIX4" },
+        "migrations": { "const": ["2-to-3", "3-to-4", "4-to-5"] }
+      }
+    },
+    "matrices": {
+      "type": "object", "additionalProperties": { "const": "pass" },
+      "required": ["base_aix_atomicity", "gdg_atomicity", "disp_cleanup", "locks", "rls_tvs", "restart", "unknown_outcome", "concurrent_mutation", "corruption", "backup_restore", "migration", "scale", "carddemo_exactness"]
+    },
+    "validation": {
+      "type": "array", "minItems": 1, "maxItems": 32,
+      "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+    },
+    "oracle": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "required_environment", "receipt"],
+      "properties": {
+        "status": { "enum": ["pending", "pass"] },
+        "required_environment": { "const": "licensed-zos-3.2" },
+        "receipt": { "type": ["string", "null"], "maxLength": 256 }
+      }
+    }
+  }
+}
