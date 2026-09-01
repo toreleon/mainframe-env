@@ -6,7 +6,7 @@ use crate::{
     JclDiagnosticProjection, JclExpandedStatement, JclExpansionLimits, JclParameterNode,
     JclPlanDocument, JclPlanNode, JclProcedureDefinition, JclRelatedDiagnostic, JclSourceOrigin,
     JclSourceOriginKind, JclSourceSpan, JclStatementId, JclStatementNode, JclSymbolDefinition,
-    JclSyntaxLimits, JclValueShape, expand_jcl,
+    JclSyntaxLimits, JclValueShape, Jes2StatementId, expand_jcl,
 };
 use mainframe_env_diagnostics::{
     Completeness, Diagnostic, DiagnosticCode, DiagnosticLimits, FailureCategory, Phase, Redaction,
@@ -375,6 +375,73 @@ pub fn convert_jcl(
         plan_nodes.push(node);
     }
 
+    for expanded in expansion.jecl_statements() {
+        if statement_nodes.len() >= limits.max_plan_nodes {
+            return Err(JclConversionProblem::ResourceLimit("plan statements"));
+        }
+        let statement_id = u32::try_from(statement_nodes.len() + 1)
+            .map_err(|_| JclConversionProblem::ResourceLimit("plan statement identity"))?;
+        let statement = expanded.statement();
+        let source_range = statement.source();
+        let descriptor = statement.identity().descriptor();
+        if let Err(message) = validate_jecl_operands(statement.identity(), statement.operands()) {
+            diagnostics.push(plan_diagnostic(
+                "MEJCL0763",
+                &message,
+                Severity::Error,
+                FailureCategory::MalformedInput,
+                Completeness::Incomplete,
+                source_range,
+            ));
+        }
+        let span = projected_source_span(source, source_range, JclSourceOriginKind::Primary, &[])?;
+        let statement_node = JclStatementNode::new(
+            statement_id,
+            statement.generated_identity(),
+            None,
+            statement.operands().to_string(),
+            Vec::new(),
+            span.clone(),
+        );
+        let insertion = statement_nodes
+            .iter()
+            .position(|candidate| {
+                candidate.source().file_id() == source_range.file.get()
+                    && candidate.source().byte_start() > source_range.bytes.start
+            })
+            .unwrap_or(statement_nodes.len());
+        statement_nodes.insert(insertion, statement_node);
+        plan_nodes.insert(
+            insertion,
+            JclPlanNode::Jecl {
+                operation: descriptor.keyword.into(),
+                statement_id,
+            },
+        );
+        capabilities.push(JclCapabilityRequirement::new(
+            descriptor.capability.into(),
+            JclCapabilityState::Deferred,
+            format!(
+                "{} JECL statement requires {}",
+                descriptor.label, descriptor.capability
+            ),
+            statement_id,
+            None,
+            span,
+        ));
+        diagnostics.push(plan_diagnostic(
+            "MEJCL0764",
+            &format!(
+                "accepted JES2 JECL statement requires deferred capability {}",
+                descriptor.capability
+            ),
+            Severity::Warning,
+            FailureCategory::Unsupported,
+            Completeness::Unsupported,
+            source_range,
+        ));
+    }
+
     if job_count != 1 {
         diagnostics.push(plan_global_diagnostic(
             "MEJCL0747",
@@ -535,6 +602,86 @@ fn validate_statement_operands(statement: &JclExpandedStatement) -> Result<(), S
             validation_name(shape)
         )),
     }
+}
+
+fn validate_jecl_operands(identity: Jes2StatementId, operands: &str) -> Result<(), String> {
+    let descriptor = identity.descriptor();
+    let value = operands.trim();
+    let valid_shape = match descriptor.validation {
+        JclValueShape::None => value.is_empty(),
+        JclValueShape::JclValue => balanced_jcl_value(value),
+        JclValueShape::Text => !value.is_empty() && !value.chars().any(char::is_control),
+        JclValueShape::Name => valid_name(value),
+        JclValueShape::NameList => validate_list(value, valid_name),
+        JclValueShape::Integer => value.parse::<u64>().is_ok_and(|parsed| {
+            descriptor.minimum.is_none_or(|minimum| parsed >= minimum)
+                && descriptor.maximum.is_none_or(|maximum| parsed <= maximum)
+        }),
+        _ => false,
+    };
+    if !valid_shape {
+        return Err(format!(
+            "{} JECL operands violate generated {} validation",
+            descriptor.label,
+            validation_name(descriptor.validation)
+        ));
+    }
+    let exact = match identity {
+        Jes2StatementId::Jobparm => validate_named_jecl_operands(
+            value,
+            &[
+                "BURST", "BYTES", "CARDS", "COPIES", "LINES", "NOLOG", "PROCLIB", "RESTART",
+                "ROOM", "SYSAFF", "SYSTEM", "TIME",
+            ],
+        ),
+        Jes2StatementId::Output => validate_named_jecl_operands(
+            value,
+            &[
+                "BURST", "CHARS", "COPIES", "DEST", "FCB", "FLASH", "FORMS", "JESDS", "UCS",
+            ],
+        ),
+        Jes2StatementId::Route => {
+            let words = value.split_whitespace().collect::<Vec<_>>();
+            words.len() == 2
+                && matches!(
+                    words[0].to_ascii_uppercase().as_str(),
+                    "PRINT" | "PUNCH" | "XEQ"
+                )
+                && valid_name(words[1])
+        }
+        Jes2StatementId::Signon => value.split_whitespace().count() <= 3,
+        Jes2StatementId::Xmit => {
+            let values = split_top_level(value);
+            !values.is_empty()
+                && valid_name(values[0].trim())
+                && values.iter().skip(1).all(|operand| {
+                    operand.split_once('=').is_some_and(|(name, value)| {
+                        name.trim().eq_ignore_ascii_case("DLM")
+                            && (1..=2).contains(&strip_quotes(value).len())
+                    })
+                })
+        }
+        _ => true,
+    };
+    exact.then_some(()).ok_or_else(|| {
+        format!(
+            "{} JECL operands violate statement-specific validation",
+            descriptor.label
+        )
+    })
+}
+
+fn validate_named_jecl_operands(value: &str, allowed: &[&str]) -> bool {
+    let operands = split_top_level(value);
+    !operands.is_empty()
+        && operands.iter().all(|operand| {
+            operand.split_once('=').is_some_and(|(name, value)| {
+                allowed
+                    .iter()
+                    .any(|allowed| allowed.eq_ignore_ascii_case(name.trim()))
+                    && !value.trim().is_empty()
+            })
+        })
 }
 
 fn normalize_parameter(identity: crate::JclParameterIdentity, raw: &str) -> Result<String, String> {
@@ -1209,7 +1356,24 @@ fn validate_statement_context(
                     ));
                 }
             }
-            JclPlanNode::Jecl { .. } => {}
+            JclPlanNode::Jecl { operation, .. } => {
+                let valid_timing = match operation.as_str() {
+                    "SIGNON" => !seen_job,
+                    "SIGNOFF" | "$" => true,
+                    "JOBPARM" | "PRIORITY" | "XEQ" => seen_job && !seen_step,
+                    _ => seen_job,
+                };
+                if !valid_timing {
+                    diagnostics.push(plan_diagnostic(
+                        "MEJCL0765",
+                        "JES2 JECL statement appears outside its converter timing window",
+                        Severity::Error,
+                        FailureCategory::MalformedInput,
+                        Completeness::Incomplete,
+                        &source,
+                    ));
+                }
+            }
         }
     }
 }
@@ -1546,7 +1710,8 @@ fn strip_quotes(value: &str) -> &str {
 mod tests {
     use super::*;
     use crate::{
-        DD_PARAMETERS, EXEC_PARAMETERS, JOB_PARAMETERS, JclParameterIdentity, OUTPUT_PARAMETERS,
+        DD_PARAMETERS, EXEC_PARAMETERS, JES2_STATEMENTS, JOB_PARAMETERS, JclParameterIdentity,
+        OUTPUT_PARAMETERS,
     };
 
     fn convert(source: &str) -> JclConversion {
@@ -1737,6 +1902,75 @@ mod tests {
     }
 
     #[test]
+    fn all_thirteen_jecl_forms_validate_in_source_timing_order_and_annotate_the_plan() {
+        let source = "/*SIGNON 1\n//J JOB CLASS=A\n/*JOBPARM SYSAFF=SYS1\n/*PRIORITY 10\n/*XEQ NODE1\n/*MESSAGE HELLO\n/*NETACCT 1234\n/*NOTIFY USER1\n/*OUTPUT DEST=LOCAL\n/*ROUTE PRINT LOCAL\n/*SETUP VOL1\n/*XMIT NODE1\n//S EXEC PGM=IEFBR14\n/*$D A,L\n/*SIGNOFF\n";
+        let conversion = convert(source);
+        assert!(conversion.is_valid(), "{:?}", conversion.diagnostics());
+        let plan = conversion.plan().unwrap();
+        assert_eq!(
+            plan.nodes()
+                .iter()
+                .filter(|node| matches!(node, JclPlanNode::Jecl { .. }))
+                .count(),
+            13
+        );
+        assert_eq!(
+            plan.capabilities()
+                .iter()
+                .filter(|requirement| requirement.capability().starts_with("jes2."))
+                .count(),
+            13
+        );
+        assert_eq!(
+            plan.nodes().iter().find_map(|node| match node {
+                JclPlanNode::Jecl { operation, .. } => Some(operation.as_str()),
+                _ => None,
+            }),
+            Some("SIGNON")
+        );
+    }
+
+    #[test]
+    fn every_jecl_descriptor_executes_valid_and_invalid_validation() {
+        for entry in JES2_STATEMENTS {
+            let valid = valid_jecl_sample(entry.id);
+            assert!(
+                validate_jecl_operands(entry.id, valid).is_ok(),
+                "{} valid sample {valid:?}",
+                entry.row_id
+            );
+            let invalid = if entry.id == Jes2StatementId::Signoff {
+                "UNEXPECTED"
+            } else {
+                ""
+            };
+            assert!(
+                validate_jecl_operands(entry.id, invalid).is_err(),
+                "{} invalid sample {invalid:?}",
+                entry.row_id
+            );
+        }
+    }
+
+    #[test]
+    fn malformed_jecl_value_and_timing_prevent_planning() {
+        for source in [
+            "//J JOB\n/*PRIORITY 16\n//S EXEC PGM=IEFBR14\n",
+            "//J JOB\n/*SIGNON 1\n//S EXEC PGM=IEFBR14\n",
+            "//J JOB\n/*ROUTE BOGUS LOCAL\n//S EXEC PGM=IEFBR14\n",
+        ] {
+            let conversion = convert(source);
+            assert!(!conversion.is_valid(), "unexpected plan for {source}");
+            assert!(
+                conversion.diagnostics().iter().any(|diagnostic| matches!(
+                    diagnostic.code().as_str(),
+                    "MEJCL0763" | "MEJCL0765"
+                ))
+            );
+        }
+    }
+
+    #[test]
     fn inline_bytes_and_expansion_provenance_survive_planning() {
         let conversion = convert_jcl(
             &JclBundle {
@@ -1831,6 +2065,24 @@ mod tests {
             | JclValueShape::BackwardReference
             | JclValueShape::Secret => "",
             JclValueShape::Boolean => "MAYBE",
+        }
+    }
+
+    const fn valid_jecl_sample(identity: Jes2StatementId) -> &'static str {
+        match identity {
+            Jes2StatementId::Command => "D A,L",
+            Jes2StatementId::Jobparm => "SYSAFF=SYS1",
+            Jes2StatementId::Message => "HELLO",
+            Jes2StatementId::Netacct => "1234",
+            Jes2StatementId::Notify => "USER1",
+            Jes2StatementId::Output => "DEST=LOCAL",
+            Jes2StatementId::Priority => "10",
+            Jes2StatementId::Route => "PRINT LOCAL",
+            Jes2StatementId::Setup => "VOL1",
+            Jes2StatementId::Signoff => "",
+            Jes2StatementId::Signon => "1",
+            Jes2StatementId::Xeq => "NODE1",
+            Jes2StatementId::Xmit => "NODE1",
         }
     }
 }

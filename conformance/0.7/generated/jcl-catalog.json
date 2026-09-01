@@ -344,7 +344,7 @@
           "aliases": [
             "/*$"
           ],
-          "capability": "jes2.statement.control",
+          "capability": "jes2.operator.command",
           "choices": [],
           "keyword": "$",
           "label": "JES2 command statement",
@@ -388,7 +388,7 @@
           "sensitive": false,
           "source_locator": "pdf-page:650;outline:/*MESSAGE statement",
           "support": "deferred",
-          "validation": "jcl-value"
+          "validation": "text"
         },
         {
           "aliases": [],
@@ -404,7 +404,7 @@
           "sensitive": false,
           "source_locator": "pdf-page:651;outline:/*NETACCT statement",
           "support": "deferred",
-          "validation": "jcl-value"
+          "validation": "text"
         },
         {
           "aliases": [],
@@ -420,7 +420,7 @@
           "sensitive": false,
           "source_locator": "pdf-page:652;outline:/*NOTIFY statement",
           "support": "deferred",
-          "validation": "jcl-value"
+          "validation": "name"
         },
         {
           "aliases": [],
@@ -444,15 +444,15 @@
           "choices": [],
           "keyword": "PRIORITY",
           "label": "/*PRIORITY statement",
-          "maximum": null,
-          "minimum": null,
+          "maximum": 15,
+          "minimum": 0,
           "ordinal": 7,
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0007",
           "rust_variant": "Priority",
           "sensitive": false,
           "source_locator": "pdf-page:660;outline:/*PRIORITY statement",
           "support": "deferred",
-          "validation": "jcl-value"
+          "validation": "integer"
         },
         {
           "aliases": [],
@@ -484,7 +484,7 @@
           "sensitive": false,
           "source_locator": "pdf-page:664;outline:/*SETUP statement",
           "support": "deferred",
-          "validation": "jcl-value"
+          "validation": "name-list"
         },
         {
           "aliases": [],
@@ -500,7 +500,7 @@
           "sensitive": false,
           "source_locator": "pdf-page:665;outline:/*SIGNOFF statement",
           "support": "deferred",
-          "validation": "jcl-value"
+          "validation": "none"
         },
         {
           "aliases": [],
@@ -532,7 +532,7 @@
           "sensitive": false,
           "source_locator": "pdf-page:668;outline:/*XEQ statement",
           "support": "deferred",
-          "validation": "jcl-value"
+          "validation": "name"
         },
         {
           "aliases": [],
@@ -3952,7 +3952,7 @@
   "plan_schema": "conformance/0.7/schemas/jcl-job-plan.schema.json",
   "plan_schema_sha256": "sha256:4c7c382dc06c33ee7622c5108a85fe96cf5f0a9f139e2827c0c2e966b47d57a5",
   "planner_semantics": "conformance/0.7/catalogs/jcl-planner-semantics.json",
-  "planner_semantics_sha256": "sha256:2f198f603ae443324e521df9a6180bd217cdf73022e121e9b9b1b544065f01de",
+  "planner_semantics_sha256": "sha256:d26274c9d06a778228420fef38254da3b6090fa9b516cb35846d614ad2b4ece6",
   "schema_version": "mainframe-env.jcl-generated-catalog@1",
   "source_catalog": "conformance/0.2/catalogs/jcl-jes2.json",
   "source_catalog_sha256": "sha256:640b6bf949b6feefa6ba2d762286500798d3157794c728c360f4a46fc260fba4",

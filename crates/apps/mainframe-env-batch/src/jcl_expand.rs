@@ -1,8 +1,8 @@
 use crate::jcl_graph::{JclDependencyGraph, JclGraphProblem};
 use crate::jcl_syntax::analyze_jcl_source_file;
 use crate::{
-    JclBundle, JclParsedStatement, JclStatementId, JclSyntaxLimits, analyze_jcl_syntax,
-    parse_jcl_statements,
+    JclBundle, JclExpandedJecl, JclParsedStatement, JclStatementId, JclSyntaxLimits,
+    analyze_jcl_syntax, parse_jcl_statements, parse_jes2_statements,
 };
 use mainframe_env_diagnostics::{
     Completeness, Diagnostic, DiagnosticCode, DiagnosticLimits, FailureCategory, Phase, Redaction,
@@ -210,6 +210,7 @@ pub struct JclExpansion {
     statements: Vec<JclExpandedStatement>,
     symbols: Vec<JclExpandedSymbol>,
     procedures: Vec<JclExpandedProcedure>,
+    jecl_statements: Vec<JclExpandedJecl>,
     procedure_search: Vec<String>,
     diagnostics: Vec<Diagnostic>,
 }
@@ -233,6 +234,11 @@ impl JclExpansion {
     #[must_use]
     pub fn procedures(&self) -> &[JclExpandedProcedure] {
         &self.procedures
+    }
+
+    #[must_use]
+    pub fn jecl_statements(&self) -> &[JclExpandedJecl] {
+        &self.jecl_statements
     }
 
     #[must_use]
@@ -310,6 +316,7 @@ pub fn expand_jcl(
     let primary = analyze_jcl_syntax(bundle, syntax_limits)
         .map_err(|problem| JclExpansionProblem::Syntax(problem.to_string()))?;
     let parsed = parse_jcl_statements(&primary);
+    let jecl = parse_jes2_statements(&primary);
     let source = primary.source_arc();
     let mut context = ExpansionContext {
         bundle,
@@ -320,7 +327,12 @@ pub fn expand_jcl(
         dependency_sites: BTreeMap::new(),
         procedures: BTreeMap::new(),
         search_order: Vec::new(),
-        diagnostics: parsed.diagnostics().to_vec(),
+        diagnostics: parsed
+            .diagnostics()
+            .iter()
+            .chain(jecl.diagnostics())
+            .cloned()
+            .collect(),
         expanded_statements: 0,
         expanded_bytes: 0,
         substitutions: 0,
@@ -385,6 +397,12 @@ pub fn expand_jcl(
         statements,
         symbols,
         procedures,
+        jecl_statements: jecl
+            .statements()
+            .iter()
+            .cloned()
+            .map(JclExpandedJecl::primary)
+            .collect(),
         procedure_search: context.search_order,
         diagnostics: context.diagnostics,
     })
@@ -730,13 +748,15 @@ fn expand_include(
             return Ok(());
         };
         let parsed = parse_source_file(context, file)?;
+        let mut include_sites = invocation_sites.to_vec();
+        include_sites.push(site.clone());
         expand_sequence(
             context,
             &parsed,
             symbols,
             exported,
             procedure_chain,
-            invocation_sites,
+            &include_sites,
             &BTreeMap::new(),
             false,
             output,

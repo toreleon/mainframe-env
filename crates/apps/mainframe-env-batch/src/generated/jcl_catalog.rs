@@ -5,9 +5,9 @@ pub const JCL_OFFICIAL_CATALOG_SHA256: &str =
 pub const JCL_PLAN_SCHEMA_SHA256: &str =
     "sha256:4c7c382dc06c33ee7622c5108a85fe96cf5f0a9f139e2827c0c2e966b47d57a5";
 pub const JCL_PLANNER_SEMANTICS_SHA256: &str =
-    "sha256:2f198f603ae443324e521df9a6180bd217cdf73022e121e9b9b1b544065f01de";
+    "sha256:d26274c9d06a778228420fef38254da3b6090fa9b516cb35846d614ad2b4ece6";
 pub const JCL_GENERATED_CATALOG_SHA256: &str =
-    "sha256:9efe35e327a2ad930bd9df0ea44fd365aaec1da2c04a6cc6a9983d91e66f2ef7";
+    "sha256:1066a5b3dc378d37deecfdb1f5c67fb194e4d026d00973816a62dbddfea262d4";
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum JclCatalogSupport {
@@ -503,7 +503,7 @@ pub static JES2_STATEMENTS: &[JclCatalogEntry<Jes2StatementId>] = &[
         choices: &[],
         support: JclCatalogSupport::Deferred,
         sensitive: false,
-        capability: "jes2.statement.control",
+        capability: "jes2.operator.command",
     },
     JclCatalogEntry {
         id: Jes2StatementId::Jobparm,
@@ -531,7 +531,7 @@ pub static JES2_STATEMENTS: &[JclCatalogEntry<Jes2StatementId>] = &[
         keyword: "MESSAGE",
         aliases: &[],
         source_locator: "pdf-page:650;outline:/*MESSAGE statement",
-        validation: JclValueShape::JclValue,
+        validation: JclValueShape::Text,
         minimum: None,
         maximum: None,
         choices: &[],
@@ -548,7 +548,7 @@ pub static JES2_STATEMENTS: &[JclCatalogEntry<Jes2StatementId>] = &[
         keyword: "NETACCT",
         aliases: &[],
         source_locator: "pdf-page:651;outline:/*NETACCT statement",
-        validation: JclValueShape::JclValue,
+        validation: JclValueShape::Text,
         minimum: None,
         maximum: None,
         choices: &[],
@@ -565,7 +565,7 @@ pub static JES2_STATEMENTS: &[JclCatalogEntry<Jes2StatementId>] = &[
         keyword: "NOTIFY",
         aliases: &[],
         source_locator: "pdf-page:652;outline:/*NOTIFY statement",
-        validation: JclValueShape::JclValue,
+        validation: JclValueShape::Name,
         minimum: None,
         maximum: None,
         choices: &[],
@@ -599,9 +599,9 @@ pub static JES2_STATEMENTS: &[JclCatalogEntry<Jes2StatementId>] = &[
         keyword: "PRIORITY",
         aliases: &[],
         source_locator: "pdf-page:660;outline:/*PRIORITY statement",
-        validation: JclValueShape::JclValue,
-        minimum: None,
-        maximum: None,
+        validation: JclValueShape::Integer,
+        minimum: Some(0),
+        maximum: Some(15),
         choices: &[],
         support: JclCatalogSupport::Deferred,
         sensitive: false,
@@ -633,7 +633,7 @@ pub static JES2_STATEMENTS: &[JclCatalogEntry<Jes2StatementId>] = &[
         keyword: "SETUP",
         aliases: &[],
         source_locator: "pdf-page:664;outline:/*SETUP statement",
-        validation: JclValueShape::JclValue,
+        validation: JclValueShape::NameList,
         minimum: None,
         maximum: None,
         choices: &[],
@@ -650,7 +650,7 @@ pub static JES2_STATEMENTS: &[JclCatalogEntry<Jes2StatementId>] = &[
         keyword: "SIGNOFF",
         aliases: &[],
         source_locator: "pdf-page:665;outline:/*SIGNOFF statement",
-        validation: JclValueShape::JclValue,
+        validation: JclValueShape::None,
         minimum: None,
         maximum: None,
         choices: &[],
@@ -684,7 +684,7 @@ pub static JES2_STATEMENTS: &[JclCatalogEntry<Jes2StatementId>] = &[
         keyword: "XEQ",
         aliases: &[],
         source_locator: "pdf-page:668;outline:/*XEQ statement",
-        validation: JclValueShape::JclValue,
+        validation: JclValueShape::Name,
         minimum: None,
         maximum: None,
         choices: &[],

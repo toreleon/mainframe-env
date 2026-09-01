@@ -7,6 +7,7 @@ mod jcl;
 mod jcl_catalog;
 mod jcl_expand;
 mod jcl_graph;
+mod jcl_jecl;
 mod jcl_plan;
 mod jcl_schema;
 mod jcl_statement;
@@ -35,6 +36,7 @@ pub use jcl_expand::{
     JclBackwardReference, JclExpandedProcedure, JclExpandedStatement, JclExpandedSymbol,
     JclExpansion, JclExpansionLimits, JclExpansionProblem, expand_jcl,
 };
+pub use jcl_jecl::{JclExpandedJecl, JclParsedJecl, Jes2StatementAnalysis, parse_jes2_statements};
 pub use jcl_plan::{JclConversion, JclConversionLimits, JclConversionProblem, convert_jcl};
 pub use jcl_schema::{
     JCL_PLAN_CONTRACT, JclCapabilityRequirement, JclCapabilityState, JclDiagnosticProjection,

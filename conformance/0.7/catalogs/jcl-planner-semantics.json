@@ -19,7 +19,21 @@
     "jes2-jecl-statements": {
       "capability_prefix": "jes2.statement",
       "default": {"validation": "jcl-value", "support": "deferred"},
-      "rules": {}
+      "rules": {
+        "$": {"validation": "jcl-value", "support": "deferred", "capability": "jes2.operator.command"},
+        "JOBPARM": {"validation": "jcl-value", "support": "deferred"},
+        "MESSAGE": {"validation": "text", "support": "deferred"},
+        "NETACCT": {"validation": "text", "support": "deferred"},
+        "NOTIFY": {"validation": "name", "support": "deferred"},
+        "OUTPUT": {"validation": "jcl-value", "support": "deferred"},
+        "PRIORITY": {"validation": "integer", "minimum": 0, "maximum": 15, "support": "deferred"},
+        "ROUTE": {"validation": "jcl-value", "support": "deferred"},
+        "SETUP": {"validation": "name-list", "support": "deferred"},
+        "SIGNOFF": {"validation": "none", "support": "deferred"},
+        "SIGNON": {"validation": "jcl-value", "support": "deferred"},
+        "XEQ": {"validation": "name", "support": "deferred"},
+        "XMIT": {"validation": "jcl-value", "support": "deferred"}
+      }
     },
     "dd-parameters": {
       "capability_prefix": "jcl.dd",
