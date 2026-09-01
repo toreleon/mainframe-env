@@ -155,14 +155,92 @@ pub(super) struct DirectiveLine {
     pub leading: usize,
 }
 
+pub(super) struct DirectiveCursor {
+    lines: Vec<DirectiveLine>,
+    position: usize,
+}
+
+impl DirectiveCursor {
+    pub(super) fn new(source: &NormalizedSource) -> Self {
+        let lines = physical_lines(&source.text)
+            .into_iter()
+            .filter_map(|line| {
+                let text = &source.text[line.content.clone()];
+                text.trim_start().starts_with(">>").then(|| DirectiveLine {
+                    range: line.content.start..line.terminator.end,
+                    content: line.content,
+                    leading: text.len() - text.trim_start().len(),
+                })
+            })
+            .collect();
+        Self { lines, position: 0 }
+    }
+
+    pub(super) fn next_from(&mut self, from: usize) -> Option<DirectiveLine> {
+        while self
+            .lines
+            .get(self.position)
+            .is_some_and(|line| line.content.start < from)
+        {
+            self.position += 1;
+        }
+        self.lines.get(self.position).cloned()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct EffectiveCompilerOptions {
+    lp: u8,
+}
+
+impl EffectiveCompilerOptions {
+    pub(super) const DEFAULT: Self = Self { lp: 32 };
+
+    pub(super) fn resolve(
+        bundle: &SourceBundle,
+        options: &CompilerOptionSet,
+    ) -> Result<Self, SyntaxProblem> {
+        let source_lp = options.value("LP").flatten().and_then(option_integer_value);
+        let bundle_lp = bundle
+            .options()
+            .get("cobol.lp")
+            .and_then(|value| option_integer_value(value));
+        if source_lp
+            .zip(bundle_lp)
+            .is_some_and(|(source, bundle)| source != bundle)
+        {
+            return Err(SyntaxProblem::ConflictingCompilerOption("LP".into()));
+        }
+        let lp = source_lp.or(bundle_lp).unwrap_or(32);
+        if !matches!(lp, 32 | 64) {
+            return Err(SyntaxProblem::InvalidCompilerOption);
+        }
+        Ok(Self { lp: lp as u8 })
+    }
+
+    #[must_use]
+    pub const fn lp(self) -> u8 {
+        self.lp
+    }
+
+    #[must_use]
+    pub const fn pointer_bytes(self) -> usize {
+        if self.lp == 64 { 8 } else { 4 }
+    }
+}
+
 impl DirectiveState {
-    pub(super) fn new(bundle: &SourceBundle, options: &CompilerOptionSet) -> Self {
+    pub(super) fn new(
+        bundle: &SourceBundle,
+        options: &CompilerOptionSet,
+        effective: EffectiveCompilerOptions,
+    ) -> Self {
         let mut state = Self {
             variables: BTreeMap::new(),
             parameters: BTreeMap::new(),
             frames: Vec::new(),
             context: SourceContext::BeforeIdentification,
-            lp: option_integer(bundle, options, "LP").unwrap_or(32) as u8,
+            lp: effective.lp(),
             java_callable_seen: false,
         };
         state.install_predefined(bundle, options);
@@ -245,26 +323,6 @@ impl DirectiveState {
     pub(super) fn observe_text(&mut self, text: &str) {
         observe_source_context(text, &mut self.context, None);
     }
-}
-
-pub(super) fn next_directive_line(source: &NormalizedSource, from: usize) -> Option<DirectiveLine> {
-    physical_lines(&source.text)
-        .into_iter()
-        .find(|line| {
-            line.content.start >= from && {
-                source.text[line.content.clone()]
-                    .trim_start()
-                    .starts_with(">>")
-            }
-        })
-        .map(|line| {
-            let text = &source.text[line.content.clone()];
-            DirectiveLine {
-                range: line.content.start..line.terminator.end,
-                content: line.content,
-                leading: text.len() - text.trim_start().len(),
-            }
-        })
 }
 
 pub(super) fn process_directive_line(
@@ -769,13 +827,15 @@ fn option_value<'a>(
 }
 
 fn option_integer(bundle: &SourceBundle, options: &CompilerOptionSet, name: &str) -> Option<i128> {
-    option_value(bundle, options, name).and_then(|value| {
-        value
-            .trim_matches(['(', ')'])
-            .split(',')
-            .next()
-            .and_then(|value| value.parse().ok())
-    })
+    option_value(bundle, options, name).and_then(option_integer_value)
+}
+
+fn option_integer_value(value: &str) -> Option<i128> {
+    value
+        .trim_matches(['(', ')'])
+        .split(',')
+        .next()
+        .and_then(|value| value.parse().ok())
 }
 
 fn option_enabled(bundle: &SourceBundle, options: &CompilerOptionSet, name: &str) -> bool {

@@ -3,9 +3,9 @@ use crate::lower::{LowerProblem, core_mir_catalog, core_mir_profile, lower_to_co
 use crate::semantic::{SemanticModel, SemanticProblem};
 use crate::syntax::{LosslessSyntax, SyntaxLimits, SyntaxProblem, decode_and_lex};
 use mainframe_env_compiler_api::{
-    ArtifactLimits, ArtifactManifest, CompilationMode, CompilerProblem, CompilerRequest,
-    CompilerResult, CompilerService, LegalizedMir, ParsedProgram, PublishedArtifact,
-    SemanticProgram, VerifiedHir,
+    ArtifactLimits, ArtifactManifest, CompilationMode, CompileOptions, CompilerProblem,
+    CompilerRequest, CompilerResult, CompilerService, LegalizedMir, ParsedProgram,
+    PublishedArtifact, SemanticProgram, VerifiedHir,
 };
 use mainframe_env_diagnostics::{
     Completeness, Diagnostic, DiagnosticCode, DiagnosticLimits, FailureCategory, Phase, Redaction,
@@ -71,11 +71,7 @@ impl CobolCompiler {
         let semantic = match SemanticModel::analyze_with_origins(
             syntax.semantic_text(),
             syntax.semantic_origins(),
-            if syntax.compiler_options().value("LP") == Some(Some("(64)")) {
-                8
-            } else {
-                4
-            },
+            syntax.effective_compiler_options().pointer_bytes(),
             self.limits.max_storage_bytes,
             self.limits.max_data_items,
         ) {
@@ -224,10 +220,21 @@ impl CompilerService for CobolCompiler {
         let payload =
             mainframe_env_ir::encode_binary(legalized.legal().module(), self.limits.codec)
                 .map_err(|problem| CompilerProblem::Legality(problem.to_string()))?;
+        let mut manifest_options = request.options.values().clone();
+        manifest_options.insert(
+            "cobol.effective-lp".into(),
+            analysis
+                .syntax
+                .as_ref()
+                .ok_or(CompilerProblem::IncompleteStage)?
+                .effective_compiler_options()
+                .lp()
+                .to_string(),
+        );
         let manifest = ArtifactManifest {
             compiler_generation: format!("mainframe-env-cobol-{}", env!("CARGO_PKG_VERSION")),
             target: request.target,
-            options: request.options,
+            options: CompileOptions::new(manifest_options)?,
             host_interfaces: BTreeSet::from([
                 "mainframe-env.host@1".to_string(),
                 "mainframe-env.cics@1".to_string(),
@@ -321,6 +328,14 @@ mod tests {
     }
 
     fn bundle_in_format(source: &str, format: SourceFormat) -> SourceBundle {
+        bundle_with_options(source, format, BTreeMap::new())
+    }
+
+    fn bundle_with_options(
+        source: &str,
+        format: SourceFormat,
+        options: BTreeMap<String, String>,
+    ) -> SourceBundle {
         let limits = SourceLimits::default();
         let path = LogicalPath::new("HELLO.cbl", limits.max_path_bytes).unwrap();
         let file = SourceFile::input(
@@ -331,7 +346,7 @@ mod tests {
             limits,
         )
         .unwrap();
-        SourceBundle::new(&path, vec![file], BTreeMap::new(), Vec::new(), limits).unwrap()
+        SourceBundle::new(&path, vec![file], options, Vec::new(), limits).unwrap()
     }
     fn request(source: &str, mode: CompilationMode) -> CompilerRequest {
         CompilerRequest {
@@ -693,5 +708,75 @@ mod tests {
                 .iter()
                 .any(|diagnostic| diagnostic.code().as_str() == "MECOB0200")
         );
+    }
+
+    #[test]
+    fn effective_lp_is_shared_by_directives_layouts_and_manifest_identity() {
+        let body = "IDENTIFICATION DIVISION. PROGRAM-ID. LPTEST. DATA DIVISION. WORKING-STORAGE SECTION. 01 IDX INDEX. 01 PTR POINTER. 01 OBJ OBJECT REFERENCE. PROCEDURE DIVISION. STOP RUN.";
+        let cases = [
+            (
+                body.to_string(),
+                BTreeMap::from([("cobol.lp".into(), "64".into())]),
+            ),
+            (format!("PROCESS LP(64)\n{body}"), BTreeMap::new()),
+            (
+                format!("PROCESS LP(64)\n{body}"),
+                BTreeMap::from([("cobol.lp".into(), "64".into())]),
+            ),
+        ];
+        for (source, options) in cases {
+            let bundle = bundle_with_options(&source, SourceFormat::Free, options);
+            let analysis = CobolCompiler::default().analyze(&bundle);
+            let syntax = analysis.syntax.as_ref().expect("LP syntax");
+            let semantic = analysis.semantic.as_ref().expect("LP semantic model");
+            assert_eq!(syntax.effective_compiler_options().lp(), 64);
+            for name in ["IDX", "PTR", "OBJ"] {
+                assert_eq!(semantic.layout(name).unwrap().length, 8, "{name}");
+            }
+        }
+
+        let conditional = ">>IF IGY-LP = 64\nIDENTIFICATION DIVISION.\nPROGRAM-ID. LP64.\n>>ELSE\nIDENTIFICATION DIVISION.\nPROGRAM-ID. LP32.\n>>END-IF\nPROCEDURE DIVISION.\nSTOP RUN.\n";
+        let bundle = bundle_with_options(
+            conditional,
+            SourceFormat::Free,
+            BTreeMap::from([("cobol.lp".into(), "64".into())]),
+        );
+        let analysis = CobolCompiler::default().analyze(&bundle);
+        assert_eq!(analysis.semantic.as_ref().unwrap().program_id, "LP64");
+
+        let result = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap();
+        let CompilerResult::Published { artifact, .. } = result else {
+            panic!("effective LP source did not publish: {result:?}");
+        };
+        assert_eq!(
+            artifact
+                .manifest()
+                .options
+                .values()
+                .get("cobol.effective-lp")
+                .map(String::as_str),
+            Some("64")
+        );
+
+        let conflicting = bundle_with_options(
+            &format!("PROCESS LP(32)\n{body}"),
+            SourceFormat::Free,
+            BTreeMap::from([("cobol.lp".into(), "64".into())]),
+        );
+        let analysis = CobolCompiler::default().analyze(&conflicting);
+        assert!(analysis.hir.is_none());
+        assert!(analysis.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code().as_str() == "MECOB0100"
+                && diagnostic
+                    .public_message()
+                    .contains("ConflictingCompilerOption")
+        }));
     }
 }

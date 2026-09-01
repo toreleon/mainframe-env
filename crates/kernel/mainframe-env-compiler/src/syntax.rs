@@ -2,6 +2,7 @@ mod directives;
 
 pub use directives::{
     CompilerDirectingNode, CompilerDirectiveNode, CompilerOption, CompilerOptionSet,
+    EffectiveCompilerOptions,
 };
 
 use crate::generated::cobol_language::CompilerDirectingKind;
@@ -112,6 +113,7 @@ pub struct LosslessSyntax {
     compiler_directing: Vec<CompilerDirectingNode>,
     compiler_directives: Vec<CompilerDirectiveNode>,
     compiler_options: CompilerOptionSet,
+    effective_options: EffectiveCompilerOptions,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -207,6 +209,10 @@ impl LosslessSyntax {
     #[must_use]
     pub fn compiler_options(&self) -> &CompilerOptionSet {
         &self.compiler_options
+    }
+    #[must_use]
+    pub const fn effective_compiler_options(&self) -> EffectiveCompilerOptions {
+        self.effective_options
     }
 }
 
@@ -306,7 +312,10 @@ pub(crate) fn decode_and_lex(
                 Ok,
             )?;
     let prepared = directives::prepare_source(&normalized, true, &mut artifacts, limits)?;
-    let mut directive_state = directives::DirectiveState::new(bundle, &artifacts.options);
+    let effective_options =
+        directives::EffectiveCompilerOptions::resolve(bundle, &artifacts.options)?;
+    let mut directive_state =
+        directives::DirectiveState::new(bundle, &artifacts.options, effective_options);
     let expanded = expand_copies(
         &prepared,
         bundle,
@@ -344,6 +353,7 @@ pub(crate) fn decode_and_lex(
     syntax.compiler_directing = artifacts.directing;
     syntax.compiler_directives = artifacts.directives;
     syntax.compiler_options = artifacts.options;
+    syntax.effective_options = effective_options;
     Ok(syntax)
 }
 
@@ -704,8 +714,9 @@ fn expand_copies(
     let initial_depth = directive_state.depth();
     let mut output = ExpandedSource::default();
     let mut cursor = 0usize;
+    let mut directive_cursor = directives::DirectiveCursor::new(source);
     loop {
-        let next_directive = directives::next_directive_line(source, cursor);
+        let next_directive = directive_cursor.next_from(cursor);
         let boundary = next_directive
             .as_ref()
             .map_or(source.text.len(), |line| line.range.start);
@@ -2075,6 +2086,7 @@ fn lex(text: &str, limits: SyntaxLimits) -> Result<LosslessSyntax, SyntaxProblem
         compiler_directing: Vec::new(),
         compiler_directives: Vec::new(),
         compiler_options: CompilerOptionSet::default(),
+        effective_options: EffectiveCompilerOptions::DEFAULT,
     })
 }
 
@@ -2224,6 +2236,7 @@ pub(crate) enum SyntaxProblem {
     DirectiveNestingExceeded,
     CompilationVariableLimitExceeded,
     InvalidCompilerOption,
+    ConflictingCompilerOption(String),
     InvalidCompilerDirective,
     UnknownCompilerDirective(String),
     InvalidDirectiveContext,
@@ -2845,6 +2858,23 @@ IDENTIFICATION DIVISION.\nPROGRAM-ID. PARAMS.\nPROCEDURE DIVISION.\nSTOP RUN.\n"
         let end = value.find("B'").unwrap();
         assert!(value[start + 2..end].bytes().all(|byte| byte == b' '));
         assert!(end > start + 2);
+    }
+
+    #[test]
+    fn high_directive_count_scans_once_and_preserves_deterministic_provenance() {
+        let mut source = String::with_capacity(800_000);
+        for _ in 0..8_000 {
+            source.push_str(">>IF TRUE\n>>END-IF\n");
+        }
+        source.push_str(
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. MANYDIRECTIVES.\nPROCEDURE DIVISION.\nSTOP RUN.\n",
+        );
+        let bundle = bundle(&source, SourceFormat::Free);
+        let first = decode_and_lex(&bundle, SyntaxLimits::default()).unwrap();
+        let second = decode_and_lex(&bundle, SyntaxLimits::default()).unwrap();
+        assert_eq!(first.compiler_directives().len(), 16_000);
+        assert_eq!(first.semantic_text(), second.semantic_text());
+        assert_eq!(first.semantic_origins(), second.semantic_origins());
     }
 
     #[test]
