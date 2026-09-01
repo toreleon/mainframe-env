@@ -1215,6 +1215,8 @@ dependencies = [
 name = "mainframe-env-coverage"
 version = "0.2.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "sha2 0.10.9",
 ]
 
@@ -2853,6 +2855,7 @@ dependencies = [
  "clap",
  "jsonschema",
  "mainframe-env-conformance",
+ "mainframe-env-coverage",
  "serde_json",
  "sha2 0.10.9",
  "toml",

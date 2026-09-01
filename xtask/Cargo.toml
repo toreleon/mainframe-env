@@ -9,6 +9,7 @@ publish = false
 [dependencies]
 clap.workspace = true
 mainframe-env-conformance.workspace = true
+mainframe-env-coverage.workspace = true
 jsonschema.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

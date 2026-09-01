@@ -1,0 +1,12 @@
+# Shared Conformance IR v1
+
+This directory contains the single product-neutral Conformance IR authority
+introduced by CI-300. `v1/spec.json` is the readable source compiled by
+`cargo xtask spec --check`; later subsystem minors extend that one document and
+the typed registries rather than creating subsystem-local harness contracts.
+
+The empty CI-300 document deliberately claims no official behavior. Catalog
+rows enter the numerator only after a later work package supplies a reviewed
+row specification, mandatory obligations, executable bindings, and verdict
+events. Verdict and ledger schemas define projections; committed per-row or
+per-obligation verdict files are prohibited.

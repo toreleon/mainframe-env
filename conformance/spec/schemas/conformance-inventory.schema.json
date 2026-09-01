@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/conformance-inventory-v1.json",
+  "title": "mainframe-env 0.3 conformance inventory additions",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_version", "edges"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.conformance-dependency-additions@1"},
+    "target_version": {"const": "0.3.0"},
+    "edges": {
+      "type": "array",
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": {
+        "type": "array",
+        "prefixItems": [
+          {"$ref": "#/$defs/package"},
+          {"$ref": "#/$defs/package"}
+        ],
+        "items": false,
+        "minItems": 2,
+        "maxItems": 2
+      }
+    }
+  },
+  "$defs": {
+    "package": {"type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 128}
+  }
+}

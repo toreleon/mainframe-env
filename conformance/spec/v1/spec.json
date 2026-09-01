@@ -1,0 +1,21 @@
+{
+  "schema_version": "mainframe-env.conformance-spec@1",
+  "spec_version": "mainframe-env.conformance-ir@1",
+  "catalog_digest": "sha256:074f7385b1d1e1127f9cf83dbbc4e0bc46903cfa7739a2515c4085f7d2037f01",
+  "shard_count": 32,
+  "registries": {
+    "operations": [],
+    "input_shapes": [],
+    "predicates": [],
+    "transitions": [],
+    "observations": [],
+    "conditions": [],
+    "recoveries": [],
+    "oracles": [],
+    "drivers": [],
+    "fixtures": []
+  },
+  "rows": [],
+  "obligations": [],
+  "cases": []
+}

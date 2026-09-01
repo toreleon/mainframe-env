@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/conformance-verdict-v1.json",
+  "title": "mainframe-env canonical conformance verdict event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "spec_version", "row_id", "obligation_id", "gate", "test_id", "verdict", "observation_digest", "cache_identity", "replay", "source_locator", "driver", "fixture_or_seed", "expected", "actual", "oracle_receipt_digest"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.conformance-verdict@1"},
+    "spec_version": {"const": "mainframe-env.conformance-ir@1"},
+    "row_id": {"$ref": "#/$defs/id"},
+    "obligation_id": {"$ref": "#/$defs/id"},
+    "gate": {"enum": ["recognized", "validated", "executed", "conditioned", "recovered", "differential"]},
+    "test_id": {"$ref": "#/$defs/id"},
+    "verdict": {"enum": ["pass", "fail"]},
+    "observation_digest": {"$ref": "#/$defs/digest"},
+    "cache_identity": {"$ref": "#/$defs/digest"},
+    "replay": {"type": "string", "minLength": 1, "maxLength": 2048},
+    "source_locator": {"type": "string", "minLength": 1, "maxLength": 2048},
+    "driver": {"$ref": "#/$defs/id"},
+    "fixture_or_seed": {"$ref": "#/$defs/id"},
+    "expected": {"type": "string", "minLength": 1, "maxLength": 16384},
+    "actual": {"type": "string", "minLength": 1, "maxLength": 16384},
+    "oracle_receipt_digest": {"anyOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]}
+  },
+  "$defs": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[A-Za-z0-9_.:/@+\\-]+$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

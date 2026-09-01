@@ -21,6 +21,10 @@ use mainframe_env_conformance::{
     verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
     verify_carddemo_vsam_from_env, verify_host_abi_libraries,
 };
+use mainframe_env_coverage::{
+    BindingKey, CompiledSpec, ConformanceLimits, CoverageGate, DerivedConformanceLedger, DriverRef,
+    FixtureRef, ObligationId, OfficialCatalogRow, OfficialRowId, TestId, Verdict, VerdictEvent,
+};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -65,6 +69,20 @@ struct EvidenceArgs {
     command: Option<EvidenceCommand>,
 }
 
+#[derive(Debug, Args)]
+struct ConformanceArgs {
+    #[arg(long)]
+    subsystem: Option<String>,
+    #[arg(long)]
+    gate: Option<String>,
+    #[arg(long)]
+    shard: Option<u16>,
+    #[arg(long)]
+    replay: Option<String>,
+    #[arg(long)]
+    check: bool,
+}
+
 #[derive(Debug, Subcommand)]
 enum EvidenceCommand {
     Seal(CheckArgs),
@@ -101,7 +119,8 @@ enum XtaskCommand {
     #[command(name = "review-repair-round-5")]
     ReviewRepairRound5(CheckArgs),
     SemanticIdentities(CheckArgs),
-    Conformance(CheckArgs),
+    Spec(CheckArgs),
+    Conformance(ConformanceArgs),
     Certification(CheckArgs),
     CarddemoCorpus(CheckArgs),
     CarddemoSource(CheckArgs),
@@ -286,7 +305,22 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
                 generate_semantic_identities(root)
             }
         ),
-        XtaskCommand::Conformance(args) => checked!("conformance", args, check_conformance(root)),
+        XtaskCommand::Spec(args) => checked!("spec", args, check_spec(root)),
+        XtaskCommand::Conformance(args) => {
+            let focused = args.subsystem.is_some()
+                || args.gate.is_some()
+                || args.shard.is_some()
+                || args.replay.is_some();
+            (
+                "conformance",
+                args.check,
+                if focused {
+                    check_focused_conformance_interface(root, &args)
+                } else {
+                    check_conformance(root)
+                },
+            )
+        }
         XtaskCommand::Certification(args) => {
             checked!("certification", args, check_certification(root))
         }
@@ -436,6 +470,192 @@ fn check_conformance(root: &Path) -> TaskResult {
     check_review_repair_round_3(root)?;
     check_review_repair_round_4(root)?;
     check_review_repair_round_5(root)
+}
+
+fn check_spec(root: &Path) -> TaskResult {
+    let schema_directory = root.join("conformance/spec/schemas");
+    let mut schemas = Vec::new();
+    collect_extension(&schema_directory, OsStr::new("json"), &mut schemas)?;
+    schemas.sort();
+    require(
+        schemas.len() == 4,
+        "Conformance IR v1 must expose exactly spec, verdict, ledger, and inventory schemas",
+    )?;
+    for schema_path in &schemas {
+        let schema = json(schema_path)?;
+        compile_draft_2020_12_schema(&schema, schema_path)?;
+    }
+    let spec_path = root.join("conformance/spec/v1/spec.json");
+    let spec_value = json(&spec_path)?;
+    let spec_schema_path = schema_directory.join("conformance-spec.schema.json");
+    validate_schema_instance(&json(&spec_schema_path)?, &spec_value, &spec_path)?;
+    let inventory_path = root.join("conformance/0.3/inventory/dependency-additions.json");
+    let inventory_schema_path = schema_directory.join("conformance-inventory.schema.json");
+    validate_schema_instance(
+        &json(&inventory_schema_path)?,
+        &json(&inventory_path)?,
+        &inventory_path,
+    )?;
+    let spec = compile_shared_spec(root)?;
+    validate_conformance_projections(&schema_directory, &spec)?;
+    require(
+        !root.join("conformance/spec/verdicts").exists()
+            && !root.join("conformance/spec/ledgers").exists(),
+        "committed per-run verdict or ledger directories are prohibited",
+    )?;
+    println!(
+        "spec-version={} catalog-rows={} claimed-rows={} obligations={} bindings={} shards={}",
+        spec.spec_version(),
+        official_catalog_rows(root)?.len(),
+        spec.rows().count(),
+        spec.obligations().count(),
+        spec.cases().count(),
+        spec.expected_shards().len(),
+    );
+    Ok(())
+}
+
+fn validate_conformance_projections(schema_directory: &Path, spec: &CompiledSpec) -> TaskResult {
+    let ledger = DerivedConformanceLedger::derive_complete(spec, Vec::new())
+        .map_err(|problem| problem.to_string())?;
+    let ledger_path = schema_directory.join("derived-ledger.schema.json");
+    let ledger_bytes = ledger
+        .canonical_json()
+        .map_err(|problem| problem.to_string())?;
+    let ledger_value: Value = serde_json::from_slice(&ledger_bytes)
+        .map_err(|error| format!("derived ledger projection: {error}"))?;
+    validate_schema_instance(&json(&ledger_path)?, &ledger_value, &ledger_path)?;
+
+    let limits = ConformanceLimits::default();
+    let event = VerdictEvent::new(
+        spec.spec_version(),
+        BindingKey {
+            row_id: OfficialRowId::new("schema:smoke:row", limits)
+                .map_err(|problem| problem.to_string())?,
+            obligation_id: ObligationId::new("schema-smoke", limits)
+                .map_err(|problem| problem.to_string())?,
+            gate: CoverageGate::Recognized,
+        },
+        TestId::new("schema.smoke", limits).map_err(|problem| problem.to_string())?,
+        Verdict::Fail,
+        "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "schema-smoke-locator",
+        DriverRef::new("schema.driver", limits).map_err(|problem| problem.to_string())?,
+        FixtureRef::new("schema.fixture", limits).map_err(|problem| problem.to_string())?,
+        "expected observation",
+        "actual observation",
+        None,
+        limits,
+    )
+    .map_err(|problem| problem.to_string())?;
+    let verdict_path = schema_directory.join("verdict-event.schema.json");
+    let verdict_bytes = event
+        .canonical_json()
+        .map_err(|problem| problem.to_string())?;
+    let verdict_value: Value = serde_json::from_slice(&verdict_bytes)
+        .map_err(|error| format!("verdict projection: {error}"))?;
+    validate_schema_instance(&json(&verdict_path)?, &verdict_value, &verdict_path)
+}
+
+fn compile_shared_spec(root: &Path) -> TaskResult<CompiledSpec> {
+    let index_path = root.join("conformance/0.2/catalogs/index.json");
+    let catalog_digest = format!("sha256:{}", file_digest(&index_path)?);
+    let bytes = fs::read(root.join("conformance/spec/v1/spec.json"))
+        .map_err(|error| format!("conformance/spec/v1/spec.json: {error}"))?;
+    CompiledSpec::compile_json(
+        &catalog_digest,
+        official_catalog_rows(root)?,
+        &bytes,
+        ConformanceLimits::default(),
+    )
+    .map_err(|problem| problem.to_string())
+}
+
+fn official_catalog_rows(root: &Path) -> TaskResult<Vec<OfficialCatalogRow>> {
+    let index_path = root.join("conformance/0.2/catalogs/index.json");
+    let index = json(&index_path)?;
+    let mut rows = Vec::new();
+    for baseline in array(&index, "baselines", &index_path)? {
+        let subsystem = text(baseline, "subsystem", &index_path)?;
+        let catalog_relative = text(baseline, "catalog", &index_path)?;
+        let catalog_path = root.join(catalog_relative);
+        let catalog = json(&catalog_path)?;
+        for unit in array(&catalog, "units", &catalog_path)? {
+            let family = text(unit, "id", &catalog_path)?;
+            for row in array(unit, "rows", &catalog_path)? {
+                rows.push(
+                    OfficialCatalogRow::new(
+                        text(row, "id", &catalog_path)?,
+                        subsystem,
+                        family,
+                        text(row, "source_locator", &catalog_path)?,
+                        CoverageGate::ALL,
+                        ConformanceLimits::default(),
+                    )
+                    .map_err(|problem| problem.to_string())?,
+                );
+            }
+        }
+    }
+    require(
+        rows.len() == 1_506,
+        "shared spec compiler did not load the frozen 1,506-row catalog",
+    )?;
+    Ok(rows)
+}
+
+fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> TaskResult {
+    require(
+        args.replay.is_none() || args.subsystem.is_none(),
+        "--replay and --subsystem are mutually exclusive",
+    )?;
+    require(
+        args.subsystem.is_some() || args.replay.is_some(),
+        "focused conformance requires --subsystem or --replay",
+    )?;
+    require(
+        args.replay.is_none() || (args.gate.is_none() && args.shard.is_none()),
+        "--replay cannot be combined with --gate or --shard",
+    )?;
+    let gate = args.gate.as_deref().map(parse_coverage_gate).transpose()?;
+    let spec = compile_shared_spec(root)?;
+    let selected = spec
+        .cases()
+        .filter(|case| {
+            if let Some(replay) = args.replay.as_deref() {
+                return case.test_id().as_str() == replay;
+            }
+            let Some(row) = spec.catalog_row(&case.key().row_id) else {
+                return false;
+            };
+            let subsystem_matches = args
+                .subsystem
+                .as_deref()
+                .is_some_and(|subsystem| subsystem == row.subsystem());
+            let gate_matches = gate.is_none_or(|gate| gate == case.key().gate);
+            let shard_matches = args.shard.is_none_or(|bucket| {
+                spec.expected_shards().iter().any(|(shard, bindings)| {
+                    shard.bucket == bucket && bindings.contains(case.key())
+                })
+            });
+            subsystem_matches && gate_matches && shard_matches
+        })
+        .count();
+    require(
+        selected > 0,
+        "focused conformance selection has no executable bindings",
+    )?;
+    Err(format!(
+        "{selected} binding(s) selected, but their product driver registry is not installed by CI-300"
+    ))
+}
+
+fn parse_coverage_gate(value: &str) -> TaskResult<CoverageGate> {
+    CoverageGate::ALL
+        .into_iter()
+        .find(|gate| gate.slug() == value)
+        .ok_or_else(|| format!("unknown coverage gate {value}"))
 }
 
 fn generate_evidence_seal(root: &Path) -> TaskResult {
@@ -1649,6 +1869,7 @@ fn check_declared_dependency_graph(root: &Path) -> TaskResult {
     for additions_path in [
         root.join("conformance/0.1.1/inventory/dependency-graph-additions.json"),
         root.join("conformance/0.2/inventory/dependency-additions.json"),
+        root.join("conformance/0.3/inventory/dependency-additions.json"),
     ] {
         if !additions_path.is_file() {
             continue;
@@ -3308,12 +3529,10 @@ fn check_dehardcoding(root: &Path) -> TaskResult {
         "TRANSACTION_TYPE_CATEGORY",
     ];
     let mut hits = Vec::new();
-    let mut scanned_files = 0usize;
     for rust_file in rust_files {
         if rust_file.starts_with(&conformance) {
             continue;
         }
-        scanned_files += 1;
         let source = read(&rust_file)?;
         let production = source.split("#[cfg(test)]").next().unwrap_or(&source);
         let upper = production.to_ascii_uppercase();
@@ -3366,6 +3585,11 @@ fn check_dehardcoding(root: &Path) -> TaskResult {
     }
     check_program_registry(root)?;
     check_route_registries(root)?;
+    let accepted_scanned_files = rust_file_count_at_commit(
+        root,
+        &accepted_0_2_completion(root)?,
+        "crates/tooling/mainframe-env-conformance/",
+    )?;
     let hardcode_path = root.join("conformance/0.2/evidence/hardcode/no-application-hardcode.json");
     let hardcode = json(&hardcode_path)?;
     require(
@@ -3373,7 +3597,8 @@ fn check_dehardcoding(root: &Path) -> TaskResult {
             == Value::String("mainframe-env.no-application-hardcode@1".into())
             && hardcode["before"]["production_h1_h3_lines"].as_u64() == Some(32)
             && hardcode["after"]["production_h1_h3_lines"].as_u64() == Some(0)
-            && hardcode["after"]["scanned_rust_files"].as_u64() == Some(scanned_files as u64)
+            && hardcode["after"]["scanned_rust_files"].as_u64()
+                == Some(accepted_scanned_files as u64)
             && hardcode["after"]["application_string_dispatch"].as_u64() == Some(0),
         "no-application-hardcode receipt is stale or incomplete",
     )?;
@@ -3391,6 +3616,22 @@ fn check_dehardcoding(root: &Path) -> TaskResult {
                 == Some(0),
         "no-string-dispatch receipt is stale or incomplete",
     )
+}
+
+fn rust_file_count_at_commit(
+    root: &Path,
+    commit: &str,
+    excluded_prefix: &str,
+) -> TaskResult<usize> {
+    let listing = command_text(root, "git", &["ls-tree", "-r", "--name-only", commit])?;
+    Ok(listing
+        .lines()
+        .filter(|path| {
+            path.starts_with("crates/")
+                && path.ends_with(".rs")
+                && !path.starts_with(excluded_prefix)
+        })
+        .count())
 }
 
 fn check_coverage(root: &Path) -> TaskResult {
@@ -5556,8 +5797,8 @@ fn accepted_0_2_completion(root: &Path) -> TaskResult<String> {
     let completions = evidence_seal::round_five_completion_commits(root, Some(evidence_digest))?;
     match completions.as_slice() {
         [completion] => Ok(completion.clone()),
-        [] => return Err("round-five accepted-candidate completion is missing".into()),
-        _ => return Err("round-five accepted-candidate completion is duplicated".into()),
+        [] => Err("round-five accepted-candidate completion is missing".into()),
+        _ => Err("round-five accepted-candidate completion is duplicated".into()),
     }
 }
 
