@@ -275,12 +275,16 @@ fn diagnostic_for_hir(problem: HirProblem) -> Diagnostic {
     } else {
         FailureCategory::MalformedInput
     };
-    diagnostic(
-        "MECOB0102",
-        Phase::Parse,
-        category,
-        format!("COBOL HIR construction failed: {problem:?}"),
-    )
+    let message = match &problem {
+        HirProblem::InvalidStatement { kind, line, detail } => {
+            let target = kind.official_kind().map_or(kind.slug(), |official| {
+                crate::generated::cobol_language::procedure_statement_descriptor(official).id
+            });
+            format!("COBOL {target} statement validation failed at procedure line {line}: {detail}")
+        }
+        _ => format!("COBOL HIR construction failed: {problem:?}"),
+    };
+    diagnostic("MECOB0102", Phase::Parse, category, message)
 }
 fn lower_problem(problem: LowerProblem) -> CompilerProblem {
     match problem {
@@ -311,13 +315,18 @@ mod tests {
         LogicalPath, SourceEncoding, SourceFile, SourceFormat, SourceLibrary, SourceLimits,
     };
     use std::collections::BTreeMap;
+
     fn bundle(source: &str) -> SourceBundle {
+        bundle_in_format(source, SourceFormat::Free)
+    }
+
+    fn bundle_in_format(source: &str, format: SourceFormat) -> SourceBundle {
         let limits = SourceLimits::default();
         let path = LogicalPath::new("HELLO.cbl", limits.max_path_bytes).unwrap();
         let file = SourceFile::input(
             "HELLO.cbl",
             source.as_bytes().to_vec(),
-            SourceFormat::Free,
+            format,
             SourceEncoding::Utf8,
             limits,
         )
@@ -597,5 +606,92 @@ mod tests {
             span.source.as_str() == "HELLO.cbl" && span.source_start < span.source_end
         }));
         assert!(!statement.source.is_empty());
+    }
+
+    #[test]
+    fn same_line_and_inline_hir_has_exact_provenance_in_all_source_formats() {
+        let lines = [
+            "IDENTIFICATION DIVISION.",
+            "PROGRAM-ID. BOUNDARIES.",
+            "DATA DIVISION.",
+            "WORKING-STORAGE SECTION.",
+            "01 A PIC 9 VALUE 1.",
+            "01 B PIC 9 VALUE 2.",
+            "PROCEDURE DIVISION.",
+            "MOVE A TO B DISPLAY B.",
+            "IF A = B DISPLAY 'YES' ELSE DISPLAY 'NO' END-IF.",
+            "STOP RUN.",
+        ];
+        for format in [
+            SourceFormat::Free,
+            SourceFormat::Fixed,
+            SourceFormat::Variable,
+        ] {
+            let source = if format == SourceFormat::Free {
+                lines.join("\n")
+            } else {
+                lines
+                    .iter()
+                    .enumerate()
+                    .map(|(index, line)| format!("{:06} {line}\n", index + 1))
+                    .collect::<String>()
+            };
+            let analysis = CobolCompiler::default().analyze(&bundle_in_format(&source, format));
+            let hir = analysis.hir.expect("valid bounded statement HIR");
+            assert_eq!(
+                hir.statements
+                    .iter()
+                    .map(|statement| statement.kind)
+                    .collect::<Vec<_>>(),
+                [
+                    crate::StatementKind::Move,
+                    crate::StatementKind::Display,
+                    crate::StatementKind::If,
+                    crate::StatementKind::Display,
+                    crate::StatementKind::Display,
+                    crate::StatementKind::StopRun,
+                    crate::StatementKind::ProgramEnd,
+                ],
+                "{format:?}"
+            );
+            let move_statement = &hir.statements[0];
+            let display_statement = &hir.statements[1];
+            assert!(
+                !move_statement
+                    .arguments
+                    .iter()
+                    .any(|token| token == "DISPLAY")
+            );
+            assert!(
+                move_statement.source.last().unwrap().source_end
+                    <= display_statement.source.first().unwrap().source_start
+            );
+            assert!(
+                hir.statements
+                    .iter()
+                    .filter(|statement| statement.official.is_some())
+                    .all(|statement| !statement.source.is_empty())
+            );
+            assert!(hir.control_nodes.iter().all(|node| !node.source.is_empty()));
+        }
+    }
+
+    #[test]
+    fn invalid_statement_grammar_precedes_execution_profile_diagnostics() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. BADSTART. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT TEST-FILE ASSIGN TO TESTDD ORGANIZATION IS INDEXED RECORD KEY IS A. DATA DIVISION. FILE SECTION. FD TEST-FILE. 01 TEST-RECORD. 05 A PIC 9. PROCEDURE DIVISION. START TEST-FILE BOGUS. STOP RUN.";
+        let analysis = CobolCompiler::default().analyze(&bundle(source));
+        assert!(analysis.hir.is_none());
+        assert!(analysis.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code().as_str() == "MECOB0102"
+                && diagnostic.phase() == Phase::Parse
+                && diagnostic.category() == FailureCategory::MalformedInput
+                && diagnostic.public_message().contains("start")
+        }));
+        assert!(
+            !analysis
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code().as_str() == "MECOB0200")
+        );
     }
 }

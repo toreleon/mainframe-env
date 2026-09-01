@@ -1157,6 +1157,19 @@ impl ReferenceMachine {
         if text.eq_ignore_ascii_case("ELSE") || text.eq_ignore_ascii_case("WHEN OTHER") {
             return Ok(true);
         }
+        let status_branch = || {
+            let upper = text.to_ascii_uppercase();
+            match upper.as_str() {
+                "AT END" => Some(self.last_file_status == "10"),
+                "NOT AT END" => Some(self.last_file_status != "10"),
+                "INVALID KEY" | "ON EXCEPTION" | "ON SIZE ERROR" | "OVERFLOW" | "ON OVERFLOW" => {
+                    Some(self.last_file_status != "00")
+                }
+                "NOT INVALID KEY" | "NOT ON EXCEPTION" | "NOT ON SIZE ERROR"
+                | "NOT ON OVERFLOW" => Some(self.last_file_status == "00"),
+                _ => None,
+            }
+        };
         let tokens = control_tokens(text);
         let condition = tokens
             .strip_prefix(&["WHEN".to_string()])
@@ -1166,17 +1179,7 @@ impl ReferenceMachine {
             .and_then(|node| self.control_nodes.get(&node))
             .and_then(|pc| self.operations.get(*pc));
         let Some(parent) = parent else {
-            let upper = text.to_ascii_uppercase();
-            return Ok(match upper.as_str() {
-                "AT END" => self.last_file_status == "10",
-                "NOT AT END" => self.last_file_status != "10",
-                "INVALID KEY" | "ON EXCEPTION" | "ON SIZE ERROR" | "OVERFLOW" | "ON OVERFLOW" => {
-                    self.last_file_status != "00"
-                }
-                "NOT INVALID KEY" | "NOT ON EXCEPTION" | "NOT ON SIZE ERROR"
-                | "NOT ON OVERFLOW" => self.last_file_status == "00",
-                _ => false,
-            });
+            return Ok(status_branch().unwrap_or(false));
         };
         let scope = optional_text_attribute(parent, "control_scope").unwrap_or("");
         if scope == "evaluate" {
@@ -1206,7 +1209,7 @@ impl ReferenceMachine {
         } else if scope == "search" {
             self.eval_condition(condition)
         } else {
-            Ok(true)
+            Ok(status_branch().unwrap_or(true))
         }
     }
 

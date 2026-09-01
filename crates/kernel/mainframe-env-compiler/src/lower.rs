@@ -11,11 +11,10 @@ pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, 
     let mut unsupported = hir.unsupported();
     let structured = hir.control_nodes.iter().any(|start| {
         start.role == ControlRole::BlockStart
-            && hir.control_nodes.iter().any(|end| {
-                end.role == ControlRole::BlockEnd
-                    && end.parent == Some(start.id)
-                    && end.line != start.line
-            })
+            && hir
+                .control_nodes
+                .iter()
+                .any(|end| end.role == ControlRole::BlockEnd && end.parent == Some(start.id))
     });
     if structured {
         unsupported.remove(&StatementKind::NextSentence);
