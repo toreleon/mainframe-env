@@ -120,7 +120,7 @@
       "setup": ""
     },
     {
-      "expression": "FUNCTION DISPLAY-OF(NAT, INT)",
+      "expression": "FUNCTION DISPLAY-OF(NAT, 1208)",
       "id": "display-of",
       "name": "DISPLAY-OF",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0018",

@@ -120,6 +120,20 @@
       "obligation_id": "boundary-sequence-and-reseed",
       "source": "IDENTIFICATION DIVISION. PROGRAM-ID. RANDOMSEQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 R1 PIC V9(18) COMP-3. 01 R2 PIC V9(18) COMP-3. 01 R3 PIC V9(18) COMP-3. 01 R4 PIC V9(18) COMP-3. PROCEDURE DIVISION. MOVE FUNCTION RANDOM(7) TO R1. MOVE FUNCTION RANDOM TO R2. MOVE FUNCTION RANDOM TO R3. MOVE FUNCTION RANDOM(7) TO R4. IF R1 = R4 AND R1 > 0 AND R1 < 1 AND R2 > 0 AND R2 < 1 AND R3 > 0 AND R3 < 1 AND R1 <> R2 AND R2 <> R3 DISPLAY 'SEQ' ELSE DISPLAY 'BAD' END-IF. STOP RUN.",
       "expected_output": "SEQ\n"
+    },
+    {
+      "id": "display-of-cp037-bytes",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0018",
+      "obligation_id": "boundary-explicit-output-ccsid",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. DISPLAYCCSID. DATA DIVISION. WORKING-STORAGE SECTION. 01 NAT-X PIC N(2) NATIONAL. 01 OUT-X PIC X(2). 01 HEX-X PIC X(4). PROCEDURE DIVISION. MOVE 'AB' TO NAT-X. MOVE FUNCTION DISPLAY-OF(NAT-X, 37) TO OUT-X. MOVE FUNCTION HEX-OF(OUT-X) TO HEX-X. DISPLAY HEX-X. STOP RUN.",
+      "expected_output": "C1C2\n"
+    },
+    {
+      "id": "national-of-cp037-bytes",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0044",
+      "obligation_id": "boundary-explicit-input-ccsid",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. NATIONALCCSID. DATA DIVISION. WORKING-STORAGE SECTION. 01 SOURCE-X PIC X(2). 01 HEX-X PIC X(8). PROCEDURE DIVISION. MOVE FUNCTION HEX-TO-CHAR('C1C2') TO SOURCE-X. MOVE FUNCTION HEX-OF(FUNCTION NATIONAL-OF(SOURCE-X, 37)) TO HEX-X. DISPLAY HEX-X. STOP RUN.",
+      "expected_output": "00410042\n"
     }
   ]
 }

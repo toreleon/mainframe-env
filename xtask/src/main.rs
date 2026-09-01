@@ -1642,11 +1642,17 @@ fn check_cobol_function_bindings(
             Some("0015" | "0017") => {
                 expected_obligations.insert("boundary-sliding-century");
             }
+            Some("0018") => {
+                expected_obligations.insert("boundary-explicit-output-ccsid");
+            }
             Some("0034") => {
                 expected_obligations.insert("boundary-national-character-count");
             }
             Some("0046") => {
                 expected_obligations.insert("boundary-currency-symbol");
+            }
+            Some("0044") => {
+                expected_obligations.insert("boundary-explicit-input-ccsid");
             }
             Some("0053") => {
                 expected_obligations.insert("boundary-sequence-and-reseed");

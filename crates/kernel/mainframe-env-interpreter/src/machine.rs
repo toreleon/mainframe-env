@@ -6333,7 +6333,14 @@ impl ReferenceMachine {
                 current_year(&clock()?)?,
                 3,
             ),
-            "DISPLAY-OF" => national_to_utf8(&bytes(0)?).map(CobolValue::Bytes),
+            "DISPLAY-OF" => {
+                let ccsid = arguments
+                    .get(1)
+                    .map(|_| integer(1).and_then(ccsid))
+                    .transpose()?
+                    .unwrap_or(self.display_ccsid()?);
+                display_of(&bytes(0)?, ccsid).map(CobolValue::Bytes)
+            }
             "EXP" => {
                 decimal_from_f64(libm::exp(decimal_f64(decimal(0)?)?)).map(CobolValue::Decimal)
             }
@@ -6425,7 +6432,24 @@ impl ReferenceMachine {
             "MIDRANGE" => midrange(&numeric()?).map(CobolValue::Decimal),
             "MIN" => extrema(self, &arguments, false),
             "MOD" => decimal_mod(decimal(0)?, decimal(1)?, true).map(CobolValue::Decimal),
-            "NATIONAL-OF" => utf8_to_national(&bytes(0)?).map(CobolValue::Bytes),
+            "NATIONAL-OF" => {
+                let source_is_utf8 = self.reference(argument(0)?).ok().is_some_and(|reference| {
+                    matches!(
+                        reference.layout.category,
+                        LayoutCategory::Utf8 | LayoutCategory::Utf8Group
+                    )
+                });
+                let ccsid = arguments
+                    .get(1)
+                    .map(|_| integer(1).and_then(ccsid))
+                    .transpose()?
+                    .unwrap_or(if source_is_utf8 {
+                        1_208
+                    } else {
+                        self.display_ccsid()?
+                    });
+                national_of(&bytes(0)?, ccsid).map(CobolValue::Bytes)
+            }
             "NUMVAL" => parse_numval(&bytes(0)?, false, None).map(CobolValue::Decimal),
             "NUMVAL-C" => {
                 let currency = bytes(1)?;
@@ -6826,6 +6850,21 @@ impl ReferenceMachine {
         let (state, value) = deterministic_random(state);
         self.random_state.set(Some(state));
         Ok(CobolValue::Decimal(value))
+    }
+
+    fn display_ccsid(&self) -> Result<u16, MachineProblem> {
+        self.invocation
+            .bindings
+            .get("cobol.display-ccsid")
+            .map(|value| {
+                std::str::from_utf8(value.bytes())
+                    .ok()
+                    .and_then(|value| value.parse::<u16>().ok())
+                    .filter(|value| *value != 0)
+                    .ok_or(MachineProblem::DataException)
+            })
+            .transpose()
+            .map(|value| value.unwrap_or(37))
     }
 
     fn reapply_entry_context(&mut self) -> Result<(), MachineProblem> {
@@ -9445,6 +9484,47 @@ fn national_to_utf8(bytes: &[u8]) -> Result<Vec<u8>, MachineProblem> {
     )
     .map(String::into_bytes)
     .map_err(|_| MachineProblem::DataException)
+}
+
+fn ccsid(value: i128) -> Result<u16, MachineProblem> {
+    u16::try_from(value)
+        .ok()
+        .filter(|value| *value != 0)
+        .ok_or(MachineProblem::DataException)
+}
+
+fn display_of(national: &[u8], ccsid: u16) -> Result<Vec<u8>, MachineProblem> {
+    let utf8 = national_to_utf8(national)?;
+    match ccsid {
+        1_208 => Ok(utf8),
+        37 => {
+            let text = std::str::from_utf8(&utf8).map_err(|_| MachineProblem::DataException)?;
+            Ok(text
+                .chars()
+                .flat_map(|character| {
+                    CodePage::Cp037
+                        .encode(&character.to_string(), 1)
+                        .unwrap_or_else(|_| vec![0x3f])
+                })
+                .collect())
+        }
+        _ => Err(MachineProblem::UnsupportedForm),
+    }
+}
+
+fn national_of(source: &[u8], ccsid: u16) -> Result<Vec<u8>, MachineProblem> {
+    let utf8 = match ccsid {
+        1_208 => std::str::from_utf8(source)
+            .map(str::as_bytes)
+            .map(<[u8]>::to_vec)
+            .map_err(|_| MachineProblem::DataException)?,
+        37 => CodePage::Cp037
+            .decode(source, source.len().saturating_mul(2).max(1))
+            .map(String::into_bytes)
+            .map_err(|_| MachineProblem::DataException)?,
+        _ => return Err(MachineProblem::UnsupportedForm),
+    };
+    utf8_to_national(&utf8)
 }
 
 fn unicode_length(
