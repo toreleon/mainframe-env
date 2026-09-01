@@ -8,22 +8,28 @@ mod jcl_conformance;
 
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use mainframe_env_conformance::{
-    verify_carddemo_application_package_from_env, verify_carddemo_base_batch_from_env,
-    verify_carddemo_base_online_from_env, verify_carddemo_batch_programs_from_env,
-    verify_carddemo_cics_abi_from_env, verify_carddemo_cics_runtime_from_env,
-    verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
-    verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
-    verify_carddemo_dataset_catalog_from_env, verify_carddemo_db2_from_env,
-    verify_carddemo_file_call_semantics_from_env, verify_carddemo_full_from_env,
-    verify_carddemo_host_operands_from_env, verify_carddemo_ims_from_env,
-    verify_carddemo_jcl_from_env, verify_carddemo_mq_authorization_from_env,
-    verify_carddemo_program_routing_from_env, verify_carddemo_resources_from_env,
-    verify_carddemo_security_from_env, verify_carddemo_seeds_from_env,
-    verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
-    verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
-    verify_carddemo_vsam_from_env, verify_cobol_exit, verify_cobol_frontend_fixtures,
-    verify_cobol_function_fixtures, verify_cobol_semantic_fixtures,
-    verify_cobol_statement_fixtures, verify_host_abi_libraries, verify_jcl_exit,
+    licensed_fixture_digest, verify_carddemo_application_package_from_env,
+    verify_carddemo_base_batch_from_env, verify_carddemo_base_online_from_env,
+    verify_carddemo_batch_programs_from_env, verify_carddemo_cics_abi_from_env,
+    verify_carddemo_cics_runtime_from_env, verify_carddemo_control_flow_from_env,
+    verify_carddemo_core_semantics_from_env, verify_carddemo_corpus_from_env,
+    verify_carddemo_data_layouts_from_env, verify_carddemo_dataset_catalog_from_env,
+    verify_carddemo_db2_from_env, verify_carddemo_file_call_semantics_from_env,
+    verify_carddemo_full_from_env, verify_carddemo_host_operands_from_env,
+    verify_carddemo_ims_from_env, verify_carddemo_jcl_from_env,
+    verify_carddemo_mq_authorization_from_env, verify_carddemo_program_routing_from_env,
+    verify_carddemo_resources_from_env, verify_carddemo_security_from_env,
+    verify_carddemo_seeds_from_env, verify_carddemo_source_closures_from_env,
+    verify_carddemo_source_preprocessing_from_env, verify_carddemo_terminal_from_env,
+    verify_carddemo_utilities_from_env, verify_carddemo_vsam_from_env,
+    verify_cobol_assurance_sources, verify_cobol_condition_fixtures,
+    verify_cobol_data_runtime_fixtures, verify_cobol_exit, verify_cobol_file_runtime_fixtures,
+    verify_cobol_frontend_fixtures, verify_cobol_function_boundary_runtime_fixtures,
+    verify_cobol_function_fixtures, verify_cobol_function_runtime_fixtures,
+    verify_cobol_licensed_receipt_from_env, verify_cobol_recovery_fixtures,
+    verify_cobol_register_runtime_fixtures, verify_cobol_semantic_fixtures,
+    verify_cobol_statement_fixtures, verify_cobol_statement_phrase_runtime_fixtures,
+    verify_cobol_statement_runtime_fixtures, verify_host_abi_libraries, verify_jcl_exit,
 };
 use mainframe_env_coverage::{
     BindingKey, CompiledSpec, ConformanceDriver, ConformanceLimits, ConformanceObservation,
@@ -529,10 +535,21 @@ fn check_spec(root: &Path) -> TaskResult {
         schema_names
             == BTreeSet::from([
                 "cobol-language.schema.json",
+                "cobol-licensed-differential-adapter.schema.json",
+                "cobol-licensed-differential-receipt.schema.json",
+                "cobol-condition-fixtures.schema.json",
+                "cobol-data-runtime-fixtures.schema.json",
                 "cobol-frontend-fixtures.schema.json",
+                "cobol-file-runtime-fixtures.schema.json",
+                "cobol-function-boundary-runtime-fixtures.schema.json",
                 "cobol-function-fixtures.schema.json",
+                "cobol-function-runtime-fixtures.schema.json",
+                "cobol-register-runtime-fixtures.schema.json",
+                "cobol-recovery-fixtures.schema.json",
                 "cobol-semantic-fixtures.schema.json",
                 "cobol-statement-fixtures.schema.json",
+                "cobol-statement-phrase-runtime-fixtures.schema.json",
+                "cobol-statement-runtime-fixtures.schema.json",
                 "conformance-inventory.schema.json",
                 "conformance-spec.schema.json",
                 "derived-ledger.schema.json",
@@ -543,6 +560,42 @@ fn check_spec(root: &Path) -> TaskResult {
     for schema_path in &schemas {
         let schema = json(schema_path)?;
         compile_draft_2020_12_schema(&schema, schema_path)?;
+    }
+    let cobol_oracle_path = root.join("conformance/0.4/oracles/cobol-licensed-differential.json");
+    let cobol_oracle_schema_path =
+        schema_directory.join("cobol-licensed-differential-adapter.schema.json");
+    validate_schema_instance(
+        &json(&cobol_oracle_schema_path)?,
+        &json(&cobol_oracle_path)?,
+        &cobol_oracle_path,
+    )?;
+    let oracle_policy = json(&cobol_oracle_path)?;
+    if let Ok(receipt_path) = env::var("MAINFRAME_ENV_COBOL65_LICENSED_ORACLE_RECEIPT") {
+        let receipt_path = fs::canonicalize(PathBuf::from(receipt_path))
+            .map_err(|error| format!("licensed COBOL receipt: {error}"))?;
+        let canonical_root = fs::canonicalize(root).map_err(|error| error.to_string())?;
+        require(
+            !receipt_path.starts_with(canonical_root),
+            "licensed COBOL receipt must remain external to the candidate tree",
+        )?;
+        validate_schema_instance(
+            &json(&schema_directory.join("cobol-licensed-differential-receipt.schema.json"))?,
+            &json(&receipt_path)?,
+            &receipt_path,
+        )?;
+        require(
+            oracle_policy["status"] == "pass",
+            "licensed COBOL receipt is present but the reviewed adapter status is not pass",
+        )?;
+        require(
+            verify_cobol_licensed_receipt_from_env()?,
+            "licensed COBOL receipt environment unexpectedly disappeared",
+        )?;
+    } else {
+        require(
+            oracle_policy["status"] == "pending",
+            "licensed COBOL differential status cannot pass without an external receipt",
+        )?;
     }
     let spec_path = root.join("conformance/spec/v1/spec.json");
     let spec_value = json(&spec_path)?;
@@ -583,6 +636,86 @@ fn check_spec(root: &Path) -> TaskResult {
         &statement_path,
     )?;
     verify_cobol_statement_fixtures()?;
+    let statement_runtime_path = root.join("conformance/0.4/cobol/statement-runtime-fixtures.json");
+    let statement_runtime_schema_path =
+        schema_directory.join("cobol-statement-runtime-fixtures.schema.json");
+    validate_schema_instance(
+        &json(&statement_runtime_schema_path)?,
+        &json(&statement_runtime_path)?,
+        &statement_runtime_path,
+    )?;
+    verify_cobol_statement_runtime_fixtures()?;
+    let statement_phrase_path =
+        root.join("conformance/0.4/cobol/statement-phrase-runtime-fixtures.json");
+    let statement_phrase_schema_path =
+        schema_directory.join("cobol-statement-phrase-runtime-fixtures.schema.json");
+    validate_schema_instance(
+        &json(&statement_phrase_schema_path)?,
+        &json(&statement_phrase_path)?,
+        &statement_phrase_path,
+    )?;
+    verify_cobol_statement_phrase_runtime_fixtures()?;
+    let data_runtime_path = root.join("conformance/0.4/cobol/data-runtime-fixtures.json");
+    let data_runtime_schema_path = schema_directory.join("cobol-data-runtime-fixtures.schema.json");
+    validate_schema_instance(
+        &json(&data_runtime_schema_path)?,
+        &json(&data_runtime_path)?,
+        &data_runtime_path,
+    )?;
+    verify_cobol_data_runtime_fixtures()?;
+    let register_runtime_path = root.join("conformance/0.4/cobol/register-runtime-fixtures.json");
+    let register_runtime_schema_path =
+        schema_directory.join("cobol-register-runtime-fixtures.schema.json");
+    validate_schema_instance(
+        &json(&register_runtime_schema_path)?,
+        &json(&register_runtime_path)?,
+        &register_runtime_path,
+    )?;
+    verify_cobol_register_runtime_fixtures()?;
+    let file_runtime_path = root.join("conformance/0.4/cobol/file-runtime-fixtures.json");
+    let file_runtime_schema_path = schema_directory.join("cobol-file-runtime-fixtures.schema.json");
+    validate_schema_instance(
+        &json(&file_runtime_schema_path)?,
+        &json(&file_runtime_path)?,
+        &file_runtime_path,
+    )?;
+    verify_cobol_file_runtime_fixtures()?;
+    let recovery_path = root.join("conformance/0.4/cobol/recovery-fixtures.json");
+    let recovery_schema_path = schema_directory.join("cobol-recovery-fixtures.schema.json");
+    validate_schema_instance(
+        &json(&recovery_schema_path)?,
+        &json(&recovery_path)?,
+        &recovery_path,
+    )?;
+    verify_cobol_recovery_fixtures()?;
+    let condition_path = root.join("conformance/0.4/cobol/condition-fixtures.json");
+    let condition_schema_path = schema_directory.join("cobol-condition-fixtures.schema.json");
+    validate_schema_instance(
+        &json(&condition_schema_path)?,
+        &json(&condition_path)?,
+        &condition_path,
+    )?;
+    verify_cobol_condition_fixtures()?;
+    let function_runtime_path = root.join("conformance/0.4/cobol/function-runtime-fixtures.json");
+    let function_runtime_schema_path =
+        schema_directory.join("cobol-function-runtime-fixtures.schema.json");
+    validate_schema_instance(
+        &json(&function_runtime_schema_path)?,
+        &json(&function_runtime_path)?,
+        &function_runtime_path,
+    )?;
+    verify_cobol_function_runtime_fixtures()?;
+    let function_boundary_path =
+        root.join("conformance/0.4/cobol/function-boundary-runtime-fixtures.json");
+    let function_boundary_schema_path =
+        schema_directory.join("cobol-function-boundary-runtime-fixtures.schema.json");
+    validate_schema_instance(
+        &json(&function_boundary_schema_path)?,
+        &json(&function_boundary_path)?,
+        &function_boundary_path,
+    )?;
+    verify_cobol_function_boundary_runtime_fixtures()?;
+    verify_cobol_assurance_sources()?;
     let function_path = root.join("conformance/0.3/cobol/function-fixtures.json");
     let function_schema_path = schema_directory.join("cobol-function-fixtures.schema.json");
     validate_schema_instance(
@@ -593,10 +726,41 @@ fn check_spec(root: &Path) -> TaskResult {
     verify_cobol_function_fixtures()?;
     check_cobol_language_generated(root)?;
     let spec = compile_shared_spec(root)?;
+    if let Ok(receipt_path) = env::var("MAINFRAME_ENV_COBOL65_LICENSED_ORACLE_RECEIPT") {
+        let receipt_path = fs::canonicalize(PathBuf::from(receipt_path))
+            .map_err(|error| format!("licensed COBOL receipt: {error}"))?;
+        let receipt = json(&receipt_path)?;
+        let candidate = candidate_digest(root)?;
+        let fixtures = licensed_fixture_digest();
+        require(
+            receipt["candidate_digest"].as_str() == Some(candidate.as_str())
+                && receipt["spec_digest"].as_str() == Some(spec.spec_digest())
+                && receipt["fixture_digest"].as_str() == Some(fixtures.as_str()),
+            "licensed COBOL receipt is for a different candidate, spec, or fixture corpus",
+        )?;
+    }
     check_cobol_frontend_bindings(root, &spec, &frontend_path)?;
     check_cobol_semantic_bindings(root, &spec, &semantic_path)?;
     check_cobol_statement_bindings(root, &spec, &statement_path)?;
+    check_cobol_statement_runtime_bindings(root, &spec, &statement_runtime_path)?;
+    check_cobol_statement_phrase_runtime_bindings(&spec, &statement_phrase_path)?;
     check_cobol_function_bindings(root, &spec, &function_path)?;
+    check_cobol_function_runtime_bindings(root, &spec, &function_runtime_path)?;
+    check_cobol_function_boundary_runtime_bindings(&spec, &function_boundary_path)?;
+    check_cobol_data_runtime_bindings(root, &spec, &data_runtime_path)?;
+    check_cobol_file_runtime_bindings(root, &spec, &file_runtime_path)?;
+    check_cobol_assurance_bindings(
+        root,
+        &spec,
+        [
+            ("statement", statement_runtime_path.as_path()),
+            ("function", function_runtime_path.as_path()),
+            ("data", data_runtime_path.as_path()),
+            ("file", file_runtime_path.as_path()),
+        ],
+    )?;
+    check_cobol_recovery_bindings(root, &spec, &recovery_path)?;
+    check_cobol_condition_bindings(root, &spec, &condition_path)?;
     validate_conformance_projections(&schema_directory, &spec)?;
     require(
         !root.join("conformance/spec/verdicts").exists()
@@ -928,12 +1092,37 @@ fn check_cobol_semantic_bindings(
         .rows()
         .filter(|row| expected_rows.contains(row.row_id().as_str()))
     {
+        let mut expected_obligations =
+            if row.row_id().as_str().contains(":data-description-clauses:")
+                || row.row_id().as_str().contains(":file-description-clauses:")
+            {
+                BTreeSet::from([
+                    "checkpoint-identity",
+                    "invalid-forms",
+                    "licensed-equivalence",
+                    "quantum-identity",
+                    "resource-exhaustion",
+                    "runtime-cancellation",
+                    "runtime-normal",
+                    "valid-forms",
+                ])
+            } else {
+                BTreeSet::from(["valid-forms", "invalid-forms"])
+            };
+        if row
+            .row_id()
+            .as_str()
+            .ends_with(":data-description-clauses:0002")
+        {
+            expected_obligations.insert("checkpoint-restart");
+            expected_obligations.insert("runtime-condition");
+        }
         require(
             row.obligations()
                 .iter()
                 .map(|obligation| obligation.as_str())
                 .collect::<BTreeSet<_>>()
-                == BTreeSet::from(["valid-forms", "invalid-forms"]),
+                == expected_obligations,
             &format!("COBOL semantic obligations drifted for {}", row.row_id()),
         )?;
     }
@@ -1038,12 +1227,78 @@ fn check_cobol_statement_bindings(
         .rows()
         .filter(|row| expected_rows.contains(row.row_id().as_str()))
     {
+        let mut expected_obligations = BTreeSet::from([
+            "checkpoint-identity",
+            "invalid-forms",
+            "licensed-equivalence",
+            "quantum-identity",
+            "resource-exhaustion",
+            "runtime-cancellation",
+            "runtime-normal",
+            "valid-forms",
+        ]);
+        if matches!(
+            row.row_id().as_str().rsplit(':').next(),
+            Some("0031" | "0032" | "0034" | "0036")
+        ) {
+            expected_obligations.insert("checkpoint-restart");
+        }
+        if matches!(
+            row.row_id().as_str().rsplit(':').next(),
+            Some("0002" | "0005" | "0022" | "0024" | "0030" | "0037" | "0039" | "0041" | "0044")
+        ) {
+            expected_obligations.insert("runtime-condition");
+        }
+        match row.row_id().as_str().rsplit(':').next() {
+            Some("0002" | "0026") => {
+                expected_obligations.insert("phrase-corresponding");
+            }
+            Some("0011") => {
+                expected_obligations.insert("phrase-upon-no-advancing");
+            }
+            Some("0015") => {
+                expected_obligations.insert("phrase-paragraph");
+                expected_obligations.insert("phrase-perform");
+            }
+            Some("0020") => {
+                expected_obligations.insert("phrase-with-filler");
+            }
+            Some("0023" | "0043") => {
+                expected_obligations.insert("phrase-count-in");
+            }
+            Some("0029") => {
+                expected_obligations.insert("phrase-inline-varying");
+                expected_obligations.insert("phrase-through");
+            }
+            Some("0030") => {
+                expected_obligations.insert("phrase-next-record");
+            }
+            Some("0035") => {
+                expected_obligations.insert("phrase-up-down-by");
+            }
+            Some("0031") => {
+                expected_obligations.insert("phrase-from");
+            }
+            Some("0032") => {
+                expected_obligations.insert("phrase-into-at-end");
+            }
+            Some("0034") => {
+                expected_obligations.insert("phrase-all");
+            }
+            Some("0039") => {
+                expected_obligations.insert("phrase-with-pointer");
+            }
+            Some("0041") => {
+                expected_obligations.insert("phrase-pointer-tally");
+            }
+            _ => {}
+        }
         require(
             row.obligations()
                 .iter()
                 .map(|obligation| obligation.as_str())
                 .collect::<BTreeSet<_>>()
-                == BTreeSet::from(["valid-forms", "invalid-forms"]),
+                == expected_obligations,
             &format!("COBOL statement obligations drifted for {}", row.row_id()),
         )?;
     }
@@ -1096,6 +1351,182 @@ fn check_cobol_statement_bindings(
     require(
         actual_cases == expected_fixtures,
         "COBOL statement executable bindings are incomplete or stale",
+    )
+}
+
+fn check_cobol_statement_runtime_bindings(
+    _root: &Path,
+    spec: &CompiledSpec,
+    fixture_path: &Path,
+) -> TaskResult {
+    let fixtures = json(fixture_path)?;
+    let digest = format!("sha256:{}", file_digest(fixture_path)?);
+    let expected = array(&fixtures, "fixtures", fixture_path)?
+        .iter()
+        .map(|fixture| {
+            Ok((
+                text(fixture, "row_id", fixture_path)?.to_string(),
+                format!(
+                    "cobol.statement-runtime.{}",
+                    text(fixture, "id", fixture_path)?
+                ),
+            ))
+        })
+        .collect::<TaskResult<BTreeMap<_, _>>>()?;
+    require(
+        expected.len() == 44,
+        "COBOL statement runtime fixture denominator drifted",
+    )?;
+    let registered = spec
+        .registries()
+        .fixtures()
+        .iter()
+        .filter(|(fixture, _)| fixture.as_str().starts_with("cobol.statement-runtime."))
+        .map(|(fixture, fixture_digest)| {
+            require(
+                fixture_digest == &digest,
+                &format!("COBOL statement runtime fixture digest drifted for {fixture}"),
+            )?;
+            Ok(fixture.as_str().to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        registered == expected.values().cloned().collect(),
+        "COBOL statement runtime fixture registry is incomplete or stale",
+    )?;
+    let cases = spec
+        .cases()
+        .filter(|case| {
+            case.test_id()
+                .as_str()
+                .starts_with("cobol.statement-runtime.")
+        })
+        .map(|case| {
+            let fixture = expected.get(case.key().row_id.as_str()).ok_or_else(|| {
+                format!("unknown COBOL statement runtime row {}", case.key().row_id)
+            })?;
+            require(
+                case.key().gate == CoverageGate::Executed
+                    && case.key().obligation_id.as_str() == "runtime-normal"
+                    && case.test_id().as_str() == fixture
+                    && case.input().as_str() == fixture
+                    && case.driver().as_str() == "cobol.statement-runtime.driver"
+                    && case.preconditions().len() == 1
+                    && case.preconditions()[0].as_str()
+                        == "cobol.statement-runtime.fixture.available"
+                    && case.expected().len() == 1
+                    && case.expected()[0].as_str() == "cobol.statement-runtime.executed"
+                    && case.recovery().is_none()
+                    && has_cobol_licensed_oracle(case),
+                &format!("COBOL statement runtime binding drifted for {fixture}"),
+            )?;
+            Ok(case.key().row_id.as_str().to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        cases == expected.keys().cloned().collect(),
+        "COBOL statement runtime cases are incomplete or stale",
+    )?;
+    for row in spec
+        .rows()
+        .filter(|row| expected.contains_key(row.row_id().as_str()))
+    {
+        require(
+            row.operation().as_str() == "cobol.statement.semantics"
+                && row.transition().as_str() == "cobol.statement.compile-and-execute"
+                && row.input().as_str() == "cobol.statement-runtime.artifact"
+                && row
+                    .obligations()
+                    .iter()
+                    .any(|obligation| obligation.as_str() == "runtime-normal"),
+            &format!(
+                "COBOL statement runtime row contract drifted for {}",
+                row.row_id()
+            ),
+        )?;
+    }
+    Ok(())
+}
+
+fn check_cobol_statement_phrase_runtime_bindings(
+    spec: &CompiledSpec,
+    fixture_path: &Path,
+) -> TaskResult {
+    let fixtures = json(fixture_path)?;
+    let digest = format!("sha256:{}", file_digest(fixture_path)?);
+    let expected = array(&fixtures, "fixtures", fixture_path)?
+        .iter()
+        .map(|fixture| {
+            let id = text(fixture, "id", fixture_path)?;
+            Ok((
+                format!("cobol.statement-phrase-runtime.{id}"),
+                (
+                    text(fixture, "row_id", fixture_path)?.to_string(),
+                    text(fixture, "obligation_id", fixture_path)?.to_string(),
+                ),
+            ))
+        })
+        .collect::<TaskResult<BTreeMap<_, _>>>()?;
+    require(
+        !expected.is_empty() && expected.len() <= 256,
+        "COBOL statement phrase fixture denominator drifted",
+    )?;
+    let registered = spec
+        .registries()
+        .fixtures()
+        .iter()
+        .filter(|(fixture, _)| {
+            fixture
+                .as_str()
+                .starts_with("cobol.statement-phrase-runtime.")
+        })
+        .map(|(fixture, fixture_digest)| {
+            require(
+                fixture_digest == &digest,
+                &format!("COBOL statement phrase fixture digest drifted for {fixture}"),
+            )?;
+            Ok(fixture.as_str().to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        registered == expected.keys().cloned().collect(),
+        "COBOL statement phrase fixture registry is incomplete or stale",
+    )?;
+    let cases = spec
+        .cases()
+        .filter(|case| {
+            case.test_id()
+                .as_str()
+                .starts_with("cobol.statement-phrase-runtime.")
+        })
+        .map(|case| {
+            let (row_id, obligation) = expected
+                .get(case.test_id().as_str())
+                .ok_or_else(|| format!("unknown COBOL phrase case {}", case.test_id()))?;
+            require(
+                case.key().row_id.as_str() == row_id
+                    && case.key().gate == CoverageGate::Executed
+                    && case.key().obligation_id.as_str() == obligation
+                    && case.input().as_str() == case.test_id().as_str()
+                    && case.driver().as_str() == "cobol.statement-phrase-runtime.driver"
+                    && case.preconditions().len() == 1
+                    && case.preconditions()[0].as_str()
+                        == "cobol.statement-phrase-runtime.fixture.available"
+                    && case.expected().len() == 1
+                    && case.expected()[0].as_str() == "cobol.statement-phrase-runtime.executed"
+                    && case.recovery().is_none()
+                    && has_cobol_licensed_oracle(case),
+                &format!(
+                    "COBOL statement phrase binding drifted for {}",
+                    case.test_id()
+                ),
+            )?;
+            Ok(case.test_id().as_str().to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        cases == expected.keys().cloned().collect(),
+        "COBOL statement phrase cases are incomplete or stale",
     )
 }
 
@@ -1154,12 +1585,34 @@ fn check_cobol_function_bindings(
         .rows()
         .filter(|row| expected_rows.contains(row.row_id().as_str()))
     {
+        let mut expected_obligations = BTreeSet::from([
+            "checkpoint-identity",
+            "invalid-signature",
+            "licensed-equivalence",
+            "quantum-identity",
+            "resource-exhaustion",
+            "runtime-cancellation",
+            "runtime-normal",
+            "valid-signature",
+        ]);
+        match row.row_id().as_str().rsplit(':').next() {
+            Some("0046") => {
+                expected_obligations.insert("boundary-currency-symbol");
+            }
+            Some("0068") => {
+                expected_obligations.insert("boundary-error-position");
+            }
+            Some("0069") => {
+                expected_obligations.insert("boundary-currency-position");
+            }
+            _ => {}
+        }
         require(
             row.obligations()
                 .iter()
                 .map(|obligation| obligation.as_str())
                 .collect::<BTreeSet<_>>()
-                == BTreeSet::from(["valid-signature", "invalid-signature"]),
+                == expected_obligations,
             &format!("COBOL function obligations drifted for {}", row.row_id()),
         )?;
     }
@@ -1212,6 +1665,713 @@ fn check_cobol_function_bindings(
     require(
         actual_cases == expected_fixtures,
         "COBOL function executable bindings are incomplete or stale",
+    )
+}
+
+fn check_cobol_function_runtime_bindings(
+    _root: &Path,
+    spec: &CompiledSpec,
+    fixture_path: &Path,
+) -> TaskResult {
+    let fixtures = json(fixture_path)?;
+    let digest = format!("sha256:{}", file_digest(fixture_path)?);
+    let expected = array(&fixtures, "fixtures", fixture_path)?
+        .iter()
+        .map(|fixture| {
+            Ok((
+                text(fixture, "row_id", fixture_path)?.to_string(),
+                format!(
+                    "cobol.function-runtime.{}",
+                    text(fixture, "id", fixture_path)?
+                ),
+            ))
+        })
+        .collect::<TaskResult<BTreeMap<_, _>>>()?;
+    require(
+        expected.len() == 82,
+        "COBOL function runtime fixture denominator drifted",
+    )?;
+    let registered = spec
+        .registries()
+        .fixtures()
+        .iter()
+        .filter(|(fixture, _)| fixture.as_str().starts_with("cobol.function-runtime."))
+        .map(|(fixture, fixture_digest)| {
+            require(
+                fixture_digest == &digest,
+                &format!("COBOL function runtime fixture digest drifted for {fixture}"),
+            )?;
+            Ok(fixture.as_str().to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        registered == expected.values().cloned().collect(),
+        "COBOL function runtime fixture registry is incomplete or stale",
+    )?;
+    let cases = spec
+        .cases()
+        .filter(|case| {
+            case.test_id()
+                .as_str()
+                .starts_with("cobol.function-runtime.")
+        })
+        .map(|case| {
+            let fixture = expected.get(case.key().row_id.as_str()).ok_or_else(|| {
+                format!("unknown COBOL function runtime row {}", case.key().row_id)
+            })?;
+            require(
+                case.key().gate == CoverageGate::Executed
+                    && case.key().obligation_id.as_str() == "runtime-normal"
+                    && case.test_id().as_str() == fixture
+                    && case.input().as_str() == fixture
+                    && case.driver().as_str() == "cobol.function-runtime.driver"
+                    && case.preconditions().len() == 1
+                    && case.preconditions()[0].as_str()
+                        == "cobol.function-runtime.fixture.available"
+                    && case.expected().len() == 1
+                    && case.expected()[0].as_str() == "cobol.function-runtime.executed"
+                    && case.recovery().is_none()
+                    && has_cobol_licensed_oracle(case),
+                &format!("COBOL function runtime binding drifted for {fixture}"),
+            )?;
+            Ok(case.key().row_id.as_str().to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        cases == expected.keys().cloned().collect(),
+        "COBOL function runtime cases are incomplete or stale",
+    )?;
+    for row in spec
+        .rows()
+        .filter(|row| expected.contains_key(row.row_id().as_str()))
+    {
+        require(
+            row.operation().as_str() == "cobol.function.semantics"
+                && row.transition().as_str() == "cobol.function.compile-and-execute"
+                && row.input().as_str() == "cobol.function-runtime.artifact"
+                && row
+                    .obligations()
+                    .iter()
+                    .any(|obligation| obligation.as_str() == "runtime-normal"),
+            &format!(
+                "COBOL function runtime row contract drifted for {}",
+                row.row_id()
+            ),
+        )?;
+    }
+    Ok(())
+}
+
+fn check_cobol_function_boundary_runtime_bindings(
+    spec: &CompiledSpec,
+    fixture_path: &Path,
+) -> TaskResult {
+    let fixtures = json(fixture_path)?;
+    let digest = format!("sha256:{}", file_digest(fixture_path)?);
+    let expected = array(&fixtures, "fixtures", fixture_path)?
+        .iter()
+        .map(|fixture| {
+            let id = text(fixture, "id", fixture_path)?;
+            Ok((
+                format!("cobol.function-boundary-runtime.{id}"),
+                (
+                    text(fixture, "row_id", fixture_path)?.to_string(),
+                    text(fixture, "obligation_id", fixture_path)?.to_string(),
+                ),
+            ))
+        })
+        .collect::<TaskResult<BTreeMap<_, _>>>()?;
+    require(
+        !expected.is_empty() && expected.len() <= 512,
+        "COBOL function boundary fixture denominator drifted",
+    )?;
+    let registered = spec
+        .registries()
+        .fixtures()
+        .iter()
+        .filter(|(fixture, _)| {
+            fixture
+                .as_str()
+                .starts_with("cobol.function-boundary-runtime.")
+        })
+        .map(|(fixture, fixture_digest)| {
+            require(
+                fixture_digest == &digest,
+                &format!("COBOL function boundary fixture digest drifted for {fixture}"),
+            )?;
+            Ok(fixture.as_str().to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        registered == expected.keys().cloned().collect(),
+        "COBOL function boundary fixture registry is incomplete or stale",
+    )?;
+    let cases = spec
+        .cases()
+        .filter(|case| {
+            case.test_id()
+                .as_str()
+                .starts_with("cobol.function-boundary-runtime.")
+        })
+        .map(|case| {
+            let (row_id, obligation) = expected.get(case.test_id().as_str()).ok_or_else(|| {
+                format!("unknown COBOL function boundary case {}", case.test_id())
+            })?;
+            require(
+                case.key().row_id.as_str() == row_id
+                    && case.key().gate == CoverageGate::Executed
+                    && case.key().obligation_id.as_str() == obligation
+                    && case.input().as_str() == case.test_id().as_str()
+                    && case.driver().as_str() == "cobol.function-boundary-runtime.driver"
+                    && case.preconditions().len() == 1
+                    && case.preconditions()[0].as_str()
+                        == "cobol.function-boundary-runtime.fixture.available"
+                    && case.expected().len() == 1
+                    && case.expected()[0].as_str() == "cobol.function-boundary-runtime.executed"
+                    && case.recovery().is_none()
+                    && has_cobol_licensed_oracle(case),
+                &format!(
+                    "COBOL function boundary binding drifted for {}",
+                    case.test_id()
+                ),
+            )?;
+            Ok(case.test_id().as_str().to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        cases == expected.keys().cloned().collect(),
+        "COBOL function boundary cases are incomplete or stale",
+    )
+}
+
+fn check_cobol_data_runtime_bindings(
+    _root: &Path,
+    spec: &CompiledSpec,
+    fixture_path: &Path,
+) -> TaskResult {
+    let fixtures = json(fixture_path)?;
+    let digest = format!("sha256:{}", file_digest(fixture_path)?);
+    let expected = array(&fixtures, "fixtures", fixture_path)?
+        .iter()
+        .map(|fixture| {
+            Ok((
+                text(fixture, "row_id", fixture_path)?.to_string(),
+                format!("cobol.data-runtime.{}", text(fixture, "id", fixture_path)?),
+            ))
+        })
+        .collect::<TaskResult<BTreeMap<_, _>>>()?;
+    require(
+        expected.len() == 17,
+        "COBOL data runtime fixture denominator drifted",
+    )?;
+    let registered = spec
+        .registries()
+        .fixtures()
+        .iter()
+        .filter(|(fixture, _)| fixture.as_str().starts_with("cobol.data-runtime."))
+        .map(|(fixture, fixture_digest)| {
+            require(
+                fixture_digest == &digest,
+                &format!("COBOL data runtime fixture digest drifted for {fixture}"),
+            )?;
+            Ok(fixture.as_str().to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        registered == expected.values().cloned().collect(),
+        "COBOL data runtime fixture registry is incomplete or stale",
+    )?;
+    let cases = spec
+        .cases()
+        .filter(|case| case.test_id().as_str().starts_with("cobol.data-runtime."))
+        .map(|case| {
+            let fixture = expected
+                .get(case.key().row_id.as_str())
+                .ok_or_else(|| format!("unknown COBOL data runtime row {}", case.key().row_id))?;
+            require(
+                case.key().gate == CoverageGate::Executed
+                    && case.key().obligation_id.as_str() == "runtime-normal"
+                    && case.test_id().as_str() == fixture
+                    && case.input().as_str() == fixture
+                    && case.driver().as_str() == "cobol.data-runtime.driver"
+                    && case.preconditions().len() == 1
+                    && case.preconditions()[0].as_str() == "cobol.data-runtime.fixture.available"
+                    && case.expected().len() == 1
+                    && case.expected()[0].as_str() == "cobol.data-runtime.executed"
+                    && case.recovery().is_none()
+                    && has_cobol_licensed_oracle(case),
+                &format!("COBOL data runtime binding drifted for {fixture}"),
+            )?;
+            Ok(case.key().row_id.as_str().to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        cases == expected.keys().cloned().collect(),
+        "COBOL data runtime cases are incomplete or stale",
+    )?;
+    for row in spec
+        .rows()
+        .filter(|row| expected.contains_key(row.row_id().as_str()))
+    {
+        require(
+            row.operation().as_str() == "cobol.data.semantics"
+                && row.transition().as_str() == "cobol.data.compile-and-execute"
+                && row.input().as_str() == "cobol.data-runtime.artifact"
+                && row
+                    .obligations()
+                    .iter()
+                    .any(|obligation| obligation.as_str() == "runtime-normal"),
+            &format!(
+                "COBOL data runtime row contract drifted for {}",
+                row.row_id()
+            ),
+        )?;
+    }
+    Ok(())
+}
+
+fn check_cobol_file_runtime_bindings(
+    _root: &Path,
+    spec: &CompiledSpec,
+    fixture_path: &Path,
+) -> TaskResult {
+    let fixtures = json(fixture_path)?;
+    let digest = format!("sha256:{}", file_digest(fixture_path)?);
+    let expected = array(&fixtures, "fixtures", fixture_path)?
+        .iter()
+        .map(|fixture| {
+            Ok((
+                text(fixture, "row_id", fixture_path)?.to_string(),
+                format!("cobol.file-runtime.{}", text(fixture, "id", fixture_path)?),
+            ))
+        })
+        .collect::<TaskResult<BTreeMap<_, _>>>()?;
+    require(
+        expected.len() == 10,
+        "COBOL file runtime fixture denominator drifted",
+    )?;
+    let registered = spec
+        .registries()
+        .fixtures()
+        .iter()
+        .filter(|(fixture, _)| fixture.as_str().starts_with("cobol.file-runtime."))
+        .map(|(fixture, fixture_digest)| {
+            require(
+                fixture_digest == &digest,
+                &format!("COBOL file runtime fixture digest drifted for {fixture}"),
+            )?;
+            Ok(fixture.as_str().to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        registered == expected.values().cloned().collect(),
+        "COBOL file runtime fixture registry is incomplete or stale",
+    )?;
+    let cases = spec
+        .cases()
+        .filter(|case| case.test_id().as_str().starts_with("cobol.file-runtime."))
+        .map(|case| {
+            let fixture = expected
+                .get(case.key().row_id.as_str())
+                .ok_or_else(|| format!("unknown COBOL file runtime row {}", case.key().row_id))?;
+            require(
+                case.key().gate == CoverageGate::Executed
+                    && case.key().obligation_id.as_str() == "runtime-normal"
+                    && case.test_id().as_str() == fixture
+                    && case.input().as_str() == fixture
+                    && case.driver().as_str() == "cobol.file-runtime.driver"
+                    && case.preconditions().len() == 1
+                    && case.preconditions()[0].as_str() == "cobol.file-runtime.fixture.available"
+                    && case.expected().len() == 1
+                    && case.expected()[0].as_str() == "cobol.file-runtime.executed"
+                    && case.recovery().is_none()
+                    && has_cobol_licensed_oracle(case),
+                &format!("COBOL file runtime binding drifted for {fixture}"),
+            )?;
+            Ok(case.key().row_id.as_str().to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        cases == expected.keys().cloned().collect(),
+        "COBOL file runtime cases are incomplete or stale",
+    )?;
+    for row in spec
+        .rows()
+        .filter(|row| expected.contains_key(row.row_id().as_str()))
+    {
+        require(
+            row.operation().as_str() == "cobol.file.semantics"
+                && row.transition().as_str() == "cobol.file.compile-and-execute"
+                && row.input().as_str() == "cobol.file-runtime.artifact"
+                && row
+                    .obligations()
+                    .iter()
+                    .any(|id| id.as_str() == "runtime-normal"),
+            &format!(
+                "COBOL file runtime row contract drifted for {}",
+                row.row_id()
+            ),
+        )?;
+    }
+    Ok(())
+}
+
+fn check_cobol_assurance_bindings(
+    root: &Path,
+    spec: &CompiledSpec,
+    fixture_paths: [(&str, &Path); 4],
+) -> TaskResult {
+    let mut expected = BTreeMap::new();
+    for (kind, fixture_path) in fixture_paths {
+        let fixtures = json(fixture_path)?;
+        for fixture in array(&fixtures, "fixtures", fixture_path)? {
+            let id = text(fixture, "id", fixture_path)?;
+            let row_id = text(fixture, "row_id", fixture_path)?;
+            let fixture_id = format!("cobol.{kind}-runtime.{id}");
+            require(
+                expected
+                    .insert(
+                        row_id.to_string(),
+                        (kind.to_string(), id.to_string(), fixture_id),
+                    )
+                    .is_none(),
+                &format!("COBOL assurance fixtures repeat official row {row_id}"),
+            )?;
+        }
+    }
+    require(
+        expected.len() == 153,
+        "COBOL assurance fixture denominator drifted",
+    )?;
+
+    let expected_tests = expected
+        .values()
+        .flat_map(|(kind, id, _)| {
+            [
+                format!("cobol.assurance.condition.{kind}.{id}"),
+                format!("cobol.assurance.cancellation.{kind}.{id}"),
+                format!("cobol.assurance.recovery.{kind}.{id}"),
+                format!("cobol.assurance.quantum.{kind}.{id}"),
+            ]
+        })
+        .collect::<BTreeSet<_>>();
+    let actual_tests = spec
+        .cases()
+        .filter(|case| case.test_id().as_str().starts_with("cobol.assurance."))
+        .map(|case| {
+            let (kind, id, fixture_id) = expected
+                .get(case.key().row_id.as_str())
+                .ok_or_else(|| format!("unknown COBOL assurance row {}", case.key().row_id))?;
+            let (gate, obligation, test_id, observation) = match case.key().obligation_id.as_str() {
+                "resource-exhaustion" => (
+                    CoverageGate::Conditioned,
+                    "resource-exhaustion",
+                    format!("cobol.assurance.condition.{kind}.{id}"),
+                    "cobol.assurance.resource-conditioned",
+                ),
+                "checkpoint-identity" => (
+                    CoverageGate::Recovered,
+                    "checkpoint-identity",
+                    format!("cobol.assurance.recovery.{kind}.{id}"),
+                    "cobol.assurance.checkpoint-recovered",
+                ),
+                "runtime-cancellation" => (
+                    CoverageGate::Conditioned,
+                    "runtime-cancellation",
+                    format!("cobol.assurance.cancellation.{kind}.{id}"),
+                    "cobol.assurance.cancellation-conditioned",
+                ),
+                "quantum-identity" => (
+                    CoverageGate::Executed,
+                    "quantum-identity",
+                    format!("cobol.assurance.quantum.{kind}.{id}"),
+                    "cobol.assurance.quantum-invariant",
+                ),
+                other => return Err(format!("unknown COBOL assurance obligation {other}")),
+            };
+            require(
+                case.key().gate == gate
+                    && case.key().obligation_id.as_str() == obligation
+                    && case.test_id().as_str() == test_id
+                    && case.input().as_str() == fixture_id
+                    && case.driver().as_str() == "cobol.assurance.driver"
+                    && case.preconditions().len() == 1
+                    && case.preconditions()[0].as_str() == "cobol.assurance.fixture.available"
+                    && case.expected().len() == 1
+                    && case.expected()[0].as_str() == observation
+                    && case.recovery().is_none()
+                    && has_cobol_licensed_oracle(case),
+                &format!("COBOL assurance binding drifted for {}", case.test_id()),
+            )?;
+            Ok(test_id)
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        actual_tests == expected_tests,
+        "COBOL assurance cases are incomplete or stale",
+    )?;
+
+    let expected_licensed = expected
+        .values()
+        .map(|(kind, id, _)| format!("cobol.licensed.{kind}.{id}"))
+        .collect::<BTreeSet<_>>();
+    let actual_licensed = spec
+        .cases()
+        .filter(|case| case.test_id().as_str().starts_with("cobol.licensed."))
+        .map(|case| {
+            let (kind, id, fixture_id) = expected
+                .get(case.key().row_id.as_str())
+                .ok_or_else(|| format!("unknown licensed COBOL row {}", case.key().row_id))?;
+            let test_id = format!("cobol.licensed.{kind}.{id}");
+            require(
+                case.key().gate == CoverageGate::Differential
+                    && case.key().obligation_id.as_str() == "licensed-equivalence"
+                    && case.test_id().as_str() == test_id
+                    && case.input().as_str() == fixture_id
+                    && case.driver().as_str() == "cobol.licensed.driver"
+                    && case.preconditions().len() == 1
+                    && case.preconditions()[0].as_str() == "cobol.licensed.receipt.available"
+                    && case.expected().len() == 1
+                    && case.expected()[0].as_str() == "cobol.licensed.row-equivalent"
+                    && case.recovery().is_none()
+                    && has_cobol_licensed_oracle(case),
+                &format!("licensed COBOL binding drifted for {}", case.test_id()),
+            )?;
+            Ok(test_id)
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        actual_licensed == expected_licensed,
+        "licensed COBOL cases are incomplete or stale",
+    )?;
+
+    require(
+        spec.cases()
+            .filter(|case| expected.contains_key(case.key().row_id.as_str()))
+            .all(has_cobol_licensed_oracle),
+        "a COBOL programming case is detached from the licensed oracle identity",
+    )?;
+
+    for row in spec
+        .rows()
+        .filter(|row| expected.contains_key(row.row_id().as_str()))
+    {
+        let obligations = row
+            .obligations()
+            .iter()
+            .map(|id| id.as_str())
+            .collect::<BTreeSet<_>>();
+        let preconditions = row
+            .preconditions()
+            .iter()
+            .map(|predicate| predicate.as_str())
+            .collect::<BTreeSet<_>>();
+        let postconditions = row
+            .postconditions()
+            .iter()
+            .map(|observation| observation.as_str())
+            .collect::<BTreeSet<_>>();
+        require(
+            obligations.contains("resource-exhaustion")
+                && obligations.contains("checkpoint-identity")
+                && obligations.contains("runtime-cancellation")
+                && obligations.contains("quantum-identity")
+                && obligations.contains("licensed-equivalence")
+                && preconditions.contains("cobol.assurance.fixture.available")
+                && preconditions.contains("cobol.licensed.receipt.available")
+                && postconditions.contains("cobol.assurance.resource-conditioned")
+                && postconditions.contains("cobol.assurance.checkpoint-recovered")
+                && postconditions.contains("cobol.assurance.cancellation-conditioned")
+                && postconditions.contains("cobol.assurance.quantum-invariant")
+                && postconditions.contains("cobol.licensed.row-equivalent")
+                && row
+                    .oracle()
+                    .is_some_and(|oracle| oracle.as_str() == "cobol.enterprise-6.5.licensed"),
+            &format!("COBOL assurance row contract drifted for {}", row.row_id()),
+        )?;
+    }
+    for (kind, name) in [
+        ("driver", "cobol.assurance.driver"),
+        ("predicate", "cobol.assurance.fixture.available"),
+        ("observation", "cobol.assurance.resource-conditioned"),
+        ("observation", "cobol.assurance.checkpoint-recovered"),
+        ("observation", "cobol.assurance.cancellation-conditioned"),
+        ("observation", "cobol.assurance.quantum-invariant"),
+        ("driver", "cobol.licensed.driver"),
+        ("predicate", "cobol.licensed.receipt.available"),
+        ("observation", "cobol.licensed.row-equivalent"),
+    ] {
+        let registered = match kind {
+            "driver" => spec
+                .registries()
+                .drivers()
+                .iter()
+                .any(|value| value.as_str() == name),
+            "predicate" => spec
+                .registries()
+                .predicates()
+                .iter()
+                .any(|value| value.as_str() == name),
+            _ => spec
+                .registries()
+                .observations()
+                .iter()
+                .any(|value| value.as_str() == name),
+        };
+        require(
+            registered,
+            &format!("COBOL assurance {kind} registry entry is missing: {name}"),
+        )?;
+    }
+    let oracle_digest = format!(
+        "sha256:{}",
+        file_digest(&root.join("conformance/0.4/oracles/cobol-licensed-differential.json"))?
+    );
+    require(
+        spec.registries().oracles().iter().any(|(oracle, digest)| {
+            oracle.as_str() == "cobol.enterprise-6.5.licensed" && digest == &oracle_digest
+        }),
+        "licensed COBOL oracle registry identity or digest drifted",
+    )?;
+    Ok(())
+}
+
+fn has_cobol_licensed_oracle(case: &mainframe_env_coverage::ConformanceCase) -> bool {
+    case.oracle()
+        .is_some_and(|oracle| oracle.as_str() == "cobol.enterprise-6.5.licensed")
+}
+
+fn check_cobol_recovery_bindings(
+    _root: &Path,
+    spec: &CompiledSpec,
+    fixture_path: &Path,
+) -> TaskResult {
+    let fixtures = json(fixture_path)?;
+    let digest = format!("sha256:{}", file_digest(fixture_path)?);
+    let expected = array(&fixtures, "fixtures", fixture_path)?
+        .iter()
+        .map(|fixture| {
+            Ok((
+                text(fixture, "row_id", fixture_path)?.to_string(),
+                format!("cobol.recovery.{}", text(fixture, "id", fixture_path)?),
+            ))
+        })
+        .collect::<TaskResult<BTreeMap<_, _>>>()?;
+    require(
+        expected.len() == 5,
+        "COBOL recovery fixture denominator drifted",
+    )?;
+    let registered = spec
+        .registries()
+        .fixtures()
+        .iter()
+        .filter(|(fixture, _)| fixture.as_str().starts_with("cobol.recovery."))
+        .map(|(fixture, fixture_digest)| {
+            require(
+                fixture_digest == &digest,
+                &format!("COBOL recovery fixture digest drifted for {fixture}"),
+            )?;
+            Ok(fixture.as_str().to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        registered == expected.values().cloned().collect(),
+        "COBOL recovery fixture registry is incomplete or stale",
+    )?;
+    let cases = spec
+        .cases()
+        .filter(|case| case.test_id().as_str().starts_with("cobol.recovery."))
+        .map(|case| {
+            let fixture = expected
+                .get(case.key().row_id.as_str())
+                .ok_or_else(|| format!("unknown COBOL recovery row {}", case.key().row_id))?;
+            require(
+                case.key().gate == CoverageGate::Recovered
+                    && case.key().obligation_id.as_str() == "checkpoint-restart"
+                    && case.test_id().as_str() == fixture
+                    && case.input().as_str() == fixture
+                    && case.driver().as_str() == "cobol.recovery.driver"
+                    && case.preconditions().len() == 1
+                    && case.preconditions()[0].as_str() == "cobol.recovery.fixture.available"
+                    && case.expected().len() == 1
+                    && case.expected()[0].as_str() == "cobol.recovery.exact"
+                    && case.recovery().is_none()
+                    && has_cobol_licensed_oracle(case),
+                &format!("COBOL recovery binding drifted for {fixture}"),
+            )?;
+            Ok(case.key().row_id.as_str().to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        cases == expected.keys().cloned().collect(),
+        "COBOL recovery cases are incomplete or stale",
+    )
+}
+
+fn check_cobol_condition_bindings(
+    _root: &Path,
+    spec: &CompiledSpec,
+    fixture_path: &Path,
+) -> TaskResult {
+    let fixtures = json(fixture_path)?;
+    let digest = format!("sha256:{}", file_digest(fixture_path)?);
+    let expected = array(&fixtures, "fixtures", fixture_path)?
+        .iter()
+        .map(|fixture| {
+            Ok((
+                text(fixture, "row_id", fixture_path)?.to_string(),
+                format!("cobol.condition.{}", text(fixture, "id", fixture_path)?),
+            ))
+        })
+        .collect::<TaskResult<BTreeMap<_, _>>>()?;
+    require(
+        expected.len() == 10,
+        "COBOL condition fixture denominator drifted",
+    )?;
+    let registered = spec
+        .registries()
+        .fixtures()
+        .iter()
+        .filter(|(fixture, _)| fixture.as_str().starts_with("cobol.condition."))
+        .map(|(fixture, fixture_digest)| {
+            require(
+                fixture_digest == &digest,
+                &format!("COBOL condition fixture digest drifted for {fixture}"),
+            )?;
+            Ok(fixture.as_str().to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        registered == expected.values().cloned().collect(),
+        "COBOL condition fixture registry is incomplete or stale",
+    )?;
+    let cases = spec
+        .cases()
+        .filter(|case| case.test_id().as_str().starts_with("cobol.condition."))
+        .map(|case| {
+            let fixture = expected
+                .get(case.key().row_id.as_str())
+                .ok_or_else(|| format!("unknown COBOL condition row {}", case.key().row_id))?;
+            require(
+                case.key().gate == CoverageGate::Conditioned
+                    && case.key().obligation_id.as_str() == "runtime-condition"
+                    && case.test_id().as_str() == fixture
+                    && case.input().as_str() == fixture
+                    && case.driver().as_str() == "cobol.condition.driver"
+                    && case.preconditions().len() == 1
+                    && case.preconditions()[0].as_str() == "cobol.condition.fixture.available"
+                    && case.expected().len() == 1
+                    && case.expected()[0].as_str() == "cobol.condition.exact"
+                    && case.recovery().is_none()
+                    && has_cobol_licensed_oracle(case),
+                &format!("COBOL condition binding drifted for {fixture}"),
+            )?;
+            Ok(case.key().row_id.as_str().to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        cases == expected.keys().cloned().collect(),
+        "COBOL condition cases are incomplete or stale",
     )
 }
 
@@ -1935,16 +3095,28 @@ fn check_cobol_exit(root: &Path) -> TaskResult {
         .iter()
         .flat_map(|batch| batch.events.iter())
         .collect::<Vec<_>>();
+    let structural_events = events
+        .iter()
+        .copied()
+        .filter(|event| {
+            matches!(
+                event.key.gate,
+                CoverageGate::Recognized | CoverageGate::Validated
+            )
+        })
+        .collect::<Vec<_>>();
     require(
-        events.len() == 346
-            && events.iter().all(|event| event.verdict == Verdict::Pass)
-            && events
+        structural_events.len() == 346
+            && structural_events
+                .iter()
+                .all(|event| event.verdict == Verdict::Pass)
+            && structural_events
                 .iter()
                 .map(|event| event.cache_identity.as_str())
                 .collect::<BTreeSet<_>>()
                 .len()
                 == 346
-            && events.iter().all(|event| {
+            && structural_events.iter().all(|event| {
                 event.replay == format!("cargo xtask conformance --replay {}", event.test_id)
             }),
         "COBOL verdict, cache, or replay closure drifted",
@@ -1969,16 +3141,8 @@ fn check_cobol_exit(root: &Path) -> TaskResult {
             && cobol_rows.iter().all(|row| {
                 row.gates[&CoverageGate::Recognized].state == GateState::Passed
                     && row.gates[&CoverageGate::Validated].state == GateState::Passed
-                    && [
-                        CoverageGate::Executed,
-                        CoverageGate::Conditioned,
-                        CoverageGate::Recovered,
-                        CoverageGate::Differential,
-                    ]
-                    .into_iter()
-                    .all(|gate| row.gates[&gate].state == GateState::Pending)
             }),
-        "COBOL ledger numerators or later-gate pending states drifted",
+        "COBOL structural ledger numerators drifted",
     )?;
     let mut incomplete = report.batches.clone();
     incomplete.pop();
@@ -1989,7 +3153,7 @@ fn check_cobol_exit(root: &Path) -> TaskResult {
     println!(
         "cobol-exit rows={} bindings={} shards={} malformed={} limits={} recovery={} prior-artifact-bytes={}",
         receipt.official_rows,
-        events.len(),
+        structural_events.len(),
         report.batches.len(),
         receipt.malformed_classes,
         receipt.limit_classes,

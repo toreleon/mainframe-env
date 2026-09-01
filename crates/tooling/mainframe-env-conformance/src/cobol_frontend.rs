@@ -146,22 +146,56 @@ pub fn cobol_conformance_handlers(
     limits: ConformanceLimits,
 ) -> Result<CobolConformanceHandlers, String> {
     verify_cobol_frontend_fixtures()?;
+    crate::cobol_assurance::verify_cobol_assurance_sources()?;
     crate::cobol_clauses::verify_cobol_semantic_fixtures()?;
+    crate::cobol_data::verify_cobol_data_runtime_fixtures()?;
+    crate::cobol_conditions::verify_cobol_condition_fixtures()?;
+    crate::cobol_function_boundaries::verify_cobol_function_boundary_runtime_fixtures()?;
     crate::cobol_functions::verify_cobol_function_fixtures()?;
+    crate::cobol_files::verify_cobol_file_runtime_fixtures()?;
+    crate::cobol_intrinsics::verify_cobol_function_runtime_fixtures()?;
+    crate::cobol_phrases::verify_cobol_statement_phrase_runtime_fixtures()?;
+    crate::cobol_registers::verify_cobol_register_runtime_fixtures()?;
+    crate::cobol_recovery::verify_cobol_recovery_fixtures()?;
+    crate::cobol_runtime::verify_cobol_statement_runtime_fixtures()?;
     crate::cobol_statements::verify_cobol_statement_fixtures()?;
     let mut drivers = vec![(
         DriverRef::new("cobol.frontend.driver", limits).map_err(|error| error.to_string())?,
         &FRONTEND_DRIVER as &dyn ConformanceDriver,
     )];
+    drivers.extend(crate::cobol_assurance::runtime_drivers(limits)?);
     drivers.extend(crate::cobol_clauses::runtime_drivers(limits)?);
+    drivers.extend(crate::cobol_data::runtime_drivers(limits)?);
+    drivers.extend(crate::cobol_conditions::runtime_drivers(limits)?);
+    drivers.extend(crate::cobol_function_boundaries::runtime_drivers(limits)?);
     drivers.extend(crate::cobol_functions::runtime_drivers(limits)?);
+    drivers.extend(crate::cobol_files::runtime_drivers(limits)?);
+    drivers.extend(crate::cobol_intrinsics::runtime_drivers(limits)?);
+    drivers.extend(crate::cobol_licensed::runtime_drivers(limits)?);
+    drivers.extend(crate::cobol_phrases::runtime_drivers(limits)?);
+    drivers.extend(crate::cobol_registers::runtime_drivers(limits)?);
+    drivers.extend(crate::cobol_recovery::runtime_drivers(limits)?);
+    drivers.extend(crate::cobol_runtime::runtime_drivers(limits)?);
     drivers.extend(crate::cobol_statements::runtime_drivers(limits)?);
     let mut predicates = vec![(
         PredicateRef::new("cobol.fixture.available", limits).map_err(|error| error.to_string())?,
         &FIXTURE_AVAILABLE as &dyn ConformancePredicate,
     )];
+    predicates.extend(crate::cobol_assurance::runtime_predicates(limits)?);
     predicates.extend(crate::cobol_clauses::runtime_predicates(limits)?);
+    predicates.extend(crate::cobol_data::runtime_predicates(limits)?);
+    predicates.extend(crate::cobol_conditions::runtime_predicates(limits)?);
+    predicates.extend(crate::cobol_function_boundaries::runtime_predicates(
+        limits,
+    )?);
     predicates.extend(crate::cobol_functions::runtime_predicates(limits)?);
+    predicates.extend(crate::cobol_files::runtime_predicates(limits)?);
+    predicates.extend(crate::cobol_intrinsics::runtime_predicates(limits)?);
+    predicates.extend(crate::cobol_licensed::runtime_predicates(limits)?);
+    predicates.extend(crate::cobol_phrases::runtime_predicates(limits)?);
+    predicates.extend(crate::cobol_registers::runtime_predicates(limits)?);
+    predicates.extend(crate::cobol_recovery::runtime_predicates(limits)?);
+    predicates.extend(crate::cobol_runtime::runtime_predicates(limits)?);
     predicates.extend(crate::cobol_statements::runtime_predicates(limits)?);
     let mut observations = vec![
         (
@@ -175,8 +209,21 @@ pub fn cobol_conformance_handlers(
             &REJECTED_OBSERVATION as &dyn ConformanceObservation,
         ),
     ];
+    observations.extend(crate::cobol_assurance::runtime_observations(limits)?);
     observations.extend(crate::cobol_clauses::runtime_observations(limits)?);
+    observations.extend(crate::cobol_data::runtime_observations(limits)?);
+    observations.extend(crate::cobol_conditions::runtime_observations(limits)?);
+    observations.extend(crate::cobol_function_boundaries::runtime_observations(
+        limits,
+    )?);
     observations.extend(crate::cobol_functions::runtime_observations(limits)?);
+    observations.extend(crate::cobol_files::runtime_observations(limits)?);
+    observations.extend(crate::cobol_intrinsics::runtime_observations(limits)?);
+    observations.extend(crate::cobol_licensed::runtime_observations(limits)?);
+    observations.extend(crate::cobol_phrases::runtime_observations(limits)?);
+    observations.extend(crate::cobol_registers::runtime_observations(limits)?);
+    observations.extend(crate::cobol_recovery::runtime_observations(limits)?);
+    observations.extend(crate::cobol_runtime::runtime_observations(limits)?);
     observations.extend(crate::cobol_statements::runtime_observations(limits)?);
     Ok(CobolConformanceHandlers {
         drivers,

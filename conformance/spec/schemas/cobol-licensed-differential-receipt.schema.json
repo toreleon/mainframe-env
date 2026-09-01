@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.example/schemas/cobol-licensed-differential-receipt.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "baseline_id",
+    "product_level",
+    "compiler_options",
+    "runtime_options",
+    "candidate_digest",
+    "spec_digest",
+    "fixture_digest",
+    "normalization_rules",
+    "cohorts",
+    "rows"
+  ],
+  "properties": {
+    "schema_version": { "const": "mainframe-env.cobol-licensed-differential-receipt@1" },
+    "baseline_id": { "const": "ibm-enterprise-cobol-6.5-2026-05-31" },
+    "product_level": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "compiler_options": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+      "uniqueItems": true
+    },
+    "runtime_options": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+      "uniqueItems": true
+    },
+    "candidate_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "spec_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "fixture_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "normalization_rules": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+      "uniqueItems": true
+    },
+    "cohorts": { "$ref": "#/$defs/cohorts" },
+    "rows": {
+      "type": "array",
+      "minItems": 153,
+      "maxItems": 153,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["row_id", "fixture_id", "normalized_observation_digest", "cohorts"],
+        "properties": {
+          "row_id": {
+            "type": "string",
+            "pattern": "^ibm-enterprise-cobol-6\\.5-2026-05-31:(procedure-statements|intrinsic-functions|data-description-clauses|file-description-clauses):[0-9]{4}$"
+          },
+          "fixture_id": {
+            "type": "string",
+            "pattern": "^cobol\\.(statement|function|data|file)-runtime\\.[a-z0-9-]+$"
+          },
+          "normalized_observation_digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "cohorts": { "$ref": "#/$defs/cohorts" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "cohorts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["positive", "negative", "boundary", "condition", "interaction"],
+      "properties": {
+        "positive": { "const": "pass" },
+        "negative": { "const": "pass" },
+        "boundary": { "const": "pass" },
+        "condition": { "const": "pass" },
+        "interaction": { "const": "pass" }
+      }
+    }
+  }
+}
