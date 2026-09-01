@@ -79,24 +79,20 @@ at every continuation; never restart completed discovery after compaction.
   Evidence-Digest: sha256:<canonical-work-package-digest>
   ```
 
-  Digest materialization is a generated workflow, not an authoring task. Workers
-  must not calculate, copy, or replace evidence, artifact, candidate, release,
-  or callback SHA-256 values by hand. Use the repository-owned evidence sealing
-  command to regenerate the affected receipt, referenced artifact hashes,
-  ledger/status projections, and a commit-message file containing the exact
-  trailers. The 0.2.0 foundation owns this command; later minors must extend the
-  shared implementation rather than add version-local hash scripts.
+  Digest materialization is generated, not typed by hand. The repository-owned
+  sealer derives content hashes, projections, and commit trailers and provides a
+  deterministic, non-mutating `--check` mode for CI. Keep it a build-hygiene
+  tool: GitHub CI status remains the authority for executed tests, and committed
+  evidence must not duplicate free-form command results, test counts, or a
+  tamper-resistant remote attestation system.
 
-  The sealing command must have a non-mutating `--check` mode used by CI, be
-  deterministic and idempotent, use the versioned canonicalization already
-  defined by each evidence schema, reject dirty or out-of-scope inputs, and
-  avoid a self-referential commit identity. Bind a receipt to its accepted
-  parent/tree and bind the completion commit back to the receipt through the
-  generated `Evidence-Digest` trailer. Completion/callback files created after
-  the commit must obtain the actual tip from Git. Literal digests are permitted
+  Use exact artifact allowlists, avoid self-referential commit identities, and
+  have callbacks emit Git-derived JSON for the controller to store outside the
+  repository. Do not add network authentication frameworks, capability
+  filesystems, or adversarial multi-user defenses unless the product's actual
+  deployment threat model later requires them. Literal digests are permitted
   only for immutable imported-source identities and reviewed golden/oracle
-  fixtures, and their checked-in value must still be reproducible by a named
-  generator or verifier.
+  fixtures with a named generator or verifier.
 
   Do not combine two named work packages in one completion commit. Focused
   repair commits are allowed but do not replace the completion commit.
