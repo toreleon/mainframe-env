@@ -1905,6 +1905,7 @@ fn check_declared_dependency_graph(root: &Path) -> TaskResult {
         root.join("conformance/0.1.1/inventory/dependency-graph-additions.json"),
         root.join("conformance/0.2/inventory/dependency-additions.json"),
         root.join("conformance/0.3/inventory/dependency-additions.json"),
+        root.join("conformance/0.7/inventory/dependency-additions.json"),
     ] {
         if !additions_path.is_file() {
             continue;
@@ -2199,6 +2200,10 @@ fn check_schemas(root: &Path) -> TaskResult {
         OsStr::new("json"),
         &mut files,
     )?;
+    let jcl_schemas = root.join("conformance/0.7/schemas");
+    if jcl_schemas.is_dir() {
+        collect_extension(&jcl_schemas, OsStr::new("json"), &mut files)?;
+    }
     require(!files.is_empty(), "no evidence schemas found")?;
     files.sort();
     for file in &files {

@@ -1114,11 +1114,14 @@ dependencies = [
 name = "mainframe-env-batch"
 version = "0.2.0"
 dependencies = [
+ "mainframe-env-diagnostics",
  "mainframe-env-encoding",
  "mainframe-env-execution-api",
  "mainframe-env-host-api",
+ "mainframe-env-source",
  "mainframe-env-store",
  "mainframe-env-store-api",
+ "rowan",
  "serde",
  "serde_json",
 ]

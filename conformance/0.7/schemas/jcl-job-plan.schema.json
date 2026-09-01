@@ -1,0 +1,293 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.example/schemas/jcl-job-plan.schema.json",
+  "title": "mainframe-env immutable JCL job plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "catalog_digest",
+    "plan_schema_digest",
+    "source_identity",
+    "plan_identity",
+    "statements",
+    "symbols",
+    "procedures",
+    "nodes",
+    "capabilities"
+  ],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.jcl-job-plan@1"},
+    "catalog_digest": {"$ref": "#/$defs/digest"},
+    "plan_schema_digest": {"$ref": "#/$defs/digest"},
+    "source_identity": {"$ref": "#/$defs/digest"},
+    "plan_identity": {"$ref": "#/$defs/digest"},
+    "statements": {
+      "type": "array",
+      "maxItems": 65536,
+      "items": {"$ref": "#/$defs/statement"}
+    },
+    "symbols": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {"$ref": "#/$defs/symbol"}
+    },
+    "procedures": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": {"$ref": "#/$defs/procedure"}
+    },
+    "nodes": {
+      "type": "array",
+      "maxItems": 4194304,
+      "items": {"$ref": "#/$defs/planNode"}
+    },
+    "capabilities": {
+      "type": "array",
+      "maxItems": 4194304,
+      "items": {"$ref": "#/$defs/capability"}
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[A-Za-z0-9$#@._:/+*-]+$"
+    },
+    "text": {
+      "type": "string",
+      "maxLength": 65536
+    },
+    "sourceOrigin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file_id", "logical_path", "byte_start", "byte_end", "kind"],
+      "properties": {
+        "file_id": {"type": "integer", "minimum": 1, "maximum": 4294967295},
+        "logical_path": {"type": "string", "minLength": 1, "maxLength": 512},
+        "byte_start": {"type": "integer", "minimum": 0},
+        "byte_end": {"type": "integer", "minimum": 0},
+        "kind": {
+          "enum": ["primary", "include", "procedure", "generated", "override-use", "definition"]
+        }
+      }
+    },
+    "sourceSpan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file_id",
+        "logical_path",
+        "byte_start",
+        "byte_end",
+        "line",
+        "column_start",
+        "column_end",
+        "origins"
+      ],
+      "properties": {
+        "file_id": {"type": "integer", "minimum": 1, "maximum": 4294967295},
+        "logical_path": {"type": "string", "minLength": 1, "maxLength": 512},
+        "byte_start": {"type": "integer", "minimum": 0},
+        "byte_end": {"type": "integer", "minimum": 0},
+        "line": {"type": "integer", "minimum": 1},
+        "column_start": {"type": "integer", "minimum": 1, "maximum": 81},
+        "column_end": {"type": "integer", "minimum": 1, "maximum": 81},
+        "origins": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {"$ref": "#/$defs/sourceOrigin"}
+        }
+      }
+    },
+    "generatedIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["row_id", "family", "ordinal", "keyword"],
+      "properties": {
+        "row_id": {"$ref": "#/$defs/token"},
+        "family": {
+          "enum": [
+            "jcl-statements",
+            "jes2-jecl-statements",
+            "dd-parameters",
+            "exec-parameters",
+            "job-parameters",
+            "output-parameters"
+          ]
+        },
+        "ordinal": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "keyword": {"$ref": "#/$defs/token"}
+      }
+    },
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity", "raw_value", "normalized_value", "outcome", "source"],
+      "properties": {
+        "identity": {"$ref": "#/$defs/generatedIdentity"},
+        "raw_value": {"$ref": "#/$defs/text"},
+        "normalized_value": {"$ref": "#/$defs/text"},
+        "outcome": {
+          "enum": [
+            "job-attribute",
+            "step-attribute",
+            "allocation-attribute",
+            "output-attribute",
+            "procedure-binding",
+            "symbol-binding",
+            "planner-annotation",
+            "capability-requirement"
+          ]
+        },
+        "source": {"$ref": "#/$defs/sourceSpan"}
+      }
+    },
+    "statement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "identity", "name", "raw_operands", "parameters", "source"],
+      "properties": {
+        "id": {"type": "integer", "minimum": 1, "maximum": 4294967295},
+        "identity": {"$ref": "#/$defs/generatedIdentity"},
+        "name": {
+          "oneOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/token"}
+          ]
+        },
+        "raw_operands": {"$ref": "#/$defs/text"},
+        "parameters": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {"$ref": "#/$defs/parameter"}
+        },
+        "source": {"$ref": "#/$defs/sourceSpan"}
+      }
+    },
+    "symbol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value", "exported", "definition", "uses"],
+      "properties": {
+        "name": {"$ref": "#/$defs/token"},
+        "value": {"$ref": "#/$defs/text"},
+        "exported": {"type": "boolean"},
+        "definition": {"$ref": "#/$defs/sourceSpan"},
+        "uses": {
+          "type": "array",
+          "maxItems": 65536,
+          "items": {"$ref": "#/$defs/sourceSpan"}
+        }
+      }
+    },
+    "procedure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "defaults", "statement_ids", "definition", "invocation_sites"],
+      "properties": {
+        "name": {"$ref": "#/$defs/token"},
+        "defaults": {
+          "type": "object",
+          "maxProperties": 4096,
+          "additionalProperties": {"$ref": "#/$defs/text"}
+        },
+        "statement_ids": {
+          "type": "array",
+          "maxItems": 65536,
+          "items": {"type": "integer", "minimum": 1, "maximum": 4294967295}
+        },
+        "definition": {"$ref": "#/$defs/sourceSpan"},
+        "invocation_sites": {
+          "type": "array",
+          "maxItems": 65536,
+          "items": {"$ref": "#/$defs/sourceSpan"}
+        }
+      }
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capability", "state", "reason", "statement_id", "parameter", "source"],
+      "properties": {
+        "capability": {"$ref": "#/$defs/token"},
+        "state": {"enum": ["available", "deferred"]},
+        "reason": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "statement_id": {"type": "integer", "minimum": 1, "maximum": 4294967295},
+        "parameter": {
+          "oneOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/generatedIdentity"}
+          ]
+        },
+        "source": {"$ref": "#/$defs/sourceSpan"}
+      }
+    },
+    "planNode": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "name", "statement_id"],
+          "properties": {
+            "kind": {"const": "job"},
+            "name": {"$ref": "#/$defs/token"},
+            "statement_id": {"type": "integer", "minimum": 1, "maximum": 4294967295}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "name", "program", "statement_id"],
+          "properties": {
+            "kind": {"const": "step"},
+            "name": {"$ref": "#/$defs/token"},
+            "program": {"$ref": "#/$defs/token"},
+            "statement_id": {"type": "integer", "minimum": 1, "maximum": 4294967295}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "name", "step", "statement_id"],
+          "properties": {
+            "kind": {"const": "dd"},
+            "name": {"$ref": "#/$defs/token"},
+            "step": {
+              "oneOf": [
+                {"type": "null"},
+                {"$ref": "#/$defs/token"}
+              ]
+            },
+            "statement_id": {"type": "integer", "minimum": 1, "maximum": 4294967295}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "name", "statement_id"],
+          "properties": {
+            "kind": {"const": "output"},
+            "name": {"$ref": "#/$defs/token"},
+            "statement_id": {"type": "integer", "minimum": 1, "maximum": 4294967295}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "operation", "statement_id"],
+          "properties": {
+            "kind": {"enum": ["jecl", "annotation"]},
+            "operation": {"$ref": "#/$defs/token"},
+            "statement_id": {"type": "integer", "minimum": 1, "maximum": 4294967295}
+          }
+        }
+      ]
+    }
+  }
+}
