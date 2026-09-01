@@ -1245,7 +1245,18 @@ fn check_cobol_statement_bindings(
         }
         if matches!(
             row.row_id().as_str().rsplit(':').next(),
-            Some("0002" | "0005" | "0022" | "0024" | "0030" | "0037" | "0039" | "0041" | "0044")
+            Some(
+                "0002"
+                    | "0005"
+                    | "0012"
+                    | "0022"
+                    | "0024"
+                    | "0030"
+                    | "0037"
+                    | "0039"
+                    | "0041"
+                    | "0044"
+            )
         ) {
             expected_obligations.insert("runtime-condition");
         }
