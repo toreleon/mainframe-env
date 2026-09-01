@@ -3,12 +3,14 @@ use mainframe_env_coverage::{
     ConformanceDriver, ConformanceLimits, ConformanceObservation, ConformancePredicate,
     DriverOutput, DriverRef, FixtureRef, ObservationCheck, ObservationRef, PredicateRef,
 };
-use mainframe_env_execution_api::{Machine, MachineDrive, MachineResume, Quantum};
+use mainframe_env_execution_api::{
+    BoundedPayload, InvocationLimits, Machine, MachineDrive, MachineResume, Quantum,
+};
 use mainframe_env_host_api::{DatasetLockMode, DatasetReadControl, DatasetRequest, HostRequest};
 use mainframe_env_interpreter::ReferenceMachine;
 use mainframe_env_ir::CodecLimits;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 const FIXTURE_BYTES: &[u8] =
     include_bytes!("../../../../conformance/0.4/cobol/statement-phrase-runtime-fixtures.json");
@@ -31,6 +33,7 @@ struct Fixture {
     source: String,
     expected_output: String,
     expected_effects: Option<Vec<String>>,
+    bindings: Option<BTreeMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -71,6 +74,12 @@ pub fn verify_cobol_statement_phrase_runtime_fixtures() -> Result<(), String> {
             || fixture.expected_output.len() > 16_384
             || fixture.expected_effects.as_ref().is_some_and(|effects| {
                 effects.len() > 64 || effects.iter().any(|effect| effect.len() > 256)
+            })
+            || fixture.bindings.as_ref().is_some_and(|bindings| {
+                bindings.len() > 32
+                    || bindings
+                        .iter()
+                        .any(|(name, value)| name.len() > 128 || value.len() > 1024)
             })
         {
             return Err(format!(
@@ -164,12 +173,21 @@ impl ConformanceObservation for Exact {
 
 fn execute(fixture: &Fixture) -> Result<Output, String> {
     let artifact = crate::compile(&fixture.source)?;
-    let mut machine = ReferenceMachine::from_binary(
-        artifact.payload(),
-        crate::invocation(&artifact, 16_384),
-        CodecLimits::default(),
-    )
-    .map_err(|error| format!("{error:?}"))?;
+    let mut invocation = crate::invocation(&artifact, 16_384);
+    for (name, value) in fixture.bindings.iter().flatten() {
+        invocation.bindings.insert(
+            name.clone(),
+            BoundedPayload::new(
+                "mainframe-env.cobol-phrase-binding@1",
+                value.as_bytes().to_vec(),
+                InvocationLimits::default(),
+            )
+            .map_err(|error| error.to_string())?,
+        );
+    }
+    let mut machine =
+        ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+            .map_err(|error| format!("{error:?}"))?;
     let mut resume = MachineResume::Start;
     let mut effects = Vec::new();
     let completion = loop {

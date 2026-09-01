@@ -1262,6 +1262,9 @@ fn check_cobol_statement_bindings(
             Some("0011") => {
                 expected_obligations.insert("phrase-upon-no-advancing");
             }
+            Some("0013") => {
+                expected_obligations.insert("phrase-alternate-entry");
+            }
             Some("0015") => {
                 expected_obligations.insert("phrase-paragraph");
                 expected_obligations.insert("phrase-perform");

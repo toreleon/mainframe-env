@@ -1681,6 +1681,28 @@ mod tests {
             MachineDrive::Completed(done) if done.output.bytes() == b"XY\n"
         ));
     }
+    #[test]
+    fn entry_binding_selects_the_alternate_entry_after_storage_initialization() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. ENTRYPOINT. DATA DIVISION. WORKING-STORAGE SECTION. 01 VALUE-X PIC X(4) VALUE 'INIT'. PROCEDURE DIVISION. DISPLAY 'MAIN'. STOP RUN. ENTRY 'ALT'. DISPLAY VALUE-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut invocation = invocation(&artifact, 1024);
+        invocation.bindings.insert(
+            "cobol.entry".into(),
+            mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cobol-entry@1",
+                b"ALT".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        let mut machine =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        match drive_to_terminal(&mut machine) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"INIT\n"),
+            other => panic!("{other:?}"),
+        }
+    }
 
     #[test]
     fn dataset_read_uses_dd_binding_and_updates_file_status() {

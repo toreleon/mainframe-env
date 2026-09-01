@@ -25,6 +25,12 @@
             "type": "array",
             "maxItems": 64,
             "items": { "type": "string", "maxLength": 256 }
+          },
+          "bindings": {
+            "type": "object",
+            "maxProperties": 32,
+            "propertyNames": { "type": "string", "maxLength": 128 },
+            "additionalProperties": { "type": "string", "maxLength": 1024 }
           }
         }
       }

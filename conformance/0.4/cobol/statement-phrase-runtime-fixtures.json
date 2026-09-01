@@ -24,6 +24,14 @@
       "expected_output": "AB\n"
     },
     {
+      "id": "entry-alternate-selection",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0013",
+      "obligation_id": "phrase-alternate-entry",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. ENTRYPOINT. DATA DIVISION. WORKING-STORAGE SECTION. 01 VALUE-X PIC X(4) VALUE 'INIT'. PROCEDURE DIVISION. DISPLAY 'MAIN'. STOP RUN. ENTRY 'ALT'. DISPLAY VALUE-X. STOP RUN.",
+      "expected_output": "INIT\n",
+      "bindings": {"cobol.entry": "ALT"}
+    },
+    {
       "id": "exit-perform",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0015",
       "obligation_id": "phrase-perform",

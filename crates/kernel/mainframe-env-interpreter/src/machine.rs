@@ -403,6 +403,15 @@ impl ReferenceMachine {
             .bindings
             .get("cics.transaction")
             .map(|value| value.bytes().to_vec());
+        let selected_entry = invocation
+            .bindings
+            .get("cobol.entry")
+            .map(|value| {
+                std::str::from_utf8(value.bytes())
+                    .map(normalize)
+                    .map_err(|_| MachineProblem::InvalidOperation)
+            })
+            .transpose()?;
         let mut implicit = BTreeMap::from([
             (
                 "EIBRESP".into(),
@@ -712,6 +721,40 @@ impl ReferenceMachine {
             && machine.layout("EIBTRNID").is_some()
         {
             machine.write("EIBTRNID", &transaction)?;
+        }
+        if let Some(selected_entry) = selected_entry {
+            let entry_pc = machine
+                .operations
+                .iter()
+                .enumerate()
+                .filter(|(_, operation)| operation.identity.name() == "entry")
+                .find_map(|(pc, operation)| {
+                    arguments(operation)
+                        .first()
+                        .filter(|name| normalize(name) == selected_entry)
+                        .map(|_| pc.saturating_add(1))
+                })
+                .ok_or(MachineProblem::InvalidOperation)?;
+            let initializers = machine
+                .operations
+                .iter()
+                .filter(|operation| operation.identity.name() == "init")
+                .cloned()
+                .collect::<Vec<_>>();
+            for initializer in initializers {
+                let reference = initializer
+                    .storage
+                    .first()
+                    .ok_or(MachineProblem::InvalidOperation)?;
+                let bytes = machine
+                    .entry_initials
+                    .get(&reference.storage)
+                    .cloned()
+                    .unwrap_or(bytes_attribute(&initializer, "initial")?.to_vec());
+                machine.write_storage(reference.storage, &bytes)?;
+            }
+            machine.reapply_entry_context()?;
+            machine.pc = entry_pc;
         }
         Ok(machine)
     }
