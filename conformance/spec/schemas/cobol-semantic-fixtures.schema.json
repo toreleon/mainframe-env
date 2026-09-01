@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/cobol-semantic-fixtures-v1.json",
+  "title": "mainframe-env COBOL semantic clause conformance fixtures",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_version", "fixtures"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.cobol-semantic-fixtures@1"},
+    "target_version": {"const": "0.3.0"},
+    "fixtures": {"type": "array", "minItems": 27, "maxItems": 27, "items": {"$ref": "#/$defs/fixture"}}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$", "maxLength": 64},
+    "row_id": {"type": "string", "pattern": "^ibm-enterprise-cobol-6\\.5-2026-05-31:[a-z-]+:[0-9]{4}$"},
+    "case": {
+      "type": "object", "additionalProperties": false, "required": ["declaration"],
+      "properties": {
+        "declaration": {"type": "string", "minLength": 1, "maxLength": 8192},
+        "expect": {"type": "array", "maxItems": 32, "items": {"$ref": "#/$defs/layout_expectation"}}
+      }
+    },
+    "layout_expectation": {
+      "type": "object", "additionalProperties": false, "required": ["name"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "category": {"enum": ["alphabetic", "alphanumeric", "alphanumeric-edited", "dbcs", "national", "national-edited", "utf8", "numeric-display", "numeric-edited", "packed-decimal", "binary", "float-short", "float-long", "index", "pointer", "pointer-32", "procedure-pointer", "function-pointer", "object-reference", "group", "national-group", "utf8-group", "condition", "rename"]},
+        "usage": {"enum": ["display", "display-1", "national", "utf8", "binary", "native-binary", "packed-decimal", "float-short", "float-long", "index", "pointer", "pointer-32", "procedure-pointer", "function-pointer", "object-reference", "group"]},
+        "byte_length": {"type": "integer", "minimum": 1, "maximum": 67108864},
+        "offset": {"type": "integer", "minimum": 0, "maximum": 67108864},
+        "length": {"type": "integer", "minimum": 0, "maximum": 67108864},
+        "element_length": {"type": "integer", "minimum": 0, "maximum": 67108864},
+        "alignment": {"type": "integer", "minimum": 1, "maximum": 16},
+        "signed": {"type": "boolean"},
+        "sign_leading": {"type": "boolean"},
+        "sign_separate": {"type": "boolean"},
+        "justified_right": {"type": "boolean"},
+        "blank_when_zero": {"type": "boolean"},
+        "synchronized": {"type": "boolean"},
+        "occurs_min": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "occurs_max": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "unbounded": {"type": "boolean"},
+        "alias_of": {"type": "string", "minLength": 1, "maxLength": 256},
+        "depending_on": {"type": "string", "minLength": 1, "maxLength": 256},
+        "dynamic": {"type": "boolean"},
+        "dynamic_limit": {"type": "integer", "minimum": 1, "maximum": 999999999},
+        "external_name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "global": {"type": "boolean"},
+        "volatile": {"type": "boolean"},
+        "typedef": {"type": "boolean"},
+        "allocated": {"type": "boolean"},
+        "object_class": {"type": "string", "minLength": 1, "maxLength": 256},
+        "initial_hex": {"type": "string", "maxLength": 131072, "pattern": "^([0-9a-f]{2})*$"},
+        "source_spans_min": {"type": "integer", "minimum": 1, "maximum": 32}
+      }
+    },
+    "fixture": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "row_id", "target_kind", "target_id", "valid", "invalid"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"}, "row_id": {"$ref": "#/$defs/row_id"},
+        "target_kind": {"enum": ["file-clause", "data-clause"]}, "target_id": {"$ref": "#/$defs/id"},
+        "valid": {"type": "array", "minItems": 1, "maxItems": 16, "items": {"$ref": "#/$defs/case"}},
+        "invalid": {"type": "array", "minItems": 1, "maxItems": 16, "items": {"$ref": "#/$defs/case"}}
+      }
+    }
+  }
+}
