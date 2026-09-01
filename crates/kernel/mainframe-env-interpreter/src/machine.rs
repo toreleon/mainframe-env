@@ -11772,11 +11772,41 @@ fn xml_character_allowed(character: char) -> bool {
 }
 
 fn xml_document(source: &str) -> Result<XmlNode, MachineProblem> {
-    let mut at = 0usize;
+    let (mut at, _) = xml_declaration(source)?;
     let node = xml_node(source, &mut at, 0)?;
     (at == source.len())
         .then_some(node)
         .ok_or(MachineProblem::DataException)
+}
+
+fn xml_declaration(source: &str) -> Result<(usize, Vec<XmlEvent>), MachineProblem> {
+    if !source.starts_with("<?xml") {
+        return Ok((0, Vec::new()));
+    }
+    let end = source.find("?>").ok_or(MachineProblem::DataException)?;
+    let declaration = source.get(2..end).ok_or(MachineProblem::DataException)?;
+    let (name, attributes) = xml_opening_tag(declaration)?;
+    if name != "xml" {
+        return Err(MachineProblem::DataException);
+    }
+    let mut events = Vec::new();
+    let mut version = false;
+    for (name, value) in attributes {
+        let kind = match name.as_str() {
+            "version" if matches!(value.as_str(), "1.0" | "1.1") => {
+                version = true;
+                "VERSION-INFORMATION"
+            }
+            "encoding" if !value.is_empty() => "ENCODING-DECLARATION",
+            "standalone" if matches!(value.as_str(), "yes" | "no") => "STANDALONE-DECLARATION",
+            _ => return Err(MachineProblem::DataException),
+        };
+        events.push(XmlEvent::new(kind, value.into_bytes()));
+    }
+    if !version {
+        return Err(MachineProblem::DataException);
+    }
+    Ok((end + 2, events))
 }
 
 fn xml_node(source: &str, at: &mut usize, depth: usize) -> Result<XmlNode, MachineProblem> {
@@ -11933,8 +11963,10 @@ fn declarative_state_key(pc: usize) -> String {
 }
 
 fn xml_document_events(source: &str) -> Result<Vec<XmlEvent>, MachineProblem> {
+    let (_, declaration_events) = xml_declaration(source)?;
     let document = xml_document(source)?;
     let mut events = vec![XmlEvent::new("START-OF-DOCUMENT", Vec::new())];
+    events.extend(declaration_events);
     let namespaces =
         BTreeMap::from([("xml".into(), "http://www.w3.org/XML/1998/namespace".into())]);
     append_xml_node_events(&document, &namespaces, &mut events)?;
