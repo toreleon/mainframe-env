@@ -10685,49 +10685,40 @@ fn integer_of_formatted_date(format: &str, value: &str) -> Result<Decimal, Machi
     })
 }
 
-fn parse_formatted_datetime(format: &str, value: &str) -> Result<(), MachineProblem> {
-    let digits = digits_only(value);
-    if format.contains("YYYY") {
-        if digits.len() < 8 {
-            return Err(MachineProblem::DataException);
-        }
-        split_yyyymmdd(
-            digits[..8]
-                .parse()
-                .map_err(|_| MachineProblem::DataException)?,
-        )?;
-    }
-    if format.contains("hh") {
-        let time = digits
-            .get(digits.len().saturating_sub(6)..)
-            .ok_or(MachineProblem::DataException)?;
-        parse_hhmmss(time.as_bytes())?;
-    }
-    Ok(())
-}
-
 fn test_formatted_datetime(format: &str, value: &str) -> usize {
+    #[derive(Clone, Copy)]
+    enum Field {
+        Year,
+        ShortYear,
+        Month,
+        Day,
+        Hour,
+        Minute,
+        Second,
+    }
+
     let format = format.as_bytes();
     let value = value.as_bytes();
     let mut format_at = 0usize;
     let mut value_at = 0usize;
+    let mut fields = Vec::new();
     while format_at < format.len() {
-        let width = [
-            (b"YYYY".as_slice(), 4usize),
-            (b"YY".as_slice(), 2),
-            (b"MM".as_slice(), 2),
-            (b"DD".as_slice(), 2),
-            (b"hh".as_slice(), 2),
-            (b"mm".as_slice(), 2),
-            (b"ss".as_slice(), 2),
+        let field = [
+            (b"YYYY".as_slice(), 4usize, Field::Year),
+            (b"YY".as_slice(), 2, Field::ShortYear),
+            (b"MM".as_slice(), 2, Field::Month),
+            (b"DD".as_slice(), 2, Field::Day),
+            (b"hh".as_slice(), 2, Field::Hour),
+            (b"mm".as_slice(), 2, Field::Minute),
+            (b"ss".as_slice(), 2, Field::Second),
         ]
         .into_iter()
-        .find_map(|(token, width)| {
+        .find_map(|(token, width, field)| {
             format[format_at..]
                 .starts_with(token)
-                .then_some((token.len(), width))
+                .then_some((token.len(), width, field))
         });
-        if let Some((token_length, width)) = width {
+        if let Some((token_length, width, field)) = field {
             for offset in 0..width {
                 if value
                     .get(value_at + offset)
@@ -10736,6 +10727,7 @@ fn test_formatted_datetime(format: &str, value: &str) -> usize {
                     return value_at + offset + 1;
                 }
             }
+            fields.push((field, value_at, width));
             format_at += token_length;
             value_at += width;
         } else {
@@ -10749,13 +10741,63 @@ fn test_formatted_datetime(format: &str, value: &str) -> usize {
     if value_at != value.len() {
         return value_at + 1;
     }
-    usize::from(
-        parse_formatted_datetime(
-            &String::from_utf8_lossy(format),
-            &String::from_utf8_lossy(value),
-        )
-        .is_err(),
-    )
+    let value_of = |wanted: fn(Field) -> bool| {
+        fields
+            .iter()
+            .find(|(field, _, _)| wanted(*field))
+            .and_then(|(_, start, width)| value.get(*start..start + width))
+            .and_then(|digits| std::str::from_utf8(digits).ok())
+            .and_then(|digits| digits.parse::<u32>().ok())
+    };
+    let year = value_of(|field| matches!(field, Field::Year));
+    let month = value_of(|field| matches!(field, Field::Month));
+    let day_limit = match (year, month) {
+        (Some(year), Some(month)) if (1_601..=9_999).contains(&year) => {
+            days_in_month(year as i32, month).unwrap_or(31)
+        }
+        _ => 31,
+    };
+    fields
+        .into_iter()
+        .filter_map(|(field, start, width)| {
+            let range = match field {
+                Field::Year => Some((1_601, 9_999)),
+                Field::ShortYear => None,
+                Field::Month => Some((1, 12)),
+                Field::Day => Some((1, day_limit)),
+                Field::Hour => Some((0, 23)),
+                Field::Minute | Field::Second => Some((0, 59)),
+            }?;
+            first_range_error(&value[start..start + width], start, range.0, range.1)
+        })
+        .min()
+        .unwrap_or(0)
+}
+
+fn first_range_error(digits: &[u8], start: usize, minimum: u32, maximum: u32) -> Option<usize> {
+    let width = digits.len();
+    for consumed in 1..=width {
+        let prefix = std::str::from_utf8(&digits[..consumed])
+            .ok()?
+            .parse::<u32>()
+            .ok()?;
+        let factor = 10u32.checked_pow((width - consumed) as u32)?;
+        let possible_minimum = prefix.checked_mul(factor)?;
+        let possible_maximum = possible_minimum.checked_add(factor - 1)?;
+        if possible_maximum < minimum || possible_minimum > maximum {
+            return Some(start + consumed);
+        }
+    }
+    None
+}
+
+fn days_in_month(year: i32, month: u32) -> Option<u32> {
+    (1..=12).contains(&month).then(|| match month {
+        2 if valid_date(year, 2, 29) => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    })
 }
 
 fn seconds_from_formatted_time(format: &str, value: &str) -> Result<Decimal, MachineProblem> {

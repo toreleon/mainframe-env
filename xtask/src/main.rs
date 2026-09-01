@@ -1647,6 +1647,9 @@ fn check_cobol_function_bindings(
             }
             Some("0067" | "0068") => {
                 expected_obligations.insert("boundary-error-position");
+                if row.row_id().as_str().ends_with(":0067") {
+                    expected_obligations.insert("boundary-range-error-position");
+                }
             }
             Some("0065" | "0066") => {
                 expected_obligations.insert("boundary-error-subfield");
