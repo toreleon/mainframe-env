@@ -108,6 +108,7 @@ struct GrammarParser<'a> {
     max_statements: usize,
     events: Vec<ProcedureEvent>,
     event_sentences: Vec<usize>,
+    sequence_owners: Vec<StatementKind>,
 }
 
 impl<'a> GrammarParser<'a> {
@@ -121,6 +122,7 @@ impl<'a> GrammarParser<'a> {
             max_statements,
             events: Vec::new(),
             event_sentences: Vec::new(),
+            sequence_owners: Vec::new(),
         })
     }
 
@@ -549,35 +551,48 @@ impl<'a> GrammarParser<'a> {
         stop: SequenceStop,
         owner: Option<StatementKind>,
     ) -> Result<(), HirProblem> {
-        while self.position < self.tokens.len() && !self.at_period() && !self.at_sequence_stop(stop)
-        {
-            if self.at_any_terminator() || self.at_word("ELSE") || self.at_word("WHEN") {
-                return Err(owner.map_or(HirProblem::UnmatchedScope, |kind| {
-                    self.invalid(kind, self.current_line(), "unexpected branch or terminator")
-                }));
-            }
-            if self.classify_at(self.position).is_none() {
-                return Err(owner.map_or_else(
-                    || HirProblem::UnknownStatement(self.current_line()),
-                    |kind| {
-                        self.invalid(
+        if let Some(owner) = owner {
+            self.sequence_owners.push(owner);
+        }
+        let result = (|| {
+            while self.position < self.tokens.len()
+                && !self.at_period()
+                && !self.at_sequence_stop(stop)
+            {
+                if self.at_any_terminator() || self.at_word("ELSE") || self.at_word("WHEN") {
+                    return Err(owner.map_or(HirProblem::UnmatchedScope, |kind| {
+                        self.invalid(kind, self.current_line(), "unexpected branch or terminator")
+                    }));
+                }
+                if self.classify_at(self.position).is_none() {
+                    return Err(owner.map_or_else(
+                        || HirProblem::UnknownStatement(self.current_line()),
+                        |kind| {
+                            self.invalid(
+                                kind,
+                                self.current_line(),
+                                "unknown token in nested statement body",
+                            )
+                        },
+                    ));
+                }
+                if let Err(problem) = self.parse_statement() {
+                    return Err(match (owner, problem) {
+                        (Some(kind), HirProblem::InvalidStatement { .. }) => self.invalid(
                             kind,
                             self.current_line(),
-                            "unknown token in nested statement body",
-                        )
-                    },
-                ));
+                            "malformed nested statement body",
+                        ),
+                        (_, problem) => problem,
+                    });
+                }
             }
-            if let Err(problem) = self.parse_statement() {
-                return Err(match (owner, problem) {
-                    (Some(kind), HirProblem::InvalidStatement { .. }) => {
-                        self.invalid(kind, self.current_line(), "malformed nested statement body")
-                    }
-                    (_, problem) => problem,
-                });
-            }
+            Ok(())
+        })();
+        if owner.is_some() {
+            self.sequence_owners.pop();
         }
-        Ok(())
+        result
     }
 
     fn find_simple_header_end(
@@ -591,6 +606,15 @@ impl<'a> GrammarParser<'a> {
         let mut depth = 0usize;
         while index < self.tokens.len() {
             if depth == 0 && (self.at_simple_stop(kind, index) || self.classify_at(index).is_some())
+            {
+                return validate_simple_header(kind, &self.tokens[start..index])
+                    .map(|()| index)
+                    .map_err(|detail| self.invalid(kind, line, detail));
+            }
+            if depth == 0
+                && self.sequence_owners.iter().rev().any(|owner| {
+                    self.branch_at(*owner, index).is_some() || self.at_terminator_at(*owner, index)
+                })
             {
                 return validate_simple_header(kind, &self.tokens[start..index])
                     .map(|()| index)

@@ -133,10 +133,49 @@ enum CobolValue {
     Decimal(Decimal),
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct ConditionStatus {
+    arithmetic_size_error: bool,
+    accept_exception: bool,
+    call_exception: bool,
+    string_overflow: bool,
+    unstring_overflow: bool,
+    json_exception: bool,
+    xml_exception: bool,
+}
+
+impl ConditionStatus {
+    fn bits(self) -> u8 {
+        u8::from(self.arithmetic_size_error)
+            | u8::from(self.accept_exception) << 1
+            | u8::from(self.call_exception) << 2
+            | u8::from(self.string_overflow) << 3
+            | u8::from(self.unstring_overflow) << 4
+            | u8::from(self.json_exception) << 5
+            | u8::from(self.xml_exception) << 6
+    }
+
+    fn from_bits(bits: u8) -> Option<Self> {
+        if bits & 0x80 != 0 {
+            return None;
+        }
+        Some(Self {
+            arithmetic_size_error: bits & 1 != 0,
+            accept_exception: bits & (1 << 1) != 0,
+            call_exception: bits & (1 << 2) != 0,
+            string_overflow: bits & (1 << 3) != 0,
+            unstring_overflow: bits & (1 << 4) != 0,
+            json_exception: bits & (1 << 5) != 0,
+            xml_exception: bits & (1 << 6) != 0,
+        })
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum PendingKind {
     Accept {
         target: String,
+        handles_exception: bool,
     },
     DatasetRead {
         target: Option<String>,
@@ -149,6 +188,7 @@ enum PendingKind {
     },
     ProgramCall {
         targets: Vec<String>,
+        handles_exception: bool,
     },
     Db2 {
         targets: Vec<String>,
@@ -202,6 +242,7 @@ pub struct MachineSnapshot {
     pub loop_counts: BTreeMap<usize, i128>,
     pub last_file_status: String,
     pub dataset_cursors: BTreeMap<String, String>,
+    pub condition_statuses: u8,
 }
 
 pub struct ReferenceMachine {
@@ -221,6 +262,7 @@ pub struct ReferenceMachine {
     loop_counts: BTreeMap<usize, i128>,
     altered: BTreeMap<String, String>,
     last_file_status: String,
+    condition_status: ConditionStatus,
     dataset_cursors: BTreeMap<String, String>,
     sql_cursors: BTreeMap<String, Vec<String>>,
     pc: usize,
@@ -392,6 +434,7 @@ impl ReferenceMachine {
             loop_counts: BTreeMap::new(),
             altered: BTreeMap::new(),
             last_file_status: "00".into(),
+            condition_status: ConditionStatus::default(),
             dataset_cursors: BTreeMap::new(),
             sql_cursors: BTreeMap::new(),
             pc: 0,
@@ -430,7 +473,7 @@ impl ReferenceMachine {
     #[must_use]
     pub fn snapshot(&self) -> MachineSnapshot {
         MachineSnapshot {
-            schema_version: 6,
+            schema_version: 7,
             program_counter: self.pc,
             effect_sequence: self.effect_sequence,
             executed_steps: self.executed_steps,
@@ -442,11 +485,12 @@ impl ReferenceMachine {
             loop_counts: self.loop_counts.clone(),
             last_file_status: self.last_file_status.clone(),
             dataset_cursors: self.dataset_cursors.clone(),
+            condition_statuses: self.condition_status.bits(),
         }
     }
 
     pub fn restore(&mut self, snapshot: MachineSnapshot) -> Result<(), MachineProblem> {
-        if !matches!(snapshot.schema_version, 1..=6)
+        if !matches!(snapshot.schema_version, 1..=7)
             || snapshot.program_counter > self.operations.len()
             || snapshot.base_storage.iter().map(Vec::len).sum::<usize>()
                 > self.invocation.limits.max_storage_bytes as usize
@@ -485,6 +529,12 @@ impl ReferenceMachine {
         } else {
             snapshot.dataset_cursors
         };
+        self.condition_status = if snapshot.schema_version < 7 {
+            ConditionStatus::default()
+        } else {
+            ConditionStatus::from_bits(snapshot.condition_statuses)
+                .ok_or(MachineProblem::IncompatibleSnapshot)?
+        };
         self.pending = None;
         self.deferred_drive = None;
         Ok(())
@@ -499,6 +549,7 @@ impl ReferenceMachine {
                 | "mainframe-env.reference-machine-checkpoint@4"
                 | "mainframe-env.reference-machine-checkpoint@5"
                 | "mainframe-env.reference-machine-checkpoint@6"
+                | "mainframe-env.reference-machine-checkpoint@7"
         ) {
             return Err(MachineProblem::IncompatibleSnapshot);
         }
@@ -592,6 +643,25 @@ impl ReferenceMachine {
             }
             return Ok(());
         }
+        if result.outcome.is_err() {
+            match &pending.kind {
+                PendingKind::Accept {
+                    handles_exception: true,
+                    ..
+                } => {
+                    self.condition_status.accept_exception = true;
+                    return Ok(());
+                }
+                PendingKind::ProgramCall {
+                    handles_exception: true,
+                    ..
+                } => {
+                    self.condition_status.call_exception = true;
+                    return Ok(());
+                }
+                _ => {}
+            }
+        }
         let outcome = result
             .outcome
             .map_err(|problem| match (&pending.kind, problem) {
@@ -608,7 +678,8 @@ impl ReferenceMachine {
                 (_, problem) => MachineProblem::Host(problem),
             })?;
         match (pending.kind, outcome) {
-            (PendingKind::Accept { target }, HostResult::Terminal(payload)) => {
+            (PendingKind::Accept { target, .. }, HostResult::Terminal(payload)) => {
+                self.condition_status.accept_exception = false;
                 self.write(&target, payload.bytes())?
             }
             (
@@ -716,8 +787,18 @@ impl ReferenceMachine {
             ) => {
                 return Err(MachineProblem::UnexpectedHostResult);
             }
-            (PendingKind::ProgramCall { targets }, HostResult::Program(payload)) => {
+            (
+                PendingKind::ProgramCall {
+                    targets,
+                    handles_exception,
+                },
+                HostResult::Program(payload),
+            ) => {
                 if payload.schema() == "mainframe-env.program.abend@1" {
+                    if handles_exception {
+                        self.condition_status.call_exception = true;
+                        return Ok(());
+                    }
                     let code = String::from_utf8(payload.bytes().to_vec())
                         .map_err(|_| MachineProblem::UnexpectedHostResult)?;
                     self.deferred_drive = Some(MachineDrive::Abend(Abend {
@@ -726,6 +807,7 @@ impl ReferenceMachine {
                     }));
                     return Ok(());
                 }
+                self.condition_status.call_exception = false;
                 let values = decode_call_values(&payload)?;
                 if values.len() != targets.len() {
                     return Err(MachineProblem::UnexpectedHostResult);
@@ -1035,7 +1117,16 @@ impl ReferenceMachine {
             }
             "move" => self.move_op(&args)?,
             "add" | "subtract" | "multiply" | "divide" | "compute" => {
-                self.arithmetic(name, &args)?
+                match self.arithmetic(name, &args) {
+                    Ok(()) => self.condition_status.arithmetic_size_error = false,
+                    Err(MachineProblem::SizeError) => {
+                        self.condition_status.arithmetic_size_error = true;
+                        if !self.has_condition_handler(operation, "ON SIZE ERROR") {
+                            return Err(MachineProblem::SizeError);
+                        }
+                    }
+                    Err(problem) => return Err(problem),
+                }
             }
             "initialize" => self.initialize_op(&args)?,
             "set" => self.set_op(&args)?,
@@ -1050,13 +1141,31 @@ impl ReferenceMachine {
                     self.write(target, &vec![0; length])?;
                 }
             }
-            "string" => self.string_op(&args)?,
-            "unstring" => self.unstring_op(&args)?,
+            "string" => {
+                self.condition_status.string_overflow = self.string_op(&args)?;
+            }
+            "unstring" => {
+                self.condition_status.unstring_overflow = self.unstring_op(&args)?;
+            }
             "inspect" => self.inspect_op(&args)?,
-            "json_generate" => self.generate(&args, true)?,
-            "xml_generate" => self.generate(&args, false)?,
-            "json_parse" => self.parse_generated(&args, true)?,
-            "xml_parse" => self.parse_generated(&args, false)?,
+            "json_generate" | "json_parse" | "xml_generate" | "xml_parse" => {
+                let json = name.starts_with("json_");
+                let result = if name.ends_with("_generate") {
+                    self.generate(&args, json)
+                } else {
+                    self.parse_generated(&args, json)
+                };
+                let failed = match result {
+                    Ok(()) => false,
+                    Err(_problem) if self.has_condition_handler(operation, "ON EXCEPTION") => true,
+                    Err(problem) => return Err(problem),
+                };
+                if json {
+                    self.condition_status.json_exception = failed;
+                } else {
+                    self.condition_status.xml_exception = failed;
+                }
+            }
             "if" => self.if_op(&args)?,
             "evaluate" => self.evaluate_op(&args)?,
             "search" => self.search_op(&args)?,
@@ -1082,8 +1191,8 @@ impl ReferenceMachine {
                 // at the exact paragraph endpoint in the machine driver.
             }
             "entry" | "label" | "continue" => {}
-            "accept" => return self.accept_effect(&args),
-            "call" | "cancel" => return self.program_effect(name, &args),
+            "accept" => return self.accept_effect(operation, &args),
+            "call" | "cancel" => return self.program_effect(operation, name, &args),
             "open" | "close" | "read" | "rewrite" | "write" => {
                 return self.dataset_effect(name, &args);
             }
@@ -1198,19 +1307,6 @@ impl ReferenceMachine {
         if text.eq_ignore_ascii_case("ELSE") || text.eq_ignore_ascii_case("WHEN OTHER") {
             return Ok(true);
         }
-        let status_branch = || {
-            let upper = text.to_ascii_uppercase();
-            match upper.as_str() {
-                "AT END" => Some(self.last_file_status == "10"),
-                "NOT AT END" => Some(self.last_file_status != "10"),
-                "INVALID KEY" | "ON EXCEPTION" | "ON SIZE ERROR" | "OVERFLOW" | "ON OVERFLOW" => {
-                    Some(self.last_file_status != "00")
-                }
-                "NOT INVALID KEY" | "NOT ON EXCEPTION" | "NOT ON SIZE ERROR"
-                | "NOT ON OVERFLOW" => Some(self.last_file_status == "00"),
-                _ => None,
-            }
-        };
         let tokens = control_tokens(text);
         let condition = tokens
             .strip_prefix(&["WHEN".to_string()])
@@ -1219,6 +1315,58 @@ impl ReferenceMachine {
             .and_then(|node| usize::try_from(node).ok())
             .and_then(|node| self.control_nodes.get(&node))
             .and_then(|pc| self.operations.get(*pc));
+        let parent_name = parent.map(|operation| operation.identity.name());
+        let status_branch = || {
+            let positive = match (text.to_ascii_uppercase().as_str(), parent_name) {
+                ("AT END", _) => Some(self.last_file_status == "10"),
+                ("INVALID KEY", _) => Some(self.last_file_status != "00"),
+                ("ON SIZE ERROR", Some("add" | "compute" | "divide" | "multiply" | "subtract")) => {
+                    Some(self.condition_status.arithmetic_size_error)
+                }
+                ("ON EXCEPTION", Some("accept")) => Some(self.condition_status.accept_exception),
+                ("ON EXCEPTION", Some("call" | "invoke")) => {
+                    Some(self.condition_status.call_exception)
+                }
+                ("ON EXCEPTION", Some("json_generate" | "json_parse")) => {
+                    Some(self.condition_status.json_exception)
+                }
+                ("ON EXCEPTION", Some("xml_generate" | "xml_parse")) => {
+                    Some(self.condition_status.xml_exception)
+                }
+                ("OVERFLOW" | "ON OVERFLOW", Some("string")) => {
+                    Some(self.condition_status.string_overflow)
+                }
+                ("OVERFLOW" | "ON OVERFLOW", Some("unstring")) => {
+                    Some(self.condition_status.unstring_overflow)
+                }
+                _ => None,
+            };
+            positive.or_else(|| match (text.to_ascii_uppercase().as_str(), parent_name) {
+                ("NOT AT END", _) => Some(self.last_file_status != "10"),
+                ("NOT INVALID KEY", _) => Some(self.last_file_status == "00"),
+                (
+                    "NOT ON SIZE ERROR",
+                    Some("add" | "compute" | "divide" | "multiply" | "subtract"),
+                ) => Some(!self.condition_status.arithmetic_size_error),
+                ("NOT ON EXCEPTION", Some("accept")) => {
+                    Some(!self.condition_status.accept_exception)
+                }
+                ("NOT ON EXCEPTION", Some("call" | "invoke")) => {
+                    Some(!self.condition_status.call_exception)
+                }
+                ("NOT ON EXCEPTION", Some("json_generate" | "json_parse")) => {
+                    Some(!self.condition_status.json_exception)
+                }
+                ("NOT ON EXCEPTION", Some("xml_generate" | "xml_parse")) => {
+                    Some(!self.condition_status.xml_exception)
+                }
+                ("NOT ON OVERFLOW", Some("string")) => Some(!self.condition_status.string_overflow),
+                ("NOT ON OVERFLOW", Some("unstring")) => {
+                    Some(!self.condition_status.unstring_overflow)
+                }
+                _ => None,
+            })
+        };
         let Some(parent) = parent else {
             return Ok(status_branch().unwrap_or(false));
         };
@@ -1252,6 +1400,18 @@ impl ReferenceMachine {
         } else {
             Ok(status_branch().unwrap_or(true))
         }
+    }
+
+    fn has_condition_handler(&self, operation: &Operation, phrase: &str) -> bool {
+        let Some(owner) = optional_integer_attribute(operation, "control_node") else {
+            return false;
+        };
+        self.operations.iter().any(|candidate| {
+            optional_integer_attribute(candidate, "control_parent") == Some(owner)
+                && optional_text_attribute(candidate, "control_role") == Some("branch")
+                && optional_text_attribute(candidate, "control_text")
+                    .is_some_and(|text| text.eq_ignore_ascii_case(phrase))
+        })
     }
 
     fn perform_control_start(
@@ -1409,7 +1569,11 @@ impl ReferenceMachine {
         Ok(return_pc)
     }
 
-    fn accept_effect(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
+    fn accept_effect(
+        &mut self,
+        operation: &Operation,
+        args: &[String],
+    ) -> Result<Step, MachineProblem> {
         let target = normalize(args.first().ok_or(MachineProblem::InvalidOperation)?);
         let request = HostRequest::Terminal(TerminalRequest::Read {
             session: mainframe_env_host_api::SessionId::new(
@@ -1418,9 +1582,22 @@ impl ReferenceMachine {
             )
             .map_err(|_| MachineProblem::InvalidOperation)?,
         });
-        self.effect(request, PendingKind::Accept { target })
+        let handles_exception = self.has_condition_handler(operation, "ON EXCEPTION");
+        self.condition_status.accept_exception = false;
+        self.effect(
+            request,
+            PendingKind::Accept {
+                target,
+                handles_exception,
+            },
+        )
     }
-    fn program_effect(&mut self, name: &str, args: &[String]) -> Result<Step, MachineProblem> {
+    fn program_effect(
+        &mut self,
+        operation: &Operation,
+        name: &str,
+        args: &[String],
+    ) -> Result<Step, MachineProblem> {
         if name == "call"
             && args.first().is_some_and(|program| {
                 matches!(
@@ -1456,9 +1633,14 @@ impl ReferenceMachine {
             .map(|target| self.read(target))
             .collect::<Result<Vec<_>, _>>()?;
         let payload = encode_call_values(&targets, &values)?;
+        let handles_exception = self.has_condition_handler(operation, "ON EXCEPTION");
+        self.condition_status.call_exception = false;
         self.effect(
             HostRequest::Program(ProgramRequest::Call { program, payload }),
-            PendingKind::ProgramCall { targets },
+            PendingKind::ProgramCall {
+                targets,
+                handles_exception,
+            },
         )
     }
     fn mq_effect(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
@@ -2410,19 +2592,37 @@ impl ReferenceMachine {
                 (target, self.eval_expression(&args[equals + 1..])?)
             }
             "add" => {
-                let pos = position(args, "TO").ok_or(MachineProblem::InvalidOperation)?;
-                let receiver = args
-                    .get(pos + 1)
-                    .ok_or(MachineProblem::InvalidOperation)?
-                    .clone();
-                let target = position(args, "GIVING")
-                    .and_then(|giving| args.get(giving + 1))
-                    .cloned()
-                    .unwrap_or_else(|| receiver.clone());
-                (
-                    target,
-                    decimal_add(self.decimal(&receiver)?, self.decimal(&args[0])?)?,
-                )
+                let to = position(args, "TO");
+                let giving = position(args, "GIVING");
+                let operand_end = to.or(giving).ok_or(MachineProblem::InvalidOperation)?;
+                if operand_end == 0 {
+                    return Err(MachineProblem::InvalidOperation);
+                }
+                let mut sum = Decimal {
+                    coefficient: 0,
+                    scale: 0,
+                };
+                for operand in &args[..operand_end] {
+                    sum = decimal_add(sum, self.decimal(operand)?)?;
+                }
+                if let Some(to) = to {
+                    let receiver = args
+                        .get(to + 1)
+                        .ok_or(MachineProblem::InvalidOperation)?
+                        .clone();
+                    sum = decimal_add(sum, self.decimal(&receiver)?)?;
+                    let target = giving
+                        .and_then(|giving| args.get(giving + 1))
+                        .cloned()
+                        .unwrap_or(receiver);
+                    (target, sum)
+                } else {
+                    let target = giving
+                        .and_then(|giving| args.get(giving + 1))
+                        .cloned()
+                        .ok_or(MachineProblem::InvalidOperation)?;
+                    (target, sum)
+                }
             }
             "subtract" => {
                 let pos = position(args, "FROM").ok_or(MachineProblem::InvalidOperation)?;
@@ -2634,7 +2834,7 @@ impl ReferenceMachine {
             Ok(())
         }
     }
-    fn string_op(&mut self, args: &[String]) -> Result<(), MachineProblem> {
+    fn string_op(&mut self, args: &[String]) -> Result<bool, MachineProblem> {
         let into = position(args, "INTO").ok_or(MachineProblem::InvalidOperation)?;
         let mut value = Vec::new();
         let mut index = 0usize;
@@ -2661,12 +2861,12 @@ impl ReferenceMachine {
             }
             value.extend(source);
         }
-        self.write(
-            args.get(into + 1).ok_or(MachineProblem::InvalidOperation)?,
-            &value,
-        )
+        let target = args.get(into + 1).ok_or(MachineProblem::InvalidOperation)?;
+        let overflow = value.len() > self.read(target)?.len();
+        self.write(target, &value)?;
+        Ok(overflow)
     }
-    fn unstring_op(&mut self, args: &[String]) -> Result<(), MachineProblem> {
+    fn unstring_op(&mut self, args: &[String]) -> Result<bool, MachineProblem> {
         let into = position(args, "INTO").ok_or(MachineProblem::InvalidOperation)?;
         let source = self.resolve(args.first().ok_or(MachineProblem::InvalidOperation)?)?;
         let delimiter = position(args, "DELIMITED")
@@ -2687,10 +2887,11 @@ impl ReferenceMachine {
                 )
             })
             .collect::<Vec<_>>();
+        let overflow = fields.len() > targets.len();
         for (target, value) in targets.into_iter().zip(fields) {
             self.write(target, value)?;
         }
-        Ok(())
+        Ok(overflow)
     }
     fn inspect_op(&mut self, args: &[String]) -> Result<(), MachineProblem> {
         if args.is_empty() {
@@ -3923,7 +4124,7 @@ impl Machine for ReferenceMachine {
         }
         let bytes = encode_snapshot(&self.snapshot())?;
         BoundedPayload::new(
-            "mainframe-env.reference-machine-checkpoint@6",
+            "mainframe-env.reference-machine-checkpoint@7",
             bytes,
             InvocationLimits {
                 max_payload_bytes: usize::try_from(
@@ -3946,7 +4147,7 @@ impl Machine for ReferenceMachine {
 }
 
 fn encode_snapshot(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
-    let mut bytes = b"MECP0006".to_vec();
+    let mut bytes = b"MECP0007".to_vec();
     bytes.extend_from_slice(&snapshot.schema_version.to_be_bytes());
     bytes.extend_from_slice(&u64::try_from(snapshot.program_counter).ok()?.to_be_bytes());
     bytes.extend_from_slice(&snapshot.effect_sequence.to_be_bytes());
@@ -4004,6 +4205,7 @@ fn encode_snapshot(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
         push_bytes(&mut bytes, dataset.as_bytes())?;
         push_bytes(&mut bytes, cursor.as_bytes())?;
     }
+    bytes.push(snapshot.condition_statuses);
     Some(bytes)
 }
 
@@ -4028,6 +4230,7 @@ fn decode_snapshot(
         b"MECP0004" => 4,
         b"MECP0005" => 5,
         b"MECP0006" => 6,
+        b"MECP0007" => 7,
         _ => return Err(MachineProblem::IncompatibleSnapshot),
     };
     let schema_version = input.u32()?;
@@ -4137,6 +4340,17 @@ fn decode_snapshot(
             }
         }
     }
+    let condition_statuses = if header_version >= 7 {
+        *input
+            .take(1)?
+            .first()
+            .ok_or(MachineProblem::IncompatibleSnapshot)?
+    } else {
+        0
+    };
+    if ConditionStatus::from_bits(condition_statuses).is_none() {
+        return Err(MachineProblem::IncompatibleSnapshot);
+    }
     if !input.finished() {
         return Err(MachineProblem::IncompatibleSnapshot);
     }
@@ -4153,6 +4367,7 @@ fn decode_snapshot(
         loop_counts,
         last_file_status,
         dataset_cursors,
+        condition_statuses,
     })
 }
 
@@ -5854,18 +6069,20 @@ mod tests {
             MachineDrive::Continue
         );
         first.last_file_status = "10".into();
+        first.condition_status.arithmetic_size_error = true;
         first
             .dataset_cursors
             .insert("IBMUSER.INPUT".into(), "CURSOR-1".into());
         let checkpoint = first.checkpoint().unwrap();
         assert_eq!(
             checkpoint.schema(),
-            "mainframe-env.reference-machine-checkpoint@6"
+            "mainframe-env.reference-machine-checkpoint@7"
         );
         let mut restored =
             ReferenceMachine::from_binary(&binary(), invocation, CodecLimits::default()).unwrap();
         restored.restore_checkpoint(&checkpoint).unwrap();
         assert_eq!(restored.last_file_status, "10");
+        assert_eq!(restored.condition_status, first.condition_status);
         assert_eq!(restored.dataset_cursors, first.dataset_cursors);
         assert_eq!(restored.executed_steps, first.executed_steps);
         let first_done = first.drive(MachineResume::Start, Quantum::new(100, 1024).unwrap());

@@ -383,6 +383,152 @@ mod tests {
         }
     }
     #[test]
+    fn add_direct_giving_to_giving_and_size_error_preserve_exact_destinations() {
+        let direct = compile(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. ADDGIVE. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9 VALUE 2. 01 B PIC 9 VALUE 4. 01 C PIC 9 VALUE 0. PROCEDURE DIVISION. ADD A GIVING C. DISPLAY C. ADD A TO B GIVING C. DISPLAY B C. STOP RUN.",
+        )
+        .unwrap();
+        assert!(matches!(
+            execute(&direct, 1024),
+            MachineDrive::Completed(done) if done.output.bytes() == b"2\n46\n"
+        ));
+
+        let size_error = compile(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. ADDSIZE. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9 VALUE 5. 01 B PIC 9 VALUE 8. 01 C PIC 9 VALUE 4. PROCEDURE DIVISION. ADD B C GIVING A ON SIZE ERROR DISPLAY 'SIZE' NOT ON SIZE ERROR DISPLAY 'BAD' END-ADD. DISPLAY A. STOP RUN.",
+        )
+        .unwrap();
+        match execute(&size_error, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"SIZE\n5\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn condition_families_ignore_conflicting_prior_file_status() {
+        use mainframe_env_host_api::{DatasetResult, EffectResult, HostRequest, HostResult};
+
+        fn run(source: &str, records: Vec<Vec<u8>>) -> Vec<u8> {
+            let artifact = compile(source).unwrap();
+            let mut invocation = invocation(&artifact, 4096);
+            invocation.bindings.insert(
+                "cobol.dd.INPUT-FILE".into(),
+                mainframe_env_execution_api::BoundedPayload::new(
+                    "mainframe-env.dataset-name@1",
+                    b"USER.INPUT".to_vec(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            );
+            let mut machine = ReferenceMachine::from_binary(
+                artifact.payload(),
+                invocation,
+                CodecLimits::default(),
+            )
+            .unwrap();
+            let mut resume = MachineResume::Start;
+            for _ in 0..64 {
+                match machine.drive(resume, Quantum::new(256, 4096).unwrap()) {
+                    MachineDrive::Continue => resume = MachineResume::Start,
+                    MachineDrive::HostCall(effect) => {
+                        assert!(matches!(effect.request, HostRequest::Dataset(_)));
+                        resume = MachineResume::HostResult(EffectResult {
+                            sequence: effect.sequence,
+                            outcome: Ok(HostResult::Dataset(DatasetResult::Records {
+                                identities: records.clone(),
+                                records: records.clone(),
+                                version: 1,
+                            })),
+                        });
+                    }
+                    MachineDrive::Completed(done) => return done.output.bytes().to_vec(),
+                    other => panic!("{other:?}"),
+                }
+            }
+            panic!("condition-family program did not terminate")
+        }
+
+        let successful = "IDENTIFICATION DIVISION. PROGRAM-ID. STATUSOK. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC PIC X. 01 A PIC 9 VALUE 1. 01 TEXT-X PIC X VALUE 'A'. 01 TARGET-X PIC X(8). 01 JSON-X PIC X(32). 01 XML-X PIC X(32). PROCEDURE DIVISION. READ INPUT-FILE INTO REC AT END CONTINUE END-READ. ADD 1 TO A ON SIZE ERROR DISPLAY 'BAD-ADD' NOT ON SIZE ERROR DISPLAY 'ADD-OK' END-ADD. STRING TEXT-X DELIMITED BY SIZE INTO TARGET-X ON OVERFLOW DISPLAY 'BAD-STR' NOT ON OVERFLOW DISPLAY 'STR-OK' END-STRING. UNSTRING TEXT-X DELIMITED BY SPACE INTO TARGET-X ON OVERFLOW DISPLAY 'BAD-UNSTR' NOT ON OVERFLOW DISPLAY 'UNSTR-OK' END-UNSTRING. JSON GENERATE JSON-X FROM TEXT-X ON EXCEPTION DISPLAY 'BAD-JSON' NOT ON EXCEPTION DISPLAY 'JSON-OK' END-JSON. XML GENERATE XML-X FROM TEXT-X ON EXCEPTION DISPLAY 'BAD-XML' NOT ON EXCEPTION DISPLAY 'XML-OK' END-XML. STOP RUN.";
+        assert_eq!(
+            run(successful, Vec::new()),
+            b"ADD-OK\nSTR-OK\nUNSTR-OK\nJSON-OK\nXML-OK\n"
+        );
+
+        let failing = "IDENTIFICATION DIVISION. PROGRAM-ID. STATUSERR. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC PIC X. 01 A PIC 9 VALUE 9. 01 B PIC 9 VALUE 9. 01 SMALL PIC 9 VALUE 5. 01 TEXT-X PIC X(3) VALUE 'ABC'. 01 WORDS-X PIC X(3) VALUE 'A B'. 01 BAD-X PIC X(3) VALUE 'BAD'. PROCEDURE DIVISION. READ INPUT-FILE INTO REC AT END CONTINUE END-READ. ADD A B GIVING SMALL ON SIZE ERROR DISPLAY 'ADD-ERR' NOT ON SIZE ERROR DISPLAY 'BAD-ADD' END-ADD. STRING TEXT-X DELIMITED BY SIZE INTO REC ON OVERFLOW DISPLAY 'STR-ERR' NOT ON OVERFLOW DISPLAY 'BAD-STR' END-STRING. UNSTRING WORDS-X DELIMITED BY SPACE INTO REC ON OVERFLOW DISPLAY 'UNSTR-ERR' NOT ON OVERFLOW DISPLAY 'BAD-UNSTR' END-UNSTRING. JSON PARSE BAD-X INTO REC ON EXCEPTION DISPLAY 'JSON-ERR' NOT ON EXCEPTION DISPLAY 'BAD-JSON' END-JSON. XML PARSE BAD-X INTO REC ON EXCEPTION DISPLAY 'XML-ERR' NOT ON EXCEPTION DISPLAY 'BAD-XML' END-XML. STOP RUN.";
+        assert_eq!(
+            run(failing, vec![b"R".to_vec()]),
+            b"ADD-ERR\nSTR-ERR\nUNSTR-ERR\nJSON-ERR\nXML-ERR\n"
+        );
+    }
+
+    #[test]
+    fn call_exception_state_ignores_conflicting_prior_file_status() {
+        use mainframe_env_host_api::{
+            DatasetResult, EffectResult, HostProblem, HostRequest, HostResult,
+        };
+
+        fn run(records: Vec<Vec<u8>>, call: Result<HostResult, HostProblem>) -> Vec<u8> {
+            let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CALLSTATUS. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC PIC X. PROCEDURE DIVISION. READ INPUT-FILE INTO REC AT END CONTINUE END-READ. CALL 'SUB' ON EXCEPTION DISPLAY 'CALL-ERR' NOT ON EXCEPTION DISPLAY 'CALL-OK' END-CALL. STOP RUN.";
+            let artifact = compile(source).unwrap();
+            let mut invocation = invocation(&artifact, 1024);
+            invocation.bindings.insert(
+                "cobol.dd.INPUT-FILE".into(),
+                mainframe_env_execution_api::BoundedPayload::new(
+                    "mainframe-env.dataset-name@1",
+                    b"USER.INPUT".to_vec(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            );
+            let mut machine = ReferenceMachine::from_binary(
+                artifact.payload(),
+                invocation,
+                CodecLimits::default(),
+            )
+            .unwrap();
+            let mut resume = MachineResume::Start;
+            let mut call = Some(call);
+            for _ in 0..64 {
+                match machine.drive(resume, Quantum::new(128, 1024).unwrap()) {
+                    MachineDrive::Continue => resume = MachineResume::Start,
+                    MachineDrive::HostCall(effect) => {
+                        let outcome = match effect.request {
+                            HostRequest::Dataset(_) => {
+                                Ok(HostResult::Dataset(DatasetResult::Records {
+                                    identities: records.clone(),
+                                    records: records.clone(),
+                                    version: 1,
+                                }))
+                            }
+                            HostRequest::Program(_) => call.take().unwrap(),
+                            other => panic!("unexpected host request: {other:?}"),
+                        };
+                        resume = MachineResume::HostResult(EffectResult {
+                            sequence: effect.sequence,
+                            outcome,
+                        });
+                    }
+                    MachineDrive::Completed(done) => return done.output.bytes().to_vec(),
+                    other => panic!("{other:?}"),
+                }
+            }
+            panic!("CALL condition program did not terminate")
+        }
+
+        let empty_result = mainframe_env_execution_api::BoundedPayload::new(
+            "mainframe-env.cobol.call-result@1",
+            0u32.to_be_bytes().to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            run(Vec::new(), Ok(HostResult::Program(empty_result))),
+            b"CALL-OK\n"
+        );
+        assert_eq!(
+            run(vec![b"R".to_vec()], Err(HostProblem::ProviderFailure)),
+            b"CALL-ERR\n"
+        );
+    }
+    #[test]
     fn packed_binary_group_condition_and_intrinsic_semantics_execute() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CORE. DATA DIVISION. WORKING-STORAGE SECTION. 01 PACKED-X PIC S9(5) COMP-3 VALUE 12. 01 BINARY-X PIC S9(4) COMP VALUE 7. 01 DISPLAY-X PIC 9(5). 01 SOURCE-GROUP. 05 TEXT-X PIC X(3) VALUE 'ABC'. 05 COUNT-X PIC 9(2) VALUE 12. 01 GROUP-OUT PIC X(5). 01 TRIM-X PIC X(8) VALUE ' ab '. 01 TEXT-OUT PIC X(8). 01 FLAG-X PIC X VALUE 'N'. 88 FLAG-YES VALUE 'Y'. PROCEDURE DIVISION. ADD 3 TO PACKED-X. MOVE PACKED-X TO DISPLAY-X. DISPLAY DISPLAY-X. MULTIPLY 3 BY BINARY-X. MOVE BINARY-X TO DISPLAY-X. DISPLAY DISPLAY-X. MOVE SOURCE-GROUP TO GROUP-OUT. DISPLAY GROUP-OUT. MOVE FUNCTION UPPER-CASE(FUNCTION TRIM(TRIM-X)) TO TEXT-OUT. DISPLAY TEXT-OUT. SET FLAG-YES TO TRUE. IF FLAG-YES DISPLAY 'YES' END-IF. STOP RUN.";
         let artifact = compile(source).unwrap();
@@ -766,7 +912,7 @@ mod tests {
         let checkpoint = first.checkpoint().unwrap();
         assert_eq!(
             checkpoint.schema(),
-            "mainframe-env.reference-machine-checkpoint@6"
+            "mainframe-env.reference-machine-checkpoint@7"
         );
         let mut restored =
             ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())

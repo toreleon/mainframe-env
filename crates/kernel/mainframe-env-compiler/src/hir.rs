@@ -584,7 +584,7 @@ fn statement_options(kind: StatementKind, text: &str) -> Vec<StatementOption> {
         return Vec::new();
     }
     let upper = text.to_ascii_uppercase();
-    let tokens = semantic_tokens(text);
+    let tokens = semantic_tokens(text, 1);
     let mut options = Vec::new();
     for (phrase, kind) in [
         ("NOT AT END", StatementOptionKind::NotAtEnd),
@@ -897,7 +897,25 @@ impl ProcedureParser {
         if self.statements.len() >= self.max_statements {
             return Err(HirProblem::StatementLimitExceeded);
         }
-        let arguments = semantic_tokens(header_text);
+        let keyword_words = match kind {
+            StatementKind::GoTo
+            | StatementKind::NextSentence
+            | StatementKind::JsonGenerate
+            | StatementKind::JsonParse
+            | StatementKind::XmlGenerate
+            | StatementKind::XmlParse
+            | StatementKind::StopRun => 2,
+            StatementKind::GoBack
+                if header_text
+                    .trim_start()
+                    .to_ascii_uppercase()
+                    .starts_with("GO ") =>
+            {
+                2
+            }
+            _ => 1,
+        };
+        let arguments = semantic_tokens(header_text, keyword_words);
         if kind == StatementKind::ExecSql
             && arguments
                 .iter()
@@ -1282,7 +1300,7 @@ fn go_to_target(text: &str) -> Option<String> {
         .map(|pair| pair[1].clone())
 }
 
-fn semantic_tokens(sentence: &str) -> Vec<String> {
+fn semantic_tokens(sentence: &str, keyword_words: usize) -> Vec<String> {
     let mut tokens = Vec::new();
     let mut current = String::new();
     let mut quote = None;
@@ -1322,7 +1340,7 @@ fn semantic_tokens(sentence: &str) -> Vec<String> {
     }
     tokens
         .into_iter()
-        .skip(1)
+        .skip(keyword_words)
         .map(|token| {
             if token.starts_with(['\'', '"']) {
                 token

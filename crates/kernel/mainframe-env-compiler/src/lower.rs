@@ -35,12 +35,14 @@ pub const PUBLISHABLE_LAYOUT_CATEGORIES: &[&str] = &[
 
 pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, LowerProblem> {
     let mut unsupported = hir.unsupported();
-    let structured = hir.control_nodes.iter().any(|start| {
-        start.role == ControlRole::BlockStart
-            && hir
-                .control_nodes
-                .iter()
-                .any(|end| end.role == ControlRole::BlockEnd && end.parent == Some(start.id))
+    let structured = hir.control_nodes.iter().any(|node| {
+        matches!(
+            node.role,
+            ControlRole::BlockStart
+                | ControlRole::BlockEnd
+                | ControlRole::Branch
+                | ControlRole::Terminator
+        )
     });
     if structured {
         unsupported.remove(&StatementKind::NextSentence);
