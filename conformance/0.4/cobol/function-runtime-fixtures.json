@@ -162,21 +162,21 @@
       "setup": ""
     },
     {
-      "expression": "FUNCTION FORMATTED-DATE('YYYY-MM-DD', 20240229)",
+      "expression": "FUNCTION FORMATTED-DATE('YYYY-MM-DD', 154557)",
       "id": "formatted-date",
       "name": "FORMATTED-DATE",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0024",
       "setup": ""
     },
     {
-      "expression": "FUNCTION FORMATTED-DATETIME('YYYYMMDDThhmmss', 20240229, 45296, 0)",
+      "expression": "FUNCTION FORMATTED-DATETIME('YYYYMMDDThhmmss', 154557, 45296)",
       "id": "formatted-datetime",
       "name": "FORMATTED-DATETIME",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0025",
       "setup": ""
     },
     {
-      "expression": "FUNCTION FORMATTED-TIME('hh:mm:ss', 45296, 0)",
+      "expression": "FUNCTION FORMATTED-TIME('hh:mm:ss', 45296)",
       "id": "formatted-time",
       "name": "FORMATTED-TIME",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0026",

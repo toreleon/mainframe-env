@@ -197,6 +197,27 @@
       "obligation_id": "boundary-packed-storage-length",
       "source": "IDENTIFICATION DIVISION. PROGRAM-ID. LENPACKED. DATA DIVISION. WORKING-STORAGE SECTION. 01 PACKED-X PIC S9(3) COMP-3 VALUE -12. 01 OUT-X PIC 9. PROCEDURE DIVISION. MOVE FUNCTION LENGTH(PACKED-X) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
       "expected_output": "2\n"
+    },
+    {
+      "id": "formatted-date-integer-epoch",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0024",
+      "obligation_id": "boundary-integer-date-epoch",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. FORMATDATEEPOCH. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUT-X PIC X(10). PROCEDURE DIVISION. MOVE FUNCTION FORMATTED-DATE('YYYY-MM-DD', 154557) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "2024-02-29\n"
+    },
+    {
+      "id": "formatted-datetime-optional-offset",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0025",
+      "obligation_id": "boundary-integer-date-optional-offset",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. FORMATDATETIME. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUT-X PIC X(15). PROCEDURE DIVISION. MOVE FUNCTION FORMATTED-DATETIME('YYYYMMDDThhmmss', 154557, 45296) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "20240229T123456\n"
+    },
+    {
+      "id": "formatted-time-optional-offset",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0026",
+      "obligation_id": "boundary-optional-offset",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. FORMATTIME. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUT-X PIC X(8). PROCEDURE DIVISION. MOVE FUNCTION FORMATTED-TIME('hh:mm:ss', 45296) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "12:34:56\n"
     }
   ]
 }

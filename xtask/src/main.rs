@@ -1655,6 +1655,15 @@ fn check_cobol_function_bindings(
             Some("0027") => {
                 expected_obligations.insert("boundary-packed-storage-hex");
             }
+            Some("0024") => {
+                expected_obligations.insert("boundary-integer-date-epoch");
+            }
+            Some("0025") => {
+                expected_obligations.insert("boundary-integer-date-optional-offset");
+            }
+            Some("0026") => {
+                expected_obligations.insert("boundary-optional-offset");
+            }
             Some("0034") => {
                 expected_obligations.insert("boundary-national-character-count");
                 expected_obligations.insert("boundary-packed-storage-length");

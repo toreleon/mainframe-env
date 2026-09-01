@@ -6377,13 +6377,21 @@ impl ReferenceMachine {
                 &String::from_utf8_lossy(&bytes(0)?),
                 integer(1)?,
                 decimal(2)?,
-                integer(3)?,
+                arguments
+                    .get(3)
+                    .map(|_| integer(3))
+                    .transpose()?
+                    .unwrap_or(0),
             )
             .map(CobolValue::Bytes),
             "FORMATTED-TIME" => formatted_time(
                 &String::from_utf8_lossy(&bytes(0)?),
                 decimal(1)?,
-                integer(2)?,
+                arguments
+                    .get(2)
+                    .map(|_| integer(2))
+                    .transpose()?
+                    .unwrap_or(0),
             )
             .map(CobolValue::Bytes),
             "HEX-OF" => Ok(CobolValue::Bytes(hex_upper(&raw_bytes(0)?))),
@@ -10784,7 +10792,8 @@ fn format_datetime(format: &str, current: &[u8]) -> Result<Vec<u8>, MachineProbl
 }
 
 fn formatted_date(format: &str, date: i128) -> Result<Vec<u8>, MachineProblem> {
-    let (year, month, day) = split_yyyymmdd(date)?;
+    let date = i64::try_from(date).map_err(|_| MachineProblem::DataException)?;
+    let (year, month, day) = cobol_date_of_integer(date)?;
     render_datetime_format(format, year, month, day, 0, 0, 0)
 }
 
@@ -10794,7 +10803,8 @@ fn formatted_datetime(
     time: Decimal,
     _offset: i128,
 ) -> Result<Vec<u8>, MachineProblem> {
-    let (year, month, day) = split_yyyymmdd(date)?;
+    let date = i64::try_from(date).map_err(|_| MachineProblem::DataException)?;
+    let (year, month, day) = cobol_date_of_integer(date)?;
     let seconds = decimal_f64(time)?;
     if !(0.0..86_400.0).contains(&seconds) {
         return Err(MachineProblem::DataException);
