@@ -677,6 +677,19 @@ impl DatasetService {
             if entry.version != row.version {
                 return Err(HostProblem::InfrastructureFailure);
             }
+            let definition = entry.definition();
+            definition
+                .validate(
+                    mainframe_env_host_api::HostLimits {
+                        max_record_bytes: limits.max_record_bytes,
+                        max_records: limits.max_records,
+                        ..Default::default()
+                    },
+                    dataset_capabilities(),
+                )
+                .map_err(|_| HostProblem::InfrastructureFailure)?;
+            validate_provider_definition(&definition)
+                .map_err(|_| HostProblem::InfrastructureFailure)?;
             validate_entry_shape(&entry, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
             if entry.attributes.organization
                 == mainframe_env_host_api::DatasetOrganization::KeySequenced
@@ -10769,6 +10782,33 @@ mod tests {
     }
 
     #[test]
+    fn restart_rejects_state_requiring_an_unadvertised_capability() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let mut definition = mainframe_env_host_api::DatasetDefinition::compatibility(attrs(
+            DatasetOrganization::Sequential,
+        ));
+        definition.lifecycle.state = mainframe_env_host_api::DatasetLifecycleState::Migrated;
+        definition.lifecycle.migration_level = 1;
+        let entry = Entry::from_definition(definition, 1);
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "dataset".into(),
+                    key: "USER.MIGRATED".into(),
+                    version: 1,
+                    payload: encode(&entry).unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        let provider_store: Arc<dyn ProviderStateStore> = store;
+        assert!(matches!(
+            DatasetService::open(provider_store, DatasetLimits::default()),
+            Err(HostProblem::InfrastructureFailure)
+        ));
+    }
+
+    #[test]
     fn sqlite_dataset_backup_restores_one_integrity_checked_snapshot() {
         let directory = std::env::temp_dir().join(format!(
             "mainframe-env-dataset-backup-{}-{:?}",
@@ -11010,11 +11050,11 @@ mod tests {
         let name = DatasetName::new("USER.GEOMETRY", 44).unwrap();
         let mut definition =
             mainframe_env_host_api::DatasetDefinition::compatibility(DatasetAttributes {
-                organization: DatasetOrganization::Sequential,
+                organization: DatasetOrganization::KeySequenced,
                 record_format: RecordFormat::Fixed,
                 logical_record_length: 100,
-                key_offset: None,
-                key_length: None,
+                key_offset: Some(0),
+                key_length: Some(4),
                 ccsid: Some(37),
             });
         definition.allocation.primary = 2;
@@ -11029,6 +11069,8 @@ mod tests {
         definition.sms.extended_format = true;
         definition.sms.extended_addressable = true;
         definition.volumes.volume_ids = vec!["VOLA".into(), "VOLB".into()];
+        definition.volumes.unit_count = 2;
+        definition.vsam.buffering = mainframe_env_host_api::BufferingMode::LocalSharedResources;
         dataset
             .invoke(DatasetRequest::Define {
                 dataset: name.clone(),
@@ -11055,7 +11097,7 @@ mod tests {
                     && description.extents[0].length == 200
                     && description.extents[1].start == 200
                     && description.extents[1].length == 300
-                    && description.buffer_bytes == 150
+                    && description.buffer_bytes == 300
                     && description.max_rba == u64::MAX
                     && description.abstract_placement.starts_with("ABSTRACT:")
         ));
@@ -11259,6 +11301,176 @@ mod tests {
             }),
             Err(HostProblem::NotFound)
         );
+    }
+
+    #[test]
+    fn every_abstract_allocation_unit_has_an_exact_capacity_constant() {
+        let dataset = service(Arc::new(MemoryStore::new(Default::default())));
+        for (position, unit, primary, block_size, expected) in [
+            (0, mainframe_env_host_api::SpaceUnit::Tracks, 1, 0, 56_664),
+            (
+                1,
+                mainframe_env_host_api::SpaceUnit::Cylinders,
+                1,
+                0,
+                849_960,
+            ),
+            (2, mainframe_env_host_api::SpaceUnit::Blocks, 2, 400, 800),
+            (3, mainframe_env_host_api::SpaceUnit::Kilobytes, 2, 0, 2_048),
+            (
+                4,
+                mainframe_env_host_api::SpaceUnit::Megabytes,
+                1,
+                0,
+                1_048_576,
+            ),
+            (5, mainframe_env_host_api::SpaceUnit::Records, 3, 0, 300),
+        ] {
+            let name = DatasetName::new(format!("USER.UNIT{position}"), 44).unwrap();
+            let mut definition =
+                mainframe_env_host_api::DatasetDefinition::compatibility(DatasetAttributes {
+                    organization: DatasetOrganization::Sequential,
+                    record_format: RecordFormat::Fixed,
+                    logical_record_length: 100,
+                    key_offset: None,
+                    key_length: None,
+                    ccsid: Some(37),
+                });
+            definition.allocation.unit = unit;
+            definition.allocation.primary = primary;
+            definition.dcb.block_size = block_size;
+            dataset
+                .invoke(DatasetRequest::Define {
+                    dataset: name.clone(),
+                    definition: Box::new(definition),
+                    mutation: mutation(910 + position),
+                })
+                .unwrap();
+            assert!(matches!(
+                dataset.invoke(DatasetRequest::Describe { dataset: name }),
+                Ok(DatasetResult::Description(description))
+                    if description.allocated_bytes == expected
+                        && description.extents.len() == 1
+                        && description.extents[0].length == expected
+            ));
+        }
+    }
+
+    #[test]
+    fn all_record_formats_enforce_exact_positive_and_negative_boundaries() {
+        let dataset = service(Arc::new(MemoryStore::new(Default::default())));
+        for (position, format) in [
+            RecordFormat::Fixed,
+            RecordFormat::FixedBlocked,
+            RecordFormat::FixedBlockedStandard,
+            RecordFormat::Variable,
+            RecordFormat::VariableBlocked,
+            RecordFormat::VariableSpanned,
+            RecordFormat::VariableBlockedSpanned,
+            RecordFormat::Undefined,
+            RecordFormat::Line,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let spanned = matches!(
+                format,
+                RecordFormat::VariableSpanned | RecordFormat::VariableBlockedSpanned
+            );
+            let logical_record_length = if spanned { 600 } else { 4 };
+            let name = DatasetName::new(format!("USER.FMT{position}"), 44).unwrap();
+            let mut definition =
+                mainframe_env_host_api::DatasetDefinition::compatibility(DatasetAttributes {
+                    organization: if spanned {
+                        DatasetOrganization::EntrySequenced
+                    } else {
+                        DatasetOrganization::Sequential
+                    },
+                    record_format: format,
+                    logical_record_length,
+                    key_offset: None,
+                    key_length: None,
+                    ccsid: Some(37),
+                });
+            definition.dcb.block_size = if matches!(
+                format,
+                RecordFormat::FixedBlocked | RecordFormat::FixedBlockedStandard
+            ) {
+                8
+            } else {
+                0
+            };
+            definition.vsam.spanned = spanned;
+            if spanned {
+                definition.vsam.control_interval_size = Some(512);
+                definition.vsam.control_area_size = Some(8_192);
+            }
+            dataset
+                .invoke(DatasetRequest::Define {
+                    dataset: name.clone(),
+                    definition: Box::new(definition),
+                    mutation: mutation(1_000 + position as u64 * 3),
+                })
+                .unwrap();
+            let valid = if spanned {
+                vec![b'S'; 550]
+            } else {
+                match format {
+                    RecordFormat::Variable | RecordFormat::VariableBlocked => b"ABC".to_vec(),
+                    RecordFormat::Undefined => b"OPAQUE".to_vec(),
+                    RecordFormat::Line => b"TEXT".to_vec(),
+                    _ => b"DATA".to_vec(),
+                }
+            };
+            dataset
+                .invoke(DatasetRequest::Write {
+                    dataset: name.clone(),
+                    member: None,
+                    records: vec![valid.clone()],
+                    expected_version: Some(1),
+                    mutation: mutation(1_001 + position as u64 * 3),
+                })
+                .unwrap();
+            assert!(matches!(
+                dataset.invoke(DatasetRequest::Read {
+                    dataset: name.clone(),
+                    member: None,
+                    key: None,
+                    max_records: 2,
+                }),
+                Ok(DatasetResult::Records { records, version: 2, .. })
+                    if records == [valid]
+            ));
+            let invalid = match format {
+                RecordFormat::Fixed
+                | RecordFormat::FixedBlocked
+                | RecordFormat::FixedBlockedStandard => Some(b"BAD".to_vec()),
+                RecordFormat::Variable | RecordFormat::VariableBlocked => Some(b"EXCESS".to_vec()),
+                RecordFormat::VariableSpanned | RecordFormat::VariableBlockedSpanned => {
+                    Some(vec![b'X'; 601])
+                }
+                RecordFormat::Line => Some(b"A\nB".to_vec()),
+                RecordFormat::Undefined => None,
+            };
+            if let Some(invalid) = invalid {
+                let result = dataset.invoke(DatasetRequest::Write {
+                    dataset: name,
+                    member: None,
+                    records: vec![invalid],
+                    expected_version: Some(2),
+                    mutation: mutation(1_002 + position as u64 * 3),
+                });
+                if format == RecordFormat::Line {
+                    assert_eq!(result, Err(HostProblem::Malformed));
+                } else {
+                    assert!(matches!(
+                        result,
+                        Err(HostProblem::Condition { ref name, response: 22, .. })
+                            if name == "LENGERR"
+                    ));
+                }
+            }
+        }
     }
 
     #[test]

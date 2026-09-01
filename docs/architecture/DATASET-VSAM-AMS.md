@@ -217,6 +217,11 @@ Conformance IR driver executes every one of the 31 commands as a real IDCAMS
 job, checks its terminal condition, reopens both JES and dataset authorities,
 and verifies the durable typed effect; this supplies 180 local bindings across
 recognized, validated, executed, conditioned, and recovered for all 36 rows.
+The companion `dataset-surface-audit.json` binds the 131 detailed descriptors
+exactly once to executable test identities and distinguishes required pass,
+implemented capability, and explicit unavailable-capability evidence. Contract
+validation rejects stale inventory digests, missing/surplus descriptors,
+incompatible dispositions, and test identities that no longer resolve.
 
 ## Evolution rules
 

@@ -4329,11 +4329,96 @@ mod tests {
         HostLimits, HostProvider, RegistrySnapshot,
     };
     use mainframe_env_store::{MemoryStore, SqliteStateStore};
+    use mainframe_env_store_api::{ProviderStateMutation, ProviderStateWrite};
     use std::collections::BTreeSet;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
     struct SecurityProvider {
         descriptor: CapabilityDescriptor,
+    }
+
+    struct FailDatasetCommitOnceStore {
+        inner: MemoryStore,
+        fail_next_mutation: AtomicBool,
+    }
+
+    impl FailDatasetCommitOnceStore {
+        fn new() -> Self {
+            Self {
+                inner: MemoryStore::new(Default::default()),
+                fail_next_mutation: AtomicBool::new(false),
+            }
+        }
+
+        fn arm(&self) {
+            self.fail_next_mutation.store(true, Ordering::SeqCst);
+        }
+    }
+
+    impl ProviderStateStore for FailDatasetCommitOnceStore {
+        fn get_provider_state(
+            &self,
+            namespace: &str,
+            key: &str,
+        ) -> Result<Option<ProviderStateRecord>, StoreError> {
+            self.inner.get_provider_state(namespace, key)
+        }
+
+        fn list_provider_state(
+            &self,
+            namespace: &str,
+            max: usize,
+        ) -> Result<Vec<ProviderStateRecord>, StoreError> {
+            self.inner.list_provider_state(namespace, max)
+        }
+
+        fn put_provider_state(
+            &self,
+            record: ProviderStateRecord,
+            expected_version: Option<u64>,
+        ) -> Result<(), StoreError> {
+            self.inner.put_provider_state(record, expected_version)
+        }
+
+        fn delete_provider_state(
+            &self,
+            namespace: &str,
+            key: &str,
+            expected_version: u64,
+        ) -> Result<(), StoreError> {
+            self.inner
+                .delete_provider_state(namespace, key, expected_version)
+        }
+
+        fn move_provider_state(
+            &self,
+            record: ProviderStateRecord,
+            old_key: &str,
+            expected_version: u64,
+        ) -> Result<(), StoreError> {
+            self.inner
+                .move_provider_state(record, old_key, expected_version)
+        }
+
+        fn put_provider_states_atomic(
+            &self,
+            writes: Vec<ProviderStateWrite>,
+        ) -> Result<(), StoreError> {
+            self.inner.put_provider_states_atomic(writes)
+        }
+
+        fn mutate_provider_states_atomic(
+            &self,
+            mutations: Vec<ProviderStateMutation>,
+        ) -> Result<(), StoreError> {
+            if self.fail_next_mutation.swap(false, Ordering::SeqCst) {
+                Err(StoreError::Infrastructure(
+                    "injected-dataset-commit-failure".into(),
+                ))
+            } else {
+                self.inner.mutate_provider_states_atomic(mutations)
+            }
+        }
     }
 
     struct DatasetProvider {
@@ -5337,6 +5422,10 @@ mod tests {
                     && description.definition.catalog.owner.as_deref() == Some("IBMUSER")
                     && description.definition.catalog.creation_date == Some(2_026_001)
                     && description.definition.catalog.retention_days == Some(30)
+                    && description.definition.sms.data_class.as_deref() == Some("STD")
+                    && description.definition.sms.management_class.as_deref() == Some("ACT")
+                    && description.definition.sms.storage_class.as_deref() == Some("ABS")
+                    && description.definition.volumes.unit_count == 2
         ));
         assert!(matches!(
             dataset.invoke(DatasetRequest::List {
@@ -5383,6 +5472,186 @@ mod tests {
     }
 
     #[test]
+    fn idcams_shcds_reconciles_unknown_tvs_commit_and_survives_restart() {
+        let store = Arc::new(FailDatasetCommitOnceStore::new());
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let dataset = DatasetService::open(provider_store, DatasetLimits::default()).unwrap();
+        let name = DatasetName::new("USER.TVSCMD", 128).unwrap();
+        let mut definition =
+            mainframe_env_host_api::DatasetDefinition::compatibility(DatasetAttributes {
+                organization: DatasetOrganization::KeySequenced,
+                record_format: RecordFormat::Fixed,
+                logical_record_length: 4,
+                key_offset: Some(0),
+                key_length: Some(2),
+                ccsid: Some(37),
+            });
+        definition.vsam.access_mode = mainframe_env_host_api::VsamAccessMode::Tvs;
+        dataset
+            .invoke(DatasetRequest::Define {
+                dataset: name.clone(),
+                definition: Box::new(definition),
+                mutation: dataset_test_mutation(550),
+            })
+            .unwrap();
+        let owner = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        dataset
+            .invoke(DatasetRequest::BeginTvs {
+                transaction: "TX-AMS".into(),
+                owner: owner.clone(),
+                mutation: dataset_test_mutation(551),
+            })
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::StageTvs {
+                transaction: "TX-AMS".into(),
+                owner: owner.clone(),
+                operation: mainframe_env_host_api::TvsRecordOperation::Insert {
+                    dataset: name.clone(),
+                    record: b"AA11".to_vec(),
+                },
+                mutation: dataset_test_mutation(552),
+            })
+            .unwrap();
+        store.arm();
+        assert_eq!(
+            dataset.invoke(DatasetRequest::CompleteTvs {
+                transaction: "TX-AMS".into(),
+                owner: owner.clone(),
+                commit: true,
+                mutation: dataset_test_mutation(553),
+            }),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::TvsStatus {
+                transaction: "TX-AMS".into(),
+                owner: owner.clone(),
+            }),
+            Ok(DatasetResult::Tvs(
+                mainframe_env_host_api::TvsUnitOfWorkReceipt {
+                    state: mainframe_env_host_api::TvsUnitOfWorkState::Unknown,
+                    ..
+                }
+            ))
+        ));
+
+        let providers = dataset_providers(dataset.clone(), InvocationLimits::default());
+        let batch_store: Arc<dyn ProviderStateStore> = store.clone();
+        let batch = BatchService::open(
+            host_with(builtins(), providers),
+            batch_store,
+            Default::default(),
+            Default::default(),
+        )
+        .unwrap();
+        let invocation = invocation();
+        let job = batch
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//SHCJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//SYSIN DD *\n SHCDS TRANSACTION(TX-AMS) COMMIT\n/*\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("ams-shcds-reconcile", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            batch
+                .run_next(&invocation, false)
+                .unwrap()
+                .unwrap()
+                .return_code,
+            Some(0)
+        );
+        assert!(
+            batch
+                .spool(&job.id, "SYSPRINT", 0, 8)
+                .unwrap()
+                .0
+                .iter()
+                .any(|record| String::from_utf8_lossy(record).contains("Committed"))
+        );
+        drop(batch);
+        drop(dataset);
+        let reopened_store: Arc<dyn ProviderStateStore> = store;
+        let reopened = DatasetService::open(reopened_store, DatasetLimits::default()).unwrap();
+        assert!(matches!(
+            reopened.invoke(DatasetRequest::TvsStatus {
+                transaction: "TX-AMS".into(),
+                owner,
+            }),
+            Ok(DatasetResult::Tvs(
+                mainframe_env_host_api::TvsUnitOfWorkReceipt {
+                    state: mainframe_env_host_api::TvsUnitOfWorkState::Committed,
+                    ..
+                }
+            ))
+        ));
+        assert!(matches!(
+            reopened.invoke(DatasetRequest::Read {
+                dataset: name,
+                member: None,
+                key: Some(b"AA".to_vec()),
+                max_records: 1,
+            }),
+            Ok(DatasetResult::Records { records, version: 2, .. })
+                if records == [b"AA11".to_vec()]
+        ));
+    }
+
+    #[test]
+    fn idcams_verify_reconciles_recovery_required_state() {
+        let (service, dataset) = service_with_real_datasets();
+        seed_real_dataset(&dataset, "USER.VERIFY", vec![b"DATA".to_vec()], 560);
+        let name = DatasetName::new("USER.VERIFY", 128).unwrap();
+        dataset
+            .invoke(DatasetRequest::SetLifecycle {
+                dataset: name.clone(),
+                state: mainframe_env_host_api::DatasetLifecycleState::Open,
+                expected_version: Some(2),
+                mutation: dataset_test_mutation(562),
+            })
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::SetLifecycle {
+                dataset: name.clone(),
+                state: mainframe_env_host_api::DatasetLifecycleState::RecoveryRequired,
+                expected_version: Some(3),
+                mutation: dataset_test_mutation(563),
+            })
+            .unwrap();
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//VERJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//SYSIN DD *\n VERIFY USER.VERIFY\n/*\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("ams-verify-recovery", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service
+                .run_next(&invocation, false)
+                .unwrap()
+                .unwrap()
+                .return_code,
+            Some(0)
+        );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Describe { dataset: name }),
+            Ok(DatasetResult::Description(description))
+                if description.version == 5
+                    && description.definition.lifecycle.state
+                        == mainframe_env_host_api::DatasetLifecycleState::Closed
+        ));
+    }
+
+    #[test]
     fn ams_expiration_forms_are_unambiguous_and_replace_each_other() {
         let mut definition =
             mainframe_env_host_api::DatasetDefinition::compatibility(DatasetAttributes {
@@ -5417,7 +5686,7 @@ mod tests {
                 ccsid: Some(37),
             });
         apply_ams_definition_operands(
-            "ALTER USER.A RECFM(VBS) LRECL(512) BLKSIZE(1024) KEYLEN(4) KEYOFF(8) \
+            "ALTER USER.A RECFM(VBS) LRECL(512) BLKSIZE(1024) KEYLEN(4) KEYOFF(8) CCSID(1047) \
              BUFNO(7) BUFSIZE(2048) BUFFERING(LSR) CONTROLINTERVALSIZE(4096) \
              CONTROLAREASIZE(65536) SHAREOPTIONS(2 3) RLS REUSE SPEED WRITECHECK ERASE \
              ACSROUTINE(STANDARD) COMPRESS(TAILORED) KEYLABEL(KEY.ONE) STRIPECOUNT(2) \
@@ -5432,6 +5701,7 @@ mod tests {
         assert_eq!(definition.attributes.logical_record_length, 512);
         assert_eq!(definition.attributes.key_length, Some(4));
         assert_eq!(definition.attributes.key_offset, Some(8));
+        assert_eq!(definition.attributes.ccsid, Some(1047));
         assert_eq!(definition.dcb.block_size, 1024);
         assert_eq!(definition.dcb.buffer_count, 7);
         assert_eq!(definition.dcb.buffer_size, Some(2048));
@@ -5682,7 +5952,7 @@ mod tests {
             .submit(
                 &invocation,
                 &JclBundle {
-                    primary: "//CAPJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//SYSIN DD *\n ALTER LIBRARYENTRY NAME(LIB)\n ALTER VOLUMEENTRY NAME(VOL001)\n CREATE LIBRARYENTRY NAME(LIB)\n CREATE VOLUMEENTRY NAME(VOL001)\n DEFINE PAGESPACE (NAME(PAGE.ONE))\n SETCACHE NAME(VOL001)\n ALLOCATE DATASET(USER.PHYS) UNIT(3390)\n ALLOCATE DATASET(USER.TAPE) TAPE UNIT(3490)\n ALLOCATE DATASET(USER.ACS) ACSROUTINE(STANDARD)\n ALLOCATE DATASET(USER.COMP) COMPRESS(GENERIC)\n ALLOCATE DATASET(USER.UNKNOWN) FROBULATE(1)\n DEFINE CLUSTER (NAME(USER.REUSE) INDEXED KEYS(2 0) RECORDSIZE(4 4) REUSE)\n DEFINE CLUSTER (NAME(USER.COMPNT) INDEXED KEYS(2 0) RECORDSIZE(4 4) DATA(RECORDSIZE(4 4)))\n ALTER USER.A MIGRATE\n ALTER USER.A OPEN BUFNO(8)\n/*\n".into(),
+                    primary: "//CAPJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//SYSIN DD *\n ALTER LIBRARYENTRY NAME(LIB)\n ALTER VOLUMEENTRY NAME(VOL001)\n CREATE LIBRARYENTRY NAME(LIB)\n CREATE VOLUMEENTRY NAME(VOL001)\n DEFINE PAGESPACE (NAME(PAGE.ONE))\n SETCACHE NAME(VOL001)\n ALLOCATE DATASET(USER.PHYS) UNIT(3390)\n ALLOCATE DATASET(USER.TAPE) TAPE UNIT(3490)\n ALLOCATE DATASET(USER.ACS) ACSROUTINE(STANDARD)\n ALLOCATE DATASET(USER.COMP) COMPRESS(GENERIC)\n ALLOCATE DATASET(USER.ENC) KEYLABEL(KEY.ONE)\n DEFINE CLUSTER (NAME(USER.STRIPE) INDEXED KEYS(2 0) RECORDSIZE(4 4) STRIPECOUNT(2) EXTENDED)\n ALLOCATE DATASET(USER.UNKNOWN) FROBULATE(1)\n DEFINE CLUSTER (NAME(USER.REUSE) INDEXED KEYS(2 0) RECORDSIZE(4 4) REUSE)\n DEFINE CLUSTER (NAME(USER.COMPNT) INDEXED KEYS(2 0) RECORDSIZE(4 4) DATA(RECORDSIZE(4 4)))\n ALTER USER.A MIGRATE\n ALTER USER.A RECALL\n ALTER USER.A OPEN BUFNO(8)\n/*\n".into(),
                     ..Default::default()
                 },
                 &IdempotencyKey::new("ams-capabilities", InvocationLimits::default()).unwrap(),
@@ -5711,16 +5981,21 @@ mod tests {
             "tape",
             "sms-acs",
             "compression",
+            "encryption",
+            "striping",
             "vsam-data-options",
             "vsam-components",
             "migration-recall",
             "ams-combined-alter",
             "ams-operand",
         ] {
-            assert!(syprint.iter().any(|record| {
-                let record = String::from_utf8_lossy(record);
-                record.contains("UnsupportedCapability") && record.contains(capability)
-            }));
+            assert!(
+                syprint.iter().any(|record| {
+                    let record = String::from_utf8_lossy(record);
+                    record.contains("UnsupportedCapability") && record.contains(capability)
+                }),
+                "missing {capability} in {syprint:?}"
+            );
         }
     }
 

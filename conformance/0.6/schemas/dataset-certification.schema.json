@@ -11,13 +11,23 @@
     "baseline_id": { "const": "ibm-zos-3.2-dfsms-ams-2026-06" },
     "surface": {
       "type": "object", "additionalProperties": false,
-      "required": ["official_rows", "ams_commands", "organizations", "detailed_descriptors", "local_bindings", "local_gates"],
+      "required": ["official_rows", "ams_commands", "organizations", "detailed_descriptors", "local_bindings", "detailed_surface_audit", "local_gates"],
       "properties": {
         "official_rows": { "const": 36 },
         "ams_commands": { "const": 31 },
         "organizations": { "const": 5 },
         "detailed_descriptors": { "const": 131 },
         "local_bindings": { "const": 180 },
+        "detailed_surface_audit": {
+          "type": "object", "additionalProperties": false,
+          "required": ["receipt", "required_pass", "capability_pass", "capability_conditioned"],
+          "properties": {
+            "receipt": { "const": "conformance/0.6/evidence/dataset-surface-audit.json" },
+            "required_pass": { "const": 97 },
+            "capability_pass": { "const": 9 },
+            "capability_conditioned": { "const": 25 }
+          }
+        },
         "local_gates": {
           "type": "object", "additionalProperties": false,
           "required": ["recognized", "validated", "executed", "conditioned", "recovered", "differential"],
@@ -44,7 +54,7 @@
     },
     "matrices": {
       "type": "object", "additionalProperties": { "const": "pass" },
-      "required": ["base_aix_atomicity", "gdg_atomicity", "disp_cleanup", "locks", "rls_tvs", "restart", "unknown_outcome", "concurrent_mutation", "corruption", "backup_restore", "migration", "scale", "carddemo_exactness", "volume_vtoc", "owner_security", "operand_rejection", "lifecycle_invalidation", "snapshot_all_organizations"]
+      "required": ["base_aix_atomicity", "gdg_atomicity", "disp_cleanup", "locks", "rls_tvs", "restart", "unknown_outcome", "concurrent_mutation", "corruption", "backup_restore", "migration", "scale", "carddemo_exactness", "volume_vtoc", "owner_security", "operand_rejection", "lifecycle_invalidation", "snapshot_all_organizations", "detailed_surface_audit"]
     },
     "validation": {
       "type": "array", "minItems": 1, "maxItems": 32,

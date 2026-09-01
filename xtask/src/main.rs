@@ -2511,6 +2511,14 @@ fn check_schemas(root: &Path) -> TaskResult {
         &json(&certification_schema)?,
         &json(&certification)?,
         &certification,
+    )?;
+    let surface_audit = root.join("conformance/0.6/evidence/dataset-surface-audit.json");
+    let surface_audit_schema =
+        root.join("conformance/0.6/schemas/dataset-surface-audit.schema.json");
+    validate_schema_instance(
+        &json(&surface_audit_schema)?,
+        &json(&surface_audit)?,
+        &surface_audit,
     )
 }
 
@@ -2795,7 +2803,144 @@ fn check_dataset_contract(root: &Path) -> TaskResult {
         fs::read(&ams_path).map_err(|error| format!("{}: {error}", ams_path.display()))?
             == render_ams_grammar(root)?,
         "generated AMS grammar is stale; run cargo xtask dataset-contract",
-    )
+    )?;
+    check_dataset_surface_audit(root)
+}
+
+fn check_dataset_surface_audit(root: &Path) -> TaskResult {
+    let inventory_path = root.join("conformance/0.6/inventory/dataset-programming-surface.json");
+    let audit_path = root.join("conformance/0.6/evidence/dataset-surface-audit.json");
+    let schema_path = root.join("conformance/0.6/schemas/dataset-surface-audit.schema.json");
+    let inventory = json(&inventory_path)?;
+    let audit = json(&audit_path)?;
+    validate_schema_instance(&json(&schema_path)?, &audit, &audit_path)?;
+    require(
+        audit["inventory_sha256"]
+            == Value::String(format!("sha256:{}", file_digest(&inventory_path)?)),
+        "dataset surface audit is bound to a different detailed inventory",
+    )?;
+
+    let mut expected = BTreeMap::<String, String>::new();
+    for family in array(&inventory, "families", &inventory_path)? {
+        let family_id = text(family, "id", &inventory_path)?;
+        for item in array(family, "items", &inventory_path)? {
+            let descriptor = format!("{family_id}:{}", text(item, "id", &inventory_path)?);
+            require(
+                expected
+                    .insert(
+                        descriptor.clone(),
+                        text(item, "implementation", &inventory_path)?.to_string(),
+                    )
+                    .is_none(),
+                &format!("duplicate detailed dataset descriptor {descriptor}"),
+            )?;
+        }
+    }
+
+    let mut manifests = Vec::new();
+    collect_named(root, OsStr::new("Cargo.toml"), &mut manifests)?;
+    let mut test_sources = BTreeMap::<String, String>::new();
+    for manifest in manifests {
+        let parsed: toml::Value = read(&manifest)?
+            .parse()
+            .map_err(|error| format!("{}: {error}", manifest.display()))?;
+        let Some(package) = parsed
+            .get("package")
+            .and_then(|value| value.get("name"))
+            .and_then(toml::Value::as_str)
+        else {
+            continue;
+        };
+        let source_root = manifest
+            .parent()
+            .ok_or_else(|| format!("{} has no parent", manifest.display()))?
+            .join("src");
+        let mut sources = Vec::new();
+        if source_root.is_dir() {
+            collect_extension(&source_root, OsStr::new("rs"), &mut sources)?;
+        }
+        sources.sort();
+        let mut combined = String::new();
+        for source in sources {
+            combined.push_str(&read(&source)?);
+            combined.push('\n');
+        }
+        test_sources.insert(package.to_string(), combined);
+    }
+
+    let mut seen_bindings = BTreeSet::new();
+    let mut seen_descriptors = BTreeSet::new();
+    let mut counts = BTreeMap::<String, usize>::new();
+    for binding in array(&audit, "bindings", &audit_path)? {
+        let binding_id = text(binding, "id", &audit_path)?;
+        require(
+            seen_bindings.insert(binding_id.to_string()),
+            &format!("duplicate dataset surface audit binding {binding_id}"),
+        )?;
+        let disposition = text(binding, "disposition", &audit_path)?;
+        for descriptor in array(binding, "descriptors", &audit_path)? {
+            let descriptor = descriptor
+                .as_str()
+                .ok_or_else(|| format!("{audit_path:?} contains a non-text descriptor"))?;
+            let implementation = expected.get(descriptor).ok_or_else(|| {
+                format!("dataset surface audit references unknown descriptor {descriptor}")
+            })?;
+            require(
+                seen_descriptors.insert(descriptor.to_string()),
+                &format!("dataset surface descriptor {descriptor} has duplicate evidence"),
+            )?;
+            require(
+                (implementation == "required" && disposition == "required-pass")
+                    || (implementation == "capability-gated"
+                        && matches!(disposition, "capability-pass" | "capability-conditioned")),
+                &format!(
+                    "dataset surface descriptor {descriptor} has disposition {disposition} incompatible with {implementation}"
+                ),
+            )?;
+            *counts.entry(disposition.to_string()).or_default() += 1;
+        }
+        for test in array(binding, "tests", &audit_path)? {
+            let test = test
+                .as_str()
+                .ok_or_else(|| format!("{audit_path:?} contains a non-text test id"))?;
+            let mut components = test.split("::");
+            let package = components
+                .next()
+                .ok_or_else(|| format!("invalid dataset evidence test id {test}"))?;
+            let test_name = test
+                .rsplit("::")
+                .next()
+                .ok_or_else(|| format!("invalid dataset evidence test id {test}"))?;
+            let sources = test_sources
+                .get(package)
+                .ok_or_else(|| format!("dataset evidence test package {package} does not exist"))?;
+            let needle = format!("fn {test_name}(");
+            let at = sources.find(&needle).ok_or_else(|| {
+                format!("dataset evidence test {test} does not resolve to a Rust test")
+            })?;
+            let prefix = &sources[at.saturating_sub(512)..at];
+            let last_function = prefix.rfind("fn ").unwrap_or(0);
+            let last_test_attribute = prefix.rfind("#[test]").or_else(|| prefix.rfind("::test]"));
+            require(
+                last_test_attribute.is_some_and(|test| test >= last_function),
+                &format!("dataset evidence target {test} is not marked as a test"),
+            )?;
+        }
+    }
+    require(
+        seen_descriptors == expected.keys().cloned().collect::<BTreeSet<_>>(),
+        "dataset surface audit has missing or surplus detailed descriptors",
+    )?;
+    require(
+        counts
+            == BTreeMap::from([
+                ("capability-conditioned".into(), 25usize),
+                ("capability-pass".into(), 9usize),
+                ("required-pass".into(), 97usize),
+            ]),
+        "dataset surface audit disposition counts drifted",
+    )?;
+    Ok(())
 }
 
 fn render_ams_grammar(root: &Path) -> TaskResult<Vec<u8>> {

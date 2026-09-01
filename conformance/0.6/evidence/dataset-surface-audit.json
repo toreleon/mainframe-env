@@ -1,0 +1,262 @@
+{
+  "schema_version": "mainframe-env.dataset-surface-audit@1",
+  "target_version": "0.6.0",
+  "inventory_sha256": "sha256:87dd08f0848db3db4d496ccdffd03a05581264b08300db77c6abc6a2d11d282c",
+  "summary": {
+    "descriptors": 131,
+    "required_pass": 97,
+    "capability_pass": 9,
+    "capability_conditioned": 25
+  },
+  "bindings": [
+    {
+      "id": "data-organizations",
+      "disposition": "required-pass",
+      "descriptors": [
+        "organizations:sequential", "organizations:pds", "organizations:pdse",
+        "organizations:ksds", "organizations:esds", "organizations:fixed-rrds",
+        "organizations:variable-rrds", "organizations:lds"
+      ],
+      "tests": [
+        "mainframe-env-dataset::service::tests::snapshots_restore_every_organization_without_flattening_and_survive_restart",
+        "mainframe-env-dataset::service::tests::complete_vsam_organizations_and_access_modes_are_durable"
+      ]
+    },
+    {
+      "id": "gdg-organization",
+      "disposition": "required-pass",
+      "descriptors": ["organizations:gdg"],
+      "tests": [
+        "mainframe-env-dataset::service::tests::carddemo_gdg_roll_resolution_replay_and_restart_are_durable",
+        "mainframe-env-batch::service::tests::idcams_gdg_definition_and_positive_generation_output_are_exact"
+      ]
+    },
+    {
+      "id": "catalog-organizations",
+      "disposition": "required-pass",
+      "descriptors": [
+        "organizations:alias", "organizations:user-catalog", "organizations:master-catalog"
+      ],
+      "tests": [
+        "mainframe-env-dataset::service::tests::pdse_catalog_alias_and_lifecycle_state_share_one_durable_graph"
+      ]
+    },
+    {
+      "id": "access-modes",
+      "disposition": "required-pass",
+      "descriptors": [
+        "access-modes:key", "access-modes:rba", "access-modes:rrn",
+        "access-modes:sequential-access", "access-modes:member"
+      ],
+      "tests": [
+        "mainframe-env-dataset::service::tests::complete_vsam_organizations_and_access_modes_are_durable",
+        "mainframe-env-dataset::service::tests::carddemo_rrds_pds_concatenation_and_record_formats_are_exact",
+        "mainframe-env-dataset::service::tests::pdse_catalog_alias_and_lifecycle_state_share_one_durable_graph"
+      ]
+    },
+    {
+      "id": "dcb",
+      "disposition": "required-pass",
+      "descriptors": [
+        "dcb:dsorg", "dcb:recfm", "dcb:lrecl", "dcb:blksize", "dcb:keylen",
+        "dcb:keyoff", "dcb:ccsid", "dcb:bufno", "dcb:bufsize", "dcb:spanned",
+        "dcb:undefined", "dcb:line"
+      ],
+      "tests": [
+        "mainframe-env-dataset::service::tests::all_record_formats_enforce_exact_positive_and_negative_boundaries",
+        "mainframe-env-batch::service::tests::ams_dcb_access_and_capability_operands_populate_typed_definition",
+        "mainframe-env-dataset::service::tests::control_interval_area_and_spanned_record_geometry_are_exact",
+        "mainframe-env-dataset::service::tests::carddemo_rrds_pds_concatenation_and_record_formats_are_exact"
+      ]
+    },
+    {
+      "id": "allocation-required",
+      "disposition": "required-pass",
+      "descriptors": [
+        "allocation:space-unit", "allocation:primary-space", "allocation:secondary-space",
+        "allocation:directory-space", "allocation:release", "allocation:contiguous",
+        "allocation:round", "allocation:unit-count", "allocation:normal-disp",
+        "allocation:abnormal-disp", "allocation:direct-allocation"
+      ],
+      "tests": [
+        "mainframe-env-dataset::service::tests::every_abstract_allocation_unit_has_an_exact_capacity_constant",
+        "mainframe-env-dataset::service::tests::deterministic_allocation_buffer_sms_and_extended_geometry_is_observable",
+        "mainframe-env-batch::service::tests::temporary_dataset_pass_and_normal_delete_follow_disp_positions",
+        "mainframe-env-batch::service::tests::abnormal_step_rolls_back_new_delete_allocation",
+        "mainframe-env-batch::service::tests::generated_idcams_handlers_route_metadata_catalog_and_modal_commands"
+      ]
+    },
+    {
+      "id": "allocation-multivolume-capability",
+      "disposition": "capability-conditioned",
+      "descriptors": ["allocation:multivolume"],
+      "tests": [
+        "mainframe-env-dataset::service::tests::deterministic_allocation_buffer_sms_and_extended_geometry_is_observable",
+        "mainframe-env-batch::service::tests::capability_gated_ams_handlers_return_explicit_condition_codes"
+      ]
+    },
+    {
+      "id": "sms-required",
+      "disposition": "required-pass",
+      "descriptors": [
+        "sms:data-class", "sms:management-class", "sms:storage-class",
+        "sms:guaranteed-space", "sms:extended-format", "sms:extended-addressable"
+      ],
+      "tests": [
+        "mainframe-env-dataset::service::tests::deterministic_allocation_buffer_sms_and_extended_geometry_is_observable",
+        "mainframe-env-batch::service::tests::generated_idcams_handlers_route_metadata_catalog_and_modal_commands"
+      ]
+    },
+    {
+      "id": "sms-conditioned",
+      "disposition": "capability-conditioned",
+      "descriptors": ["sms:acs", "sms:compression", "sms:encryption"],
+      "tests": [
+        "mainframe-env-batch::service::tests::capability_gated_ams_handlers_return_explicit_condition_codes",
+        "mainframe-env-host-api::dataset::tests::every_deferred_operand_family_fails_explicitly"
+      ]
+    },
+    {
+      "id": "volume-required",
+      "disposition": "required-pass",
+      "descriptors": ["volume:abstract-volume", "volume:vtoc", "volume:extent-order"],
+      "tests": [
+        "mainframe-env-dataset::service::tests::deterministic_allocation_buffer_sms_and_extended_geometry_is_observable"
+      ]
+    },
+    {
+      "id": "volume-conditioned",
+      "disposition": "capability-conditioned",
+      "descriptors": [
+        "volume:physical-disk", "volume:tape", "volume:library-entry",
+        "volume:volume-entry", "volume:striping"
+      ],
+      "tests": [
+        "mainframe-env-batch::service::tests::capability_gated_ams_handlers_return_explicit_condition_codes",
+        "mainframe-env-host-api::dataset::tests::every_deferred_operand_family_fails_explicitly"
+      ]
+    },
+    {
+      "id": "catalog",
+      "disposition": "required-pass",
+      "descriptors": [
+        "catalog:search-order", "catalog:alias-resolution", "catalog:alternate-index",
+        "catalog:path", "catalog:gdg-selection", "catalog:user-catalog-routing",
+        "catalog:master-catalog-routing", "catalog:owner", "catalog:expiration",
+        "catalog:rename", "catalog:list", "catalog:invalidation"
+      ],
+      "tests": [
+        "mainframe-env-dataset::service::tests::pdse_catalog_alias_and_lifecycle_state_share_one_durable_graph",
+        "mainframe-env-dataset::service::tests::catalog_owner_expiration_retention_and_purge_are_enforced",
+        "mainframe-env-dataset::service::tests::rename_atomically_retargets_indexes_paths_and_catalog_aliases",
+        "mainframe-env-batch::service::tests::idcams_aix_path_and_build_route_to_typed_index_state"
+      ]
+    },
+    {
+      "id": "lifecycle-required",
+      "disposition": "required-pass",
+      "descriptors": [
+        "lifecycle:allocate", "lifecycle:cataloged", "lifecycle:open", "lifecycle:close",
+        "lifecycle:recovery-required", "lifecycle:backup", "lifecycle:restore",
+        "lifecycle:delete"
+      ],
+      "tests": [
+        "mainframe-env-dataset::service::tests::typed_definition_capabilities_lifecycle_and_restart_are_exact",
+        "mainframe-env-dataset::service::tests::recovery_required_blocks_updates_until_verified_closed",
+        "mainframe-env-dataset::service::tests::lifecycle_close_atomically_releases_nontransactional_locks_across_restart",
+        "mainframe-env-batch::service::tests::idcams_export_import_and_recover_preserve_snapshot_records"
+      ]
+    },
+    {
+      "id": "lifecycle-conditioned",
+      "disposition": "capability-conditioned",
+      "descriptors": ["lifecycle:migrate", "lifecycle:recall"],
+      "tests": [
+        "mainframe-env-dataset::service::tests::restart_rejects_state_requiring_an_unadvertised_capability",
+        "mainframe-env-batch::service::tests::capability_gated_ams_handlers_return_explicit_condition_codes",
+        "mainframe-env-host-api::dataset::tests::every_deferred_operand_family_fails_explicitly"
+      ]
+    },
+    {
+      "id": "provider-required",
+      "disposition": "required-pass",
+      "descriptors": [
+        "provider-capabilities:abstract-volumes", "provider-capabilities:catalog-routing",
+        "provider-capabilities:diagnostics"
+      ],
+      "tests": [
+        "mainframe-env-dataset::service::tests::deterministic_allocation_buffer_sms_and_extended_geometry_is_observable",
+        "mainframe-env-dataset::service::tests::pdse_catalog_alias_and_lifecycle_state_share_one_durable_graph"
+      ]
+    },
+    {
+      "id": "provider-capabilities-implemented",
+      "disposition": "capability-pass",
+      "descriptors": [
+        "provider-capabilities:allocation-extents", "provider-capabilities:buffering",
+        "provider-capabilities:catalog-metadata", "provider-capabilities:control-intervals",
+        "provider-capabilities:extended-format-capability", "provider-capabilities:rls-capability",
+        "provider-capabilities:sharing", "provider-capabilities:sms-classes",
+        "provider-capabilities:tvs-capability"
+      ],
+      "tests": [
+        "mainframe-env-dataset::service::tests::deterministic_allocation_buffer_sms_and_extended_geometry_is_observable",
+        "mainframe-env-dataset::service::tests::control_interval_area_and_spanned_record_geometry_are_exact",
+        "mainframe-env-dataset::service::tests::rls_locks_enforce_shareoptions_lease_coverage_and_order_after_restart",
+        "mainframe-env-dataset::service::tests::tvs_commit_rollback_replay_and_restart_are_atomic_across_datasets"
+      ]
+    },
+    {
+      "id": "provider-capabilities-conditioned",
+      "disposition": "capability-conditioned",
+      "descriptors": [
+        "provider-capabilities:physical-volumes", "provider-capabilities:tape-capability",
+        "provider-capabilities:sms-acs-capability", "provider-capabilities:encryption-capability",
+        "provider-capabilities:compression-capability", "provider-capabilities:striping-capability",
+        "provider-capabilities:migration-recall-capability",
+        "provider-capabilities:vsam-data-options"
+      ],
+      "tests": [
+        "mainframe-env-dataset::service::tests::restart_rejects_state_requiring_an_unadvertised_capability",
+        "mainframe-env-dataset::service::tests::deterministic_allocation_buffer_sms_and_extended_geometry_is_observable",
+        "mainframe-env-batch::service::tests::capability_gated_ams_handlers_return_explicit_condition_codes",
+        "mainframe-env-host-api::dataset::tests::every_deferred_operand_family_fails_explicitly"
+      ]
+    },
+    {
+      "id": "ams-required",
+      "disposition": "required-pass",
+      "descriptors": [
+        "ams-commands:allocate", "ams-commands:alter", "ams-commands:bldindex",
+        "ams-commands:dcollect", "ams-commands:define-alias",
+        "ams-commands:define-alternateindex", "ams-commands:define-cluster",
+        "ams-commands:define-generationdatagroup", "ams-commands:define-nonvsam",
+        "ams-commands:define-path", "ams-commands:define-usercatalog", "ams-commands:delete",
+        "ams-commands:diagnose", "ams-commands:examine", "ams-commands:export",
+        "ams-commands:export-disconnect", "ams-commands:import",
+        "ams-commands:import-connect", "ams-commands:listcat", "ams-commands:listdata",
+        "ams-commands:print", "ams-commands:repro", "ams-commands:recover",
+        "ams-commands:shcds", "ams-commands:verify"
+      ],
+      "tests": [
+        "mainframe-env-conformance::dataset::tests::fixture_expectations_are_unique_and_drivers_match",
+        "mainframe-env-batch::service::tests::idcams_shcds_reconciles_unknown_tvs_commit_and_survives_restart",
+        "mainframe-env-batch::service::tests::idcams_verify_reconciles_recovery_required_state",
+        "mainframe-env-batch::service::tests::generated_idcams_handlers_route_metadata_catalog_and_modal_commands"
+      ]
+    },
+    {
+      "id": "ams-conditioned",
+      "disposition": "capability-conditioned",
+      "descriptors": [
+        "ams-commands:alter-libraryentry", "ams-commands:alter-volumeentry",
+        "ams-commands:create-libraryentry", "ams-commands:create-volumeentry",
+        "ams-commands:define-pagespace", "ams-commands:setcache"
+      ],
+      "tests": [
+        "mainframe-env-conformance::dataset::tests::fixture_expectations_are_unique_and_drivers_match",
+        "mainframe-env-batch::service::tests::capability_gated_ams_handlers_return_explicit_condition_codes"
+      ]
+    }
+  ]
+}

@@ -8,6 +8,12 @@
     "organizations": 5,
     "detailed_descriptors": 131,
     "local_bindings": 180,
+    "detailed_surface_audit": {
+      "receipt": "conformance/0.6/evidence/dataset-surface-audit.json",
+      "required_pass": 97,
+      "capability_pass": 9,
+      "capability_conditioned": 25
+    },
     "local_gates": {
       "recognized": 36,
       "validated": 36,
@@ -41,7 +47,8 @@
     "owner_security": "pass",
     "operand_rejection": "pass",
     "lifecycle_invalidation": "pass",
-    "snapshot_all_organizations": "pass"
+    "snapshot_all_organizations": "pass",
+    "detailed_surface_audit": "pass"
   },
   "validation": [
     "cargo test --workspace --all-targets",

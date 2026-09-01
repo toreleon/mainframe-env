@@ -669,6 +669,16 @@ impl DatasetDefinition {
             "TVS",
         )?;
         require_capability(
+            (self.lifecycle.migration_level == 0
+                && !matches!(
+                    self.lifecycle.state,
+                    DatasetLifecycleState::Migrated | DatasetLifecycleState::RecallPending
+                ))
+                || capabilities.migration_recall,
+            "migration-recall",
+            "MIGRATE/RECALL",
+        )?;
+        require_capability(
             (!self.vsam.reuse
                 && !self.vsam.speed
                 && !self.vsam.write_check
@@ -944,6 +954,47 @@ mod tests {
             DatasetDefinition::compatibility(attributes(DatasetOrganization::Sequential));
         definition.volumes.device_type = Some("3390".into());
         rejected!(definition, "physical-volumes");
+
+        let mut definition =
+            DatasetDefinition::compatibility(attributes(DatasetOrganization::Sequential));
+        definition.volumes.kind = VolumeKind::Tape;
+        rejected!(definition, "tape");
+
+        let mut definition =
+            DatasetDefinition::compatibility(attributes(DatasetOrganization::Sequential));
+        definition.sms.acs_routine = Some("STANDARD".into());
+        rejected!(definition, "sms-acs");
+
+        let mut definition =
+            DatasetDefinition::compatibility(attributes(DatasetOrganization::Sequential));
+        definition.security.encryption_key_label = Some("KEY.ONE".into());
+        rejected!(definition, "encryption");
+
+        let mut definition =
+            DatasetDefinition::compatibility(attributes(DatasetOrganization::Sequential));
+        definition.security.compression = CompressionMode::Generic;
+        rejected!(definition, "compression");
+
+        let mut definition =
+            DatasetDefinition::compatibility(attributes(DatasetOrganization::KeySequenced));
+        definition.vsam.stripe_count = 2;
+        rejected!(definition, "striping");
+
+        let mut definition =
+            DatasetDefinition::compatibility(attributes(DatasetOrganization::Sequential));
+        definition.lifecycle.state = DatasetLifecycleState::Migrated;
+        definition.lifecycle.migration_level = 1;
+        rejected!(definition, "migration-recall");
+
+        let mut definition =
+            DatasetDefinition::compatibility(attributes(DatasetOrganization::KeySequenced));
+        definition.vsam.access_mode = VsamAccessMode::Rls;
+        rejected!(definition, "rls");
+
+        let mut definition =
+            DatasetDefinition::compatibility(attributes(DatasetOrganization::KeySequenced));
+        definition.vsam.access_mode = VsamAccessMode::Tvs;
+        rejected!(definition, "tvs");
     }
 
     #[test]
