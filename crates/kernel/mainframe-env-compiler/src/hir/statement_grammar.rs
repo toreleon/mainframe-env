@@ -1771,10 +1771,29 @@ fn validate_json_parse(tokens: &[Token<'_>]) -> Result<(), &'static str> {
     if cursor.eat("WITH") {
         cursor.expect("DETAIL")?;
     }
+    validate_json_ignoring(&mut cursor)?;
     validate_json_names(&mut cursor)?;
     validate_json_suppress(&mut cursor)?;
     validate_json_converting(&mut cursor, true)?;
     cursor.finish()
+}
+
+fn validate_json_ignoring(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
+    if !cursor.eat("IGNORING") {
+        return Ok(());
+    }
+    loop {
+        cursor.expect("JSON")?;
+        cursor.expect("NULL")?;
+        cursor.expect("FOR")?;
+        if !cursor.eat("ALL") {
+            cursor.operand()?;
+        }
+        if !cursor.eat("ALSO") {
+            break;
+        }
+    }
+    Ok(())
 }
 
 fn validate_json_names(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {

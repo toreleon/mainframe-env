@@ -390,6 +390,20 @@
       "obligation_id": "phrase-boolean-null-converting",
       "source": "IDENTIFICATION DIVISION. PROGRAM-ID. JSONPARSECONVERT. DATA DIVISION. WORKING-STORAGE SECTION. 01 JSON-X PIC X(96) VALUE '{\"RECORD-X\":{\"FLAG-X\":true,\"OTHER-X\":false,\"EMPTY-X\":null}}'. 01 RECORD-X. 05 FLAG-X PIC X VALUE 'N'. 05 OTHER-X PIC X VALUE 'Y'. 05 EMPTY-X PIC X(2) VALUE 'AB'. PROCEDURE DIVISION. JSON PARSE JSON-X INTO RECORD-X CONVERTING FLAG-X FROM JSON BOOLEAN USING 'Y' AND 'N' ALSO OTHER-X FROM JSON BOOLEAN USING 'T' AND 'F' ALSO EMPTY-X FROM JSON NULL USING SPACES. DISPLAY FLAG-X OTHER-X EMPTY-X. STOP RUN.",
       "expected_output": "YF  \n"
+    },
+    {
+      "id": "json-parse-null-status",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
+      "obligation_id": "phrase-null-status",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. JSONNULLSTATUS. DATA DIVISION. WORKING-STORAGE SECTION. 01 JSON-X PIC X(64) VALUE '{\"RECORD-X\":{\"VALUE-X\":null}}'. 01 RECORD-X. 05 VALUE-X PIC X(2) VALUE 'AB'. PROCEDURE DIVISION. JSON PARSE JSON-X INTO RECORD-X. DISPLAY VALUE-X JSON-STATUS. STOP RUN.",
+      "expected_output": "AB32\n"
+    },
+    {
+      "id": "json-parse-ignoring-null",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
+      "obligation_id": "phrase-ignoring-null",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. JSONIGNORENULL. DATA DIVISION. WORKING-STORAGE SECTION. 01 JSON-X PIC X(64) VALUE '{\"RECORD-X\":{\"VALUE-X\":null}}'. 01 RECORD-X. 05 VALUE-X PIC X(2) VALUE 'AB'. PROCEDURE DIVISION. JSON PARSE JSON-X INTO RECORD-X IGNORING JSON NULL FOR VALUE-X. DISPLAY VALUE-X JSON-STATUS. STOP RUN.",
+      "expected_output": "AB0\n"
     }
   ]
 }

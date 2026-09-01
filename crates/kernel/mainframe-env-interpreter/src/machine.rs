@@ -162,6 +162,8 @@ struct JsonClauses {
     names: BTreeMap<String, Option<String>>,
     suppressed: BTreeSet<String>,
     conversions: BTreeMap<String, JsonConversion>,
+    ignore_null_all: bool,
+    ignored_nulls: BTreeSet<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1859,6 +1861,15 @@ impl ReferenceMachine {
             }
             "json_generate" | "json_parse" | "xml_generate" | "xml_parse" => {
                 let json = name.starts_with("json_");
+                if json {
+                    self.implicit.insert(
+                        "JSON-STATUS".into(),
+                        CobolValue::Decimal(Decimal {
+                            coefficient: 0,
+                            scale: 0,
+                        }),
+                    );
+                }
                 let result = if name.ends_with("_generate") {
                     self.generate(&args, json)
                 } else {
@@ -1883,7 +1894,9 @@ impl ReferenceMachine {
                         scale: 0,
                     });
                     self.implicit.insert("JSON-CODE".into(), code.clone());
-                    self.implicit.insert("JSON-STATUS".into(), code);
+                    if failed {
+                        self.implicit.insert("JSON-STATUS".into(), code);
+                    }
                 } else {
                     self.condition_status.xml_exception = failed;
                     self.implicit.insert(
@@ -6468,6 +6481,18 @@ impl ReferenceMachine {
                         return Err(MachineProblem::InvalidOperation);
                     }
                 }
+            }
+            if value.is_null() {
+                if !clauses.ignores_null(layout) {
+                    self.implicit.insert(
+                        "JSON-STATUS".into(),
+                        CobolValue::Decimal(Decimal {
+                            coefficient: 32,
+                            scale: 0,
+                        }),
+                    );
+                }
+                return Ok(());
             }
             let bytes = if is_numeric(layout.category) {
                 let text = value
@@ -11137,6 +11162,36 @@ fn xml_escape(value: &str) -> String {
 impl JsonClauses {
     fn parse(args: &[String], parsing: bool) -> Result<Self, MachineProblem> {
         let mut clauses = Self::default();
+        if let Some(mut at) = position(args, "IGNORING").map(|position| position + 1) {
+            loop {
+                if args.get(at).is_none_or(|token| token != "JSON")
+                    || args.get(at + 1).is_none_or(|token| token != "NULL")
+                    || args.get(at + 2).is_none_or(|token| token != "FOR")
+                {
+                    return Err(MachineProblem::InvalidOperation);
+                }
+                at += 3;
+                if args.get(at).is_some_and(|token| token == "ALL") {
+                    clauses.ignore_null_all = true;
+                    at += 1;
+                } else {
+                    clauses.ignored_nulls.insert(normalize(
+                        args.get(at).ok_or(MachineProblem::InvalidOperation)?,
+                    ));
+                    at += 1;
+                    while args
+                        .get(at)
+                        .is_some_and(|token| matches!(token.as_str(), "OF" | "IN"))
+                    {
+                        at += 2;
+                    }
+                }
+                if args.get(at).is_none_or(|token| token != "ALSO") {
+                    break;
+                }
+                at += 1;
+            }
+        }
         if let Some(mut at) = position(args, "NAME").map(|position| position + 1) {
             while at < args.len() && !matches!(args[at].as_str(), "SUPPRESS" | "CONVERTING") {
                 if args[at] == "OF" {
@@ -11264,6 +11319,12 @@ impl JsonClauses {
         self.conversions
             .get(&layout.name)
             .or_else(|| self.conversions.get(&layout.simple_name))
+    }
+
+    fn ignores_null(&self, layout: &LayoutMetadata) -> bool {
+        self.ignore_null_all
+            || self.ignored_nulls.contains(&layout.name)
+            || self.ignored_nulls.contains(&layout.simple_name)
     }
 }
 
