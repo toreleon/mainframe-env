@@ -483,6 +483,13 @@
       "obligation_id": "phrase-numeric-character-reference",
       "source": "IDENTIFICATION DIVISION. PROGRAM-ID. XMLNUMREF. DATA DIVISION. WORKING-STORAGE SECTION. 01 XML-X PIC X(96) VALUE '<MESSAGE><TEXT-X>&#x1F642;</TEXT-X></MESSAGE>'. 01 MESSAGE. 05 TEXT-X PIC X(4). PROCEDURE DIVISION. XML PARSE XML-X INTO MESSAGE. DISPLAY TEXT-X. STOP RUN.",
       "expected_output": "🙂\n"
+    },
+    {
+      "id": "xml-parse-namespace-events",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044",
+      "obligation_id": "phrase-namespace-events",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. XMLNSEVENTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 XML-X PIC X(96) VALUE '<p:ROOT xmlns:p=\"urn:test\" p:ID=\"7\">X</p:ROOT>'. PROCEDURE DIVISION. XML PARSE XML-X PROCESSING PROCEDURE HANDLE. DISPLAY 'DONE'. STOP RUN. HANDLE. DISPLAY XML-EVENT ':' XML-TEXT ':' XML-NAMESPACE ':' XML-NAMESPACE-PREFIX. EXIT.",
+      "expected_output": "START-OF-DOCUMENT:::\nNAMESPACE-DECLARATION::urn:test:p\nSTART-OF-ELEMENT:ROOT:urn:test:p\nATTRIBUTE-NAME:ID:urn:test:p\nATTRIBUTE-CHARACTERS:7::\nCONTENT-CHARACTERS:X::\nEND-OF-ELEMENT:ROOT:urn:test:p\nEND-OF-DOCUMENT:::\nDONE\n"
     }
   ]
 }

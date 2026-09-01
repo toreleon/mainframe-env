@@ -158,6 +158,25 @@ struct XmlNode {
     children: Vec<XmlNode>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct XmlEvent {
+    kind: String,
+    text: Vec<u8>,
+    namespace: Vec<u8>,
+    prefix: Vec<u8>,
+}
+
+impl XmlEvent {
+    fn new(kind: &str, text: Vec<u8>) -> Self {
+        Self {
+            kind: kind.into(),
+            text,
+            namespace: Vec::new(),
+            prefix: Vec::new(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct JsonClauses {
     names: BTreeMap<String, Option<String>>,
@@ -6817,16 +6836,32 @@ impl ReferenceMachine {
         self.label(target).map(Step::Jump)
     }
 
-    fn install_xml_event(&mut self, event: &(String, Vec<u8>)) {
+    fn install_xml_event(&mut self, event: &XmlEvent) {
         self.implicit.insert(
             "XML-EVENT".into(),
-            CobolValue::Bytes(event.0.as_bytes().to_vec()),
+            CobolValue::Bytes(event.kind.as_bytes().to_vec()),
         );
         self.implicit
-            .insert("XML-TEXT".into(), CobolValue::Bytes(event.1.clone()));
+            .insert("XML-TEXT".into(), CobolValue::Bytes(event.text.clone()));
         self.implicit.insert(
             "XML-NTEXT".into(),
-            CobolValue::Bytes(utf8_to_national(&event.1).unwrap_or_default()),
+            CobolValue::Bytes(utf8_to_national(&event.text).unwrap_or_default()),
+        );
+        self.implicit.insert(
+            "XML-NAMESPACE".into(),
+            CobolValue::Bytes(event.namespace.clone()),
+        );
+        self.implicit.insert(
+            "XML-NNAMESPACE".into(),
+            CobolValue::Bytes(utf8_to_national(&event.namespace).unwrap_or_default()),
+        );
+        self.implicit.insert(
+            "XML-NAMESPACE-PREFIX".into(),
+            CobolValue::Bytes(event.prefix.clone()),
+        );
+        self.implicit.insert(
+            "XML-NNAMESPACE-PREFIX".into(),
+            CobolValue::Bytes(utf8_to_national(&event.prefix).unwrap_or_default()),
         );
     }
 
@@ -11880,36 +11915,112 @@ fn declarative_state_key(pc: usize) -> String {
     format!("__COBOL_DECLARATIVE_RETURN_{pc}")
 }
 
-fn xml_document_events(source: &str) -> Result<Vec<(String, Vec<u8>)>, MachineProblem> {
+fn xml_document_events(source: &str) -> Result<Vec<XmlEvent>, MachineProblem> {
     let document = xml_document(source)?;
-    let mut events = vec![("START-OF-DOCUMENT".into(), Vec::new())];
-    append_xml_node_events(&document, &mut events)?;
-    events.push(("END-OF-DOCUMENT".into(), Vec::new()));
+    let mut events = vec![XmlEvent::new("START-OF-DOCUMENT", Vec::new())];
+    let namespaces =
+        BTreeMap::from([("xml".into(), "http://www.w3.org/XML/1998/namespace".into())]);
+    append_xml_node_events(&document, &namespaces, &mut events)?;
+    events.push(XmlEvent::new("END-OF-DOCUMENT", Vec::new()));
     Ok(events)
 }
 
 fn append_xml_node_events(
     node: &XmlNode,
-    events: &mut Vec<(String, Vec<u8>)>,
+    inherited_namespaces: &BTreeMap<String, String>,
+    events: &mut Vec<XmlEvent>,
 ) -> Result<(), MachineProblem> {
     events
         .len()
         .checked_add(2usize.saturating_add(node.attributes.len().saturating_mul(2)))
         .filter(|count| *count <= 65_536)
         .ok_or(MachineProblem::ResourceExhausted)?;
-    events.push(("START-OF-ELEMENT".into(), node.name.as_bytes().to_vec()));
+    let mut namespaces = inherited_namespaces.clone();
     for (name, value) in &node.attributes {
-        events.push(("ATTRIBUTE-NAME".into(), name.as_bytes().to_vec()));
-        events.push(("ATTRIBUTE-CHARACTERS".into(), value.as_bytes().to_vec()));
+        let prefix = if name == "xmlns" {
+            Some("")
+        } else {
+            name.strip_prefix("xmlns:")
+        };
+        let Some(prefix) = prefix else {
+            continue;
+        };
+        if prefix == "xmlns"
+            || (prefix == "xml"
+                && value != namespaces.get("xml").ok_or(MachineProblem::DataException)?)
+        {
+            return Err(MachineProblem::DataException);
+        }
+        if value.is_empty() {
+            namespaces.remove(prefix);
+        } else {
+            namespaces.insert(prefix.into(), value.clone());
+        }
+        let mut event = XmlEvent::new("NAMESPACE-DECLARATION", Vec::new());
+        event.namespace = value.as_bytes().to_vec();
+        event.prefix = prefix.as_bytes().to_vec();
+        events.push(event);
+    }
+    let (prefix, local) = split_xml_name(&node.name)?;
+    let namespace = xml_namespace(&namespaces, prefix, true)?;
+    let mut start = XmlEvent::new("START-OF-ELEMENT", local.as_bytes().to_vec());
+    start.namespace = namespace.as_bytes().to_vec();
+    start.prefix = prefix.as_bytes().to_vec();
+    events.push(start);
+    for (name, value) in &node.attributes {
+        if name == "xmlns" || name.starts_with("xmlns:") {
+            continue;
+        }
+        let (prefix, local) = split_xml_name(name)?;
+        let namespace = xml_namespace(&namespaces, prefix, false)?;
+        let mut attribute = XmlEvent::new("ATTRIBUTE-NAME", local.as_bytes().to_vec());
+        attribute.namespace = namespace.as_bytes().to_vec();
+        attribute.prefix = prefix.as_bytes().to_vec();
+        events.push(attribute);
+        events.push(XmlEvent::new(
+            "ATTRIBUTE-CHARACTERS",
+            value.as_bytes().to_vec(),
+        ));
     }
     if !node.text.is_empty() {
-        events.push(("CONTENT-CHARACTERS".into(), node.text.as_bytes().to_vec()));
+        events.push(XmlEvent::new(
+            "CONTENT-CHARACTERS",
+            node.text.as_bytes().to_vec(),
+        ));
     }
     for child in &node.children {
-        append_xml_node_events(child, events)?;
+        append_xml_node_events(child, &namespaces, events)?;
     }
-    events.push(("END-OF-ELEMENT".into(), node.name.as_bytes().to_vec()));
+    let mut end = XmlEvent::new("END-OF-ELEMENT", local.as_bytes().to_vec());
+    end.namespace = namespace.as_bytes().to_vec();
+    end.prefix = prefix.as_bytes().to_vec();
+    events.push(end);
     Ok(())
+}
+
+fn split_xml_name(name: &str) -> Result<(&str, &str), MachineProblem> {
+    let mut parts = name.split(':');
+    let first = parts.next().ok_or(MachineProblem::DataException)?;
+    let second = parts.next();
+    if first.is_empty() || parts.next().is_some() || second.is_some_and(str::is_empty) {
+        return Err(MachineProblem::DataException);
+    }
+    Ok(second.map_or(("", first), |local| (first, local)))
+}
+
+fn xml_namespace<'a>(
+    namespaces: &'a BTreeMap<String, String>,
+    prefix: &str,
+    default_for_unprefixed: bool,
+) -> Result<&'a str, MachineProblem> {
+    if prefix.is_empty() && !default_for_unprefixed {
+        return Ok("");
+    }
+    namespaces
+        .get(prefix)
+        .map(String::as_str)
+        .or_else(|| prefix.is_empty().then_some(""))
+        .ok_or(MachineProblem::DataException)
 }
 
 fn replace_bytes(source: &[u8], from: &[u8], to: &[u8]) -> Result<Vec<u8>, MachineProblem> {
