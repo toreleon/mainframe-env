@@ -581,7 +581,10 @@ fn line_range(source: &str, line: usize) -> Option<std::ops::Range<usize>> {
     (current == line).then_some(start..source.len())
 }
 
-fn statement_options(text: &str) -> Vec<StatementOption> {
+fn statement_options(kind: StatementKind, text: &str) -> Vec<StatementOption> {
+    if kind.official_kind().is_none() {
+        return Vec::new();
+    }
     let upper = text.to_ascii_uppercase();
     let tokens = semantic_tokens(text);
     let mut options = Vec::new();
@@ -891,7 +894,7 @@ impl ProcedureParser {
             kind,
             official: kind.official_kind(),
             arguments,
-            options: statement_options(text),
+            options: statement_options(kind, text),
             line,
             source: Vec::new(),
         });
@@ -1714,7 +1717,10 @@ fn validate_form(kind: StatementKind, arguments: &[String]) -> Result<(), HirPro
         K::Invoke => arguments.len() >= 2,
         K::JsonGenerate | K::XmlGenerate => arguments.len() >= 3 && contains("FROM"),
         K::JsonParse => arguments.len() >= 3 && contains("INTO"),
-        K::XmlParse => arguments.len() >= 4 && contains("PROCESSING") && contains("PROCEDURE"),
+        K::XmlParse => {
+            arguments.len() >= 3
+                && (contains("INTO") || (contains("PROCESSING") && contains("PROCEDURE")))
+        }
         K::Merge => contains("USING") && contains("GIVING"),
         K::Move => contains("TO"),
         K::Open => {
@@ -1793,10 +1799,12 @@ fn validate_statement_options(
                 | K::ReturnStatement
                 | K::String
                 | K::Unstring
+                | K::XmlParse
         ),
         O::From => matches!(
             kind,
-            K::ExecSql
+            K::Accept
+                | K::ExecSql
                 | K::JsonGenerate
                 | K::Perform
                 | K::Release
@@ -1860,6 +1868,27 @@ mod tests {
         let sentences = split_sentences(source);
         assert_eq!(sentences.len(), 2);
         assert!(sentences[0].1.contains("A.COL"));
+    }
+
+    #[test]
+    fn optional_xml_parse_and_host_dialect_operands_remain_compatible() {
+        let parsed = parse_procedure(
+            "ACCEPT A FROM SYSIN. XML PARSE J INTO A. EXEC CICS WRITEQ TD FROM(A) END-EXEC. EXEC DLI GU INTO(A) END-EXEC. STOP RUN.",
+            16,
+        )
+        .unwrap();
+        assert!(
+            parsed
+                .statements
+                .iter()
+                .any(|statement| statement.kind == StatementKind::XmlParse)
+        );
+        assert!(parsed.statements.iter().all(|statement| {
+            !matches!(
+                statement.kind,
+                StatementKind::ExecCics | StatementKind::ExecDli
+            ) || statement.options.is_empty()
+        }));
     }
 
     #[test]

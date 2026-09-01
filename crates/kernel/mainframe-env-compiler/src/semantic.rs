@@ -1591,7 +1591,9 @@ fn validate_spec_constraints(specs: &[DataSpec]) -> Result<(), SemanticProblem> 
             if contains_word(&spec.words, "EXTERNAL")
                 || contains_word(&spec.words, "VALUE")
                 || specs.iter().any(|candidate| {
-                    candidate.parent == Some(index) && contains_word(&candidate.words, "VALUE")
+                    candidate.parent == Some(index)
+                        && candidate.level != 88
+                        && contains_word(&candidate.words, "VALUE")
                 })
             {
                 return Err(SemanticProblem::InvalidRedefines(spec.name.clone()));
@@ -2693,7 +2695,7 @@ mod tests {
 
     #[test]
     fn levels_redefines_occurs_conditions_and_references_are_explicit() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. T. DATA DIVISION. WORKING-STORAGE SECTION. 01 ROOT. 05 COUNT-X PIC 9 VALUE 2. 05 TABLE-X OCCURS 1 TO 3 TIMES DEPENDING ON COUNT-X INDEXED BY IX. 10 ITEM-X PIC X(2) VALUE 'AB'. 05 RAW-X PIC X(4). 05 NUM-X REDEFINES RAW-X PIC 9(4). 66 RANGE-X RENAMES COUNT-X THRU RAW-X. 77 SOLO-X PIC S9(4) COMP-3 VALUE -12. 88 SOLO-VALID VALUE 1 THRU 9. PROCEDURE DIVISION. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. T. DATA DIVISION. WORKING-STORAGE SECTION. 01 ROOT. 05 COUNT-X PIC 9 VALUE 2. 05 TABLE-X OCCURS 1 TO 3 TIMES DEPENDING ON COUNT-X INDEXED BY IX. 10 ITEM-X PIC X(2) VALUE 'AB'. 05 RAW-X PIC X(4). 05 NUM-X REDEFINES RAW-X PIC 9(4). 88 NUM-VALID VALUE 1 THRU 9. 66 RANGE-X RENAMES COUNT-X THRU RAW-X. 77 SOLO-X PIC S9(4) COMP-3 VALUE -12. 88 SOLO-VALID VALUE 1 THRU 9. PROCEDURE DIVISION. STOP RUN.";
         let model = SemanticModel::analyze(source, 1024, 64).unwrap();
         let table = model.layout("TABLE-X").unwrap();
         assert_eq!(
@@ -2712,6 +2714,10 @@ mod tests {
         );
         assert_eq!(
             model.layout("SOLO-VALID").unwrap().condition_values,
+            ["1", "THRU", "9"]
+        );
+        assert_eq!(
+            model.layout("NUM-VALID").unwrap().condition_values,
             ["1", "THRU", "9"]
         );
         assert_eq!(

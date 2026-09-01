@@ -700,9 +700,10 @@ fn is_receiving_position(source: &str, start: usize) -> bool {
     let sentence_start = source[..start].rfind('.').map_or(0, |index| index + 1);
     let prefix = source[sentence_start..start].to_ascii_uppercase();
     prefix.rfind(" TO ").is_some_and(|to| {
-        prefix[..to].trim_start().starts_with("MOVE ")
-            || prefix[..to].trim_start().starts_with("SET ")
-            || prefix[..to].trim_start().starts_with("ADD ")
+        prefix[to + 4..].trim().is_empty()
+            && (prefix[..to].trim_start().starts_with("MOVE ")
+                || prefix[..to].trim_start().starts_with("SET ")
+                || prefix[..to].trim_start().starts_with("ADD "))
     })
 }
 
@@ -769,6 +770,10 @@ mod tests {
             reference.kind == SpecialRegisterKind::LengthOf
                 && reference.value_type == IntrinsicValueType::Integer
         }));
+        assert!(
+            SemanticModel::analyze(&program("MOVE TEXT TO TEXT(LENGTH OF TEXT:1)"), 4096, 128,)
+                .is_ok()
+        );
         assert!(SemanticModel::analyze(&program("MOVE 'X' TO WHEN-COMPILED"), 4096, 128).is_err());
     }
 }
