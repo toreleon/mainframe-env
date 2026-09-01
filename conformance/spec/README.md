@@ -10,3 +10,8 @@ rows enter the numerator only after a later work package supplies a reviewed
 row specification, mandatory obligations, executable bindings, and verdict
 events. Verdict and ledger schemas define projections; committed per-row or
 per-obligation verdict files are prohibited.
+
+Cross-subsystem cases use the separate bounded `ScenarioSpec` section. A
+scenario contains only typed participant drivers, ordered step references,
+failure-point references, and exact credits to already registered
+`(row, obligation, gate)` bindings; it is not a workflow or expression DSL.

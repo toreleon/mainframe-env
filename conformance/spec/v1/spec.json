@@ -13,9 +13,12 @@
     "recoveries": [],
     "oracles": [],
     "drivers": [],
-    "fixtures": []
+    "fixtures": [],
+    "scenario_steps": [],
+    "failure_points": []
   },
   "rows": [],
   "obligations": [],
-  "cases": []
+  "cases": [],
+  "scenarios": []
 }

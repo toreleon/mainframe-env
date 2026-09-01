@@ -23,7 +23,8 @@ use mainframe_env_conformance::{
 };
 use mainframe_env_coverage::{
     BindingKey, CompiledSpec, ConformanceLimits, CoverageGate, DerivedConformanceLedger, DriverRef,
-    FixtureRef, ObligationId, OfficialCatalogRow, OfficialRowId, TestId, Verdict, VerdictEvent,
+    FixtureRef, ObligationId, OfficialCatalogRow, OfficialRowId, RunnerContext, TestId, Verdict,
+    VerdictEvent,
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -449,6 +450,7 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
 }
 
 fn check_conformance(root: &Path) -> TaskResult {
+    check_spec(root)?;
     check_versions(root)?;
     check_architecture(root)?;
     check_profiles(root)?;
@@ -504,19 +506,27 @@ fn check_spec(root: &Path) -> TaskResult {
         "committed per-run verdict or ledger directories are prohibited",
     )?;
     println!(
-        "spec-version={} catalog-rows={} claimed-rows={} obligations={} bindings={} shards={}",
+        "spec-version={} catalog-rows={} claimed-rows={} obligations={} bindings={} scenarios={} shards={}",
         spec.spec_version(),
         official_catalog_rows(root)?.len(),
         spec.rows().count(),
         spec.obligations().count(),
         spec.cases().count(),
+        spec.scenarios().count(),
         spec.expected_shards().len(),
     );
     Ok(())
 }
 
 fn validate_conformance_projections(schema_directory: &Path, spec: &CompiledSpec) -> TaskResult {
-    let ledger = DerivedConformanceLedger::derive_complete(spec, Vec::new())
+    let limits = ConformanceLimits::default();
+    let context = RunnerContext::new(
+        "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+        "schema-smoke",
+        limits,
+    )
+    .map_err(|problem| problem.to_string())?;
+    let ledger = DerivedConformanceLedger::derive_complete(spec, &context, Vec::new())
         .map_err(|problem| problem.to_string())?;
     let ledger_path = schema_directory.join("derived-ledger.schema.json");
     let ledger_bytes = ledger
@@ -526,7 +536,6 @@ fn validate_conformance_projections(schema_directory: &Path, spec: &CompiledSpec
         .map_err(|error| format!("derived ledger projection: {error}"))?;
     validate_schema_instance(&json(&ledger_path)?, &ledger_value, &ledger_path)?;
 
-    let limits = ConformanceLimits::default();
     let event = VerdictEvent::new(
         spec.spec_version(),
         BindingKey {
@@ -575,11 +584,9 @@ fn compile_shared_spec(root: &Path) -> TaskResult<CompiledSpec> {
 fn official_catalog_rows(root: &Path) -> TaskResult<Vec<OfficialCatalogRow>> {
     let index_path = root.join("conformance/0.2/catalogs/index.json");
     let index = json(&index_path)?;
+    let catalogs = indexed_catalog_closure(root, &index, &index_path)?;
     let mut rows = Vec::new();
-    for baseline in array(&index, "baselines", &index_path)? {
-        let subsystem = text(baseline, "subsystem", &index_path)?;
-        let catalog_relative = text(baseline, "catalog", &index_path)?;
-        let catalog_path = root.join(catalog_relative);
+    for (subsystem, catalog_path) in catalogs {
         let catalog = json(&catalog_path)?;
         for unit in array(&catalog, "units", &catalog_path)? {
             let family = text(unit, "id", &catalog_path)?;
@@ -587,7 +594,7 @@ fn official_catalog_rows(root: &Path) -> TaskResult<Vec<OfficialCatalogRow>> {
                 rows.push(
                     OfficialCatalogRow::new(
                         text(row, "id", &catalog_path)?,
-                        subsystem,
+                        &subsystem,
                         family,
                         text(row, "source_locator", &catalog_path)?,
                         CoverageGate::ALL,
@@ -603,6 +610,34 @@ fn official_catalog_rows(root: &Path) -> TaskResult<Vec<OfficialCatalogRow>> {
         "shared spec compiler did not load the frozen 1,506-row catalog",
     )?;
     Ok(rows)
+}
+
+fn indexed_catalog_closure(
+    root: &Path,
+    index: &Value,
+    index_path: &Path,
+) -> TaskResult<Vec<(String, PathBuf)>> {
+    let mut catalogs = Vec::new();
+    for baseline in array(index, "baselines", index_path)? {
+        let subsystem = text(baseline, "subsystem", index_path)?.to_string();
+        let catalog_relative = text(baseline, "catalog", index_path)?;
+        require(
+            catalog_relative.starts_with("conformance/0.2/catalogs/")
+                && catalog_relative.ends_with(".json")
+                && !catalog_relative.contains(".."),
+            &format!("indexed catalog path is unsafe: {catalog_relative}"),
+        )?;
+        let catalog_path = root.join(catalog_relative);
+        let expected = text(baseline, "catalog_sha256", index_path)?;
+        validate_sha256_identity(expected, "indexed catalog digest")?;
+        let actual = format!("sha256:{}", file_digest(&catalog_path)?);
+        require(
+            actual == expected,
+            &format!("indexed catalog digest drifted: {catalog_relative}"),
+        )?;
+        catalogs.push((subsystem, catalog_path));
+    }
+    Ok(catalogs)
 }
 
 fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> TaskResult {
@@ -6983,6 +7018,35 @@ mod tests {
         );
         check_work_package_amendments(&root)
             .expect("0.2 amendments remain bound to accepted candidate");
+    }
+
+    #[test]
+    fn fast_spec_gate_rejects_same_count_catalog_mutation_under_stale_index() {
+        let root = temporary_git_repository("catalog-closure-drift");
+        let catalog_relative = "conformance/0.2/catalogs/mock.json";
+        let catalog_path = root.join(catalog_relative);
+        fs::create_dir_all(catalog_path.parent().expect("catalog parent"))
+            .expect("catalog directory");
+        fs::write(&catalog_path, br#"{"rows":[{"label":"one"}]}"#).expect("catalog");
+        let expected = format!(
+            "sha256:{}",
+            file_digest(&catalog_path).expect("catalog digest")
+        );
+        let index_path = root.join("conformance/0.2/catalogs/index.json");
+        let index = json!({
+            "baselines": [{
+                "subsystem": "mock",
+                "catalog": catalog_relative,
+                "catalog_sha256": expected
+            }]
+        });
+        assert!(indexed_catalog_closure(&root, &index, &index_path).is_ok());
+
+        // The row count and byte length remain unchanged; only closure hashing
+        // can detect this catalog substitution under the stale index.
+        fs::write(&catalog_path, br#"{"rows":[{"label":"two"}]}"#).expect("mutated catalog");
+        assert!(indexed_catalog_closure(&root, &index, &index_path).is_err());
+        fs::remove_dir_all(root).expect("temporary repository cleanup");
     }
 
     #[test]

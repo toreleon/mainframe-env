@@ -5,7 +5,8 @@ v1, independent six-gate row projections, and verdict-derived ledgers.
 Non-goals: IBM publication extraction, product semantics, provider routing, or
 claiming compatibility from catalog presence. The v1 IR owns typed row specs,
 mandatory obligations, bounded registry references, executable bindings,
-replayable verdicts, and deterministic shard/cache identities.
+replayable verdicts, deterministic shard/cache identities, and the separate
+bounded `ScenarioSpec` cross-subsystem binding boundary.
 
 Invariants: a row is complete only when every applicable gate's latest retained
 evidence passes; differential pass evidence names a licensed pinned oracle;

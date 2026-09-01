@@ -20,6 +20,9 @@ pub struct ConformanceLimits {
     pub max_row_specs: usize,
     pub max_obligations: usize,
     pub max_bindings: usize,
+    pub max_scenarios: usize,
+    pub max_scenario_steps: usize,
+    pub max_scenario_credits: usize,
     pub max_registry_entries: usize,
     pub max_refs_per_case: usize,
     pub max_shards: u16,
@@ -36,6 +39,9 @@ impl Default for ConformanceLimits {
             max_row_specs: 100_000,
             max_obligations: 1_000_000,
             max_bindings: 1_000_000,
+            max_scenarios: 100_000,
+            max_scenario_steps: 1_024,
+            max_scenario_credits: 100_000,
             max_registry_entries: 100_000,
             max_refs_per_case: 256,
             max_shards: 4_096,
@@ -85,6 +91,9 @@ typed_id!(OracleRef);
 typed_id!(DriverRef);
 typed_id!(FixtureRef);
 typed_id!(TestId);
+typed_id!(ScenarioId);
+typed_id!(ScenarioStepRef);
+typed_id!(FailurePointRef);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OfficialCatalogRow {
@@ -267,6 +276,42 @@ pub struct ConformanceCase {
     oracle: Option<OracleRef>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScenarioSpec {
+    scenario_id: ScenarioId,
+    drivers: Vec<DriverRef>,
+    ordered_steps: Vec<ScenarioStepRef>,
+    failure_points: Vec<FailurePointRef>,
+    credits: Vec<BindingKey>,
+}
+
+impl ScenarioSpec {
+    #[must_use]
+    pub fn scenario_id(&self) -> &ScenarioId {
+        &self.scenario_id
+    }
+
+    #[must_use]
+    pub fn drivers(&self) -> &[DriverRef] {
+        &self.drivers
+    }
+
+    #[must_use]
+    pub fn ordered_steps(&self) -> &[ScenarioStepRef] {
+        &self.ordered_steps
+    }
+
+    #[must_use]
+    pub fn failure_points(&self) -> &[FailurePointRef] {
+        &self.failure_points
+    }
+
+    #[must_use]
+    pub fn credits(&self) -> &[BindingKey] {
+        &self.credits
+    }
+}
+
 impl ConformanceCase {
     #[must_use]
     pub fn spec_version(&self) -> &str {
@@ -326,6 +371,8 @@ pub struct RegistryDeclarations {
     oracles: BTreeMap<OracleRef, String>,
     drivers: BTreeSet<DriverRef>,
     fixtures: BTreeMap<FixtureRef, String>,
+    scenario_steps: BTreeSet<ScenarioStepRef>,
+    failure_points: BTreeSet<FailurePointRef>,
 }
 
 impl RegistryDeclarations {
@@ -379,6 +426,16 @@ impl RegistryDeclarations {
         &self.fixtures
     }
 
+    #[must_use]
+    pub fn scenario_steps(&self) -> &BTreeSet<ScenarioStepRef> {
+        &self.scenario_steps
+    }
+
+    #[must_use]
+    pub fn failure_points(&self) -> &BTreeSet<FailurePointRef> {
+        &self.failure_points
+    }
+
     fn fixture_digest(&self, fixture: &FixtureRef) -> Option<&str> {
         self.fixtures.get(fixture).map(String::as_str)
     }
@@ -424,6 +481,7 @@ pub struct CompiledSpec {
     rows: BTreeMap<OfficialRowId, RowSpec>,
     obligations: BTreeMap<(OfficialRowId, ObligationId), MandatoryObligation>,
     cases: BTreeMap<BindingKey, ConformanceCase>,
+    scenarios: BTreeMap<ScenarioId, ScenarioSpec>,
     registries: RegistryDeclarations,
     expected_shards: BTreeMap<ShardKey, BTreeSet<BindingKey>>,
 }
@@ -540,6 +598,17 @@ impl CompiledSpec {
                 }
             }
         }
+        if raw.scenarios.len() > limits.max_scenarios {
+            return Err(SpecProblem::LimitExceeded("scenarios"));
+        }
+        let mut scenarios = BTreeMap::new();
+        for raw_scenario in raw.scenarios {
+            let scenario = compile_scenario(raw_scenario, &cases, &registries, limits)?;
+            let key = scenario.scenario_id.clone();
+            if scenarios.insert(key.clone(), scenario).is_some() {
+                return Err(SpecProblem::DuplicateScenario(key.to_string()));
+            }
+        }
         let mut expected_shards = BTreeMap::<ShardKey, BTreeSet<BindingKey>>::new();
         for key in cases.keys() {
             let catalog_row = catalog
@@ -568,6 +637,7 @@ impl CompiledSpec {
             rows,
             obligations,
             cases,
+            scenarios,
             registries,
             expected_shards,
         })
@@ -615,6 +685,15 @@ impl CompiledSpec {
         self.cases.get(key)
     }
 
+    pub fn scenarios(&self) -> impl Iterator<Item = &ScenarioSpec> {
+        self.scenarios.values()
+    }
+
+    #[must_use]
+    pub fn scenario(&self, id: &ScenarioId) -> Option<&ScenarioSpec> {
+        self.scenarios.get(id)
+    }
+
     #[must_use]
     pub fn registries(&self) -> &RegistryDeclarations {
         &self.registries
@@ -623,6 +702,13 @@ impl CompiledSpec {
     #[must_use]
     pub fn expected_shards(&self) -> &BTreeMap<ShardKey, BTreeSet<BindingKey>> {
         &self.expected_shards
+    }
+
+    #[must_use]
+    pub fn shard_for_binding(&self, key: &BindingKey) -> Option<&ShardKey> {
+        self.expected_shards
+            .iter()
+            .find_map(|(shard, bindings)| bindings.contains(key).then_some(shard))
     }
 }
 
@@ -869,34 +955,29 @@ pub struct DerivedConformanceLedger {
 impl DerivedConformanceLedger {
     pub fn derive_complete(
         spec: &CompiledSpec,
+        context: &RunnerContext,
         events: Vec<VerdictEvent>,
     ) -> Result<Self, SpecProblem> {
-        Self::derive(spec, events, true)
+        Self::derive(spec, context, events, true)
     }
 
     pub fn derive_partial(
         spec: &CompiledSpec,
+        context: &RunnerContext,
         events: Vec<VerdictEvent>,
     ) -> Result<Self, SpecProblem> {
-        Self::derive(spec, events, false)
+        Self::derive(spec, context, events, false)
     }
 
     fn derive(
         spec: &CompiledSpec,
+        context: &RunnerContext,
         events: Vec<VerdictEvent>,
         require_complete: bool,
     ) -> Result<Self, SpecProblem> {
         let mut by_binding = BTreeMap::new();
         for event in events {
-            if event.spec_version != spec.spec_version {
-                return Err(SpecProblem::StaleSpecVersion(event.spec_version));
-            }
-            let Some(case) = spec.cases.get(&event.key) else {
-                return Err(SpecProblem::UnknownBinding(format_binding(&event.key)));
-            };
-            if event.test_id != case.test_id {
-                return Err(SpecProblem::ConflictingVerdict(format_binding(&event.key)));
-            }
+            validate_verdict_event(spec, context, &event, ConformanceLimits::default())?;
             let key = event.key.clone();
             if by_binding.insert(key.clone(), event).is_some() {
                 return Err(SpecProblem::DuplicateVerdict(format_binding(&key)));
@@ -1079,6 +1160,113 @@ impl DerivedConformanceLedger {
     }
 }
 
+fn validate_verdict_event(
+    spec: &CompiledSpec,
+    context: &RunnerContext,
+    event: &VerdictEvent,
+    limits: ConformanceLimits,
+) -> Result<(), SpecProblem> {
+    let binding = format_binding(&event.key);
+    if event.schema_version != CONFORMANCE_VERDICT_CONTRACT {
+        return Err(SpecProblem::ConflictingVerdict(format!(
+            "{binding}: verdict schema"
+        )));
+    }
+    if event.spec_version != spec.spec_version {
+        return Err(SpecProblem::StaleSpecVersion(event.spec_version.clone()));
+    }
+    validate_digest(&event.observation_digest)?;
+    validate_digest(&event.cache_identity)?;
+    validate_text(&event.source_locator, limits.max_locator_bytes)?;
+    validate_text(&event.replay, limits.max_locator_bytes)?;
+    validate_text(&event.expected, limits.max_observation_bytes)?;
+    validate_text(&event.actual, limits.max_observation_bytes)?;
+    if let Some(receipt) = &event.oracle_receipt_digest {
+        validate_digest(receipt)?;
+    }
+    let case = spec
+        .cases
+        .get(&event.key)
+        .ok_or_else(|| SpecProblem::UnknownBinding(binding.clone()))?;
+    if event.test_id != case.test_id {
+        return Err(SpecProblem::ConflictingVerdict(format!(
+            "{binding}: test identity"
+        )));
+    }
+    if event.driver != case.driver {
+        return Err(SpecProblem::ConflictingVerdict(format!(
+            "{binding}: driver"
+        )));
+    }
+    if event.fixture_or_seed != case.input {
+        return Err(SpecProblem::ConflictingVerdict(format!(
+            "{binding}: fixture or seed"
+        )));
+    }
+    let catalog = spec
+        .catalog_rows
+        .get(&event.key.row_id)
+        .ok_or_else(|| SpecProblem::UnknownRow(event.key.row_id.to_string()))?;
+    if event.source_locator != catalog.source_locator {
+        return Err(SpecProblem::ConflictingVerdict(format!(
+            "{binding}: source locator"
+        )));
+    }
+    let expected_replay = format!("cargo xtask conformance --replay {}", case.test_id.as_str());
+    if event.replay != expected_replay {
+        return Err(SpecProblem::ConflictingVerdict(format!(
+            "{binding}: replay identity"
+        )));
+    }
+    let shard = spec
+        .shard_for_binding(&event.key)
+        .ok_or(SpecProblem::IncompleteShardSet)?;
+    let fixture_digest = spec
+        .registries
+        .fixture_digest(&case.input)
+        .ok_or_else(|| SpecProblem::UnknownRegistryRef(case.input.to_string()))?;
+    let oracle_digest = case
+        .oracle
+        .as_ref()
+        .map(|oracle| {
+            spec.registries
+                .oracle_digest(oracle)
+                .ok_or_else(|| SpecProblem::UnknownRegistryRef(oracle.to_string()))
+        })
+        .transpose()?;
+    let expected_cache = CacheIdentity::new(
+        CacheIdentityInput {
+            candidate_digest: &context.candidate_digest,
+            catalog_digest: spec.catalog_digest(),
+            spec_digest: spec.spec_digest(),
+            runner_version: CONFORMANCE_RUNNER_VERSION_V1,
+            fixture_digest,
+            oracle_digest,
+            environment_class: &context.environment_class,
+            shard,
+            binding: &event.key,
+        },
+        limits,
+    )?;
+    if event.cache_identity != expected_cache.identity {
+        return Err(SpecProblem::ConflictingVerdict(format!(
+            "{binding}: cache identity"
+        )));
+    }
+    if event.key.gate == CoverageGate::Differential {
+        if event.verdict == Verdict::Pass
+            && (case.oracle.is_none() || event.oracle_receipt_digest.is_none())
+        {
+            return Err(SpecProblem::OracleReceiptRequired);
+        }
+    } else if event.oracle_receipt_digest.is_some() {
+        return Err(SpecProblem::ConflictingVerdict(format!(
+            "{binding}: unexpected oracle receipt"
+        )));
+    }
+    Ok(())
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SpecProblem {
     MalformedDocument(String),
@@ -1097,9 +1285,12 @@ pub enum SpecProblem {
     MissingBinding(String),
     DuplicateBinding(String),
     UnknownBinding(String),
+    DuplicateScenario(String),
+    InvalidScenario(String),
     StaleSpecVersion(String),
     IncompatibleGate(String),
     IncompleteShardSet,
+    DuplicateShardBatch(String),
     UnsafeCacheKey(String),
     OracleReceiptRequired,
     DuplicateVerdict(String),
@@ -1129,6 +1320,7 @@ struct RawSpecDocument {
     rows: Vec<RawRowSpec>,
     obligations: Vec<RawObligation>,
     cases: Vec<RawCase>,
+    scenarios: Vec<RawScenario>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1144,6 +1336,8 @@ struct RawRegistries {
     oracles: Vec<RawArtifactEntry>,
     drivers: Vec<String>,
     fixtures: Vec<RawArtifactEntry>,
+    scenario_steps: Vec<String>,
+    failure_points: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1193,6 +1387,24 @@ struct RawCase {
     oracle: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawScenario {
+    scenario_id: String,
+    drivers: Vec<String>,
+    ordered_steps: Vec<String>,
+    failure_points: Vec<String>,
+    credits: Vec<RawScenarioCredit>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawScenarioCredit {
+    row_id: String,
+    obligation_id: String,
+    gate: String,
+}
+
 fn compile_registries(
     raw: RawRegistries,
     limits: ConformanceLimits,
@@ -1208,6 +1420,18 @@ fn compile_registries(
         oracles: compile_artifacts(raw.oracles, OracleRef::new, "oracle", limits)?,
         drivers: compile_set(raw.drivers, DriverRef::new, "driver", limits)?,
         fixtures: compile_artifacts(raw.fixtures, FixtureRef::new, "fixture", limits)?,
+        scenario_steps: compile_set(
+            raw.scenario_steps,
+            ScenarioStepRef::new,
+            "scenario-step",
+            limits,
+        )?,
+        failure_points: compile_set(
+            raw.failure_points,
+            FailurePointRef::new,
+            "failure-point",
+            limits,
+        )?,
     })
 }
 
@@ -1426,6 +1650,74 @@ fn compile_case(
         expected,
         recovery,
         oracle,
+    })
+}
+
+fn compile_scenario(
+    raw: RawScenario,
+    cases: &BTreeMap<BindingKey, ConformanceCase>,
+    registries: &RegistryDeclarations,
+    limits: ConformanceLimits,
+) -> Result<ScenarioSpec, SpecProblem> {
+    if raw.drivers.len() > limits.max_scenario_steps {
+        return Err(SpecProblem::LimitExceeded("scenario drivers"));
+    }
+    if raw.ordered_steps.len() > limits.max_scenario_steps {
+        return Err(SpecProblem::LimitExceeded("scenario steps"));
+    }
+    if raw.failure_points.len() > limits.max_scenario_steps {
+        return Err(SpecProblem::LimitExceeded("scenario failure points"));
+    }
+    if raw.credits.len() > limits.max_scenario_credits {
+        return Err(SpecProblem::LimitExceeded("scenario credits"));
+    }
+    let scenario_id = ScenarioId::new(raw.scenario_id, limits)?;
+    let drivers = compile_refs(raw.drivers, DriverRef::new, limits)?;
+    if drivers.len() < 2 {
+        return Err(SpecProblem::InvalidScenario(format!(
+            "{scenario_id} must declare at least two participating drivers"
+        )));
+    }
+    require_registry_all(&registries.drivers, &drivers, "scenario-driver")?;
+    let ordered_steps = compile_refs(raw.ordered_steps, ScenarioStepRef::new, limits)?;
+    if ordered_steps.is_empty() {
+        return Err(SpecProblem::InvalidScenario(format!(
+            "{scenario_id} has no ordered steps"
+        )));
+    }
+    require_registry_all(&registries.scenario_steps, &ordered_steps, "scenario-step")?;
+    let failure_points = compile_refs(raw.failure_points, FailurePointRef::new, limits)?;
+    require_registry_all(&registries.failure_points, &failure_points, "failure-point")?;
+    if raw.credits.is_empty() {
+        return Err(SpecProblem::InvalidScenario(format!(
+            "{scenario_id} has no exact credits"
+        )));
+    }
+    let mut seen = BTreeSet::new();
+    let mut credits = Vec::with_capacity(raw.credits.len());
+    for raw_credit in raw.credits {
+        let credit = BindingKey {
+            row_id: OfficialRowId::new(raw_credit.row_id, limits)?,
+            obligation_id: ObligationId::new(raw_credit.obligation_id, limits)?,
+            gate: parse_gate(&raw_credit.gate)?,
+        };
+        if !cases.contains_key(&credit) {
+            return Err(SpecProblem::UnknownBinding(format_binding(&credit)));
+        }
+        if !seen.insert(credit.clone()) {
+            return Err(SpecProblem::InvalidScenario(format!(
+                "{scenario_id} duplicates credit {}",
+                format_binding(&credit)
+            )));
+        }
+        credits.push(credit);
+    }
+    Ok(ScenarioSpec {
+        scenario_id,
+        drivers,
+        ordered_steps,
+        failure_points,
+        credits,
     })
 }
 
@@ -1874,7 +2166,7 @@ impl<'a> ConformanceRunner<'a> {
             .iter()
             .flat_map(|batch| batch.events.iter().cloned())
             .collect();
-        let ledger = DerivedConformanceLedger::derive_partial(self.spec, events)?;
+        let ledger = DerivedConformanceLedger::derive_partial(self.spec, context, events)?;
         Ok(ConformanceRunReport { batches, ledger })
     }
 
@@ -2041,12 +2333,16 @@ pub fn validate_verdict_batches(
         .collect::<BTreeMap<_, _>>();
     let mut actual = BTreeMap::<ShardKey, BTreeSet<BindingKey>>::new();
     for batch in batches {
-        let entry = actual.entry(batch.shard.clone()).or_default();
+        if actual.contains_key(&batch.shard) {
+            return Err(SpecProblem::DuplicateShardBatch(batch.shard.identity()));
+        }
+        let mut event_keys = BTreeSet::new();
         for event in &batch.events {
-            if !entry.insert(event.key.clone()) {
+            if !event_keys.insert(event.key.clone()) {
                 return Err(SpecProblem::DuplicateVerdict(format_binding(&event.key)));
             }
         }
+        actual.insert(batch.shard.clone(), event_keys);
     }
     if actual == expected {
         Ok(())
@@ -2091,6 +2387,10 @@ mod conformance_tests {
         "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     const FIXTURE_DIGEST: &str =
         "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+    const ORACLE_DIGEST: &str =
+        "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+    const ORACLE_RECEIPT: &str =
+        "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
 
     fn limits() -> ConformanceLimits {
         ConformanceLimits::default()
@@ -2126,7 +2426,9 @@ mod conformance_tests {
                 "recoveries": [],
                 "oracles": [],
                 "drivers": ["mock.driver"],
-                "fixtures": [{"id": "mock.fixture", "digest": FIXTURE_DIGEST}]
+                "fixtures": [{"id": "mock.fixture", "digest": FIXTURE_DIGEST}],
+                "scenario_steps": ["mock.step.prepare", "mock.step.commit"],
+                "failure_points": ["mock.failure.after-prepare"]
             },
             "rows": [{
                 "row_id": "official:mock:0001",
@@ -2172,7 +2474,8 @@ mod conformance_tests {
                     "recovery": null,
                     "oracle": null
                 }
-            ]
+            ],
+            "scenarios": []
         })
     }
 
@@ -2183,6 +2486,78 @@ mod conformance_tests {
             &serde_json::to_vec(value).unwrap(),
             limits(),
         )
+    }
+
+    fn differential_spec() -> CompiledSpec {
+        let value = json!({
+            "schema_version": CONFORMANCE_SPEC_DOCUMENT_CONTRACT,
+            "spec_version": CONFORMANCE_SPEC_VERSION_V1,
+            "catalog_digest": CATALOG_DIGEST,
+            "shard_count": 1,
+            "registries": {
+                "operations": ["mock.operation"],
+                "input_shapes": ["mock.input"],
+                "predicates": ["fixture.ready"],
+                "transitions": ["mock.transition"],
+                "observations": ["output.exact"],
+                "conditions": [],
+                "recoveries": [],
+                "oracles": [{"id": "mock.oracle", "digest": ORACLE_DIGEST}],
+                "drivers": ["mock.driver"],
+                "fixtures": [{"id": "mock.fixture", "digest": FIXTURE_DIGEST}],
+                "scenario_steps": [],
+                "failure_points": []
+            },
+            "rows": [{
+                "row_id": "official:mock:0001",
+                "operation": "mock.operation",
+                "input": "mock.input",
+                "preconditions": ["fixture.ready"],
+                "transition": "mock.transition",
+                "postconditions": ["output.exact"],
+                "conditions": [],
+                "recovery": null,
+                "oracle": "mock.oracle",
+                "applicable_gates": ["differential"],
+                "obligations": ["oracle-equivalence"]
+            }],
+            "obligations": [{
+                "row_id": "official:mock:0001",
+                "obligation_id": "oracle-equivalence",
+                "applicable_gates": ["differential"]
+            }],
+            "cases": [{
+                "spec_version": CONFORMANCE_SPEC_VERSION_V1,
+                "row_id": "official:mock:0001",
+                "obligation_id": "oracle-equivalence",
+                "gate": "differential",
+                "test_id": "mock.oracle",
+                "driver": "mock.driver",
+                "input": "mock.fixture",
+                "preconditions": ["fixture.ready"],
+                "expected": ["output.exact"],
+                "recovery": null,
+                "oracle": "mock.oracle"
+            }],
+            "scenarios": []
+        });
+        CompiledSpec::compile_json(
+            CATALOG_DIGEST,
+            vec![
+                OfficialCatalogRow::new(
+                    "official:mock:0001",
+                    "mock",
+                    "family",
+                    "official-page:1",
+                    [CoverageGate::Differential],
+                    limits(),
+                )
+                .unwrap(),
+            ],
+            &serde_json::to_vec(&value).unwrap(),
+            limits(),
+        )
+        .unwrap()
     }
 
     struct Echo;
@@ -2198,16 +2573,49 @@ mod conformance_tests {
                 .map_err(|error| error.to_string())
         }
     }
+    struct OmittedTransitionMutant;
+    impl ConformanceDriver for OmittedTransitionMutant {
+        fn execute(&self, _fixture: &FixtureRef) -> Result<DriverOutput, String> {
+            DriverOutput::new(b"before-transition".to_vec(), limits())
+                .map_err(|error| error.to_string())
+        }
+    }
+    struct ForbiddenMutationMutant;
+    impl ConformanceDriver for ForbiddenMutationMutant {
+        fn execute(&self, _fixture: &FixtureRef) -> Result<DriverOutput, String> {
+            DriverOutput::new(b"ok|protected=changed".to_vec(), limits())
+                .map_err(|error| error.to_string())
+        }
+    }
+    struct WrongEncodingMutant;
+    impl ConformanceDriver for WrongEncodingMutant {
+        fn execute(&self, _fixture: &FixtureRef) -> Result<DriverOutput, String> {
+            DriverOutput::new(vec![0x96, 0x92], limits()).map_err(|error| error.to_string())
+        }
+    }
     struct OversizedFailure;
     impl ConformanceDriver for OversizedFailure {
         fn execute(&self, _fixture: &FixtureRef) -> Result<DriverOutput, String> {
             Err(format!("{}\nsecret", "x".repeat(100_000)))
         }
     }
+    struct EchoWithOracle;
+    impl ConformanceDriver for EchoWithOracle {
+        fn execute(&self, _fixture: &FixtureRef) -> Result<DriverOutput, String> {
+            DriverOutput::with_oracle_receipt(b"ok".to_vec(), ORACLE_RECEIPT, limits())
+                .map_err(|error| error.to_string())
+        }
+    }
     struct Ready;
     impl ConformancePredicate for Ready {
         fn evaluate(&self, _fixture: &FixtureRef) -> Result<bool, String> {
             Ok(true)
+        }
+    }
+    struct NotReady;
+    impl ConformancePredicate for NotReady {
+        fn evaluate(&self, _fixture: &FixtureRef) -> Result<bool, String> {
+            Ok(false)
         }
     }
     struct Exact;
@@ -2222,27 +2630,54 @@ mod conformance_tests {
             .map_err(|error| error.to_string())
         }
     }
+    struct RejectionExpected;
+    impl ConformanceObservation for RejectionExpected {
+        fn evaluate(&self, output: &DriverOutput) -> Result<ObservationCheck, String> {
+            ObservationCheck::new(
+                output.bytes() == b"rejected",
+                "validation=rejected",
+                format!("bytes={}", hex(output.bytes())),
+                limits(),
+            )
+            .map_err(|error| error.to_string())
+        }
+    }
     static ECHO: Echo = Echo;
     static GENERIC_SUCCESS: GenericSuccessMutant = GenericSuccessMutant;
+    static OMITTED_TRANSITION: OmittedTransitionMutant = OmittedTransitionMutant;
+    static FORBIDDEN_MUTATION: ForbiddenMutationMutant = ForbiddenMutationMutant;
+    static WRONG_ENCODING: WrongEncodingMutant = WrongEncodingMutant;
     static OVERSIZED_FAILURE: OversizedFailure = OversizedFailure;
+    static ECHO_WITH_ORACLE: EchoWithOracle = EchoWithOracle;
     static READY: Ready = Ready;
+    static NOT_READY: NotReady = NotReady;
     static EXACT: Exact = Exact;
+    static REJECTION_EXPECTED: RejectionExpected = RejectionExpected;
 
     fn hex(bytes: &[u8]) -> String {
         bytes.iter().map(|byte| format!("{byte:02x}")).collect()
     }
 
     fn runtime<'a>(spec: &CompiledSpec, driver: &'a dyn ConformanceDriver) -> RuntimeRegistry<'a> {
+        runtime_with(spec, driver, &READY, &EXACT)
+    }
+
+    fn runtime_with<'a>(
+        spec: &CompiledSpec,
+        driver: &'a dyn ConformanceDriver,
+        predicate: &'a dyn ConformancePredicate,
+        observation: &'a dyn ConformanceObservation,
+    ) -> RuntimeRegistry<'a> {
         RuntimeRegistry::new(
             spec,
             vec![(DriverRef::new("mock.driver", limits()).unwrap(), driver)],
             vec![(
                 PredicateRef::new("fixture.ready", limits()).unwrap(),
-                &READY,
+                predicate,
             )],
             vec![(
                 ObservationRef::new("output.exact", limits()).unwrap(),
-                &EXACT,
+                observation,
             )],
             limits(),
         )
@@ -2264,6 +2699,51 @@ mod conformance_tests {
         assert_eq!(spec.obligations().count(), 2);
         assert_eq!(spec.cases().count(), 2);
         assert!(!spec.expected_shards().is_empty());
+    }
+
+    #[test]
+    fn scenario_spec_is_bounded_typed_and_credits_registered_bindings_only() {
+        let mut value = document();
+        value["registries"]["drivers"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!("mock.second-driver"));
+        value["scenarios"] = json!([{
+            "scenario_id": "mock.cross-subsystem",
+            "drivers": ["mock.driver", "mock.second-driver"],
+            "ordered_steps": ["mock.step.prepare", "mock.step.commit"],
+            "failure_points": ["mock.failure.after-prepare"],
+            "credits": [{
+                "row_id": "official:mock:0001",
+                "obligation_id": "valid-form",
+                "gate": "recognized"
+            }]
+        }]);
+        let spec = compile(&value).unwrap();
+        let scenario = spec.scenarios().next().unwrap();
+        assert_eq!(scenario.scenario_id().as_str(), "mock.cross-subsystem");
+        assert_eq!(scenario.drivers().len(), 2);
+        assert_eq!(
+            scenario
+                .ordered_steps()
+                .iter()
+                .map(ScenarioStepRef::as_str)
+                .collect::<Vec<_>>(),
+            ["mock.step.prepare", "mock.step.commit"]
+        );
+        assert_eq!(scenario.credits().len(), 1);
+
+        value["scenarios"][0]["credits"][0]["obligation_id"] = json!("unregistered");
+        assert!(matches!(
+            compile(&value),
+            Err(SpecProblem::UnknownBinding(_))
+        ));
+        value["scenarios"][0]["credits"][0]["obligation_id"] = json!("valid-form");
+        value["scenarios"][0]["ordered_steps"][0] = json!("unregistered.step");
+        assert!(matches!(
+            compile(&value),
+            Err(SpecProblem::UnknownRegistryRef(_))
+        ));
     }
 
     #[test]
@@ -2348,20 +2828,138 @@ mod conformance_tests {
     }
 
     #[test]
-    fn generic_success_and_byte_mutants_are_killed_by_independent_observation() {
+    fn ledger_rejects_events_that_drift_from_case_catalog_or_runner_context() {
+        fn events(spec: &CompiledSpec) -> Vec<VerdictEvent> {
+            ConformanceRunner::new(spec, runtime(spec, &ECHO), limits())
+                .run(&selection(), &context())
+                .unwrap()
+                .batches
+                .into_iter()
+                .flat_map(|batch| batch.events)
+                .collect()
+        }
+        fn rejected(spec: &CompiledSpec, mutate: impl FnOnce(&mut VerdictEvent)) -> SpecProblem {
+            let mut events = events(spec);
+            mutate(&mut events[0]);
+            DerivedConformanceLedger::derive_complete(spec, &context(), events).unwrap_err()
+        }
+
         let spec = compile(&document()).unwrap();
-        let runner = ConformanceRunner::new(&spec, runtime(&spec, &GENERIC_SUCCESS), limits());
-        let report = runner.run(&selection(), &context()).unwrap();
+        assert!(matches!(
+            rejected(&spec, |event| {
+                event.cache_identity =
+                    "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+                        .into();
+            }),
+            SpecProblem::ConflictingVerdict(_)
+        ));
+        assert!(matches!(
+            rejected(&spec, |event| {
+                event.driver = DriverRef::new("wrong.driver", limits()).unwrap();
+            }),
+            SpecProblem::ConflictingVerdict(_)
+        ));
+        assert!(matches!(
+            rejected(&spec, |event| {
+                event.fixture_or_seed = FixtureRef::new("wrong.fixture", limits()).unwrap();
+            }),
+            SpecProblem::ConflictingVerdict(_)
+        ));
+        assert!(matches!(
+            rejected(&spec, |event| event.source_locator = "wrong-locator".into()),
+            SpecProblem::ConflictingVerdict(_)
+        ));
+        assert!(matches!(
+            rejected(&spec, |event| event.replay =
+                "cargo xtask conformance --replay wrong".into()),
+            SpecProblem::ConflictingVerdict(_)
+        ));
+        assert_eq!(
+            rejected(&spec, |event| event.expected.clear()),
+            SpecProblem::InvalidText
+        );
+        assert_eq!(
+            rejected(&spec, |event| event.actual =
+                "malformed\nobservation".into()),
+            SpecProblem::InvalidText
+        );
+        assert_eq!(
+            rejected(&spec, |event| {
+                event.actual = "x".repeat(limits().max_observation_bytes + 1);
+            }),
+            SpecProblem::InvalidText
+        );
+        assert!(matches!(
+            rejected(&spec, |event| event.schema_version =
+                "mainframe-env.conformance-verdict@0"),
+            SpecProblem::ConflictingVerdict(_)
+        ));
+        let wrong_context = RunnerContext::new(
+            "sha256:1212121212121212121212121212121212121212121212121212121212121212",
+            "other-environment",
+            limits(),
+        )
+        .unwrap();
+        assert!(matches!(
+            DerivedConformanceLedger::derive_complete(&spec, &wrong_context, events(&spec)),
+            Err(SpecProblem::ConflictingVerdict(_))
+        ));
+    }
+
+    #[test]
+    fn representative_semantic_and_encoding_mutants_are_killed() {
+        let spec = compile(&document()).unwrap();
+        let mutants: [(&str, &dyn ConformanceDriver); 4] = [
+            ("omitted-transition", &OMITTED_TRANSITION),
+            ("forbidden-state-mutation", &FORBIDDEN_MUTATION),
+            ("generic-success", &GENERIC_SUCCESS),
+            ("wrong-byte-encoding", &WRONG_ENCODING),
+        ];
+        for (name, mutant) in mutants {
+            let report = ConformanceRunner::new(&spec, runtime(&spec, mutant), limits())
+                .run(&selection(), &context())
+                .unwrap();
+            assert!(
+                report
+                    .batches
+                    .iter()
+                    .flat_map(|batch| &batch.events)
+                    .all(|event| event.verdict == Verdict::Fail),
+                "mutant survived: {name}"
+            );
+        }
+
+        let false_precondition = ConformanceRunner::new(
+            &spec,
+            runtime_with(&spec, &ECHO, &NOT_READY, &EXACT),
+            limits(),
+        )
+        .run(&selection(), &context())
+        .unwrap();
         assert!(
-            report
+            false_precondition
                 .batches
                 .iter()
                 .flat_map(|batch| &batch.events)
                 .all(|event| event.verdict == Verdict::Fail
-                    && event.actual.contains("67656e65726963"))
+                    && event.actual.contains("precondition:fixture.ready=false"))
         );
-        assert_eq!(report.ledger.counts[&CoverageGate::Recognized].fail, 1);
-        assert_eq!(report.ledger.counts[&CoverageGate::Validated].fail, 1);
+
+        let bypassed_validation = ConformanceRunner::new(
+            &spec,
+            runtime_with(&spec, &ECHO, &READY, &REJECTION_EXPECTED),
+            limits(),
+        )
+        .run(&selection(), &context())
+        .unwrap();
+        assert!(
+            bypassed_validation
+                .batches
+                .iter()
+                .flat_map(|batch| &batch.events)
+                .all(|event| event.verdict == Verdict::Fail
+                    && event.expected.contains("validation=rejected"))
+        );
     }
 
     #[test]
@@ -2394,8 +2992,37 @@ mod conformance_tests {
             Err(SpecProblem::IncompleteShardSet)
         );
         assert!(matches!(
-            DerivedConformanceLedger::derive_complete(&spec, Vec::new()),
+            DerivedConformanceLedger::derive_complete(&spec, &context(), Vec::new()),
             Err(SpecProblem::MissingVerdict(_))
+        ));
+    }
+
+    #[test]
+    fn partitioned_duplicate_shard_batches_are_rejected_before_union() {
+        let mut value = document();
+        value["shard_count"] = json!(1);
+        value["obligations"][1]["applicable_gates"] = json!(["recognized"]);
+        value["cases"][1]["gate"] = json!("recognized");
+        let spec = compile(&value).unwrap();
+        let report = ConformanceRunner::new(&spec, runtime(&spec, &ECHO), limits())
+            .run(&selection(), &context())
+            .unwrap();
+        assert_eq!(report.batches.len(), 1);
+        assert_eq!(report.batches[0].events.len(), 2);
+        let shard = report.batches[0].shard.clone();
+        let duplicate_batches = vec![
+            VerdictBatch {
+                shard: shard.clone(),
+                events: vec![report.batches[0].events[0].clone()],
+            },
+            VerdictBatch {
+                shard,
+                events: vec![report.batches[0].events[1].clone()],
+            },
+        ];
+        assert!(matches!(
+            validate_verdict_batches(&spec, &selection(), &duplicate_batches),
+            Err(SpecProblem::DuplicateShardBatch(_))
         ));
     }
 
@@ -2493,6 +3120,21 @@ mod conformance_tests {
                 None,
                 limits(),
             ),
+            Err(SpecProblem::OracleReceiptRequired)
+        );
+
+        let spec = differential_spec();
+        let report = ConformanceRunner::new(&spec, runtime(&spec, &ECHO_WITH_ORACLE), limits())
+            .run(&selection(), &context())
+            .unwrap();
+        let mut events = report
+            .batches
+            .into_iter()
+            .flat_map(|batch| batch.events)
+            .collect::<Vec<_>>();
+        events[0].oracle_receipt_digest = None;
+        assert_eq!(
+            DerivedConformanceLedger::derive_complete(&spec, &context(), events),
             Err(SpecProblem::OracleReceiptRequired)
         );
     }
