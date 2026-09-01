@@ -34,6 +34,8 @@ pub struct JclBundle {
     pub primary: String,
     pub includes: BTreeMap<String, String>,
     pub cataloged_procedures: BTreeMap<String, String>,
+    pub procedure_libraries: BTreeMap<String, BTreeMap<String, String>>,
+    pub symbols: BTreeMap<String, String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

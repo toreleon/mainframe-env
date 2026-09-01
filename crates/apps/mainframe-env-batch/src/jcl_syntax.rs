@@ -11,6 +11,7 @@ use rowan::{GreenNode, GreenNodeBuilder, Language};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::ops::Range;
+use std::sync::Arc;
 
 /// Stable identity for the owned, lossless JCL concrete-syntax contract.
 pub const JCL_SYNTAX_CONTRACT: &str = "mainframe-env.jcl-syntax@1";
@@ -237,7 +238,7 @@ impl JclLosslessSyntax {
 
 #[derive(Clone, Debug)]
 pub struct JclSyntaxAnalysis {
-    source: SourceBundle,
+    source: Arc<SourceBundle>,
     syntax: JclLosslessSyntax,
     diagnostics: Vec<Diagnostic>,
 }
@@ -246,6 +247,10 @@ impl JclSyntaxAnalysis {
     #[must_use]
     pub fn source(&self) -> &SourceBundle {
         &self.source
+    }
+
+    pub(crate) fn source_arc(&self) -> Arc<SourceBundle> {
+        Arc::clone(&self.source)
     }
 
     #[must_use]
@@ -312,10 +317,17 @@ pub fn analyze_jcl_syntax(
     bundle: &JclBundle,
     limits: JclSyntaxLimits,
 ) -> Result<JclSyntaxAnalysis, JclSyntaxProblem> {
-    let source = source_bundle(bundle, limits)?;
-    let primary = source
-        .file(source.primary())
-        .ok_or(JclSyntaxProblem::PrimaryMissing)?;
+    let source = Arc::new(source_bundle(bundle, limits)?);
+    let primary = source.primary();
+    analyze_jcl_source_file(source, primary, limits)
+}
+
+pub(crate) fn analyze_jcl_source_file(
+    source: Arc<SourceBundle>,
+    file: FileId,
+    limits: JclSyntaxLimits,
+) -> Result<JclSyntaxAnalysis, JclSyntaxProblem> {
+    let primary = source.file(file).ok_or(JclSyntaxProblem::PrimaryMissing)?;
     let text = std::str::from_utf8(primary.bytes())
         .map_err(|_| JclSyntaxProblem::SourceNotUtf8)?
         .to_string();
@@ -337,7 +349,7 @@ pub fn analyze_jcl_syntax(
     for (index, physical) in physical_records.iter().enumerate() {
         let raw = &text[physical.content.clone()];
         let line = index + 1;
-        let file = source.primary();
+        let file = primary.id();
         let mut kind = JclRecordKind::Error;
 
         if cntl_definition.is_some() && !is_endcntl_record(raw) {
@@ -470,7 +482,7 @@ pub fn analyze_jcl_syntax(
         diagnostics.push(diagnostic(
             "MEJCL0704",
             "in-stream data is missing its declared delimiter",
-            source.primary(),
+            primary.id(),
             state.definition_span,
         ));
     }
@@ -478,7 +490,7 @@ pub fn analyze_jcl_syntax(
         diagnostics.push(diagnostic(
             "MEJCL0705",
             "CNTL statement is missing a matching ENDCNTL statement",
-            source.primary(),
+            primary.id(),
             definition,
         ));
     }
@@ -517,6 +529,15 @@ fn source_bundle(
         bundle.primary.as_bytes(),
         source_limits,
     )?];
+    let mut system_symbol_members = Vec::new();
+    if !bundle.symbols.is_empty() {
+        let path = LogicalPath::new("jcl/system-symbols.json", limits.max_path_bytes)
+            .map_err(|problem| JclSyntaxProblem::SourceBundle(problem.to_string()))?;
+        let bytes = serde_json::to_vec(&bundle.symbols)
+            .map_err(|problem| JclSyntaxProblem::SourceBundle(problem.to_string()))?;
+        system_symbol_members.push(path.clone());
+        files.push(source_file(path.as_str(), &bytes, source_limits)?);
+    }
     let mut include_members = Vec::new();
     let mut procedure_members = Vec::new();
     for (name, bytes) in &bundle.includes {
@@ -525,14 +546,33 @@ fn source_bundle(
         files.push(source_file(path.as_str(), bytes.as_bytes(), source_limits)?);
     }
     for (name, bytes) in &bundle.cataloged_procedures {
-        let path = member_path("jcl/procedures", name, limits)?;
+        let path = member_path("jcl/procedures/default", name, limits)?;
         procedure_members.push(path.clone());
         files.push(source_file(path.as_str(), bytes.as_bytes(), source_limits)?);
+    }
+    let mut named_procedure_libraries = Vec::new();
+    for (library, members) in &bundle.procedure_libraries {
+        let library_token = member_token(library)?;
+        let mut paths = Vec::new();
+        for (name, bytes) in members {
+            let path = member_path(&format!("jcl/procedures/{library_token}"), name, limits)?;
+            paths.push(path.clone());
+            files.push(source_file(path.as_str(), bytes.as_bytes(), source_limits)?);
+        }
+        if !paths.is_empty() {
+            named_procedure_libraries.push((library_token, paths));
+        }
     }
     if files.len() > limits.max_files {
         return Err(JclSyntaxProblem::FileLimitExceeded);
     }
     let mut libraries = Vec::new();
+    if !system_symbol_members.is_empty() {
+        libraries.push(
+            SourceLibrary::new("jcl-system-symbols", system_symbol_members, source_limits)
+                .map_err(library_problem)?,
+        );
+    }
     if !include_members.is_empty() {
         libraries.push(
             SourceLibrary::new("jcl-includes", include_members, source_limits)
@@ -541,7 +581,13 @@ fn source_bundle(
     }
     if !procedure_members.is_empty() {
         libraries.push(
-            SourceLibrary::new("jcl-procedures", procedure_members, source_limits)
+            SourceLibrary::new("jcl-procedures-default", procedure_members, source_limits)
+                .map_err(library_problem)?,
+        );
+    }
+    for (library, members) in named_procedure_libraries {
+        libraries.push(
+            SourceLibrary::new(format!("jcl-procedures-{library}"), members, source_limits)
                 .map_err(library_problem)?,
         );
     }
@@ -576,6 +622,12 @@ fn member_path(
     name: &str,
     limits: JclSyntaxLimits,
 ) -> Result<LogicalPath, JclSyntaxProblem> {
+    let name = member_token(name)?;
+    LogicalPath::new(format!("{directory}/{name}.jcl"), limits.max_path_bytes)
+        .map_err(|problem| JclSyntaxProblem::SourceBundle(problem.to_string()))
+}
+
+fn member_token(name: &str) -> Result<String, JclSyntaxProblem> {
     if name.is_empty()
         || name.len() > 128
         || !name.bytes().all(|byte| {
@@ -586,11 +638,7 @@ fn member_path(
             "invalid JCL member name {name:?}"
         )));
     }
-    LogicalPath::new(
-        format!("{directory}/{}.jcl", name.to_ascii_uppercase()),
-        limits.max_path_bytes,
-    )
-    .map_err(|problem| JclSyntaxProblem::SourceBundle(problem.to_string()))
+    Ok(name.to_ascii_uppercase())
 }
 
 fn library_problem(problem: LibraryProblem) -> JclSyntaxProblem {
@@ -975,6 +1023,7 @@ mod tests {
                 primary: "//J JOB\n".into(),
                 includes: BTreeMap::from([("A".into(), "//*A\n".into())]),
                 cataloged_procedures: BTreeMap::from([("P".into(), "//P PROC\n// PEND\n".into())]),
+                ..JclBundle::default()
             },
             JclSyntaxLimits::default(),
         )
@@ -984,12 +1033,30 @@ mod tests {
                 primary: "//J JOB\n".into(),
                 includes: BTreeMap::from([("A".into(), "//*CHANGED\n".into())]),
                 cataloged_procedures: BTreeMap::from([("P".into(), "//P PROC\n// PEND\n".into())]),
+                ..JclBundle::default()
             },
             JclSyntaxLimits::default(),
         )
         .unwrap();
         assert_ne!(first.source().id(), second.source().id());
         assert_eq!(first.source().libraries().len(), 2);
+        let system_symbol = analyze_jcl_syntax(
+            &JclBundle {
+                primary: "//J JOB\n".into(),
+                symbols: BTreeMap::from([("SYSUID".into(), "USER1".into())]),
+                ..JclBundle::default()
+            },
+            JclSyntaxLimits::default(),
+        )
+        .unwrap();
+        assert_ne!(first.source().id(), system_symbol.source().id());
+        assert!(
+            system_symbol
+                .source()
+                .files()
+                .iter()
+                .any(|file| file.path().as_str() == "jcl/system-symbols.json")
+        );
     }
 
     #[test]

@@ -5,6 +5,8 @@
 mod controller;
 mod jcl;
 mod jcl_catalog;
+mod jcl_expand;
+mod jcl_graph;
 mod jcl_schema;
 mod jcl_statement;
 mod jcl_syntax;
@@ -25,6 +27,10 @@ pub use jcl_catalog::{
     JCL_OFFICIAL_CATALOG_SHA256, JCL_PLAN_SCHEMA_SHA256, JCL_STATEMENTS, JES2_STATEMENTS,
     JOB_PARAMETERS, JclCatalogEntry, JclStatementId, Jes2StatementId, JobParameterId,
     OUTPUT_PARAMETERS, OutputParameterId,
+};
+pub use jcl_expand::{
+    JclBackwardReference, JclExpandedProcedure, JclExpandedStatement, JclExpandedSymbol,
+    JclExpansion, JclExpansionLimits, JclExpansionProblem, expand_jcl,
 };
 pub use jcl_schema::{
     JCL_PLAN_CONTRACT, JclCapabilityRequirement, JclCapabilityState, JclDiagnosticProjection,
