@@ -4,7 +4,7 @@
   "title": "mainframe-env Enterprise COBOL 6.5 language catalog",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "target_version", "baseline_id", "source", "compiler_directing_statements", "compiler_directive_groups", "procedure_statements", "file_description_clauses", "data_description_clauses"],
+  "required": ["schema_version", "target_version", "baseline_id", "source", "compiler_directing_statements", "compiler_directive_groups", "procedure_statements", "file_description_clauses", "data_description_clauses", "intrinsic_functions", "special_registers"],
   "properties": {
     "schema_version": {"const": "mainframe-env.cobol-language@1"},
     "target_version": {"const": "0.3.0"},
@@ -21,7 +21,9 @@
     "compiler_directive_groups": {"type": "array", "minItems": 5, "maxItems": 5, "items": {"$ref": "#/$defs/group"}},
     "procedure_statements": {"type": "array", "minItems": 44, "maxItems": 44, "items": {"$ref": "#/$defs/statement-family"}},
     "file_description_clauses": {"type": "array", "minItems": 10, "maxItems": 10, "items": {"$ref": "#/$defs/clause"}},
-    "data_description_clauses": {"type": "array", "minItems": 17, "maxItems": 17, "items": {"$ref": "#/$defs/clause"}}
+    "data_description_clauses": {"type": "array", "minItems": 17, "maxItems": 17, "items": {"$ref": "#/$defs/clause"}},
+    "intrinsic_functions": {"type": "array", "minItems": 82, "maxItems": 82, "items": {"$ref": "#/$defs/intrinsic-function"}},
+    "special_registers": {"type": "array", "minItems": 28, "maxItems": 28, "items": {"$ref": "#/$defs/special-register"}}
   },
   "$defs": {
     "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$", "maxLength": 64},
@@ -68,6 +70,49 @@
         "source_locator": {"type": "string", "pattern": "^pdf-page:[0-9]+;outline:.+$", "maxLength": 256},
         "forms": {"type": "array", "minItems": 1, "maxItems": 16, "items": {"type": "string", "minLength": 1, "maxLength": 1024}}
       }
+    },
+    "argument-class": {"enum": ["alphabetic", "alphanumeric", "dbcs", "integer", "numeric", "national", "utf8", "other", "keyword"]},
+    "signature": {
+      "type": "object", "additionalProperties": false,
+      "required": ["arguments", "variadic", "homogeneous", "result"],
+      "properties": {
+        "arguments": {"type": "array", "maxItems": 4, "items": {"type": "array", "minItems": 1, "maxItems": 9, "uniqueItems": true, "items": {"$ref": "#/$defs/argument-class"}}},
+        "variadic": {"type": "boolean"},
+        "homogeneous": {"type": "boolean"},
+        "result": {"enum": ["integer", "numeric", "alphanumeric", "national", "utf8", "preserve-numeric", "content", "string-first", "comparable", "range-sum"]}
+      }
+    },
+    "intrinsic-function": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "row_id", "name", "source_locator", "signatures", "literal_arguments", "fixed_length", "runtime_supported"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"}, "row_id": {"$ref": "#/$defs/official_id"},
+        "name": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]*$", "maxLength": 64},
+        "source_locator": {"type": "string", "pattern": "^pdf-page:[0-9]+;outline:.+$", "maxLength": 256},
+        "signatures": {"type": "array", "minItems": 1, "maxItems": 4, "items": {"$ref": "#/$defs/signature"}},
+        "literal_arguments": {"type": "array", "maxItems": 4, "uniqueItems": true, "items": {"type": "integer", "minimum": 0, "maximum": 3}},
+        "fixed_length": {"anyOf": [{"type": "integer", "minimum": 1, "maximum": 1024}, {"type": "null"}]},
+        "runtime_supported": {"type": "boolean"}
+      }
+    },
+    "special-register": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "name", "source_locator", "value_type", "usage", "length_kind", "writable", "operand"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "name": {"type": "string", "pattern": "^[A-Z][A-Z0-9 -]*$", "maxLength": 64},
+        "source_locator": {"type": "string", "pattern": "^pdf-page:[0-9]+;outline:.+$", "maxLength": 256},
+        "value_type": {"enum": ["alphanumeric", "integer", "national", "other", "group"]},
+        "usage": {"enum": ["display", "binary", "native-binary", "national", "pointer", "group"]},
+        "length_kind": {"enum": ["fixed", "lp", "dynamic", "dependent"]},
+        "fixed_length": {"type": "integer", "minimum": 1, "maximum": 1024},
+        "writable": {"type": "boolean"},
+        "operand": {"enum": ["none", "data-item", "file", "debug-context"]}
+      },
+      "allOf": [
+        {"if": {"properties": {"length_kind": {"const": "fixed"}}}, "then": {"required": ["fixed_length"]}},
+        {"if": {"properties": {"length_kind": {"enum": ["lp", "dynamic", "dependent"]}}}, "then": {"not": {"required": ["fixed_length"]}}}
+      ]
     }
   }
 }

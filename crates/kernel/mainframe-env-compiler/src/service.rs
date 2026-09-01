@@ -131,6 +131,20 @@ impl CobolCompiler {
                 ),
             ));
         }
+        for intrinsic in semantic.execution_incomplete_intrinsics() {
+            if diagnostics.len() >= self.limits.max_diagnostics {
+                break;
+            }
+            diagnostics.push(diagnostic(
+                "MECOB0202",
+                Phase::Lower,
+                FailureCategory::Unsupported,
+                format!(
+                    "FUNCTION {} is recognized and typed but has no 0.3 execution route",
+                    crate::intrinsic_function_descriptor(intrinsic).name
+                ),
+            ));
+        }
         let hir_text = to_text(&hir.module, self.limits.codec).ok();
         let completeness = if diagnostics.is_empty() {
             Completeness::Complete
@@ -512,6 +526,40 @@ mod tests {
                 .layout("PART.CODE-X")
                 .is_some_and(|layout| layout.source.len() >= 2)
         );
+    }
+
+    #[test]
+    fn intrinsic_and_special_register_nodes_are_typed_and_unsupported_execution_is_blocked() {
+        let source = "IDENTIFICATION DIVISION.\nPROGRAM-ID. FUNCTIONS.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 TEXT-X PIC X(8) VALUE 'ABC'.\n01 NUM-X PIC 9(3)V99 COMP-3 VALUE 1.5.\n01 INT-X PIC 9(4) BINARY.\nPROCEDURE DIVISION.\nMOVE FUNCTION LOWER-CASE(TEXT-X) TO TEXT-X.\nMOVE FUNCTION ABS(NUM-X) TO NUM-X.\nMOVE LENGTH OF TEXT-X TO INT-X.\nDISPLAY WHEN-COMPILED.\nSTOP RUN.\n";
+        let analysis = CobolCompiler::default().analyze(&bundle(source));
+        let semantic = analysis.semantic.as_ref().expect("function semantic model");
+        assert_eq!(semantic.intrinsic_calls.len(), 2);
+        assert!(
+            semantic
+                .intrinsic_calls
+                .iter()
+                .all(|call| !call.source.is_empty())
+        );
+        assert_eq!(semantic.special_registers.len(), 2);
+        assert!(
+            semantic
+                .special_registers
+                .iter()
+                .all(|register| !register.source.is_empty())
+        );
+        assert_eq!(analysis.completeness, Completeness::Unsupported);
+        assert!(analysis.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code().as_str() == "MECOB0202" && diagnostic.public_message().contains("ABS")
+        }));
+        assert!(matches!(
+            CobolCompiler::default()
+                .compile(request(source, CompilationMode::Executable))
+                .unwrap(),
+            CompilerResult::Failed {
+                completeness: Completeness::Unsupported,
+                ..
+            }
+        ));
     }
 
     #[test]

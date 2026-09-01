@@ -23,6 +23,7 @@ mod abi;
 mod carddemo;
 mod cobol_clauses;
 mod cobol_frontend;
+mod cobol_functions;
 mod cobol_statements;
 
 pub use abi::{
@@ -57,6 +58,7 @@ pub use carddemo::{
 
 pub use cobol_clauses::verify_cobol_semantic_fixtures;
 pub use cobol_frontend::{cobol_frontend_runtime, verify_cobol_frontend_fixtures};
+pub use cobol_functions::verify_cobol_function_fixtures;
 pub use cobol_statements::verify_cobol_statement_fixtures;
 
 pub const HELLO_SOURCE: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. HELLO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MSG PIC X(12) VALUE 'HELLO WORLD!'.\nPROCEDURE DIVISION.\nDISPLAY MSG.\nSTOP RUN.\n";

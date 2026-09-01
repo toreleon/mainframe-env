@@ -29,3 +29,11 @@ SYNCHRONIZED alignment, inherited group usage, non-allocating TYPEDEF templates,
 TYPE instance expansion, dynamic/unbounded metadata, and source provenance.
 Dynamic and unbounded layouts remain analyzable but block executable publication
 until their runtime storage semantics are implemented by the 0.4 profile.
+
+The generated Enterprise COBOL catalog also owns all 82 intrinsic-function
+identities/signatures and 28 special-register identities. Semantic analysis
+records typed calls/references with source provenance, validates overloads,
+argument classes, arity, homogeneous/variadic rules, format-literal context,
+special-register operands and receiving restrictions, and infers result type and
+fixed length. Recognized functions without an explicit interpreter route remain
+analyzable but block executable publication.

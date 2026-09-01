@@ -18,6 +18,12 @@ official denominator: each accepted clause case now carries independently
 reviewed layout expectations for data class, USAGE, size/alignment, table and
 alias metadata, initialization, allocation, and provenance where applicable.
 
+CB-305 adds all 82 intrinsic-function rows with separate valid-signature
+recognition and invalid-signature validation obligations. Their independent
+fixture catalog checks exact inferred result type, fixed length, generated
+identity, and provenance; the generated special-register registry is closed by
+28 reviewed metadata expectations without creating non-official coverage rows.
+
 Cross-subsystem cases use the separate bounded `ScenarioSpec` section. A
 scenario contains only typed participant drivers, ordered step references,
 failure-point references, and exact credits to already registered

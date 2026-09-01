@@ -14,10 +14,15 @@ pub use generated::cobol_language::{
     ClauseDescriptor, CompilerDirectingDescriptor, CompilerDirectingKind,
     CompilerDirectiveDescriptor, CompilerDirectiveGroup, CompilerDirectiveGroupDescriptor,
     CompilerDirectiveKind, DATA_DESCRIPTION_CLAUSES, DataDescriptionClauseKind,
-    FILE_DESCRIPTION_CLAUSES, FileDescriptionClauseKind, PROCEDURE_STATEMENTS,
-    ProcedureStatementDescriptor, ProcedureStatementKind, compiler_directing_descriptor,
-    compiler_directive_descriptor, data_description_clause_descriptor,
-    file_description_clause_descriptor, procedure_statement_descriptor,
+    FILE_DESCRIPTION_CLAUSES, FileDescriptionClauseKind, INTRINSIC_FUNCTIONS,
+    IntrinsicArgumentClass, IntrinsicFunctionDescriptor, IntrinsicFunctionKind,
+    IntrinsicResultRule, IntrinsicSignature, PROCEDURE_STATEMENTS, ProcedureStatementDescriptor,
+    ProcedureStatementKind, SPECIAL_REGISTERS, SpecialRegisterDescriptor, SpecialRegisterKind,
+    SpecialRegisterLengthKind, SpecialRegisterOperand, SpecialRegisterUsage,
+    SpecialRegisterValueType, compiler_directing_descriptor, compiler_directive_descriptor,
+    data_description_clause_descriptor, file_description_clause_descriptor,
+    intrinsic_function_descriptor, intrinsic_function_named, procedure_statement_descriptor,
+    special_register_descriptor, special_register_named,
 };
 
 pub use hir::{
@@ -27,9 +32,10 @@ pub use hir::{
 pub use lower::{CORE_NAMESPACE, core_mir_catalog, core_mir_profile};
 pub use semantic::{
     CobolClauseKind, CobolClauseNode, CobolDataDescription, CobolDivisionKind, CobolDivisionNode,
-    CobolFileBinding, CobolFileDescription, CobolLayout, CobolScope, CobolScopeId, CobolScopeKind,
-    CobolSectionKind, CobolSectionNode, CobolTableKey, CobolUsage, DataCategory, DataReference,
-    ResolutionProblem, SemanticModel, StorageSection,
+    CobolFileBinding, CobolFileDescription, CobolIntrinsicArgument, CobolIntrinsicCall,
+    CobolLayout, CobolScope, CobolScopeId, CobolScopeKind, CobolSectionKind, CobolSectionNode,
+    CobolSpecialRegisterReference, CobolTableKey, CobolUsage, DataCategory, DataReference,
+    IntrinsicValueType, ResolutionProblem, SemanticModel, StorageSection,
 };
 pub use service::{CobolAnalysis, CobolCompiler, CobolCompilerLimits};
 pub use syntax::{

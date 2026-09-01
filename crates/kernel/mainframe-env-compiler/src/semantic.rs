@@ -1,11 +1,16 @@
+mod functions;
 mod structure;
 
+pub use functions::{
+    CobolIntrinsicArgument, CobolIntrinsicCall, CobolSpecialRegisterReference, IntrinsicValueType,
+};
 pub use structure::{
     CobolClauseKind, CobolClauseNode, CobolDataDescription, CobolDivisionKind, CobolDivisionNode,
     CobolFileDescription, CobolScope, CobolScopeId, CobolScopeKind, CobolSectionKind,
     CobolSectionNode,
 };
 
+use crate::IntrinsicFunctionKind;
 use crate::syntax::{SourceOrigin, SourceSpan};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -153,6 +158,8 @@ pub struct SemanticModel {
     pub scopes: Vec<CobolScope>,
     pub file_descriptions: Vec<CobolFileDescription>,
     pub data_descriptions: Vec<CobolDataDescription>,
+    pub intrinsic_calls: Vec<CobolIntrinsicCall>,
+    pub special_registers: Vec<CobolSpecialRegisterReference>,
     by_qualified: BTreeMap<String, usize>,
     by_simple: BTreeMap<String, Vec<usize>>,
     pub storage_bytes: usize,
@@ -255,6 +262,20 @@ impl SemanticModel {
                     .push(index);
             }
         }
+        let user_functions = structure
+            .scopes
+            .iter()
+            .filter(|scope| scope.kind == CobolScopeKind::Function)
+            .map(|scope| scope.name.clone())
+            .collect::<BTreeSet<_>>();
+        let (intrinsic_calls, special_registers) = functions::analyze(
+            source,
+            origins,
+            &layouts,
+            &files,
+            &user_functions,
+            pointer_bytes,
+        )?;
         Ok(Self {
             program_id,
             layouts,
@@ -264,6 +285,8 @@ impl SemanticModel {
             scopes: structure.scopes,
             file_descriptions: structure.file_descriptions,
             data_descriptions: structure.data_descriptions,
+            intrinsic_calls,
+            special_registers,
             by_qualified,
             by_simple,
             storage_bytes: cursor,
@@ -363,6 +386,15 @@ impl SemanticModel {
             .iter()
             .filter(|layout| layout.dynamic || layout.unbounded)
             .map(|layout| layout.qualified_name.clone())
+            .collect()
+    }
+
+    #[must_use]
+    pub fn execution_incomplete_intrinsics(&self) -> BTreeSet<IntrinsicFunctionKind> {
+        self.intrinsic_calls
+            .iter()
+            .filter(|call| !call.runtime_supported)
+            .map(|call| call.kind)
             .collect()
     }
 }
@@ -2634,6 +2666,8 @@ pub(crate) enum SemanticProblem {
     InvalidRedefines(String),
     InvalidReference(String),
     InvalidFileLayout(String),
+    InvalidIntrinsic(String),
+    InvalidSpecialRegister(String),
     ScopeLimitExceeded,
 }
 

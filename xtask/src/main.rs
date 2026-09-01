@@ -20,7 +20,7 @@ use mainframe_env_conformance::{
     verify_carddemo_seeds_from_env, verify_carddemo_source_closures_from_env,
     verify_carddemo_source_preprocessing_from_env, verify_carddemo_terminal_from_env,
     verify_carddemo_utilities_from_env, verify_carddemo_vsam_from_env,
-    verify_cobol_frontend_fixtures, verify_cobol_semantic_fixtures,
+    verify_cobol_frontend_fixtures, verify_cobol_function_fixtures, verify_cobol_semantic_fixtures,
     verify_cobol_statement_fixtures, verify_host_abi_libraries,
 };
 use mainframe_env_coverage::{
@@ -500,6 +500,7 @@ fn check_spec(root: &Path) -> TaskResult {
             == BTreeSet::from([
                 "cobol-language.schema.json",
                 "cobol-frontend-fixtures.schema.json",
+                "cobol-function-fixtures.schema.json",
                 "cobol-semantic-fixtures.schema.json",
                 "cobol-statement-fixtures.schema.json",
                 "conformance-inventory.schema.json",
@@ -552,11 +553,20 @@ fn check_spec(root: &Path) -> TaskResult {
         &statement_path,
     )?;
     verify_cobol_statement_fixtures()?;
+    let function_path = root.join("conformance/0.3/cobol/function-fixtures.json");
+    let function_schema_path = schema_directory.join("cobol-function-fixtures.schema.json");
+    validate_schema_instance(
+        &json(&function_schema_path)?,
+        &json(&function_path)?,
+        &function_path,
+    )?;
+    verify_cobol_function_fixtures()?;
     check_cobol_language_generated(root)?;
     let spec = compile_shared_spec(root)?;
     check_cobol_frontend_bindings(root, &spec, &frontend_path)?;
     check_cobol_semantic_bindings(root, &spec, &semantic_path)?;
     check_cobol_statement_bindings(root, &spec, &statement_path)?;
+    check_cobol_function_bindings(root, &spec, &function_path)?;
     validate_conformance_projections(&schema_directory, &spec)?;
     require(
         !root.join("conformance/spec/verdicts").exists()
@@ -653,6 +663,7 @@ fn check_cobol_language_catalog(root: &Path, path: &Path) -> TaskResult {
         ),
         ("compiler_directive_groups", "compiler-directive-groups", 5),
         ("procedure_statements", "procedure-statements", 44),
+        ("intrinsic_functions", "intrinsic-functions", 82),
         ("file_description_clauses", "file-description-clauses", 10),
         ("data_description_clauses", "data-description-clauses", 17),
     ] {
@@ -673,13 +684,30 @@ fn check_cobol_language_catalog(root: &Path, path: &Path) -> TaskResult {
                     "COBOL catalog references unknown official row {row_id}"
                 ));
             };
+            let catalog_label = entry["label"].as_str().or_else(|| entry["name"].as_str());
+            let normalized_label = label
+                .split_once(". ")
+                .map_or(label.as_str(), |(_, name)| name);
             require(
                 official_unit == unit
-                    && entry["label"].as_str() == Some(label)
+                    && catalog_label == Some(normalized_label)
                     && entry["source_locator"].as_str() == Some(locator),
                 &format!("COBOL catalog drifted from official row {row_id}"),
             )?;
         }
+    }
+    let special_registers = array(&language, "special_registers", path)?;
+    require(
+        special_registers.len() == 28,
+        "COBOL special-register denominator drifted",
+    )?;
+    let mut register_names = BTreeSet::new();
+    for register in special_registers {
+        require(
+            ids.insert(format!("special-registers:{}", text(register, "id", path)?))
+                && register_names.insert(text(register, "name", path)?),
+            "COBOL special-register identities are duplicated",
+        )?;
     }
     Ok(())
 }
@@ -1037,6 +1065,122 @@ fn check_cobol_statement_bindings(
     )
 }
 
+fn check_cobol_function_bindings(
+    root: &Path,
+    spec: &CompiledSpec,
+    fixture_path: &Path,
+) -> TaskResult {
+    let fixtures = json(fixture_path)?;
+    let language_path = root.join("conformance/0.3/cobol/language.json");
+    let language = json(&language_path)?;
+    let catalog = array(&language, "intrinsic_functions", &language_path)?
+        .iter()
+        .map(|entry| {
+            Ok((
+                text(entry, "row_id", &language_path)?.to_string(),
+                (
+                    text(entry, "id", &language_path)?.to_string(),
+                    text(entry, "name", &language_path)?.to_string(),
+                ),
+            ))
+        })
+        .collect::<TaskResult<BTreeMap<_, _>>>()?;
+    let digest = format!("sha256:{}", file_digest(fixture_path)?);
+    let mut expected_rows = BTreeSet::new();
+    let mut expected_fixtures = BTreeSet::new();
+    for fixture in array(&fixtures, "fixtures", fixture_path)? {
+        let id = text(fixture, "id", fixture_path)?;
+        let row_id = text(fixture, "row_id", fixture_path)?;
+        require(
+            expected_rows.insert(row_id.to_string()),
+            &format!("COBOL function fixtures repeat official row {row_id}"),
+        )?;
+        require(
+            catalog.get(row_id)
+                == Some(&(
+                    id.to_string(),
+                    text(fixture, "name", fixture_path)?.to_string(),
+                )),
+            &format!("COBOL function target drifts from generated catalog for {row_id}"),
+        )?;
+        for suffix in ["valid", "invalid"] {
+            expected_fixtures.insert(format!("cobol.function.{id}.{suffix}"));
+        }
+    }
+    let actual_rows = spec
+        .rows()
+        .filter(|row| expected_rows.contains(row.row_id().as_str()))
+        .map(|row| row.row_id().as_str().to_string())
+        .collect::<BTreeSet<_>>();
+    require(
+        actual_rows == expected_rows,
+        "COBOL function fixtures and row specifications are not closed",
+    )?;
+    for row in spec
+        .rows()
+        .filter(|row| expected_rows.contains(row.row_id().as_str()))
+    {
+        require(
+            row.obligations()
+                .iter()
+                .map(|obligation| obligation.as_str())
+                .collect::<BTreeSet<_>>()
+                == BTreeSet::from(["valid-signature", "invalid-signature"]),
+            &format!("COBOL function obligations drifted for {}", row.row_id()),
+        )?;
+    }
+    let actual_fixtures = spec
+        .registries()
+        .fixtures()
+        .iter()
+        .filter(|(fixture, _)| fixture.as_str().starts_with("cobol.function."))
+        .map(|(fixture, fixture_digest)| {
+            require(
+                fixture_digest == &digest,
+                &format!("COBOL function fixture digest drifted for {fixture}"),
+            )?;
+            Ok(fixture.as_str().to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        actual_fixtures == expected_fixtures,
+        "COBOL function fixture registry is incomplete or contains stale entries",
+    )?;
+    let actual_cases = spec
+        .cases()
+        .filter(|case| case.test_id().as_str().starts_with("cobol.function."))
+        .map(|case| {
+            require(
+                case.driver().as_str() == "cobol.function.driver"
+                    && case.input().as_str() == case.test_id().as_str()
+                    && case.preconditions().len() == 1
+                    && case.preconditions()[0].as_str() == "cobol.function.fixture.available"
+                    && case.expected().len() == 1,
+                &format!("COBOL function binding drifted for {}", case.test_id()),
+            )?;
+            let expected = if case.key().gate == CoverageGate::Recognized {
+                "cobol.function.accepted"
+            } else if case.key().gate == CoverageGate::Validated {
+                "cobol.function.rejected"
+            } else {
+                return Err(format!(
+                    "COBOL function case claims a later gate: {}",
+                    case.test_id()
+                ));
+            };
+            require(
+                case.expected()[0].as_str() == expected,
+                &format!("COBOL function expectation drifted for {}", case.test_id()),
+            )?;
+            Ok(case.test_id().as_str().to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        actual_cases == expected_fixtures,
+        "COBOL function executable bindings are incomplete or stale",
+    )
+}
+
 fn generate_cobol_language(root: &Path) -> TaskResult {
     let path = root.join("crates/kernel/mainframe-env-compiler/src/generated/cobol_language.rs");
     fs::create_dir_all(path.parent().ok_or("generated COBOL path has no parent")?)
@@ -1063,6 +1207,8 @@ fn render_cobol_language(root: &Path) -> TaskResult<Vec<u8>> {
     let procedure_statements = array(&language, "procedure_statements", &path)?;
     let file_clauses = array(&language, "file_description_clauses", &path)?;
     let data_clauses = array(&language, "data_description_clauses", &path)?;
+    let intrinsic_functions = array(&language, "intrinsic_functions", &path)?;
+    let special_registers = array(&language, "special_registers", &path)?;
     let literal = |value: &str| serde_json::to_string(value).map_err(|error| error.to_string());
     let mut source =
         String::from("// @generated by `cargo xtask cobol-language`; do not edit.\n\n");
@@ -1095,6 +1241,52 @@ fn render_cobol_language(root: &Path) -> TaskResult<Vec<u8>> {
         ));
     }
     source.push_str("    ];\n}\n\n");
+    source.push_str("#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]\n");
+    source.push_str("pub enum IntrinsicFunctionKind {\n");
+    for entry in intrinsic_functions {
+        source.push_str(&format!(
+            "    {},\n",
+            rust_variant(text(entry, "id", &path)?)?
+        ));
+    }
+    source.push_str("}\n\n");
+    source.push_str(&format!(
+        "impl IntrinsicFunctionKind {{\n    pub const ALL: [Self; {}] = [\n",
+        intrinsic_functions.len()
+    ));
+    for entry in intrinsic_functions {
+        source.push_str(&format!(
+            "        Self::{},\n",
+            rust_variant(text(entry, "id", &path)?)?
+        ));
+    }
+    source.push_str("    ];\n}\n\n");
+    source.push_str("#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]\n");
+    source.push_str("pub enum SpecialRegisterKind {\n");
+    for entry in special_registers {
+        source.push_str(&format!(
+            "    {},\n",
+            rust_variant(text(entry, "id", &path)?)?
+        ));
+    }
+    source.push_str("}\n\n");
+    source.push_str(&format!(
+        "impl SpecialRegisterKind {{\n    pub const ALL: [Self; {}] = [\n",
+        special_registers.len()
+    ));
+    for entry in special_registers {
+        source.push_str(&format!(
+            "        Self::{},\n",
+            rust_variant(text(entry, "id", &path)?)?
+        ));
+    }
+    source.push_str("    ];\n}\n\n");
+    source.push_str("#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]\npub enum IntrinsicArgumentClass { Alphabetic, Alphanumeric, Dbcs, Integer, Numeric, National, Utf8, Other, Keyword }\n\n");
+    source.push_str("#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]\npub enum IntrinsicResultRule { Integer, Numeric, Alphanumeric, National, Utf8, PreserveNumeric, Content, StringFirst, Comparable, RangeSum }\n\n");
+    source.push_str("#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]\npub enum SpecialRegisterValueType { Alphanumeric, Integer, National, Other, Group }\n\n");
+    source.push_str("#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]\npub enum SpecialRegisterUsage { Display, Binary, NativeBinary, National, Pointer, Group }\n\n");
+    source.push_str("#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]\npub enum SpecialRegisterLengthKind { Fixed, Lp, Dynamic, Dependent }\n\n");
+    source.push_str("#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]\npub enum SpecialRegisterOperand { None, DataItem, File, DebugContext }\n\n");
     source.push_str(&format!(
         "impl FileDescriptionClauseKind {{\n    pub const ALL: [Self; {}] = [\n",
         file_clauses.len()
@@ -1175,6 +1367,12 @@ fn render_cobol_language(root: &Path) -> TaskResult<Vec<u8>> {
     source.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
     source.push_str("pub struct ProcedureStatementDescriptor {\n");
     source.push_str("    pub kind: ProcedureStatementKind,\n    pub id: &'static str,\n    pub row_id: &'static str,\n    pub label: &'static str,\n    pub source_locator: &'static str,\n    pub forms: &'static [&'static str],\n}\n\n");
+    source.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
+    source.push_str("pub struct IntrinsicSignature {\n    pub arguments: &'static [&'static [IntrinsicArgumentClass]],\n    pub variadic: bool,\n    pub homogeneous: bool,\n    pub result: IntrinsicResultRule,\n}\n\n");
+    source.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
+    source.push_str("pub struct IntrinsicFunctionDescriptor {\n    pub kind: IntrinsicFunctionKind,\n    pub id: &'static str,\n    pub row_id: &'static str,\n    pub name: &'static str,\n    pub source_locator: &'static str,\n    pub signatures: &'static [IntrinsicSignature],\n    pub literal_arguments: &'static [usize],\n    pub fixed_length: Option<usize>,\n    pub runtime_supported: bool,\n}\n\n");
+    source.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
+    source.push_str("pub struct SpecialRegisterDescriptor {\n    pub kind: SpecialRegisterKind,\n    pub id: &'static str,\n    pub name: &'static str,\n    pub source_locator: &'static str,\n    pub value_type: SpecialRegisterValueType,\n    pub usage: SpecialRegisterUsage,\n    pub length_kind: SpecialRegisterLengthKind,\n    pub fixed_length: Option<usize>,\n    pub writable: bool,\n    pub operand: SpecialRegisterOperand,\n}\n\n");
     source.push_str(
         "pub static COMPILER_DIRECTING_STATEMENTS: &[CompilerDirectingDescriptor] = &[\n",
     );
@@ -1230,6 +1428,113 @@ fn render_cobol_language(root: &Path) -> TaskResult<Vec<u8>> {
             source.push(',');
         }
         source.push_str("],\n    },\n");
+    }
+    source.push_str("];\n\n");
+    source.push_str("pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[\n");
+    for entry in intrinsic_functions {
+        let id = text(entry, "id", &path)?;
+        source.push_str("    IntrinsicFunctionDescriptor {\n");
+        source.push_str(&format!(
+            "        kind: IntrinsicFunctionKind::{},\n",
+            rust_variant(id)?
+        ));
+        for field in ["id", "row_id", "name", "source_locator"] {
+            source.push_str(&format!(
+                "        {field}: {},\n",
+                literal(text(entry, field, &path)?)?
+            ));
+        }
+        source.push_str("        signatures: &[\n");
+        for signature in array(entry, "signatures", &path)? {
+            source.push_str("            IntrinsicSignature { arguments: &[");
+            for position in array(signature, "arguments", &path)? {
+                let classes = position
+                    .as_array()
+                    .ok_or("intrinsic argument set is not an array")?;
+                source.push_str("&[");
+                for class in classes {
+                    source.push_str(&format!(
+                        "IntrinsicArgumentClass::{},",
+                        rust_variant(class.as_str().ok_or("intrinsic class is not a string")?)?
+                    ));
+                }
+                source.push_str("],");
+            }
+            source.push_str(&format!(
+                "], variadic: {}, homogeneous: {}, result: IntrinsicResultRule::{} }},\n",
+                signature["variadic"]
+                    .as_bool()
+                    .ok_or("intrinsic variadic flag is not boolean")?,
+                signature["homogeneous"]
+                    .as_bool()
+                    .ok_or("intrinsic homogeneous flag is not boolean")?,
+                rust_variant(text(signature, "result", &path)?)?
+            ));
+        }
+        source.push_str("        ],\n");
+        source.push_str("        literal_arguments: &[");
+        for index in array(entry, "literal_arguments", &path)? {
+            source.push_str(&format!(
+                "{}usize,",
+                index
+                    .as_u64()
+                    .ok_or("intrinsic literal argument index is not an integer")?
+            ));
+        }
+        source.push_str("],\n");
+        source.push_str(&format!(
+            "        fixed_length: {},\n",
+            entry["fixed_length"]
+                .as_u64()
+                .map_or_else(|| "None".to_string(), |value| format!("Some({value}usize)"))
+        ));
+        source.push_str(&format!(
+            "        runtime_supported: {},\n",
+            entry["runtime_supported"]
+                .as_bool()
+                .ok_or("intrinsic runtime support flag is not boolean")?
+        ));
+        source.push_str("    },\n");
+    }
+    source.push_str("];\n\n");
+    source.push_str("pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[\n");
+    for entry in special_registers {
+        let id = text(entry, "id", &path)?;
+        source.push_str("    SpecialRegisterDescriptor {\n");
+        source.push_str(&format!(
+            "        kind: SpecialRegisterKind::{},\n",
+            rust_variant(id)?
+        ));
+        for field in ["id", "name", "source_locator"] {
+            source.push_str(&format!(
+                "        {field}: {},\n",
+                literal(text(entry, field, &path)?)?
+            ));
+        }
+        for (field, kind) in [
+            ("value_type", "SpecialRegisterValueType"),
+            ("usage", "SpecialRegisterUsage"),
+            ("length_kind", "SpecialRegisterLengthKind"),
+            ("operand", "SpecialRegisterOperand"),
+        ] {
+            source.push_str(&format!(
+                "        {field}: {kind}::{},\n",
+                rust_variant(text(entry, field, &path)?)?
+            ));
+        }
+        source.push_str(&format!(
+            "        fixed_length: {},\n",
+            entry["fixed_length"]
+                .as_u64()
+                .map_or_else(|| "None".to_string(), |value| format!("Some({value}usize)"))
+        ));
+        source.push_str(&format!(
+            "        writable: {},\n",
+            entry["writable"]
+                .as_bool()
+                .ok_or("special-register writable flag is not boolean")?
+        ));
+        source.push_str("    },\n");
     }
     source.push_str("];\n\n");
     source.push_str("pub static FILE_DESCRIPTION_CLAUSES: &[ClauseDescriptor<FileDescriptionClauseKind>] = &[\n");
@@ -1330,6 +1635,10 @@ fn render_cobol_language(root: &Path) -> TaskResult<Vec<u8>> {
     source.push_str("\npub fn file_description_clause_descriptor(kind: FileDescriptionClauseKind) -> &'static ClauseDescriptor<FileDescriptionClauseKind> {\n    FILE_DESCRIPTION_CLAUSES.iter().find(|entry| entry.kind == kind).expect(\"generated file clause kind\")\n}\n");
     source.push_str("\npub fn data_description_clause_descriptor(kind: DataDescriptionClauseKind) -> &'static ClauseDescriptor<DataDescriptionClauseKind> {\n    DATA_DESCRIPTION_CLAUSES.iter().find(|entry| entry.kind == kind).expect(\"generated data clause kind\")\n}\n");
     source.push_str("\npub fn procedure_statement_descriptor(kind: ProcedureStatementKind) -> &'static ProcedureStatementDescriptor {\n    PROCEDURE_STATEMENTS.iter().find(|entry| entry.kind == kind).expect(\"generated procedure statement kind\")\n}\n");
+    source.push_str("\npub fn intrinsic_function_descriptor(kind: IntrinsicFunctionKind) -> &'static IntrinsicFunctionDescriptor {\n    INTRINSIC_FUNCTIONS.iter().find(|entry| entry.kind == kind).expect(\"generated intrinsic function kind\")\n}\n");
+    source.push_str("\npub fn intrinsic_function_named(name: &str) -> Option<&'static IntrinsicFunctionDescriptor> {\n    INTRINSIC_FUNCTIONS.iter().find(|entry| entry.name.eq_ignore_ascii_case(name))\n}\n");
+    source.push_str("\npub fn special_register_descriptor(kind: SpecialRegisterKind) -> &'static SpecialRegisterDescriptor {\n    SPECIAL_REGISTERS.iter().find(|entry| entry.kind == kind).expect(\"generated special register kind\")\n}\n");
+    source.push_str("\npub fn special_register_named(name: &str) -> Option<&'static SpecialRegisterDescriptor> {\n    SPECIAL_REGISTERS.iter().find(|entry| entry.name.eq_ignore_ascii_case(name))\n}\n");
     format_generated_rust(root, source.into_bytes())
 }
 

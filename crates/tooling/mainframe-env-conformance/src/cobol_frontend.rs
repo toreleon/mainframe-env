@@ -127,18 +127,21 @@ pub fn cobol_frontend_runtime(
 ) -> Result<RuntimeRegistry<'static>, String> {
     verify_cobol_frontend_fixtures()?;
     crate::cobol_clauses::verify_cobol_semantic_fixtures()?;
+    crate::cobol_functions::verify_cobol_function_fixtures()?;
     crate::cobol_statements::verify_cobol_statement_fixtures()?;
     let mut drivers = vec![(
         DriverRef::new("cobol.frontend.driver", limits).map_err(|error| error.to_string())?,
         &FRONTEND_DRIVER as &dyn ConformanceDriver,
     )];
     drivers.extend(crate::cobol_clauses::runtime_drivers(limits)?);
+    drivers.extend(crate::cobol_functions::runtime_drivers(limits)?);
     drivers.extend(crate::cobol_statements::runtime_drivers(limits)?);
     let mut predicates = vec![(
         PredicateRef::new("cobol.fixture.available", limits).map_err(|error| error.to_string())?,
         &FIXTURE_AVAILABLE as &dyn ConformancePredicate,
     )];
     predicates.extend(crate::cobol_clauses::runtime_predicates(limits)?);
+    predicates.extend(crate::cobol_functions::runtime_predicates(limits)?);
     predicates.extend(crate::cobol_statements::runtime_predicates(limits)?);
     let mut observations = vec![
         (
@@ -153,6 +156,7 @@ pub fn cobol_frontend_runtime(
         ),
     ];
     observations.extend(crate::cobol_clauses::runtime_observations(limits)?);
+    observations.extend(crate::cobol_functions::runtime_observations(limits)?);
     observations.extend(crate::cobol_statements::runtime_observations(limits)?);
     RuntimeRegistry::new(spec, drivers, predicates, observations, limits)
         .map_err(|error| error.to_string())
