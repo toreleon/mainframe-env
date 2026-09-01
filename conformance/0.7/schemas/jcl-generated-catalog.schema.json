@@ -9,6 +9,8 @@
     "target_version",
     "source_catalog",
     "source_catalog_sha256",
+    "planner_semantics",
+    "planner_semantics_sha256",
     "plan_schema",
     "plan_schema_sha256",
     "generated_coverage_credit",
@@ -19,6 +21,8 @@
     "target_version": {"const": "0.7.0"},
     "source_catalog": {"const": "conformance/0.2/catalogs/jcl-jes2.json"},
     "source_catalog_sha256": {"$ref": "#/$defs/digest"},
+    "planner_semantics": {"const": "conformance/0.7/catalogs/jcl-planner-semantics.json"},
+    "planner_semantics_sha256": {"$ref": "#/$defs/digest"},
     "plan_schema": {"const": "conformance/0.7/schemas/jcl-job-plan.schema.json"},
     "plan_schema_sha256": {"$ref": "#/$defs/digest"},
     "generated_coverage_credit": {"const": 0},
@@ -68,7 +72,14 @@
         "keyword",
         "aliases",
         "rust_variant",
-        "source_locator"
+        "source_locator",
+        "validation",
+        "minimum",
+        "maximum",
+        "choices",
+        "support",
+        "sensitive",
+        "capability"
       ],
       "properties": {
         "row_id": {
@@ -85,7 +96,19 @@
           "items": {"type": "string", "minLength": 1, "maxLength": 64}
         },
         "rust_variant": {"type": "string", "pattern": "^[A-Z][A-Za-z0-9]*$"},
-        "source_locator": {"type": "string", "minLength": 1, "maxLength": 256}
+        "source_locator": {"type": "string", "minLength": 1, "maxLength": 256},
+        "validation": {"type": "string", "minLength": 1, "maxLength": 64},
+        "minimum": {"type": ["integer", "null"], "minimum": 0, "maximum": 4294967295},
+        "maximum": {"type": ["integer", "null"], "minimum": 0, "maximum": 4294967295},
+        "choices": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 64}
+        },
+        "support": {"enum": ["available", "deferred"]},
+        "sensitive": {"type": "boolean"},
+        "capability": {"type": "string", "pattern": "^[a-z][a-z0-9.-]+$"}
       }
     }
   }

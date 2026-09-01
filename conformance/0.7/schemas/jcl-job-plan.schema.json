@@ -145,7 +145,12 @@
             "capability-requirement"
           ]
         },
-        "source": {"$ref": "#/$defs/sourceSpan"}
+        "source": {"$ref": "#/$defs/sourceSpan"},
+        "inline_data": {
+          "type": "array",
+          "maxItems": 67108864,
+          "items": {"type": "integer", "minimum": 0, "maximum": 255}
+        }
       }
     },
     "statement": {

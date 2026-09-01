@@ -645,9 +645,10 @@ fn expand_sequence(
                 let mut effective_operands =
                     substitute_symbols(context, statement.operands(), symbols, &site);
                 let relative_name = match statement.identity() {
-                    JclStatementId::Dd => current_step
-                        .as_ref()
-                        .and_then(|step| statement.name().map(|name| format!("{step}.{name}"))),
+                    JclStatementId::Dd => current_step.as_ref().map_or_else(
+                        || statement.name().map(str::to_ascii_uppercase),
+                        |step| statement.name().map(|name| format!("{step}.{name}")),
+                    ),
                     _ => statement.name().map(str::to_ascii_uppercase),
                 };
                 let mut sites = Vec::new();
@@ -1030,7 +1031,9 @@ fn substitute_symbols(
             continue;
         }
         if bytes.get(index + 1) == Some(&b'&') {
-            output.push('&');
+            // Preserve the JCL temporary-data-set prefix. Literal ampersand
+            // interpretation remains a later operand-specific concern.
+            output.push_str("&&");
             index += 2;
             continue;
         }
@@ -1591,7 +1594,7 @@ mod tests {
     #[test]
     fn procedure_export_updates_the_caller_only_after_invocation() {
         let expansion = expand(JclBundle {
-            primary: "//P PROC\n// SET PROGRAM=IEFBR14\n// EXPORT SYMLIST=(PROGRAM)\n// PEND\n//J JOB\n//R EXEC PROC=P\n//S EXEC PGM=&PROGRAM.\n".into(),
+            primary: "//J JOB\n//P PROC\n// SET PROGRAM=IEFBR14\n// EXPORT SYMLIST=(PROGRAM)\n// PEND\n//R EXEC PROC=P\n//S EXEC PGM=&PROGRAM.\n".into(),
             ..JclBundle::default()
         });
         assert!(expansion.is_complete(), "{:?}", expansion.diagnostics());

@@ -349,6 +349,8 @@ pub struct JclStatementNode {
     raw_operands: String,
     parameters: Vec<JclParameterNode>,
     source: JclSourceSpan,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    inline_data: Vec<u8>,
 }
 
 impl JclStatementNode {
@@ -368,7 +370,14 @@ impl JclStatementNode {
             raw_operands,
             parameters,
             source,
+            inline_data: Vec::new(),
         }
+    }
+
+    #[must_use]
+    pub fn with_inline_data(mut self, inline_data: Vec<u8>) -> Self {
+        self.inline_data = inline_data;
+        self
     }
 
     #[must_use]
@@ -399,6 +408,11 @@ impl JclStatementNode {
     #[must_use]
     pub fn source(&self) -> &JclSourceSpan {
         &self.source
+    }
+
+    #[must_use]
+    pub fn inline_data(&self) -> &[u8] {
+        &self.inline_data
     }
 }
 

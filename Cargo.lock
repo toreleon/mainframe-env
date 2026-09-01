@@ -1114,6 +1114,7 @@ dependencies = [
 name = "mainframe-env-batch"
 version = "0.2.0"
 dependencies = [
+ "jsonschema",
  "mainframe-env-diagnostics",
  "mainframe-env-encoding",
  "mainframe-env-execution-api",
@@ -1124,6 +1125,7 @@ dependencies = [
  "rowan",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
 ]
 
 [[package]]

@@ -3,9 +3,10 @@ mod generated;
 
 pub use generated::{
     DD_PARAMETERS, DdParameterId, EXEC_PARAMETERS, ExecParameterId, JCL_GENERATED_CATALOG_SHA256,
-    JCL_OFFICIAL_CATALOG_SHA256, JCL_PLAN_SCHEMA_SHA256, JCL_STATEMENTS, JES2_STATEMENTS,
-    JOB_PARAMETERS, JclCatalogEntry, JclStatementId, Jes2StatementId, JobParameterId,
-    OUTPUT_PARAMETERS, OutputParameterId,
+    JCL_OFFICIAL_CATALOG_SHA256, JCL_PLAN_SCHEMA_SHA256, JCL_PLANNER_SEMANTICS_SHA256,
+    JCL_STATEMENTS, JES2_STATEMENTS, JOB_PARAMETERS, JclCatalogEntry, JclCatalogSupport,
+    JclStatementId, JclValueShape, Jes2StatementId, JobParameterId, OUTPUT_PARAMETERS,
+    OutputParameterId,
 };
 
 #[cfg(test)]

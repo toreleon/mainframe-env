@@ -1,6 +1,8 @@
 use super::*;
 
 const SOURCE_PATH: &str = "conformance/0.2/catalogs/jcl-jes2.json";
+const SEMANTICS_PATH: &str = "conformance/0.7/catalogs/jcl-planner-semantics.json";
+const SEMANTICS_SCHEMA_PATH: &str = "conformance/0.7/schemas/jcl-planner-semantics.schema.json";
 const PLAN_SCHEMA_PATH: &str = "conformance/0.7/schemas/jcl-job-plan.schema.json";
 const GENERATED_JSON_PATH: &str = "conformance/0.7/generated/jcl-catalog.json";
 const GENERATED_RUST_PATH: &str = "crates/apps/mainframe-env-batch/src/generated/jcl_catalog.rs";
@@ -37,6 +39,13 @@ struct Entry {
     variant: String,
     keyword: String,
     aliases: Vec<String>,
+    validation: String,
+    minimum: Option<u64>,
+    maximum: Option<u64>,
+    choices: Vec<String>,
+    support: String,
+    sensitive: bool,
+    capability: String,
 }
 
 struct Artifacts {
@@ -83,6 +92,14 @@ pub(super) fn check(root: &Path) -> TaskResult {
 fn render(root: &Path) -> TaskResult<Artifacts> {
     let source_path = root.join(SOURCE_PATH);
     let source = json(&source_path)?;
+    let semantics_path = root.join(SEMANTICS_PATH);
+    let semantics = json(&semantics_path)?;
+    let semantics_schema_path = root.join(SEMANTICS_SCHEMA_PATH);
+    validate_schema_instance(
+        &json(&semantics_schema_path)?,
+        &semantics,
+        &semantics_schema_path,
+    )?;
     require(
         source["schema_version"] == Value::String("mainframe-env.official-catalog@1".into())
             && source["baseline_id"] == Value::String("ibm-zos-3.2-jcl-jes2-2026-06".into())
@@ -120,6 +137,7 @@ fn render(root: &Path) -> TaskResult<Artifacts> {
                 &format!("JCL catalog row identity is invalid or duplicated: {row_id}"),
             )?;
             let (variant, keyword, aliases) = normalize(family, &label)?;
+            let rule = semantic_rule(&semantics, family, &keyword)?;
             require(
                 variants.insert(variant.clone()),
                 &format!("JCL generated variant is duplicated in {family}: {variant}"),
@@ -139,6 +157,13 @@ fn render(root: &Path) -> TaskResult<Artifacts> {
                 variant,
                 keyword,
                 aliases,
+                validation: rule.validation,
+                minimum: rule.minimum,
+                maximum: rule.maximum,
+                choices: rule.choices,
+                support: rule.support,
+                sensitive: rule.sensitive,
+                capability: rule.capability,
             });
         }
     }
@@ -147,8 +172,15 @@ fn render(root: &Path) -> TaskResult<Artifacts> {
         "JCL generated catalog must contain exactly 237 rows",
     )?;
     let catalog_digest = format!("sha256:{}", file_digest(&source_path)?);
+    let semantics_digest = format!("sha256:{}", file_digest(&semantics_path)?);
     let plan_schema_digest = format!("sha256:{}", file_digest(&root.join(PLAN_SCHEMA_PATH))?);
-    let generated_json = render_json(&entries, &catalog_digest, &plan_schema_digest)?;
+    validate_semantic_rule_closure(&semantics, &entries)?;
+    let generated_json = render_json(
+        &entries,
+        &catalog_digest,
+        &semantics_digest,
+        &plan_schema_digest,
+    )?;
     let generated_value: Value = serde_json::from_slice(&generated_json)
         .map_err(|error| format!("generated JCL catalog projection: {error}"))?;
     let generated_schema_path = root.join(GENERATED_SCHEMA_PATH);
@@ -163,17 +195,130 @@ fn render(root: &Path) -> TaskResult<Artifacts> {
         rust: render_rust(
             &entries,
             &catalog_digest,
+            &semantics_digest,
             &plan_schema_digest,
             &generated_digest,
         )?,
         documentation: render_documentation(
             &entries,
             &catalog_digest,
+            &semantics_digest,
             &plan_schema_digest,
             &generated_digest,
         )
         .into_bytes(),
     })
+}
+
+#[derive(Clone, Debug)]
+struct SemanticRule {
+    validation: String,
+    minimum: Option<u64>,
+    maximum: Option<u64>,
+    choices: Vec<String>,
+    support: String,
+    sensitive: bool,
+    capability: String,
+}
+
+fn semantic_rule(semantics: &Value, family: &str, keyword: &str) -> TaskResult<SemanticRule> {
+    let family_value = semantics["families"]
+        .get(family)
+        .ok_or_else(|| format!("JCL semantics omit family {family}"))?;
+    let rule = family_value["rules"]
+        .get(keyword)
+        .unwrap_or(&family_value["default"]);
+    let prefix = text(family_value, "capability_prefix", Path::new(SEMANTICS_PATH))?;
+    let validation = text(rule, "validation", Path::new(SEMANTICS_PATH))?.to_string();
+    let support = text(rule, "support", Path::new(SEMANTICS_PATH))?.to_string();
+    let minimum = rule.get("minimum").and_then(Value::as_u64);
+    let maximum = rule.get("maximum").and_then(Value::as_u64);
+    require(
+        minimum
+            .zip(maximum)
+            .is_none_or(|(minimum, maximum)| minimum <= maximum),
+        &format!("JCL semantic range is inverted for {family}/{keyword}"),
+    )?;
+    let choices = rule
+        .get("choices")
+        .map(|choices| {
+            choices
+                .as_array()
+                .ok_or_else(|| {
+                    format!("JCL semantic choices are not an array: {family}/{keyword}")
+                })?
+                .iter()
+                .map(|choice| {
+                    choice.as_str().map(str::to_string).ok_or_else(|| {
+                        format!("JCL semantic choice is not a string: {family}/{keyword}")
+                    })
+                })
+                .collect::<TaskResult<Vec<_>>>()
+        })
+        .transpose()?
+        .unwrap_or_default();
+    require(
+        (validation == "enum") == !choices.is_empty(),
+        &format!("JCL enum choice closure differs for {family}/{keyword}"),
+    )?;
+    Ok(SemanticRule {
+        validation,
+        minimum,
+        maximum,
+        choices,
+        support,
+        sensitive: rule
+            .get("sensitive")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        capability: rule
+            .get("capability")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .unwrap_or_else(|| format!("{prefix}.{}", capability_token(keyword))),
+    })
+}
+
+fn validate_semantic_rule_closure(semantics: &Value, entries: &[Entry]) -> TaskResult {
+    for (family, _, _, _) in FAMILIES {
+        let known = entries
+            .iter()
+            .filter(|entry| entry.family == family)
+            .map(|entry| entry.keyword.as_str())
+            .collect::<BTreeSet<_>>();
+        let rules = semantics["families"][family]["rules"]
+            .as_object()
+            .ok_or_else(|| format!("JCL semantic rules are missing for {family}"))?;
+        let declared = rules.keys().map(String::as_str).collect::<BTreeSet<_>>();
+        require(
+            declared.is_subset(&known),
+            &format!(
+                "JCL semantic catalog contains unknown {family} rules: {:?}",
+                declared.difference(&known).collect::<Vec<_>>()
+            ),
+        )?;
+    }
+    Ok(())
+}
+
+fn capability_token(keyword: &str) -> String {
+    let value = keyword
+        .to_ascii_lowercase()
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || character == '-' {
+                character
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>();
+    let value = value.trim_matches('-');
+    if value.is_empty() {
+        "control".into()
+    } else {
+        value.into()
+    }
 }
 
 fn normalize(family: &str, label: &str) -> TaskResult<(String, String, Vec<String>)> {
@@ -231,6 +376,7 @@ fn normalize(family: &str, label: &str) -> TaskResult<(String, String, Vec<Strin
 fn render_json(
     entries: &[Entry],
     catalog_digest: &str,
+    semantics_digest: &str,
     plan_schema_digest: &str,
 ) -> TaskResult<Vec<u8>> {
     let families = FAMILIES
@@ -248,6 +394,13 @@ fn render_json(
                         "aliases": entry.aliases,
                         "rust_variant": entry.variant,
                         "source_locator": entry.source_locator,
+                        "validation": entry.validation,
+                        "minimum": entry.minimum,
+                        "maximum": entry.maximum,
+                        "choices": entry.choices,
+                        "support": entry.support,
+                        "sensitive": entry.sensitive,
+                        "capability": entry.capability,
                     })
                 })
                 .collect::<Vec<_>>();
@@ -259,6 +412,8 @@ fn render_json(
         "target_version": "0.7.0",
         "source_catalog": SOURCE_PATH,
         "source_catalog_sha256": catalog_digest,
+        "planner_semantics": SEMANTICS_PATH,
+        "planner_semantics_sha256": semantics_digest,
         "plan_schema": PLAN_SCHEMA_PATH,
         "plan_schema_sha256": plan_schema_digest,
         "generated_coverage_credit": 0,
@@ -269,6 +424,7 @@ fn render_json(
 fn render_rust(
     entries: &[Entry],
     catalog_digest: &str,
+    semantics_digest: &str,
     plan_schema_digest: &str,
     generated_digest: &str,
 ) -> TaskResult<Vec<u8>> {
@@ -280,10 +436,23 @@ fn render_rust(
         "pub const JCL_PLAN_SCHEMA_SHA256: &str = \"{plan_schema_digest}\";\n"
     ));
     output.push_str(&format!(
+        "pub const JCL_PLANNER_SEMANTICS_SHA256: &str = \"{semantics_digest}\";\n"
+    ));
+    output.push_str(&format!(
         "pub const JCL_GENERATED_CATALOG_SHA256: &str = \"{generated_digest}\";\n\n"
     ));
     output.push_str(
         "#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]\n\
+         pub enum JclCatalogSupport { Available, Deferred }\n\n\
+         #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]\n\
+         pub enum JclValueShape {\n\
+             None, JclValue, Text, Name, NameList, Integer, IntegerOrTuple,\n\
+             IntegerOrX, IntegerOrSuffix, Boolean, Enum, Size, SizeOrTuple,\n\
+             Time, Class, Condition, MessageLevel, Dataset, Disposition,\n\
+             Delimiter, RecordFormat, Path, Program, Procedure, Restart, Sysout,\n\
+             OutputReference, BackwardReference, Secret,\n\
+         }\n\n\
+         #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]\n\
          pub struct JclCatalogEntry<I> {\n\
              pub id: I,\n\
              pub row_id: &'static str,\n\
@@ -293,6 +462,13 @@ fn render_rust(
              pub keyword: &'static str,\n\
              pub aliases: &'static [&'static str],\n\
              pub source_locator: &'static str,\n\
+             pub validation: JclValueShape,\n\
+             pub minimum: Option<u64>,\n\
+             pub maximum: Option<u64>,\n\
+             pub choices: &'static [&'static str],\n\
+             pub support: JclCatalogSupport,\n\
+             pub sensitive: bool,\n\
+             pub capability: &'static str,\n\
          }\n\n\
          impl<I: Copy> JclCatalogEntry<I> {\n\
              #[must_use]\n\
@@ -334,6 +510,21 @@ fn render_rust(
                 "        source_locator: {:?},\n",
                 entry.source_locator
             ));
+            let validation = rust_variant(&entry.validation).expect("validated value shape");
+            let support = rust_variant(&entry.support).expect("validated support state");
+            output.push_str(&format!(
+                "        validation: JclValueShape::{validation},\n"
+            ));
+            output.push_str(&format!("        minimum: {:?},\n", entry.minimum));
+            output.push_str(&format!("        maximum: {:?},\n", entry.maximum));
+            output.push_str("        choices: &[");
+            for choice in &entry.choices {
+                output.push_str(&format!("{choice:?}, "));
+            }
+            output.push_str("],\n");
+            output.push_str(&format!("        support: JclCatalogSupport::{support},\n"));
+            output.push_str(&format!("        sensitive: {},\n", entry.sensitive));
+            output.push_str(&format!("        capability: {:?},\n", entry.capability));
             output.push_str("    },\n");
         }
         output.push_str("];\n\n");
@@ -383,6 +574,7 @@ fn format_generated_rust(source: String) -> TaskResult<Vec<u8>> {
 fn render_documentation(
     entries: &[Entry],
     catalog_digest: &str,
+    semantics_digest: &str,
     plan_schema_digest: &str,
     generated_digest: &str,
 ) -> String {
@@ -390,21 +582,29 @@ fn render_documentation(
         "# Generated JCL/JES2 0.7.0 inventory\n\n\
          Generated by `cargo xtask jcl-catalog`; do not edit. Catalog presence grants no semantic coverage.\n\n\
          - Official catalog: `{catalog_digest}`\n\
+         - Planner semantics: `{semantics_digest}`\n\
          - Generated catalog: `{generated_digest}`\n\
          - Plan schema: `{plan_schema_digest}`\n\n"
     );
     for (family, denominator, _, _) in FAMILIES {
         output.push_str(&format!("## {family} ({denominator})\n\n"));
-        output.push_str("| Ordinal | Keyword | Official label | Row ID | Source |\n");
-        output.push_str("|---:|---|---|---|---|\n");
+        output.push_str("| Ordinal | Keyword | Validation | Support | Capability | Official label | Row ID | Source |\n");
+        output.push_str("|---:|---|---|---|---|---|---|---|\n");
         for entry in entries.iter().filter(|entry| entry.family == family) {
             let keywords = std::iter::once(entry.keyword.as_str())
                 .chain(entry.aliases.iter().map(String::as_str))
                 .collect::<Vec<_>>()
                 .join(", ");
             output.push_str(&format!(
-                "| {} | `{}` | {} | `{}` | `{}` |\n",
-                entry.ordinal, keywords, entry.label, entry.row_id, entry.source_locator
+                "| {} | `{}` | `{}` | `{}` | `{}` | {} | `{}` | `{}` |\n",
+                entry.ordinal,
+                keywords,
+                entry.validation,
+                entry.support,
+                entry.capability,
+                entry.label,
+                entry.row_id,
+                entry.source_locator
             ));
         }
         output.push('\n');

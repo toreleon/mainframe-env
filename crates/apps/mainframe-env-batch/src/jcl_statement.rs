@@ -1,6 +1,7 @@
 use crate::{
-    DdParameterId, ExecParameterId, JclGeneratedIdentity, JclParameterOutcome, JclRecordKind,
-    JclStatementId, JclSyntaxAnalysis, JobParameterId, OutputParameterId,
+    DdParameterId, ExecParameterId, JclCatalogSupport, JclGeneratedIdentity, JclParameterOutcome,
+    JclRecordKind, JclStatementId, JclSyntaxAnalysis, JclValueShape, JobParameterId,
+    OutputParameterId,
 };
 use mainframe_env_diagnostics::{
     Completeness, Diagnostic, DiagnosticCode, DiagnosticLimits, FailureCategory, Phase, Redaction,
@@ -34,6 +35,76 @@ impl JclParameterIdentity {
             Self::Exec(_) => JclParameterOutcome::StepAttribute,
             Self::Job(_) => JclParameterOutcome::JobAttribute,
             Self::Output(_) => JclParameterOutcome::OutputAttribute,
+        }
+    }
+
+    #[must_use]
+    pub fn validation(self) -> JclValueShape {
+        match self {
+            Self::Dd(id) => id.descriptor().validation,
+            Self::Exec(id) => id.descriptor().validation,
+            Self::Job(id) => id.descriptor().validation,
+            Self::Output(id) => id.descriptor().validation,
+        }
+    }
+
+    #[must_use]
+    pub fn minimum(self) -> Option<u64> {
+        match self {
+            Self::Dd(id) => id.descriptor().minimum,
+            Self::Exec(id) => id.descriptor().minimum,
+            Self::Job(id) => id.descriptor().minimum,
+            Self::Output(id) => id.descriptor().minimum,
+        }
+    }
+
+    #[must_use]
+    pub fn maximum(self) -> Option<u64> {
+        match self {
+            Self::Dd(id) => id.descriptor().maximum,
+            Self::Exec(id) => id.descriptor().maximum,
+            Self::Job(id) => id.descriptor().maximum,
+            Self::Output(id) => id.descriptor().maximum,
+        }
+    }
+
+    #[must_use]
+    pub fn choices(self) -> &'static [&'static str] {
+        match self {
+            Self::Dd(id) => id.descriptor().choices,
+            Self::Exec(id) => id.descriptor().choices,
+            Self::Job(id) => id.descriptor().choices,
+            Self::Output(id) => id.descriptor().choices,
+        }
+    }
+
+    #[must_use]
+    pub fn support(self) -> JclCatalogSupport {
+        match self {
+            Self::Dd(id) => id.descriptor().support,
+            Self::Exec(id) => id.descriptor().support,
+            Self::Job(id) => id.descriptor().support,
+            Self::Output(id) => id.descriptor().support,
+        }
+    }
+
+    #[must_use]
+    pub fn sensitive(self) -> bool {
+        match self {
+            Self::Dd(id) => id.descriptor().sensitive,
+            Self::Exec(id) => id.descriptor().sensitive,
+            Self::Job(id) => id.descriptor().sensitive,
+            Self::Output(id) => id.descriptor().sensitive,
+        }
+    }
+
+    #[must_use]
+    pub fn capability(self) -> &'static str {
+        match self {
+            Self::Dd(id) => id.descriptor().capability,
+            Self::Exec(id) => id.descriptor().capability,
+            Self::Job(id) => id.descriptor().capability,
+            Self::Output(id) => id.descriptor().capability,
         }
     }
 }
@@ -72,6 +143,7 @@ impl JclParsedParameter {
 pub struct JclParsedStatement {
     ordinal: u32,
     identity: JclStatementId,
+    source_operation: String,
     name: Option<String>,
     operands: String,
     parameters: Vec<JclParsedParameter>,
@@ -95,6 +167,11 @@ impl JclParsedStatement {
     #[must_use]
     pub fn generated_identity(&self) -> JclGeneratedIdentity {
         self.identity.descriptor().generated_identity()
+    }
+
+    #[must_use]
+    pub fn source_operation(&self) -> &str {
+        &self.source_operation
     }
 
     #[must_use]
@@ -180,6 +257,7 @@ pub fn parse_jcl_statements(syntax: &JclSyntaxAnalysis) -> JclStatementAnalysis 
             statements.push(JclParsedStatement {
                 ordinal,
                 identity,
+                source_operation: identity.descriptor().keyword.into(),
                 name,
                 operands,
                 parameters: Vec::new(),
@@ -230,7 +308,11 @@ pub fn parse_jcl_statements(syntax: &JclSyntaxAnalysis) -> JclStatementAnalysis 
             ));
             continue;
         };
-        let parsed_name = (!name.is_empty()).then(|| name.to_ascii_uppercase());
+        let parsed_name = if name.is_empty() && identity == JclStatementId::Dd {
+            Some("*".into())
+        } else {
+            (!name.is_empty()).then(|| name.to_ascii_uppercase())
+        };
         let mut parameters = Vec::new();
         if let Err(message) = parse_parameters(identity, &operands, &mut parameters) {
             diagnostics.push(statement_diagnostic("MEJCL0721", &message, record.span()));
@@ -251,6 +333,11 @@ pub fn parse_jcl_statements(syntax: &JclSyntaxAnalysis) -> JclStatementAnalysis 
         statements.push(JclParsedStatement {
             ordinal,
             identity,
+            source_operation: if operation.is_empty() {
+                identity.descriptor().keyword.into()
+            } else {
+                operation.to_ascii_uppercase()
+            },
             name: parsed_name,
             operands,
             parameters,
@@ -264,6 +351,15 @@ pub fn parse_jcl_statements(syntax: &JclSyntaxAnalysis) -> JclStatementAnalysis 
         statements,
         diagnostics,
     }
+}
+
+pub(crate) fn parse_effective_parameters(
+    statement: JclStatementId,
+    operands: &str,
+) -> Result<Vec<JclParsedParameter>, String> {
+    let mut output = Vec::new();
+    parse_parameters(statement, operands, &mut output)?;
+    Ok(output)
 }
 
 fn statement_identity(name: &str, operation: &str) -> Option<JclStatementId> {

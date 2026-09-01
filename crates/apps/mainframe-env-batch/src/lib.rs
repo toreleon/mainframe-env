@@ -7,6 +7,7 @@ mod jcl;
 mod jcl_catalog;
 mod jcl_expand;
 mod jcl_graph;
+mod jcl_plan;
 mod jcl_schema;
 mod jcl_statement;
 mod jcl_syntax;
@@ -20,18 +21,21 @@ pub use controller::{
 };
 
 pub use jcl::{
-    DdPlan, Disposition, JclBundle, JclLimits, JobPlan, StepCondition, StepPlan, parse_jcl,
+    DdPlan, Disposition, JclBundle, JclLimits, JobPlan, OutputPlan, StepCondition, StepPlan,
+    parse_jcl,
 };
 pub use jcl_catalog::{
     DD_PARAMETERS, DdParameterId, EXEC_PARAMETERS, ExecParameterId, JCL_GENERATED_CATALOG_SHA256,
-    JCL_OFFICIAL_CATALOG_SHA256, JCL_PLAN_SCHEMA_SHA256, JCL_STATEMENTS, JES2_STATEMENTS,
-    JOB_PARAMETERS, JclCatalogEntry, JclStatementId, Jes2StatementId, JobParameterId,
-    OUTPUT_PARAMETERS, OutputParameterId,
+    JCL_OFFICIAL_CATALOG_SHA256, JCL_PLAN_SCHEMA_SHA256, JCL_PLANNER_SEMANTICS_SHA256,
+    JCL_STATEMENTS, JES2_STATEMENTS, JOB_PARAMETERS, JclCatalogEntry, JclCatalogSupport,
+    JclStatementId, JclValueShape, Jes2StatementId, JobParameterId, OUTPUT_PARAMETERS,
+    OutputParameterId,
 };
 pub use jcl_expand::{
     JclBackwardReference, JclExpandedProcedure, JclExpandedStatement, JclExpandedSymbol,
     JclExpansion, JclExpansionLimits, JclExpansionProblem, expand_jcl,
 };
+pub use jcl_plan::{JclConversion, JclConversionLimits, JclConversionProblem, convert_jcl};
 pub use jcl_schema::{
     JCL_PLAN_CONTRACT, JclCapabilityRequirement, JclCapabilityState, JclDiagnosticProjection,
     JclGeneratedIdentity, JclParameterNode, JclParameterOutcome, JclPlanDocument, JclPlanNode,

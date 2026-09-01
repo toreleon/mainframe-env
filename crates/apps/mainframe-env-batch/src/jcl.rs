@@ -1,3 +1,7 @@
+use crate::{
+    JclCapabilityRequirement, JclConversionLimits, JclParameterNode, JclPlanDocument, JclPlanNode,
+    JclSourceOriginKind, convert_jcl,
+};
 use mainframe_env_host_api::HostProblem;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -18,11 +22,11 @@ impl Default for JclLimits {
     fn default() -> Self {
         Self {
             max_source_bytes: 4 * 1024 * 1024,
-            max_lines: 65536,
-            max_steps: 4096,
-            max_dds_per_step: 1024,
-            max_procedures: 1024,
-            max_symbols: 4096,
+            max_lines: 65_536,
+            max_steps: 4_096,
+            max_dds_per_step: 1_024,
+            max_procedures: 1_024,
+            max_symbols: 4_096,
             max_inline_bytes: 64 * 1024 * 1024,
             max_expansion_depth: 16,
         }
@@ -75,6 +79,15 @@ pub struct DdPlan {
     pub source_line: usize,
     #[serde(default)]
     pub source_end_line: usize,
+    #[serde(default)]
+    pub parameters: Vec<JclParameterNode>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct OutputPlan {
+    pub name: String,
+    pub parameters: Vec<JclParameterNode>,
+    pub source_line: usize,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -112,6 +125,8 @@ pub struct StepPlan {
     pub procedure: Option<String>,
     #[serde(default)]
     pub invocation_line: Option<usize>,
+    #[serde(default)]
+    pub parameters: Vec<JclParameterNode>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -127,488 +142,259 @@ pub struct JobPlan {
     #[serde(default)]
     pub job_dds: Vec<DdPlan>,
     pub steps: Vec<StepPlan>,
+    #[serde(default)]
+    pub outputs: Vec<OutputPlan>,
+    #[serde(default)]
+    pub parameters: Vec<JclParameterNode>,
+    #[serde(default)]
+    pub capabilities: Vec<JclCapabilityRequirement>,
     pub source: String,
 }
 
-#[derive(Clone, Debug)]
-struct Statement {
-    name: String,
-    operation: String,
-    operands: String,
-    inline: Vec<u8>,
-    line: usize,
-    end_line: usize,
-}
-
-#[derive(Clone, Debug)]
-struct ProcedureDefinition {
-    defaults: BTreeMap<String, String>,
-    body: Vec<Statement>,
-}
-
+/// Compatibility adapter for the existing JES service. The authoritative
+/// implementation is the immutable converter; no legacy parser remains.
 pub fn parse_jcl(bundle: &JclBundle, limits: JclLimits) -> Result<JobPlan, HostProblem> {
-    if bundle.primary.is_empty()
-        || bundle.primary.len() > limits.max_source_bytes
-        || bundle.primary.lines().count() > limits.max_lines
-        || bundle.includes.len() > limits.max_procedures
-        || bundle.cataloged_procedures.len() > limits.max_procedures
+    if bundle.primary.is_empty() || bundle.primary.len() > limits.max_source_bytes {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let conversion = convert_jcl(bundle, conversion_limits(limits)).map_err(|problem| {
+        if matches!(problem, crate::JclConversionProblem::ResourceLimit(_)) {
+            HostProblem::ResourceExhausted
+        } else {
+            HostProblem::Malformed
+        }
+    })?;
+    if let Some(plan) = conversion.legacy_plan() {
+        return Ok(plan.clone());
+    }
+    if conversion
+        .diagnostics()
+        .iter()
+        .any(|diagnostic| matches!(diagnostic.code().as_str(), "MEJCL0733" | "MEJCL0734"))
     {
-        return Err(HostProblem::ResourceExhausted);
+        Err(HostProblem::NotFound)
+    } else {
+        Err(HostProblem::Malformed)
     }
-    let mut source = bundle.primary.clone();
-    for _ in 0..limits.max_expansion_depth {
-        let mut expanded = String::new();
-        let mut changed = false;
-        for line in source.lines() {
-            if let Some(member) = include_member(line) {
-                let include = bundle.includes.get(&member).ok_or(HostProblem::NotFound)?;
-                expanded.push_str(include);
-                if !include.ends_with('\n') {
-                    expanded.push('\n');
-                }
-                changed = true;
-            } else {
-                expanded.push_str(line);
-                expanded.push('\n');
-            }
-        }
-        source = expanded;
-        if !changed {
-            break;
-        }
-        if source.len() > limits.max_source_bytes {
-            return Err(HostProblem::ResourceExhausted);
-        }
-    }
-    if source.lines().any(|line| include_member(line).is_some()) {
-        return Err(HostProblem::ResourceExhausted);
-    }
-    let statements = statements(&source, limits)?;
-    build_plan(&source, statements, bundle, limits, 0)
 }
 
-fn build_plan(
-    source: &str,
-    parsed_statements: Vec<Statement>,
-    bundle: &JclBundle,
-    limits: JclLimits,
-    depth: usize,
+fn conversion_limits(limits: JclLimits) -> JclConversionLimits {
+    let mut conversion = JclConversionLimits::default();
+    conversion.syntax.max_file_bytes = limits.max_source_bytes;
+    conversion.syntax.max_total_source_bytes = limits
+        .max_source_bytes
+        .saturating_mul(limits.max_procedures.saturating_add(1));
+    conversion.syntax.max_lines = limits.max_lines;
+    conversion.syntax.max_inline_bytes = limits.max_inline_bytes;
+    conversion.expansion.max_expansion_depth = limits.max_expansion_depth;
+    conversion.expansion.max_procedures = limits.max_procedures;
+    conversion.expansion.max_symbols = limits.max_symbols;
+    conversion.expansion.max_expanded_statements = limits
+        .max_steps
+        .saturating_mul(limits.max_dds_per_step.saturating_add(2));
+    conversion.max_plan_nodes = conversion.expansion.max_expanded_statements;
+    conversion
+}
+
+pub(crate) fn legacy_job_plan(
+    document: &JclPlanDocument,
+    source: String,
+    limits: JclConversionLimits,
 ) -> Result<JobPlan, HostProblem> {
-    if depth > limits.max_expansion_depth {
-        return Err(HostProblem::ResourceExhausted);
-    }
-    let mut symbols = BTreeMap::new();
-    let mut procedures: BTreeMap<String, ProcedureDefinition> = BTreeMap::new();
-    let mut current_proc: Option<(String, ProcedureDefinition)> = None;
-    let mut retained = Vec::new();
-    for statement in parsed_statements {
-        match statement.operation.as_str() {
-            "SET" => {
-                for (name, value) in assignments(&statement.operands) {
-                    if symbols.len() >= limits.max_symbols {
-                        return Err(HostProblem::ResourceExhausted);
-                    }
-                    symbols.insert(name, substitute(&value, &symbols)?);
-                }
-            }
-            "PROC" => {
-                if current_proc.is_some() {
-                    return Err(HostProblem::Malformed);
-                }
-                current_proc = Some((
-                    statement.name.clone(),
-                    ProcedureDefinition {
-                        defaults: assignments(&statement.operands),
-                        body: Vec::new(),
-                    },
-                ));
-            }
-            "PEND" => {
-                let (name, body) = current_proc.take().ok_or(HostProblem::Malformed)?;
-                if procedures.insert(name, body).is_some()
-                    || procedures.len() > limits.max_procedures
-                {
-                    return Err(HostProblem::ResourceExhausted);
-                }
-            }
-            _ if current_proc.is_some() => current_proc.as_mut().unwrap().1.body.push(statement),
-            _ => retained.push(statement),
-        }
-    }
-    if current_proc.is_some() {
-        return Err(HostProblem::Malformed);
-    }
-    for (name, body) in &bundle.cataloged_procedures {
-        let parsed = statements(body, limits)?;
-        let (declared_name, definition) = cataloged_procedure(parsed)?;
-        procedures
-            .entry(name.to_ascii_uppercase())
-            .or_insert_with(|| definition.clone());
-        procedures.entry(declared_name).or_insert(definition);
-    }
-    let mut job_name = None;
+    let statements = document
+        .statements()
+        .iter()
+        .map(|statement| (statement.id(), statement))
+        .collect::<BTreeMap<_, _>>();
+    let mut name = None;
     let mut class = 'A';
     let mut priority = 0u8;
     let mut restart_step = None;
-    let mut procedure_libraries = Vec::new();
+    let mut job_parameters = Vec::new();
     let mut job_dds = Vec::new();
-    let mut steps = Vec::new();
-    let mut active_if: Option<StepCondition> = None;
-    for mut statement in retained {
-        statement.operands = substitute(&statement.operands, &symbols)?;
-        match statement.operation.as_str() {
-            "JOB" => {
-                if job_name.is_some() {
-                    return Err(HostProblem::Malformed);
-                }
-                job_name = Some(statement.name.clone());
-                let values = assignments(&statement.operands);
-                class = values
+    let mut steps = Vec::<StepPlan>::new();
+    let mut outputs = Vec::new();
+    let mut active_conditions = Vec::<StepCondition>::new();
+    for node in document.nodes() {
+        match node {
+            JclPlanNode::Job {
+                name: job_name,
+                statement_id,
+            } => {
+                name = Some(job_name.clone());
+                let statement = statements
+                    .get(statement_id)
+                    .ok_or(HostProblem::InfrastructureFailure)?;
+                job_parameters = statement.parameters().to_vec();
+                let parameters = parameter_map(statement.parameters());
+                class = parameters
                     .get("CLASS")
                     .and_then(|value| value.chars().next())
                     .unwrap_or('A');
-                priority = values
+                priority = parameters
                     .get("PRTY")
                     .and_then(|value| value.parse().ok())
                     .unwrap_or(0);
-                restart_step = values.get("RESTART").cloned();
+                restart_step = parameters.get("RESTART").cloned();
             }
-            "IF" => active_if = Some(parse_if(&statement.operands)?),
-            "ELSE" => active_if = active_if.take().map(invert_condition),
-            "ENDIF" => active_if = None,
-            "JCLLIB" => {
-                procedure_libraries.extend(
-                    assignments(&statement.operands)
-                        .get("ORDER")
-                        .into_iter()
-                        .flat_map(|value| list_values(value)),
-                );
-            }
-            "EXEC" => {
-                if steps.len() >= limits.max_steps {
-                    return Err(HostProblem::ResourceExhausted);
-                }
-                let values = assignments(&statement.operands);
-                if let Some(program) = values.get("PGM") {
-                    steps.push(StepPlan {
-                        name: statement.name,
-                        program: program.to_ascii_uppercase(),
-                        parameter: values.get("PARM").cloned(),
-                        condition: values
-                            .get("COND")
-                            .map(|value| parse_cond(value))
-                            .transpose()?
-                            .or_else(|| active_if.clone())
-                            .unwrap_or(StepCondition::Always),
-                        dds: Vec::new(),
-                        source_line: statement.line,
-                        source_end_line: statement.end_line,
-                        procedure: None,
-                        invocation_line: None,
+            JclPlanNode::Step {
+                name,
+                program,
+                statement_id,
+            } => {
+                let statement = statements
+                    .get(statement_id)
+                    .ok_or(HostProblem::InfrastructureFailure)?;
+                let parameters = parameter_map(statement.parameters());
+                let condition = parameters
+                    .get("COND")
+                    .map(|value| parse_cond(value))
+                    .transpose()?
+                    .or_else(|| active_conditions.last().cloned())
+                    .unwrap_or(StepCondition::Always);
+                let procedure = statement
+                    .source()
+                    .origins()
+                    .iter()
+                    .find(|origin| origin.kind() == JclSourceOriginKind::Procedure)
+                    .and_then(|origin| {
+                        origin
+                            .logical_path()
+                            .rsplit('/')
+                            .next()
+                            .and_then(|leaf| leaf.strip_suffix(".jcl"))
+                            .map(str::to_string)
                     });
-                } else {
-                    let proc_name = values
-                        .get("PROC")
-                        .cloned()
-                        .or_else(|| first_operand(&statement.operands))
-                        .ok_or(HostProblem::Malformed)?
-                        .to_ascii_uppercase();
-                    let definition = procedures.get(&proc_name).ok_or(HostProblem::NotFound)?;
-                    let mut procedure_symbols = symbols.clone();
-                    procedure_symbols.extend(definition.defaults.clone());
-                    procedure_symbols.extend(
-                        values
-                            .into_iter()
-                            .filter(|(name, _)| !matches!(name.as_str(), "PGM" | "PROC")),
-                    );
-                    for mut nested in procedure_steps(
-                        &definition.body,
-                        &procedure_symbols,
-                        &proc_name,
-                        limits,
-                        depth + 1,
-                    )? {
-                        if steps.len() >= limits.max_steps {
-                            return Err(HostProblem::ResourceExhausted);
-                        }
-                        nested.invocation_line = Some(statement.line);
-                        steps.push(nested);
-                    }
-                }
+                let invocation_line = statement
+                    .source()
+                    .origins()
+                    .iter()
+                    .find(|origin| origin.kind() == JclSourceOriginKind::Generated)
+                    .and_then(|origin| {
+                        source_line(document, origin.file_id(), origin.byte_start())
+                    });
+                steps.push(StepPlan {
+                    name: name.clone(),
+                    program: program.clone(),
+                    parameter: parameters.get("PARM").cloned(),
+                    condition,
+                    dds: Vec::new(),
+                    source_line: statement.source().line(),
+                    source_end_line: statement.source().line(),
+                    procedure,
+                    invocation_line,
+                    parameters: statement.parameters().to_vec(),
+                });
             }
-            "DD" => {
-                if override_procedure_dd(&mut steps, &statement, limits)? {
-                    continue;
-                }
-                let target = steps
-                    .last_mut()
+            JclPlanNode::Dd {
+                name,
+                step,
+                statement_id,
+            } => {
+                let statement = statements
+                    .get(statement_id)
+                    .ok_or(HostProblem::InfrastructureFailure)?;
+                let target = step
+                    .as_ref()
+                    .and_then(|step| {
+                        steps
+                            .iter_mut()
+                            .rev()
+                            .find(|candidate| candidate.name == *step)
+                    })
                     .map(|step| &mut step.dds)
                     .unwrap_or(&mut job_dds);
-                if target.len() >= limits.max_dds_per_step {
+                if target.len() >= limits.max_parameters_per_statement.saturating_mul(4) {
                     return Err(HostProblem::ResourceExhausted);
                 }
-                push_dd(target, &statement, limits)?;
+                let mut dd = dd_plan(name, statement)?;
+                if dd.name == "*" {
+                    dd.name = target
+                        .last()
+                        .map(|previous| previous.name.clone())
+                        .ok_or(HostProblem::Malformed)?;
+                    dd.concatenation = true;
+                }
+                target.push(dd);
             }
-            "OUTPUT" => {}
-            _ => return Err(HostProblem::Unsupported),
+            JclPlanNode::Output { name, statement_id } => {
+                let statement = statements
+                    .get(statement_id)
+                    .ok_or(HostProblem::InfrastructureFailure)?;
+                outputs.push(OutputPlan {
+                    name: name.clone(),
+                    parameters: statement.parameters().to_vec(),
+                    source_line: statement.source().line(),
+                });
+            }
+            JclPlanNode::Annotation {
+                operation,
+                statement_id,
+            } => {
+                let statement = statements
+                    .get(statement_id)
+                    .ok_or(HostProblem::InfrastructureFailure)?;
+                match operation.as_str() {
+                    "IF" => active_conditions.push(parse_if(statement.raw_operands())?),
+                    "ELSE" => {
+                        if let Some(condition) = active_conditions.pop() {
+                            active_conditions.push(invert_condition(condition));
+                        }
+                    }
+                    "ENDIF" => {
+                        active_conditions.pop();
+                    }
+                    _ => {}
+                }
+            }
+            JclPlanNode::Jecl { .. } => {}
         }
     }
-    let name = job_name.ok_or(HostProblem::Malformed)?;
-    if steps.is_empty() {
-        return Err(HostProblem::Malformed);
-    }
     Ok(JobPlan {
-        name,
+        name: name.ok_or(HostProblem::Malformed)?,
         class,
         priority,
         restart_step,
-        symbols,
-        procedure_libraries,
+        symbols: document
+            .symbols()
+            .iter()
+            .map(|symbol| (symbol.name().to_string(), symbol.value().to_string()))
+            .collect(),
+        procedure_libraries: Vec::new(),
         job_dds,
         steps,
-        source: source.into(),
+        outputs,
+        parameters: job_parameters,
+        capabilities: document.capabilities().to_vec(),
+        source,
     })
 }
 
-fn cataloged_procedure(
-    statements: Vec<Statement>,
-) -> Result<(String, ProcedureDefinition), HostProblem> {
-    let mut current: Option<(String, ProcedureDefinition)> = None;
-    let mut completed = None;
-    for statement in statements {
-        match statement.operation.as_str() {
-            "PROC" => {
-                if current.is_some() || completed.is_some() {
-                    return Err(HostProblem::Malformed);
-                }
-                current = Some((
-                    statement.name,
-                    ProcedureDefinition {
-                        defaults: assignments(&statement.operands),
-                        body: Vec::new(),
-                    },
-                ));
-            }
-            "PEND" => {
-                completed = Some(current.take().ok_or(HostProblem::Malformed)?);
-            }
-            _ => current
-                .as_mut()
-                .ok_or(HostProblem::Malformed)?
-                .1
-                .body
-                .push(statement),
-        }
-    }
-    if current.is_some() {
-        return Err(HostProblem::Malformed);
-    }
-    completed.ok_or(HostProblem::Malformed)
-}
-
-fn override_procedure_dd(
-    steps: &mut [StepPlan],
-    statement: &Statement,
-    limits: JclLimits,
-) -> Result<bool, HostProblem> {
-    let Some((procedure_step, dd_name)) = statement.name.split_once('.') else {
-        return Ok(false);
-    };
-    let step = steps
-        .iter_mut()
-        .rev()
-        .find(|step| {
-            step.procedure.is_some()
-                && step
-                    .name
-                    .rsplit('.')
-                    .next()
-                    .is_some_and(|name| name.eq_ignore_ascii_case(procedure_step))
+fn parameter_map(parameters: &[JclParameterNode]) -> BTreeMap<String, String> {
+    parameters
+        .iter()
+        .map(|parameter| {
+            (
+                parameter.identity().keyword().to_string(),
+                parameter.normalized_value().to_string(),
+            )
         })
-        .ok_or(HostProblem::NotFound)?;
-    step.dds.retain(|dd| !dd.name.eq_ignore_ascii_case(dd_name));
-    let mut override_statement = statement.clone();
-    override_statement.name = dd_name.to_ascii_uppercase();
-    push_dd(&mut step.dds, &override_statement, limits)?;
-    Ok(true)
+        .collect()
 }
 
-fn procedure_steps(
-    statements_in: &[Statement],
-    symbols: &BTreeMap<String, String>,
-    procedure: &str,
-    limits: JclLimits,
-    depth: usize,
-) -> Result<Vec<StepPlan>, HostProblem> {
-    if depth > limits.max_expansion_depth {
-        return Err(HostProblem::ResourceExhausted);
-    }
-    let mut steps: Vec<StepPlan> = Vec::new();
-    for statement in statements_in {
-        let mut statement = statement.clone();
-        statement.operands = substitute(&statement.operands, symbols)?;
-        match statement.operation.as_str() {
-            "EXEC" => {
-                let values = assignments(&statement.operands);
-                let program = values.get("PGM").ok_or(HostProblem::Unsupported)?;
-                steps.push(StepPlan {
-                    name: statement.name,
-                    program: program.to_ascii_uppercase(),
-                    parameter: values.get("PARM").cloned(),
-                    condition: values
-                        .get("COND")
-                        .map(|value| parse_cond(value))
-                        .transpose()?
-                        .unwrap_or(StepCondition::Always),
-                    dds: Vec::new(),
-                    source_line: statement.line,
-                    source_end_line: statement.end_line,
-                    procedure: Some(procedure.into()),
-                    invocation_line: None,
-                });
-            }
-            "DD" => {
-                let step = steps.last_mut().ok_or(HostProblem::Malformed)?;
-                if step.dds.len() >= limits.max_dds_per_step {
-                    return Err(HostProblem::ResourceExhausted);
-                }
-                push_dd(&mut step.dds, &statement, limits)?;
-            }
-            _ => return Err(HostProblem::Unsupported),
-        }
-    }
-    Ok(steps)
-}
-
-fn statements(source: &str, limits: JclLimits) -> Result<Vec<Statement>, HostProblem> {
-    let lines = source.lines().collect::<Vec<_>>();
-    let mut out = Vec::new();
-    let mut index = 0;
-    while index < lines.len() {
-        let line_number = index + 1;
-        let line = lines[index];
-        index += 1;
-        if line.starts_with("//*") || line.trim().is_empty() {
-            continue;
-        }
-        if !line.starts_with("//") {
-            return Err(HostProblem::Malformed);
-        }
-        let content = line
-            .get(2..72.min(line.len()))
-            .ok_or(HostProblem::Malformed)?;
-        if content.trim().is_empty() {
-            break;
-        }
-        let no_name = content.starts_with(char::is_whitespace);
-        let parts = content
-            .split_whitespace()
-            .map(str::to_string)
-            .collect::<Vec<_>>();
-        let (name, operation, mut operands) = if no_name {
-            (
-                "*".to_string(),
-                parts
-                    .first()
-                    .cloned()
-                    .unwrap_or_default()
-                    .to_ascii_uppercase(),
-                parts.get(1..).unwrap_or_default().join(" "),
-            )
-        } else {
-            (
-                parts
-                    .first()
-                    .cloned()
-                    .unwrap_or_default()
-                    .to_ascii_uppercase(),
-                parts
-                    .get(1)
-                    .cloned()
-                    .unwrap_or_default()
-                    .to_ascii_uppercase(),
-                parts.get(2..).unwrap_or_default().join(" "),
-            )
-        };
-        let mut end_line = line_number;
-        while operands.ends_with(',') && index < lines.len() {
-            let continuation = lines[index];
-            if !continuation.starts_with("//") {
-                break;
-            }
-            operands.push_str(
-                continuation
-                    .get(2..72.min(continuation.len()))
-                    .unwrap_or("")
-                    .trim(),
-            );
-            index += 1;
-            end_line = index;
-        }
-        let mut inline = Vec::new();
-        let inline_operand = split_operands(&operands).into_iter().next();
-        if operation == "DD"
-            && inline_operand
-                .as_deref()
-                .is_some_and(|value| value == "*" || value.starts_with("DATA"))
-        {
-            let delimiter = assignments(&operands)
-                .get("DLM")
-                .cloned()
-                .unwrap_or_else(|| "/*".into());
-            while index < lines.len()
-                && jcl_control_columns(lines[index]).trim_end() != delimiter
-                && !(delimiter == "/*" && lines[index].starts_with("//"))
-            {
-                inline.extend_from_slice(lines[index].as_bytes());
-                inline.push(b'\n');
-                if inline.len() > limits.max_inline_bytes {
-                    return Err(HostProblem::ResourceExhausted);
-                }
-                index += 1;
-            }
-            if index < lines.len() && jcl_control_columns(lines[index]).trim_end() == delimiter {
-                index += 1;
-            }
-        }
-        if name.is_empty() || operation.is_empty() {
-            return Err(HostProblem::Malformed);
-        }
-        out.push(Statement {
-            name,
-            operation,
-            operands,
-            inline,
-            line: line_number,
-            end_line,
-        });
-        if out.len() > limits.max_lines {
-            return Err(HostProblem::ResourceExhausted);
-        }
-    }
-    Ok(out)
-}
-
-fn dd_plan(
-    statement: &Statement,
-    concatenation: bool,
-    limits: JclLimits,
-) -> Result<DdPlan, HostProblem> {
-    let values = assignments(&statement.operands);
-    let (dataset, member, generation) = values
-        .get("DSN")
-        .or_else(|| values.get("DSNAME"))
+fn dd_plan(name: &str, statement: &crate::JclStatementNode) -> Result<DdPlan, HostProblem> {
+    let parameters = parameter_map(statement.parameters());
+    let (dataset, member, generation) = parameters
+        .get("DSNAME")
         .map(|value| dataset_and_member(value))
         .unwrap_or((None, None, None));
-    let temporary = dataset.as_ref().is_some_and(|name| name.starts_with("&&"));
-    let sysout = values.get("SYSOUT").cloned();
-    let dcb_values = values
+    let dcb = parameters
         .get("DCB")
-        .map(|value| assignments(value.trim().trim_matches(['(', ')'])))
+        .map(|value| assignment_map(value.trim_matches(['(', ')'])))
         .unwrap_or_default();
-    let parameter = |name: &str| values.get(name).or_else(|| dcb_values.get(name));
+    let parameter = |name: &str| parameters.get(name).or_else(|| dcb.get(name));
     let organization = parameter("DSORG")
-        .map(|value| match value.to_ascii_uppercase().as_str() {
+        .map(|value| match value.as_str() {
             "PS" => Ok("PS".into()),
             "PO" | "PO-E" => Ok("PO".into()),
             _ => Err(HostProblem::Unsupported),
@@ -616,53 +402,48 @@ fn dd_plan(
         .transpose()?
         .or_else(|| {
             parameter("DSNTYPE")
-                .is_some_and(|value| value.eq_ignore_ascii_case("LIBRARY"))
+                .is_some_and(|value| value == "LIBRARY")
                 .then(|| "PO".into())
         });
-    let record_format = parameter("RECFM")
-        .map(|value| match value.to_ascii_uppercase().as_str() {
-            "F" => Ok("F".into()),
-            "FB" | "FBA" => Ok("FB".into()),
-            "V" => Ok("V".into()),
-            "VB" | "VBA" => Ok("VB".into()),
-            "U" => Ok("U".into()),
-            _ => Err(HostProblem::Unsupported),
-        })
-        .transpose()?;
-    let logical_record_length = parameter("LRECL")
-        .map(|value| value.parse::<u32>().map_err(|_| HostProblem::Malformed))
-        .transpose()?;
-    let disposition = values
+    let record_format = parameter("RECFM").map(|value| {
+        if value.starts_with('F') {
+            "FB".to_string()
+        } else if value.starts_with('V') {
+            "VB".to_string()
+        } else {
+            value.clone()
+        }
+    });
+    let logical_record_length = parameter("LRECL").and_then(|value| value.parse::<u32>().ok());
+    let ccsid = parameter("CCSID").and_then(|value| value.parse::<u16>().ok());
+    let disposition = parameters
         .get("DISP")
         .map(|value| {
             value
-                .trim_matches(|ch| ch == '(' || ch == ')')
+                .trim_matches(['(', ')'])
                 .split(',')
-                .filter(|value| !value.is_empty())
                 .map(disposition)
                 .collect::<Result<Vec<_>, _>>()
         })
         .transpose()?
         .unwrap_or_default();
-    if statement.inline.len() > limits.max_inline_bytes {
-        return Err(HostProblem::ResourceExhausted);
-    }
     Ok(DdPlan {
-        name: statement.name.clone(),
+        name: name.into(),
+        temporary: dataset.as_ref().is_some_and(|name| name.starts_with("&&")),
         dataset,
         member,
         generation,
         organization,
         record_format,
         logical_record_length,
-        ccsid: None,
-        temporary,
-        sysout,
+        ccsid,
+        sysout: parameters.get("SYSOUT").cloned(),
         disposition,
-        inline_data: statement.inline.clone(),
-        concatenation,
-        source_line: statement.line,
-        source_end_line: statement.end_line,
+        inline_data: statement.inline_data().to_vec(),
+        concatenation: false,
+        source_line: statement.source().line(),
+        source_end_line: statement.source().line(),
+        parameters: statement.parameters().to_vec(),
     })
 }
 
@@ -685,33 +466,17 @@ fn dataset_and_member(value: &str) -> (Option<String>, Option<String>, Option<i3
     }
 }
 
-fn push_dd(
-    target: &mut Vec<DdPlan>,
-    statement: &Statement,
-    limits: JclLimits,
-) -> Result<(), HostProblem> {
-    let concatenation = statement.name == "*";
-    let mut plan = dd_plan(statement, concatenation, limits)?;
-    if concatenation {
-        plan.name = target
-            .last()
-            .map(|previous| previous.name.clone())
-            .ok_or(HostProblem::Malformed)?;
-    }
-    target.push(plan);
-    Ok(())
-}
-
-fn jcl_control_columns(line: &str) -> &str {
-    line.get(..72.min(line.len())).unwrap_or(line)
-}
-
-fn list_values(value: &str) -> Vec<String> {
+fn assignment_map(value: &str) -> BTreeMap<String, String> {
     value
-        .trim_matches(|ch| matches!(ch, '(' | ')'))
         .split(',')
-        .map(|item| item.trim().trim_matches(['\'', '"']).to_string())
-        .filter(|item| !item.is_empty())
+        .filter_map(|operand| {
+            operand.split_once('=').map(|(name, value)| {
+                (
+                    name.trim().to_ascii_uppercase(),
+                    value.trim().to_ascii_uppercase(),
+                )
+            })
+        })
         .collect()
 }
 
@@ -730,69 +495,8 @@ fn disposition(value: &str) -> Result<Disposition, HostProblem> {
     })
 }
 
-fn assignments(value: &str) -> BTreeMap<String, String> {
-    split_operands(value)
-        .into_iter()
-        .filter_map(|item| {
-            item.split_once('=').map(|(name, value)| {
-                (
-                    name.trim().to_ascii_uppercase(),
-                    value
-                        .trim()
-                        .trim_matches('\'')
-                        .trim_matches('"')
-                        .to_string(),
-                )
-            })
-        })
-        .collect()
-}
-
-fn split_operands(value: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    let mut current = String::new();
-    let mut depth = 0usize;
-    let mut quote = None;
-    for ch in value.chars() {
-        if matches!(ch, '\'' | '"') {
-            quote = if quote == Some(ch) {
-                None
-            } else if quote.is_none() {
-                Some(ch)
-            } else {
-                quote
-            };
-        }
-        if quote.is_none() {
-            if ch == '(' {
-                depth += 1;
-            } else if ch == ')' {
-                depth = depth.saturating_sub(1);
-            } else if ch == ',' && depth == 0 {
-                out.push(current.trim().to_string());
-                current.clear();
-                continue;
-            }
-        }
-        current.push(ch);
-    }
-    if !current.trim().is_empty() {
-        out.push(current.trim().to_string());
-    }
-    out
-}
-
-fn substitute(value: &str, symbols: &BTreeMap<String, String>) -> Result<String, HostProblem> {
-    let mut output = value.to_string();
-    for (name, replacement) in symbols {
-        output = output.replace(&format!("&{name}."), replacement);
-        output = output.replace(&format!("&{name}"), replacement);
-    }
-    Ok(output)
-}
-
 fn parse_cond(value: &str) -> Result<StepCondition, HostProblem> {
-    let value = value.trim().trim_matches(|ch| ch == '(' || ch == ')');
+    let value = value.trim().trim_matches(['(', ')']);
     if value.eq_ignore_ascii_case("EVEN") {
         return Ok(StepCondition::Even);
     }
@@ -800,24 +504,12 @@ fn parse_cond(value: &str) -> Result<StepCondition, HostProblem> {
         return Ok(StepCondition::Only);
     }
     let parts = value.split(',').map(str::trim).collect::<Vec<_>>();
-    if parts.len() != 2 {
+    if parts.len() < 2 {
         return Err(HostProblem::Malformed);
     }
     Ok(StepCondition::SkipIfMaxRc {
         code: parts[0].parse().map_err(|_| HostProblem::Malformed)?,
         operator: reverse_cond_operator(parts[1])?.into(),
-    })
-}
-
-fn reverse_cond_operator(operator: &str) -> Result<&'static str, HostProblem> {
-    Ok(match operator.trim().to_ascii_uppercase().as_str() {
-        "EQ" | "=" => "EQ",
-        "NE" | "¬=" => "NE",
-        "GT" | ">" => "LT",
-        "GE" | ">=" => "LE",
-        "LT" | "<" => "GT",
-        "LE" | "<=" => "GE",
-        _ => return Err(HostProblem::Malformed),
     })
 }
 
@@ -839,6 +531,18 @@ fn parse_if(value: &str) -> Result<StepCondition, HostProblem> {
     })
 }
 
+fn reverse_cond_operator(operator: &str) -> Result<&'static str, HostProblem> {
+    Ok(match operator.trim().to_ascii_uppercase().as_str() {
+        "EQ" | "=" => "EQ",
+        "NE" | "¬=" => "NE",
+        "GT" | ">" => "LT",
+        "GE" | ">=" => "LE",
+        "LT" | "<" => "GT",
+        "LE" | "<=" => "GE",
+        _ => return Err(HostProblem::Malformed),
+    })
+}
+
 fn invert_condition(value: StepCondition) -> StepCondition {
     match value {
         StepCondition::RunIfMaxRc { operator, code } => {
@@ -849,26 +553,6 @@ fn invert_condition(value: StepCondition) -> StepCondition {
         }
         other => other,
     }
-}
-
-fn first_operand(value: &str) -> Option<String> {
-    split_operands(value)
-        .first()
-        .filter(|value| !value.contains('='))
-        .cloned()
-}
-
-fn include_member(line: &str) -> Option<String> {
-    if !line.starts_with("//") || !line.to_ascii_uppercase().contains(" INCLUDE ") {
-        return None;
-    }
-    let upper = line.to_ascii_uppercase();
-    let start = upper.find("MEMBER=")? + "MEMBER=".len();
-    let value = upper[start..]
-        .split(|ch: char| ch == ',' || ch.is_whitespace())
-        .next()?
-        .trim_matches(|ch| ch == '\'' || ch == '"');
-    (!value.is_empty()).then(|| value.to_string())
 }
 
 fn compare(left: i32, operator: &str, right: i32) -> bool {
@@ -883,183 +567,71 @@ fn compare(left: i32, operator: &str, right: i32) -> bool {
     }
 }
 
+fn source_line(document: &JclPlanDocument, file_id: u32, byte_start: usize) -> Option<usize> {
+    document
+        .statements()
+        .iter()
+        .find(|statement| {
+            statement.source().file_id() == file_id && statement.source().byte_start() == byte_start
+        })
+        .map(|statement| statement.source().line())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn parses_job_exec_dd_inline_symbols_and_conditions() {
-        let source = "//CARDJOB JOB CLASS=A,PRTY=7\n// SET PGM=IEBGENER\n//COPY EXEC PGM=&PGM.,COND=(4,GE)\n//SYSUT1 DD *\nHELLO\n/*\n//SYSUT2 DD SYSOUT=*\n";
+    fn compatibility_adapter_uses_the_new_converter_plan() {
         let plan = parse_jcl(
             &JclBundle {
-                primary: source.into(),
-                ..Default::default()
+                primary: "//J JOB CLASS=A,PRTY=7\n//S EXEC PGM=IEBGENER,COND=(4,GE)\n//IN DD *\nONE\n/*\n//OUT DD SYSOUT=*\n".into(),
+                ..JclBundle::default()
             },
             JclLimits::default(),
         )
         .unwrap();
-        assert_eq!(plan.name, "CARDJOB");
+        assert_eq!(plan.name, "J");
         assert_eq!(plan.priority, 7);
         assert_eq!(plan.steps[0].program, "IEBGENER");
-        assert_eq!(plan.steps[0].dds[0].inline_data, b"HELLO\n");
+        assert_eq!(plan.steps[0].dds[0].inline_data, b"ONE\n");
         assert!(!plan.steps[0].condition.should_run(4, false));
+        assert!(!plan.capabilities.is_empty());
     }
 
     #[test]
-    fn cond_compares_the_literal_code_to_prior_maximum_rc() {
-        let condition = parse_cond("(4,LT)").unwrap();
-        assert!(condition.should_run(0, false));
-        assert!(!condition.should_run(8, false));
-    }
-
-    #[test]
-    fn dd_allocation_attributes_preserve_nested_dcb_and_library_type() {
-        let plan = parse_jcl(
-            &JclBundle {
-                primary: "//J JOB CLASS=A\n//S EXEC PGM=IEBGENER\n//OUT DD DSN=U.OUT,DISP=(NEW,CATLG,DELETE),\n// DCB=(LRECL=80,RECFM=FBA,DSORG=PS)\n//LIB DD DSN=U.LIB,DISP=(NEW,CATLG,DELETE),\n// DSNTYPE=LIBRARY,RECFM=FB,LRECL=132\n".into(),
-                ..Default::default()
-            },
-            JclLimits::default(),
-        )
-        .unwrap();
-        let output = &plan.steps[0].dds[0];
-        assert_eq!(output.organization.as_deref(), Some("PS"));
-        assert_eq!(output.record_format.as_deref(), Some("FB"));
-        assert_eq!(output.logical_record_length, Some(80));
-        let library = &plan.steps[0].dds[1];
-        assert_eq!(library.organization.as_deref(), Some("PO"));
-        assert_eq!(library.record_format.as_deref(), Some("FB"));
-        assert_eq!(library.logical_record_length, Some(132));
-    }
-
-    #[test]
-    fn expands_include_and_instream_procedure() {
-        let plan = parse_jcl(
-            &JclBundle {
-                primary: "//J JOB CLASS=B\n//INC INCLUDE MEMBER=PART\n//P PROC\n//S EXEC PGM=IEFBR14\n// PEND\n//RUN EXEC P\n".into(),
-                includes: BTreeMap::from([("PART".into(), "//* INCLUDED\n".into())]),
-                ..Default::default()
-            },
-            JclLimits::default(),
-        )
-        .unwrap();
-        assert_eq!(plan.steps.len(), 1);
-        assert_eq!(plan.steps[0].procedure.as_deref(), Some("P"));
-    }
-
-    #[test]
-    fn malformed_and_unbounded_fail_closed() {
-        assert_eq!(
-            parse_jcl(
-                &JclBundle {
-                    primary: "NOT JCL".into(),
-                    ..Default::default()
-                },
-                JclLimits::default()
-            ),
-            Err(HostProblem::Malformed)
-        );
-        assert_eq!(
-            parse_jcl(
-                &JclBundle {
-                    primary: "x".repeat(5),
-                    ..Default::default()
-                },
-                JclLimits {
-                    max_source_bytes: 4,
-                    ..Default::default()
-                }
-            ),
-            Err(HostProblem::ResourceExhausted)
-        );
-    }
-
-    #[test]
-    fn fixed_width_instream_delimiter_ignores_record_padding() {
-        let source = "//CARDJOB JOB CLASS=A                                                       \n//COPY EXEC PGM=IEBGENER                                                   \n//SYSUT1 DD *                                                              \nHELLO                                                                       \n/*                                                                          \n//SYSUT2 DD SYSOUT=*                                                        \n";
-        let plan = parse_jcl(
-            &JclBundle {
-                primary: source.into(),
-                ..Default::default()
-            },
-            JclLimits::default(),
-        )
-        .unwrap();
-        assert_eq!(
-            plan.steps[0].dds[0].inline_data,
-            b"HELLO                                                                       \n"
-        );
-        assert_eq!(plan.steps[0].dds[1].name, "SYSUT2");
-    }
-
-    #[test]
-    fn cataloged_procedure_symbols_overrides_and_concatenations_keep_provenance() {
-        let plan = parse_jcl(
-            &JclBundle {
-                primary: "//J JOB CLASS=A\n// SET ROOT=AWS\n// SET HLQ=&ROOT..DEMO\n//JOBLIB DD DSN=ONE\n// DD DSN=TWO\n//RUN EXEC PROC=REPROC,\n// CNTLLIB=&HLQ..CNTL\n//P.IN DD DSN=&HLQ..INPUT\n".into(),
-                cataloged_procedures: BTreeMap::from([(
-                    "REPROC".into(),
-                    "//REPROC PROC CNTLLIB=NULL\n//P EXEC PGM=IDCAMS\n//IN DD DSN=&CNTLLIB\n// PEND\n".into(),
-                )]),
-                ..Default::default()
-            },
-            JclLimits::default(),
-        )
-        .unwrap();
-        assert_eq!(plan.symbols["HLQ"], "AWS.DEMO");
-        assert_eq!(plan.job_dds.len(), 2);
-        assert_eq!(plan.job_dds[1].name, "JOBLIB");
-        assert!(plan.job_dds[1].concatenation);
-        assert_eq!(plan.steps[0].procedure.as_deref(), Some("REPROC"));
-        assert_eq!(plan.steps[0].invocation_line, Some(6));
-        assert_eq!(plan.steps[0].source_line, 2);
-        assert_eq!(plan.steps[0].dds.len(), 1);
-        assert_eq!(
-            plan.steps[0].dds[0].dataset.as_deref(),
-            Some("AWS.DEMO.INPUT")
-        );
-        assert_eq!(plan.steps[0].dds[0].source_line, 8);
-        assert_eq!(plan.steps[0].source_end_line, 2);
-    }
-
-    #[test]
-    fn if_else_conditions_keep_each_selected_step_line() {
-        let plan = parse_jcl(
-            &JclBundle {
-                primary: "//J JOB CLASS=A\n// IF (RC = 0) THEN\n//YES EXEC PGM=IEFBR14\n// ELSE\n//NO EXEC PGM=IDCAMS\n// ENDIF\n".into(),
-                ..Default::default()
-            },
-            JclLimits::default(),
-        )
-        .unwrap();
-        assert_eq!(
-            plan.steps[0].condition,
-            StepCondition::RunIfMaxRc {
-                operator: "=".into(),
-                code: 0
-            }
-        );
-        assert_eq!(
-            plan.steps[1].condition,
-            StepCondition::SkipIfMaxRc {
-                operator: "=".into(),
-                code: 0
-            }
-        );
-        assert_eq!(plan.steps[0].source_line, 3);
-        assert_eq!(plan.steps[1].source_line, 5);
-    }
-
-    #[test]
-    fn prior_job_plan_json_defaults_new_provenance_fields() {
+    fn prior_job_plan_json_defaults_additive_typed_fields() {
         let plan: JobPlan = serde_json::from_str(
-            r#"{"name":"J","class":"A","priority":0,"restart_step":null,"steps":[{"name":"S","program":"IEFBR14","parameter":null,"condition":"Always","dds":[],"source_line":2,"procedure":null}],"source":"//J JOB CLASS=A\n//S EXEC PGM=IEFBR14\n"}"#,
+            r#"{"name":"J","class":"A","priority":0,"restart_step":null,"steps":[{"name":"S","program":"IEFBR14","parameter":null,"condition":"Always","dds":[],"source_line":2,"procedure":null}],"source":"//J JOB\n//S EXEC PGM=IEFBR14\n"}"#,
         )
         .unwrap();
-        assert!(plan.symbols.is_empty());
-        assert!(plan.procedure_libraries.is_empty());
-        assert!(plan.job_dds.is_empty());
-        assert_eq!(plan.steps[0].source_end_line, 0);
-        assert_eq!(plan.steps[0].invocation_line, None);
+        assert!(plan.outputs.is_empty());
+        assert!(plan.parameters.is_empty());
+        assert!(plan.capabilities.is_empty());
+        assert!(plan.steps[0].parameters.is_empty());
+    }
+
+    #[test]
+    fn temporary_disposition_plan_preserves_both_step_allocations() {
+        let plan = parse_jcl(
+            &JclBundle {
+                primary: "//TEMPJOB JOB CLASS=A\n//MAKE EXEC PGM=IEFBR14\n//WORK DD DSN=&&WORK,DISP=(NEW,PASS,DELETE)\n//USE EXEC PGM=IEFBR14\n//INPUT DD DSN=&&WORK,DISP=(OLD,DELETE,DELETE)\n".into(),
+                ..JclBundle::default()
+            },
+            JclLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(plan.steps.len(), 2);
+        assert_eq!(plan.steps[0].dds.len(), 1);
+        assert_eq!(plan.steps[1].dds.len(), 1);
+        assert!(plan.steps[0].dds[0].temporary);
+        assert_eq!(
+            plan.steps[0].dds[0].disposition,
+            vec![Disposition::New, Disposition::Pass, Disposition::Delete]
+        );
+        assert_eq!(
+            plan.steps[1].dds[0].disposition,
+            vec![Disposition::Old, Disposition::Delete, Disposition::Delete]
+        );
     }
 }
