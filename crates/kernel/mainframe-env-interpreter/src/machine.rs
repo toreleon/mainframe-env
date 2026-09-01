@@ -6010,7 +6010,7 @@ impl ReferenceMachine {
             if json {
                 let clauses = JsonClauses::parse(args)?;
                 let value = self
-                    .json_layout_value(&layout, &clauses, true)?
+                    .json_layout_value(&layout, &clauses, &[], true)?
                     .ok_or(MachineProblem::DataException)?;
                 if clauses.omitted(&layout) {
                     serde_json::to_string(&value).map_err(|_| MachineProblem::DataException)?
@@ -6088,11 +6088,31 @@ impl ReferenceMachine {
         &self,
         layout: &LayoutMetadata,
         clauses: &JsonClauses,
+        indexes: &[usize],
         root: bool,
     ) -> Result<Option<serde_json::Value>, MachineProblem> {
         if !root && clauses.suppressed(layout) {
             return Ok(None);
         }
+        if layout.occurs > 1 {
+            let mut values = Vec::new();
+            for occurrence in 1..=self.active_occurs(layout)? {
+                let mut indexes = indexes.to_vec();
+                indexes.push(occurrence);
+                values.push(self.json_layout_single_value(layout, clauses, &indexes)?);
+            }
+            return Ok(Some(serde_json::Value::Array(values)));
+        }
+        self.json_layout_single_value(layout, clauses, indexes)
+            .map(Some)
+    }
+
+    fn json_layout_single_value(
+        &self,
+        layout: &LayoutMetadata,
+        clauses: &JsonClauses,
+        indexes: &[usize],
+    ) -> Result<serde_json::Value, MachineProblem> {
         if is_group(layout.category) {
             let mut children = self
                 .layouts
@@ -6117,21 +6137,21 @@ impl ReferenceMachine {
             }
             let mut object = serde_json::Map::new();
             for child in children {
-                if let Some(value) = self.json_layout_value(&child, clauses, false)? {
+                if let Some(value) = self.json_layout_value(&child, clauses, indexes, false)? {
                     object.insert(clauses.name(&child).to_string(), value);
                 }
             }
-            return Ok(Some(serde_json::Value::Object(object)));
+            return Ok(serde_json::Value::Object(object));
         }
+        let reference = self.layout_occurrence_reference(layout, indexes)?;
+        let bytes = self.read_reference(&reference)?;
         if is_numeric(layout.category) {
-            let value = decimal_string(decode_decimal(layout, &self.read(&layout.name)?)?);
+            let value = decimal_string(decode_decimal(layout, &bytes)?);
             return value
                 .parse::<serde_json::Number>()
                 .map(serde_json::Value::Number)
-                .map(Some)
                 .map_err(|_| MachineProblem::DataException);
         }
-        let bytes = self.read(&layout.name)?;
         let text = if matches!(
             layout.category,
             LayoutCategory::National | LayoutCategory::NationalEdited
@@ -6141,7 +6161,7 @@ impl ReferenceMachine {
         } else {
             String::from_utf8(bytes).map_err(|_| MachineProblem::DataException)?
         };
-        Ok(Some(serde_json::Value::String(text.trim_end().into())))
+        Ok(serde_json::Value::String(text.trim_end().into()))
     }
 
     fn xml_layout_value(&self, layout: &LayoutMetadata) -> Result<String, MachineProblem> {
@@ -6205,9 +6225,7 @@ impl ReferenceMachine {
             let clauses = JsonClauses::parse(args)?;
             let value: serde_json::Value =
                 serde_json::from_str(source.trim()).map_err(|_| MachineProblem::DataException)?;
-            if let Some(layout) = self.layout(target).cloned()
-                && is_group(layout.category)
-            {
+            if let Some(layout) = self.layout(target).cloned() {
                 let value = if clauses.omitted(&layout) {
                     &value
                 } else {
@@ -6216,7 +6234,7 @@ impl ReferenceMachine {
                         .and_then(|object| object.get(clauses.name(&layout)))
                         .ok_or(MachineProblem::DataException)?
                 };
-                self.parse_json_group(&layout, value, &clauses)?;
+                self.parse_json_layout(&layout, value, &clauses, &[], true)?;
                 return Ok(());
             }
             let value = value
@@ -6329,12 +6347,74 @@ impl ReferenceMachine {
         Ok(())
     }
 
-    fn parse_json_group(
+    fn parse_json_layout(
         &mut self,
         layout: &LayoutMetadata,
         value: &serde_json::Value,
         clauses: &JsonClauses,
+        indexes: &[usize],
+        root: bool,
     ) -> Result<(), MachineProblem> {
+        if !root && clauses.suppressed(layout) {
+            return Ok(());
+        }
+        if layout.occurs > 1 {
+            let values = value.as_array().ok_or(MachineProblem::DataException)?;
+            let occurs = self.active_occurs(layout)?;
+            if values.len() != occurs {
+                return Err(MachineProblem::DataException);
+            }
+            for (index, value) in values.iter().enumerate() {
+                let mut indexes = indexes.to_vec();
+                indexes.push(index + 1);
+                self.parse_json_single_value(layout, value, clauses, &indexes)?;
+            }
+            return Ok(());
+        }
+        self.parse_json_single_value(layout, value, clauses, indexes)
+    }
+
+    fn parse_json_single_value(
+        &mut self,
+        layout: &LayoutMetadata,
+        value: &serde_json::Value,
+        clauses: &JsonClauses,
+        indexes: &[usize],
+    ) -> Result<(), MachineProblem> {
+        if !is_group(layout.category) {
+            let reference = self.layout_occurrence_reference(layout, indexes)?;
+            let bytes = if is_numeric(layout.category) {
+                let text = value
+                    .as_number()
+                    .map(ToString::to_string)
+                    .or_else(|| value.as_str().map(str::to_string))
+                    .ok_or(MachineProblem::DataException)?;
+                let mut element = layout.clone();
+                element.length = reference.length;
+                element.occurs = 1;
+                encode_decimal(
+                    &element,
+                    decimal_rescale(
+                        decimal_text(&text).ok_or(MachineProblem::DataException)?,
+                        element.scale,
+                    )?,
+                )?
+            } else {
+                let text = value.as_str().ok_or(MachineProblem::DataException)?;
+                let bytes = if matches!(
+                    layout.category,
+                    LayoutCategory::National | LayoutCategory::NationalEdited
+                ) {
+                    utf8_to_national(text.as_bytes())?
+                } else {
+                    text.as_bytes().to_vec()
+                };
+                FixedValue::fit(&bytes, reference.length, layout.justified_right)
+                    .bytes()
+                    .to_vec()
+            };
+            return self.write_reference(&reference, &bytes);
+        }
         let object = value.as_object().ok_or(MachineProblem::DataException)?;
         let mut children = self
             .layouts
@@ -6361,41 +6441,25 @@ impl ReferenceMachine {
             let value = object
                 .get(clauses.name(&child))
                 .ok_or(MachineProblem::DataException)?;
-            if is_group(child.category) {
-                self.parse_json_group(&child, value, clauses)?;
-                continue;
-            }
-            let reference = self.reference(std::slice::from_ref(&child.name))?;
-            let bytes = if is_numeric(child.category) {
-                let text = value
-                    .as_number()
-                    .map(ToString::to_string)
-                    .or_else(|| value.as_str().map(str::to_string))
-                    .ok_or(MachineProblem::DataException)?;
-                encode_decimal(
-                    &child,
-                    decimal_rescale(
-                        decimal_text(&text).ok_or(MachineProblem::DataException)?,
-                        child.scale,
-                    )?,
-                )?
-            } else {
-                let text = value.as_str().ok_or(MachineProblem::DataException)?;
-                let bytes = if matches!(
-                    child.category,
-                    LayoutCategory::National | LayoutCategory::NationalEdited
-                ) {
-                    utf8_to_national(text.as_bytes())?
-                } else {
-                    text.as_bytes().to_vec()
-                };
-                FixedValue::fit(&bytes, reference.length, child.justified_right)
-                    .bytes()
-                    .to_vec()
-            };
-            self.write_reference(&reference, &bytes)?;
+            self.parse_json_layout(&child, value, clauses, indexes, false)?;
         }
         Ok(())
+    }
+
+    fn layout_occurrence_reference(
+        &self,
+        layout: &LayoutMetadata,
+        indexes: &[usize],
+    ) -> Result<ResolvedReference, MachineProblem> {
+        if indexes.is_empty() {
+            return self.reference(std::slice::from_ref(&layout.name));
+        }
+        let mut tokens = Vec::with_capacity(indexes.len() + 3);
+        tokens.push(layout.name.clone());
+        tokens.push("(".into());
+        tokens.extend(indexes.iter().map(ToString::to_string));
+        tokens.push(")".into());
+        self.reference(&tokens)
     }
 
     fn xml_processing_step(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
