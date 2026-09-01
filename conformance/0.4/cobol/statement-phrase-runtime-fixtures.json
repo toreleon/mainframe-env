@@ -113,7 +113,22 @@
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0007",
       "obligation_id": "phrase-multiple-with-lock",
       "source": "IDENTIFICATION DIVISION. PROGRAM-ID. MULTICLOSE. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT FIRST-FILE ASSIGN TO FIRSTDD ORGANIZATION IS SEQUENTIAL. SELECT SECOND-FILE ASSIGN TO SECONDDD ORGANIZATION IS SEQUENTIAL. DATA DIVISION. FILE SECTION. FD FIRST-FILE. 01 FIRST-REC PIC X. FD SECOND-FILE. 01 SECOND-REC PIC X. PROCEDURE DIVISION. CLOSE FIRST-FILE WITH LOCK SECOND-FILE. DISPLAY 'DONE'. STOP RUN.",
-      "expected_output": "DONE\n"
+      "expected_output": "DONE\n",
+      "expected_effects": [
+        "dataset.close:unit=none,no-rewind=false,removal=false,lock=true",
+        "dataset.close:unit=none,no-rewind=false,removal=false,lock=false"
+      ]
+    },
+    {
+      "id": "close-reel-dispositions",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0007",
+      "obligation_id": "phrase-reel-removal-no-rewind",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. REELCLOSE. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT FIRST-FILE ASSIGN TO FIRSTDD ORGANIZATION IS SEQUENTIAL. SELECT SECOND-FILE ASSIGN TO SECONDDD ORGANIZATION IS SEQUENTIAL. DATA DIVISION. FILE SECTION. FD FIRST-FILE. 01 FIRST-REC PIC X. FD SECOND-FILE. 01 SECOND-REC PIC X. PROCEDURE DIVISION. CLOSE FIRST-FILE REEL WITH NO REWIND SECOND-FILE UNIT FOR REMOVAL. DISPLAY 'DONE'. STOP RUN.",
+      "expected_output": "DONE\n",
+      "expected_effects": [
+        "dataset.close:unit=reel,no-rewind=true,removal=false,lock=false",
+        "dataset.close:unit=unit,no-rewind=false,removal=true,lock=false"
+      ]
     },
     {
       "id": "read-next-record",

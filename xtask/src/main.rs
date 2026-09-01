@@ -1258,6 +1258,7 @@ fn check_cobol_statement_bindings(
             }
             Some("0007") => {
                 expected_obligations.insert("phrase-multiple-with-lock");
+                expected_obligations.insert("phrase-reel-removal-no-rewind");
             }
             Some("0011") => {
                 expected_obligations.insert("phrase-upon-no-advancing");

@@ -259,6 +259,7 @@ fn effect_name(effect: &EffectRequest) -> String {
         HostRequest::Program(ProgramRequest::Cancel { .. }) => "program.cancel",
         HostRequest::Program(_) => "program.other",
         HostRequest::Dataset(DatasetRequest::Attributes { .. }) => "dataset.attributes",
+        HostRequest::Dataset(DatasetRequest::Close { .. }) => "dataset.close",
         HostRequest::Dataset(DatasetRequest::StartBrowse { .. }) => "dataset.start-browse",
         HostRequest::Dataset(DatasetRequest::Read { .. }) => "dataset.read",
         HostRequest::Dataset(DatasetRequest::ReadNext { .. }) => "dataset.read-next",
@@ -306,6 +307,14 @@ pub(crate) fn effect_result(effect: &EffectRequest) -> Result<EffectResult, Stri
         HostRequest::Dataset(DatasetRequest::EndBrowse { .. }) => {
             HostResult::Dataset(DatasetResult::Browse {
                 cursor: "cursor-1".into(),
+                record: None,
+                identity: None,
+                key: None,
+            })
+        }
+        HostRequest::Dataset(DatasetRequest::Close { cursor, .. }) => {
+            HostResult::Dataset(DatasetResult::Browse {
+                cursor: cursor.clone().unwrap_or_else(|| "closed".into()),
                 record: None,
                 identity: None,
                 key: None,

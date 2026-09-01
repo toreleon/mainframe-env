@@ -1813,7 +1813,7 @@ mod tests {
                     };
                     let (kind, dataset) = match request {
                         DatasetRequest::Truncate { dataset, .. } => ("truncate", dataset.as_str()),
-                        DatasetRequest::Attributes { dataset } => ("close", dataset.as_str()),
+                        DatasetRequest::Close { dataset, .. } => ("close", dataset.as_str()),
                         other => panic!("unexpected dataset request: {other:?}"),
                     };
                     requests.push(format!("{kind}:{dataset}"));

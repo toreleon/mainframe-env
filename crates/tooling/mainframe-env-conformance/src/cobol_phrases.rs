@@ -6,7 +6,9 @@ use mainframe_env_coverage::{
 use mainframe_env_execution_api::{
     BoundedPayload, InvocationLimits, Machine, MachineDrive, MachineResume, Quantum,
 };
-use mainframe_env_host_api::{DatasetLockMode, DatasetReadControl, DatasetRequest, HostRequest};
+use mainframe_env_host_api::{
+    DatasetLockMode, DatasetReadControl, DatasetReelUnit, DatasetRequest, HostRequest,
+};
 use mainframe_env_interpreter::ReferenceMachine;
 use mainframe_env_ir::CodecLimits;
 use serde::{Deserialize, Serialize};
@@ -246,6 +248,17 @@ fn phrase_effect(request: &HostRequest) -> String {
         HostRequest::Dataset(DatasetRequest::ReadNext { control: value, .. }) => {
             format!("dataset.read-next:{}", control(value))
         }
+        HostRequest::Dataset(DatasetRequest::Close { control, .. }) => format!(
+            "dataset.close:unit={},no-rewind={},removal={},lock={}",
+            match control.reel_or_unit {
+                None => "none",
+                Some(DatasetReelUnit::Reel) => "reel",
+                Some(DatasetReelUnit::Unit) => "unit",
+            },
+            control.no_rewind,
+            control.removal,
+            control.lock,
+        ),
         HostRequest::Dataset(_) => "dataset.other".into(),
         HostRequest::Terminal(_) => "terminal".into(),
         HostRequest::Clock(_) => "clock".into(),
@@ -266,7 +279,8 @@ mod tests {
     fn statement_phrase_fixtures_execute_exactly() {
         verify_cobol_statement_phrase_runtime_fixtures().unwrap();
         for fixture in catalog().unwrap().fixtures {
-            let output = execute(&fixture).unwrap();
+            let output =
+                execute(&fixture).unwrap_or_else(|error| panic!("{}: {error}", fixture.id));
             assert!(output.matched, "{}: {}", fixture.id, output.actual);
         }
     }
