@@ -11213,27 +11213,31 @@ fn declarative_state_key(pc: usize) -> String {
 }
 
 fn xml_document_events(source: &str) -> Result<Vec<(String, Vec<u8>)>, MachineProblem> {
-    let open_end = source.find('>').ok_or(MachineProblem::DataException)?;
-    let name = source
-        .get(1..open_end)
-        .filter(|name| !name.is_empty() && !name.contains(['<', '>', ' ', '/']))
-        .ok_or(MachineProblem::DataException)?;
-    let closing = format!("</{name}>");
-    let body = source
-        .strip_suffix(&closing)
-        .and_then(|value| value.get(open_end + 1..))
-        .ok_or(MachineProblem::DataException)?;
-    if body.contains('<') || body.contains('>') {
-        return Err(MachineProblem::DataException);
+    let document = xml_document(source)?;
+    let mut events = vec![("START-OF-DOCUMENT".into(), Vec::new())];
+    append_xml_node_events(&document, &mut events)?;
+    events.push(("END-OF-DOCUMENT".into(), Vec::new()));
+    Ok(events)
+}
+
+fn append_xml_node_events(
+    node: &XmlNode,
+    events: &mut Vec<(String, Vec<u8>)>,
+) -> Result<(), MachineProblem> {
+    events
+        .len()
+        .checked_add(2)
+        .filter(|count| *count <= 65_536)
+        .ok_or(MachineProblem::ResourceExhausted)?;
+    events.push(("START-OF-ELEMENT".into(), node.name.as_bytes().to_vec()));
+    if !node.text.is_empty() {
+        events.push(("CONTENT-CHARACTERS".into(), node.text.as_bytes().to_vec()));
     }
-    let body = xml_unescape(body)?.into_bytes();
-    Ok(vec![
-        ("START-OF-DOCUMENT".into(), Vec::new()),
-        ("START-OF-ELEMENT".into(), name.as_bytes().to_vec()),
-        ("CONTENT-CHARACTERS".into(), body),
-        ("END-OF-ELEMENT".into(), name.as_bytes().to_vec()),
-        ("END-OF-DOCUMENT".into(), Vec::new()),
-    ])
+    for child in &node.children {
+        append_xml_node_events(child, events)?;
+    }
+    events.push(("END-OF-ELEMENT".into(), node.name.as_bytes().to_vec()));
+    Ok(())
 }
 
 fn replace_bytes(source: &[u8], from: &[u8], to: &[u8]) -> Result<Vec<u8>, MachineProblem> {
