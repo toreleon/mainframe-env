@@ -68,8 +68,9 @@ impl CobolCompiler {
             Ok(syntax) => syntax,
             Err(problem) => return failed_analysis(diagnostic_for_syntax(problem)),
         };
-        let semantic = match SemanticModel::analyze(
+        let semantic = match SemanticModel::analyze_with_origins(
             syntax.semantic_text(),
+            syntax.semantic_origins(),
             self.limits.max_storage_bytes,
             self.limits.max_data_items,
         ) {
@@ -425,7 +426,22 @@ mod tests {
     #[test]
     fn analysis_retains_lossless_syntax() {
         let analysis = CobolCompiler::default().analyze(&bundle(HELLO));
-        assert_eq!(analysis.syntax.unwrap().text(), HELLO);
+        assert_eq!(analysis.syntax.as_ref().unwrap().text(), HELLO);
+        let semantic = analysis.semantic.as_ref().unwrap();
+        assert!(
+            semantic
+                .divisions
+                .iter()
+                .all(|node| !node.source.is_empty())
+        );
+        assert!(semantic.scopes.iter().all(|node| !node.source.is_empty()));
+        assert!(
+            semantic
+                .data_descriptions
+                .iter()
+                .all(|node| !node.source.is_empty()
+                    && node.clauses.iter().all(|clause| !clause.source.is_empty()))
+        );
         assert_eq!(analysis.completeness, Completeness::Complete);
     }
 }

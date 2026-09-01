@@ -20,7 +20,7 @@ use mainframe_env_conformance::{
     verify_carddemo_seeds_from_env, verify_carddemo_source_closures_from_env,
     verify_carddemo_source_preprocessing_from_env, verify_carddemo_terminal_from_env,
     verify_carddemo_utilities_from_env, verify_carddemo_vsam_from_env,
-    verify_cobol_frontend_fixtures, verify_host_abi_libraries,
+    verify_cobol_frontend_fixtures, verify_cobol_semantic_fixtures, verify_host_abi_libraries,
 };
 use mainframe_env_coverage::{
     BindingKey, CompiledSpec, ConformanceLimits, ConformanceRunner, CoverageGate,
@@ -499,6 +499,7 @@ fn check_spec(root: &Path) -> TaskResult {
             == BTreeSet::from([
                 "cobol-language.schema.json",
                 "cobol-frontend-fixtures.schema.json",
+                "cobol-semantic-fixtures.schema.json",
                 "conformance-inventory.schema.json",
                 "conformance-spec.schema.json",
                 "derived-ledger.schema.json",
@@ -533,9 +534,18 @@ fn check_spec(root: &Path) -> TaskResult {
         &frontend_path,
     )?;
     verify_cobol_frontend_fixtures()?;
+    let semantic_path = root.join("conformance/0.3/cobol/semantic-fixtures.json");
+    let semantic_schema_path = schema_directory.join("cobol-semantic-fixtures.schema.json");
+    validate_schema_instance(
+        &json(&semantic_schema_path)?,
+        &json(&semantic_path)?,
+        &semantic_path,
+    )?;
+    verify_cobol_semantic_fixtures()?;
     check_cobol_language_generated(root)?;
     let spec = compile_shared_spec(root)?;
     check_cobol_frontend_bindings(root, &spec, &frontend_path)?;
+    check_cobol_semantic_bindings(root, &spec, &semantic_path)?;
     validate_conformance_projections(&schema_directory, &spec)?;
     require(
         !root.join("conformance/spec/verdicts").exists()
@@ -631,6 +641,8 @@ fn check_cobol_language_catalog(root: &Path, path: &Path) -> TaskResult {
             15,
         ),
         ("compiler_directive_groups", "compiler-directive-groups", 5),
+        ("file_description_clauses", "file-description-clauses", 10),
+        ("data_description_clauses", "data-description-clauses", 17),
     ] {
         let entries = array(&language, field, path)?;
         require(
@@ -640,8 +652,8 @@ fn check_cobol_language_catalog(root: &Path, path: &Path) -> TaskResult {
         for entry in entries {
             let id = text(entry, "id", path)?;
             require(
-                ids.insert(id.to_string()),
-                &format!("COBOL catalog repeats identity {id}"),
+                ids.insert(format!("{unit}:{id}")),
+                &format!("COBOL catalog repeats identity {unit}:{id}"),
             )?;
             let row_id = text(entry, "row_id", path)?;
             let Some((official_unit, label, locator)) = official_rows.get(row_id) else {
@@ -784,6 +796,125 @@ fn check_cobol_frontend_bindings(
     )
 }
 
+fn check_cobol_semantic_bindings(
+    root: &Path,
+    spec: &CompiledSpec,
+    fixture_path: &Path,
+) -> TaskResult {
+    let fixtures = json(fixture_path)?;
+    let language_path = root.join("conformance/0.3/cobol/language.json");
+    let language = json(&language_path)?;
+    let mut catalog_targets = BTreeMap::new();
+    for (field, target_kind) in [
+        ("file_description_clauses", "file-clause"),
+        ("data_description_clauses", "data-clause"),
+    ] {
+        for entry in array(&language, field, &language_path)? {
+            catalog_targets.insert(
+                text(entry, "row_id", &language_path)?.to_string(),
+                (
+                    target_kind.to_string(),
+                    text(entry, "id", &language_path)?.to_string(),
+                ),
+            );
+        }
+    }
+    let digest = format!("sha256:{}", file_digest(fixture_path)?);
+    let mut expected_rows = BTreeSet::new();
+    let mut expected_fixtures = BTreeSet::new();
+    for fixture in array(&fixtures, "fixtures", fixture_path)? {
+        let id = text(fixture, "id", fixture_path)?;
+        let row_id = text(fixture, "row_id", fixture_path)?;
+        require(
+            expected_rows.insert(row_id.to_string()),
+            &format!("COBOL semantic fixtures repeat official row {row_id}"),
+        )?;
+        let target = (
+            text(fixture, "target_kind", fixture_path)?.to_string(),
+            text(fixture, "target_id", fixture_path)?.to_string(),
+        );
+        require(
+            catalog_targets.get(row_id) == Some(&target),
+            &format!("COBOL semantic target drifts from generated catalog for {row_id}"),
+        )?;
+        for suffix in ["valid", "invalid"] {
+            expected_fixtures.insert(format!("cobol.semantic.{id}.{suffix}"));
+        }
+    }
+    let actual_rows = spec
+        .rows()
+        .filter(|row| expected_rows.contains(row.row_id().as_str()))
+        .map(|row| row.row_id().as_str().to_string())
+        .collect::<BTreeSet<_>>();
+    require(
+        actual_rows == expected_rows,
+        "COBOL semantic fixtures and row specifications are not closed",
+    )?;
+    for row in spec
+        .rows()
+        .filter(|row| expected_rows.contains(row.row_id().as_str()))
+    {
+        require(
+            row.obligations()
+                .iter()
+                .map(|obligation| obligation.as_str())
+                .collect::<BTreeSet<_>>()
+                == BTreeSet::from(["valid-forms", "invalid-forms"]),
+            &format!("COBOL semantic obligations drifted for {}", row.row_id()),
+        )?;
+    }
+    let actual_fixtures = spec
+        .registries()
+        .fixtures()
+        .iter()
+        .filter(|(fixture, _)| fixture.as_str().starts_with("cobol.semantic."))
+        .map(|(fixture, fixture_digest)| {
+            require(
+                fixture_digest == &digest,
+                &format!("COBOL semantic fixture digest drifted for {fixture}"),
+            )?;
+            Ok(fixture.as_str().to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        actual_fixtures == expected_fixtures,
+        "COBOL semantic fixture registry is incomplete or stale",
+    )?;
+    let actual_cases = spec
+        .cases()
+        .filter(|case| case.test_id().as_str().starts_with("cobol.semantic."))
+        .map(|case| {
+            require(
+                case.driver().as_str() == "cobol.semantic.driver"
+                    && case.input().as_str() == case.test_id().as_str()
+                    && case.preconditions().len() == 1
+                    && case.preconditions()[0].as_str() == "cobol.semantic.fixture.available"
+                    && case.expected().len() == 1,
+                &format!("COBOL semantic binding drifted for {}", case.test_id()),
+            )?;
+            let expected = if case.key().gate == CoverageGate::Recognized {
+                "cobol.semantic.accepted"
+            } else if case.key().gate == CoverageGate::Validated {
+                "cobol.semantic.rejected"
+            } else {
+                return Err(format!(
+                    "COBOL semantic case claims a later gate: {}",
+                    case.test_id()
+                ));
+            };
+            require(
+                case.expected()[0].as_str() == expected,
+                &format!("COBOL semantic expectation drifted for {}", case.test_id()),
+            )?;
+            Ok(case.test_id().as_str().to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        actual_cases == expected_fixtures,
+        "COBOL semantic executable bindings are incomplete or stale",
+    )
+}
+
 fn generate_cobol_language(root: &Path) -> TaskResult {
     let path = root.join("crates/kernel/mainframe-env-compiler/src/generated/cobol_language.rs");
     fs::create_dir_all(path.parent().ok_or("generated COBOL path has no parent")?)
@@ -807,12 +938,54 @@ fn render_cobol_language(root: &Path) -> TaskResult<Vec<u8>> {
     check_cobol_language_catalog(root, &path)?;
     let statements = array(&language, "compiler_directing_statements", &path)?;
     let groups = array(&language, "compiler_directive_groups", &path)?;
+    let file_clauses = array(&language, "file_description_clauses", &path)?;
+    let data_clauses = array(&language, "data_description_clauses", &path)?;
     let literal = |value: &str| serde_json::to_string(value).map_err(|error| error.to_string());
     let mut source =
         String::from("// @generated by `cargo xtask cobol-language`; do not edit.\n\n");
     source.push_str("#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]\n");
     source.push_str("pub enum CompilerDirectingKind {\n");
     for entry in statements {
+        source.push_str(&format!(
+            "    {},\n",
+            rust_variant(text(entry, "id", &path)?)?
+        ));
+    }
+    source.push_str("}\n\n");
+    source.push_str(&format!(
+        "impl FileDescriptionClauseKind {{\n    pub const ALL: [Self; {}] = [\n",
+        file_clauses.len()
+    ));
+    for entry in file_clauses {
+        source.push_str(&format!(
+            "        Self::{},\n",
+            rust_variant(text(entry, "id", &path)?)?
+        ));
+    }
+    source.push_str("    ];\n}\n\n");
+    source.push_str("#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]\n");
+    source.push_str("pub enum FileDescriptionClauseKind {\n");
+    for entry in file_clauses {
+        source.push_str(&format!(
+            "    {},\n",
+            rust_variant(text(entry, "id", &path)?)?
+        ));
+    }
+    source.push_str("}\n\n");
+    source.push_str(&format!(
+        "impl DataDescriptionClauseKind {{\n    pub const ALL: [Self; {}] = [\n",
+        data_clauses.len()
+    ));
+    for entry in data_clauses {
+        source.push_str(&format!(
+            "        Self::{},\n",
+            rust_variant(text(entry, "id", &path)?)?
+        ));
+    }
+    source.push_str("    ];\n}\n\n");
+    source.push_str("#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]\n");
+    source.push_str("pub enum DataDescriptionClauseKind {\n");
+    for entry in data_clauses {
         source.push_str(&format!(
             "    {},\n",
             rust_variant(text(entry, "id", &path)?)?
@@ -853,6 +1026,9 @@ fn render_cobol_language(root: &Path) -> TaskResult<Vec<u8>> {
     source.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
     source.push_str("pub struct CompilerDirectiveDescriptor {\n");
     source.push_str("    pub kind: CompilerDirectiveKind,\n    pub group: CompilerDirectiveGroup,\n    pub id: &'static str,\n}\n\n");
+    source.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
+    source.push_str("pub struct ClauseDescriptor<K> {\n");
+    source.push_str("    pub kind: K,\n    pub id: &'static str,\n    pub row_id: &'static str,\n    pub label: &'static str,\n    pub source_locator: &'static str,\n    pub forms: &'static [&'static str],\n    pub placement: &'static str,\n}\n\n");
     source.push_str(
         "pub static COMPILER_DIRECTING_STATEMENTS: &[CompilerDirectingDescriptor] = &[\n",
     );
@@ -883,6 +1059,64 @@ fn render_cobol_language(root: &Path) -> TaskResult<Vec<u8>> {
                 literal(text(entry, field, &path)?)?
             ));
         }
+        source.push_str("    },\n");
+    }
+    source.push_str("];\n\n");
+    source.push_str("pub static FILE_DESCRIPTION_CLAUSES: &[ClauseDescriptor<FileDescriptionClauseKind>] = &[\n");
+    for entry in file_clauses {
+        let id = text(entry, "id", &path)?;
+        source.push_str("    ClauseDescriptor {\n");
+        source.push_str(&format!(
+            "        kind: FileDescriptionClauseKind::{},\n",
+            rust_variant(id)?
+        ));
+        for field in ["id", "row_id", "label", "source_locator"] {
+            source.push_str(&format!(
+                "        {field}: {},\n",
+                literal(text(entry, field, &path)?)?
+            ));
+        }
+        source.push_str("        forms: &[");
+        for form in array(entry, "forms", &path)? {
+            source.push_str(&literal(
+                form.as_str().ok_or("COBOL form is not a string")?,
+            )?);
+            source.push(',');
+        }
+        source.push_str("],\n");
+        source.push_str(&format!(
+            "        placement: {},\n",
+            literal(text(entry, "placement", &path)?)?
+        ));
+        source.push_str("    },\n");
+    }
+    source.push_str("];\n\n");
+    source.push_str("pub static DATA_DESCRIPTION_CLAUSES: &[ClauseDescriptor<DataDescriptionClauseKind>] = &[\n");
+    for entry in data_clauses {
+        let id = text(entry, "id", &path)?;
+        source.push_str("    ClauseDescriptor {\n");
+        source.push_str(&format!(
+            "        kind: DataDescriptionClauseKind::{},\n",
+            rust_variant(id)?
+        ));
+        for field in ["id", "row_id", "label", "source_locator"] {
+            source.push_str(&format!(
+                "        {field}: {},\n",
+                literal(text(entry, field, &path)?)?
+            ));
+        }
+        source.push_str("        forms: &[");
+        for form in array(entry, "forms", &path)? {
+            source.push_str(&literal(
+                form.as_str().ok_or("COBOL form is not a string")?,
+            )?);
+            source.push(',');
+        }
+        source.push_str("],\n");
+        source.push_str(&format!(
+            "        placement: {},\n",
+            literal(text(entry, "placement", &path)?)?
+        ));
         source.push_str("    },\n");
     }
     source.push_str("];\n\n");
@@ -923,6 +1157,8 @@ fn render_cobol_language(root: &Path) -> TaskResult<Vec<u8>> {
     source.push_str("];\n\n");
     source.push_str("pub fn compiler_directing_descriptor(kind: CompilerDirectingKind) -> &'static CompilerDirectingDescriptor {\n    COMPILER_DIRECTING_STATEMENTS.iter().find(|entry| entry.kind == kind).expect(\"generated directing kind\")\n}\n\n");
     source.push_str("pub fn compiler_directive_descriptor(kind: CompilerDirectiveKind) -> &'static CompilerDirectiveDescriptor {\n    COMPILER_DIRECTIVES.iter().find(|entry| entry.kind == kind).expect(\"generated directive kind\")\n}\n");
+    source.push_str("\npub fn file_description_clause_descriptor(kind: FileDescriptionClauseKind) -> &'static ClauseDescriptor<FileDescriptionClauseKind> {\n    FILE_DESCRIPTION_CLAUSES.iter().find(|entry| entry.kind == kind).expect(\"generated file clause kind\")\n}\n");
+    source.push_str("\npub fn data_description_clause_descriptor(kind: DataDescriptionClauseKind) -> &'static ClauseDescriptor<DataDescriptionClauseKind> {\n    DATA_DESCRIPTION_CLAUSES.iter().find(|entry| entry.kind == kind).expect(\"generated data clause kind\")\n}\n");
     format_generated_rust(root, source.into_bytes())
 }
 

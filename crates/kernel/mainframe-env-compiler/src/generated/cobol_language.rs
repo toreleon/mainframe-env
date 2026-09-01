@@ -19,6 +19,78 @@ pub enum CompilerDirectingKind {
     Use,
 }
 
+impl FileDescriptionClauseKind {
+    pub const ALL: [Self; 10] = [
+        Self::External,
+        Self::Global,
+        Self::BlockContains,
+        Self::Record,
+        Self::LabelRecords,
+        Self::ValueOf,
+        Self::DataRecords,
+        Self::Linage,
+        Self::RecordingMode,
+        Self::CodeSet,
+    ];
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum FileDescriptionClauseKind {
+    External,
+    Global,
+    BlockContains,
+    Record,
+    LabelRecords,
+    ValueOf,
+    DataRecords,
+    Linage,
+    RecordingMode,
+    CodeSet,
+}
+
+impl DataDescriptionClauseKind {
+    pub const ALL: [Self; 17] = [
+        Self::BlankWhenZero,
+        Self::DynamicLength,
+        Self::External,
+        Self::Global,
+        Self::Justified,
+        Self::GroupUsage,
+        Self::Occurs,
+        Self::Picture,
+        Self::Redefines,
+        Self::Renames,
+        Self::Sign,
+        Self::Synchronized,
+        Self::Typedef,
+        Self::Type,
+        Self::Usage,
+        Self::Value,
+        Self::Volatile,
+    ];
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum DataDescriptionClauseKind {
+    BlankWhenZero,
+    DynamicLength,
+    External,
+    Global,
+    Justified,
+    GroupUsage,
+    Occurs,
+    Picture,
+    Redefines,
+    Renames,
+    Sign,
+    Synchronized,
+    Typedef,
+    Type,
+    Usage,
+    Value,
+    Volatile,
+}
+
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CompilerDirectiveGroup {
     Callinterface,
@@ -74,6 +146,17 @@ pub struct CompilerDirectiveDescriptor {
     pub kind: CompilerDirectiveKind,
     pub group: CompilerDirectiveGroup,
     pub id: &'static str,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ClauseDescriptor<K> {
+    pub kind: K,
+    pub id: &'static str,
+    pub row_id: &'static str,
+    pub label: &'static str,
+    pub source_locator: &'static str,
+    pub forms: &'static [&'static str],
+    pub placement: &'static str,
 }
 
 pub static COMPILER_DIRECTING_STATEMENTS: &[CompilerDirectingDescriptor] = &[
@@ -232,6 +315,268 @@ pub static COMPILER_DIRECTING_STATEMENTS: &[CompilerDirectingDescriptor] = &[
     },
 ];
 
+pub static FILE_DESCRIPTION_CLAUSES: &[ClauseDescriptor<FileDescriptionClauseKind>] = &[
+    ClauseDescriptor {
+        kind: FileDescriptionClauseKind::External,
+        id: "external",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0001",
+        label: "EXTERNAL clause",
+        source_locator: "pdf-page:214;outline:EXTERNAL clause",
+        forms: &["EXTERNAL"],
+        placement: "fd-entry",
+    },
+    ClauseDescriptor {
+        kind: FileDescriptionClauseKind::Global,
+        id: "global",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0002",
+        label: "GLOBAL clause",
+        source_locator: "pdf-page:215;outline:GLOBAL clause",
+        forms: &["GLOBAL"],
+        placement: "fd-entry",
+    },
+    ClauseDescriptor {
+        kind: FileDescriptionClauseKind::BlockContains,
+        id: "block-contains",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0003",
+        label: "BLOCK CONTAINS clause",
+        source_locator: "pdf-page:215;outline:BLOCK CONTAINS clause",
+        forms: &["BLOCK CONTAINS [integer-1 TO] integer-2 [CHARACTERS|RECORDS]"],
+        placement: "fd-or-sd-entry",
+    },
+    ClauseDescriptor {
+        kind: FileDescriptionClauseKind::Record,
+        id: "record",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0004",
+        label: "RECORD clause",
+        source_locator: "pdf-page:216;outline:RECORD clause",
+        forms: &[
+            "RECORD CONTAINS integer-3 CHARACTERS",
+            "RECORD CONTAINS integer-4 TO integer-5 CHARACTERS",
+            "RECORD IS VARYING [IN SIZE] [FROM integer-6] [TO integer-7] [CHARACTERS] [DEPENDING ON data-name-1]",
+        ],
+        placement: "fd-or-sd-entry",
+    },
+    ClauseDescriptor {
+        kind: FileDescriptionClauseKind::LabelRecords,
+        id: "label-records",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0005",
+        label: "LABEL RECORDS clause",
+        source_locator: "pdf-page:218;outline:LABEL RECORDS clause",
+        forms: &["LABEL RECORDS [ARE] STANDARD|OMITTED|data-name"],
+        placement: "fd-or-sd-entry",
+    },
+    ClauseDescriptor {
+        kind: FileDescriptionClauseKind::ValueOf,
+        id: "value-of",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0006",
+        label: "VALUE OF clause",
+        source_locator: "pdf-page:219;outline:VALUE OF clause",
+        forms: &["VALUE OF data-name IS literal"],
+        placement: "fd-or-sd-entry",
+    },
+    ClauseDescriptor {
+        kind: FileDescriptionClauseKind::DataRecords,
+        id: "data-records",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0007",
+        label: "DATA RECORDS clause",
+        source_locator: "pdf-page:219;outline:DATA RECORDS clause",
+        forms: &["DATA RECORDS [ARE] data-name..."],
+        placement: "fd-or-sd-entry",
+    },
+    ClauseDescriptor {
+        kind: FileDescriptionClauseKind::Linage,
+        id: "linage",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0008",
+        label: "LINAGE clause",
+        source_locator: "pdf-page:219;outline:LINAGE clause",
+        forms: &[
+            "LINAGE [IS] integer|data-name LINES [WITH FOOTING AT integer|data-name] [LINES AT TOP integer|data-name] [LINES AT BOTTOM integer|data-name]",
+        ],
+        placement: "fd-or-sd-entry",
+    },
+    ClauseDescriptor {
+        kind: FileDescriptionClauseKind::RecordingMode,
+        id: "recording-mode",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0009",
+        label: "RECORDING MODE clause",
+        source_locator: "pdf-page:221;outline:RECORDING MODE clause",
+        forms: &["RECORDING MODE [IS] F|V|U|S"],
+        placement: "fd-or-sd-entry",
+    },
+    ClauseDescriptor {
+        kind: FileDescriptionClauseKind::CodeSet,
+        id: "code-set",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0010",
+        label: "CODE-SET clause",
+        source_locator: "pdf-page:222;outline:CODE-SET clause",
+        forms: &["CODE-SET [IS] alphabet-name"],
+        placement: "fd-or-sd-entry",
+    },
+];
+
+pub static DATA_DESCRIPTION_CLAUSES: &[ClauseDescriptor<DataDescriptionClauseKind>] = &[
+    ClauseDescriptor {
+        kind: DataDescriptionClauseKind::BlankWhenZero,
+        id: "blank-when-zero",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0001",
+        label: "BLANK WHEN ZERO clause",
+        source_locator: "pdf-page:226;outline:BLANK WHEN ZERO clause",
+        forms: &["BLANK WHEN ZERO|ZEROS|ZEROES"],
+        placement: "elementary-data-entry",
+    },
+    ClauseDescriptor {
+        kind: DataDescriptionClauseKind::DynamicLength,
+        id: "dynamic-length",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0002",
+        label: "DYNAMIC LENGTH clause",
+        source_locator: "pdf-page:226;outline:DYNAMIC LENGTH clause",
+        forms: &["DYNAMIC [LENGTH] [LIMIT [IS] integer]"],
+        placement: "elementary-data-entry",
+    },
+    ClauseDescriptor {
+        kind: DataDescriptionClauseKind::External,
+        id: "external",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0003",
+        label: "EXTERNAL clause",
+        source_locator: "pdf-page:227;outline:EXTERNAL clause",
+        forms: &["EXTERNAL [AS literal]"],
+        placement: "working-storage-level-01",
+    },
+    ClauseDescriptor {
+        kind: DataDescriptionClauseKind::Global,
+        id: "global",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0004",
+        label: "GLOBAL clause",
+        source_locator: "pdf-page:228;outline:GLOBAL clause",
+        forms: &["GLOBAL"],
+        placement: "level-01",
+    },
+    ClauseDescriptor {
+        kind: DataDescriptionClauseKind::Justified,
+        id: "justified",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0005",
+        label: "JUSTIFIED clause",
+        source_locator: "pdf-page:228;outline:JUSTIFIED clause",
+        forms: &["JUSTIFIED|JUST RIGHT"],
+        placement: "elementary-data-entry",
+    },
+    ClauseDescriptor {
+        kind: DataDescriptionClauseKind::GroupUsage,
+        id: "group-usage",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0006",
+        label: "GROUP-USAGE clause",
+        source_locator: "pdf-page:229;outline:GROUP-USAGE clause",
+        forms: &["GROUP-USAGE [IS] NATIONAL|UTF-8"],
+        placement: "group-data-entry",
+    },
+    ClauseDescriptor {
+        kind: DataDescriptionClauseKind::Occurs,
+        id: "occurs",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0007",
+        label: "OCCURS clause",
+        source_locator: "pdf-page:231;outline:OCCURS clause",
+        forms: &[
+            "OCCURS integer TIMES",
+            "OCCURS integer-1 TO integer-2 TIMES [DEPENDING ON data-name] [KEY IS data-name] [INDEXED BY index-name...]",
+        ],
+        placement: "data-entry",
+    },
+    ClauseDescriptor {
+        kind: DataDescriptionClauseKind::Picture,
+        id: "picture",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0008",
+        label: "PICTURE clause",
+        source_locator: "pdf-page:237;outline:PICTURE clause",
+        forms: &["PIC|PICTURE [IS] character-string [BYTE-LENGTH integer]"],
+        placement: "elementary-data-entry",
+    },
+    ClauseDescriptor {
+        kind: DataDescriptionClauseKind::Redefines,
+        id: "redefines",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0009",
+        label: "REDEFINES clause",
+        source_locator: "pdf-page:255;outline:REDEFINES clause",
+        forms: &["REDEFINES data-name"],
+        placement: "immediately-after-data-name",
+    },
+    ClauseDescriptor {
+        kind: DataDescriptionClauseKind::Renames,
+        id: "renames",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0010",
+        label: "RENAMES clause",
+        source_locator: "pdf-page:258;outline:RENAMES clause",
+        forms: &["RENAMES data-name-1 [THROUGH|THRU data-name-2]"],
+        placement: "level-66",
+    },
+    ClauseDescriptor {
+        kind: DataDescriptionClauseKind::Sign,
+        id: "sign",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0011",
+        label: "SIGN clause",
+        source_locator: "pdf-page:260;outline:SIGN clause",
+        forms: &["SIGN [IS] LEADING|TRAILING [SEPARATE [CHARACTER]]"],
+        placement: "signed-numeric-entry",
+    },
+    ClauseDescriptor {
+        kind: DataDescriptionClauseKind::Synchronized,
+        id: "synchronized",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0012",
+        label: "SYNCHRONIZED clause",
+        source_locator: "pdf-page:261;outline:SYNCHRONIZED clause",
+        forms: &["SYNCHRONIZED|SYNC [LEFT|RIGHT]"],
+        placement: "elementary-or-level-01-group",
+    },
+    ClauseDescriptor {
+        kind: DataDescriptionClauseKind::Typedef,
+        id: "typedef",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0013",
+        label: "TYPEDEF clause",
+        source_locator: "pdf-page:266;outline:TYPEDEF clause",
+        forms: &["[IS] TYPEDEF"],
+        placement: "level-01-type-declaration",
+    },
+    ClauseDescriptor {
+        kind: DataDescriptionClauseKind::Type,
+        id: "type",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0014",
+        label: "TYPE clause",
+        source_locator: "pdf-page:267;outline:TYPE clause",
+        forms: &["TYPE [TO] type-name"],
+        placement: "data-entry",
+    },
+    ClauseDescriptor {
+        kind: DataDescriptionClauseKind::Usage,
+        id: "usage",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0015",
+        label: "USAGE clause",
+        source_locator: "pdf-page:269;outline:USAGE clause",
+        forms: &["[USAGE [IS]] representation"],
+        placement: "data-entry",
+    },
+    ClauseDescriptor {
+        kind: DataDescriptionClauseKind::Value,
+        id: "value",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0016",
+        label: "VALUE clause",
+        source_locator: "pdf-page:277;outline:VALUE clause",
+        forms: &[
+            "VALUE [IS] literal|figurative-constant",
+            "VALUES [ARE] literal [THROUGH literal]...",
+            "VALUE [IS] NULL",
+        ],
+        placement: "data-or-condition-entry",
+    },
+    ClauseDescriptor {
+        kind: DataDescriptionClauseKind::Volatile,
+        id: "volatile",
+        row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0017",
+        label: "VOLATILE clause",
+        source_locator: "pdf-page:284;outline:VOLATILE clause",
+        forms: &["VOLATILE"],
+        placement: "data-entry-except-level-66-88",
+    },
+];
+
 pub static COMPILER_DIRECTIVE_GROUPS: &[CompilerDirectiveGroupDescriptor] = &[
     CompilerDirectiveGroupDescriptor {
         group: CompilerDirectiveGroup::Callinterface,
@@ -369,4 +714,22 @@ pub fn compiler_directive_descriptor(
         .iter()
         .find(|entry| entry.kind == kind)
         .expect("generated directive kind")
+}
+
+pub fn file_description_clause_descriptor(
+    kind: FileDescriptionClauseKind,
+) -> &'static ClauseDescriptor<FileDescriptionClauseKind> {
+    FILE_DESCRIPTION_CLAUSES
+        .iter()
+        .find(|entry| entry.kind == kind)
+        .expect("generated file clause kind")
+}
+
+pub fn data_description_clause_descriptor(
+    kind: DataDescriptionClauseKind,
+) -> &'static ClauseDescriptor<DataDescriptionClauseKind> {
+    DATA_DESCRIPTION_CLAUSES
+        .iter()
+        .find(|entry| entry.kind == kind)
+        .expect("generated data clause kind")
 }

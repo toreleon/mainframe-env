@@ -1,3 +1,12 @@
+mod structure;
+
+pub use structure::{
+    CobolClauseKind, CobolClauseNode, CobolDataDescription, CobolDivisionKind, CobolDivisionNode,
+    CobolFileDescription, CobolScope, CobolScopeId, CobolScopeKind, CobolSectionKind,
+    CobolSectionNode,
+};
+
+use crate::syntax::SourceOrigin;
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -80,21 +89,52 @@ pub struct SemanticModel {
     pub program_id: String,
     pub layouts: Vec<CobolLayout>,
     pub files: Vec<CobolFileBinding>,
+    pub divisions: Vec<CobolDivisionNode>,
+    pub sections: Vec<CobolSectionNode>,
+    pub scopes: Vec<CobolScope>,
+    pub file_descriptions: Vec<CobolFileDescription>,
+    pub data_descriptions: Vec<CobolDataDescription>,
     by_qualified: BTreeMap<String, usize>,
     by_simple: BTreeMap<String, Vec<usize>>,
     pub storage_bytes: usize,
 }
 
 impl SemanticModel {
+    #[cfg(test)]
     pub(crate) fn analyze(
         source: &str,
         max_storage: usize,
         max_items: usize,
     ) -> Result<Self, SemanticProblem> {
+        Self::analyze_with_origins(source, &[], max_storage, max_items)
+    }
+
+    pub(crate) fn analyze_with_origins(
+        source: &str,
+        origins: &[SourceOrigin],
+        max_storage: usize,
+        max_items: usize,
+    ) -> Result<Self, SemanticProblem> {
+        let structure = structure::analyze(source, origins, max_items)?;
         let cleaned = strip_comments(source);
         let upper = cleaned.to_ascii_uppercase();
         let program_id = extract_program_id(&upper).ok_or(SemanticProblem::MissingProgramId)?;
         let files = file_bindings(&cleaned)?;
+        for description in structure
+            .file_descriptions
+            .iter()
+            .filter(|description| !description.sort_merge)
+        {
+            if !files
+                .iter()
+                .any(|binding| binding.select_name == description.name)
+            {
+                return Err(SemanticProblem::InvalidDeclaration(format!(
+                    "FD {} has no matching SELECT",
+                    description.name
+                )));
+            }
+        }
         let data_start = upper.find("DATA DIVISION").unwrap_or(0);
         let data_end = upper[data_start..]
             .find("PROCEDURE DIVISION")
@@ -142,6 +182,11 @@ impl SemanticModel {
             program_id,
             layouts,
             files,
+            divisions: structure.divisions,
+            sections: structure.sections,
+            scopes: structure.scopes,
+            file_descriptions: structure.file_descriptions,
+            data_descriptions: structure.data_descriptions,
             by_qualified,
             by_simple,
             storage_bytes: cursor,
@@ -1268,6 +1313,8 @@ pub(crate) enum SemanticProblem {
     IncompleteLayout(String),
     ItemLimitExceeded,
     StorageLimitExceeded,
+    InvalidClause(String),
+    ScopeLimitExceeded,
 }
 
 #[cfg(test)]
@@ -1365,5 +1412,48 @@ mod tests {
         assert_eq!(model.files[0].file_status.as_deref(), Some("FILE-STATUS"));
         assert_eq!(model.files[1].organization, "RELATIVE");
         assert_eq!(model.files[1].relative_key.as_deref(), Some("REL-NUM"));
+    }
+
+    #[test]
+    fn all_file_and_data_clause_identities_are_typed_and_validated() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CLAUSES. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT PRINT-FILE ASSIGN TO PRINTDD. DATA DIVISION. FILE SECTION. FD PRINT-FILE EXTERNAL GLOBAL BLOCK CONTAINS 1 TO 10 CHARACTERS RECORD CONTAINS 1 TO 80 CHARACTERS LABEL RECORDS ARE STANDARD VALUE OF FILE-ID IS 'PRINT' DATA RECORDS ARE PRINT-REC LINAGE IS 60 LINES WITH FOOTING AT 55 LINES AT TOP 3 LINES AT BOTTOM 2 RECORDING MODE IS V CODE-SET IS EBCDIC. 01 PRINT-REC PIC X(80). WORKING-STORAGE SECTION. 01 EDITED PIC ZZ9 BLANK WHEN ZERO. 01 DYN-ITEM PIC X DYNAMIC LENGTH LIMIT IS 100. 01 EXTERNAL-REC EXTERNAL GLOBAL. 01 JUSTIFIED-ITEM PIC X JUST RIGHT. 01 NATIONAL-GROUP GROUP-USAGE IS NATIONAL. 05 NATIONAL-ITEM PIC N. 01 TABLE-REC. 05 TABLE-ITEM OCCURS 1 TO 3 TIMES DEPENDING ON TABLE-COUNT PIC X. 01 TABLE-COUNT PIC 9. 01 BASE-ITEM PIC X. 01 ALIAS-ITEM REDEFINES BASE-ITEM PIC X. 66 RENAMED-ITEM RENAMES BASE-ITEM THRU ALIAS-ITEM. 77 SIGNED-ITEM PIC S9(4) SIGN IS LEADING SEPARATE CHARACTER SYNC RIGHT USAGE DISPLAY VALUE -1. 01 PRICE-T TYPEDEF PIC 9(5). 01 PRICE TYPE PRICE-T VALUE 1. 01 VOLATILE-ITEM PIC X VOLATILE. PROCEDURE DIVISION. STOP RUN.";
+        let model = SemanticModel::analyze(source, 4096, 128).unwrap();
+        let file_kinds = model.file_descriptions[0]
+            .clauses
+            .iter()
+            .map(|clause| clause.kind)
+            .collect::<BTreeSet<_>>();
+        assert_eq!(file_kinds.len(), crate::FILE_DESCRIPTION_CLAUSES.len());
+        let data_kinds = model
+            .data_descriptions
+            .iter()
+            .flat_map(|description| description.clauses.iter())
+            .filter_map(|clause| match clause.kind {
+                CobolClauseKind::Data(kind) => Some(kind),
+                CobolClauseKind::File(_) => None,
+            })
+            .collect::<BTreeSet<_>>();
+        assert_eq!(data_kinds.len(), crate::DATA_DESCRIPTION_CLAUSES.len());
+    }
+
+    #[test]
+    fn nested_program_function_class_and_method_scopes_have_stable_parents() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. OUTER. IDENTIFICATION DIVISION. PROGRAM-ID. INNER. END PROGRAM INNER. IDENTIFICATION DIVISION. FUNCTION-ID. FN. END FUNCTION FN. IDENTIFICATION DIVISION. CLASS-ID. CLS. IDENTIFICATION DIVISION. METHOD-ID. RUN. END METHOD RUN. END CLASS CLS. PROCEDURE DIVISION. STOP RUN.";
+        let model = SemanticModel::analyze(source, 1024, 32).unwrap();
+        assert_eq!(model.scopes.len(), 5);
+        assert_eq!(model.scopes[0].parent, None);
+        assert_eq!(model.scopes[1].parent, Some(model.scopes[0].id));
+        assert_eq!(model.scopes[2].parent, Some(model.scopes[0].id));
+        assert_eq!(model.scopes[4].parent, Some(model.scopes[3].id));
+        assert_eq!(model.divisions.len(), 6);
+
+        let literal = SemanticModel::analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. REAL. PROCEDURE DIVISION. DISPLAY 'PROGRAM-ID. FAKE. DATA DIVISION'. STOP RUN.",
+            1024,
+            16,
+        )
+        .unwrap();
+        assert_eq!(literal.scopes.len(), 1);
+        assert_eq!(literal.divisions.len(), 2);
     }
 }

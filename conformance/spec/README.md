@@ -5,12 +5,13 @@ introduced by CI-300. `v1/spec.json` is the readable source compiled by
 `cargo xtask spec --check`; later subsystem minors extend that one document and
 the typed registries rather than creating subsystem-local harness contracts.
 
-The CI-300 foundation deliberately claimed no official behavior. CB-301 adds
-the first reviewed executable claims for COBOL compiler-directing statements
-and directive groups. Catalog rows enter the numerator only after a work
-package supplies a reviewed row specification, mandatory obligations,
-executable bindings, and verdict events. Verdict and ledger schemas define
-projections; committed per-row or per-obligation verdict files are prohibited.
+The CI-300 foundation deliberately claimed no official behavior. CB-301 and
+CB-302 add reviewed executable claims for COBOL compiler-directing statements,
+directive groups, and file/data description clauses. Catalog rows enter the
+numerator only after a work package supplies a reviewed row specification,
+mandatory obligations, executable bindings, and verdict events. Verdict and
+ledger schemas define projections; committed per-row or per-obligation verdict
+files are prohibited.
 
 Cross-subsystem cases use the separate bounded `ScenarioSpec` section. A
 scenario contains only typed participant drivers, ordered step references,

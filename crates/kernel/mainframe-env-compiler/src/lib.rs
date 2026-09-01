@@ -11,9 +11,12 @@ mod syntax;
 
 pub use generated::cobol_language::{
     COMPILER_DIRECTING_STATEMENTS, COMPILER_DIRECTIVE_GROUPS, COMPILER_DIRECTIVES,
-    CompilerDirectingDescriptor, CompilerDirectingKind, CompilerDirectiveDescriptor,
-    CompilerDirectiveGroup, CompilerDirectiveGroupDescriptor, CompilerDirectiveKind,
-    compiler_directing_descriptor, compiler_directive_descriptor,
+    ClauseDescriptor, CompilerDirectingDescriptor, CompilerDirectingKind,
+    CompilerDirectiveDescriptor, CompilerDirectiveGroup, CompilerDirectiveGroupDescriptor,
+    CompilerDirectiveKind, DATA_DESCRIPTION_CLAUSES, DataDescriptionClauseKind,
+    FILE_DESCRIPTION_CLAUSES, FileDescriptionClauseKind, compiler_directing_descriptor,
+    compiler_directive_descriptor, data_description_clause_descriptor,
+    file_description_clause_descriptor,
 };
 
 pub use hir::{
@@ -22,8 +25,10 @@ pub use hir::{
 };
 pub use lower::{CORE_NAMESPACE, core_mir_catalog, core_mir_profile};
 pub use semantic::{
-    CobolFileBinding, CobolLayout, DataCategory, DataReference, ResolutionProblem, SemanticModel,
-    StorageSection,
+    CobolClauseKind, CobolClauseNode, CobolDataDescription, CobolDivisionKind, CobolDivisionNode,
+    CobolFileBinding, CobolFileDescription, CobolLayout, CobolScope, CobolScopeId, CobolScopeKind,
+    CobolSectionKind, CobolSectionNode, DataCategory, DataReference, ResolutionProblem,
+    SemanticModel, StorageSection,
 };
 pub use service::{CobolAnalysis, CobolCompiler, CobolCompilerLimits};
 pub use syntax::{

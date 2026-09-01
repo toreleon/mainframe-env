@@ -126,32 +126,32 @@ pub fn cobol_frontend_runtime(
     limits: ConformanceLimits,
 ) -> Result<RuntimeRegistry<'static>, String> {
     verify_cobol_frontend_fixtures()?;
-    RuntimeRegistry::new(
-        spec,
-        vec![(
-            DriverRef::new("cobol.frontend.driver", limits).map_err(|error| error.to_string())?,
-            &FRONTEND_DRIVER,
-        )],
-        vec![(
-            PredicateRef::new("cobol.fixture.available", limits)
+    crate::cobol_clauses::verify_cobol_semantic_fixtures()?;
+    let mut drivers = vec![(
+        DriverRef::new("cobol.frontend.driver", limits).map_err(|error| error.to_string())?,
+        &FRONTEND_DRIVER as &dyn ConformanceDriver,
+    )];
+    drivers.extend(crate::cobol_clauses::runtime_drivers(limits)?);
+    let mut predicates = vec![(
+        PredicateRef::new("cobol.fixture.available", limits).map_err(|error| error.to_string())?,
+        &FIXTURE_AVAILABLE as &dyn ConformancePredicate,
+    )];
+    predicates.extend(crate::cobol_clauses::runtime_predicates(limits)?);
+    let mut observations = vec![
+        (
+            ObservationRef::new("cobol.frontend.accepted", limits)
                 .map_err(|error| error.to_string())?,
-            &FIXTURE_AVAILABLE,
-        )],
-        vec![
-            (
-                ObservationRef::new("cobol.frontend.accepted", limits)
-                    .map_err(|error| error.to_string())?,
-                &ACCEPTED_OBSERVATION as &dyn ConformanceObservation,
-            ),
-            (
-                ObservationRef::new("cobol.frontend.rejected", limits)
-                    .map_err(|error| error.to_string())?,
-                &REJECTED_OBSERVATION as &dyn ConformanceObservation,
-            ),
-        ],
-        limits,
-    )
-    .map_err(|error| error.to_string())
+            &ACCEPTED_OBSERVATION as &dyn ConformanceObservation,
+        ),
+        (
+            ObservationRef::new("cobol.frontend.rejected", limits)
+                .map_err(|error| error.to_string())?,
+            &REJECTED_OBSERVATION as &dyn ConformanceObservation,
+        ),
+    ];
+    observations.extend(crate::cobol_clauses::runtime_observations(limits)?);
+    RuntimeRegistry::new(spec, drivers, predicates, observations, limits)
+        .map_err(|error| error.to_string())
 }
 
 impl ConformancePredicate for FixtureAvailable {
