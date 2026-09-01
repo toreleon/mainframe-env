@@ -143,6 +143,10 @@ pub struct PrincipalProfile {
     pub default_group: Option<String>,
     pub state: PrincipalState,
     pub(crate) credential: Option<CredentialVerifier>,
+    #[serde(default)]
+    pub profile_template: Option<String>,
+    #[serde(default)]
+    pub segments: BTreeMap<String, ProfileSegment>,
     pub security_level: u32,
     pub security_label: Option<String>,
     pub categories: BTreeSet<String>,
@@ -164,6 +168,10 @@ pub struct GroupProfile {
     pub owner: String,
     pub superior_group: Option<String>,
     pub universal: bool,
+    #[serde(default)]
+    pub profile_template: Option<String>,
+    #[serde(default)]
+    pub segments: BTreeMap<String, ProfileSegment>,
     pub version: u64,
 }
 
@@ -698,6 +706,12 @@ impl SecurityDatabaseSnapshot {
                     digest_sha256(digest)?;
                 }
             }
+            self.validate_profile_segments(
+                principal.profile_template.as_deref(),
+                &principal.segments,
+                PrincipalKind::User,
+                limits,
+            )?;
         }
         for (name, group) in &self.groups {
             principal_name(name)?;
@@ -720,6 +734,12 @@ impl SecurityDatabaseSnapshot {
                         .and_then(|value| value.superior_group.as_deref());
                 }
             }
+            self.validate_profile_segments(
+                group.profile_template.as_deref(),
+                &group.segments,
+                PrincipalKind::Group,
+                limits,
+            )?;
         }
         for (key, connection) in &self.connections {
             if *key != connection_key(&connection.user, &connection.group)
@@ -781,42 +801,12 @@ impl SecurityDatabaseSnapshot {
             {
                 return Err(SecuritySchemaProblem::Malformed);
             }
-            let template = self
-                .templates
-                .get(&class.profile_template)
-                .ok_or(SecuritySchemaProblem::MissingReference)?;
-            for required in &template.required_segments {
-                if !profile.segments.contains_key(required) {
-                    return Err(SecuritySchemaProblem::MissingReference);
-                }
-            }
-            for (name, segment) in &profile.segments {
-                let segment_schema = template
-                    .segments
-                    .get(name)
-                    .ok_or(SecuritySchemaProblem::MissingReference)?;
-                if segment.template != *name
-                    || segment.template_version != segment_schema.version
-                    || segment.fields.len() > limits.max_fields_per_segment
-                {
-                    return Err(SecuritySchemaProblem::IncompatibleVersion);
-                }
-                for (field, field_schema) in &segment_schema.fields {
-                    if field_schema.required && !segment.fields.contains_key(field) {
-                        return Err(SecuritySchemaProblem::MissingReference);
-                    }
-                }
-                for (field, value) in &segment.fields {
-                    let field_schema = segment_schema
-                        .fields
-                        .get(field)
-                        .ok_or(SecuritySchemaProblem::MissingReference)?;
-                    if value.kind() != field_schema.kind {
-                        return Err(SecuritySchemaProblem::Malformed);
-                    }
-                    validate_segment_value(value, field_schema, limits)?;
-                }
-            }
+            self.validate_profile_segments(
+                Some(&class.profile_template),
+                &profile.segments,
+                PrincipalKind::Undefined,
+                limits,
+            )?;
             for ace in &profile.access_list {
                 if !self.principals.contains_key(&ace.principal)
                     && !self.groups.contains_key(&ace.principal)
@@ -826,6 +816,64 @@ impl SecurityDatabaseSnapshot {
                 if let Some(condition) = &ace.when {
                     validate_condition(condition, limits)?;
                 }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_profile_segments(
+        &self,
+        template_name: Option<&str>,
+        segments: &BTreeMap<String, ProfileSegment>,
+        expected_kind: PrincipalKind,
+        limits: SecurityDatabaseLimits,
+    ) -> Result<(), SecuritySchemaProblem> {
+        let Some(template_name) = template_name else {
+            return if segments.is_empty() {
+                Ok(())
+            } else {
+                Err(SecuritySchemaProblem::MissingReference)
+            };
+        };
+        let template = self
+            .templates
+            .get(template_name)
+            .ok_or(SecuritySchemaProblem::MissingReference)?;
+        if template.profile_kind != expected_kind
+            || segments.len() > limits.max_segments_per_profile
+        {
+            return Err(SecuritySchemaProblem::Malformed);
+        }
+        for required in &template.required_segments {
+            if !segments.contains_key(required) {
+                return Err(SecuritySchemaProblem::MissingReference);
+            }
+        }
+        for (name, segment) in segments {
+            let segment_schema = template
+                .segments
+                .get(name)
+                .ok_or(SecuritySchemaProblem::MissingReference)?;
+            if segment.template != *name
+                || segment.template_version != segment_schema.version
+                || segment.fields.len() > limits.max_fields_per_segment
+            {
+                return Err(SecuritySchemaProblem::IncompatibleVersion);
+            }
+            for (field, field_schema) in &segment_schema.fields {
+                if field_schema.required && !segment.fields.contains_key(field) {
+                    return Err(SecuritySchemaProblem::MissingReference);
+                }
+            }
+            for (field, value) in &segment.fields {
+                let field_schema = segment_schema
+                    .fields
+                    .get(field)
+                    .ok_or(SecuritySchemaProblem::MissingReference)?;
+                if value.kind() != field_schema.kind {
+                    return Err(SecuritySchemaProblem::Malformed);
+                }
+                validate_segment_value(value, field_schema, limits)?;
             }
         }
         Ok(())
@@ -1080,6 +1128,8 @@ mod tests {
             default_group: None,
             state: PrincipalState::Active,
             credential: None,
+            profile_template: None,
+            segments: BTreeMap::new(),
             security_level: 0,
             security_label: None,
             categories: BTreeSet::new(),
@@ -1140,6 +1190,8 @@ mod tests {
                     owner: name.into(),
                     superior_group: superior.map(str::to_string),
                     universal: false,
+                    profile_template: None,
+                    segments: BTreeMap::new(),
                     version: 1,
                 },
             );
@@ -1147,6 +1199,61 @@ mod tests {
         assert_eq!(
             snapshot.validate(SecurityDatabaseLimits::default()),
             Err(SecuritySchemaProblem::Cycle)
+        );
+    }
+
+    #[test]
+    fn principal_segments_are_bound_to_typed_profile_templates() {
+        let mut snapshot = SecurityDatabaseSnapshot::default();
+        snapshot.templates.insert(
+            "USER".into(),
+            ProfileTemplate {
+                id: "USER".into(),
+                version: 1,
+                profile_kind: PrincipalKind::User,
+                required_segments: BTreeSet::from(["OMVS".into()]),
+                segments: BTreeMap::from([(
+                    "OMVS".into(),
+                    SegmentTemplate {
+                        name: "OMVS".into(),
+                        version: 1,
+                        fields: BTreeMap::from([(
+                            "UID".into(),
+                            SegmentFieldSchema {
+                                kind: SegmentFieldKind::Unsigned,
+                                required: true,
+                                max_bytes: 20,
+                                max_items: 0,
+                            },
+                        )]),
+                    },
+                )]),
+            },
+        );
+        let mut user = principal("IBMUSER");
+        user.profile_template = Some("USER".into());
+        user.segments.insert(
+            "OMVS".into(),
+            ProfileSegment {
+                template: "OMVS".into(),
+                template_version: 1,
+                fields: BTreeMap::from([("UID".into(), SegmentValue::Unsigned(1000))]),
+            },
+        );
+        snapshot.principals.insert("IBMUSER".into(), user);
+        snapshot.validate(Default::default()).unwrap();
+        snapshot
+            .principals
+            .get_mut("IBMUSER")
+            .unwrap()
+            .segments
+            .get_mut("OMVS")
+            .unwrap()
+            .fields
+            .insert("UID".into(), SegmentValue::Text("1000".into()));
+        assert_eq!(
+            snapshot.validate(Default::default()),
+            Err(SecuritySchemaProblem::Malformed)
         );
     }
 

@@ -641,6 +641,8 @@ impl RacfService {
                 changed_tick: 0,
                 history_digests: Vec::new(),
             }),
+            profile_template: None,
+            segments: BTreeMap::new(),
             security_level: 0,
             security_label: None,
             categories: BTreeSet::new(),
@@ -757,6 +759,8 @@ fn group_profile(name: &str) -> GroupProfile {
         owner: name.into(),
         superior_group: None,
         universal: false,
+        profile_template: None,
+        segments: BTreeMap::new(),
         version: 1,
     }
 }

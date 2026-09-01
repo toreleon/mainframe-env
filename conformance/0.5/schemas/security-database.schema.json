@@ -50,7 +50,7 @@
     },
     "principal": {
       "type": "object", "additionalProperties": false,
-      "required": ["id", "kind", "owner", "default_group", "state", "credential", "security_level", "security_label", "categories", "attributes", "version"],
+      "required": ["id", "kind", "owner", "default_group", "state", "credential", "profile_template", "segments", "security_level", "security_label", "categories", "attributes", "version"],
       "properties": {
         "id": {"$ref": "#/$defs/principal_name"},
         "kind": {"$ref": "#/$defs/principal_kind"},
@@ -58,6 +58,8 @@
         "default_group": {"anyOf": [{"$ref": "#/$defs/principal_name"}, {"type": "null"}]},
         "state": {"enum": ["active", "password-expired", "revoked", "suspended", "locked"]},
         "credential": {"anyOf": [{"$ref": "#/$defs/credential"}, {"type": "null"}]},
+        "profile_template": {"anyOf": [{"$ref": "#/$defs/name"}, {"type": "null"}]},
+        "segments": {"type": "object", "maxProperties": 64, "additionalProperties": {"$ref": "#/$defs/profile_segment"}},
         "security_level": {"type": "integer", "minimum": 0},
         "security_label": {"anyOf": [{"$ref": "#/$defs/name"}, {"type": "null"}]},
         "categories": {"$ref": "#/$defs/string_set"},
@@ -67,12 +69,14 @@
     },
     "group": {
       "type": "object", "additionalProperties": false,
-      "required": ["name", "owner", "superior_group", "universal", "version"],
+      "required": ["name", "owner", "superior_group", "universal", "profile_template", "segments", "version"],
       "properties": {
         "name": {"$ref": "#/$defs/principal_name"},
         "owner": {"$ref": "#/$defs/principal_name"},
         "superior_group": {"anyOf": [{"$ref": "#/$defs/principal_name"}, {"type": "null"}]},
         "universal": {"type": "boolean"},
+        "profile_template": {"anyOf": [{"$ref": "#/$defs/name"}, {"type": "null"}]},
+        "segments": {"type": "object", "maxProperties": 64, "additionalProperties": {"$ref": "#/$defs/profile_segment"}},
         "version": {"$ref": "#/$defs/version"}
       }
     },
