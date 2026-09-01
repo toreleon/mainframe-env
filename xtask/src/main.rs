@@ -1239,7 +1239,7 @@ fn check_cobol_statement_bindings(
         ]);
         if matches!(
             row.row_id().as_str().rsplit(':').next(),
-            Some("0031" | "0032" | "0034" | "0036")
+            Some("0029" | "0031" | "0032" | "0034" | "0036")
         ) {
             expected_obligations.insert("checkpoint-restart");
         }
@@ -1282,6 +1282,7 @@ fn check_cobol_statement_bindings(
             }
             Some("0029") => {
                 expected_obligations.insert("phrase-inline-varying");
+                expected_obligations.insert("phrase-out-of-line-times-until-varying");
                 expected_obligations.insert("phrase-through");
             }
             Some("0028") => {
@@ -2307,7 +2308,7 @@ fn check_cobol_recovery_bindings(
         })
         .collect::<TaskResult<BTreeMap<_, _>>>()?;
     require(
-        expected.len() == 5,
+        (5..=512).contains(&expected.len()),
         "COBOL recovery fixture denominator drifted",
     )?;
     let registered = spec

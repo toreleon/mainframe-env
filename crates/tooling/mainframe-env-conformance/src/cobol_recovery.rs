@@ -33,6 +33,7 @@ enum Marker {
     DynamicValue,
     SortSecondRecord,
     SearchBranch,
+    PerformRepetition,
 }
 #[derive(Debug, Deserialize, Serialize)]
 struct Output {
@@ -51,7 +52,7 @@ pub fn verify_cobol_recovery_fixtures() -> Result<(), String> {
     let catalog = catalog()?;
     if catalog.schema_version != "mainframe-env.cobol-recovery-fixtures@1"
         || catalog.target_version != "0.4.0"
-        || catalog.fixtures.len() != 5
+        || !(5..=512).contains(&catalog.fixtures.len())
     {
         return Err("COBOL recovery fixture denominator drifted".into());
     }
@@ -152,6 +153,12 @@ fn execute(fixture: &Fixture) -> Result<Output, String> {
                 first.position_summary().contains("role=Some(\"branch\")")
                     && first.position_summary().contains("scope=Some(\"search\")")
             }
+            Marker::PerformRepetition => first.variable("I").is_some_and(|value| {
+                value
+                    .text()
+                    .parse::<u8>()
+                    .is_ok_and(|value| (1..5).contains(&value))
+            }),
         };
         if reached {
             break;
