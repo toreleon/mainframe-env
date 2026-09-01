@@ -1367,6 +1367,7 @@ fn check_cobol_statement_bindings(
                 expected_obligations.insert("phrase-file-status-error");
             }
             Some("0044") => {
+                expected_obligations.insert("phrase-attribute-events");
                 expected_obligations.insert("phrase-group-hierarchy");
                 expected_obligations.insert("phrase-nested-processing-events");
                 expected_obligations.insert("phrase-occurs-elements");

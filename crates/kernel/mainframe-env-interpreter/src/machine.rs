@@ -153,6 +153,7 @@ struct SortWorkspace {
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct XmlNode {
     name: String,
+    attributes: Vec<(String, String)>,
     text: String,
     children: Vec<XmlNode>,
 }
@@ -11727,11 +11728,10 @@ fn xml_node(source: &str, at: &mut usize, depth: usize) -> Result<XmlNode, Machi
         .find('>')
         .map(|offset| *at + offset)
         .ok_or(MachineProblem::DataException)?;
-    let name = source
+    let opening = source
         .get(*at + 1..open_end)
-        .filter(|name| !name.is_empty() && !name.contains(['<', '>', ' ', '/', '\t', '\r', '\n']))
-        .ok_or(MachineProblem::DataException)?
-        .to_string();
+        .ok_or(MachineProblem::DataException)?;
+    let (name, attributes) = xml_opening_tag(opening)?;
     *at = open_end + 1;
     let mut text = String::new();
     let mut children = Vec::new();
@@ -11748,6 +11748,7 @@ fn xml_node(source: &str, at: &mut usize, depth: usize) -> Result<XmlNode, Machi
             }
             return Ok(XmlNode {
                 name,
+                attributes,
                 text: xml_unescape(&text)?,
                 children,
             });
@@ -11759,6 +11760,76 @@ fn xml_node(source: &str, at: &mut usize, depth: usize) -> Result<XmlNode, Machi
         let next = rest.find('<').ok_or(MachineProblem::DataException)?;
         text.push_str(&rest[..next]);
         *at += next;
+    }
+}
+
+fn xml_opening_tag(opening: &str) -> Result<(String, Vec<(String, String)>), MachineProblem> {
+    let bytes = opening.as_bytes();
+    let mut at = 0usize;
+    let skip_space = |at: &mut usize| {
+        while bytes.get(*at).is_some_and(u8::is_ascii_whitespace) {
+            *at += 1;
+        }
+    };
+    skip_space(&mut at);
+    let name_start = at;
+    while bytes.get(at).is_some_and(|byte| {
+        !byte.is_ascii_whitespace() && !matches!(*byte, b'/' | b'=' | b'<' | b'>')
+    }) {
+        at += 1;
+    }
+    let name = opening
+        .get(name_start..at)
+        .filter(|name| !name.is_empty())
+        .ok_or(MachineProblem::DataException)?
+        .to_string();
+    let mut attributes = Vec::new();
+    let mut names = BTreeSet::new();
+    loop {
+        skip_space(&mut at);
+        if at == bytes.len() {
+            return Ok((name, attributes));
+        }
+        let attribute_start = at;
+        while bytes.get(at).is_some_and(|byte| {
+            !byte.is_ascii_whitespace() && !matches!(*byte, b'/' | b'=' | b'<' | b'>')
+        }) {
+            at += 1;
+        }
+        let attribute = opening
+            .get(attribute_start..at)
+            .filter(|attribute| !attribute.is_empty())
+            .ok_or(MachineProblem::DataException)?
+            .to_string();
+        if !names.insert(attribute.clone()) || attributes.len() >= 4_096 {
+            return Err(MachineProblem::DataException);
+        }
+        skip_space(&mut at);
+        if bytes.get(at) != Some(&b'=') {
+            return Err(MachineProblem::DataException);
+        }
+        at += 1;
+        skip_space(&mut at);
+        let quote = *bytes
+            .get(at)
+            .filter(|quote| matches!(quote, b'\'' | b'"'))
+            .ok_or(MachineProblem::DataException)?;
+        at += 1;
+        let value_start = at;
+        while bytes.get(at).is_some_and(|byte| *byte != quote) {
+            if matches!(bytes[at], b'<' | b'>') {
+                return Err(MachineProblem::DataException);
+            }
+            at += 1;
+        }
+        let value = opening
+            .get(value_start..at)
+            .ok_or(MachineProblem::DataException)?;
+        if bytes.get(at) != Some(&quote) {
+            return Err(MachineProblem::DataException);
+        }
+        at += 1;
+        attributes.push((attribute, xml_unescape(value)?));
     }
 }
 
@@ -11799,10 +11870,14 @@ fn append_xml_node_events(
 ) -> Result<(), MachineProblem> {
     events
         .len()
-        .checked_add(2)
+        .checked_add(2usize.saturating_add(node.attributes.len().saturating_mul(2)))
         .filter(|count| *count <= 65_536)
         .ok_or(MachineProblem::ResourceExhausted)?;
     events.push(("START-OF-ELEMENT".into(), node.name.as_bytes().to_vec()));
+    for (name, value) in &node.attributes {
+        events.push(("ATTRIBUTE-NAME".into(), name.as_bytes().to_vec()));
+        events.push(("ATTRIBUTE-CHARACTERS".into(), value.as_bytes().to_vec()));
+    }
     if !node.text.is_empty() {
         events.push(("CONTENT-CHARACTERS".into(), node.text.as_bytes().to_vec()));
     }
