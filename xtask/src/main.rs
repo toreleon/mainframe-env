@@ -1284,6 +1284,7 @@ fn check_cobol_statement_bindings(
                 expected_obligations.insert("phrase-boolean-null-converting");
                 expected_obligations.insert("phrase-count-in");
                 expected_obligations.insert("phrase-count-modes");
+                expected_obligations.insert("phrase-ebcdic-encoding");
                 expected_obligations.insert("phrase-group-hierarchy");
                 expected_obligations.insert("phrase-name-overrides");
                 expected_obligations.insert("phrase-occurs-array");
@@ -1297,6 +1298,7 @@ fn check_cobol_statement_bindings(
             }
             Some("0024") => {
                 expected_obligations.insert("phrase-boolean-null-converting");
+                expected_obligations.insert("phrase-ebcdic-encoding");
                 expected_obligations.insert("phrase-group-partial-exception");
                 expected_obligations.insert("phrase-group-hierarchy");
                 expected_obligations.insert("phrase-ignoring-null");

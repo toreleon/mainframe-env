@@ -164,6 +164,8 @@ struct JsonClauses {
     conversions: BTreeMap<String, JsonConversion>,
     ignore_null_all: bool,
     ignored_nulls: BTreeSet<String>,
+    encoding: Option<String>,
+    encoding_from_codepage: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -6028,9 +6030,12 @@ impl ReferenceMachine {
         let from = position(args, "FROM")
             .and_then(|i| args.get(i + 1))
             .ok_or(MachineProblem::InvalidOperation)?;
+        let json_clauses = json.then(|| JsonClauses::parse(args, false)).transpose()?;
         let generated = if let Some(layout) = self.layout(from).cloned() {
             if json {
-                let clauses = JsonClauses::parse(args, false)?;
+                let clauses = json_clauses
+                    .as_ref()
+                    .ok_or(MachineProblem::InvalidOperation)?;
                 let value = self
                     .json_layout_value(&layout, &clauses, &[], true)?
                     .ok_or(MachineProblem::DataException)?;
@@ -6062,6 +6067,11 @@ impl ReferenceMachine {
                 format!("<{from}>{}</{from}>", xml_escape(&value))
             }
         };
+        let generated_bytes = if let Some(clauses) = &json_clauses {
+            self.encode_json_text(generated.as_bytes(), clauses)?
+        } else {
+            generated.as_bytes().to_vec()
+        };
         let count_assignment = position(args, "COUNT")
             .map(|count| {
                 let mode = args.get(count + 1).map(String::as_str);
@@ -6087,7 +6097,7 @@ impl ReferenceMachine {
                     coefficient: i128::try_from(if mode == Some("CHARACTERS") {
                         generated.chars().count()
                     } else {
-                        generated.len()
+                        generated_bytes.len()
                     })
                     .map_err(|_| MachineProblem::ResourceExhausted)?,
                     scale: 0,
@@ -6099,7 +6109,11 @@ impl ReferenceMachine {
                 Ok((reference, bytes))
             })
             .transpose()?;
-        self.write(target, generated.as_bytes())?;
+        if let Some(clauses) = &json_clauses {
+            self.write_json_text(target, &generated_bytes, clauses)?;
+        } else {
+            self.write(target, &generated_bytes)?;
+        }
         if let Some((target, bytes)) = count_assignment {
             self.write_reference(&target, &bytes)?;
         }
@@ -6281,12 +6295,19 @@ impl ReferenceMachine {
         if args.len() < 3 {
             return Err(MachineProblem::InvalidOperation);
         }
-        let source = String::from_utf8(self.resolve(&args[0])?)
-            .map_err(|_| MachineProblem::DataException)?;
+        let source_bytes = self.resolve(&args[0])?;
+        let json_clauses = json.then(|| JsonClauses::parse(args, true)).transpose()?;
+        let source = if let Some(clauses) = &json_clauses {
+            self.decode_json_text(&source_bytes, clauses)?
+        } else {
+            String::from_utf8(source_bytes).map_err(|_| MachineProblem::DataException)?
+        };
         let into = position(args, "INTO").ok_or(MachineProblem::UnsupportedForm)?;
         let target = args.get(into + 1).ok_or(MachineProblem::InvalidOperation)?;
         let value = if json {
-            let clauses = JsonClauses::parse(args, true)?;
+            let clauses = json_clauses
+                .as_ref()
+                .ok_or(MachineProblem::InvalidOperation)?;
             let value: serde_json::Value =
                 serde_json::from_str(source.trim()).map_err(|_| MachineProblem::DataException)?;
             if let Some(layout) = self.layout(target).cloned() {
@@ -6615,6 +6636,71 @@ impl ReferenceMachine {
                 .bytes()
                 .to_vec(),
         )
+    }
+
+    fn json_ccsid(&self, clauses: &JsonClauses) -> Result<u16, MachineProblem> {
+        if clauses.encoding_from_codepage {
+            return self.display_ccsid();
+        }
+        let Some(value) = &clauses.encoding else {
+            return Ok(1_208);
+        };
+        let value = value_decimal(self.eval_value(std::slice::from_ref(value))?)?;
+        if value.scale != 0 {
+            return Err(MachineProblem::DataException);
+        }
+        u16::try_from(value.coefficient).map_err(|_| MachineProblem::DataException)
+    }
+
+    fn encode_json_text(
+        &self,
+        utf8: &[u8],
+        clauses: &JsonClauses,
+    ) -> Result<Vec<u8>, MachineProblem> {
+        match self.json_ccsid(clauses)? {
+            1_208 => Ok(utf8.to_vec()),
+            37 => CodePage::Cp037
+                .encode(
+                    std::str::from_utf8(utf8).map_err(|_| MachineProblem::DataException)?,
+                    utf8.len().saturating_mul(4).max(1),
+                )
+                .map_err(|_| MachineProblem::DataException),
+            _ => Err(MachineProblem::UnsupportedForm),
+        }
+    }
+
+    fn decode_json_text(
+        &self,
+        source: &[u8],
+        clauses: &JsonClauses,
+    ) -> Result<String, MachineProblem> {
+        match self.json_ccsid(clauses)? {
+            1_208 => String::from_utf8(source.to_vec()).map_err(|_| MachineProblem::DataException),
+            37 => CodePage::Cp037
+                .decode(source, source.len().saturating_mul(4).max(1))
+                .map_err(|_| MachineProblem::DataException),
+            _ => Err(MachineProblem::UnsupportedForm),
+        }
+    }
+
+    fn write_json_text(
+        &mut self,
+        target: &str,
+        generated: &[u8],
+        clauses: &JsonClauses,
+    ) -> Result<(), MachineProblem> {
+        let reference = self.reference(std::slice::from_ref(&target.to_string()))?;
+        if generated.len() > reference.length {
+            return Err(MachineProblem::SizeError);
+        }
+        let fill = if self.json_ccsid(clauses)? == 37 {
+            0x40
+        } else {
+            b' '
+        };
+        let mut bytes = vec![fill; reference.length];
+        bytes[..generated.len()].copy_from_slice(generated);
+        self.write_reference(&reference, &bytes)
     }
 
     fn xml_processing_step(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
@@ -11190,6 +11276,20 @@ impl JsonClauses {
                     break;
                 }
                 at += 1;
+            }
+        }
+        if let Some(at) = position(args, "ENCODING").map(|position| position + 1) {
+            if args.get(at).is_some_and(|token| token == "FROM") {
+                if args.get(at + 1).is_none_or(|token| token != "CODEPAGE") {
+                    return Err(MachineProblem::InvalidOperation);
+                }
+                clauses.encoding_from_codepage = true;
+            } else {
+                clauses.encoding = Some(
+                    args.get(at)
+                        .cloned()
+                        .ok_or(MachineProblem::InvalidOperation)?,
+                );
             }
         }
         if let Some(mut at) = position(args, "NAME").map(|position| position + 1) {

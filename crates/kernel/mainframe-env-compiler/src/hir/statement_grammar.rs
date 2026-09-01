@@ -1757,6 +1757,7 @@ fn validate_generate(tokens: &[Token<'_>]) -> Result<(), &'static str> {
         cursor.expect("IN")?;
         cursor.operand()?;
     }
+    validate_json_encoding(&mut cursor)?;
     validate_json_names(&mut cursor)?;
     validate_json_suppress(&mut cursor)?;
     validate_json_converting(&mut cursor, false)?;
@@ -1772,10 +1773,22 @@ fn validate_json_parse(tokens: &[Token<'_>]) -> Result<(), &'static str> {
         cursor.expect("DETAIL")?;
     }
     validate_json_ignoring(&mut cursor)?;
+    validate_json_encoding(&mut cursor)?;
     validate_json_names(&mut cursor)?;
     validate_json_suppress(&mut cursor)?;
     validate_json_converting(&mut cursor, true)?;
     cursor.finish()
+}
+
+fn validate_json_encoding(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
+    if !cursor.eat("ENCODING") {
+        return Ok(());
+    }
+    if cursor.eat("FROM") {
+        cursor.expect("CODEPAGE")
+    } else {
+        cursor.atom()
+    }
 }
 
 fn validate_json_ignoring(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
