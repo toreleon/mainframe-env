@@ -2549,10 +2549,20 @@ fn check_profiles(root: &Path) -> TaskResult {
     let profiles_path = root.join("conformance/0.1/inventory/profiles.json");
     let inventory = json(&inventory_path)?;
     let profiles = json(&profiles_path)?;
-    let known: BTreeSet<_> = array(&inventory, "packages", &inventory_path)?
+    let mut known = array(&inventory, "packages", &inventory_path)?
         .iter()
-        .filter_map(|row| row.get("name").and_then(Value::as_str))
-        .collect();
+        .filter_map(|row| row.get("name").and_then(Value::as_str).map(str::to_string))
+        .collect::<BTreeSet<_>>();
+    let additions_path = root.join("conformance/0.2/inventory/package-additions.json");
+    if additions_path.is_file() {
+        let additions = json(&additions_path)?;
+        for package in array(&additions, "packages", &additions_path)? {
+            require(
+                known.insert(text(package, "name", &additions_path)?.to_string()),
+                "package addition duplicates a historical profile package",
+            )?;
+        }
+    }
     let excluded = excluded_names(root)?;
 
     for profile in array(&profiles, "profiles", &profiles_path)? {
