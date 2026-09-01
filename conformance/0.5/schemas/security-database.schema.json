@@ -1,0 +1,365 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/racf-database-v2.json",
+  "title": "mainframe-env RACF security database v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "generation", "classes", "templates", "principals", "groups", "connections", "profiles", "acees", "tokens", "certificates", "keys", "keyrings", "audits", "transactions", "recovery", "migrations"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.racf-database@2"},
+    "generation": {"$ref": "#/$defs/version"},
+    "classes": {"$ref": "#/$defs/class_map"},
+    "templates": {"$ref": "#/$defs/template_map"},
+    "principals": {"$ref": "#/$defs/principal_map"},
+    "groups": {"$ref": "#/$defs/group_map"},
+    "connections": {"$ref": "#/$defs/connection_map"},
+    "profiles": {"$ref": "#/$defs/profile_map"},
+    "acees": {"$ref": "#/$defs/acee_map"},
+    "tokens": {"$ref": "#/$defs/token_map"},
+    "certificates": {"$ref": "#/$defs/certificate_map"},
+    "keys": {"$ref": "#/$defs/key_map"},
+    "keyrings": {"$ref": "#/$defs/keyring_map"},
+    "audits": {"type": "array", "maxItems": 65536, "items": {"$ref": "#/$defs/audit"}},
+    "transactions": {"$ref": "#/$defs/transaction_map"},
+    "recovery": {"$ref": "#/$defs/recovery_map"},
+    "migrations": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/migration"}}
+  },
+  "$defs": {
+    "version": {"type": "integer", "minimum": 1},
+    "tick": {"type": "integer", "minimum": 0},
+    "name": {"type": "string", "minLength": 1, "maxLength": 246, "pattern": "^[A-Z0-9@#$_.:/-]+$"},
+    "principal_name": {"type": "string", "minLength": 1, "maxLength": 8, "pattern": "^[A-Z0-9@#$_-]+$"},
+    "class_name": {"type": "string", "minLength": 1, "maxLength": 32, "pattern": "^[A-Z0-9@#$_-]+$"},
+    "profile_name": {"type": "string", "minLength": 1, "maxLength": 246, "pattern": "^[A-Z0-9@#$.*%_-]+$"},
+    "text": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "reference": {"type": "string", "minLength": 3, "maxLength": 4096, "pattern": "^[^[:space:]]+:[^[:space:]]+$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-fA-F]{64}$"},
+    "access": {"enum": ["NONE", "EXECUTE", "READ", "UPDATE", "CONTROL", "ALTER"]},
+    "audit_policy": {"enum": ["none", "failures", "successes", "all"]},
+    "principal_kind": {"enum": ["user", "group", "started-task", "undefined"]},
+    "string_set": {"type": "array", "maxItems": 1024, "uniqueItems": true, "items": {"$ref": "#/$defs/name"}},
+    "credential": {
+      "type": "object", "additionalProperties": false,
+      "required": ["algorithm", "encoded_verifier", "changed_tick", "history_digests"],
+      "properties": {
+        "algorithm": {"type": "string", "minLength": 1, "maxLength": 64},
+        "encoded_verifier": {"$ref": "#/$defs/text"},
+        "changed_tick": {"$ref": "#/$defs/tick"},
+        "history_digests": {"type": "array", "maxItems": 1024, "items": {"$ref": "#/$defs/digest"}}
+      }
+    },
+    "principal": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "kind", "owner", "default_group", "state", "credential", "security_level", "security_label", "categories", "attributes", "version"],
+      "properties": {
+        "id": {"$ref": "#/$defs/principal_name"},
+        "kind": {"$ref": "#/$defs/principal_kind"},
+        "owner": {"$ref": "#/$defs/principal_name"},
+        "default_group": {"anyOf": [{"$ref": "#/$defs/principal_name"}, {"type": "null"}]},
+        "state": {"enum": ["active", "password-expired", "revoked", "suspended", "locked"]},
+        "credential": {"anyOf": [{"$ref": "#/$defs/credential"}, {"type": "null"}]},
+        "security_level": {"type": "integer", "minimum": 0},
+        "security_label": {"anyOf": [{"$ref": "#/$defs/name"}, {"type": "null"}]},
+        "categories": {"$ref": "#/$defs/string_set"},
+        "attributes": {"$ref": "#/$defs/string_set"},
+        "version": {"$ref": "#/$defs/version"}
+      }
+    },
+    "group": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "owner", "superior_group", "universal", "version"],
+      "properties": {
+        "name": {"$ref": "#/$defs/principal_name"},
+        "owner": {"$ref": "#/$defs/principal_name"},
+        "superior_group": {"anyOf": [{"$ref": "#/$defs/principal_name"}, {"type": "null"}]},
+        "universal": {"type": "boolean"},
+        "version": {"$ref": "#/$defs/version"}
+      }
+    },
+    "connection": {
+      "type": "object", "additionalProperties": false,
+      "required": ["user", "group", "authority", "special", "operations", "auditor", "revoked", "version"],
+      "properties": {
+        "user": {"$ref": "#/$defs/principal_name"},
+        "group": {"$ref": "#/$defs/principal_name"},
+        "authority": {"enum": ["use", "create", "connect", "join"]},
+        "special": {"type": "boolean"},
+        "operations": {"type": "boolean"},
+        "auditor": {"type": "boolean"},
+        "revoked": {"type": "boolean"},
+        "version": {"$ref": "#/$defs/version"}
+      }
+    },
+    "segment_field_schema": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "required", "max_bytes", "max_items"],
+      "properties": {
+        "kind": {"enum": ["boolean", "unsigned", "text", "name", "names", "secret-reference", "certificate-reference", "key-reference"]},
+        "required": {"type": "boolean"},
+        "max_bytes": {"type": "integer", "minimum": 1, "maximum": 4096},
+        "max_items": {"type": "integer", "minimum": 0, "maximum": 256}
+      }
+    },
+    "segment_template": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "version", "fields"],
+      "properties": {
+        "name": {"$ref": "#/$defs/name"},
+        "version": {"type": "integer", "minimum": 1, "maximum": 4294967295},
+        "fields": {"type": "object", "maxProperties": 256, "additionalProperties": {"$ref": "#/$defs/segment_field_schema"}}
+      }
+    },
+    "profile_template": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "version", "profile_kind", "required_segments", "segments"],
+      "properties": {
+        "id": {"$ref": "#/$defs/name"},
+        "version": {"type": "integer", "minimum": 1, "maximum": 4294967295},
+        "profile_kind": {"$ref": "#/$defs/principal_kind"},
+        "required_segments": {"$ref": "#/$defs/string_set"},
+        "segments": {"type": "object", "maxProperties": 64, "additionalProperties": {"$ref": "#/$defs/segment_template"}}
+      }
+    },
+    "segment_value": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["type", "value"], "properties": {"type": {"const": "boolean"}, "value": {"type": "boolean"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "value"], "properties": {"type": {"const": "unsigned"}, "value": {"type": "integer", "minimum": 0}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "value"], "properties": {"type": {"const": "text"}, "value": {"$ref": "#/$defs/text"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "value"], "properties": {"type": {"const": "name"}, "value": {"$ref": "#/$defs/name"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "value"], "properties": {"type": {"const": "names"}, "value": {"$ref": "#/$defs/string_set"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "value"], "properties": {"type": {"const": "secret-reference"}, "value": {"$ref": "#/$defs/reference"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "value"], "properties": {"type": {"const": "certificate-reference"}, "value": {"$ref": "#/$defs/reference"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "value"], "properties": {"type": {"const": "key-reference"}, "value": {"$ref": "#/$defs/reference"}}}
+      ]
+    },
+    "profile_segment": {
+      "type": "object", "additionalProperties": false,
+      "required": ["template", "template_version", "fields"],
+      "properties": {
+        "template": {"$ref": "#/$defs/name"},
+        "template_version": {"type": "integer", "minimum": 1, "maximum": 4294967295},
+        "fields": {"type": "object", "maxProperties": 256, "additionalProperties": {"$ref": "#/$defs/segment_value"}}
+      }
+    },
+    "class": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "supplied", "active", "generic_allowed", "discrete_allowed", "raclist", "default_uacc", "max_profile_name_bytes", "posit", "member_class", "grouping_class", "profile_template", "version"],
+      "properties": {
+        "name": {"$ref": "#/$defs/class_name"},
+        "supplied": {"type": "boolean"},
+        "active": {"type": "boolean"},
+        "generic_allowed": {"type": "boolean"},
+        "discrete_allowed": {"type": "boolean"},
+        "raclist": {"type": "boolean"},
+        "default_uacc": {"$ref": "#/$defs/access"},
+        "max_profile_name_bytes": {"type": "integer", "minimum": 1, "maximum": 246},
+        "posit": {"anyOf": [{"type": "integer", "minimum": 0, "maximum": 65535}, {"type": "null"}]},
+        "member_class": {"anyOf": [{"$ref": "#/$defs/class_name"}, {"type": "null"}]},
+        "grouping_class": {"anyOf": [{"$ref": "#/$defs/class_name"}, {"type": "null"}]},
+        "profile_template": {"$ref": "#/$defs/name"},
+        "version": {"$ref": "#/$defs/version"}
+      }
+    },
+    "access_condition": {
+      "type": "object", "additionalProperties": false,
+      "required": ["terminal", "console", "system", "application", "start_tick", "end_tick"],
+      "properties": {
+        "terminal": {"anyOf": [{"$ref": "#/$defs/name"}, {"type": "null"}]},
+        "console": {"anyOf": [{"$ref": "#/$defs/name"}, {"type": "null"}]},
+        "system": {"anyOf": [{"$ref": "#/$defs/name"}, {"type": "null"}]},
+        "application": {"anyOf": [{"$ref": "#/$defs/name"}, {"type": "null"}]},
+        "start_tick": {"anyOf": [{"$ref": "#/$defs/tick"}, {"type": "null"}]},
+        "end_tick": {"anyOf": [{"$ref": "#/$defs/tick"}, {"type": "null"}]}
+      }
+    },
+    "ace": {
+      "type": "object", "additionalProperties": false,
+      "required": ["principal", "access", "when", "audit"],
+      "properties": {
+        "principal": {"$ref": "#/$defs/principal_name"},
+        "access": {"$ref": "#/$defs/access"},
+        "when": {"anyOf": [{"$ref": "#/$defs/access_condition"}, {"type": "null"}]},
+        "audit": {"$ref": "#/$defs/audit_policy"}
+      }
+    },
+    "profile": {
+      "type": "object", "additionalProperties": false,
+      "required": ["class", "name", "generic", "owner", "uacc", "audit", "security_level", "security_label", "categories", "access_list", "segments", "version"],
+      "properties": {
+        "class": {"$ref": "#/$defs/class_name"},
+        "name": {"$ref": "#/$defs/profile_name"},
+        "generic": {"type": "boolean"},
+        "owner": {"$ref": "#/$defs/principal_name"},
+        "uacc": {"$ref": "#/$defs/access"},
+        "audit": {"$ref": "#/$defs/audit_policy"},
+        "security_level": {"type": "integer", "minimum": 0},
+        "security_label": {"anyOf": [{"$ref": "#/$defs/name"}, {"type": "null"}]},
+        "categories": {"$ref": "#/$defs/string_set"},
+        "access_list": {"type": "array", "maxItems": 1024, "items": {"$ref": "#/$defs/ace"}},
+        "segments": {"type": "object", "maxProperties": 64, "additionalProperties": {"$ref": "#/$defs/profile_segment"}},
+        "version": {"$ref": "#/$defs/version"}
+      }
+    },
+    "acee": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "principal", "default_group", "groups", "parent", "delegated_by", "security_level", "security_label", "categories", "token_ids", "created_tick", "state", "version"],
+      "properties": {
+        "id": {"$ref": "#/$defs/name"},
+        "principal": {"$ref": "#/$defs/principal_name"},
+        "default_group": {"anyOf": [{"$ref": "#/$defs/principal_name"}, {"type": "null"}]},
+        "groups": {"$ref": "#/$defs/string_set"},
+        "parent": {"anyOf": [{"$ref": "#/$defs/name"}, {"type": "null"}]},
+        "delegated_by": {"anyOf": [{"$ref": "#/$defs/principal_name"}, {"type": "null"}]},
+        "security_level": {"type": "integer", "minimum": 0},
+        "security_label": {"anyOf": [{"$ref": "#/$defs/name"}, {"type": "null"}]},
+        "categories": {"$ref": "#/$defs/string_set"},
+        "token_ids": {"$ref": "#/$defs/string_set"},
+        "created_tick": {"$ref": "#/$defs/tick"},
+        "state": {"enum": ["active", "deleted"]},
+        "version": {"$ref": "#/$defs/version"}
+      }
+    },
+    "token": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "kind", "owner", "issuer", "audience", "token_reference", "token_digest", "scopes", "issued_tick", "expires_tick", "state", "version"],
+      "properties": {
+        "id": {"$ref": "#/$defs/name"},
+        "kind": {"enum": ["saf-identity", "pass-ticket", "jwt-reference", "custom"]},
+        "owner": {"$ref": "#/$defs/principal_name"},
+        "issuer": {"$ref": "#/$defs/name"},
+        "audience": {"anyOf": [{"$ref": "#/$defs/name"}, {"type": "null"}]},
+        "token_reference": {"$ref": "#/$defs/reference"},
+        "token_digest": {"$ref": "#/$defs/digest"},
+        "scopes": {"$ref": "#/$defs/string_set"},
+        "issued_tick": {"$ref": "#/$defs/tick"},
+        "expires_tick": {"anyOf": [{"$ref": "#/$defs/tick"}, {"type": "null"}]},
+        "state": {"enum": ["active", "revoked", "expired"]},
+        "version": {"$ref": "#/$defs/version"}
+      }
+    },
+    "certificate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "owner", "label", "certificate_reference", "fingerprint_sha256", "trusted", "not_before_tick", "not_after_tick", "version"],
+      "properties": {
+        "id": {"$ref": "#/$defs/name"},
+        "owner": {"$ref": "#/$defs/principal_name"},
+        "label": {"$ref": "#/$defs/text"},
+        "certificate_reference": {"$ref": "#/$defs/reference"},
+        "fingerprint_sha256": {"$ref": "#/$defs/digest"},
+        "trusted": {"type": "boolean"},
+        "not_before_tick": {"anyOf": [{"$ref": "#/$defs/tick"}, {"type": "null"}]},
+        "not_after_tick": {"anyOf": [{"$ref": "#/$defs/tick"}, {"type": "null"}]},
+        "version": {"$ref": "#/$defs/version"}
+      }
+    },
+    "key": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "owner", "key_reference", "algorithm", "exportable", "version"],
+      "properties": {
+        "id": {"$ref": "#/$defs/name"},
+        "owner": {"$ref": "#/$defs/principal_name"},
+        "key_reference": {"$ref": "#/$defs/reference"},
+        "algorithm": {"$ref": "#/$defs/text"},
+        "exportable": {"type": "boolean"},
+        "version": {"$ref": "#/$defs/version"}
+      }
+    },
+    "keyring": {
+      "type": "object", "additionalProperties": false,
+      "required": ["owner", "name", "certificates", "default_certificate", "version"],
+      "properties": {
+        "owner": {"$ref": "#/$defs/principal_name"},
+        "name": {"$ref": "#/$defs/name"},
+        "certificates": {"$ref": "#/$defs/string_set"},
+        "default_certificate": {"anyOf": [{"$ref": "#/$defs/name"}, {"type": "null"}]},
+        "version": {"$ref": "#/$defs/version"}
+      }
+    },
+    "saf_status": {
+      "type": "object", "additionalProperties": false,
+      "required": ["saf_return_code", "racf_return_code", "racf_reason_code", "reason"],
+      "properties": {
+        "saf_return_code": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+        "racf_return_code": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+        "racf_reason_code": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+        "reason": {"enum": ["granted", "default-deny", "class-inactive", "profile-not-found", "principal-not-found", "principal-inactive", "insufficient-access", "security-label-mismatch", "condition-not-satisfied", "token-invalid", "acee-invalid", "credential-invalid", "policy-unavailable", "store-unavailable", "malformed-request", "unsupported-request", "resource-exhausted", "cancelled", "timed-out", "recovery-required"]}
+      }
+    },
+    "audit_field": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["type", "value"], "properties": {"type": {"const": "text"}, "value": {"$ref": "#/$defs/text"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type"], "properties": {"type": {"const": "redacted"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "value"], "properties": {"type": {"const": "digest"}, "value": {"$ref": "#/$defs/digest"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "value"], "properties": {"type": {"const": "reference"}, "value": {"$ref": "#/$defs/reference"}}}
+      ]
+    },
+    "audit": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "correlation", "actor", "action", "class", "resource_digest", "decision", "status", "fields", "tick"],
+      "properties": {
+        "id": {"$ref": "#/$defs/name"},
+        "correlation": {"$ref": "#/$defs/text"},
+        "actor": {"$ref": "#/$defs/principal_name"},
+        "action": {"$ref": "#/$defs/text"},
+        "class": {"anyOf": [{"$ref": "#/$defs/class_name"}, {"type": "null"}]},
+        "resource_digest": {"anyOf": [{"$ref": "#/$defs/text"}, {"type": "null"}]},
+        "decision": {"enum": ["allow", "deny", "no-decision"]},
+        "status": {"$ref": "#/$defs/saf_status"},
+        "fields": {"type": "object", "maxProperties": 256, "additionalProperties": {"$ref": "#/$defs/audit_field"}},
+        "tick": {"$ref": "#/$defs/tick"}
+      }
+    },
+    "transaction": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "idempotency_key", "actor", "operation", "request_digest", "state", "base_generation", "final_generation", "status"],
+      "properties": {
+        "id": {"$ref": "#/$defs/name"},
+        "idempotency_key": {"$ref": "#/$defs/name"},
+        "actor": {"$ref": "#/$defs/principal_name"},
+        "operation": {"$ref": "#/$defs/name"},
+        "request_digest": {"$ref": "#/$defs/digest"},
+        "state": {"enum": ["intent", "committed", "rolled-back", "unknown-outcome"]},
+        "base_generation": {"$ref": "#/$defs/version"},
+        "final_generation": {"anyOf": [{"$ref": "#/$defs/version"}, {"type": "null"}]},
+        "status": {"$ref": "#/$defs/saf_status"}
+      }
+    },
+    "recovery_record": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "transaction_id", "state", "attempt", "last_error", "version"],
+      "properties": {
+        "id": {"$ref": "#/$defs/name"},
+        "transaction_id": {"$ref": "#/$defs/name"},
+        "state": {"enum": ["required", "replaying", "reconciled", "failed"]},
+        "attempt": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+        "last_error": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+        "version": {"$ref": "#/$defs/version"}
+      }
+    },
+    "migration": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "from_schema", "to_schema", "state", "source_digest", "result_digest"],
+      "properties": {
+        "id": {"$ref": "#/$defs/name"},
+        "from_schema": {"$ref": "#/$defs/text"},
+        "to_schema": {"$ref": "#/$defs/text"},
+        "state": {"enum": ["planned", "applied", "rolled-back"]},
+        "source_digest": {"$ref": "#/$defs/digest"},
+        "result_digest": {"anyOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]}
+      }
+    },
+    "principal_map": {"type": "object", "maxProperties": 4096, "additionalProperties": {"$ref": "#/$defs/principal"}},
+    "group_map": {"type": "object", "maxProperties": 4096, "additionalProperties": {"$ref": "#/$defs/group"}},
+    "connection_map": {"type": "object", "maxProperties": 65536, "additionalProperties": {"$ref": "#/$defs/connection"}},
+    "class_map": {"type": "object", "maxProperties": 1024, "additionalProperties": {"$ref": "#/$defs/class"}},
+    "template_map": {"type": "object", "maxProperties": 1024, "additionalProperties": {"$ref": "#/$defs/profile_template"}},
+    "profile_map": {"type": "object", "maxProperties": 65536, "additionalProperties": {"$ref": "#/$defs/profile"}},
+    "acee_map": {"type": "object", "maxProperties": 65536, "additionalProperties": {"$ref": "#/$defs/acee"}},
+    "token_map": {"type": "object", "maxProperties": 65536, "additionalProperties": {"$ref": "#/$defs/token"}},
+    "certificate_map": {"type": "object", "maxProperties": 65536, "additionalProperties": {"$ref": "#/$defs/certificate"}},
+    "key_map": {"type": "object", "maxProperties": 65536, "additionalProperties": {"$ref": "#/$defs/key"}},
+    "keyring_map": {"type": "object", "maxProperties": 4096, "additionalProperties": {"$ref": "#/$defs/keyring"}},
+    "transaction_map": {"type": "object", "maxProperties": 65536, "additionalProperties": {"$ref": "#/$defs/transaction"}},
+    "recovery_map": {"type": "object", "maxProperties": 4096, "additionalProperties": {"$ref": "#/$defs/recovery_record"}}
+  }
+}

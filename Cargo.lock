@@ -1328,11 +1328,13 @@ name = "mainframe-env-racf"
 version = "0.2.0"
 dependencies = [
  "argon2",
+ "jsonschema",
  "mainframe-env-execution-api",
  "mainframe-env-host-api",
  "mainframe-env-store",
  "mainframe-env-store-api",
  "serde",
+ "serde_json",
  "static_assertions",
  "zeroize",
 ]

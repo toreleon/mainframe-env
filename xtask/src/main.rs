@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 mod evidence_seal;
+mod work_package_seal;
 
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use mainframe_env_conformance::{
@@ -84,6 +85,18 @@ struct ConformanceArgs {
     check: bool,
 }
 
+#[derive(Debug, Args)]
+struct WorkPackageSealArgs {
+    #[arg(long)]
+    id: String,
+    #[arg(long)]
+    target_version: String,
+    #[arg(long = "path", required = true)]
+    paths: Vec<String>,
+    #[arg(long)]
+    check: bool,
+}
+
 #[derive(Debug, Subcommand)]
 enum EvidenceCommand {
     Seal(CheckArgs),
@@ -121,6 +134,7 @@ enum XtaskCommand {
     ReviewRepairRound5(CheckArgs),
     SemanticIdentities(CheckArgs),
     Spec(CheckArgs),
+    WorkPackageSeal(WorkPackageSealArgs),
     Conformance(ConformanceArgs),
     Certification(CheckArgs),
     CarddemoCorpus(CheckArgs),
@@ -437,6 +451,11 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             checked!("carddemo-full", args, check_carddemo_full(root))
         }
         XtaskCommand::Digest(args) => checked!("digest", args, print_digest(root)),
+        XtaskCommand::WorkPackageSeal(args) => (
+            "work-package-seal",
+            args.check,
+            work_package_seal::run(root, &args),
+        ),
         XtaskCommand::Release(args) => (
             "release",
             args.check,
@@ -2196,6 +2215,11 @@ fn check_schemas(root: &Path) -> TaskResult {
     )?;
     collect_extension(
         &root.join("conformance/0.2/schemas"),
+        OsStr::new("json"),
+        &mut files,
+    )?;
+    collect_extension(
+        &root.join("conformance/0.5/schemas"),
         OsStr::new("json"),
         &mut files,
     )?;
