@@ -1,0 +1,22 @@
+{
+  "schema_version": "mainframe-env.dataset-state-migration@1",
+  "migration_id": "dataset-state-v2-to-v3",
+  "from_versions": [1, 2],
+  "to_version": 3,
+  "reader_versions": [1, 2, 3],
+  "writer_version": 3,
+  "destructive": false,
+  "steps": [
+    "Decode MEDS1 and MEDS2 record and member state with their original bounds.",
+    "Materialize deterministic compatibility defaults for DCB, allocation, SMS, volume, catalog, security, VSAM, and lifecycle fields.",
+    "Validate the complete typed definition before publishing any MEDS3 write.",
+    "Write MEDS3 only through the existing optimistic provider-state transaction path."
+  ],
+  "failure_policy": "reject-before-publication",
+  "rollback": {
+    "supported": true,
+    "method": "restore-verified-pre-migration-provider-snapshot",
+    "requires_backup": true,
+    "partial_state_selected": false
+  }
+}

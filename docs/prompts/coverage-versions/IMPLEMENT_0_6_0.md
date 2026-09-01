@@ -32,6 +32,23 @@ store receipts before exposing new public behavior.
 5. Implement **DAT-606** differential, scale, corruption, backup/restore,
    migration, retry, restart, and unknown-outcome suites.
 
+## Approved 2026-09-01 completion policy
+
+For this development cycle, a licensed z/OS 3.2 dataset/VSAM/AMS receipt is
+unavailable. The user-approved completion disposition is
+`pass-with-licensed-differential-pending`:
+
+- preserve the exact differential numerator as 0/36 and keep
+  `cargo xtask dataset-oracle --check` fail-closed;
+- never treat modeled, simulated, documentation-derived, historical, or
+  current-product output as licensed differential evidence;
+- require an independent bounded pure-state reference simulation for the five
+  organization rows, all 31 AMS identities, applicable state/recovery
+  properties, explicit capability/unknown boundaries, and representative
+  mutants; and
+- defer the real licensed 36-row campaign to the 0.17 `release-certify` hard
+  gate, which remains mandatory before 1.0 certification.
+
 ## Reuse and architecture guardrails
 
 - Dataset, VSAM, catalog, allocation, lock, RLS/TVS, and recovery semantics
@@ -64,11 +81,14 @@ store receipts before exposing new public behavior.
 ## Completion gate
 
 Do not finish until every pinned organization, access mode, DCB/SMS/catalog row
-and 31/31 AMS commands pass all applicable gates; base/AIX, locks, RLS/TVS, GDG,
-DISP, restart, unknown-outcome and concurrent-mutation matrices pass; licensed
-z/OS 3.2 dataset/VSAM/AMS differentials pass; and CardDemo records, keys,
-generations, aliases, and bytes remain exact.
+and 31/31 AMS commands pass recognized, validated, executed, conditioned, and
+recovered; base/AIX, locks, RLS/TVS, GDG, DISP, restart, unknown-outcome and
+concurrent-mutation matrices pass; the approved independent reference
+simulation and mutants pass; and CardDemo records, keys, generations, aliases,
+and bytes remain exact. The licensed differential remains pending at exactly
+0/36 under the approved policy and is a hard 0.17 release-certify dependency.
 
 At handoff, report inventory counts by gate, state/migration versions, lock and
 recovery evidence, provider-capability gaps, oracle receipts, and full unchanged-
-candidate validation. Do not claim whole DFSMS parity.
+candidate validation. Report the 0/36 pending differential explicitly and do
+not claim whole DFSMS parity.

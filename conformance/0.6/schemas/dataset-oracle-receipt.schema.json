@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/dataset-oracle-receipt.schema.json",
+  "title": "Licensed z/OS 3.2 dataset VSAM AMS oracle receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "baseline_id", "environment", "status", "candidate_digest", "case_count", "command_cases", "organization_cases", "oracle_run_id", "result_digest"],
+  "properties": {
+    "schema_version": { "const": "mainframe-env.dataset-oracle-receipt@1" },
+    "baseline_id": { "const": "ibm-zos-3.2-dfsms-ams-2026-06" },
+    "environment": { "const": "licensed-zos-3.2" },
+    "status": { "const": "pass" },
+    "candidate_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "case_count": { "const": 36 },
+    "command_cases": { "const": 31 },
+    "organization_cases": { "const": 5 },
+    "oracle_run_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "result_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}

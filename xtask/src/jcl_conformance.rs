@@ -646,50 +646,44 @@ pub(super) fn runtime() -> JclConformanceRuntime {
 }
 
 impl JclConformanceRuntime {
-    pub(super) fn registry<'a>(
-        &'a self,
-        spec: &CompiledSpec,
+    pub(super) fn drivers(
+        &self,
         limits: ConformanceLimits,
-    ) -> Result<RuntimeRegistry<'a>, String> {
-        let cobol = mainframe_env_conformance::cobol_conformance_handlers(limits)?;
-        let mut drivers: Vec<(DriverRef, &'a dyn ConformanceDriver)> = cobol.drivers;
-        drivers.push((
-            DriverRef::new("jcl.driver.convert", limits).map_err(|problem| problem.to_string())?,
+    ) -> Result<Vec<(DriverRef, &dyn ConformanceDriver)>, SpecProblem> {
+        Ok(vec![(
+            DriverRef::new("jcl.driver.convert", limits)?,
             &self.fixture as &dyn ConformanceDriver,
-        ));
-        let mut predicates: Vec<(PredicateRef, &'a dyn ConformancePredicate)> = cobol.predicates;
-        predicates.push((
-            PredicateRef::new("jcl.fixture.exists", limits)
-                .map_err(|problem| problem.to_string())?,
+        )])
+    }
+
+    pub(super) fn predicates(
+        &self,
+        limits: ConformanceLimits,
+    ) -> Result<Vec<(PredicateRef, &dyn ConformancePredicate)>, SpecProblem> {
+        Ok(vec![(
+            PredicateRef::new("jcl.fixture.exists", limits)?,
             &self.fixture as &dyn ConformancePredicate,
-        ));
-        let mut observations: Vec<(ObservationRef, &'a dyn ConformanceObservation)> =
-            cobol.observations;
-        observations.extend([
+        )])
+    }
+
+    pub(super) fn observations(
+        &self,
+        limits: ConformanceLimits,
+    ) -> Result<Vec<(ObservationRef, &dyn ConformanceObservation)>, SpecProblem> {
+        Ok(vec![
             (
-                ObservationRef::new("jcl.observation.target-recognized", limits)
-                    .map_err(|problem| problem.to_string())?,
+                ObservationRef::new("jcl.observation.target-recognized", limits)?,
                 &self.target_recognized as &dyn ConformanceObservation,
             ),
             (
-                ObservationRef::new("jcl.observation.target-validated", limits)
-                    .map_err(|problem| problem.to_string())?,
-                &self.target_validated as &dyn ConformanceObservation,
+                ObservationRef::new("jcl.observation.target-validated", limits)?,
+                &self.target_validated,
             ),
             (
-                ObservationRef::new("jcl.observation.target-error", limits)
-                    .map_err(|problem| problem.to_string())?,
-                &self.target_error as &dyn ConformanceObservation,
+                ObservationRef::new("jcl.observation.target-error", limits)?,
+                &self.target_error,
             ),
-        ]);
-        mainframe_env_conformance::racf_runtime_with(
-            spec,
-            drivers,
-            predicates,
-            observations,
-            limits,
-        )
-        .map_err(|problem| problem.to_string())
+        ])
     }
 }
 
@@ -773,13 +767,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn shared_runtime_closes_cobol_and_jcl_handlers() {
+    fn shared_runtime_closes_cobol_dataset_racf_and_jcl_handlers() {
         let root = repository_root().unwrap();
         let spec = compile_shared_spec(&root).unwrap();
-        let handlers = runtime();
-        handlers
-            .registry(&spec, ConformanceLimits::default())
-            .unwrap();
+        let dataset_handlers = dataset_conformance_runtime();
+        let jcl_handlers = runtime();
+        combined_conformance_runtime(
+            &spec,
+            &dataset_handlers,
+            &jcl_handlers,
+            ConformanceLimits::default(),
+        )
+        .unwrap();
     }
 
     #[test]

@@ -2,12 +2,26 @@
 
 #![forbid(unsafe_code)]
 
+mod dataset;
 mod names;
 mod registry;
 mod request;
 mod semantic;
 mod service;
+mod surface;
 
+pub use dataset::{
+    AllocationSpace, BufferingMode, CatalogEntryKind, CatalogKind, CatalogListEntry,
+    CatalogMetadata, CatalogResolution, CompressionMode, DATASET_DEFINITION_CONTRACT,
+    DATASET_PROVIDER_CAPABILITY_CONTRACT, DATASET_REQUEST_CONTRACT, DATASET_RESULT_CONTRACT,
+    DATASET_STATE_SCHEMA_VERSION, DataSecurity, DatasetDefinition, DatasetDescription,
+    DatasetDiagnostic, DatasetExtent, DatasetLifecycleState, DatasetLockMode, DatasetLockReceipt,
+    DatasetLockTarget, DatasetMemberGenerationSnapshot, DatasetMemberSnapshot,
+    DatasetProviderCapabilities, DatasetRelativeRecordSnapshot, DatasetShareOptions,
+    DatasetSnapshot, DatasetVolumeDescription, DatasetVolumeExtent, DcbOptions, LifecycleMetadata,
+    SmsClasses, SpaceUnit, TvsRecordOperation, TvsUnitOfWorkReceipt, TvsUnitOfWorkState,
+    VolumeKind, VolumeSelection, VsamAccessMode, VsamAttributes,
+};
 pub use names::{
     DatasetName, HostNameProblem, JobName, MemberName, ProgramName, ResourceName, SessionId,
 };
@@ -35,3 +49,7 @@ pub use semantic::{
     official_semantic_identities, official_semantic_identity,
 };
 pub use service::{AuditedEffectResult, ScopedHostService};
+pub use surface::{
+    DATASET_SURFACE_INVENTORY_SHA256, DatasetSurfaceDescriptor, dataset_surface_descriptor,
+    dataset_surface_descriptors,
+};

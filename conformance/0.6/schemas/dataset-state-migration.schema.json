@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/dataset-state-migration.schema.json",
+  "title": "Dataset provider state migration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "migration_id", "from_versions", "to_version", "reader_versions",
+    "writer_version", "destructive", "steps", "failure_policy", "rollback"
+  ],
+  "properties": {
+    "schema_version": { "const": "mainframe-env.dataset-state-migration@1" },
+    "migration_id": { "const": "dataset-state-v2-to-v3" },
+    "from_versions": {
+      "type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true,
+      "items": { "enum": [1, 2] }
+    },
+    "to_version": { "const": 3 },
+    "reader_versions": {
+      "type": "array", "minItems": 3, "maxItems": 3, "uniqueItems": true,
+      "items": { "enum": [1, 2, 3] }
+    },
+    "writer_version": { "const": 3 },
+    "destructive": { "const": false },
+    "steps": {
+      "type": "array", "minItems": 1, "maxItems": 16,
+      "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+    },
+    "failure_policy": { "enum": ["reject-before-publication"] },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["supported", "method", "requires_backup", "partial_state_selected"],
+      "properties": {
+        "supported": { "const": true },
+        "method": { "const": "restore-verified-pre-migration-provider-snapshot" },
+        "requires_backup": { "const": true },
+        "partial_state_selected": { "const": false }
+      }
+    }
+  }
+}

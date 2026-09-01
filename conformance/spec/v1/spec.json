@@ -5883,6 +5883,381 @@
       "test_id": "cobol.statement.xml-parse.valid"
     },
     {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.esds.invalid"
+      ],
+      "gate": "conditioned",
+      "input": "dataset.esds.invalid",
+      "obligation_id": "invalid-boundary",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0001",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.esds.conditioned"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.esds.invalid"
+      ],
+      "gate": "validated",
+      "input": "dataset.esds.invalid",
+      "obligation_id": "invalid-boundary",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0001",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.esds.validated"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.esds.valid"
+      ],
+      "gate": "executed",
+      "input": "dataset.esds.valid",
+      "obligation_id": "valid-access",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0001",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.esds.executed"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.esds.valid"
+      ],
+      "gate": "recognized",
+      "input": "dataset.esds.valid",
+      "obligation_id": "valid-access",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0001",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.esds.recognized"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.esds.valid"
+      ],
+      "gate": "recovered",
+      "input": "dataset.esds.valid",
+      "obligation_id": "valid-access",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0001",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.esds.recovered"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.ksds.invalid"
+      ],
+      "gate": "conditioned",
+      "input": "dataset.ksds.invalid",
+      "obligation_id": "invalid-boundary",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0002",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.ksds.conditioned"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.ksds.invalid"
+      ],
+      "gate": "validated",
+      "input": "dataset.ksds.invalid",
+      "obligation_id": "invalid-boundary",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0002",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.ksds.validated"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.ksds.valid"
+      ],
+      "gate": "executed",
+      "input": "dataset.ksds.valid",
+      "obligation_id": "valid-access",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0002",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.ksds.executed"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.ksds.valid"
+      ],
+      "gate": "recognized",
+      "input": "dataset.ksds.valid",
+      "obligation_id": "valid-access",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0002",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.ksds.recognized"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.ksds.valid"
+      ],
+      "gate": "recovered",
+      "input": "dataset.ksds.valid",
+      "obligation_id": "valid-access",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0002",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.ksds.recovered"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.lds.invalid"
+      ],
+      "gate": "conditioned",
+      "input": "dataset.lds.invalid",
+      "obligation_id": "invalid-boundary",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0003",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.lds.conditioned"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.lds.invalid"
+      ],
+      "gate": "validated",
+      "input": "dataset.lds.invalid",
+      "obligation_id": "invalid-boundary",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0003",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.lds.validated"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.lds.valid"
+      ],
+      "gate": "executed",
+      "input": "dataset.lds.valid",
+      "obligation_id": "valid-access",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0003",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.lds.executed"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.lds.valid"
+      ],
+      "gate": "recognized",
+      "input": "dataset.lds.valid",
+      "obligation_id": "valid-access",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0003",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.lds.recognized"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.lds.valid"
+      ],
+      "gate": "recovered",
+      "input": "dataset.lds.valid",
+      "obligation_id": "valid-access",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0003",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.lds.recovered"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.rrds.invalid"
+      ],
+      "gate": "conditioned",
+      "input": "dataset.rrds.invalid",
+      "obligation_id": "invalid-boundary",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0004",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.rrds.conditioned"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.rrds.invalid"
+      ],
+      "gate": "validated",
+      "input": "dataset.rrds.invalid",
+      "obligation_id": "invalid-boundary",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0004",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.rrds.validated"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.rrds.valid"
+      ],
+      "gate": "executed",
+      "input": "dataset.rrds.valid",
+      "obligation_id": "valid-access",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0004",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.rrds.executed"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.rrds.valid"
+      ],
+      "gate": "recognized",
+      "input": "dataset.rrds.valid",
+      "obligation_id": "valid-access",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0004",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.rrds.recognized"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.rrds.valid"
+      ],
+      "gate": "recovered",
+      "input": "dataset.rrds.valid",
+      "obligation_id": "valid-access",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0004",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.rrds.recovered"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.vrrds.invalid"
+      ],
+      "gate": "conditioned",
+      "input": "dataset.vrrds.invalid",
+      "obligation_id": "invalid-boundary",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0005",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.vrrds.conditioned"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.vrrds.invalid"
+      ],
+      "gate": "validated",
+      "input": "dataset.vrrds.invalid",
+      "obligation_id": "invalid-boundary",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0005",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.vrrds.validated"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.vrrds.valid"
+      ],
+      "gate": "executed",
+      "input": "dataset.vrrds.valid",
+      "obligation_id": "valid-access",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0005",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.vrrds.executed"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.vrrds.valid"
+      ],
+      "gate": "recognized",
+      "input": "dataset.vrrds.valid",
+      "obligation_id": "valid-access",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0005",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.vrrds.recognized"
+    },
+    {
+      "driver": "dataset.organization.driver",
+      "expected": [
+        "observe.dataset.vrrds.valid"
+      ],
+      "gate": "recovered",
+      "input": "dataset.vrrds.valid",
+      "obligation_id": "valid-access",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0005",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "dataset.vrrds.recovered"
+    },
+    {
       "driver": "jcl.driver.convert",
       "expected": [
         "jcl.observation.target-error"
@@ -28556,6 +28931,91 @@
     },
     {
       "applicable_gates": [
+        "validated",
+        "conditioned"
+      ],
+      "obligation_id": "invalid-boundary",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0001"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "executed",
+        "recovered"
+      ],
+      "obligation_id": "valid-access",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0001"
+    },
+    {
+      "applicable_gates": [
+        "validated",
+        "conditioned"
+      ],
+      "obligation_id": "invalid-boundary",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0002"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "executed",
+        "recovered"
+      ],
+      "obligation_id": "valid-access",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0002"
+    },
+    {
+      "applicable_gates": [
+        "validated",
+        "conditioned"
+      ],
+      "obligation_id": "invalid-boundary",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0003"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "executed",
+        "recovered"
+      ],
+      "obligation_id": "valid-access",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0003"
+    },
+    {
+      "applicable_gates": [
+        "validated",
+        "conditioned"
+      ],
+      "obligation_id": "invalid-boundary",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0004"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "executed",
+        "recovered"
+      ],
+      "obligation_id": "valid-access",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0004"
+    },
+    {
+      "applicable_gates": [
+        "validated",
+        "conditioned"
+      ],
+      "obligation_id": "invalid-boundary",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0005"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "executed",
+        "recovered"
+      ],
+      "obligation_id": "valid-access",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0005"
+    },
+    {
+      "applicable_gates": [
         "validated"
       ],
       "obligation_id": "dd.parameters-0001.malformed",
@@ -34900,6 +35360,7 @@
       "cobol.function.diagnostic",
       "cobol.semantic.diagnostic",
       "cobol.statement.diagnostic",
+      "dataset.organization.condition",
       "jcl.condition.diagnostic",
       "racf.command.diagnostic",
       "racf.racroute.status"
@@ -34909,6 +35370,7 @@
       "cobol.function.driver",
       "cobol.semantic.driver",
       "cobol.statement.driver",
+      "dataset.organization.driver",
       "jcl.driver.convert",
       "racf.command.driver",
       "racf.racroute.driver"
@@ -36298,6 +36760,46 @@
       {
         "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.xml-parse.valid"
+      },
+      {
+        "digest": "sha256:86ad090ad57d033f2ff620b75cb7c4ada6ce7cc0845c1f4cdff5655cd7428a7d",
+        "id": "dataset.esds.invalid"
+      },
+      {
+        "digest": "sha256:86ad090ad57d033f2ff620b75cb7c4ada6ce7cc0845c1f4cdff5655cd7428a7d",
+        "id": "dataset.esds.valid"
+      },
+      {
+        "digest": "sha256:86ad090ad57d033f2ff620b75cb7c4ada6ce7cc0845c1f4cdff5655cd7428a7d",
+        "id": "dataset.ksds.invalid"
+      },
+      {
+        "digest": "sha256:86ad090ad57d033f2ff620b75cb7c4ada6ce7cc0845c1f4cdff5655cd7428a7d",
+        "id": "dataset.ksds.valid"
+      },
+      {
+        "digest": "sha256:86ad090ad57d033f2ff620b75cb7c4ada6ce7cc0845c1f4cdff5655cd7428a7d",
+        "id": "dataset.lds.invalid"
+      },
+      {
+        "digest": "sha256:86ad090ad57d033f2ff620b75cb7c4ada6ce7cc0845c1f4cdff5655cd7428a7d",
+        "id": "dataset.lds.valid"
+      },
+      {
+        "digest": "sha256:86ad090ad57d033f2ff620b75cb7c4ada6ce7cc0845c1f4cdff5655cd7428a7d",
+        "id": "dataset.rrds.invalid"
+      },
+      {
+        "digest": "sha256:86ad090ad57d033f2ff620b75cb7c4ada6ce7cc0845c1f4cdff5655cd7428a7d",
+        "id": "dataset.rrds.valid"
+      },
+      {
+        "digest": "sha256:86ad090ad57d033f2ff620b75cb7c4ada6ce7cc0845c1f4cdff5655cd7428a7d",
+        "id": "dataset.vrrds.invalid"
+      },
+      {
+        "digest": "sha256:86ad090ad57d033f2ff620b75cb7c4ada6ce7cc0845c1f4cdff5655cd7428a7d",
+        "id": "dataset.vrrds.valid"
       },
       {
         "digest": "sha256:dec8d31cf2a13a717c8144d4ae7c967790604bd7b69876f08ce5a3d8255fbb07",
@@ -40121,6 +40623,7 @@
       "cobol.function.source-bundle",
       "cobol.semantic.source-bundle",
       "cobol.statement.source-bundle",
+      "dataset.organization.fixture",
       "jcl.input.bundle",
       "racf.command.text",
       "racf.racroute.typed"
@@ -40137,6 +40640,16 @@
       "jcl.observation.target-error",
       "jcl.observation.target-recognized",
       "jcl.observation.target-validated",
+      "observe.dataset.esds.invalid",
+      "observe.dataset.esds.valid",
+      "observe.dataset.ksds.invalid",
+      "observe.dataset.ksds.valid",
+      "observe.dataset.lds.invalid",
+      "observe.dataset.lds.valid",
+      "observe.dataset.rrds.invalid",
+      "observe.dataset.rrds.valid",
+      "observe.dataset.vrrds.invalid",
+      "observe.dataset.vrrds.valid",
       "racf.command.passed"
     ],
     "operations": [
@@ -40144,6 +40657,7 @@
       "cobol.function.analyze",
       "cobol.semantic.analyze",
       "cobol.statement.parse",
+      "dataset.organization.access",
       "jcl.convert.dd-parameters",
       "jcl.convert.exec-parameters",
       "jcl.convert.jcl-statements",
@@ -40163,6 +40677,7 @@
       "racf.authority.ready"
     ],
     "recoveries": [
+      "dataset.organization.restart",
       "jcl.recovery.record-boundary",
       "racf.restart-recovery"
     ],
@@ -40172,6 +40687,7 @@
       "cobol.function.infer-signature",
       "cobol.semantic.resolve-clauses",
       "cobol.statement.build-typed-ast",
+      "dataset.organization.transition",
       "jcl.transition.convert",
       "racf.command.transition",
       "racf.racroute.transition"
@@ -45367,6 +45883,146 @@
       "recovery": null,
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044",
       "transition": "cobol.statement.build-typed-ast"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [
+        "dataset.organization.condition"
+      ],
+      "input": "dataset.organization.fixture",
+      "obligations": [
+        "valid-access",
+        "invalid-boundary"
+      ],
+      "operation": "dataset.organization.access",
+      "oracle": null,
+      "postconditions": [
+        "observe.dataset.esds.valid",
+        "observe.dataset.esds.invalid"
+      ],
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0001",
+      "transition": "dataset.organization.transition"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [
+        "dataset.organization.condition"
+      ],
+      "input": "dataset.organization.fixture",
+      "obligations": [
+        "valid-access",
+        "invalid-boundary"
+      ],
+      "operation": "dataset.organization.access",
+      "oracle": null,
+      "postconditions": [
+        "observe.dataset.ksds.valid",
+        "observe.dataset.ksds.invalid"
+      ],
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0002",
+      "transition": "dataset.organization.transition"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [
+        "dataset.organization.condition"
+      ],
+      "input": "dataset.organization.fixture",
+      "obligations": [
+        "valid-access",
+        "invalid-boundary"
+      ],
+      "operation": "dataset.organization.access",
+      "oracle": null,
+      "postconditions": [
+        "observe.dataset.lds.valid",
+        "observe.dataset.lds.invalid"
+      ],
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0003",
+      "transition": "dataset.organization.transition"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [
+        "dataset.organization.condition"
+      ],
+      "input": "dataset.organization.fixture",
+      "obligations": [
+        "valid-access",
+        "invalid-boundary"
+      ],
+      "operation": "dataset.organization.access",
+      "oracle": null,
+      "postconditions": [
+        "observe.dataset.rrds.valid",
+        "observe.dataset.rrds.invalid"
+      ],
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0004",
+      "transition": "dataset.organization.transition"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [
+        "dataset.organization.condition"
+      ],
+      "input": "dataset.organization.fixture",
+      "obligations": [
+        "valid-access",
+        "invalid-boundary"
+      ],
+      "operation": "dataset.organization.access",
+      "oracle": null,
+      "postconditions": [
+        "observe.dataset.vrrds.valid",
+        "observe.dataset.vrrds.invalid"
+      ],
+      "preconditions": [],
+      "recovery": "dataset.organization.restart",
+      "row_id": "ibm-zos-3.2-dfsms-ams-2026-06:vsam-primary-organizations:0005",
+      "transition": "dataset.organization.transition"
     },
     {
       "applicable_gates": [

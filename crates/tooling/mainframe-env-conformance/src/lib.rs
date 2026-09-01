@@ -26,6 +26,8 @@ mod cobol_exit;
 mod cobol_frontend;
 mod cobol_functions;
 mod cobol_statements;
+mod dataset;
+mod dataset_reference;
 mod jcl;
 mod racf;
 mod racf_oracle;
@@ -60,6 +62,10 @@ pub use carddemo::{
     verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
     verify_carddemo_vsam_from_env,
 };
+pub use dataset::{
+    DatasetConformanceRuntime, dataset_conformance_runtime, run_dataset_conformance,
+};
+pub use dataset_reference::{DatasetReferenceSimulationReport, run_dataset_reference_simulation};
 pub use jcl::{JclExitReceipt, JclFixtureRuntime, jcl_fixture_runtime, verify_jcl_exit};
 pub use racf::{racf_runtime, racf_runtime_with};
 pub use racf_oracle::{RACF_ORACLE_RELATIVE_PATH, RacfOracleCampaign, RacfOracleCase};
