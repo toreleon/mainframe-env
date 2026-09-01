@@ -264,6 +264,13 @@
       "obligation_id": "phrase-group-hierarchy",
       "source": "IDENTIFICATION DIVISION. PROGRAM-ID. JSONGROUP. DATA DIVISION. WORKING-STORAGE SECTION. 01 GREETING. 05 COUNT-X PIC 99 VALUE 12. 05 MSG PIC X(5) VALUE 'Hello'. 01 JSON-X PIC X(80). 01 LEN-X PIC 99. PROCEDURE DIVISION. JSON GENERATE JSON-X FROM GREETING COUNT IN LEN-X. DISPLAY JSON-X(1:LEN-X). STOP RUN.",
       "expected_output": "{\"GREETING\":{\"COUNT-X\":12,\"MSG\":\"Hello\"}}\n"
+    },
+    {
+      "id": "json-parse-group-hierarchy",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
+      "obligation_id": "phrase-group-hierarchy",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. JSONPARSEGROUP. DATA DIVISION. WORKING-STORAGE SECTION. 01 JSON-X PIC X(80) VALUE '{\"GREETING\":{\"COUNT-X\":34,\"MSG\":\"World\"}}'. 01 GREETING. 05 COUNT-X PIC 99. 05 MSG PIC X(5). PROCEDURE DIVISION. JSON PARSE JSON-X INTO GREETING. DISPLAY COUNT-X MSG. STOP RUN.",
+      "expected_output": "34World\n"
     }
   ]
 }

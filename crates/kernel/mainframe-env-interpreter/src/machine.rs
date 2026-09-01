@@ -6109,6 +6109,20 @@ impl ReferenceMachine {
         let value = if json {
             let value: serde_json::Value =
                 serde_json::from_str(source.trim()).map_err(|_| MachineProblem::DataException)?;
+            if let Some(layout) = self.layout(target).cloned()
+                && is_group(layout.category)
+            {
+                let value = value
+                    .as_object()
+                    .and_then(|object| object.get(&layout.simple_name))
+                    .unwrap_or(&value);
+                let mut assignments = Vec::new();
+                self.stage_json_group(&layout, value, &mut assignments)?;
+                for (reference, bytes) in assignments {
+                    self.write_reference(&reference, &bytes)?;
+                }
+                return Ok(());
+            }
             let value = value
                 .as_object()
                 .and_then(|object| object.values().next())
@@ -6135,6 +6149,72 @@ impl ReferenceMachine {
             xml_unescape(body)?
         };
         self.write(target, value.as_bytes())
+    }
+
+    fn stage_json_group(
+        &self,
+        layout: &LayoutMetadata,
+        value: &serde_json::Value,
+        assignments: &mut Vec<(ResolvedReference, Vec<u8>)>,
+    ) -> Result<(), MachineProblem> {
+        let object = value.as_object().ok_or(MachineProblem::DataException)?;
+        let mut children = self
+            .layouts
+            .values()
+            .filter(|candidate| candidate.parent.as_deref() == Some(layout.name.as_str()))
+            .filter(|candidate| {
+                candidate.simple_name != "FILLER"
+                    && !matches!(
+                        candidate.category,
+                        LayoutCategory::Condition | LayoutCategory::Rename
+                    )
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        children.sort_by(|left, right| {
+            left.offset
+                .cmp(&right.offset)
+                .then_with(|| left.name.cmp(&right.name))
+        });
+        for child in children {
+            let value = object
+                .get(&child.simple_name)
+                .ok_or(MachineProblem::DataException)?;
+            if is_group(child.category) {
+                self.stage_json_group(&child, value, assignments)?;
+                continue;
+            }
+            let reference = self.reference(std::slice::from_ref(&child.name))?;
+            let bytes = if is_numeric(child.category) {
+                let text = value
+                    .as_number()
+                    .map(ToString::to_string)
+                    .or_else(|| value.as_str().map(str::to_string))
+                    .ok_or(MachineProblem::DataException)?;
+                encode_decimal(
+                    &child,
+                    decimal_rescale(
+                        decimal_text(&text).ok_or(MachineProblem::DataException)?,
+                        child.scale,
+                    )?,
+                )?
+            } else {
+                let text = value.as_str().ok_or(MachineProblem::DataException)?;
+                let bytes = if matches!(
+                    child.category,
+                    LayoutCategory::National | LayoutCategory::NationalEdited
+                ) {
+                    utf8_to_national(text.as_bytes())?
+                } else {
+                    text.as_bytes().to_vec()
+                };
+                FixedValue::fit(&bytes, reference.length, child.justified_right)
+                    .bytes()
+                    .to_vec()
+            };
+            assignments.push((reference, bytes));
+        }
+        Ok(())
     }
 
     fn xml_processing_step(&mut self, args: &[String]) -> Result<Step, MachineProblem> {

@@ -1287,6 +1287,7 @@ fn check_cobol_statement_bindings(
                 }
             }
             Some("0024") => {
+                expected_obligations.insert("phrase-group-hierarchy");
                 expected_obligations.insert("phrase-with-detail");
             }
             Some("0029") => {
