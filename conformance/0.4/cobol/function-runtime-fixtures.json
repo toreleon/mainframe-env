@@ -498,7 +498,7 @@
       "setup": "MOVE 'Aé🙂' TO UTF."
     },
     {
-      "expression": "FUNCTION ULENGTH(UTF, 1, 2)",
+      "expression": "FUNCTION ULENGTH(UTF, 2, 2)",
       "id": "ulength",
       "name": "ULENGTH",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0072",

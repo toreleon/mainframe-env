@@ -1422,6 +1422,17 @@ mod tests {
         }
     }
     #[test]
+    fn national_length_and_utf8_index_width_boundaries_are_exact() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. UNICODEFN. DATA DIVISION. WORKING-STORAGE SECTION. 01 NAT-X PIC N(3) NATIONAL. 01 UTF-X PIC U(4) BYTE-LENGTH 16 UTF-8. 01 L1 PIC 99. 01 L2 PIC 99. 01 L3 PIC 99. 01 L4 PIC 99. 01 L5 PIC 99. 01 L6 PIC 99. 01 L7 PIC 99. 01 L8 PIC 99. PROCEDURE DIVISION. MOVE 'Aé🙂' TO UTF-X. MOVE FUNCTION LENGTH(NAT-X) TO L1. MOVE FUNCTION BYTE-LENGTH(NAT-X) TO L2. MOVE FUNCTION LENGTH(UTF-X) TO L3. MOVE FUNCTION ULENGTH(UTF-X, 2, 2) TO L4. MOVE FUNCTION UPOS(UTF-X, 3) TO L5. MOVE FUNCTION UWIDTH(UTF-X, 2) TO L6. MOVE FUNCTION UWIDTH(UTF-X, 3) TO L7. MOVE FUNCTION USUPPLEMENTARY(UTF-X) TO L8. DISPLAY L1 L2 L3 L4 L5 L6 L7 L8. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => {
+                assert_eq!(done.output.bytes(), b"0306040104020403\n")
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
     fn test_numval_variants_return_error_positions_and_honor_currency_arguments() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. TESTNUM. DATA DIVISION. WORKING-STORAGE SECTION. 01 BAD-X PIC X(4) VALUE '12A3'. 01 CUR-X PIC X(6) VALUE '€12X'. 01 SYMBOL-X PIC X(3) VALUE '€'. 01 POS-X PIC 9. 01 VALUE-X PIC 99V9. PROCEDURE DIVISION. MOVE FUNCTION TEST-NUMVAL(BAD-X) TO POS-X. DISPLAY POS-X. MOVE FUNCTION TEST-NUMVAL-C(CUR-X, SYMBOL-X) TO POS-X. DISPLAY POS-X. MOVE FUNCTION NUMVAL-C('€12.5', SYMBOL-X) TO VALUE-X. DISPLAY VALUE-X. STOP RUN.";
         let artifact = compile(source).unwrap();

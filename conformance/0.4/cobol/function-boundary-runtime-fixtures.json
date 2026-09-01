@@ -3,6 +3,20 @@
   "target_version": "0.4.0",
   "fixtures": [
     {
+      "id": "byte-length-national-bytes",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0008",
+      "obligation_id": "boundary-national-byte-count",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. BYTELENNAT. DATA DIVISION. WORKING-STORAGE SECTION. 01 NAT-X PIC N(3) NATIONAL. 01 OUT-X PIC 99. PROCEDURE DIVISION. MOVE FUNCTION BYTE-LENGTH(NAT-X) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "06\n"
+    },
+    {
+      "id": "length-national-characters",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0034",
+      "obligation_id": "boundary-national-character-count",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. LENNAT. DATA DIVISION. WORKING-STORAGE SECTION. 01 NAT-X PIC N(3) NATIONAL. 01 OUT-X PIC 99. PROCEDURE DIVISION. MOVE FUNCTION LENGTH(NAT-X) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "03\n"
+    },
+    {
       "id": "numval-c-currency",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0046",
       "obligation_id": "boundary-currency-symbol",
@@ -17,11 +31,46 @@
       "expected_output": "3\n"
     },
     {
+      "id": "test-formatted-datetime-error-position",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0067",
+      "obligation_id": "boundary-error-position",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. TESTFORMAT. DATA DIVISION. WORKING-STORAGE SECTION. 01 BAD-X PIC X(8) VALUE '12:3X:56'. 01 POS-X PIC 99. PROCEDURE DIVISION. MOVE FUNCTION TEST-FORMATTED-DATETIME('hh:mm:ss', BAD-X) TO POS-X. DISPLAY POS-X. STOP RUN.",
+      "expected_output": "05\n"
+    },
+    {
       "id": "test-numval-c-currency-position",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0069",
       "obligation_id": "boundary-currency-position",
       "source": "IDENTIFICATION DIVISION. PROGRAM-ID. TESTNUMC. DATA DIVISION. WORKING-STORAGE SECTION. 01 CUR-X PIC X(6) VALUE '€12X'. 01 SYMBOL-X PIC X(3) VALUE '€'. 01 POS-X PIC 9. PROCEDURE DIVISION. MOVE FUNCTION TEST-NUMVAL-C(CUR-X, SYMBOL-X) TO POS-X. DISPLAY POS-X. STOP RUN.",
       "expected_output": "4\n"
+    },
+    {
+      "id": "ulength-byte-slice",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0072",
+      "obligation_id": "boundary-byte-aligned-slice",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. ULENSLICE. DATA DIVISION. WORKING-STORAGE SECTION. 01 UTF-X PIC U(4) BYTE-LENGTH 16 UTF-8. 01 OUT-X PIC 99. PROCEDURE DIVISION. MOVE 'Aé🙂' TO UTF-X. MOVE FUNCTION ULENGTH(UTF-X, 2, 2) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "01\n"
+    },
+    {
+      "id": "upos-multibyte-position",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0073",
+      "obligation_id": "boundary-multibyte-position",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. UPOSBOUND. DATA DIVISION. WORKING-STORAGE SECTION. 01 UTF-X PIC U(4) BYTE-LENGTH 16 UTF-8. 01 OUT-X PIC 99. PROCEDURE DIVISION. MOVE 'Aé🙂' TO UTF-X. MOVE FUNCTION UPOS(UTF-X, 3) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "04\n"
+    },
+    {
+      "id": "usupplementary-first-index",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0076",
+      "obligation_id": "boundary-first-supplementary-index",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. USUPBOUND. DATA DIVISION. WORKING-STORAGE SECTION. 01 UTF-X PIC U(4) BYTE-LENGTH 16 UTF-8. 01 OUT-X PIC 99. PROCEDURE DIVISION. MOVE 'Aé🙂' TO UTF-X. MOVE FUNCTION USUPPLEMENTARY(UTF-X) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "03\n"
+    },
+    {
+      "id": "uwidth-multibyte-width",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0079",
+      "obligation_id": "boundary-multibyte-width",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. UWIDTHBOUND. DATA DIVISION. WORKING-STORAGE SECTION. 01 UTF-X PIC U(4) BYTE-LENGTH 16 UTF-8. 01 OUT-X PIC 99. PROCEDURE DIVISION. MOVE 'Aé🙂' TO UTF-X. MOVE FUNCTION UWIDTH(UTF-X, 3) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "04\n"
     }
   ]
 }

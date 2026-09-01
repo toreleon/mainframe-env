@@ -6107,7 +6107,37 @@ impl ReferenceMachine {
                     String::from_utf8_lossy(&bytes).to_lowercase().into_bytes(),
                 ))
             }
-            "LENGTH" => Ok(integer_value(bytes(0)?.len() as i128)),
+            "LENGTH" => {
+                let value = bytes(0)?;
+                let length = self.reference(argument(0)?).ok().map_or_else(
+                    || value.len(),
+                    |reference| match reference.layout.category {
+                        LayoutCategory::National
+                        | LayoutCategory::NationalEdited
+                        | LayoutCategory::NationalGroup => value.len() / 2,
+                        LayoutCategory::Utf8 if !reference.layout.dynamic => {
+                            expanded_picture(&reference.layout.picture, reference.layout.length)
+                                .map(|picture| {
+                                    picture.iter().filter(|symbol| **symbol == b'U').count()
+                                })
+                                .unwrap_or_else(|_| {
+                                    std::str::from_utf8(&value)
+                                        .map(str::chars)
+                                        .map(Iterator::count)
+                                        .unwrap_or(value.len())
+                                })
+                        }
+                        LayoutCategory::Utf8 | LayoutCategory::Utf8Group => {
+                            std::str::from_utf8(&value)
+                                .map(str::chars)
+                                .map(Iterator::count)
+                                .unwrap_or(value.len())
+                        }
+                        _ => value.len(),
+                    },
+                );
+                Ok(integer_value(length as i128))
+            }
             "LOG" => {
                 decimal_from_f64(libm::log(decimal_f64(decimal(0)?)?)).map(CobolValue::Decimal)
             }
@@ -6185,13 +6215,10 @@ impl ReferenceMachine {
             "TEST-DAY-YYYYDDD" => Ok(integer_value(i128::from(
                 integer_of_day(integer(0)?).is_err(),
             ))),
-            "TEST-FORMATTED-DATETIME" => Ok(integer_value(i128::from(
-                parse_formatted_datetime(
-                    &String::from_utf8_lossy(&bytes(0)?),
-                    &String::from_utf8_lossy(&bytes(1)?),
-                )
-                .is_err(),
-            ))),
+            "TEST-FORMATTED-DATETIME" => Ok(integer_value(test_formatted_datetime(
+                &String::from_utf8_lossy(&bytes(0)?),
+                &String::from_utf8_lossy(&bytes(1)?),
+            ) as i128)),
             "TEST-NUMVAL" => Ok(integer_value(test_numval(&bytes(0)?, false, None) as i128)),
             "TEST-NUMVAL-C" => {
                 let currency = bytes(1)?;
@@ -6212,7 +6239,12 @@ impl ReferenceMachine {
                     _ => value.trim().as_bytes().to_vec(),
                 }))
             }
-            "ULENGTH" => unicode_length(&bytes(0)?, arguments.get(1..)).map(CobolValue::Decimal),
+            "ULENGTH" => unicode_length(
+                &bytes(0)?,
+                arguments.get(1).map(|_| integer(1)).transpose()?,
+                arguments.get(2).map(|_| integer(2)).transpose()?,
+            )
+            .map(CobolValue::Decimal),
             "UPOS" => unicode_position(&bytes(0)?, integer(1)?).map(CobolValue::Decimal),
             "USUBSTR" => unicode_substring(
                 &bytes(0)?,
@@ -6224,8 +6256,8 @@ impl ReferenceMachine {
                 String::from_utf8(bytes(0)?)
                     .map_err(|_| MachineProblem::DataException)?
                     .chars()
-                    .filter(|character| u32::from(*character) > 0xffff)
-                    .count() as i128,
+                    .position(|character| u32::from(character) > 0xffff)
+                    .map_or(0, |position| position + 1) as i128,
             )),
             "UVALID" => Ok(integer_value(test_utf8(&bytes(0)?) as i128)),
             "UWIDTH" => unicode_width(&bytes(0)?, integer(1)?).map(CobolValue::Decimal),
@@ -9076,12 +9108,30 @@ fn national_to_utf8(bytes: &[u8]) -> Result<Vec<u8>, MachineProblem> {
     .map_err(|_| MachineProblem::DataException)
 }
 
-fn unicode_length(bytes: &[u8], _bounds: Option<&[&[String]]>) -> Result<Decimal, MachineProblem> {
-    Ok(Decimal {
-        coefficient: std::str::from_utf8(bytes)
+fn unicode_length(
+    bytes: &[u8],
+    start: Option<i128>,
+    length: Option<i128>,
+) -> Result<Decimal, MachineProblem> {
+    let text = std::str::from_utf8(bytes).map_err(|_| MachineProblem::DataException)?;
+    let text = if start.is_some() || length.is_some() {
+        let start = usize::try_from(start.ok_or(MachineProblem::DataException)?)
+            .ok()
+            .and_then(|start| start.checked_sub(1))
+            .ok_or(MachineProblem::DataException)?;
+        let length = usize::try_from(length.ok_or(MachineProblem::DataException)?)
+            .map_err(|_| MachineProblem::DataException)?;
+        let end = start
+            .checked_add(length)
+            .filter(|end| *end <= bytes.len())
+            .ok_or(MachineProblem::DataException)?;
+        std::str::from_utf8(bytes.get(start..end).ok_or(MachineProblem::DataException)?)
             .map_err(|_| MachineProblem::DataException)?
-            .chars()
-            .count() as i128,
+    } else {
+        text
+    };
+    Ok(Decimal {
+        coefficient: text.chars().count() as i128,
         scale: 0,
     })
 }
@@ -9116,6 +9166,10 @@ fn unicode_substring(
         .map(|length| usize::try_from(length).map_err(|_| MachineProblem::DataException))
         .transpose()?;
     let text = std::str::from_utf8(bytes).map_err(|_| MachineProblem::DataException)?;
+    let available = text.chars().count();
+    if start >= available || length.is_some_and(|length| start.saturating_add(length) > available) {
+        return Err(MachineProblem::DataException);
+    }
     Ok(text
         .chars()
         .skip(start)
@@ -9124,8 +9178,24 @@ fn unicode_substring(
         .into_bytes())
 }
 
-fn unicode_width(bytes: &[u8], _mode: i128) -> Result<Decimal, MachineProblem> {
-    unicode_length(bytes, None)
+fn unicode_width(bytes: &[u8], character: i128) -> Result<Decimal, MachineProblem> {
+    let Some(character) = usize::try_from(character)
+        .ok()
+        .and_then(|character| character.checked_sub(1))
+    else {
+        return Ok(Decimal {
+            coefficient: 0,
+            scale: 0,
+        });
+    };
+    let text = std::str::from_utf8(bytes).map_err(|_| MachineProblem::DataException)?;
+    Ok(Decimal {
+        coefficient: text
+            .chars()
+            .nth(character)
+            .map_or(0, |character| character.len_utf8()) as i128,
+        scale: 0,
+    })
 }
 
 fn test_utf8(bytes: &[u8]) -> usize {
@@ -10279,6 +10349,58 @@ fn parse_formatted_datetime(format: &str, value: &str) -> Result<(), MachineProb
         parse_hhmmss(time.as_bytes())?;
     }
     Ok(())
+}
+
+fn test_formatted_datetime(format: &str, value: &str) -> usize {
+    let format = format.as_bytes();
+    let value = value.as_bytes();
+    let mut format_at = 0usize;
+    let mut value_at = 0usize;
+    while format_at < format.len() {
+        let width = [
+            (b"YYYY".as_slice(), 4usize),
+            (b"YY".as_slice(), 2),
+            (b"MM".as_slice(), 2),
+            (b"DD".as_slice(), 2),
+            (b"hh".as_slice(), 2),
+            (b"mm".as_slice(), 2),
+            (b"ss".as_slice(), 2),
+        ]
+        .into_iter()
+        .find_map(|(token, width)| {
+            format[format_at..]
+                .starts_with(token)
+                .then_some((token.len(), width))
+        });
+        if let Some((token_length, width)) = width {
+            for offset in 0..width {
+                if value
+                    .get(value_at + offset)
+                    .is_none_or(|byte| !byte.is_ascii_digit())
+                {
+                    return value_at + offset + 1;
+                }
+            }
+            format_at += token_length;
+            value_at += width;
+        } else {
+            if value.get(value_at) != format.get(format_at) {
+                return value_at + 1;
+            }
+            format_at += 1;
+            value_at += 1;
+        }
+    }
+    if value_at != value.len() {
+        return value_at + 1;
+    }
+    usize::from(
+        parse_formatted_datetime(
+            &String::from_utf8_lossy(format),
+            &String::from_utf8_lossy(value),
+        )
+        .is_err(),
+    )
 }
 
 fn seconds_from_formatted_time(format: &str, value: &str) -> Result<Decimal, MachineProblem> {
