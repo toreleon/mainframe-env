@@ -20,6 +20,32 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::OnceLock;
 
 const NAMESPACE: &str = "mainframe.core.cobol";
+pub const SUPPORTED_LAYOUT_CATEGORIES: &[&str] = &[
+    "alphabetic",
+    "alphanumeric",
+    "alphanumeric_edited",
+    "binary",
+    "condition",
+    "dbcs",
+    "float_long",
+    "float_short",
+    "function_pointer",
+    "group",
+    "index",
+    "national",
+    "national_edited",
+    "national_group",
+    "numeric_display",
+    "numeric_edited",
+    "object_reference",
+    "packed_decimal",
+    "pointer",
+    "pointer_32",
+    "procedure_pointer",
+    "rename",
+    "utf8",
+    "utf8_group",
+];
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct StorageView {
@@ -30,13 +56,28 @@ struct StorageView {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum LayoutCategory {
+    Alphabetic,
     Alphanumeric,
+    AlphanumericEdited,
+    Dbcs,
+    National,
+    NationalEdited,
+    Utf8,
     NumericDisplay,
     NumericEdited,
     PackedDecimal,
     Binary,
+    FloatShort,
+    FloatLong,
+    Index,
     Pointer,
+    Pointer32,
+    ProcedurePointer,
+    FunctionPointer,
+    ObjectReference,
     Group,
+    NationalGroup,
+    Utf8Group,
     Condition,
     Rename,
 }
@@ -2739,12 +2780,12 @@ impl ReferenceMachine {
                 .ok_or(MachineProblem::UnknownStorage)?;
             let reference = self.reference(&args[at..end])?;
             let layout = reference.layout.clone();
-            let targets = if layout.category == LayoutCategory::Group {
+            let targets = if is_group(layout.category) {
                 self.layouts
                     .values()
                     .filter(|candidate| {
                         candidate.length > 0
-                            && candidate.category != LayoutCategory::Group
+                            && !is_group(candidate.category)
                             && candidate.offset >= layout.offset
                             && candidate.offset.saturating_add(candidate.length)
                                 <= layout.offset.saturating_add(layout.length)
@@ -2763,7 +2804,7 @@ impl ReferenceMachine {
                             scale: target.scale,
                         },
                     )?;
-                } else if target.category == LayoutCategory::Pointer {
+                } else if is_pointer_like(target.category) {
                     self.write_raw(&target.name, &vec![0; target.length])?;
                 } else {
                     self.write_raw(&target.name, &vec![b' '; target.length])?;
@@ -4436,13 +4477,28 @@ fn layout_metadata(operations: &[Operation]) -> Result<LayoutState, MachineProbl
         let name = text_attribute(operation, "name")?.to_ascii_uppercase();
         let simple_name = text_attribute(operation, "simple_name")?.to_ascii_uppercase();
         let category = match text_attribute(operation, "category")? {
+            "alphabetic" => LayoutCategory::Alphabetic,
             "alphanumeric" => LayoutCategory::Alphanumeric,
+            "alphanumeric_edited" => LayoutCategory::AlphanumericEdited,
+            "dbcs" => LayoutCategory::Dbcs,
+            "national" => LayoutCategory::National,
+            "national_edited" => LayoutCategory::NationalEdited,
+            "utf8" => LayoutCategory::Utf8,
             "numeric_display" => LayoutCategory::NumericDisplay,
             "numeric_edited" => LayoutCategory::NumericEdited,
             "packed_decimal" => LayoutCategory::PackedDecimal,
             "binary" => LayoutCategory::Binary,
+            "float_short" => LayoutCategory::FloatShort,
+            "float_long" => LayoutCategory::FloatLong,
+            "index" => LayoutCategory::Index,
             "pointer" => LayoutCategory::Pointer,
+            "pointer_32" => LayoutCategory::Pointer32,
+            "procedure_pointer" => LayoutCategory::ProcedurePointer,
+            "function_pointer" => LayoutCategory::FunctionPointer,
+            "object_reference" => LayoutCategory::ObjectReference,
             "group" => LayoutCategory::Group,
+            "national_group" => LayoutCategory::NationalGroup,
+            "utf8_group" => LayoutCategory::Utf8Group,
             "condition" => LayoutCategory::Condition,
             "rename" => LayoutCategory::Rename,
             _ => {
@@ -4774,6 +4830,25 @@ const fn is_numeric(category: LayoutCategory) -> bool {
             | LayoutCategory::NumericEdited
             | LayoutCategory::PackedDecimal
             | LayoutCategory::Binary
+    )
+}
+
+const fn is_group(category: LayoutCategory) -> bool {
+    matches!(
+        category,
+        LayoutCategory::Group | LayoutCategory::NationalGroup | LayoutCategory::Utf8Group
+    )
+}
+
+const fn is_pointer_like(category: LayoutCategory) -> bool {
+    matches!(
+        category,
+        LayoutCategory::Index
+            | LayoutCategory::Pointer
+            | LayoutCategory::Pointer32
+            | LayoutCategory::ProcedurePointer
+            | LayoutCategory::FunctionPointer
+            | LayoutCategory::ObjectReference
     )
 }
 

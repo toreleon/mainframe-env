@@ -6,6 +6,32 @@ use mainframe_env_ir::{
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const CORE_NAMESPACE: &str = "mainframe.core.cobol";
+pub const PUBLISHABLE_LAYOUT_CATEGORIES: &[&str] = &[
+    "alphabetic",
+    "alphanumeric",
+    "alphanumeric_edited",
+    "binary",
+    "condition",
+    "dbcs",
+    "float_long",
+    "float_short",
+    "function_pointer",
+    "group",
+    "index",
+    "national",
+    "national_edited",
+    "national_group",
+    "numeric_display",
+    "numeric_edited",
+    "object_reference",
+    "packed_decimal",
+    "pointer",
+    "pointer_32",
+    "procedure_pointer",
+    "rename",
+    "utf8",
+    "utf8_group",
+];
 
 pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, LowerProblem> {
     let mut unsupported = hir.unsupported();

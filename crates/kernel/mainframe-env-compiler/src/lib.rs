@@ -29,7 +29,9 @@ pub use hir::{
     CobolHir, ControlEdge, ControlEdgeKind, ControlNode, ControlRole, ControlScope, HirStatement,
     StatementKind, StatementOption, StatementOptionKind, cobol_hir_catalog,
 };
-pub use lower::{CORE_NAMESPACE, core_mir_catalog, core_mir_profile};
+pub use lower::{
+    CORE_NAMESPACE, PUBLISHABLE_LAYOUT_CATEGORIES, core_mir_catalog, core_mir_profile,
+};
 pub use semantic::{
     CobolClauseKind, CobolClauseNode, CobolDataDescription, CobolDivisionKind, CobolDivisionNode,
     CobolFileBinding, CobolFileDescription, CobolIntrinsicArgument, CobolIntrinsicCall,
