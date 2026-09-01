@@ -149,7 +149,7 @@ fn context(base: &CommandContext, sequence: usize) -> Result<CommandContext, Str
 
 fn execute_matrix(target: CommandFamily) -> Result<(), String> {
     let (service, base) = setup()?;
-    for (sequence, command) in sec_502_matrix().iter().enumerate() {
+    for (sequence, command) in command_matrix().iter().enumerate() {
         let result = service
             .execute_command(&context(&base, sequence + 1)?, command)
             .map_err(|problem| format!("RACF selected route failed: {problem}"))?;
@@ -195,7 +195,7 @@ fn execute_denied(target: CommandFamily) -> Result<(), String> {
     Ok(())
 }
 
-fn sec_502_matrix() -> &'static [&'static str] {
+fn command_matrix() -> &'static [&'static str] {
     &[
         "ADDGROUP OPER OWNER(RACFADM)",
         "ADDGROUP DEV SUPGROUP(OPER) OWNER(RACFADM)",
@@ -219,6 +219,13 @@ fn sec_502_matrix() -> &'static [&'static str] {
         "DELDSD 'USER2.**' GENERIC",
         "DELUSER USER2",
         "DELGROUP DEV",
+        "RACPRIV ON",
+        "RACPRMCK MEMBER(IRROPT01)",
+        "SET TRACE AUTOAPPL",
+        "SETROPTS PROGRAM RULES",
+        "RVARY LIST",
+        "STOP",
+        "RESTART",
     ]
 }
 
@@ -275,10 +282,10 @@ mod tests {
     }
 
     #[test]
-    fn all_sec_502_families_have_executable_and_deny_routes() {
+    fn all_enabled_command_families_have_executable_and_deny_routes() {
         for descriptor in command_descriptors()
             .iter()
-            .filter(|descriptor| descriptor.work_package() == "SEC-502")
+            .filter(|descriptor| matches!(descriptor.work_package(), "SEC-502" | "SEC-503"))
         {
             execute_matrix(descriptor.family()).unwrap();
             execute_denied(descriptor.family()).unwrap();

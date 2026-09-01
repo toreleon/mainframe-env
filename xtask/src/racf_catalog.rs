@@ -2,6 +2,8 @@ use super::*;
 
 const CATALOG_PATH: &str = "conformance/0.5/racf/command-language.json";
 const SCHEMA_PATH: &str = "conformance/0.5/schemas/racf-command-catalog.schema.json";
+const CLASS_CATALOG_PATH: &str = "conformance/0.5/racf/supplied-classes.json";
+const CLASS_SCHEMA_PATH: &str = "conformance/0.5/schemas/racf-class-catalog.schema.json";
 const GENERATED_PATH: &str =
     "crates/providers/mainframe-env-racf/src/generated/racf_command_catalog.rs";
 const SPEC_PATH: &str = "conformance/spec/v1/spec.json";
@@ -94,9 +96,12 @@ fn project_spec(root: &Path) -> TaskResult<Vec<u8>> {
     for (index, family) in families.iter().enumerate() {
         let row_id = text(family, "row_id", &catalog_path)?;
         let sequence = index + 1;
-        let sec_502 = text(family, "work_package", &catalog_path)? == "SEC-502";
+        let executable = matches!(
+            text(family, "work_package", &catalog_path)?,
+            "SEC-502" | "SEC-503"
+        );
         let mut obligation_ids = vec!["syntax", "malformed"];
-        if sec_502 {
+        if executable {
             obligation_ids.extend(["authorized", "unauthorized"]);
         }
         rows.push(json!({
@@ -132,7 +137,7 @@ fn project_spec(root: &Path) -> TaskResult<Vec<u8>> {
                 );
             }
         }
-        if sec_502 {
+        if executable {
             obligations.push(json!({
                 "row_id": row_id,
                 "obligation_id": "authorized",
@@ -261,6 +266,22 @@ fn render(root: &Path) -> TaskResult<Vec<u8>> {
         official_rows.len() == families.len(),
         "RACF generated/official command denominators differ",
     )?;
+    let class_path = root.join(CLASS_CATALOG_PATH);
+    let class_catalog = json(&class_path)?;
+    validate_schema_instance(
+        &json(&root.join(CLASS_SCHEMA_PATH))?,
+        &class_catalog,
+        &class_path,
+    )?;
+    let classes = array(&class_catalog, "classes", &class_path)?;
+    let mut class_names = BTreeSet::new();
+    for class in classes {
+        let name = text(class, "name", &class_path)?;
+        require(
+            class_names.insert(name),
+            &format!("duplicate RACF supplied class {name}"),
+        )?;
+    }
 
     let mut variants = BTreeSet::new();
     let mut selectors = BTreeSet::new();
@@ -342,6 +363,23 @@ fn render(root: &Path) -> TaskResult<Vec<u8>> {
         out.push_str("        operands: &[");
         separated_strings(&mut out, string_array(family, "operands", &catalog_path)?);
         out.push_str("],\n    },\n");
+    }
+    out.push_str("];\n\npub const SUPPLIED_CLASS_DESCRIPTORS: &[SuppliedClassDescriptor] = &[\n");
+    for class in classes {
+        let posit = class["posit"]
+            .as_u64()
+            .map_or_else(|| "None".to_string(), |value| format!("Some({value})"));
+        out.push_str(&format!(
+            "    SuppliedClassDescriptor {{ name: {:?}, active: {}, generic_allowed: {}, generic_active: {}, discrete_allowed: {}, raclist: {}, max_profile_name_bytes: {}, posit: {} }},\n",
+            text(class, "name", &class_path)?,
+            boolean(class, "active", &class_path)?,
+            boolean(class, "generic_allowed", &class_path)?,
+            boolean(class, "generic_active", &class_path)?,
+            boolean(class, "discrete_allowed", &class_path)?,
+            boolean(class, "raclist", &class_path)?,
+            integer(class, "max_profile_name_bytes", &class_path)?,
+            posit,
+        ));
     }
     out.push_str("];\n");
     Ok(out.into_bytes())

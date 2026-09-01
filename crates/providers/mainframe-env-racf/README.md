@@ -26,3 +26,10 @@ list, display, and search families through authorized, deny, rollback,
 idempotency, concurrent-CAS, and audit routes. Policy/operations and advanced
 identity families remain assigned to their later named work packages rather
 than receiving generic-success handlers.
+
+SEC-503 adds generated supplied-class metadata plus validated installation-
+defined classes, SETROPTS/class activation and generic controls, owned RACLIST
+snapshots with explicit refresh semantics, PROGRAM control, RACPRIV, SET,
+RVARY, STOP/RESTART, and bounded RACPRMCK member validation. A RACLISTed class
+never falls through to live profiles when its cache is absent, and stopped or
+inactive authority state fails closed.

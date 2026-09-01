@@ -5,11 +5,11 @@ use crate::command::{
 };
 use crate::model::{
     AccessControlEntry, AccessLevel, AuditFieldValue, AuditPolicy, ClassDescriptor,
-    DecisionOutcome, DecisionReason, GroupAuthority, GroupConnection, GroupProfile, PrincipalKind,
-    PrincipalProfile, PrincipalState, ProfileSegment, ProfileTemplate, ResourceProfile, SafStatus,
-    SecurityAuditRecord, SecurityDatabaseSnapshot, SecurityTransaction, SegmentFieldKind,
-    SegmentFieldSchema, SegmentTemplate, SegmentValue, TransactionState, connection_key,
-    profile_key,
+    DatabaseSharingMode, DecisionOutcome, DecisionReason, GroupAuthority, GroupConnection,
+    GroupProfile, PrincipalKind, PrincipalProfile, PrincipalState, ProfileSegment, ProfileTemplate,
+    RaclistCache, ResourceProfile, SafStatus, SecurityAuditRecord, SecurityDatabaseSnapshot,
+    SecurityTransaction, SegmentFieldKind, SegmentFieldSchema, SegmentTemplate, SegmentValue,
+    TransactionState, connection_key, profile_key,
 };
 use mainframe_env_execution_api::PrincipalId;
 use mainframe_env_host_api::HostProblem;
@@ -124,6 +124,25 @@ pub enum CommandRecord {
         profiles: usize,
         generation: u64,
     },
+    Class {
+        name: String,
+        supplied: bool,
+        active: bool,
+        generic_active: bool,
+        raclist: bool,
+        cache_generation: Option<u64>,
+        version: u64,
+    },
+    Policy {
+        add_creator: bool,
+        program_control: bool,
+        ml_active: bool,
+        rules: bool,
+        write_down: bool,
+        subsystem_running: bool,
+        database_active: bool,
+        database_sharing: DatabaseSharingMode,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -154,7 +173,7 @@ pub(crate) fn execute(
     input: &str,
 ) -> Result<CommandResult, CommandDiagnostic> {
     let parsed = parse_command(input, CommandLanguageLimits::default())?;
-    if parsed.descriptor.work_package() != "SEC-502" {
+    if !matches!(parsed.descriptor.work_package(), "SEC-502" | "SEC-503") {
         return Err(diagnostic(CommandDiagnosticCode::UnsupportedFamily, 0));
     }
     let request_digest = format!("sha256:{:x}", Sha256::digest(input.as_bytes()));
@@ -282,6 +301,12 @@ fn apply_mutation(
             delete_resources(snapshot, context, command)
         }
         CommandFamily::Permit => permit(snapshot, context, command),
+        CommandFamily::Racpriv => racpriv(snapshot, context, command),
+        CommandFamily::Restart => restart(snapshot, context),
+        CommandFamily::Rvary => rvary(snapshot, context, command),
+        CommandFamily::Set => set_operational_options(snapshot, context, command),
+        CommandFamily::Setropts => setropts(snapshot, context, command),
+        CommandFamily::Stop => stop(snapshot, context),
         _ => Err(SemanticProblem::Invalid(0)),
     }
 }
@@ -307,8 +332,369 @@ fn apply_query(
             list_profiles(snapshot, &upper_class(class)?, command, 1)
         }
         CommandFamily::Search => search(snapshot, command),
+        CommandFamily::Racprmck => validate_parmlib_members(command),
         _ => Err(SemanticProblem::Invalid(0)),
     }
+}
+
+fn racpriv(
+    snapshot: &mut SecurityDatabaseSnapshot,
+    context: &CommandContext,
+    command: &ParsedCommand,
+) -> Result<Vec<CommandRecord>, SemanticProblem> {
+    require_special(snapshot, context)?;
+    if command.has_operand("ON") == command.has_operand("OFF") && !command.has_operand("LIST") {
+        return Err(SemanticProblem::Invalid(0));
+    }
+    if command.has_operand("ON") {
+        snapshot.policy.write_down = true;
+    }
+    if command.has_operand("OFF") {
+        snapshot.policy.write_down = false;
+    }
+    Ok(vec![policy_record(snapshot)])
+}
+
+fn restart(
+    snapshot: &mut SecurityDatabaseSnapshot,
+    context: &CommandContext,
+) -> Result<Vec<CommandRecord>, SemanticProblem> {
+    require_special(snapshot, context)?;
+    snapshot.subsystem.running = true;
+    snapshot.subsystem.restart_generation = checked_version(snapshot.subsystem.restart_generation)?;
+    Ok(vec![policy_record(snapshot)])
+}
+
+fn stop(
+    snapshot: &mut SecurityDatabaseSnapshot,
+    context: &CommandContext,
+) -> Result<Vec<CommandRecord>, SemanticProblem> {
+    require_special(snapshot, context)?;
+    snapshot.subsystem.running = false;
+    Ok(vec![policy_record(snapshot)])
+}
+
+fn rvary(
+    snapshot: &mut SecurityDatabaseSnapshot,
+    context: &CommandContext,
+    command: &ParsedCommand,
+) -> Result<Vec<CommandRecord>, SemanticProblem> {
+    require_special(snapshot, context)?;
+    let actions = [
+        "ACTIVE",
+        "INACTIVE",
+        "SWITCH",
+        "DATASHARE",
+        "NODATASHARE",
+        "LIST",
+    ]
+    .into_iter()
+    .filter(|name| command.has_operand(name))
+    .count();
+    if actions != 1 {
+        return Err(SemanticProblem::Invalid(0));
+    }
+    if command.has_operand("ACTIVE") {
+        snapshot.database_status.active = true;
+    } else if command.has_operand("INACTIVE") {
+        snapshot.database_status.active = false;
+    } else if command.has_operand("DATASHARE") {
+        snapshot.database_status.sharing_mode = DatabaseSharingMode::DataSharing;
+    } else if command.has_operand("NODATASHARE") {
+        snapshot.database_status.sharing_mode = DatabaseSharingMode::NonDataSharing;
+    } else if command.has_operand("SWITCH") {
+        let dataset = operand_name(command, "DATASET", 246)?.ok_or(SemanticProblem::Invalid(0))?;
+        snapshot.database_status.backup_dataset = snapshot.database_status.primary_dataset.take();
+        snapshot.database_status.primary_dataset = Some(dataset);
+        snapshot.database_status.switch_generation =
+            checked_version(snapshot.database_status.switch_generation)?;
+    }
+    Ok(vec![policy_record(snapshot)])
+}
+
+fn set_operational_options(
+    snapshot: &mut SecurityDatabaseSnapshot,
+    context: &CommandContext,
+    command: &ParsedCommand,
+) -> Result<Vec<CommandRecord>, SemanticProblem> {
+    require_special(snapshot, context)?;
+    if command.operands.is_empty() {
+        return Err(SemanticProblem::Invalid(0));
+    }
+    for (positive, negative, key) in [
+        ("AUTOAPPL", "NOAUTOAPPL", "AUTOAPPL"),
+        ("AUTODIRECT", "NOAUTODIRECT", "AUTODIRECT"),
+        ("AUTOPWD", "NOAUTOPWD", "AUTOPWD"),
+        ("AUTOSIGNON", "NOAUTOSIGNON", "AUTOSIGNON"),
+    ] {
+        if command.has_operand(positive) && command.has_operand(negative) {
+            return Err(SemanticProblem::Conflict);
+        }
+        if command.has_operand(positive) {
+            snapshot.policy.set_flags.insert(key.into(), true);
+        }
+        if command.has_operand(negative) {
+            snapshot.policy.set_flags.insert(key.into(), false);
+        }
+    }
+    if command.has_operand("TRACE") && command.has_operand("NOTRACE") {
+        return Err(SemanticProblem::Conflict);
+    }
+    if command.has_operand("TRACE") {
+        snapshot.subsystem.trace = true;
+    }
+    if command.has_operand("NOTRACE") {
+        snapshot.subsystem.trace = false;
+    }
+    Ok(vec![policy_record(snapshot)])
+}
+
+fn setropts(
+    snapshot: &mut SecurityDatabaseSnapshot,
+    context: &CommandContext,
+    command: &ParsedCommand,
+) -> Result<Vec<CommandRecord>, SemanticProblem> {
+    require_special(snapshot, context)?;
+    if command.operands.is_empty() {
+        return Err(SemanticProblem::Invalid(0));
+    }
+    for (positive, negative, target) in [
+        ("ADDCREATOR", "NOADDCREATOR", "add_creator"),
+        ("CMDVIOL", "NOCMDVIOL", "command_violations_audited"),
+        ("JESBATCHALLRACF", "NOJESBATCHALLRACF", "jes_batch_all_racf"),
+        ("MLACTIVE", "NOMLACTIVE", "ml_active"),
+        ("PROGRAM", "NOPROGRAM", "program_control"),
+        ("RULES", "NORULES", "rules"),
+        ("SECLEVELAUDIT", "NOSECLEVELAUDIT", "security_level_audit"),
+        ("SECLABELAUDIT", "NOSECLABELAUDIT", "security_label_audit"),
+        ("WHENPROGRAM", "NOWHENPROGRAM", "when_program"),
+    ] {
+        if command.has_operand(positive) && command.has_operand(negative) {
+            return Err(SemanticProblem::Conflict);
+        }
+        if command.has_operand(positive) {
+            set_policy_boolean(snapshot, target, true);
+        }
+        if command.has_operand(negative) {
+            set_policy_boolean(snapshot, target, false);
+        }
+    }
+
+    for class in operand_names(command, "CLASSACT", 32)? {
+        ensure_resource_class(snapshot, &class)?;
+        let descriptor = snapshot
+            .classes
+            .get_mut(&class)
+            .ok_or(SemanticProblem::NotFound)?;
+        descriptor.active = true;
+        descriptor.version = checked_version(descriptor.version)?;
+    }
+    for class in operand_names(command, "NOCLASSACT", 32)?
+        .into_iter()
+        .chain(operand_names(command, "INACTIVE", 32)?)
+    {
+        ensure_resource_class(snapshot, &class)?;
+        let descriptor = snapshot
+            .classes
+            .get_mut(&class)
+            .ok_or(SemanticProblem::NotFound)?;
+        descriptor.active = false;
+        descriptor.version = checked_version(descriptor.version)?;
+        snapshot.raclist_caches.remove(&class);
+    }
+    for class in operand_names(command, "GENERIC", 32)? {
+        ensure_resource_class(snapshot, &class)?;
+        let descriptor = snapshot
+            .classes
+            .get_mut(&class)
+            .ok_or(SemanticProblem::NotFound)?;
+        if !descriptor.generic_allowed {
+            return Err(SemanticProblem::Invalid(0));
+        }
+        descriptor.generic_active = true;
+        descriptor.version = checked_version(descriptor.version)?;
+    }
+    for class in operand_names(command, "NOGENERIC", 32)? {
+        ensure_resource_class(snapshot, &class)?;
+        let descriptor = snapshot
+            .classes
+            .get_mut(&class)
+            .ok_or(SemanticProblem::NotFound)?;
+        descriptor.generic_active = false;
+        descriptor.version = checked_version(descriptor.version)?;
+    }
+    let raclist = operand_names(command, "RACLIST", 32)?;
+    for class in &raclist {
+        ensure_resource_class(snapshot, class)?;
+        snapshot
+            .classes
+            .get_mut(class)
+            .ok_or(SemanticProblem::NotFound)?
+            .raclist = true;
+        refresh_raclist(snapshot, class)?;
+    }
+    for class in operand_names(command, "NORACLIST", 32)? {
+        ensure_resource_class(snapshot, &class)?;
+        let descriptor = snapshot
+            .classes
+            .get_mut(&class)
+            .ok_or(SemanticProblem::NotFound)?;
+        descriptor.raclist = false;
+        descriptor.version = checked_version(descriptor.version)?;
+        snapshot.raclist_caches.remove(&class);
+    }
+    if command.has_operand("REFRESH") && raclist.is_empty() {
+        return Err(SemanticProblem::Invalid(0));
+    }
+    let consumed = [
+        "ADDCREATOR",
+        "NOADDCREATOR",
+        "CMDVIOL",
+        "NOCMDVIOL",
+        "JESBATCHALLRACF",
+        "NOJESBATCHALLRACF",
+        "MLACTIVE",
+        "NOMLACTIVE",
+        "PROGRAM",
+        "NOPROGRAM",
+        "RULES",
+        "NORULES",
+        "SECLEVELAUDIT",
+        "NOSECLEVELAUDIT",
+        "SECLABELAUDIT",
+        "NOSECLABELAUDIT",
+        "WHENPROGRAM",
+        "NOWHENPROGRAM",
+        "CLASSACT",
+        "NOCLASSACT",
+        "INACTIVE",
+        "GENERIC",
+        "NOGENERIC",
+        "RACLIST",
+        "NORACLIST",
+        "REFRESH",
+        "LIST",
+    ];
+    for operand in &command.operands {
+        if !consumed.contains(&operand.name.as_str()) {
+            snapshot
+                .policy
+                .values
+                .insert(operand.name.clone(), operand_text(operand));
+        }
+    }
+    let mut records = vec![policy_record(snapshot)];
+    let requested_classes = [
+        "CLASSACT",
+        "NOCLASSACT",
+        "INACTIVE",
+        "GENERIC",
+        "NOGENERIC",
+        "RACLIST",
+        "NORACLIST",
+    ]
+    .into_iter()
+    .map(|name| operand_names(command, name, 32))
+    .collect::<Result<Vec<_>, _>>()?
+    .into_iter()
+    .flatten()
+    .collect::<BTreeSet<_>>();
+    for class in requested_classes {
+        records.push(class_record(snapshot, &class)?);
+    }
+    Ok(records)
+}
+
+fn validate_parmlib_members(
+    command: &ParsedCommand,
+) -> Result<Vec<CommandRecord>, SemanticProblem> {
+    let members = operand_names(command, "MEMBER", 8)?;
+    if members.is_empty() || members.len() > 3 {
+        return Err(SemanticProblem::Invalid(0));
+    }
+    Ok(members
+        .into_iter()
+        .map(|name| CommandRecord::Name {
+            kind: CommandObjectKind::Database,
+            name,
+        })
+        .collect())
+}
+
+fn refresh_raclist(
+    snapshot: &mut SecurityDatabaseSnapshot,
+    class: &str,
+) -> Result<(), SemanticProblem> {
+    let profiles = snapshot
+        .profiles
+        .iter()
+        .filter(|(_, profile)| profile.class == class)
+        .map(|(key, profile)| (key.clone(), profile.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let version = snapshot
+        .raclist_caches
+        .get(class)
+        .map_or(Ok(1), |cache| checked_version(cache.version))?;
+    snapshot.raclist_caches.insert(
+        class.into(),
+        RaclistCache {
+            class: class.into(),
+            built_generation: snapshot.generation,
+            profiles,
+            version,
+        },
+    );
+    Ok(())
+}
+
+fn set_policy_boolean(snapshot: &mut SecurityDatabaseSnapshot, target: &str, value: bool) {
+    match target {
+        "add_creator" => snapshot.policy.add_creator = value,
+        "command_violations_audited" => snapshot.policy.command_violations_audited = value,
+        "jes_batch_all_racf" => snapshot.policy.jes_batch_all_racf = value,
+        "ml_active" => snapshot.policy.ml_active = value,
+        "program_control" => snapshot.policy.program_control = value,
+        "rules" => snapshot.policy.rules = value,
+        "security_level_audit" => snapshot.policy.security_level_audit = value,
+        "security_label_audit" => snapshot.policy.security_label_audit = value,
+        "when_program" => snapshot.policy.when_program = value,
+        _ => {}
+    }
+}
+
+fn policy_record(snapshot: &SecurityDatabaseSnapshot) -> CommandRecord {
+    CommandRecord::Policy {
+        add_creator: snapshot.policy.add_creator,
+        program_control: snapshot.policy.program_control,
+        ml_active: snapshot.policy.ml_active,
+        rules: snapshot.policy.rules,
+        write_down: snapshot.policy.write_down,
+        subsystem_running: snapshot.subsystem.running,
+        database_active: snapshot.database_status.active,
+        database_sharing: snapshot.database_status.sharing_mode,
+    }
+}
+
+fn class_record(
+    snapshot: &SecurityDatabaseSnapshot,
+    class: &str,
+) -> Result<CommandRecord, SemanticProblem> {
+    let descriptor = snapshot
+        .classes
+        .get(class)
+        .ok_or(SemanticProblem::NotFound)?;
+    Ok(CommandRecord::Class {
+        name: class.into(),
+        supplied: descriptor.supplied,
+        active: descriptor.active,
+        generic_active: descriptor.generic_active,
+        raclist: descriptor.raclist,
+        cache_generation: snapshot
+            .raclist_caches
+            .get(class)
+            .map(|cache| cache.built_generation),
+        version: descriptor.version,
+    })
 }
 
 fn add_group(
@@ -738,12 +1124,17 @@ fn define_resources(
             security_level: operand_u32(command, "LEVEL")?.unwrap_or(0),
             security_label: operand_name(command, "SECLABEL", 246)?,
             categories: operand_names(command, "ADDCATEGORY", 246)?,
-            access_list: vec![AccessControlEntry {
-                principal: context.actor().as_str().into(),
-                access: AccessLevel::Alter,
-                when: None,
-                audit: AuditPolicy::None,
-            }],
+            access_list: snapshot
+                .policy
+                .add_creator
+                .then(|| AccessControlEntry {
+                    principal: context.actor().as_str().into(),
+                    access: AccessLevel::Alter,
+                    when: None,
+                    audit: AuditPolicy::None,
+                })
+                .into_iter()
+                .collect(),
             segments: BTreeMap::new(),
             version: 1,
         };
@@ -1229,24 +1620,28 @@ fn ensure_resource_class(
     class: &str,
 ) -> Result<(), SemanticProblem> {
     ensure_base_template(snapshot, "RESOURCE", PrincipalKind::Undefined, &[])?;
-    snapshot
-        .classes
-        .entry(class.into())
-        .or_insert(ClassDescriptor {
+    snapshot.classes.entry(class.into()).or_insert_with(|| {
+        let supplied = crate::supplied_class_descriptors()
+            .iter()
+            .find(|descriptor| descriptor.name == class);
+        ClassDescriptor {
             name: class.into(),
-            supplied: matches!(class, "DATASET" | "FACILITY" | "PROGRAM"),
-            active: true,
-            generic_allowed: true,
-            discrete_allowed: true,
-            raclist: false,
+            supplied: supplied.is_some(),
+            active: supplied.is_none_or(|descriptor| descriptor.active),
+            generic_allowed: supplied.is_none_or(|descriptor| descriptor.generic_allowed),
+            generic_active: supplied.is_none_or(|descriptor| descriptor.generic_active),
+            discrete_allowed: supplied.is_none_or(|descriptor| descriptor.discrete_allowed),
+            raclist: supplied.is_some_and(|descriptor| descriptor.raclist),
             default_uacc: AccessLevel::None,
-            max_profile_name_bytes: 246,
-            posit: None,
+            max_profile_name_bytes: supplied
+                .map_or(246, |descriptor| descriptor.max_profile_name_bytes),
+            posit: supplied.and_then(|descriptor| descriptor.posit),
             member_class: None,
             grouping_class: None,
             profile_template: "RESOURCE".into(),
             version: 1,
-        });
+        }
+    });
     Ok(())
 }
 
@@ -1914,9 +2309,9 @@ mod tests {
     }
 
     #[test]
-    fn later_package_families_are_recognized_but_not_executed_by_sec_502() {
+    fn sec_505_families_are_recognized_but_not_executed_early() {
         let (service, context) = setup();
-        for form in ["SETROPTS LIST", "RACDCERT LIST", "TARGET LIST"] {
+        for form in ["PASSWORD USER(RACFADM)", "RACDCERT LIST", "TARGET LIST"] {
             assert_ne!(
                 crate::recognize_command(form, Default::default()).unwrap(),
                 CommandFamily::AddUser
@@ -2021,5 +2416,198 @@ mod tests {
             )
             .unwrap();
         assert_eq!(listed.records.len(), 2);
+    }
+
+    #[test]
+    fn setropts_raclist_refresh_class_and_generic_policy_are_exact() {
+        use mainframe_env_host_api::{AccessIntent, ResourceName, SecurityDecision};
+
+        let (service, context) = setup();
+        service.execute_command(&context, "ADDUSER USER1").unwrap();
+        service
+            .execute_command(
+                &next(&context, "POLICY-DEFINE"),
+                "ADDSD 'USER1.**' GENERIC OWNER(RACFADM) UACC(NONE)",
+            )
+            .unwrap();
+        service
+            .execute_command(
+                &next(&context, "POLICY-PERMIT-READ"),
+                "PERMIT 'USER1.**' CLASS(DATASET) ID(USER1) ACCESS(READ)",
+            )
+            .unwrap();
+        let user = PrincipalId::new("USER1", InvocationLimits::default()).unwrap();
+        let resource = ResourceName::new("USER1.DATA", 246).unwrap();
+        assert_eq!(
+            service
+                .authorize(&user, "DATASET", &resource, AccessIntent::Read)
+                .unwrap(),
+            SecurityDecision::Allow
+        );
+        service
+            .execute_command(
+                &next(&context, "POLICY-RACLIST"),
+                "SETROPTS RACLIST(DATASET)",
+            )
+            .unwrap();
+        service
+            .execute_command(
+                &next(&context, "POLICY-PERMIT-UPDATE"),
+                "PERMIT 'USER1.**' CLASS(DATASET) ID(USER1) ACCESS(UPDATE)",
+            )
+            .unwrap();
+        assert_eq!(
+            service
+                .authorize(&user, "DATASET", &resource, AccessIntent::Update)
+                .unwrap(),
+            SecurityDecision::Deny,
+            "RACLIST keeps the owned cached generation until refresh"
+        );
+        service
+            .execute_command(
+                &next(&context, "POLICY-REFRESH"),
+                "SETROPTS RACLIST(DATASET) REFRESH",
+            )
+            .unwrap();
+        assert_eq!(
+            service
+                .authorize(&user, "DATASET", &resource, AccessIntent::Update)
+                .unwrap(),
+            SecurityDecision::Allow
+        );
+        service
+            .execute_command(
+                &next(&context, "POLICY-INACTIVE"),
+                "SETROPTS INACTIVE(DATASET)",
+            )
+            .unwrap();
+        assert_eq!(
+            service
+                .authorize(&user, "DATASET", &resource, AccessIntent::Read)
+                .unwrap(),
+            SecurityDecision::Deny
+        );
+        service
+            .execute_command(
+                &next(&context, "POLICY-ACTIVE"),
+                "SETROPTS CLASSACT(DATASET) RACLIST(DATASET) REFRESH",
+            )
+            .unwrap();
+        service
+            .execute_command(
+                &next(&context, "POLICY-NOGENERIC"),
+                "SETROPTS NOGENERIC(DATASET)",
+            )
+            .unwrap();
+        assert_eq!(
+            service
+                .authorize(&user, "DATASET", &resource, AccessIntent::Read)
+                .unwrap(),
+            SecurityDecision::Deny
+        );
+        service
+            .execute_command(
+                &next(&context, "POLICY-GENERIC"),
+                "SETROPTS GENERIC(DATASET)",
+            )
+            .unwrap();
+        assert_eq!(
+            service
+                .authorize(&user, "DATASET", &resource, AccessIntent::Read)
+                .unwrap(),
+            SecurityDecision::Allow
+        );
+    }
+
+    #[test]
+    fn operations_program_control_and_all_seven_sec_503_families_execute() {
+        use mainframe_env_host_api::{AccessIntent, ResourceName, SecurityDecision};
+
+        let (service, context) = setup();
+        service
+            .execute_command(
+                &context,
+                "RDEFINE PROGRAM APP.LOAD OWNER(RACFADM) UACC(EXECUTE)",
+            )
+            .unwrap();
+        let admin = context.actor().clone();
+        let program = ResourceName::new("APP.LOAD", 246).unwrap();
+        assert_eq!(
+            service
+                .authorize(&admin, "PROGRAM", &program, AccessIntent::Execute)
+                .unwrap(),
+            SecurityDecision::Deny
+        );
+        let commands = [
+            "RACPRIV ON",
+            "RACPRMCK MEMBER(IRROPT01 IRROPT02)",
+            "SET TRACE AUTOAPPL",
+            "SETROPTS PROGRAM RULES",
+            "RVARY LIST",
+            "STOP",
+            "RESTART",
+        ];
+        let mut reached = BTreeSet::new();
+        for (index, command) in commands.into_iter().enumerate() {
+            let result = service
+                .execute_command(&next(&context, &format!("SEC503-{index:02}")), command)
+                .unwrap();
+            reached.insert(result.family);
+        }
+        let expected = crate::command_descriptors()
+            .iter()
+            .filter(|descriptor| descriptor.work_package() == "SEC-503")
+            .map(|descriptor| descriptor.family())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(reached, expected);
+        assert_eq!(expected.len(), 7);
+        assert_eq!(
+            service
+                .authorize(&admin, "PROGRAM", &program, AccessIntent::Execute)
+                .unwrap(),
+            SecurityDecision::Allow
+        );
+        service
+            .execute_command(&next(&context, "RVARY-INACTIVE"), "RVARY INACTIVE")
+            .unwrap();
+        assert_eq!(
+            service
+                .authorize(&admin, "PROGRAM", &program, AccessIntent::Execute)
+                .unwrap(),
+            SecurityDecision::Deny
+        );
+        service
+            .execute_command(&next(&context, "RVARY-ACTIVE"), "RVARY ACTIVE")
+            .unwrap();
+        assert_eq!(
+            service
+                .execute_command(&next(&context, "PARMLIB-LIMIT"), "RACPRMCK MEMBER(A B C D)",)
+                .unwrap_err()
+                .code,
+            CommandDiagnosticCode::InvalidValue
+        );
+        service
+            .execute_command(
+                &next(&context, "CUSTOM-DEFINE"),
+                "RDEFINE CUSTOMCLS CUSTOM.RESOURCE OWNER(RACFADM)",
+            )
+            .unwrap();
+        let class_result = service
+            .execute_command(
+                &next(&context, "CUSTOM-INACTIVE"),
+                "SETROPTS INACTIVE(CUSTOMCLS)",
+            )
+            .unwrap();
+        assert!(matches!(
+            class_result.records.as_slice(),
+            [
+                CommandRecord::Policy { .. },
+                CommandRecord::Class {
+                    supplied: false,
+                    active: false,
+                    ..
+                }
+            ]
+        ));
     }
 }

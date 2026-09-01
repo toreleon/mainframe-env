@@ -20,6 +20,7 @@ pub struct SecurityDatabaseSummary {
     pub classes: usize,
     pub templates: usize,
     pub profiles: usize,
+    pub raclist_caches: usize,
     pub acees: usize,
     pub tokens: usize,
     pub certificates: usize,
@@ -29,6 +30,7 @@ pub struct SecurityDatabaseSummary {
     pub transactions: usize,
     pub recovery_records: usize,
     pub migrations: usize,
+    pub subsystem_running: bool,
 }
 
 pub struct SecurityDatabase {
@@ -62,6 +64,7 @@ impl SecurityDatabase {
             classes: snapshot.classes.len(),
             templates: snapshot.templates.len(),
             profiles: snapshot.profiles.len(),
+            raclist_caches: snapshot.raclist_caches.len(),
             acees: snapshot.acees.len(),
             tokens: snapshot.tokens.len(),
             certificates: snapshot.certificates.len(),
@@ -71,6 +74,7 @@ impl SecurityDatabase {
             transactions: snapshot.transactions.len(),
             recovery_records: snapshot.recovery.len(),
             migrations: snapshot.migrations.len(),
+            subsystem_running: snapshot.subsystem.running,
         })
     }
 
@@ -332,6 +336,7 @@ mod tests {
                 supplied: true,
                 active: true,
                 generic_allowed: true,
+                generic_active: true,
                 discrete_allowed: true,
                 raclist: false,
                 default_uacc: AccessLevel::None,

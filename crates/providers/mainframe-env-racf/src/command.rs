@@ -30,13 +30,26 @@ pub struct CommandDescriptor {
     operands: &'static [&'static str],
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SuppliedClassDescriptor {
+    pub name: &'static str,
+    pub active: bool,
+    pub generic_allowed: bool,
+    pub generic_active: bool,
+    pub discrete_allowed: bool,
+    pub raclist: bool,
+    pub max_profile_name_bytes: usize,
+    pub posit: Option<u16>,
+}
+
 mod generated {
-    use super::{CommandDescriptor, CommandDomain};
+    use super::{CommandDescriptor, CommandDomain, SuppliedClassDescriptor};
     include!("generated/racf_command_catalog.rs");
 }
 
 use generated::COMMAND_DESCRIPTORS;
 pub use generated::CommandFamily;
+use generated::SUPPLIED_CLASS_DESCRIPTORS;
 
 impl CommandDescriptor {
     #[must_use]
@@ -93,6 +106,11 @@ impl CommandDescriptor {
 #[must_use]
 pub const fn command_descriptors() -> &'static [CommandDescriptor] {
     COMMAND_DESCRIPTORS
+}
+
+#[must_use]
+pub const fn supplied_class_descriptors() -> &'static [SuppliedClassDescriptor] {
+    SUPPLIED_CLASS_DESCRIPTORS
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -594,6 +612,30 @@ mod tests {
         assert_eq!(
             recognize_command("PHRASE", Default::default()).unwrap(),
             CommandFamily::Password
+        );
+    }
+
+    #[test]
+    fn supplied_class_metadata_is_generated_and_unique() {
+        let classes = supplied_class_descriptors();
+        assert_eq!(classes.len(), 24);
+        assert_eq!(
+            classes
+                .iter()
+                .map(|descriptor| descriptor.name)
+                .collect::<BTreeSet<_>>()
+                .len(),
+            classes.len()
+        );
+        let dataset = classes
+            .iter()
+            .find(|descriptor| descriptor.name == "DATASET")
+            .unwrap();
+        assert!(dataset.active && dataset.generic_allowed);
+        assert!(
+            classes
+                .iter()
+                .all(|descriptor| descriptor.name != "CUSTOMCLS")
         );
     }
 

@@ -164,6 +164,7 @@ impl RacfService {
         limits: RacfLimits,
     ) -> Result<Arc<Self>, HostProblem> {
         let database = SecurityDatabase::open(store, limits.into())?;
+        install_supplied_class_catalog(&database)?;
         Ok(Arc::new(Self {
             database,
             secrets,
@@ -557,6 +558,9 @@ impl RacfService {
     ) -> Result<SecurityDecision, HostProblem> {
         let class = normalize(class, 32)?;
         let snapshot = self.database.read()?;
+        if !snapshot.subsystem.running || !snapshot.database_status.active {
+            return Ok(SecurityDecision::Deny);
+        }
         let Some(user) = snapshot.principals.get(principal.as_str()) else {
             return Ok(SecurityDecision::Deny);
         };
@@ -572,13 +576,24 @@ impl RacfService {
         if !class_record.active {
             return Ok(SecurityDecision::Deny);
         }
-        let selected = snapshot
-            .profiles
-            .values()
+        if class == "PROGRAM" && !snapshot.policy.program_control {
+            return Ok(SecurityDecision::Deny);
+        }
+        let profiles = if class_record.raclist {
+            let Some(cache) = snapshot.raclist_caches.get(&class) else {
+                return Ok(SecurityDecision::Deny);
+            };
+            cache.profiles.values().collect::<Vec<_>>()
+        } else {
+            snapshot.profiles.values().collect::<Vec<_>>()
+        };
+        let selected = profiles
+            .into_iter()
             .filter(|profile| {
                 profile.class == class
                     && if profile.generic {
-                        generic_match(&profile.name, resource.as_str())
+                        class_record.generic_active
+                            && generic_match(&profile.name, resource.as_str())
                     } else {
                         profile.name == resource.as_str()
                     }
@@ -838,18 +853,24 @@ fn install_resource_schema(
     };
     insert_exact(&mut snapshot.templates, "RESOURCE", template)?;
     if !snapshot.classes.contains_key(class) {
+        let supplied = crate::supplied_class_descriptors()
+            .iter()
+            .find(|descriptor| descriptor.name == class);
         snapshot.classes.insert(
             class.into(),
             ClassDescriptor {
                 name: class.into(),
-                supplied: false,
-                active: true,
-                generic_allowed: true,
-                discrete_allowed: true,
-                raclist: false,
+                supplied: supplied.is_some(),
+                active: supplied.is_none_or(|descriptor| descriptor.active),
+                generic_allowed: supplied.is_none_or(|descriptor| descriptor.generic_allowed),
+                generic_active: supplied.is_none_or(|descriptor| descriptor.generic_active),
+                discrete_allowed: supplied.is_none_or(|descriptor| descriptor.discrete_allowed),
+                raclist: supplied.is_some_and(|descriptor| descriptor.raclist),
                 default_uacc: AccessLevel::None,
-                max_profile_name_bytes: max_name_bytes,
-                posit: None,
+                max_profile_name_bytes: supplied.map_or(max_name_bytes, |descriptor| {
+                    descriptor.max_profile_name_bytes
+                }),
+                posit: supplied.and_then(|descriptor| descriptor.posit),
                 member_class: None,
                 grouping_class: None,
                 profile_template: "RESOURCE".into(),
@@ -857,6 +878,57 @@ fn install_resource_schema(
             },
         );
     }
+    Ok(())
+}
+
+fn install_supplied_class_catalog(database: &SecurityDatabase) -> Result<(), HostProblem> {
+    database.mutate_if_changed(|snapshot| {
+        let mut changed = false;
+        let template = ProfileTemplate {
+            id: "RESOURCE".into(),
+            version: 1,
+            profile_kind: PrincipalKind::Undefined,
+            required_segments: BTreeSet::new(),
+            segments: BTreeMap::from([(
+                "BASE".into(),
+                SegmentTemplate {
+                    name: "BASE".into(),
+                    version: 1,
+                    fields: BTreeMap::new(),
+                },
+            )]),
+        };
+        if !snapshot.templates.contains_key("RESOURCE") {
+            snapshot.templates.insert("RESOURCE".into(), template);
+            changed = true;
+        }
+        for supplied in crate::supplied_class_descriptors() {
+            if snapshot.classes.contains_key(supplied.name) {
+                continue;
+            }
+            snapshot.classes.insert(
+                supplied.name.into(),
+                ClassDescriptor {
+                    name: supplied.name.into(),
+                    supplied: true,
+                    active: supplied.active,
+                    generic_allowed: supplied.generic_allowed,
+                    generic_active: supplied.generic_active,
+                    discrete_allowed: supplied.discrete_allowed,
+                    raclist: supplied.raclist,
+                    default_uacc: AccessLevel::None,
+                    max_profile_name_bytes: supplied.max_profile_name_bytes,
+                    posit: supplied.posit,
+                    member_class: None,
+                    grouping_class: None,
+                    profile_template: "RESOURCE".into(),
+                    version: 1,
+                },
+            );
+            changed = true;
+        }
+        Ok(((), changed))
+    })?;
     Ok(())
 }
 

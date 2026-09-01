@@ -4,7 +4,7 @@
   "title": "mainframe-env RACF security database v2",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "generation", "classes", "templates", "principals", "groups", "connections", "profiles", "acees", "tokens", "certificates", "keys", "keyrings", "audits", "transactions", "recovery", "migrations"],
+  "required": ["schema_version", "generation", "classes", "templates", "principals", "groups", "connections", "profiles", "raclist_caches", "policy", "database_status", "subsystem", "acees", "tokens", "certificates", "keys", "keyrings", "audits", "transactions", "recovery", "migrations"],
   "properties": {
     "schema_version": {"const": "mainframe-env.racf-database@2"},
     "generation": {"$ref": "#/$defs/version"},
@@ -14,6 +14,10 @@
     "groups": {"$ref": "#/$defs/group_map"},
     "connections": {"$ref": "#/$defs/connection_map"},
     "profiles": {"$ref": "#/$defs/profile_map"},
+    "raclist_caches": {"$ref": "#/$defs/raclist_cache_map"},
+    "policy": {"$ref": "#/$defs/policy"},
+    "database_status": {"$ref": "#/$defs/database_status"},
+    "subsystem": {"$ref": "#/$defs/subsystem"},
     "acees": {"$ref": "#/$defs/acee_map"},
     "tokens": {"$ref": "#/$defs/token_map"},
     "certificates": {"$ref": "#/$defs/certificate_map"},
@@ -147,12 +151,13 @@
     },
     "class": {
       "type": "object", "additionalProperties": false,
-      "required": ["name", "supplied", "active", "generic_allowed", "discrete_allowed", "raclist", "default_uacc", "max_profile_name_bytes", "posit", "member_class", "grouping_class", "profile_template", "version"],
+      "required": ["name", "supplied", "active", "generic_allowed", "generic_active", "discrete_allowed", "raclist", "default_uacc", "max_profile_name_bytes", "posit", "member_class", "grouping_class", "profile_template", "version"],
       "properties": {
         "name": {"$ref": "#/$defs/class_name"},
         "supplied": {"type": "boolean"},
         "active": {"type": "boolean"},
         "generic_allowed": {"type": "boolean"},
+        "generic_active": {"type": "boolean"},
         "discrete_allowed": {"type": "boolean"},
         "raclist": {"type": "boolean"},
         "default_uacc": {"$ref": "#/$defs/access"},
@@ -202,6 +207,54 @@
         "access_list": {"type": "array", "maxItems": 1024, "items": {"$ref": "#/$defs/ace"}},
         "segments": {"type": "object", "maxProperties": 64, "additionalProperties": {"$ref": "#/$defs/profile_segment"}},
         "version": {"$ref": "#/$defs/version"}
+      }
+    },
+    "raclist_cache": {
+      "type": "object", "additionalProperties": false,
+      "required": ["class", "built_generation", "profiles", "version"],
+      "properties": {
+        "class": {"$ref": "#/$defs/class_name"},
+        "built_generation": {"$ref": "#/$defs/version"},
+        "profiles": {"$ref": "#/$defs/profile_map"},
+        "version": {"$ref": "#/$defs/version"}
+      }
+    },
+    "policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["add_creator", "command_violations_audited", "jes_batch_all_racf", "ml_active", "program_control", "rules", "security_level_audit", "security_label_audit", "when_program", "write_down", "set_flags", "values"],
+      "properties": {
+        "add_creator": {"type": "boolean"},
+        "command_violations_audited": {"type": "boolean"},
+        "jes_batch_all_racf": {"type": "boolean"},
+        "ml_active": {"type": "boolean"},
+        "program_control": {"type": "boolean"},
+        "rules": {"type": "boolean"},
+        "security_level_audit": {"type": "boolean"},
+        "security_label_audit": {"type": "boolean"},
+        "when_program": {"type": "boolean"},
+        "write_down": {"type": "boolean"},
+        "set_flags": {"type": "object", "maxProperties": 256, "additionalProperties": {"type": "boolean"}},
+        "values": {"type": "object", "maxProperties": 256, "additionalProperties": {"$ref": "#/$defs/text"}}
+      }
+    },
+    "database_status": {
+      "type": "object", "additionalProperties": false,
+      "required": ["active", "primary_dataset", "backup_dataset", "sharing_mode", "switch_generation"],
+      "properties": {
+        "active": {"type": "boolean"},
+        "primary_dataset": {"anyOf": [{"$ref": "#/$defs/profile_name"}, {"type": "null"}]},
+        "backup_dataset": {"anyOf": [{"$ref": "#/$defs/profile_name"}, {"type": "null"}]},
+        "sharing_mode": {"enum": ["non-data-sharing", "data-sharing"]},
+        "switch_generation": {"$ref": "#/$defs/version"}
+      }
+    },
+    "subsystem": {
+      "type": "object", "additionalProperties": false,
+      "required": ["running", "trace", "restart_generation"],
+      "properties": {
+        "running": {"type": "boolean"},
+        "trace": {"type": "boolean"},
+        "restart_generation": {"$ref": "#/$defs/version"}
       }
     },
     "acee": {
@@ -358,6 +411,7 @@
     "class_map": {"type": "object", "maxProperties": 1024, "additionalProperties": {"$ref": "#/$defs/class"}},
     "template_map": {"type": "object", "maxProperties": 1024, "additionalProperties": {"$ref": "#/$defs/profile_template"}},
     "profile_map": {"type": "object", "maxProperties": 65536, "additionalProperties": {"$ref": "#/$defs/profile"}},
+    "raclist_cache_map": {"type": "object", "maxProperties": 1024, "additionalProperties": {"$ref": "#/$defs/raclist_cache"}},
     "acee_map": {"type": "object", "maxProperties": 65536, "additionalProperties": {"$ref": "#/$defs/acee"}},
     "token_map": {"type": "object", "maxProperties": 65536, "additionalProperties": {"$ref": "#/$defs/token"}},
     "certificate_map": {"type": "object", "maxProperties": 65536, "additionalProperties": {"$ref": "#/$defs/certificate"}},

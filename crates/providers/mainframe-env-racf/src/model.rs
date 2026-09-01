@@ -272,6 +272,8 @@ pub struct ClassDescriptor {
     pub supplied: bool,
     pub active: bool,
     pub generic_allowed: bool,
+    #[serde(default = "default_true")]
+    pub generic_active: bool,
     pub discrete_allowed: bool,
     pub raclist: bool,
     pub default_uacc: AccessLevel,
@@ -281,6 +283,99 @@ pub struct ClassDescriptor {
     pub grouping_class: Option<String>,
     pub profile_template: String,
     pub version: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RaclistCache {
+    pub class: String,
+    pub built_generation: u64,
+    pub profiles: BTreeMap<String, ResourceProfile>,
+    pub version: u64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum DatabaseSharingMode {
+    NonDataSharing,
+    DataSharing,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RacfDatabaseStatus {
+    pub active: bool,
+    pub primary_dataset: Option<String>,
+    pub backup_dataset: Option<String>,
+    pub sharing_mode: DatabaseSharingMode,
+    pub switch_generation: u64,
+}
+
+impl Default for RacfDatabaseStatus {
+    fn default() -> Self {
+        Self {
+            active: true,
+            primary_dataset: None,
+            backup_dataset: None,
+            sharing_mode: DatabaseSharingMode::NonDataSharing,
+            switch_generation: 1,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SecurityPolicyOptions {
+    pub add_creator: bool,
+    pub command_violations_audited: bool,
+    pub jes_batch_all_racf: bool,
+    pub ml_active: bool,
+    pub program_control: bool,
+    pub rules: bool,
+    pub security_level_audit: bool,
+    pub security_label_audit: bool,
+    pub when_program: bool,
+    pub write_down: bool,
+    pub set_flags: BTreeMap<String, bool>,
+    #[serde(default)]
+    pub values: BTreeMap<String, String>,
+}
+
+impl Default for SecurityPolicyOptions {
+    fn default() -> Self {
+        Self {
+            add_creator: true,
+            command_violations_audited: true,
+            jes_batch_all_racf: false,
+            ml_active: false,
+            program_control: false,
+            rules: false,
+            security_level_audit: false,
+            security_label_audit: false,
+            when_program: false,
+            write_down: false,
+            set_flags: BTreeMap::new(),
+            values: BTreeMap::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RacfSubsystemState {
+    pub running: bool,
+    pub trace: bool,
+    pub restart_generation: u64,
+}
+
+impl Default for RacfSubsystemState {
+    fn default() -> Self {
+        Self {
+            running: true,
+            trace: false,
+            restart_generation: 1,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -564,6 +659,14 @@ pub(crate) struct SecurityDatabaseSnapshot {
     pub groups: BTreeMap<String, GroupProfile>,
     pub connections: BTreeMap<String, GroupConnection>,
     pub profiles: BTreeMap<String, ResourceProfile>,
+    #[serde(default)]
+    pub raclist_caches: BTreeMap<String, RaclistCache>,
+    #[serde(default)]
+    pub policy: SecurityPolicyOptions,
+    #[serde(default)]
+    pub database_status: RacfDatabaseStatus,
+    #[serde(default)]
+    pub subsystem: RacfSubsystemState,
     pub acees: BTreeMap<String, Acee>,
     pub tokens: BTreeMap<String, SecurityToken>,
     pub certificates: BTreeMap<String, CertificateReference>,
@@ -586,6 +689,10 @@ impl Default for SecurityDatabaseSnapshot {
             groups: BTreeMap::new(),
             connections: BTreeMap::new(),
             profiles: BTreeMap::new(),
+            raclist_caches: BTreeMap::new(),
+            policy: SecurityPolicyOptions::default(),
+            database_status: RacfDatabaseStatus::default(),
+            subsystem: RacfSubsystemState::default(),
             acees: BTreeMap::new(),
             tokens: BTreeMap::new(),
             certificates: BTreeMap::new(),
@@ -622,6 +729,7 @@ impl SecurityDatabaseSnapshot {
             (self.classes.len(), limits.max_classes),
             (self.templates.len(), limits.max_templates),
             (self.profiles.len(), limits.max_profiles),
+            (self.raclist_caches.len(), limits.max_classes),
             (self.acees.len(), limits.max_acees),
             (self.tokens.len(), limits.max_tokens),
             (self.certificates.len(), limits.max_certificates),
@@ -639,6 +747,7 @@ impl SecurityDatabaseSnapshot {
         self.validate_principals(limits)?;
         self.validate_classes(limits)?;
         self.validate_profiles(limits)?;
+        self.validate_policy_state(limits)?;
         self.validate_runtime_records(limits)
     }
 
@@ -972,6 +1081,46 @@ impl SecurityDatabaseSnapshot {
         }
         Ok(())
     }
+
+    fn validate_policy_state(
+        &self,
+        limits: SecurityDatabaseLimits,
+    ) -> Result<(), SecuritySchemaProblem> {
+        if self.database_status.switch_generation == 0 || self.subsystem.restart_generation == 0 {
+            return Err(SecuritySchemaProblem::Malformed);
+        }
+        for name in self.policy.set_flags.keys() {
+            identifier(name, limits.max_name_bytes)?;
+        }
+        for (name, value) in &self.policy.values {
+            identifier(name, limits.max_name_bytes)?;
+            bounded(value, limits.max_value_bytes)?;
+        }
+        for (cache_class, cache) in &self.raclist_caches {
+            class_name(cache_class)?;
+            let class = self
+                .classes
+                .get(cache_class)
+                .ok_or(SecuritySchemaProblem::MissingReference)?;
+            if cache.class != *cache_class
+                || cache.version == 0
+                || cache.built_generation == 0
+                || !class.raclist
+                || cache.profiles.len() > limits.max_profiles
+                || cache
+                    .profiles
+                    .values()
+                    .any(|profile| profile.class != *cache_class)
+            {
+                return Err(SecuritySchemaProblem::Malformed);
+            }
+        }
+        Ok(())
+    }
+}
+
+const fn default_true() -> bool {
+    true
 }
 
 fn validate_segment_value(
@@ -1158,6 +1307,7 @@ mod tests {
                 supplied: true,
                 active: true,
                 generic_allowed: true,
+                generic_active: true,
                 discrete_allowed: true,
                 raclist: false,
                 default_uacc: AccessLevel::None,
