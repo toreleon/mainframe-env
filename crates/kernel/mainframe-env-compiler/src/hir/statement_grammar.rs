@@ -1754,6 +1754,12 @@ fn validate_generate(tokens: &[Token<'_>]) -> Result<(), &'static str> {
         cursor.expect("IN")?;
         cursor.operand()?;
     }
+    if cursor.eat("NAME") {
+        cursor.eat("OF");
+        cursor.operand()?;
+        cursor.expect("IS")?;
+        cursor.expect("OMITTED")?;
+    }
     cursor.finish()
 }
 
@@ -1764,6 +1770,12 @@ fn validate_json_parse(tokens: &[Token<'_>]) -> Result<(), &'static str> {
     cursor.operand()?;
     if cursor.eat("WITH") {
         cursor.expect("DETAIL")?;
+    }
+    if cursor.eat("NAME") {
+        cursor.eat("OF");
+        cursor.operand()?;
+        cursor.expect("IS")?;
+        cursor.expect("OMITTED")?;
     }
     cursor.finish()
 }

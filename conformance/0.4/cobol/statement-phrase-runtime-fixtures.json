@@ -292,6 +292,20 @@
       "obligation_id": "phrase-group-hierarchy",
       "source": "IDENTIFICATION DIVISION. PROGRAM-ID. XMLPARSEGROUP. DATA DIVISION. WORKING-STORAGE SECTION. 01 XML-X PIC X(128) VALUE '<GREETING><COUNT-X>34</COUNT-X><MSG>A&amp;B</MSG></GREETING>'. 01 GREETING. 05 COUNT-X PIC 99. 05 MSG PIC X(3). PROCEDURE DIVISION. XML PARSE XML-X INTO GREETING. DISPLAY COUNT-X MSG. STOP RUN.",
       "expected_output": "34A&B\n"
+    },
+    {
+      "id": "json-generate-root-name-omitted",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0023",
+      "obligation_id": "phrase-root-name-omitted",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. JSONOMITGEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 GREETING. 05 COUNT-X PIC 99 VALUE 12. 05 MSG PIC X(5) VALUE 'Hello'. 01 JSON-X PIC X(80). 01 LEN-X PIC 99. PROCEDURE DIVISION. JSON GENERATE JSON-X FROM GREETING COUNT IN LEN-X NAME GREETING IS OMITTED. DISPLAY JSON-X(1:LEN-X). STOP RUN.",
+      "expected_output": "{\"COUNT-X\":12,\"MSG\":\"Hello\"}\n"
+    },
+    {
+      "id": "json-parse-root-name-omitted",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
+      "obligation_id": "phrase-root-name-omitted",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. JSONOMITPARSE. DATA DIVISION. WORKING-STORAGE SECTION. 01 JSON-X PIC X(80) VALUE '{\"COUNT-X\":34,\"MSG\":\"World\"}'. 01 GREETING. 05 COUNT-X PIC 99. 05 MSG PIC X(5). PROCEDURE DIVISION. JSON PARSE JSON-X INTO GREETING NAME GREETING IS OMITTED. DISPLAY COUNT-X MSG. STOP RUN.",
+      "expected_output": "34World\n"
     }
   ]
 }

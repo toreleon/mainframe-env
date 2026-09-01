@@ -6004,11 +6004,13 @@ impl ReferenceMachine {
             && is_group(layout.category)
         {
             if json {
-                serde_json::to_string(&BTreeMap::from([(
-                    layout.simple_name.clone(),
-                    self.json_layout_value(&layout)?,
-                )]))
-                .map_err(|_| MachineProblem::DataException)?
+                let value = self.json_layout_value(&layout)?;
+                if json_name_omitted(args, &layout.simple_name) {
+                    serde_json::to_string(&value).map_err(|_| MachineProblem::DataException)?
+                } else {
+                    serde_json::to_string(&BTreeMap::from([(layout.simple_name.clone(), value)]))
+                        .map_err(|_| MachineProblem::DataException)?
+                }
             } else {
                 self.xml_layout_value(&layout)?
             }
@@ -6171,10 +6173,14 @@ impl ReferenceMachine {
             if let Some(layout) = self.layout(target).cloned()
                 && is_group(layout.category)
             {
-                let value = value
-                    .as_object()
-                    .and_then(|object| object.get(&layout.simple_name))
-                    .unwrap_or(&value);
+                let value = if json_name_omitted(args, &layout.simple_name) {
+                    &value
+                } else {
+                    value
+                        .as_object()
+                        .and_then(|object| object.get(&layout.simple_name))
+                        .ok_or(MachineProblem::DataException)?
+                };
                 let mut assignments = Vec::new();
                 self.stage_json_group(&layout, value, &mut assignments)?;
                 for (reference, bytes) in assignments {
@@ -10898,6 +10904,21 @@ fn xml_escape(value: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&apos;")
+}
+
+fn json_name_omitted(args: &[String], name: &str) -> bool {
+    args.iter().enumerate().any(|(index, token)| {
+        if token != "NAME" {
+            return false;
+        }
+        let mut at = index + 1;
+        if args.get(at).is_some_and(|token| token == "OF") {
+            at += 1;
+        }
+        args.get(at).is_some_and(|token| token == name)
+            && args.get(at + 1).is_some_and(|token| token == "IS")
+            && args.get(at + 2).is_some_and(|token| token == "OMITTED")
+    })
 }
 
 fn xml_unescape(value: &str) -> Result<String, MachineProblem> {

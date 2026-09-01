@@ -1280,13 +1280,19 @@ fn check_cobol_statement_bindings(
             Some("0021") => {
                 expected_obligations.insert("phrase-leading-first-before-after");
             }
-            Some("0023" | "0043") => {
+            Some("0023") => {
+                expected_obligations.insert("phrase-count-in");
+                expected_obligations.insert("phrase-group-hierarchy");
+                expected_obligations.insert("phrase-root-name-omitted");
+            }
+            Some("0043") => {
                 expected_obligations.insert("phrase-count-in");
                 expected_obligations.insert("phrase-group-hierarchy");
             }
             Some("0024") => {
                 expected_obligations.insert("phrase-group-atomic-exception");
                 expected_obligations.insert("phrase-group-hierarchy");
+                expected_obligations.insert("phrase-root-name-omitted");
                 expected_obligations.insert("phrase-with-detail");
             }
             Some("0029") => {
