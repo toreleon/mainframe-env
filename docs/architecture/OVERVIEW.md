@@ -97,6 +97,15 @@ SourceBundle
 Stage constructors are private. A later stage cannot be fabricated by calling a
 validator and ignoring its result.
 
+## Conformance model
+
+From 0.3 onward, official catalog rows are connected to executable behavior
+through the shared typed [Conformance IR](CONFORMANCE-IR.md). Behavioral tests
+emit explicit `(row_id, gate, verdict)` events, and coverage ledgers are derived
+from those events rather than edited or inferred from broad workload success.
+Application profiles such as CardDemo remain integration consumers, not the
+primary IBM conformance model.
+
 ## State scopes
 
 Every mutable or durable object declares one scope:

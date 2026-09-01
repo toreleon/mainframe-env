@@ -16,24 +16,29 @@ COBOL 6.5 structure without claiming 0.4 execution semantics.
 
 Read `docs/prompts/coverage-versions/README.md`,
 `docs/delivery/coverage-versions/0.3.0.md`, the official COBOL baseline receipt
-and normalized catalogs, compiler/IR/source/diagnostic contracts, and relevant
-ADRs. Verify accepted 0.2.0 receipts for catalog generation, packages, coverage,
-source provenance, and handler identity before public integration.
+and normalized catalogs, `docs/architecture/CONFORMANCE-IR.md`,
+compiler/IR/source/diagnostic contracts, and relevant ADRs. Verify accepted
+0.2.0 receipts for catalog generation, packages, coverage, source provenance,
+and handler identity before public integration.
 
 If 0.2.0 is not accepted, only isolated grammar/catalog/fixture preparation is
 allowed. Do not merge a new public compiler artifact format or claim coverage.
 
 ## Implement in this order
 
-1. Freeze lossless syntax-node, source-span, diagnostic, name, type, layout, and
+1. Freeze the shared minimal typed Conformance IR, bounded operation/predicate/
+   observation registries, executable test binding, verdict event, derived
+   coverage ledger, and `spec --check`/focused runner interfaces. This is the
+   common foundation reused by every later subsystem minor.
+2. Freeze lossless syntax-node, source-span, diagnostic, name, type, layout, and
    executable-blocking contracts.
-2. Run **CB-301/CB-303** for lexer, preprocessing/directives, complete statement
+3. Run **CB-301/CB-303** for lexer, preprocessing/directives, complete statement
    AST, options, scopes, and recovery; run **CB-302/CB-304** for divisions,
    declarations, clauses, types, layouts, aliases, and tables.
-3. Implement **CB-305** from the reviewed intrinsic/special-register catalog,
+4. Implement **CB-305** from the reviewed intrinsic/special-register catalog,
    with exact signatures, type inference, context, and diagnostics.
-4. Implement **CB-306** malformed, limit, recovery, deterministic-generation,
-   and prior-artifact compatibility suites.
+5. Implement **CB-306** malformed, limit, recovery, deterministic-generation,
+   prior-artifact compatibility, row-binding, verdict, and ledger suites.
 
 ## Reuse and architecture guardrails
 
@@ -51,6 +56,12 @@ allowed. Do not merge a new public compiler artifact format or claim coverage.
 - Generate function, statement, clause, directive, and special-register
   identities from the shared contract compiler and close their registry against
   explicit validators. Do not hand-maintain matching enums and lookup tables.
+- Keep one generic Conformance IR. It contains typed bounded references to owned
+  product drivers and observations, not Rust/shell snippets, arbitrary
+  expressions, COBOL-specific duplicated algorithms, or process evidence.
+- Generate or register executable cases from the formal rows. A broad compiler
+  or CardDemo test contributes coverage only through explicit row/gate verdicts.
+  Do not add per-review schemas or manually edited coverage pass counts.
 
 ## Version-specific invariants
 
@@ -64,6 +75,10 @@ allowed. Do not merge a new public compiler artifact format or claim coverage.
   of compiler ownership.
 - One semantic owner integrates qualification, scopes, name resolution, types,
   PICTURE/USAGE, alignment, aliasing, and layouts.
+- Every recognition or validation claim is traceable as official row -> typed
+  Conformance IR case -> executable test -> verdict event -> derived ledger.
+  Execution, recovery, and IBM differential gates owned by later versions remain
+  explicitly pending rather than being rounded up or marked non-applicable.
 
 ## Completion gate
 
@@ -73,7 +88,12 @@ clause/directive validates; every syntax/semantic node has stable bounded
 provenance; incomplete execution cannot publish; and accepted 0.1.1 artifacts
 remain readable within the declared compatibility window.
 
-Run complete compiler/source/IR diagnostics, malformed/boundary/property/fuzz,
-artifact round-trip, architecture, coverage-ledger, and full repository gates.
-At handoff, report denominators and recognition/validation numerators separately;
-leave execution/recovery/differential pending where 0.4 owns them.
+Require `cargo xtask spec --check` to compile the complete COBOL specification,
+registries, schemas, and test bindings quickly without product environments.
+Run focused COBOL recognition/validation conformance during implementation, then
+tier-3 complete compiler/source/IR diagnostics, malformed/boundary/property/fuzz,
+artifact round-trip, and affected-scope repository validation once on the
+unchanged minor candidate. Generate the ledger exclusively from verdict events.
+At handoff, report denominators and recognition/validation numerators with exact
+row/test bindings; leave execution/recovery/differential pending where 0.4 or
+0.17 owns them.

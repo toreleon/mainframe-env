@@ -15,6 +15,7 @@ differential semantics** over the accepted 0.3 typed language model.
 
 Read `docs/prompts/coverage-versions/README.md`,
 `docs/delivery/coverage-versions/0.4.0.md`, the 0.3 coverage/evidence package,
+the accepted 0.3 Conformance IR/verdict/ledger contracts,
 compiler/interpreter/execution/host contracts, and the pinned Enterprise COBOL
 6.5 receipt. Verify 0.3.0 has accepted all structural rows and artifact formats.
 
@@ -45,8 +46,9 @@ must rerun the affected 0.3 gate.
   precision, compiler options, size-error conditions, aliasing, and IBM-visible
   results remain owned semantic adapters and must pass licensed differentials.
 - Reuse the 0.2 host registry, effect protocol, checkpoint envelope, migration
-  runner, and evidence harness. LE and host extensions add typed catalog rows
-  and handlers rather than introducing a second invocation mechanism.
+  runner, and the 0.3 Conformance IR/runner. LE and host extensions add typed
+  catalog rows and handlers rather than introducing a second invocation or
+  conformance mechanism.
 - Locale, code-page, date/time, sort/merge, and file adapters may use reviewed
   libraries internally, but normalize immediately to owned values and keep
   source bytes, CCSID, conditions, and replay identity explicit.
@@ -61,6 +63,9 @@ must rerun the affected 0.3 gate.
 - Host services are selected by typed ABI contracts, never copybook/program names.
 - Resource exhaustion, cancellation, provider failure, invalid data, and runtime
   limits produce exact typed conditions without forbidden mutation.
+- Extend the accepted 0.3 row specifications with execution, condition,
+  recovery, and oracle bindings. Generate row-level verdicts and the ledger;
+  never infer execution coverage from a broad interpreter/CardDemo pass.
 
 ## Completion gate
 
@@ -71,5 +76,5 @@ pass. The complete 0.3 recognition/validation and 0.1.1 compatibility suites mus
 remain green.
 
 At handoff, report coverage by all six gates, oracle environment receipts and
-normalization rules, interpreter resource bounds, recovery results, and the
-unchanged source/artifact identity. Never mark unavailable oracle work passed.
+normalization rules, interpreter resource bounds, recovery results, and exact
+row/test verdict bindings. Never mark unavailable oracle work passed.

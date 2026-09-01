@@ -53,16 +53,42 @@ completely before editing.
 
 ### Persistent program control
 
-Before broad implementation, create and maintain:
+Before broad implementation, maintain the concise human-readable
+`docs/delivery/coverage-versions/status/<target-version>.md`. Record the
+candidate/dependency identity, current and completed work packages, blockers,
+decisions, and next executable step. Do not turn controller state into product
+conformance evidence.
 
-- `docs/delivery/coverage-versions/status/<target-version>.md`; and
-- `conformance/<minor-line>/evidence/program-status.json`, with its schema and
-  deterministic validation command.
+From 0.3 onward, do not create a version-specific status schema, command-result
+ledger, dirty-tree receipt, or `review-repair-round-N` evidence/schema family.
+If automation needs machine state, use one shared minimal generated status
+format outside the coverage ledger. Read the status at every continuation and
+never restart completed discovery after compaction.
 
-Record the target/source identity, dependency receipts, current work package,
-completed work, commands and exit codes, evidence paths, dirty-tree identity,
-open decisions, blockers, and next smallest executable step. Read these ledgers
-at every continuation; never restart completed discovery after compaction.
+### Conformance-driven SDLC from 0.3
+
+Read and follow [`CONFORMANCE-IR.md`](../../architecture/CONFORMANCE-IR.md).
+The 0.2 catalogs and row identities define the denominator; the shared typed
+Conformance IR defines behavior and binds claimed gates to executable tests.
+
+- Each claimed official row has a typed specification with `row_id`, operation,
+  input, preconditions, transition, postconditions, conditions, recovery,
+  oracle, and applicable gates.
+- Every behavioral conformance test binds at least one `(row_id, gate)` and
+  emits a bounded canonical verdict event. Internal unit tests without a row
+  binding remain useful but contribute no official coverage.
+- Generate the coverage ledger from the official catalog and verdict events.
+  Never edit pass counts or infer row completion from a broad workload result.
+- CardDemo and other applications are integration profiles. They may exercise
+  registered row bindings but are not the primary IBM conformance model.
+- Provide fast `spec --check`, focused subsystem/gate conformance, and
+  release-only certification entry points. Keep the agent inner loop on the
+  first two tiers.
+- Use model checking only for bounded concurrency, transaction, restart,
+  retry, rollback, or unknown-outcome transitions.
+- Retain only candidate SHA, spec/catalog identity, verdict/ledger artifact,
+  CI verdict/reference, and shipped artifact digest, plus recovery/oracle
+  receipts when those gates apply.
 
 ### Implementation discipline
 
@@ -127,8 +153,9 @@ record the decision in the target status ledger.
 
 - Reuse the accepted 0.2 authorities rather than creating subsystem-private
   variants: the contract/catalog compiler, application-package trust and
-  generation runtime, store/migration/artifact adapters, and conformance/oracle
-  evidence harness. Extend their typed contracts through their owners.
+  generation runtime, store/migration/artifact adapters, and the 0.3 shared
+  Conformance IR/compiler/runner/ledger pipeline. Extend their typed contracts
+  through their owners.
 - One readable normative catalog or schema must generate all applicable Rust
   identities/descriptors, registry tables, schema/OpenAPI artifacts, coverage
   rows, documentation, and handler-closure inputs. Do not hand-maintain parallel

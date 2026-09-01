@@ -76,6 +76,26 @@ snapshot date, source URL, source digest, extraction method, and denominator.
 When IBM continuous-delivery documentation changes, a new baseline is created;
 the old denominator is never silently rewritten.
 
+### Executable measurement from 0.3
+
+The 0.2 catalog and gate contract is the authority foundation, not the final
+conformance workflow. From 0.3, every claimed gate must flow through the shared
+typed [Conformance IR](../architecture/CONFORMANCE-IR.md):
+
+```text
+official row
+  -> typed operation/input/precondition/transition/postcondition specification
+  -> generated or registered executable test
+  -> canonical (row_id, gate, verdict) event
+  -> generated coverage ledger
+```
+
+CardDemo and other workloads remain valuable integration profiles, but a
+workload pass does not replace row-level mappings. Process receipts, command
+transcripts, review-round schemas, and manually maintained pass counts do not
+contribute coverage. Evidence remains minimal, while formal specification and
+executable behavior receive the implementation investment.
+
 ## Official pinned baselines
 
 The counts below are reference units, not a statement that all units are equal

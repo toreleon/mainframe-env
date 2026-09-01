@@ -81,20 +81,27 @@ All versions inherit these invariants:
 
 ## Common evidence package
 
-Every minor version must produce:
+From 0.3 onward, every claimed coverage gate flows through the shared typed
+[Conformance IR](../../architecture/CONFORMANCE-IR.md):
 
-- source identity and clean-tree receipt;
-- versioned contract and official-baseline inventory;
-- numerator/denominator coverage report for every affected gate;
-- generated catalog/code digest and manual review receipt;
-- positive, negative, boundary, malformed, authorization, resource, restart,
-  and compatibility results appropriate to the scope;
-- architecture and application-hardcode scan results;
-- migration, backup/restore, rollback, and state-version evidence when durable
-  state changes;
-- full affected profile closure and no-fallback report;
-- release notes, known limitations, and upgrade instructions; and
-- licensed IBM differential receipts when required by the version exit gate.
+```text
+official row -> formal case -> executable test -> row/gate verdict -> ledger
+```
+
+The retained package is intentionally small:
+
+- candidate commit SHA;
+- official catalog and Conformance IR version/digest;
+- canonical row-level verdict stream or its artifact digest;
+- generated numerator/denominator ledger for affected gates;
+- CI verdict/reference and shipped artifact digest;
+- migration/restart/rollback receipt only when durable behavior changes; and
+- licensed IBM oracle receipt only for a differential claim.
+
+Do not add per-review schemas, free-form command transcripts, test-count claims,
+GitHub job archives, dirty-tree/status evidence, or manually maintained coverage
+pass counts. Release notes, limitations, and upgrade instructions remain normal
+documentation rather than cryptographic conformance evidence.
 
 ## Risk-tiered validation floor
 
