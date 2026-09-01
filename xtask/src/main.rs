@@ -1322,6 +1322,7 @@ fn check_cobol_statement_bindings(
             }
             Some("0030") => {
                 expected_obligations.insert("phrase-declarative-error");
+                expected_obligations.insert("phrase-file-status-error");
                 expected_obligations.insert("phrase-lock-wait");
                 expected_obligations.insert("phrase-next-record");
             }
@@ -1346,6 +1347,7 @@ fn check_cobol_statement_bindings(
             }
             Some("0042") => {
                 expected_obligations.insert("phrase-advancing-end-page");
+                expected_obligations.insert("phrase-file-status-error");
             }
             Some("0044") => {
                 expected_obligations.insert("phrase-group-hierarchy");
