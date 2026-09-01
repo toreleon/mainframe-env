@@ -677,6 +677,7 @@ mod tests {
                 concatenation: false,
                 source_line: 1,
                 source_end_line: 1,
+                parameters: Vec::new(),
             }],
         }
     }

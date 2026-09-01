@@ -400,6 +400,23 @@ fn project_spec(root: &Path) -> TaskResult<Vec<u8>> {
             );
         }
     }
+    rows.sort_by(|left, right| left["row_id"].as_str().cmp(&right["row_id"].as_str()));
+    obligations.sort_by(|left, right| {
+        (left["row_id"].as_str(), left["obligation_id"].as_str())
+            .cmp(&(right["row_id"].as_str(), right["obligation_id"].as_str()))
+    });
+    cases.sort_by(|left, right| {
+        (
+            left["row_id"].as_str(),
+            left["obligation_id"].as_str(),
+            left["gate"].as_str(),
+        )
+            .cmp(&(
+                right["row_id"].as_str(),
+                right["obligation_id"].as_str(),
+                right["gate"].as_str(),
+            ))
+    });
     spec["rows"] = Value::Array(rows);
     spec["obligations"] = Value::Array(obligations);
     spec["cases"] = Value::Array(cases);

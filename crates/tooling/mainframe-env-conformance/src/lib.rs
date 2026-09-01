@@ -21,6 +21,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 mod abi;
 mod carddemo;
+mod jcl;
 mod racf;
 mod racf_oracle;
 mod racf_reference;
@@ -54,6 +55,7 @@ pub use carddemo::{
     verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
     verify_carddemo_vsam_from_env,
 };
+pub use jcl::{JclExitReceipt, JclFixtureRuntime, jcl_fixture_runtime, verify_jcl_exit};
 pub use racf::racf_runtime;
 pub use racf_oracle::{RACF_ORACLE_RELATIVE_PATH, RacfOracleCampaign, RacfOracleCase};
 

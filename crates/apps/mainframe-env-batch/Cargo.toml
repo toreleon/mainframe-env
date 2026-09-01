@@ -7,11 +7,16 @@ license.workspace = true
 
 [dependencies]
 mainframe-env-execution-api.workspace = true
+mainframe-env-diagnostics.workspace = true
 mainframe-env-encoding.workspace = true
 mainframe-env-host-api.workspace = true
+mainframe-env-source.workspace = true
 mainframe-env-store-api.workspace = true
+rowan.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 
 [dev-dependencies]
+jsonschema.workspace = true
 mainframe-env-store = { path = "../../stores/mainframe-env-store" }
