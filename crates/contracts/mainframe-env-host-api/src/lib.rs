@@ -15,9 +15,10 @@ pub use dataset::{
     CatalogResolution, CompressionMode, DATASET_DEFINITION_CONTRACT,
     DATASET_PROVIDER_CAPABILITY_CONTRACT, DATASET_REQUEST_CONTRACT, DATASET_RESULT_CONTRACT,
     DATASET_STATE_SCHEMA_VERSION, DataSecurity, DatasetDefinition, DatasetDescription,
-    DatasetDiagnostic, DatasetLifecycleState, DatasetProviderCapabilities, DatasetShareOptions,
-    DcbOptions, LifecycleMetadata, SmsClasses, SpaceUnit, VolumeKind, VolumeSelection,
-    VsamAttributes,
+    DatasetDiagnostic, DatasetLifecycleState, DatasetLockMode, DatasetLockReceipt,
+    DatasetLockTarget, DatasetProviderCapabilities, DatasetShareOptions, DcbOptions,
+    LifecycleMetadata, SmsClasses, SpaceUnit, TvsRecordOperation, TvsUnitOfWorkReceipt,
+    TvsUnitOfWorkState, VolumeKind, VolumeSelection, VsamAccessMode, VsamAttributes,
 };
 pub use names::{
     DatasetName, HostNameProblem, JobName, MemberName, ProgramName, ResourceName, SessionId,

@@ -2498,8 +2498,23 @@ impl ProductServer {
         if let DatasetRequest::DefineAlias { target, .. } = &request {
             self.authorize_resource(principal, "DATASET", target.as_str(), AccessIntent::Read)?;
         }
+        if let DatasetRequest::TvsStatus { owner, .. }
+        | DatasetRequest::AcquireLock { owner, .. }
+        | DatasetRequest::ReleaseLock { owner, .. }
+        | DatasetRequest::BeginTvs { owner, .. }
+        | DatasetRequest::StageTvs { owner, .. }
+        | DatasetRequest::CompleteTvs { owner, .. }
+        | DatasetRequest::ReconcileTvs { owner, .. } = &request
+            && owner.as_str() != principal
+        {
+            return Err(gateway_problem(HostProblem::Unauthorized));
+        }
         let dataset = match &request {
-            DatasetRequest::Capabilities => None,
+            DatasetRequest::Capabilities
+            | DatasetRequest::TvsStatus { .. }
+            | DatasetRequest::BeginTvs { .. }
+            | DatasetRequest::CompleteTvs { .. }
+            | DatasetRequest::ReconcileTvs { .. } => None,
             DatasetRequest::List { pattern, .. } => Some(pattern.as_str()),
             DatasetRequest::ReadConcatenation { .. } => None,
             DatasetRequest::Rename { from, .. } => Some(from.as_str()),
@@ -2510,6 +2525,7 @@ impl ProductServer {
             DatasetRequest::Attributes { dataset }
             | DatasetRequest::Describe { dataset }
             | DatasetRequest::Diagnose { dataset }
+            | DatasetRequest::ListLocks { dataset, .. }
             | DatasetRequest::ListMembers { dataset, .. }
             | DatasetRequest::Read { dataset, .. }
             | DatasetRequest::ReadRelative { dataset, .. }
@@ -2523,6 +2539,8 @@ impl ProductServer {
             | DatasetRequest::DefineMemberAlias { dataset, .. }
             | DatasetRequest::WriteMemberGeneration { dataset, .. }
             | DatasetRequest::DeleteMemberGeneration { dataset, .. }
+            | DatasetRequest::AcquireLock { dataset, .. }
+            | DatasetRequest::ReleaseLock { dataset, .. }
             | DatasetRequest::Write { dataset, .. }
             | DatasetRequest::Append { dataset, .. }
             | DatasetRequest::Truncate { dataset, .. }
@@ -2536,6 +2554,13 @@ impl ProductServer {
             | DatasetRequest::ReadNext { dataset, .. }
             | DatasetRequest::EndBrowse { dataset, .. } => Some(dataset.as_str()),
             DatasetRequest::DefinePath { path, .. } => Some(path.as_str()),
+            DatasetRequest::StageTvs { operation, .. } => Some(match operation {
+                mainframe_env_host_api::TvsRecordOperation::Insert { dataset, .. }
+                | mainframe_env_host_api::TvsRecordOperation::Rewrite { dataset, .. }
+                | mainframe_env_host_api::TvsRecordOperation::Delete { dataset, .. } => {
+                    dataset.as_str()
+                }
+            }),
             DatasetRequest::DefineAlternateIndex { base, .. }
             | DatasetRequest::DefineGenerationGroup { base, .. }
             | DatasetRequest::CreateGeneration { base, .. }
@@ -2551,6 +2576,8 @@ impl ProductServer {
                     DatasetRequest::Attributes { .. }
                         | DatasetRequest::Describe { .. }
                         | DatasetRequest::Diagnose { .. }
+                        | DatasetRequest::ListLocks { .. }
+                        | DatasetRequest::TvsStatus { .. }
                         | DatasetRequest::ListMembers { .. }
                         | DatasetRequest::Read { .. }
                         | DatasetRequest::ReadRelative { .. }
@@ -3610,6 +3637,12 @@ fn dataset_mutation(request: &DatasetRequest) -> Option<&Mutation> {
         | DatasetRequest::DefineMemberAlias { mutation, .. }
         | DatasetRequest::WriteMemberGeneration { mutation, .. }
         | DatasetRequest::DeleteMemberGeneration { mutation, .. }
+        | DatasetRequest::AcquireLock { mutation, .. }
+        | DatasetRequest::ReleaseLock { mutation, .. }
+        | DatasetRequest::BeginTvs { mutation, .. }
+        | DatasetRequest::StageTvs { mutation, .. }
+        | DatasetRequest::CompleteTvs { mutation, .. }
+        | DatasetRequest::ReconcileTvs { mutation, .. }
         | DatasetRequest::Write { mutation, .. }
         | DatasetRequest::Append { mutation, .. }
         | DatasetRequest::Truncate { mutation, .. }

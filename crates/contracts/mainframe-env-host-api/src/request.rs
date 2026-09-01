@@ -1,6 +1,7 @@
 use crate::dataset::{
     CatalogKind, CatalogResolution, DatasetDefinition, DatasetDescription, DatasetDiagnostic,
-    DatasetLifecycleState, DatasetProviderCapabilities,
+    DatasetLifecycleState, DatasetLockMode, DatasetLockReceipt, DatasetLockTarget,
+    DatasetProviderCapabilities, TvsRecordOperation, TvsUnitOfWorkReceipt,
 };
 use crate::{DatasetName, JobName, MemberName, ProgramName, ResourceName, SessionId};
 use mainframe_env_execution_api::{
@@ -159,6 +160,15 @@ pub enum DatasetRequest {
     ResolveCatalog {
         name: DatasetName,
     },
+    ListLocks {
+        dataset: DatasetName,
+        now_tick: u64,
+        max_items: u32,
+    },
+    TvsStatus {
+        transaction: String,
+        owner: PrincipalId,
+    },
     ListMembers {
         dataset: DatasetName,
         start: Option<MemberName>,
@@ -255,6 +265,45 @@ pub enum DatasetRequest {
         member: MemberName,
         generation: u64,
         expected_version: Option<u64>,
+        mutation: Mutation,
+    },
+    AcquireLock {
+        dataset: DatasetName,
+        target: DatasetLockTarget,
+        owner: PrincipalId,
+        mode: DatasetLockMode,
+        now_tick: u64,
+        lease_ticks: u64,
+        transaction: Option<String>,
+        mutation: Mutation,
+    },
+    ReleaseLock {
+        dataset: DatasetName,
+        lock_id: String,
+        owner: PrincipalId,
+        mutation: Mutation,
+    },
+    BeginTvs {
+        transaction: String,
+        owner: PrincipalId,
+        mutation: Mutation,
+    },
+    StageTvs {
+        transaction: String,
+        owner: PrincipalId,
+        operation: TvsRecordOperation,
+        mutation: Mutation,
+    },
+    CompleteTvs {
+        transaction: String,
+        owner: PrincipalId,
+        commit: bool,
+        mutation: Mutation,
+    },
+    ReconcileTvs {
+        transaction: String,
+        owner: PrincipalId,
+        committed: bool,
         mutation: Mutation,
     },
     Write {
@@ -387,6 +436,10 @@ pub enum DatasetResult {
         diagnostics: Vec<DatasetDiagnostic>,
     },
     Catalog(CatalogResolution),
+    Locks {
+        locks: Vec<DatasetLockReceipt>,
+    },
+    Tvs(TvsUnitOfWorkReceipt),
     Records {
         records: Vec<Vec<u8>>,
         identities: Vec<Vec<u8>>,
@@ -910,6 +963,8 @@ impl HostRequest {
                 | DatasetRequest::Describe { .. }
                 | DatasetRequest::Diagnose { .. }
                 | DatasetRequest::ResolveCatalog { .. }
+                | DatasetRequest::ListLocks { .. }
+                | DatasetRequest::TvsStatus { .. }
                 | DatasetRequest::ListMembers { .. }
                 | DatasetRequest::ReadMemberGeneration { .. }
                 | DatasetRequest::Read { .. }
@@ -957,6 +1012,12 @@ impl HostRequest {
                     | DatasetRequest::DefineMemberAlias { .. }
                     | DatasetRequest::WriteMemberGeneration { .. }
                     | DatasetRequest::DeleteMemberGeneration { .. }
+                    | DatasetRequest::AcquireLock { .. }
+                    | DatasetRequest::ReleaseLock { .. }
+                    | DatasetRequest::BeginTvs { .. }
+                    | DatasetRequest::StageTvs { .. }
+                    | DatasetRequest::CompleteTvs { .. }
+                    | DatasetRequest::ReconcileTvs { .. }
                     | DatasetRequest::Write { .. }
                     | DatasetRequest::Append { .. }
                     | DatasetRequest::Truncate { .. }
@@ -1003,6 +1064,12 @@ impl HostRequest {
                 | DatasetRequest::DefineMemberAlias { mutation, .. }
                 | DatasetRequest::WriteMemberGeneration { mutation, .. }
                 | DatasetRequest::DeleteMemberGeneration { mutation, .. }
+                | DatasetRequest::AcquireLock { mutation, .. }
+                | DatasetRequest::ReleaseLock { mutation, .. }
+                | DatasetRequest::BeginTvs { mutation, .. }
+                | DatasetRequest::StageTvs { mutation, .. }
+                | DatasetRequest::CompleteTvs { mutation, .. }
+                | DatasetRequest::ReconcileTvs { mutation, .. }
                 | DatasetRequest::Write { mutation, .. }
                 | DatasetRequest::Append { mutation, .. }
                 | DatasetRequest::Truncate { mutation, .. }
@@ -1206,6 +1273,33 @@ impl HostResult {
                 if resolution.alias_chain.len() > limits.max_records || resolution.version == 0 =>
             {
                 Err(HostProblem::ResourceExhausted)
+            }
+            Self::Dataset(DatasetResult::Locks { locks })
+                if locks.len() > limits.max_records
+                    || locks.iter().any(|lock| {
+                        lock.lock_id.is_empty()
+                            || lock.lock_id.len() > limits.max_name_bytes
+                            || lock.expires_at == 0
+                            || lock.version == 0
+                            || matches!(
+                                &lock.target,
+                                DatasetLockTarget::Record(identity)
+                                    if identity.is_empty()
+                                        || identity.len() > limits.max_record_bytes
+                            )
+                            || lock.transaction.as_ref().is_some_and(|transaction| {
+                                transaction.is_empty() || transaction.len() > limits.max_name_bytes
+                            })
+                    }) =>
+            {
+                Err(HostProblem::ResourceExhausted)
+            }
+            Self::Dataset(DatasetResult::Tvs(receipt))
+                if receipt.transaction.is_empty()
+                    || receipt.transaction.len() > limits.max_name_bytes
+                    || receipt.version == 0 =>
+            {
+                Err(HostProblem::Malformed)
             }
             Self::Dataset(DatasetResult::MemberGeneration { generation: 0, .. }) => {
                 Err(HostProblem::Malformed)
@@ -1440,6 +1534,20 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
         | DatasetRequest::Describe { .. }
         | DatasetRequest::Diagnose { .. }
         | DatasetRequest::ResolveCatalog { .. } => Ok(()),
+        DatasetRequest::ListLocks {
+            now_tick,
+            max_items,
+            ..
+        } => {
+            if *now_tick == 0 {
+                Err(HostProblem::Malformed)
+            } else if *max_items == 0 || *max_items as usize > limits.max_records {
+                Err(HostProblem::ResourceExhausted)
+            } else {
+                Ok(())
+            }
+        }
+        DatasetRequest::TvsStatus { transaction, .. } => validate_transaction(transaction, limits),
         DatasetRequest::List {
             max_items, pattern, ..
         } if *max_items == 0
@@ -1540,6 +1648,66 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
             } else {
                 mutation.validate(limits)
             }
+        }
+        DatasetRequest::AcquireLock {
+            target,
+            now_tick,
+            lease_ticks,
+            transaction,
+            mutation,
+            ..
+        } => {
+            if *now_tick == 0
+                || *lease_ticks == 0
+                || matches!(target, DatasetLockTarget::Record(identity) if identity.is_empty())
+            {
+                return Err(HostProblem::Malformed);
+            }
+            if matches!(target, DatasetLockTarget::Record(identity) if identity.len() > limits.max_record_bytes)
+            {
+                return Err(HostProblem::ResourceExhausted);
+            }
+            if let Some(transaction) = transaction {
+                validate_transaction(transaction, limits)?;
+            }
+            mutation.validate(limits)
+        }
+        DatasetRequest::ReleaseLock {
+            lock_id, mutation, ..
+        } => {
+            if lock_id.is_empty() || lock_id.len() > limits.max_name_bytes {
+                Err(HostProblem::Malformed)
+            } else {
+                mutation.validate(limits)
+            }
+        }
+        DatasetRequest::BeginTvs {
+            transaction,
+            mutation,
+            ..
+        }
+        | DatasetRequest::CompleteTvs {
+            transaction,
+            mutation,
+            ..
+        }
+        | DatasetRequest::ReconcileTvs {
+            transaction,
+            mutation,
+            ..
+        } => {
+            validate_transaction(transaction, limits)?;
+            mutation.validate(limits)
+        }
+        DatasetRequest::StageTvs {
+            transaction,
+            operation,
+            mutation,
+            ..
+        } => {
+            validate_transaction(transaction, limits)?;
+            validate_tvs_operation(operation, limits)?;
+            mutation.validate(limits)
         }
         DatasetRequest::Write {
             records, mutation, ..
@@ -1667,6 +1835,51 @@ fn validate_records(records: &[Vec<u8>], limits: HostLimits) -> Result<(), HostP
         Err(HostProblem::ResourceExhausted)
     } else {
         Ok(())
+    }
+}
+fn validate_transaction(transaction: &str, limits: HostLimits) -> Result<(), HostProblem> {
+    if transaction.is_empty()
+        || transaction.len() > limits.max_name_bytes
+        || transaction.chars().any(char::is_control)
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
+}
+fn validate_tvs_operation(
+    operation: &TvsRecordOperation,
+    limits: HostLimits,
+) -> Result<(), HostProblem> {
+    match operation {
+        TvsRecordOperation::Insert { record, .. } => {
+            if record.is_empty() {
+                Err(HostProblem::Malformed)
+            } else if record.len() > limits.max_record_bytes {
+                Err(HostProblem::ResourceExhausted)
+            } else {
+                Ok(())
+            }
+        }
+        TvsRecordOperation::Rewrite { key, record, .. } => {
+            if key.is_empty() || record.is_empty() {
+                Err(HostProblem::Malformed)
+            } else if key.len() > limits.max_record_bytes || record.len() > limits.max_record_bytes
+            {
+                Err(HostProblem::ResourceExhausted)
+            } else {
+                Ok(())
+            }
+        }
+        TvsRecordOperation::Delete { key, .. } => {
+            if key.is_empty() {
+                Err(HostProblem::Malformed)
+            } else if key.len() > limits.max_record_bytes {
+                Err(HostProblem::ResourceExhausted)
+            } else {
+                Ok(())
+            }
+        }
     }
 }
 fn validate_fields(fields: &[TerminalField], limits: HostLimits) -> Result<(), HostProblem> {

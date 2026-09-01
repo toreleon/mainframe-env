@@ -2,13 +2,14 @@ use crate::names::DatasetName;
 use crate::request::{
     DatasetAttributes, DatasetOrganization, HostLimits, HostProblem, RecordFormat,
 };
+use mainframe_env_execution_api::PrincipalId;
 
 pub const DATASET_DEFINITION_CONTRACT: &str = "mainframe-env.dataset-definition@1";
 pub const DATASET_REQUEST_CONTRACT: &str = "mainframe-env.host.dataset-request@2";
 pub const DATASET_RESULT_CONTRACT: &str = "mainframe-env.host.dataset-result@2";
 pub const DATASET_PROVIDER_CAPABILITY_CONTRACT: &str =
     "mainframe-env.dataset-provider-capabilities@1";
-pub const DATASET_STATE_SCHEMA_VERSION: u16 = 4;
+pub const DATASET_STATE_SCHEMA_VERSION: u16 = 5;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SpaceUnit {
@@ -115,6 +116,72 @@ pub enum BufferingMode {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum VsamAccessMode {
+    NonRls,
+    Rls,
+    Tvs,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DatasetLockMode {
+    Shared,
+    Update,
+    Exclusive,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DatasetLockTarget {
+    Dataset,
+    Record(Vec<u8>),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DatasetLockReceipt {
+    pub lock_id: String,
+    pub dataset: DatasetName,
+    pub target: DatasetLockTarget,
+    pub owner: PrincipalId,
+    pub mode: DatasetLockMode,
+    pub expires_at: u64,
+    pub transaction: Option<String>,
+    pub version: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TvsRecordOperation {
+    Insert {
+        dataset: DatasetName,
+        record: Vec<u8>,
+    },
+    Rewrite {
+        dataset: DatasetName,
+        key: Vec<u8>,
+        record: Vec<u8>,
+    },
+    Delete {
+        dataset: DatasetName,
+        key: Vec<u8>,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TvsUnitOfWorkState {
+    Active,
+    Committed,
+    RolledBack,
+    Unknown,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TvsUnitOfWorkReceipt {
+    pub transaction: String,
+    pub owner: PrincipalId,
+    pub state: TvsUnitOfWorkState,
+    pub staged_operations: u32,
+    pub version: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DatasetShareOptions {
     pub cross_region: u8,
     pub cross_system: u8,
@@ -134,6 +201,7 @@ pub struct VsamAttributes {
     pub control_interval_size: Option<u32>,
     pub control_area_size: Option<u64>,
     pub share_options: DatasetShareOptions,
+    pub access_mode: VsamAccessMode,
     pub spanned: bool,
     pub reuse: bool,
     pub speed: bool,
@@ -149,6 +217,7 @@ impl Default for VsamAttributes {
             control_interval_size: None,
             control_area_size: None,
             share_options: DatasetShareOptions::default(),
+            access_mode: VsamAccessMode::NonRls,
             spanned: false,
             reuse: false,
             speed: false,
@@ -287,7 +356,7 @@ impl DatasetProviderCapabilities {
             buffering: false,
             catalog_metadata: false,
             catalog_routing: true,
-            control_intervals: false,
+            control_intervals: true,
             extended_format: false,
             physical_volumes: false,
             tape: false,
@@ -437,6 +506,12 @@ impl DatasetDefinition {
         if self.vsam.control_area_size == Some(0) || self.vsam.stripe_count == 0 {
             return Err(HostProblem::Malformed);
         }
+        if let Some(area) = self.vsam.control_area_size {
+            let interval = u64::from(self.vsam.control_interval_size.unwrap_or(4096));
+            if area < interval || area % interval != 0 {
+                return Err(HostProblem::Malformed);
+            }
+        }
         let is_vsam = matches!(
             self.attributes.organization,
             DatasetOrganization::KeySequenced
@@ -452,6 +527,11 @@ impl DatasetDefinition {
             && (self.attributes.record_format != RecordFormat::Undefined
                 || self.attributes.key_offset.is_some()
                 || self.vsam.spanned)
+        {
+            return Err(HostProblem::Malformed);
+        }
+        if self.vsam.access_mode == VsamAccessMode::Tvs
+            && self.attributes.organization != DatasetOrganization::KeySequenced
         {
             return Err(HostProblem::Malformed);
         }
@@ -532,6 +612,16 @@ impl DatasetDefinition {
             "SHAREOPTIONS",
         )?;
         require_capability(
+            self.vsam.access_mode != VsamAccessMode::Rls || capabilities.rls,
+            "rls",
+            "RLS",
+        )?;
+        require_capability(
+            self.vsam.access_mode != VsamAccessMode::Tvs || capabilities.tvs,
+            "tvs",
+            "TVS",
+        )?;
+        require_capability(
             (!self.vsam.reuse
                 && !self.vsam.speed
                 && !self.vsam.write_check
@@ -588,6 +678,9 @@ pub struct DatasetDescription {
     pub version: u64,
     pub allocated_bytes: u64,
     pub used_bytes: u64,
+    pub control_intervals: u64,
+    pub control_areas: u64,
+    pub high_used_rba: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -713,7 +806,7 @@ mod tests {
         let mut definition =
             DatasetDefinition::compatibility(attributes(DatasetOrganization::KeySequenced));
         definition.vsam.control_interval_size = Some(4096);
-        rejected!(definition, "control-intervals");
+        assert_eq!(definition.validate(limits, capabilities), Ok(()));
 
         let mut definition =
             DatasetDefinition::compatibility(attributes(DatasetOrganization::Sequential));

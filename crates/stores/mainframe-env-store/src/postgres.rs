@@ -1,6 +1,6 @@
 use crate::runtime::{AdapterRuntime, block_on};
 use mainframe_env_store_api::{
-    ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
+    ProviderStateMutation, ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
 };
 use sqlx::Row;
 use sqlx::postgres::{PgPool, PgPoolOptions};
@@ -293,6 +293,130 @@ impl ProviderStateStore for PostgresStateStore {
                 if affected != 1 {
                     return Err(StoreError::Conflict);
                 }
+            }
+            transaction.commit().await.map_err(infrastructure)
+        })?
+    }
+
+    fn mutate_provider_states_atomic(
+        &self,
+        mutations: Vec<ProviderStateMutation>,
+    ) -> Result<(), StoreError> {
+        if mutations.is_empty() {
+            return Err(StoreError::InvalidTransition);
+        }
+        if mutations.iter().any(|mutation| {
+            matches!(mutation, ProviderStateMutation::Put(write) if write.record.payload.len() > self.max_payload_bytes)
+        }) {
+            return Err(StoreError::PayloadTooLarge);
+        }
+        block_on(&self.runtime, async {
+            let mut transaction = self.pool.begin().await.map_err(infrastructure)?;
+            for mutation in mutations {
+                let affected = match mutation {
+                    ProviderStateMutation::Put(write) => {
+                        let record = write.record;
+                        if let Some(expected) = write.expected_version {
+                            if record.version
+                                != expected.checked_add(1).ok_or(StoreError::Conflict)?
+                            {
+                                return Err(StoreError::Conflict);
+                            }
+                            sqlx::query(
+                                "UPDATE provider_state SET version=$1,payload=$2 WHERE namespace=$3 AND key=$4 AND version=$5",
+                            )
+                            .bind(i64::try_from(record.version).map_err(|_| StoreError::Conflict)?)
+                            .bind(record.payload)
+                            .bind(record.namespace)
+                            .bind(record.key)
+                            .bind(i64::try_from(expected).map_err(|_| StoreError::Conflict)?)
+                            .execute(&mut *transaction)
+                            .await
+                            .map_err(infrastructure)?
+                            .rows_affected()
+                        } else {
+                            if record.version != 1 {
+                                return Err(StoreError::Conflict);
+                            }
+                            sqlx::query(
+                                "INSERT INTO provider_state(namespace,key,version,payload) VALUES($1,$2,1,$3) ON CONFLICT DO NOTHING",
+                            )
+                            .bind(record.namespace)
+                            .bind(record.key)
+                            .bind(record.payload)
+                            .execute(&mut *transaction)
+                            .await
+                            .map_err(infrastructure)?
+                            .rows_affected()
+                        }
+                    }
+                    ProviderStateMutation::Delete {
+                        namespace,
+                        key,
+                        expected_version,
+                    } => {
+                        if namespace.is_empty() || key.is_empty() || expected_version == 0 {
+                            return Err(StoreError::Conflict);
+                        }
+                        sqlx::query(
+                            "DELETE FROM provider_state WHERE namespace=$1 AND key=$2 AND version=$3",
+                        )
+                        .bind(namespace)
+                        .bind(key)
+                        .bind(i64::try_from(expected_version).map_err(|_| StoreError::Conflict)?)
+                        .execute(&mut *transaction)
+                        .await
+                        .map_err(infrastructure)?
+                        .rows_affected()
+                    }
+                    ProviderStateMutation::Move {
+                        record,
+                        old_key,
+                        expected_version,
+                    } => {
+                        if record.payload.len() > self.max_payload_bytes
+                            || record.key == old_key
+                            || record.version
+                                != expected_version
+                                    .checked_add(1)
+                                    .ok_or(StoreError::Conflict)?
+                        {
+                            return Err(StoreError::Conflict);
+                        }
+                        let inserted = sqlx::query(
+                            "INSERT INTO provider_state(namespace,key,version,payload) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING",
+                        )
+                        .bind(&record.namespace)
+                        .bind(&record.key)
+                        .bind(i64::try_from(record.version).map_err(|_| StoreError::Conflict)?)
+                        .bind(&record.payload)
+                        .execute(&mut *transaction)
+                        .await
+                        .map_err(infrastructure)?
+                        .rows_affected();
+                        let deleted = sqlx::query(
+                            "DELETE FROM provider_state WHERE namespace=$1 AND key=$2 AND version=$3",
+                        )
+                        .bind(&record.namespace)
+                        .bind(old_key)
+                        .bind(i64::try_from(expected_version).map_err(|_| StoreError::Conflict)?)
+                        .execute(&mut *transaction)
+                        .await
+                        .map_err(infrastructure)?
+                        .rows_affected();
+                        u64::from(inserted == 1 && deleted == 1)
+                    }
+                };
+                if affected != 1 {
+                    return Err(StoreError::Conflict);
+                }
+            }
+            let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM provider_state")
+                .fetch_one(&mut *transaction)
+                .await
+                .map_err(infrastructure)?;
+            if usize::try_from(count).map_err(|_| StoreError::CapacityExceeded)? > self.max_rows {
+                return Err(StoreError::CapacityExceeded);
             }
             transaction.commit().await.map_err(infrastructure)
         })?

@@ -1,6 +1,6 @@
 use crate::runtime::{AdapterRuntime, block_on};
 use mainframe_env_store_api::{
-    ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
+    ProviderStateMutation, ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
 };
 use sqlx::Row;
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
@@ -348,6 +348,137 @@ impl ProviderStateStore for SqliteStateStore {
                 .map_err(|error| StoreError::Infrastructure(error.to_string()))
         })?
     }
+
+    fn mutate_provider_states_atomic(
+        &self,
+        mutations: Vec<ProviderStateMutation>,
+    ) -> Result<(), StoreError> {
+        if mutations.is_empty() {
+            return Err(StoreError::InvalidTransition);
+        }
+        if mutations.iter().any(|mutation| {
+            matches!(mutation, ProviderStateMutation::Put(write) if write.record.payload.len() > self.max_payload_bytes)
+        }) {
+            return Err(StoreError::PayloadTooLarge);
+        }
+        block_on(&self.runtime, async {
+            let mut transaction = self
+                .pool
+                .begin()
+                .await
+                .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
+            for mutation in mutations {
+                let affected = match mutation {
+                    ProviderStateMutation::Put(write) => {
+                        let record = write.record;
+                        if let Some(expected) = write.expected_version {
+                            if record.version
+                                != expected.checked_add(1).ok_or(StoreError::Conflict)?
+                            {
+                                return Err(StoreError::Conflict);
+                            }
+                            sqlx::query(
+                                "UPDATE provider_state SET version=?,payload=? WHERE namespace=? AND key=? AND version=?",
+                            )
+                            .bind(i64::try_from(record.version).map_err(|_| StoreError::Conflict)?)
+                            .bind(record.payload)
+                            .bind(record.namespace)
+                            .bind(record.key)
+                            .bind(i64::try_from(expected).map_err(|_| StoreError::Conflict)?)
+                            .execute(&mut *transaction)
+                            .await
+                            .map_err(|error| StoreError::Infrastructure(error.to_string()))?
+                            .rows_affected()
+                        } else {
+                            if record.version != 1 {
+                                return Err(StoreError::Conflict);
+                            }
+                            sqlx::query(
+                                "INSERT OR IGNORE INTO provider_state(namespace,key,version,payload) VALUES(?,?,1,?)",
+                            )
+                            .bind(record.namespace)
+                            .bind(record.key)
+                            .bind(record.payload)
+                            .execute(&mut *transaction)
+                            .await
+                            .map_err(|error| StoreError::Infrastructure(error.to_string()))?
+                            .rows_affected()
+                        }
+                    }
+                    ProviderStateMutation::Delete {
+                        namespace,
+                        key,
+                        expected_version,
+                    } => {
+                        if namespace.is_empty() || key.is_empty() || expected_version == 0 {
+                            return Err(StoreError::Conflict);
+                        }
+                        sqlx::query(
+                            "DELETE FROM provider_state WHERE namespace=? AND key=? AND version=?",
+                        )
+                        .bind(namespace)
+                        .bind(key)
+                        .bind(i64::try_from(expected_version).map_err(|_| StoreError::Conflict)?)
+                        .execute(&mut *transaction)
+                        .await
+                        .map_err(|error| StoreError::Infrastructure(error.to_string()))?
+                        .rows_affected()
+                    }
+                    ProviderStateMutation::Move {
+                        record,
+                        old_key,
+                        expected_version,
+                    } => {
+                        if record.payload.len() > self.max_payload_bytes
+                            || record.key == old_key
+                            || record.version
+                                != expected_version
+                                    .checked_add(1)
+                                    .ok_or(StoreError::Conflict)?
+                        {
+                            return Err(StoreError::Conflict);
+                        }
+                        let inserted = sqlx::query(
+                            "INSERT OR IGNORE INTO provider_state(namespace,key,version,payload) VALUES(?,?,?,?)",
+                        )
+                        .bind(&record.namespace)
+                        .bind(&record.key)
+                        .bind(i64::try_from(record.version).map_err(|_| StoreError::Conflict)?)
+                        .bind(&record.payload)
+                        .execute(&mut *transaction)
+                        .await
+                        .map_err(|error| StoreError::Infrastructure(error.to_string()))?
+                        .rows_affected();
+                        let deleted = sqlx::query(
+                            "DELETE FROM provider_state WHERE namespace=? AND key=? AND version=?",
+                        )
+                        .bind(&record.namespace)
+                        .bind(old_key)
+                        .bind(i64::try_from(expected_version).map_err(|_| StoreError::Conflict)?)
+                        .execute(&mut *transaction)
+                        .await
+                        .map_err(|error| StoreError::Infrastructure(error.to_string()))?
+                        .rows_affected();
+                        u64::from(inserted == 1 && deleted == 1)
+                    }
+                };
+                if affected != 1 {
+                    return Err(StoreError::Conflict);
+                }
+            }
+            let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM provider_state")
+                .fetch_one(&mut *transaction)
+                .await
+                .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
+            if usize::try_from(count).map_err(|_| StoreError::CapacityExceeded)? > self.max_rows {
+                return Err(StoreError::CapacityExceeded);
+            }
+            transaction
+                .commit()
+                .await
+                .map_err(|error| StoreError::Infrastructure(error.to_string()))
+        })?
+    }
 }
 
 #[cfg(test)]
@@ -442,6 +573,91 @@ mod tests {
                 b"value"
             );
         }
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_dir(directory);
+    }
+
+    #[test]
+    fn sqlite_mixed_provider_batch_rolls_back_every_operation_on_conflict() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-sqlite-mixed-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("state.db");
+        let store =
+            SqliteStateStore::open(&format!("sqlite://{}?mode=rwc", path.display()), 1024, 16)
+                .unwrap();
+        for key in ["a", "b"] {
+            store
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: "dataset".into(),
+                        key: key.into(),
+                        version: 1,
+                        payload: key.as_bytes().to_vec(),
+                    },
+                    None,
+                )
+                .unwrap();
+        }
+        assert!(matches!(
+            store.mutate_provider_states_atomic(vec![
+                ProviderStateMutation::Delete {
+                    namespace: "dataset".into(),
+                    key: "a".into(),
+                    expected_version: 1,
+                },
+                ProviderStateMutation::Put(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: "dataset".into(),
+                        key: "b".into(),
+                        version: 2,
+                        payload: b"B2".to_vec(),
+                    },
+                    expected_version: Some(99),
+                }),
+            ]),
+            Err(StoreError::Conflict)
+        ));
+        assert!(store.get_provider_state("dataset", "a").unwrap().is_some());
+        assert_eq!(
+            store
+                .get_provider_state("dataset", "b")
+                .unwrap()
+                .unwrap()
+                .version,
+            1
+        );
+        store
+            .mutate_provider_states_atomic(vec![
+                ProviderStateMutation::Delete {
+                    namespace: "dataset".into(),
+                    key: "a".into(),
+                    expected_version: 1,
+                },
+                ProviderStateMutation::Put(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: "dataset".into(),
+                        key: "b".into(),
+                        version: 2,
+                        payload: b"B2".to_vec(),
+                    },
+                    expected_version: Some(1),
+                }),
+            ])
+            .unwrap();
+        assert_eq!(store.get_provider_state("dataset", "a").unwrap(), None);
+        assert_eq!(
+            store
+                .get_provider_state("dataset", "b")
+                .unwrap()
+                .unwrap()
+                .payload,
+            b"B2"
+        );
+        drop(store);
         let _ = std::fs::remove_file(path);
         let _ = std::fs::remove_dir(directory);
     }

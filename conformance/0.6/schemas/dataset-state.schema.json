@@ -9,8 +9,8 @@
     "pdse_directory", "allocated_bytes", "used_bytes", "content_digest"
   ],
   "properties": {
-    "schema_version": { "const": "mainframe-env.dataset-state@4" },
-    "state_schema_version": { "const": 4 },
+    "schema_version": { "const": "mainframe-env.dataset-state@5" },
+    "state_schema_version": { "const": 5 },
     "dataset": { "$ref": "#/$defs/name" },
     "version": { "type": "integer", "minimum": 1 },
     "allocated_bytes": { "type": "integer", "minimum": 0 },
@@ -121,7 +121,7 @@
         },
         "vsam": {
           "type": "object", "additionalProperties": false,
-          "required": ["control_interval_size", "control_area_size", "share_options", "spanned", "reuse", "speed", "write_check", "erase_on_delete", "buffering", "stripe_count"],
+          "required": ["control_interval_size", "control_area_size", "share_options", "access_mode", "spanned", "reuse", "speed", "write_check", "erase_on_delete", "buffering", "stripe_count"],
           "properties": {
             "control_interval_size": { "type": ["integer", "null"], "minimum": 512, "maximum": 32768, "multipleOf": 512 },
             "control_area_size": { "type": ["integer", "null"], "minimum": 1 },
@@ -133,6 +133,7 @@
                 "cross_system": { "type": "integer", "minimum": 3, "maximum": 4 }
               }
             },
+            "access_mode": { "enum": ["non-rls", "rls", "tvs"] },
             "spanned": { "type": "boolean" },
             "reuse": { "type": "boolean" },
             "speed": { "type": "boolean" },

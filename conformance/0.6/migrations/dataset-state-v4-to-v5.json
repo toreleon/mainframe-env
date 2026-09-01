@@ -1,0 +1,22 @@
+{
+  "schema_version": "mainframe-env.dataset-state-v5-migration@1",
+  "migration_id": "dataset-state-v4-to-v5",
+  "from_version": 4,
+  "to_version": 5,
+  "reader_versions": [1, 2, 3, 4, 5],
+  "writer_version": 5,
+  "destructive": false,
+  "steps": [
+    "Decode MEDS1 through MEDS4 using their original bounds and compatibility defaults.",
+    "Materialize NONRLS as the VSAM access mode for every pre-MEDS5 dataset.",
+    "Validate access mode, SHAREOPTIONS, control-interval geometry, and dependency state before publication.",
+    "Write MEDS5 through the existing optimistic provider-state transaction path."
+  ],
+  "failure_policy": "reject-before-publication",
+  "rollback": {
+    "supported": true,
+    "method": "restore-verified-pre-migration-provider-snapshot",
+    "requires_backup": true,
+    "partial_state_selected": false
+  }
+}

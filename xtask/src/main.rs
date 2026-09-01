@@ -2334,6 +2334,14 @@ fn check_schemas(root: &Path) -> TaskResult {
         &json(&migration_v4_path)?,
         &migration_v4_path,
     )?;
+    let migration_v5_path = root.join("conformance/0.6/migrations/dataset-state-v4-to-v5.json");
+    let migration_v5_schema =
+        root.join("conformance/0.6/schemas/dataset-state-v5-migration.schema.json");
+    validate_schema_instance(
+        &json(&migration_v5_schema)?,
+        &json(&migration_v5_path)?,
+        &migration_v5_path,
+    )?;
     let organization_fixture = root.join("conformance/0.6/fixtures/dataset-organizations.json");
     let organization_schema =
         root.join("conformance/0.6/schemas/dataset-organization-fixtures.schema.json");

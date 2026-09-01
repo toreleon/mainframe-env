@@ -2,9 +2,9 @@ use mainframe_env_execution_api::{ArtifactRef, ExecutionId, IdempotencyKey, Life
 use mainframe_env_store_api::{
     ArtifactRecord, ArtifactStore, CheckpointRecord, CheckpointStore, EffectRecord, EffectState,
     EventStore, ExecutionRecord, ExecutionState, ExecutionStore, GenerationRecord, GenerationStore,
-    IdempotencyStore, JournalStore, OutboxRecord, OutboxStore, ProviderStateRecord,
-    ProviderStateStore, ProviderStateWrite, SessionRecord, SessionStore, StoreError, WorkRecord,
-    WorkState, WorkStore,
+    IdempotencyStore, JournalStore, OutboxRecord, OutboxStore, ProviderStateMutation,
+    ProviderStateRecord, ProviderStateStore, ProviderStateWrite, SessionRecord, SessionStore,
+    StoreError, WorkRecord, WorkState, WorkStore,
 };
 use std::collections::BTreeMap;
 use std::sync::{Mutex, MutexGuard};
@@ -858,18 +858,80 @@ impl ProviderStateStore for MemoryStore {
         &self,
         writes: Vec<ProviderStateWrite>,
     ) -> Result<(), StoreError> {
-        if writes.is_empty() {
+        self.mutate_provider_states_atomic(
+            writes.into_iter().map(ProviderStateMutation::Put).collect(),
+        )
+    }
+
+    fn mutate_provider_states_atomic(
+        &self,
+        mutations: Vec<ProviderStateMutation>,
+    ) -> Result<(), StoreError> {
+        if mutations.is_empty() {
             return Err(StoreError::InvalidTransition);
         }
         let mut state = self.lock()?;
         let mut staged = state.clone();
-        for write in writes {
-            Self::put_provider_state_locked(
-                &mut staged,
-                write.record,
-                write.expected_version,
-                self.limits,
-            )?;
+        for mutation in mutations {
+            match mutation {
+                ProviderStateMutation::Put(write) => Self::put_provider_state_locked(
+                    &mut staged,
+                    write.record,
+                    write.expected_version,
+                    self.limits,
+                )?,
+                ProviderStateMutation::Delete {
+                    namespace,
+                    key,
+                    expected_version,
+                } => {
+                    if namespace.is_empty() || key.is_empty() || expected_version == 0 {
+                        return Err(StoreError::Conflict);
+                    }
+                    let map_key = (namespace, key);
+                    let current = staged
+                        .provider_state
+                        .get(&map_key)
+                        .ok_or(StoreError::NotFound)?;
+                    if current.version != expected_version {
+                        return Err(StoreError::Conflict);
+                    }
+                    let bytes = current.payload.len();
+                    staged.provider_state.remove(&map_key);
+                    staged.blob_bytes = staged.blob_bytes.saturating_sub(bytes);
+                }
+                ProviderStateMutation::Move {
+                    record,
+                    old_key,
+                    expected_version,
+                } => {
+                    if record.namespace.is_empty()
+                        || record.key.is_empty()
+                        || record.key == old_key
+                        || record.version
+                            != expected_version
+                                .checked_add(1)
+                                .ok_or(StoreError::Conflict)?
+                    {
+                        return Err(StoreError::Conflict);
+                    }
+                    let old_map_key = (record.namespace.clone(), old_key);
+                    let new_map_key = (record.namespace.clone(), record.key.clone());
+                    let old = staged
+                        .provider_state
+                        .get(&old_map_key)
+                        .ok_or(StoreError::NotFound)?;
+                    if old.version != expected_version
+                        || staged.provider_state.contains_key(&new_map_key)
+                    {
+                        return Err(StoreError::Conflict);
+                    }
+                    let old_bytes = old.payload.len();
+                    Self::reserve_blob(&mut staged, old_bytes, record.payload.len(), self.limits)?;
+                    staged.provider_state.remove(&old_map_key);
+                    staged.provider_state.insert(new_map_key, record);
+                }
+            }
         }
         *state = staged;
         Ok(())
@@ -1080,6 +1142,87 @@ mod tests {
             payload: vec![2],
         };
         assert_eq!(store.put_artifact(conflicting), Err(StoreError::Conflict));
+    }
+
+    #[test]
+    fn mixed_provider_state_batch_is_atomic_on_success_and_conflict() {
+        let store = MemoryStore::new(StoreLimits::default());
+        for key in ["a", "b"] {
+            store
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: "dataset".into(),
+                        key: key.into(),
+                        version: 1,
+                        payload: key.as_bytes().to_vec(),
+                    },
+                    None,
+                )
+                .unwrap();
+        }
+        store
+            .mutate_provider_states_atomic(vec![
+                ProviderStateMutation::Delete {
+                    namespace: "dataset".into(),
+                    key: "a".into(),
+                    expected_version: 1,
+                },
+                ProviderStateMutation::Put(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: "dataset".into(),
+                        key: "b".into(),
+                        version: 2,
+                        payload: b"B2".to_vec(),
+                    },
+                    expected_version: Some(1),
+                }),
+                ProviderStateMutation::Put(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: "dataset".into(),
+                        key: "c".into(),
+                        version: 1,
+                        payload: b"C1".to_vec(),
+                    },
+                    expected_version: None,
+                }),
+            ])
+            .unwrap();
+        assert_eq!(store.get_provider_state("dataset", "a").unwrap(), None);
+        assert_eq!(
+            store
+                .get_provider_state("dataset", "b")
+                .unwrap()
+                .unwrap()
+                .payload,
+            b"B2"
+        );
+        assert!(matches!(
+            store.mutate_provider_states_atomic(vec![
+                ProviderStateMutation::Put(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: "dataset".into(),
+                        key: "b".into(),
+                        version: 3,
+                        payload: b"B3".to_vec(),
+                    },
+                    expected_version: Some(2),
+                }),
+                ProviderStateMutation::Delete {
+                    namespace: "dataset".into(),
+                    key: "missing".into(),
+                    expected_version: 1,
+                },
+            ]),
+            Err(StoreError::NotFound)
+        ));
+        assert_eq!(
+            store
+                .get_provider_state("dataset", "b")
+                .unwrap()
+                .unwrap()
+                .version,
+            2
+        );
     }
 
     #[test]

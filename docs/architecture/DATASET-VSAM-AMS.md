@@ -45,27 +45,29 @@ or descriptor generation grants no behavior coverage.
 - catalog type, catalog selection, owner, expiration, and retention; and
 - lifecycle, migration level, and backup generation.
 
-The deterministic provider advertises abstract-volume support. Physical disk,
-tape, ACS, encryption, compression, striping, migration/recall, RLS, and TVS
-remain false until their adapter or semantic work package passes. An operand
+The deterministic provider advertises abstract-volume, CI/CA, RLS, bounded
+SHAREOPTIONS, and KSDS TVS support. Physical disk, tape, ACS, encryption,
+compression, striping, and migration/recall remain false until their adapter or
+semantic work package passes. An operand
 that requires a false capability returns `UnsupportedCapability` with both the
 capability and affected operand; it cannot be silently stored, ignored, or
 reported as successful.
 
 ## Durable state and migration
 
-Dataset state writer version 4 (`MEDS4`) is a bounded owned binary codec. The
-reader accepts `MEDS1` through `MEDS4`. Older records materialize reviewed
+Dataset state writer version 5 (`MEDS5`) is a bounded owned binary codec. The
+reader accepts `MEDS1` through `MEDS5`. Older records materialize reviewed
 compatibility defaults and are fully validated before any current-version write.
 Corrupt, over-limit, cross-reference-invalid, or capability-invalid state fails
 before publication.
 
 The portable state, diagnostic, capability, and migration schemas live in
 `conformance/0.6/schemas`. The non-destructive migration contract is
-`conformance/0.6/migrations/dataset-state-v2-to-v3.json` and
-`dataset-state-v3-to-v4.json`. Rollback restores a
-digest-verified pre-migration provider snapshot atomically; partial version-3
-state is never selected. Backup/restore and injected-failure evidence belongs
+`conformance/0.6/migrations/dataset-state-v2-to-v3.json`,
+`dataset-state-v3-to-v4.json`, and `dataset-state-v4-to-v5.json`. MEDS4 records
+materialize `NONRLS`; MEDS5 persists the explicit access mode. Rollback restores a
+digest-verified pre-migration provider snapshot atomically; partial migrated
+state is never selected. Backup/restore and broad injected-failure evidence belongs
 to DAT-606.
 
 ## Deterministic allocation model
@@ -98,8 +100,30 @@ Explicit sequential access uses a zero-based logical position and a direction;
 returned identities remain organization-specific (key, RBA, RRN, or ordinal).
 All mutating RBA/RRN/key paths publish data and idempotency result in the same
 provider-state transaction, and restart reconstructs the same identities.
-Control-interval/control-area placement and spanned-fragment behavior are added
-by DAT-604 without leaking a physical page manager into this interface.
+CI placement accounts for seven deterministic control bytes per interval.
+Nonspanned records must fit one interval; VS/VBS records retain one logical byte
+string while their geometry reports the exact number of occupied fragments.
+Control areas contain an integral declared number of intervals. The description
+reports occupied CI/CA counts and high-used RBA without exposing a page manager.
+
+## Locking, RLS, TVS, and recovery
+
+RLS uses durable dataset or organization-specific record identities. A logical
+tick is supplied by the request, leases expire only against explicit ticks, and
+RLS data mutation requires a live covering update or exclusive receipt owned by
+the invoking principal. Resources are acquired in lexical dataset/target order;
+an inversion returns `LOCKORDER` before publication. The deterministic adapter
+implements SHAREOPTIONS `(1,3)` and `(2,3)`; other combinations fail explicitly
+instead of being stored without behavior.
+
+TVS currently accepts KSDS operations. A durable UOW stages inserts, rewrites,
+and deletes while holding exclusive primary-key locks. Commit publishes every
+touched base cluster, upgraded AIX/PATH version, UOW state, released lock, and
+idempotency replay in one mixed provider-state transaction. Rollback publishes
+only the terminal UOW and releases its locks. An injected pre-commit failure
+marks the UOW `Unknown`; an owner-scoped reconciliation request explicitly
+chooses commit or rollback. Restart reloads active and unknown UOWs and validates
+all lock/UOW/dataset cross-references before provider publication.
 
 ## Catalog, GDG, and partitioned-directory model
 
@@ -123,7 +147,7 @@ separate ordered generation list per member; normal member reads select the
 latest generation and an explicit non-positive relative generation selects
 history. Each generation records whether it is a program object. Member aliases
 resolve to the same generation authority and cannot shadow members or form
-cycles. `MEDS4` persists generations and aliases without duplicating a selected
+cycles. `MEDS5` persists generations and aliases without duplicating a selected
 member projection.
 
 GDG roll-in distinguishes `SCRATCH` from `NOSCRATCH`: both remove old

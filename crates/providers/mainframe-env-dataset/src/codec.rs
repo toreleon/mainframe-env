@@ -2,7 +2,7 @@ use mainframe_env_host_api::{
     AllocationSpace, BufferingMode, CatalogEntryKind, CatalogMetadata, CompressionMode,
     DataSecurity, DatasetAttributes, DatasetDefinition, DatasetLifecycleState, DatasetName,
     DatasetOrganization, DatasetShareOptions, DcbOptions, LifecycleMetadata, RecordFormat,
-    SmsClasses, SpaceUnit, VolumeKind, VolumeSelection, VsamAttributes,
+    SmsClasses, SpaceUnit, VolumeKind, VolumeSelection, VsamAccessMode, VsamAttributes,
 };
 use std::collections::BTreeMap;
 
@@ -81,7 +81,11 @@ impl Entry {
 }
 
 pub(crate) fn encode(entry: &Entry) -> Result<Vec<u8>, ()> {
-    let mut out = b"MEDS4".to_vec();
+    encode_state(entry, b"MEDS5", true)
+}
+
+fn encode_state(entry: &Entry, schema: &[u8; 5], include_access_mode: bool) -> Result<Vec<u8>, ()> {
+    let mut out = schema.to_vec();
     out.push(org(entry.attributes.organization));
     out.push(recfm(entry.attributes.record_format));
     u32v(&mut out, entry.attributes.logical_record_length);
@@ -89,7 +93,7 @@ pub(crate) fn encode(entry: &Entry) -> Result<Vec<u8>, ()> {
     optional_u32(&mut out, entry.attributes.key_length);
     optional_u16(&mut out, entry.attributes.ccsid);
     u64v(&mut out, entry.version);
-    encode_metadata(&mut out, entry)?;
+    encode_metadata(&mut out, entry, include_access_mode)?;
     records(&mut out, &entry.records)?;
     u32v(
         &mut out,
@@ -141,7 +145,7 @@ pub(crate) fn encode_definition_digest_v2(definition: &DatasetDefinition) -> Res
     optional_u32(&mut out, entry.attributes.key_length);
     optional_u16(&mut out, entry.attributes.ccsid);
     u64v(&mut out, 0);
-    encode_metadata(&mut out, &entry)?;
+    encode_metadata(&mut out, &entry, false)?;
     records(&mut out, &[])?;
     u32v(&mut out, 0);
     u32v(&mut out, 0);
@@ -158,7 +162,7 @@ pub(crate) fn decode(
         at: 0,
     };
     let schema = r.take(5)?;
-    if !matches!(schema, b"MEDS1" | b"MEDS2" | b"MEDS3" | b"MEDS4") {
+    if !matches!(schema, b"MEDS1" | b"MEDS2" | b"MEDS3" | b"MEDS4" | b"MEDS5") {
         return Err(());
     }
     let organization = org_back(r.byte()?)?;
@@ -176,8 +180,8 @@ pub(crate) fn decode(
         key_length,
         ccsid,
     });
-    if matches!(schema, b"MEDS3" | b"MEDS4") {
-        decode_metadata(&mut r, &mut definition, max_records)?;
+    if matches!(schema, b"MEDS3" | b"MEDS4" | b"MEDS5") {
+        decode_metadata(&mut r, &mut definition, max_records, schema == b"MEDS5")?;
     }
     let records = r.records(max_records, max_record)?;
     let count = usize::try_from(r.u32()?).map_err(|_| ())?;
@@ -195,7 +199,7 @@ pub(crate) fn decode(
         }
     }
     let mut relative_records = BTreeMap::new();
-    if matches!(schema, b"MEDS2" | b"MEDS3" | b"MEDS4") {
+    if matches!(schema, b"MEDS2" | b"MEDS3" | b"MEDS4" | b"MEDS5") {
         let count = usize::try_from(r.u32()?).map_err(|_| ())?;
         if count > max_records {
             return Err(());
@@ -211,14 +215,14 @@ pub(crate) fn decode(
             }
         }
     }
-    if schema != b"MEDS4" && r.at != bytes_in.len() {
+    if !matches!(schema, b"MEDS4" | b"MEDS5") && r.at != bytes_in.len() {
         return Err(());
     }
     let mut entry = Entry::from_definition(definition, version);
     entry.records = records;
     entry.members = members;
     entry.relative_records = relative_records;
-    if schema == b"MEDS4" {
+    if matches!(schema, b"MEDS4" | b"MEDS5") {
         let member_count = usize::try_from(r.u32()?).map_err(|_| ())?;
         if member_count > max_members {
             return Err(());
@@ -321,7 +325,7 @@ fn recfm_back(value: u8) -> Result<RecordFormat, ()> {
     }
 }
 
-fn encode_metadata(out: &mut Vec<u8>, entry: &Entry) -> Result<(), ()> {
+fn encode_metadata(out: &mut Vec<u8>, entry: &Entry, include_access_mode: bool) -> Result<(), ()> {
     u32v(out, entry.dcb.block_size);
     u16v(out, entry.dcb.buffer_count);
     optional_u32(out, entry.dcb.buffer_size);
@@ -356,6 +360,9 @@ fn encode_metadata(out: &mut Vec<u8>, entry: &Entry) -> Result<(), ()> {
     optional_u64(out, entry.vsam.control_area_size);
     out.push(entry.vsam.share_options.cross_region);
     out.push(entry.vsam.share_options.cross_system);
+    if include_access_mode {
+        out.push(vsam_access_mode(entry.vsam.access_mode));
+    }
     boolv(out, entry.vsam.spanned);
     boolv(out, entry.vsam.reuse);
     boolv(out, entry.vsam.speed);
@@ -383,6 +390,7 @@ fn decode_metadata(
     reader: &mut Reader<'_>,
     definition: &mut DatasetDefinition,
     max_items: usize,
+    has_access_mode: bool,
 ) -> Result<(), ()> {
     definition.dcb = DcbOptions {
         block_size: reader.u32()?,
@@ -428,6 +436,11 @@ fn decode_metadata(
         share_options: DatasetShareOptions {
             cross_region: reader.byte()?,
             cross_system: reader.byte()?,
+        },
+        access_mode: if has_access_mode {
+            vsam_access_mode_back(reader.byte()?)?
+        } else {
+            VsamAccessMode::NonRls
         },
         spanned: reader.bool()?,
         reuse: reader.bool()?,
@@ -515,6 +528,23 @@ fn buffering_back(value: u8) -> Result<BufferingMode, ()> {
         1 => Ok(BufferingMode::NonsharedResources),
         2 => Ok(BufferingMode::LocalSharedResources),
         3 => Ok(BufferingMode::GlobalSharedResources),
+        _ => Err(()),
+    }
+}
+
+fn vsam_access_mode(value: VsamAccessMode) -> u8 {
+    match value {
+        VsamAccessMode::NonRls => 0,
+        VsamAccessMode::Rls => 1,
+        VsamAccessMode::Tvs => 2,
+    }
+}
+
+fn vsam_access_mode_back(value: u8) -> Result<VsamAccessMode, ()> {
+    match value {
+        0 => Ok(VsamAccessMode::NonRls),
+        1 => Ok(VsamAccessMode::Rls),
+        2 => Ok(VsamAccessMode::Tvs),
         _ => Err(()),
     }
 }
@@ -732,7 +762,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn meds2_state_upgrades_to_the_typed_meds4_definition() {
+    fn meds2_state_upgrades_to_the_typed_meds5_definition() {
         let mut legacy = b"MEDS2".to_vec();
         legacy.extend_from_slice(&[0, 0]);
         legacy.extend_from_slice(&4u32.to_be_bytes());
@@ -760,12 +790,12 @@ mod tests {
             })
         );
         let upgraded = encode(&decoded).unwrap();
-        assert_eq!(&upgraded[..5], b"MEDS4");
+        assert_eq!(&upgraded[..5], b"MEDS5");
         assert_eq!(decode(&upgraded, 8, 80, 8).unwrap(), decoded);
     }
 
     #[test]
-    fn meds3_definition_upgrades_with_empty_pdse_directory() {
+    fn meds3_definition_upgrades_to_meds5_with_empty_pdse_directory() {
         let definition = DatasetDefinition::compatibility(DatasetAttributes {
             organization: DatasetOrganization::PartitionedExtended,
             record_format: RecordFormat::Fixed,
@@ -780,7 +810,29 @@ mod tests {
         assert!(decoded.member_generations.is_empty());
         assert!(decoded.member_aliases.is_empty());
         let upgraded = encode(&decoded).unwrap();
-        assert_eq!(&upgraded[..5], b"MEDS4");
+        assert_eq!(&upgraded[..5], b"MEDS5");
+        assert_eq!(decode(&upgraded, 8, 80, 8).unwrap(), decoded);
+    }
+
+    #[test]
+    fn meds4_state_defaults_to_non_rls_and_upgrades_without_data_loss() {
+        let definition = DatasetDefinition::compatibility(DatasetAttributes {
+            organization: DatasetOrganization::KeySequenced,
+            record_format: RecordFormat::Fixed,
+            logical_record_length: 4,
+            key_offset: Some(0),
+            key_length: Some(2),
+            ccsid: Some(37),
+        });
+        let mut original = Entry::from_definition(definition, 7);
+        original.records = vec![b"AA11".to_vec(), b"BB22".to_vec()];
+        let legacy = encode_state(&original, b"MEDS4", false).unwrap();
+        let decoded = decode(&legacy, 8, 80, 8).unwrap();
+        assert_eq!(decoded.vsam.access_mode, VsamAccessMode::NonRls);
+        assert_eq!(decoded.records, original.records);
+        assert_eq!(decoded.version, 7);
+        let upgraded = encode(&decoded).unwrap();
+        assert_eq!(&upgraded[..5], b"MEDS5");
         assert_eq!(decode(&upgraded, 8, 80, 8).unwrap(), decoded);
     }
 }

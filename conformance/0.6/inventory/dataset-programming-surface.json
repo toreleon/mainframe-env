@@ -10,7 +10,7 @@
     "pages": 610,
     "snapshot_date": "2026-06-22"
   },
-  "state_schema_version": 3,
+  "state_schema_version": 5,
   "families": [
     {
       "id": "organizations",
