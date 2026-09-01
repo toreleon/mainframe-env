@@ -22,6 +22,7 @@ use std::collections::{BTreeMap, BTreeSet};
 mod abi;
 mod carddemo;
 mod cobol_clauses;
+mod cobol_exit;
 mod cobol_frontend;
 mod cobol_functions;
 mod cobol_statements;
@@ -57,6 +58,7 @@ pub use carddemo::{
 };
 
 pub use cobol_clauses::verify_cobol_semantic_fixtures;
+pub use cobol_exit::{CobolExitReceipt, verify_cobol_exit};
 pub use cobol_frontend::{cobol_frontend_runtime, verify_cobol_frontend_fixtures};
 pub use cobol_functions::verify_cobol_function_fixtures;
 pub use cobol_statements::verify_cobol_statement_fixtures;

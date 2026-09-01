@@ -19,14 +19,15 @@ use mainframe_env_conformance::{
     verify_carddemo_resources_from_env, verify_carddemo_security_from_env,
     verify_carddemo_seeds_from_env, verify_carddemo_source_closures_from_env,
     verify_carddemo_source_preprocessing_from_env, verify_carddemo_terminal_from_env,
-    verify_carddemo_utilities_from_env, verify_carddemo_vsam_from_env,
+    verify_carddemo_utilities_from_env, verify_carddemo_vsam_from_env, verify_cobol_exit,
     verify_cobol_frontend_fixtures, verify_cobol_function_fixtures, verify_cobol_semantic_fixtures,
     verify_cobol_statement_fixtures, verify_host_abi_libraries,
 };
 use mainframe_env_coverage::{
     BindingKey, CompiledSpec, ConformanceLimits, ConformanceRunner, CoverageGate,
-    DerivedConformanceLedger, DriverRef, FixtureRef, ObligationId, OfficialCatalogRow,
+    DerivedConformanceLedger, DriverRef, FixtureRef, GateState, ObligationId, OfficialCatalogRow,
     OfficialRowId, RunnerContext, RunnerSelection, TestId, Verdict, VerdictEvent,
+    validate_verdict_batches,
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -123,6 +124,7 @@ enum XtaskCommand {
     ReviewRepairRound5(CheckArgs),
     SemanticIdentities(CheckArgs),
     CobolLanguage(CheckArgs),
+    CobolExit(CheckArgs),
     Spec(CheckArgs),
     Conformance(ConformanceArgs),
     Certification(CheckArgs),
@@ -318,6 +320,7 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
                 generate_cobol_language(root)
             }
         ),
+        XtaskCommand::CobolExit(args) => checked!("cobol-exit", args, check_cobol_exit(root)),
         XtaskCommand::Spec(args) => checked!("spec", args, check_spec(root)),
         XtaskCommand::Conformance(args) => {
             let focused = args.subsystem.is_some()
@@ -1804,6 +1807,113 @@ fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> T
         failed
     );
     require(failed == 0, "focused conformance produced failing verdicts")
+}
+
+fn check_cobol_exit(root: &Path) -> TaskResult {
+    check_spec(root)?;
+    let receipt = verify_cobol_exit()?;
+    require(
+        command_text(root, "git", &["rev-parse", "mainframe-env-v0.1.1^{}"])?
+            == "44f3081eb2fdf22d09e1a97725f5a4163431ca70",
+        "accepted 0.1.1 release commit moved",
+    )?;
+    require(
+        command_text(root, "git", &["rev-parse", "mainframe-env-v0.1.1^{tree}"])?
+            == "3d504ece02f1c09e124606ded695b00ba984d104",
+        "accepted 0.1.1 release tree moved",
+    )?;
+    let versions: Value = serde_json::from_str(&command_text(
+        root,
+        "git",
+        &[
+            "show",
+            "mainframe-env-v0.1.1:conformance/0.1/inventory/versions.json",
+        ],
+    )?)
+    .map_err(|error| format!("accepted 0.1.1 version inventory: {error}"))?;
+    require(
+        versions["contracts"]["artifact"] == "mainframe-env.artifact@1"
+            && versions["contracts"]["ir_binary"] == "mainframe-env.ir-binary@1"
+            && versions["contracts"]["ir_envelope"] == "mainframe-env.ir-envelope@1",
+        "accepted 0.1.1 artifact compatibility contracts drifted",
+    )?;
+
+    let limits = ConformanceLimits::default();
+    let spec = compile_shared_spec(root)?;
+    let selection = RunnerSelection::focused("cobol", None, None, limits)
+        .map_err(|problem| problem.to_string())?;
+    let context = RunnerContext::new(candidate_digest(root)?, "local", limits)
+        .map_err(|problem| problem.to_string())?;
+    let report = ConformanceRunner::new(&spec, cobol_frontend_runtime(&spec, limits)?, limits)
+        .run(&selection, &context)
+        .map_err(|problem| problem.to_string())?;
+    let events = report
+        .batches
+        .iter()
+        .flat_map(|batch| batch.events.iter())
+        .collect::<Vec<_>>();
+    require(
+        events.len() == 346
+            && events.iter().all(|event| event.verdict == Verdict::Pass)
+            && events
+                .iter()
+                .map(|event| event.cache_identity.as_str())
+                .collect::<BTreeSet<_>>()
+                .len()
+                == 346
+            && events.iter().all(|event| {
+                event.replay == format!("cargo xtask conformance --replay {}", event.test_id)
+            }),
+        "COBOL verdict, cache, or replay closure drifted",
+    )?;
+    let expected_batches = spec
+        .expected_shards()
+        .keys()
+        .filter(|shard| shard.subsystem == "cobol")
+        .count();
+    require(
+        report.batches.len() == expected_batches,
+        "COBOL shard closure drifted",
+    )?;
+    let cobol_rows = report
+        .ledger
+        .rows
+        .values()
+        .filter(|row| row.subsystem == "cobol")
+        .collect::<Vec<_>>();
+    require(
+        cobol_rows.len() == 173
+            && cobol_rows.iter().all(|row| {
+                row.gates[&CoverageGate::Recognized].state == GateState::Passed
+                    && row.gates[&CoverageGate::Validated].state == GateState::Passed
+                    && [
+                        CoverageGate::Executed,
+                        CoverageGate::Conditioned,
+                        CoverageGate::Recovered,
+                        CoverageGate::Differential,
+                    ]
+                    .into_iter()
+                    .all(|gate| row.gates[&gate].state == GateState::Pending)
+            }),
+        "COBOL ledger numerators or later-gate pending states drifted",
+    )?;
+    let mut incomplete = report.batches.clone();
+    incomplete.pop();
+    require(
+        validate_verdict_batches(&spec, &selection, &incomplete).is_err(),
+        "COBOL omitted-shard mutant survived",
+    )?;
+    println!(
+        "cobol-exit rows={} bindings={} shards={} malformed={} limits={} recovery={} prior-artifact-bytes={}",
+        receipt.official_rows,
+        events.len(),
+        report.batches.len(),
+        receipt.malformed_classes,
+        receipt.limit_classes,
+        receipt.recovery_classes,
+        receipt.prior_artifact_bytes,
+    );
+    Ok(())
 }
 
 fn candidate_digest(root: &Path) -> TaskResult<String> {
