@@ -2,6 +2,10 @@
 
 #![forbid(unsafe_code)]
 
+mod conformance;
+
+pub use conformance::*;
+
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -9,7 +13,7 @@ pub const COVERAGE_ROW_CONTRACT: &str = "mainframe-env.coverage-row@1";
 pub const COVERAGE_EVIDENCE_CONTRACT: &str = "mainframe-env.coverage-evidence@1";
 pub const COVERAGE_LEDGER_CONTRACT: &str = "mainframe-env.coverage-ledger@1";
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CoverageGate {
     Recognized,
     Validated,

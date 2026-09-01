@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/conformance-spec-v1.json",
+  "title": "mainframe-env shared Conformance IR v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "spec_version", "catalog_digest", "shard_count", "registries", "rows", "obligations", "cases", "scenarios"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.conformance-spec@1"},
+    "spec_version": {"const": "mainframe-env.conformance-ir@1"},
+    "catalog_digest": {"$ref": "#/$defs/digest"},
+    "shard_count": {"type": "integer", "minimum": 1, "maximum": 4096},
+    "registries": {"$ref": "#/$defs/registries"},
+    "rows": {"type": "array", "maxItems": 100000, "items": {"$ref": "#/$defs/row"}},
+    "obligations": {"type": "array", "maxItems": 1000000, "items": {"$ref": "#/$defs/obligation"}},
+    "cases": {"type": "array", "maxItems": 1000000, "items": {"$ref": "#/$defs/case"}},
+    "scenarios": {"type": "array", "maxItems": 100000, "items": {"$ref": "#/$defs/scenario"}}
+  },
+  "$defs": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[A-Za-z0-9_.:/@+\\-]+$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "gate": {"enum": ["recognized", "validated", "executed", "conditioned", "recovered", "differential"]},
+    "gates": {"type": "array", "minItems": 1, "maxItems": 6, "uniqueItems": true, "items": {"$ref": "#/$defs/gate"}},
+    "ids": {"type": "array", "maxItems": 100000, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "digest"],
+      "properties": {"id": {"$ref": "#/$defs/id"}, "digest": {"$ref": "#/$defs/digest"}}
+    },
+    "registries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operations", "input_shapes", "predicates", "transitions", "observations", "conditions", "recoveries", "oracles", "drivers", "fixtures", "scenario_steps", "failure_points"],
+      "properties": {
+        "operations": {"$ref": "#/$defs/ids"},
+        "input_shapes": {"$ref": "#/$defs/ids"},
+        "predicates": {"$ref": "#/$defs/ids"},
+        "transitions": {"$ref": "#/$defs/ids"},
+        "observations": {"$ref": "#/$defs/ids"},
+        "conditions": {"$ref": "#/$defs/ids"},
+        "recoveries": {"$ref": "#/$defs/ids"},
+        "oracles": {"type": "array", "maxItems": 100000, "items": {"$ref": "#/$defs/artifact"}},
+        "drivers": {"$ref": "#/$defs/ids"},
+        "fixtures": {"type": "array", "maxItems": 100000, "items": {"$ref": "#/$defs/artifact"}},
+        "scenario_steps": {"$ref": "#/$defs/ids"},
+        "failure_points": {"$ref": "#/$defs/ids"}
+      }
+    },
+    "row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["row_id", "operation", "input", "preconditions", "transition", "postconditions", "conditions", "recovery", "oracle", "applicable_gates", "obligations"],
+      "properties": {
+        "row_id": {"$ref": "#/$defs/id"},
+        "operation": {"$ref": "#/$defs/id"},
+        "input": {"$ref": "#/$defs/id"},
+        "preconditions": {"$ref": "#/$defs/ids"},
+        "transition": {"$ref": "#/$defs/id"},
+        "postconditions": {"$ref": "#/$defs/ids"},
+        "conditions": {"$ref": "#/$defs/ids"},
+        "recovery": {"anyOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
+        "oracle": {"anyOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
+        "applicable_gates": {"$ref": "#/$defs/gates"},
+        "obligations": {"type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
+      }
+    },
+    "obligation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["row_id", "obligation_id", "applicable_gates"],
+      "properties": {
+        "row_id": {"$ref": "#/$defs/id"},
+        "obligation_id": {"$ref": "#/$defs/id"},
+        "applicable_gates": {"$ref": "#/$defs/gates"}
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["spec_version", "row_id", "obligation_id", "gate", "test_id", "driver", "input", "preconditions", "expected", "recovery", "oracle"],
+      "properties": {
+        "spec_version": {"const": "mainframe-env.conformance-ir@1"},
+        "row_id": {"$ref": "#/$defs/id"},
+        "obligation_id": {"$ref": "#/$defs/id"},
+        "gate": {"$ref": "#/$defs/gate"},
+        "test_id": {"$ref": "#/$defs/id"},
+        "driver": {"$ref": "#/$defs/id"},
+        "input": {"$ref": "#/$defs/id"},
+        "preconditions": {"type": "array", "maxItems": 256, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "expected": {"type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "recovery": {"anyOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
+        "oracle": {"anyOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]}
+      }
+    },
+    "credit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["row_id", "obligation_id", "gate"],
+      "properties": {
+        "row_id": {"$ref": "#/$defs/id"},
+        "obligation_id": {"$ref": "#/$defs/id"},
+        "gate": {"$ref": "#/$defs/gate"}
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenario_id", "drivers", "ordered_steps", "failure_points", "credits"],
+      "properties": {
+        "scenario_id": {"$ref": "#/$defs/id"},
+        "drivers": {"type": "array", "minItems": 2, "maxItems": 1024, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "ordered_steps": {"type": "array", "minItems": 1, "maxItems": 1024, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "failure_points": {"type": "array", "maxItems": 1024, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "credits": {"type": "array", "minItems": 1, "maxItems": 100000, "uniqueItems": true, "items": {"$ref": "#/$defs/credit"}}
+      }
+    }
+  }
+}

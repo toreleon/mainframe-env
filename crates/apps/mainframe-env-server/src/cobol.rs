@@ -1059,6 +1059,7 @@ mod tests {
                     concatenation: false,
                     source_line: 1,
                     source_end_line: 1,
+                    parameters: Vec::new(),
                 }],
             })
             .unwrap();
@@ -1137,6 +1138,7 @@ mod tests {
                             concatenation: false,
                             source_line: 1,
                             source_end_line: 1,
+                            parameters: Vec::new(),
                         },
                         DdPlan {
                             name: "SYSLIB".into(),
@@ -1154,6 +1156,7 @@ mod tests {
                             concatenation: false,
                             source_line: 9,
                             source_end_line: 9,
+                            parameters: Vec::new(),
                         },
                     ],
                 },
@@ -1192,6 +1195,7 @@ mod tests {
                     concatenation: false,
                     source_line: 1,
                     source_end_line: 1,
+                    parameters: Vec::new(),
                 }],
             })
             .unwrap();

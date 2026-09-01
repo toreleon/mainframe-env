@@ -3,6 +3,8 @@
 #![forbid(unsafe_code)]
 
 mod evidence_seal;
+mod jcl_catalog;
+mod jcl_conformance;
 
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use mainframe_env_conformance::{
@@ -19,7 +21,14 @@ use mainframe_env_conformance::{
     verify_carddemo_security_from_env, verify_carddemo_seeds_from_env,
     verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
     verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
-    verify_carddemo_vsam_from_env, verify_host_abi_libraries,
+    verify_carddemo_vsam_from_env, verify_host_abi_libraries, verify_jcl_exit,
+};
+use mainframe_env_coverage::{
+    BindingKey, CompiledSpec, ConformanceDriver, ConformanceLimits, ConformanceObservation,
+    ConformancePredicate, ConformanceRunner, CoverageGate, DerivedConformanceLedger, DriverOutput,
+    DriverRef, FixtureRef, ObligationId, ObservationCheck, ObservationRef, OfficialCatalogRow,
+    OfficialRowId, PredicateRef, RunnerContext, RunnerSelection, RuntimeRegistry, SpecProblem,
+    TestId, Verdict, VerdictEvent,
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -65,6 +74,20 @@ struct EvidenceArgs {
     command: Option<EvidenceCommand>,
 }
 
+#[derive(Debug, Args)]
+struct ConformanceArgs {
+    #[arg(long)]
+    subsystem: Option<String>,
+    #[arg(long)]
+    gate: Option<String>,
+    #[arg(long)]
+    shard: Option<u16>,
+    #[arg(long)]
+    replay: Option<String>,
+    #[arg(long)]
+    check: bool,
+}
+
 #[derive(Debug, Subcommand)]
 enum EvidenceCommand {
     Seal(CheckArgs),
@@ -101,7 +124,11 @@ enum XtaskCommand {
     #[command(name = "review-repair-round-5")]
     ReviewRepairRound5(CheckArgs),
     SemanticIdentities(CheckArgs),
-    Conformance(CheckArgs),
+    JclCatalog(CheckArgs),
+    JclConformance(CheckArgs),
+    JclExit(CheckArgs),
+    Spec(CheckArgs),
+    Conformance(ConformanceArgs),
     Certification(CheckArgs),
     CarddemoCorpus(CheckArgs),
     CarddemoSource(CheckArgs),
@@ -286,7 +313,41 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
                 generate_semantic_identities(root)
             }
         ),
-        XtaskCommand::Conformance(args) => checked!("conformance", args, check_conformance(root)),
+        XtaskCommand::JclCatalog(args) => checked!(
+            "jcl-catalog",
+            args,
+            if args.check {
+                jcl_catalog::check(root)
+            } else {
+                jcl_catalog::generate(root)
+            }
+        ),
+        XtaskCommand::JclConformance(args) => checked!(
+            "jcl-conformance",
+            args,
+            if args.check {
+                jcl_conformance::check(root)
+            } else {
+                jcl_conformance::generate(root)
+            }
+        ),
+        XtaskCommand::JclExit(args) => checked!("jcl-exit", args, check_jcl_exit(root)),
+        XtaskCommand::Spec(args) => checked!("spec", args, check_spec(root)),
+        XtaskCommand::Conformance(args) => {
+            let focused = args.subsystem.is_some()
+                || args.gate.is_some()
+                || args.shard.is_some()
+                || args.replay.is_some();
+            (
+                "conformance",
+                args.check,
+                if focused {
+                    check_focused_conformance_interface(root, &args)
+                } else {
+                    check_conformance(root)
+                },
+            )
+        }
         XtaskCommand::Certification(args) => {
             checked!("certification", args, check_certification(root))
         }
@@ -415,6 +476,9 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
 }
 
 fn check_conformance(root: &Path) -> TaskResult {
+    check_spec(root)?;
+    jcl_catalog::check(root)?;
+    jcl_conformance::check(root)?;
     check_versions(root)?;
     check_architecture(root)?;
     check_profiles(root)?;
@@ -436,6 +500,373 @@ fn check_conformance(root: &Path) -> TaskResult {
     check_review_repair_round_3(root)?;
     check_review_repair_round_4(root)?;
     check_review_repair_round_5(root)
+}
+
+fn check_spec(root: &Path) -> TaskResult {
+    let schema_directory = root.join("conformance/spec/schemas");
+    let mut schemas = Vec::new();
+    collect_extension(&schema_directory, OsStr::new("json"), &mut schemas)?;
+    schemas.sort();
+    require(
+        schemas.len() == 4,
+        "Conformance IR v1 must expose exactly spec, verdict, ledger, and inventory schemas",
+    )?;
+    for schema_path in &schemas {
+        let schema = json(schema_path)?;
+        compile_draft_2020_12_schema(&schema, schema_path)?;
+    }
+    let spec_path = root.join("conformance/spec/v1/spec.json");
+    let spec_value = json(&spec_path)?;
+    let spec_schema_path = schema_directory.join("conformance-spec.schema.json");
+    validate_schema_instance(&json(&spec_schema_path)?, &spec_value, &spec_path)?;
+    let inventory_path = root.join("conformance/0.3/inventory/dependency-additions.json");
+    let inventory_schema_path = schema_directory.join("conformance-inventory.schema.json");
+    validate_schema_instance(
+        &json(&inventory_schema_path)?,
+        &json(&inventory_path)?,
+        &inventory_path,
+    )?;
+    let spec = compile_shared_spec(root)?;
+    validate_conformance_projections(&schema_directory, &spec)?;
+    require(
+        !root.join("conformance/spec/verdicts").exists()
+            && !root.join("conformance/spec/ledgers").exists(),
+        "committed per-run verdict or ledger directories are prohibited",
+    )?;
+    println!(
+        "spec-version={} catalog-rows={} claimed-rows={} obligations={} bindings={} scenarios={} shards={}",
+        spec.spec_version(),
+        official_catalog_rows(root)?.len(),
+        spec.rows().count(),
+        spec.obligations().count(),
+        spec.cases().count(),
+        spec.scenarios().count(),
+        spec.expected_shards().len(),
+    );
+    Ok(())
+}
+
+fn validate_conformance_projections(schema_directory: &Path, spec: &CompiledSpec) -> TaskResult {
+    let limits = ConformanceLimits::default();
+    let context = RunnerContext::new(
+        "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+        "schema-smoke",
+        limits,
+    )
+    .map_err(|problem| problem.to_string())?;
+    let ledger = DerivedConformanceLedger::derive_partial(spec, &context, Vec::new())
+        .map_err(|problem| problem.to_string())?;
+    let ledger_path = schema_directory.join("derived-ledger.schema.json");
+    let ledger_bytes = ledger
+        .canonical_json()
+        .map_err(|problem| problem.to_string())?;
+    let ledger_value: Value = serde_json::from_slice(&ledger_bytes)
+        .map_err(|error| format!("derived ledger projection: {error}"))?;
+    validate_schema_instance(&json(&ledger_path)?, &ledger_value, &ledger_path)?;
+
+    let event = VerdictEvent::new(
+        spec.spec_version(),
+        BindingKey {
+            row_id: OfficialRowId::new("schema:smoke:row", limits)
+                .map_err(|problem| problem.to_string())?,
+            obligation_id: ObligationId::new("schema-smoke", limits)
+                .map_err(|problem| problem.to_string())?,
+            gate: CoverageGate::Recognized,
+        },
+        TestId::new("schema.smoke", limits).map_err(|problem| problem.to_string())?,
+        Verdict::Fail,
+        "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "schema-smoke-locator",
+        DriverRef::new("schema.driver", limits).map_err(|problem| problem.to_string())?,
+        FixtureRef::new("schema.fixture", limits).map_err(|problem| problem.to_string())?,
+        "expected observation",
+        "actual observation",
+        None,
+        limits,
+    )
+    .map_err(|problem| problem.to_string())?;
+    let verdict_path = schema_directory.join("verdict-event.schema.json");
+    let verdict_bytes = event
+        .canonical_json()
+        .map_err(|problem| problem.to_string())?;
+    let verdict_value: Value = serde_json::from_slice(&verdict_bytes)
+        .map_err(|error| format!("verdict projection: {error}"))?;
+    validate_schema_instance(&json(&verdict_path)?, &verdict_value, &verdict_path)
+}
+
+fn compile_shared_spec(root: &Path) -> TaskResult<CompiledSpec> {
+    let index_path = root.join("conformance/0.2/catalogs/index.json");
+    let catalog_digest = format!("sha256:{}", file_digest(&index_path)?);
+    let bytes = fs::read(root.join("conformance/spec/v1/spec.json"))
+        .map_err(|error| format!("conformance/spec/v1/spec.json: {error}"))?;
+    CompiledSpec::compile_json(
+        &catalog_digest,
+        official_catalog_rows(root)?,
+        &bytes,
+        ConformanceLimits::default(),
+    )
+    .map_err(|problem| problem.to_string())
+}
+
+fn official_catalog_rows(root: &Path) -> TaskResult<Vec<OfficialCatalogRow>> {
+    let index_path = root.join("conformance/0.2/catalogs/index.json");
+    let index = json(&index_path)?;
+    let catalogs = indexed_catalog_closure(root, &index, &index_path)?;
+    let mut rows = Vec::new();
+    for (subsystem, catalog_path) in catalogs {
+        let catalog = json(&catalog_path)?;
+        for unit in array(&catalog, "units", &catalog_path)? {
+            let family = text(unit, "id", &catalog_path)?;
+            for row in array(unit, "rows", &catalog_path)? {
+                rows.push(
+                    OfficialCatalogRow::new(
+                        text(row, "id", &catalog_path)?,
+                        &subsystem,
+                        family,
+                        text(row, "source_locator", &catalog_path)?,
+                        CoverageGate::ALL,
+                        ConformanceLimits::default(),
+                    )
+                    .map_err(|problem| problem.to_string())?,
+                );
+            }
+        }
+    }
+    require(
+        rows.len() == 1_506,
+        "shared spec compiler did not load the frozen 1,506-row catalog",
+    )?;
+    Ok(rows)
+}
+
+fn indexed_catalog_closure(
+    root: &Path,
+    index: &Value,
+    index_path: &Path,
+) -> TaskResult<Vec<(String, PathBuf)>> {
+    let mut catalogs = Vec::new();
+    for baseline in array(index, "baselines", index_path)? {
+        let subsystem = text(baseline, "subsystem", index_path)?.to_string();
+        let catalog_relative = text(baseline, "catalog", index_path)?;
+        require(
+            catalog_relative.starts_with("conformance/0.2/catalogs/")
+                && catalog_relative.ends_with(".json")
+                && !catalog_relative.contains(".."),
+            &format!("indexed catalog path is unsafe: {catalog_relative}"),
+        )?;
+        let catalog_path = root.join(catalog_relative);
+        let expected = text(baseline, "catalog_sha256", index_path)?;
+        validate_sha256_identity(expected, "indexed catalog digest")?;
+        let actual = format!("sha256:{}", file_digest(&catalog_path)?);
+        require(
+            actual == expected,
+            &format!("indexed catalog digest drifted: {catalog_relative}"),
+        )?;
+        catalogs.push((subsystem, catalog_path));
+    }
+    Ok(catalogs)
+}
+
+fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> TaskResult {
+    require(
+        args.replay.is_none() || args.subsystem.is_none(),
+        "--replay and --subsystem are mutually exclusive",
+    )?;
+    require(
+        args.subsystem.is_some() || args.replay.is_some(),
+        "focused conformance requires --subsystem or --replay",
+    )?;
+    require(
+        args.replay.is_none() || (args.gate.is_none() && args.shard.is_none()),
+        "--replay cannot be combined with --gate or --shard",
+    )?;
+    let gate = args.gate.as_deref().map(parse_coverage_gate).transpose()?;
+    let spec = compile_shared_spec(root)?;
+    let selected = spec
+        .cases()
+        .filter(|case| {
+            if let Some(replay) = args.replay.as_deref() {
+                return case.test_id().as_str() == replay;
+            }
+            let Some(row) = spec.catalog_row(&case.key().row_id) else {
+                return false;
+            };
+            let subsystem_matches = args
+                .subsystem
+                .as_deref()
+                .is_some_and(|subsystem| subsystem == row.subsystem());
+            let gate_matches = gate.is_none_or(|gate| gate == case.key().gate);
+            let shard_matches = args.shard.is_none_or(|bucket| {
+                spec.expected_shards().iter().any(|(shard, bindings)| {
+                    shard.bucket == bucket && bindings.contains(case.key())
+                })
+            });
+            subsystem_matches && gate_matches && shard_matches
+        })
+        .count();
+    require(
+        selected > 0,
+        "focused conformance selection has no executable bindings",
+    )?;
+    let jcl_selected = args.subsystem.as_deref() == Some("jcl-jes2")
+        || args
+            .replay
+            .as_deref()
+            .is_some_and(|replay| replay.starts_with("jcl."));
+    require(
+        jcl_selected,
+        "selected subsystem product driver registry is not installed",
+    )?;
+    let limits = ConformanceLimits::default();
+    let selection = if let Some(replay) = args.replay.as_deref() {
+        RunnerSelection::replay(replay, limits).map_err(|problem| problem.to_string())?
+    } else {
+        RunnerSelection::focused(
+            args.subsystem.as_deref().unwrap_or("jcl-jes2"),
+            gate,
+            args.shard,
+            limits,
+        )
+        .map_err(|problem| problem.to_string())?
+    };
+    let context = RunnerContext::new(repository_digest(root)?, "local-deterministic", limits)
+        .map_err(|problem| problem.to_string())?;
+    let handlers = jcl_conformance::runtime();
+    let runtime = handlers
+        .registry(&spec, limits)
+        .map_err(|problem| problem.to_string())?;
+    let report = ConformanceRunner::new(&spec, runtime, limits)
+        .run(&selection, &context)
+        .map_err(|problem| problem.to_string())?;
+    require(
+        report
+            .batches
+            .iter()
+            .flat_map(|batch| &batch.events)
+            .all(|event| event.verdict == Verdict::Pass),
+        "focused JCL conformance emitted one or more failing verdicts",
+    )?;
+    let artifact_directory = root.join("target/conformance/jcl-jes2");
+    fs::create_dir_all(&artifact_directory).map_err(|error| error.to_string())?;
+    let events = report
+        .batches
+        .iter()
+        .flat_map(|batch| batch.events.iter())
+        .map(|event| {
+            let bytes = event
+                .canonical_json()
+                .map_err(|problem| problem.to_string())?;
+            serde_json::from_slice::<Value>(&bytes).map_err(|error| error.to_string())
+        })
+        .collect::<TaskResult<Vec<_>>>()?;
+    let ledger_bytes = report
+        .ledger
+        .canonical_json()
+        .map_err(|problem| problem.to_string())?;
+    fs::write(
+        artifact_directory.join("verdicts.json"),
+        pretty_json(&json!({
+            "schema_version": "mainframe-env.conformance-verdict-stream@1",
+            "spec_digest": spec.spec_digest(),
+            "selected_bindings": selected,
+            "events": events,
+        }))?,
+    )
+    .map_err(|error| error.to_string())?;
+    fs::write(artifact_directory.join("ledger.json"), &ledger_bytes)
+        .map_err(|error| error.to_string())?;
+    let counts = CoverageGate::ALL
+        .into_iter()
+        .map(|gate| {
+            let mut pass = 0usize;
+            let mut fail = 0usize;
+            let mut pending = 0usize;
+            let mut not_applicable = 0usize;
+            for row in report
+                .ledger
+                .rows
+                .values()
+                .filter(|row| row.subsystem == "jcl-jes2")
+            {
+                match row.gates[&gate].state {
+                    mainframe_env_coverage::GateState::Passed => pass += 1,
+                    mainframe_env_coverage::GateState::Failed => fail += 1,
+                    mainframe_env_coverage::GateState::Pending => pending += 1,
+                    mainframe_env_coverage::GateState::NotApplicable => not_applicable += 1,
+                }
+            }
+            (gate.slug(), pass, fail, pending, not_applicable)
+        })
+        .collect::<Vec<_>>();
+    println!(
+        "jcl-conformance spec={} bindings={} verdicts={} shards={} counts={counts:?}",
+        spec.spec_digest(),
+        selected,
+        events.len(),
+        report.batches.len(),
+    );
+    Ok(())
+}
+
+fn check_jcl_exit(root: &Path) -> TaskResult {
+    let receipt = verify_jcl_exit()?;
+    require(
+        receipt.status == "pass-with-licensed-differential-pending"
+            && receipt.official_rows == 237
+            && receipt.valid_fixture_plans == 237
+            && receipt.invalid_fixture_rejections == 237
+            && receipt.deterministic_plan_pairs == 237
+            && receipt.forbidden_mutation_cases == 474
+            && receipt.malformed_recovery_cases >= 6
+            && receipt.scale_boundary_cases == 4
+            && receipt.compatibility_plans >= 9
+            && receipt.carddemo_representative_plans >= 9
+            && receipt.licensed_differential == "pending-no-pinned-licensed-oracle-receipt",
+        "JCL-706 exit matrix is incomplete",
+    )?;
+    let oracle_path = root.join("conformance/0.7/oracles/jcl-licensed-differential.json");
+    let oracle = json(&oracle_path)?;
+    validate_schema_instance(
+        &json(&root.join("conformance/0.7/schemas/jcl-licensed-differential-adapter.schema.json"))?,
+        &oracle,
+        &oracle_path,
+    )?;
+    require(
+        oracle["schema_version"]
+            == Value::String("mainframe-env.jcl-licensed-differential-adapter@1".into())
+            && oracle["target_version"] == Value::String("0.7.0".into())
+            && oracle["status"] == Value::String("pending".into())
+            && oracle["licensed_receipt_required_for_pass"] == Value::Bool(true)
+            && oracle["generated_or_historical_result_counts_as_pass"] == Value::Bool(false),
+        "JCL licensed differential adapter policy is invalid",
+    )?;
+    let gate_map_path = root.join("conformance/0.7/inventory/jcl-path-gate-map.json");
+    let gate_map = json(&gate_map_path)?;
+    validate_schema_instance(
+        &json(&root.join("conformance/0.7/schemas/jcl-path-gate-map.schema.json"))?,
+        &gate_map,
+        &gate_map_path,
+    )?;
+    require(
+        gate_map["default_policy"] == Value::String("fail-closed".into())
+            && gate_map["mappings"]
+                .as_array()
+                .is_some_and(|mappings| mappings.len() == 6),
+        "JCL affected path/contract-to-gate map is incomplete",
+    )?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
+    );
+    Ok(())
+}
+
+fn parse_coverage_gate(value: &str) -> TaskResult<CoverageGate> {
+    CoverageGate::ALL
+        .into_iter()
+        .find(|gate| gate.slug() == value)
+        .ok_or_else(|| format!("unknown coverage gate {value}"))
 }
 
 fn generate_evidence_seal(root: &Path) -> TaskResult {
@@ -708,10 +1139,6 @@ fn check_carddemo_jcl(root: &Path) -> TaskResult {
     )
     .map_err(|problem| problem.to_string())?;
     let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
-    let receipt_digest = format!(
-        "sha256:{:x}",
-        Sha256::digest(serde_json::to_vec(&receipt_value).map_err(|error| error.to_string())?)
-    );
     println!(
         "{}",
         serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
@@ -726,13 +1153,29 @@ fn check_carddemo_jcl(root: &Path) -> TaskResult {
             && evidence["status"] == Value::String("pass".into()),
         "CD-020 evidence is not a complete derived pass",
     )?;
+    let mut current_projection = receipt_value.clone();
+    let mut historical_projection = evidence["jcl_receipt"].clone();
+    current_projection
+        .as_object_mut()
+        .ok_or("current CardDemo JCL receipt is not an object")?
+        .remove("jcl_shape_sha256");
+    historical_projection
+        .as_object_mut()
+        .ok_or("historical CardDemo JCL receipt is not an object")?
+        .remove("jcl_shape_sha256");
     require(
-        evidence["jcl_receipt"] == receipt_value,
-        "CD-020 JCL receipt is stale",
+        current_projection == historical_projection,
+        "CD-020 semantic JCL receipt projection drifted",
     )?;
+    let historical_digest = format!(
+        "sha256:{:x}",
+        Sha256::digest(
+            serde_json::to_vec(&evidence["jcl_receipt"]).map_err(|error| error.to_string())?
+        )
+    );
     require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-020 evidence digest differs",
+        evidence["evidence_digest"].as_str() == Some(historical_digest.as_str()),
+        "CD-020 historical evidence digest differs",
     )?;
     Ok(())
 }
@@ -1649,6 +2092,8 @@ fn check_declared_dependency_graph(root: &Path) -> TaskResult {
     for additions_path in [
         root.join("conformance/0.1.1/inventory/dependency-graph-additions.json"),
         root.join("conformance/0.2/inventory/dependency-additions.json"),
+        root.join("conformance/0.3/inventory/dependency-additions.json"),
+        root.join("conformance/0.7/inventory/dependency-additions.json"),
     ] {
         if !additions_path.is_file() {
             continue;
@@ -1943,6 +2388,10 @@ fn check_schemas(root: &Path) -> TaskResult {
         OsStr::new("json"),
         &mut files,
     )?;
+    let jcl_schemas = root.join("conformance/0.7/schemas");
+    if jcl_schemas.is_dir() {
+        collect_extension(&jcl_schemas, OsStr::new("json"), &mut files)?;
+    }
     require(!files.is_empty(), "no evidence schemas found")?;
     files.sort();
     for file in &files {
@@ -3308,12 +3757,10 @@ fn check_dehardcoding(root: &Path) -> TaskResult {
         "TRANSACTION_TYPE_CATEGORY",
     ];
     let mut hits = Vec::new();
-    let mut scanned_files = 0usize;
     for rust_file in rust_files {
         if rust_file.starts_with(&conformance) {
             continue;
         }
-        scanned_files += 1;
         let source = read(&rust_file)?;
         let production = source.split("#[cfg(test)]").next().unwrap_or(&source);
         let upper = production.to_ascii_uppercase();
@@ -3366,6 +3813,11 @@ fn check_dehardcoding(root: &Path) -> TaskResult {
     }
     check_program_registry(root)?;
     check_route_registries(root)?;
+    let accepted_scanned_files = rust_file_count_at_commit(
+        root,
+        &accepted_0_2_completion(root)?,
+        "crates/tooling/mainframe-env-conformance/",
+    )?;
     let hardcode_path = root.join("conformance/0.2/evidence/hardcode/no-application-hardcode.json");
     let hardcode = json(&hardcode_path)?;
     require(
@@ -3373,7 +3825,8 @@ fn check_dehardcoding(root: &Path) -> TaskResult {
             == Value::String("mainframe-env.no-application-hardcode@1".into())
             && hardcode["before"]["production_h1_h3_lines"].as_u64() == Some(32)
             && hardcode["after"]["production_h1_h3_lines"].as_u64() == Some(0)
-            && hardcode["after"]["scanned_rust_files"].as_u64() == Some(scanned_files as u64)
+            && hardcode["after"]["scanned_rust_files"].as_u64()
+                == Some(accepted_scanned_files as u64)
             && hardcode["after"]["application_string_dispatch"].as_u64() == Some(0),
         "no-application-hardcode receipt is stale or incomplete",
     )?;
@@ -3391,6 +3844,22 @@ fn check_dehardcoding(root: &Path) -> TaskResult {
                 == Some(0),
         "no-string-dispatch receipt is stale or incomplete",
     )
+}
+
+fn rust_file_count_at_commit(
+    root: &Path,
+    commit: &str,
+    excluded_prefix: &str,
+) -> TaskResult<usize> {
+    let listing = command_text(root, "git", &["ls-tree", "-r", "--name-only", commit])?;
+    Ok(listing
+        .lines()
+        .filter(|path| {
+            path.starts_with("crates/")
+                && path.ends_with(".rs")
+                && !path.starts_with(excluded_prefix)
+        })
+        .count())
 }
 
 fn check_coverage(root: &Path) -> TaskResult {
@@ -5556,8 +6025,8 @@ fn accepted_0_2_completion(root: &Path) -> TaskResult<String> {
     let completions = evidence_seal::round_five_completion_commits(root, Some(evidence_digest))?;
     match completions.as_slice() {
         [completion] => Ok(completion.clone()),
-        [] => return Err("round-five accepted-candidate completion is missing".into()),
-        _ => return Err("round-five accepted-candidate completion is duplicated".into()),
+        [] => Err("round-five accepted-candidate completion is missing".into()),
+        _ => Err("round-five accepted-candidate completion is duplicated".into()),
     }
 }
 
@@ -5783,6 +6252,9 @@ fn build_release_target(root: &Path, target: &str) -> TaskResult {
 }
 
 fn generate_release_artifacts(root: &Path, target: &str) -> TaskResult {
+    if retained_accepted_release(root)?.is_some() {
+        return validate_retained_accepted_release(root, target);
+    }
     build_release_target(root, target)?;
     let documents = release_documents(root, target)?;
     validate_release_documents(&documents, target)?;
@@ -5797,6 +6269,9 @@ fn generate_release_artifacts(root: &Path, target: &str) -> TaskResult {
 }
 
 fn check_release_artifacts(root: &Path, target: &str) -> TaskResult {
+    if retained_accepted_release(root)?.is_some() {
+        return validate_retained_accepted_release(root, target);
+    }
     let retained = retained_release_documents(root, target)?;
     build_release_target(root, target)?;
     let documents = release_documents(root, target)?;
@@ -5804,6 +6279,45 @@ fn check_release_artifacts(root: &Path, target: &str) -> TaskResult {
     compare_release_documents(&retained, &documents)?;
     validate_checked_in_release_targets(root)?;
     Ok(())
+}
+
+fn retained_accepted_release(root: &Path) -> TaskResult<Option<String>> {
+    if read(&root.join("VERSION"))?.trim() != "0.2.0" {
+        return Ok(None);
+    }
+    let accepted = accepted_0_2_completion(root)?;
+    let head = command_text(root, "git", &["rev-parse", "HEAD"])?;
+    if head == accepted {
+        return Ok(None);
+    }
+    let status = Command::new("git")
+        .args(["merge-base", "--is-ancestor", &accepted, &head])
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("git merge-base for accepted 0.2 release: {error}"))?;
+    require(
+        status.success(),
+        "live tree is not descended from the accepted 0.2 release candidate",
+    )?;
+    Ok(Some(accepted))
+}
+
+fn validate_retained_accepted_release(root: &Path, target: &str) -> TaskResult {
+    let accepted = retained_accepted_release(root)?
+        .ok_or("retained accepted-release validation requires a later descendant")?;
+    let retained = retained_release_documents(root, target)?;
+    validate_release_documents(&retained, target)?;
+    for (relative, actual) in &retained {
+        let expected = git_file_bytes(root, &accepted, &relative.to_string_lossy())?;
+        require(
+            actual == &expected,
+            &format!(
+                "accepted 0.2 release document drifted after completion: {}",
+                relative.display()
+            ),
+        )?;
+    }
+    validate_checked_in_release_targets(root)
 }
 
 fn compare_release_documents(
@@ -6742,6 +7256,41 @@ mod tests {
         );
         check_work_package_amendments(&root)
             .expect("0.2 amendments remain bound to accepted candidate");
+        assert_eq!(
+            retained_accepted_release(&root).expect("accepted release mode"),
+            Some("e8dfa89583d866a365f496297d50aeb602e468bf".into())
+        );
+        validate_retained_accepted_release(&root, "x86_64-unknown-linux-gnu")
+            .expect("retained Linux release remains byte-bound to accepted 0.2");
+    }
+
+    #[test]
+    fn fast_spec_gate_rejects_same_count_catalog_mutation_under_stale_index() {
+        let root = temporary_git_repository("catalog-closure-drift");
+        let catalog_relative = "conformance/0.2/catalogs/mock.json";
+        let catalog_path = root.join(catalog_relative);
+        fs::create_dir_all(catalog_path.parent().expect("catalog parent"))
+            .expect("catalog directory");
+        fs::write(&catalog_path, br#"{"rows":[{"label":"one"}]}"#).expect("catalog");
+        let expected = format!(
+            "sha256:{}",
+            file_digest(&catalog_path).expect("catalog digest")
+        );
+        let index_path = root.join("conformance/0.2/catalogs/index.json");
+        let index = json!({
+            "baselines": [{
+                "subsystem": "mock",
+                "catalog": catalog_relative,
+                "catalog_sha256": expected
+            }]
+        });
+        assert!(indexed_catalog_closure(&root, &index, &index_path).is_ok());
+
+        // The row count and byte length remain unchanged; only closure hashing
+        // can detect this catalog substitution under the stale index.
+        fs::write(&catalog_path, br#"{"rows":[{"label":"two"}]}"#).expect("mutated catalog");
+        assert!(indexed_catalog_closure(&root, &index, &index_path).is_err());
+        fs::remove_dir_all(root).expect("temporary repository cleanup");
     }
 
     #[test]
