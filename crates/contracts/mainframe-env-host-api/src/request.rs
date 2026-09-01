@@ -364,6 +364,12 @@ pub enum DatasetRequest {
         key_offset: u32,
         key_length: u32,
         allow_duplicates: bool,
+        upgrade: bool,
+        mutation: Mutation,
+    },
+    BuildAlternateIndex {
+        base: DatasetName,
+        index: DatasetName,
         mutation: Mutation,
     },
     DefinePath {
@@ -1024,6 +1030,7 @@ impl HostRequest {
                     | DatasetRequest::RewriteRecord { .. }
                     | DatasetRequest::DeleteRecord { .. }
                     | DatasetRequest::DefineAlternateIndex { .. }
+                    | DatasetRequest::BuildAlternateIndex { .. }
                     | DatasetRequest::DefinePath { .. }
                     | DatasetRequest::WriteRelative { .. }
                     | DatasetRequest::DeleteRelative { .. }
@@ -1076,6 +1083,7 @@ impl HostRequest {
                 | DatasetRequest::RewriteRecord { mutation, .. }
                 | DatasetRequest::DeleteRecord { mutation, .. }
                 | DatasetRequest::DefineAlternateIndex { mutation, .. }
+                | DatasetRequest::BuildAlternateIndex { mutation, .. }
                 | DatasetRequest::DefinePath { mutation, .. }
                 | DatasetRequest::WriteRelative { mutation, .. }
                 | DatasetRequest::DeleteRelative { mutation, .. }
@@ -1754,6 +1762,7 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
                 mutation.validate(limits)
             }
         }
+        DatasetRequest::BuildAlternateIndex { mutation, .. } => mutation.validate(limits),
         DatasetRequest::DefinePath { mutation, .. } => mutation.validate(limits),
         DatasetRequest::WriteRelative {
             record_number,

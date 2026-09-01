@@ -555,6 +555,28 @@ fn check_dataset_fixture_bindings(root: &Path, spec: &CompiledSpec) -> TaskResul
         actual.keys().cloned().collect::<BTreeSet<_>>() == expected_ids
             && actual.values().all(|digest| digest == &expected_digest),
         "dataset organization fixture registry is stale or incomplete",
+    )?;
+    let ams_path = root.join("conformance/0.6/fixtures/ams-commands.json");
+    let ams_fixture = json(&ams_path)?;
+    let ams_rows = array(&ams_fixture, "cases", &ams_path)?;
+    unique_rows(ams_rows, "id", &ams_path)?;
+    require(ams_rows.len() == 31, "AMS fixture denominator must be 31")?;
+    let ams_digest = format!("sha256:{}", file_digest(&ams_path)?);
+    let ams_ids = ams_rows
+        .iter()
+        .map(|row| text(row, "id", &ams_path).map(str::to_string))
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    let actual_ams = spec
+        .registries()
+        .fixtures()
+        .iter()
+        .filter(|(fixture, _)| fixture.as_str().starts_with("ams."))
+        .map(|(fixture, digest)| (fixture.as_str().to_string(), digest.clone()))
+        .collect::<BTreeMap<_, _>>();
+    require(
+        actual_ams.keys().cloned().collect::<BTreeSet<_>>() == ams_ids
+            && actual_ams.values().all(|digest| digest == &ams_digest),
+        "AMS fixture registry is stale or incomplete",
     )
 }
 
@@ -610,8 +632,10 @@ fn validate_conformance_projections(schema_directory: &Path, spec: &CompiledSpec
 fn compile_shared_spec(root: &Path) -> TaskResult<CompiledSpec> {
     let index_path = root.join("conformance/0.2/catalogs/index.json");
     let catalog_digest = format!("sha256:{}", file_digest(&index_path)?);
-    let bytes = fs::read(root.join("conformance/spec/v1/spec.json"))
-        .map_err(|error| format!("conformance/spec/v1/spec.json: {error}"))?;
+    let spec_path = root.join("conformance/spec/v1/spec.json");
+    let mut spec_value = json(&spec_path)?;
+    augment_ams_spec(root, &mut spec_value)?;
+    let bytes = serde_json::to_vec(&spec_value).map_err(|error| error.to_string())?;
     CompiledSpec::compile_json(
         &catalog_digest,
         official_catalog_rows(root)?,
@@ -619,6 +643,106 @@ fn compile_shared_spec(root: &Path) -> TaskResult<CompiledSpec> {
         ConformanceLimits::default(),
     )
     .map_err(|problem| problem.to_string())
+}
+
+fn augment_ams_spec(root: &Path, spec: &mut Value) -> TaskResult {
+    let fixture_path = root.join("conformance/0.6/fixtures/ams-commands.json");
+    let fixture = json(&fixture_path)?;
+    let cases = array(&fixture, "cases", &fixture_path)?;
+    let digest = format!("sha256:{}", file_digest(&fixture_path)?);
+    let registries = spec
+        .get_mut("registries")
+        .and_then(Value::as_object_mut)
+        .ok_or("conformance spec registries are missing")?;
+    for (name, value) in [
+        ("operations", "dataset.ams.command"),
+        ("input_shapes", "dataset.ams.fixture"),
+        ("transitions", "dataset.ams.transition"),
+        ("conditions", "dataset.ams.condition"),
+        ("recoveries", "dataset.ams.restart"),
+        ("drivers", "dataset.ams.driver"),
+    ] {
+        registries
+            .get_mut(name)
+            .and_then(Value::as_array_mut)
+            .ok_or_else(|| format!("conformance registry {name} is missing"))?
+            .push(Value::String(value.into()));
+    }
+    let mut new_observations = Vec::new();
+    let mut new_fixtures = Vec::new();
+    for case in cases {
+        let fixture_id = text(case, "id", &fixture_path)?;
+        new_observations.push(Value::String(format!("observe.{fixture_id}")));
+        new_fixtures.push(json!({"id": fixture_id, "digest": digest.clone()}));
+    }
+    registries
+        .get_mut("observations")
+        .and_then(Value::as_array_mut)
+        .ok_or("conformance observation registry is missing")?
+        .extend(new_observations);
+    registries
+        .get_mut("fixtures")
+        .and_then(Value::as_array_mut)
+        .ok_or("conformance fixture registry is missing")?
+        .extend(new_fixtures);
+
+    let mut new_rows = Vec::new();
+    let mut new_obligations = Vec::new();
+    let mut new_bindings = Vec::new();
+    for (position, case) in cases.iter().enumerate() {
+        let command = text(case, "command_id", &fixture_path)?;
+        let fixture_id = text(case, "id", &fixture_path)?;
+        let row_id = format!(
+            "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:{:04}",
+            position + 1
+        );
+        new_rows.push(json!({
+            "row_id": row_id,
+            "operation": "dataset.ams.command",
+            "input": "dataset.ams.fixture",
+            "preconditions": [],
+            "transition": "dataset.ams.transition",
+            "postconditions": [format!("observe.{fixture_id}")],
+            "conditions": ["dataset.ams.condition"],
+            "recovery": "dataset.ams.restart",
+            "oracle": null,
+            "applicable_gates": ["recognized", "validated", "executed", "conditioned", "recovered", "differential"],
+            "obligations": ["command-contract"]
+        }));
+        new_obligations.push(json!({
+            "row_id": row_id,
+            "obligation_id": "command-contract",
+            "applicable_gates": ["recognized", "validated", "executed"]
+        }));
+        for gate in ["recognized", "validated", "executed"] {
+            new_bindings.push(json!({
+                "spec_version": "mainframe-env.conformance-ir@1",
+                "row_id": row_id,
+                "obligation_id": "command-contract",
+                "gate": gate,
+                "test_id": format!("dataset.ams.{command}.{gate}"),
+                "driver": "dataset.ams.driver",
+                "input": fixture_id,
+                "preconditions": [],
+                "expected": [format!("observe.{fixture_id}")],
+                "recovery": "dataset.ams.restart",
+                "oracle": null
+            }));
+        }
+    }
+    spec.get_mut("rows")
+        .and_then(Value::as_array_mut)
+        .ok_or("conformance spec rows are missing")?
+        .extend(new_rows);
+    spec.get_mut("obligations")
+        .and_then(Value::as_array_mut)
+        .ok_or("conformance spec obligations are missing")?
+        .extend(new_obligations);
+    spec.get_mut("cases")
+        .and_then(Value::as_array_mut)
+        .ok_or("conformance spec cases are missing")?
+        .extend(new_bindings);
+    Ok(())
 }
 
 fn official_catalog_rows(root: &Path) -> TaskResult<Vec<OfficialCatalogRow>> {
@@ -2349,7 +2473,10 @@ fn check_schemas(root: &Path) -> TaskResult {
         &json(&organization_schema)?,
         &json(&organization_fixture)?,
         &organization_fixture,
-    )
+    )?;
+    let ams_fixture = root.join("conformance/0.6/fixtures/ams-commands.json");
+    let ams_schema = root.join("conformance/0.6/schemas/ams-command-fixtures.schema.json");
+    validate_schema_instance(&json(&ams_schema)?, &json(&ams_fixture)?, &ams_fixture)
 }
 
 fn compile_draft_2020_12_schema(schema: &Value, path: &Path) -> TaskResult<jsonschema::Validator> {
@@ -2586,7 +2713,13 @@ fn generate_dataset_contract(root: &Path) -> TaskResult {
         fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
     }
     fs::write(&path, render_dataset_contract(root)?)
-        .map_err(|error| format!("{}: {error}", path.display()))
+        .map_err(|error| format!("{}: {error}", path.display()))?;
+    let ams_path = root.join("crates/apps/mainframe-env-batch/src/generated/ams_grammar.rs");
+    if let Some(parent) = ams_path.parent() {
+        fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
+    }
+    fs::write(&ams_path, render_ams_grammar(root)?)
+        .map_err(|error| format!("{}: {error}", ams_path.display()))
 }
 
 fn check_dataset_contract(root: &Path) -> TaskResult {
@@ -2597,7 +2730,97 @@ fn check_dataset_contract(root: &Path) -> TaskResult {
     require(
         fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))? == expected,
         "generated dataset programming surface is stale; run cargo xtask dataset-contract",
+    )?;
+    let ams_path = root.join("crates/apps/mainframe-env-batch/src/generated/ams_grammar.rs");
+    require(
+        fs::read(&ams_path).map_err(|error| format!("{}: {error}", ams_path.display()))?
+            == render_ams_grammar(root)?,
+        "generated AMS grammar is stale; run cargo xtask dataset-contract",
     )
+}
+
+fn render_ams_grammar(root: &Path) -> TaskResult<Vec<u8>> {
+    let grammar_path = root.join("conformance/0.6/ams/grammar.json");
+    let schema_path = root.join("conformance/0.6/schemas/ams-grammar.schema.json");
+    let grammar = json(&grammar_path)?;
+    validate_schema_instance(&json(&schema_path)?, &grammar, &grammar_path)?;
+    let commands = array(&grammar, "commands", &grammar_path)?;
+    unique_rows(commands, "id", &grammar_path)?;
+    require(
+        commands.len() == 31,
+        "AMS grammar must contain exactly 31 commands",
+    )?;
+
+    let inventory_path = root.join("conformance/0.6/inventory/dataset-programming-surface.json");
+    let inventory = json(&inventory_path)?;
+    let ams_family = array(&inventory, "families", &inventory_path)?
+        .iter()
+        .find(|family| family["id"] == Value::String("ams-commands".into()))
+        .ok_or("dataset surface AMS family is missing")?;
+    let ams_items = array(ams_family, "items", &inventory_path)?;
+    require(
+        ams_items.len() == commands.len(),
+        "AMS grammar and programming surface counts differ",
+    )?;
+    for (command, surface) in commands.iter().zip(ams_items) {
+        for field in ["id", "label", "implementation"] {
+            require(
+                text(command, field, &grammar_path)? == text(surface, field, &inventory_path)?,
+                &format!("AMS grammar {field} differs from the programming surface"),
+            )?;
+        }
+        let capability = command["capability"].as_str();
+        require(
+            (text(command, "implementation", &grammar_path)? == "required" && capability.is_none())
+                || (text(command, "implementation", &grammar_path)? == "capability-gated"
+                    && capability.is_some()),
+            "AMS grammar capability does not match implementation class",
+        )?;
+    }
+
+    let mut source =
+        String::from("// @generated by `cargo xtask dataset-contract`; do not edit.\n\n");
+    source.push_str(&format!(
+        "pub const AMS_GRAMMAR_SHA256: &str = \"sha256:{}\";\n\n",
+        file_digest(&grammar_path)?
+    ));
+    source.push_str("pub(crate) static AMS_GRAMMAR: &[super::AmsGrammarEntry] = &[\n");
+    for command in commands {
+        source.push_str("    super::AmsGrammarEntry {\n");
+        for field in ["id", "label"] {
+            source.push_str(&format!(
+                "        {field}: {},\n",
+                serde_json::to_string(text(command, field, &grammar_path)?)
+                    .map_err(|error| error.to_string())?
+            ));
+        }
+        source.push_str("        keywords: &[");
+        for keyword in array(command, "keywords", &grammar_path)? {
+            source.push_str(
+                &serde_json::to_string(
+                    keyword
+                        .as_str()
+                        .ok_or_else(|| "AMS grammar keyword is not text".to_string())?,
+                )
+                .map_err(|error| error.to_string())?,
+            );
+            source.push_str(", ");
+        }
+        source.push_str("],\n");
+        source.push_str(&format!(
+            "        capability: {},\n",
+            command["capability"].as_str().map_or_else(
+                || "None".to_string(),
+                |value| format!(
+                    "Some({})",
+                    serde_json::to_string(value).unwrap_or_else(|_| "\"invalid\"".into())
+                )
+            )
+        ));
+        source.push_str("    },\n");
+    }
+    source.push_str("];\n");
+    Ok(source.into_bytes())
 }
 
 fn render_dataset_contract(root: &Path) -> TaskResult<Vec<u8>> {

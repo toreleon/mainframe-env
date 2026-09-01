@@ -588,6 +588,7 @@ struct AlternateIndex {
     key_offset: u32,
     key_length: u32,
     allow_duplicates: bool,
+    upgrade: bool,
     version: u64,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2767,8 +2768,16 @@ impl DatasetService {
                 key_offset,
                 key_length,
                 allow_duplicates,
+                upgrade,
                 mutation,
             } => {
+                if !upgrade {
+                    return Err(HostProblem::UnsupportedCapability {
+                        capability: "alternate-index-no-upgrade".into(),
+                        detail: "NOUPGRADE requires a materialized non-upgrading AIX adapter"
+                            .into(),
+                    });
+                }
                 if state
                     .entries
                     .len()
@@ -2793,6 +2802,7 @@ impl DatasetService {
                     key_offset: *key_offset,
                     key_length: *key_length,
                     allow_duplicates: *allow_duplicates,
+                    upgrade: *upgrade,
                     version: 1,
                 };
                 validate_alternate_index(base_entry, &definition)?;
@@ -2844,6 +2854,73 @@ impl DatasetService {
                     .alternate_indexes
                     .insert(index.as_str().into(), definition);
                 state.dependencies = dependencies;
+                state
+                    .replay
+                    .insert(mutation.idempotency_key.as_str().into(), replay);
+                Ok(result)
+            }
+            DatasetRequest::BuildAlternateIndex {
+                base,
+                index,
+                mutation,
+            } => {
+                let current = state
+                    .alternate_indexes
+                    .get(index.as_str())
+                    .cloned()
+                    .ok_or(HostProblem::NotFound)?;
+                if current.is_path {
+                    return Err(HostProblem::Unsupported);
+                }
+                if current.base != base.as_str() {
+                    return Err(condition("INVREQ", 16));
+                }
+                validate_alternate_index(entry_text(state, &current.base)?, &current)?;
+                let mut updates = state
+                    .alternate_indexes
+                    .iter()
+                    .filter(|(name, candidate)| {
+                        name.as_str() == index.as_str() || candidate.parent == index.as_str()
+                    })
+                    .map(|(name, candidate)| {
+                        let mut next = candidate.clone();
+                        next.version = next
+                            .version
+                            .checked_add(1)
+                            .ok_or(HostProblem::ResourceExhausted)?;
+                        Ok((name.clone(), candidate.version, next))
+                    })
+                    .collect::<Result<Vec<_>, HostProblem>>()?;
+                updates.sort_by(|left, right| left.0.cmp(&right.0));
+                let version = updates
+                    .iter()
+                    .find(|(name, _, _)| name == index.as_str())
+                    .map(|(_, _, next)| next.version)
+                    .ok_or(HostProblem::InfrastructureFailure)?;
+                let result = DatasetResult::Mutated { version };
+                let replay = Replay {
+                    request_digest: request_digest(request)?,
+                    result: Some(result.clone()),
+                };
+                let mut mutations = updates
+                    .iter()
+                    .map(|(name, expected, next)| {
+                        Ok(ProviderStateMutation::Put(ProviderStateWrite {
+                            record: ProviderStateRecord {
+                                namespace: "dataset-aix".into(),
+                                key: name.clone(),
+                                version: next.version,
+                                payload: encode_alternate_index(next)?,
+                            },
+                            expected_version: Some(*expected),
+                        }))
+                    })
+                    .collect::<Result<Vec<_>, HostProblem>>()?;
+                mutations.push(replay_mutation(mutation, &replay)?);
+                self.commit_catalog_mutations(mutations, mutation, &replay)?;
+                for (name, _, next) in updates {
+                    state.alternate_indexes.insert(name, next);
+                }
                 state
                     .replay
                     .insert(mutation.idempotency_key.as_str().into(), replay);
@@ -4909,25 +4986,26 @@ fn decode_catalog_alias(payload: &[u8], version: u64) -> Result<CatalogAlias, Ho
 }
 
 fn encode_alternate_index(index: &AlternateIndex) -> Result<Vec<u8>, HostProblem> {
-    let mut payload = b"MEAIX2".to_vec();
+    let mut payload = b"MEAIX3".to_vec();
     dataset_field(&mut payload, index.base.as_bytes())?;
     dataset_field(&mut payload, index.parent.as_bytes())?;
     payload.push(u8::from(index.is_path));
     payload.extend_from_slice(&index.key_offset.to_be_bytes());
     payload.extend_from_slice(&index.key_length.to_be_bytes());
     payload.push(u8::from(index.allow_duplicates));
+    payload.push(u8::from(index.upgrade));
     Ok(payload)
 }
 
 fn decode_alternate_index(payload: &[u8], version: u64) -> Result<AlternateIndex, HostProblem> {
     let schema = payload.get(..6);
-    if !matches!(schema, Some(b"MEAIX1") | Some(b"MEAIX2")) || version == 0 {
+    if !matches!(schema, Some(b"MEAIX1") | Some(b"MEAIX2") | Some(b"MEAIX3")) || version == 0 {
         return Err(HostProblem::InfrastructureFailure);
     }
     let mut at = 6usize;
     let base = String::from_utf8(dataset_take_field(payload, &mut at, 128)?)
         .map_err(|_| HostProblem::InfrastructureFailure)?;
-    let (parent, is_path) = if schema == Some(b"MEAIX2") {
+    let (parent, is_path) = if matches!(schema, Some(b"MEAIX2") | Some(b"MEAIX3")) {
         let parent = String::from_utf8(dataset_take_field(payload, &mut at, 128)?)
             .map_err(|_| HostProblem::InfrastructureFailure)?;
         let is_path = match payload.get(at) {
@@ -4962,6 +5040,17 @@ fn decode_alternate_index(payload: &[u8], version: u64) -> Result<AlternateIndex
         _ => return Err(HostProblem::InfrastructureFailure),
     };
     at += 1;
+    let upgrade = if schema == Some(b"MEAIX3") {
+        let value = match payload.get(at) {
+            Some(0) => false,
+            Some(1) => true,
+            _ => return Err(HostProblem::InfrastructureFailure),
+        };
+        at += 1;
+        value
+    } else {
+        true
+    };
     if at != payload.len() || base.is_empty() || key_length == 0 {
         return Err(HostProblem::InfrastructureFailure);
     }
@@ -4972,6 +5061,7 @@ fn decode_alternate_index(payload: &[u8], version: u64) -> Result<AlternateIndex
         key_offset,
         key_length,
         allow_duplicates,
+        upgrade,
         version,
     })
 }
@@ -5437,6 +5527,7 @@ fn mutation(request: &DatasetRequest) -> Option<&mainframe_env_host_api::Mutatio
         | DatasetRequest::RewriteRecord { mutation, .. }
         | DatasetRequest::DeleteRecord { mutation, .. }
         | DatasetRequest::DefineAlternateIndex { mutation, .. }
+        | DatasetRequest::BuildAlternateIndex { mutation, .. }
         | DatasetRequest::DefinePath { mutation, .. }
         | DatasetRequest::WriteRelative { mutation, .. }
         | DatasetRequest::DeleteRelative { mutation, .. }
@@ -5518,6 +5609,7 @@ fn atomic_dataset_request(request: &DatasetRequest) -> bool {
             | DatasetRequest::RewriteRecord { .. }
             | DatasetRequest::DeleteRecord { .. }
             | DatasetRequest::DefineAlternateIndex { .. }
+            | DatasetRequest::BuildAlternateIndex { .. }
             | DatasetRequest::DefinePath { .. }
             | DatasetRequest::WriteRelative { .. }
             | DatasetRequest::DeleteRelative { .. }
@@ -6317,6 +6409,7 @@ fn request_digest(request: &DatasetRequest) -> Result<[u8; 32], HostProblem> {
             key_offset,
             key_length,
             allow_duplicates,
+            upgrade,
             mutation,
         } => {
             digest_field(&mut digest, b"define-alternate-index");
@@ -6325,6 +6418,17 @@ fn request_digest(request: &DatasetRequest) -> Result<[u8; 32], HostProblem> {
             digest_field(&mut digest, &key_offset.to_be_bytes());
             digest_field(&mut digest, &key_length.to_be_bytes());
             digest_field(&mut digest, &[u8::from(*allow_duplicates)]);
+            digest_field(&mut digest, &[u8::from(*upgrade)]);
+            digest_mutation(&mut digest, mutation);
+        }
+        DatasetRequest::BuildAlternateIndex {
+            base,
+            index,
+            mutation,
+        } => {
+            digest_field(&mut digest, b"build-alternate-index");
+            digest_field(&mut digest, base.as_str().as_bytes());
+            digest_field(&mut digest, index.as_str().as_bytes());
             digest_mutation(&mut digest, mutation);
         }
         DatasetRequest::DefinePath {
@@ -8156,6 +8260,7 @@ mod tests {
                 key_offset: 2,
                 key_length: 1,
                 allow_duplicates: false,
+                upgrade: true,
                 mutation: mutation(3),
             }),
             Err(HostProblem::Condition { ref name, response: 14, .. }) if name == "DUPREC"
@@ -8167,6 +8272,7 @@ mod tests {
                 key_offset: 2,
                 key_length: 1,
                 allow_duplicates: true,
+                upgrade: true,
                 mutation: mutation(4),
             })
             .unwrap();
@@ -8247,6 +8353,7 @@ mod tests {
                 key_offset: 2,
                 key_length: 1,
                 allow_duplicates: false,
+                upgrade: true,
                 mutation: mutation(7),
             })
             .unwrap();
@@ -8317,13 +8424,34 @@ mod tests {
         );
         assert!(matches!(
             restarted.invoke(DatasetRequest::Read {
-                dataset: duplicate_aix,
+                dataset: duplicate_aix.clone(),
                 member: None,
                 key: Some(b"Z".to_vec()),
                 max_records: 1,
             }),
             Ok(DatasetResult::Records { records, identities, .. })
                 if records == [b"AAZ9".to_vec()] && identities == [b"AA".to_vec()]
+        ));
+        assert_eq!(
+            restarted.invoke(DatasetRequest::BuildAlternateIndex {
+                base: base.clone(),
+                index: duplicate_aix,
+                mutation: mutation(10),
+            }),
+            Ok(DatasetResult::Mutated { version: 5 })
+        );
+        assert!(matches!(
+            restarted.invoke(DatasetRequest::DefineAlternateIndex {
+                base,
+                index: DatasetName::new("USER.BASE.STALE", 44).unwrap(),
+                key_offset: 2,
+                key_length: 1,
+                allow_duplicates: true,
+                upgrade: false,
+                mutation: mutation(11),
+            }),
+            Err(HostProblem::UnsupportedCapability { ref capability, .. })
+                if capability == "alternate-index-no-upgrade"
         ));
     }
     #[test]

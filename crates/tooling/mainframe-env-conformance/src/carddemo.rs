@@ -3211,6 +3211,7 @@ pub fn verify_carddemo_seeds_from_env(
                 key_offset: offset,
                 key_length: length,
                 allow_duplicates: true,
+                upgrade: true,
                 mutation: mutation(sequence as u64 + 1),
             })
             .map_err(|problem| {
@@ -12585,6 +12586,7 @@ fn install_base_online_authorities(
                 key_offset: offset,
                 key_length: length,
                 allow_duplicates: true,
+                upgrade: true,
                 mutation: mutation(sequence as u64 + 1),
             })
             .map_err(terminal_problem)?;

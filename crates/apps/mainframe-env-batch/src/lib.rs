@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+mod ams;
 mod controller;
 mod jcl;
 mod program;
@@ -13,6 +14,11 @@ pub use controller::{
     BatchControllerSelector,
 };
 
+pub use ams::{
+    AMS_GRAMMAR_CONTRACT, AMS_GRAMMAR_SHA256, AmsCommand, AmsComparison, AmsRegister, AmsStatement,
+    parse_idcams_control, validate_idcams_control,
+};
+
 pub use jcl::{
     DdPlan, Disposition, JclBundle, JclLimits, JobPlan, StepCondition, StepPlan, parse_jcl,
 };
@@ -21,4 +27,4 @@ pub use program::{
     common_program_catalog_sha256, decode_program_output, system_service_program,
     utility_disposition,
 };
-pub use service::{BatchLimits, BatchService, JobSnapshot, JobState, validate_idcams_control};
+pub use service::{BatchLimits, BatchService, JobSnapshot, JobState};

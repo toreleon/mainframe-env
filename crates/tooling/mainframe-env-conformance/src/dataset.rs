@@ -1,3 +1,4 @@
+use mainframe_env_batch::{AmsStatement, parse_idcams_control, validate_idcams_control};
 use mainframe_env_coverage::{
     CompiledSpec, ConformanceDriver, ConformanceLimits, ConformanceObservation,
     ConformanceRunReport, ConformanceRunner, DriverOutput, DriverRef, FixtureRef, ObservationCheck,
@@ -16,6 +17,7 @@ use std::sync::Arc;
 
 const FIXTURES: &str =
     include_str!("../../../../conformance/0.6/fixtures/dataset-organizations.json");
+const AMS_FIXTURES: &str = include_str!("../../../../conformance/0.6/fixtures/ams-commands.json");
 
 const FIXTURE_IDS: [&str; 10] = [
     "dataset.esds.invalid",
@@ -29,6 +31,39 @@ const FIXTURE_IDS: [&str; 10] = [
     "dataset.vrrds.invalid",
     "dataset.vrrds.valid",
 ];
+const AMS_FIXTURE_IDS: [&str; 31] = [
+    "ams.allocate",
+    "ams.alter",
+    "ams.alter-libraryentry",
+    "ams.alter-volumeentry",
+    "ams.bldindex",
+    "ams.create-libraryentry",
+    "ams.create-volumeentry",
+    "ams.dcollect",
+    "ams.define-alias",
+    "ams.define-alternateindex",
+    "ams.define-cluster",
+    "ams.define-generationdatagroup",
+    "ams.define-nonvsam",
+    "ams.define-pagespace",
+    "ams.define-path",
+    "ams.define-usercatalog",
+    "ams.delete",
+    "ams.diagnose",
+    "ams.examine",
+    "ams.export",
+    "ams.export-disconnect",
+    "ams.import",
+    "ams.import-connect",
+    "ams.listcat",
+    "ams.listdata",
+    "ams.print",
+    "ams.repro",
+    "ams.recover",
+    "ams.setcache",
+    "ams.shcds",
+    "ams.verify",
+];
 
 pub fn run_dataset_conformance(
     spec: &CompiledSpec,
@@ -37,14 +72,26 @@ pub fn run_dataset_conformance(
 ) -> Result<ConformanceRunReport, String> {
     let limits = ConformanceLimits::default();
     let driver = DatasetOrganizationDriver;
-    let observations = FIXTURE_IDS.map(|fixture| ExpectedObservation { fixture });
+    let ams_driver = AmsCommandDriver;
+    let observations = FIXTURE_IDS
+        .into_iter()
+        .chain(AMS_FIXTURE_IDS)
+        .map(|fixture| ExpectedObservation { fixture })
+        .collect::<Vec<_>>();
     let runtime = RuntimeRegistry::new(
         spec,
-        vec![(
-            DriverRef::new("dataset.organization.driver", limits)
-                .map_err(|problem| problem.to_string())?,
-            &driver as &dyn ConformanceDriver,
-        )],
+        vec![
+            (
+                DriverRef::new("dataset.organization.driver", limits)
+                    .map_err(|problem| problem.to_string())?,
+                &driver as &dyn ConformanceDriver,
+            ),
+            (
+                DriverRef::new("dataset.ams.driver", limits)
+                    .map_err(|problem| problem.to_string())?,
+                &ams_driver as &dyn ConformanceDriver,
+            ),
+        ],
         Vec::new(),
         observations
             .iter()
@@ -65,6 +112,40 @@ pub fn run_dataset_conformance(
 }
 
 struct DatasetOrganizationDriver;
+
+struct AmsCommandDriver;
+
+impl ConformanceDriver for AmsCommandDriver {
+    fn execute(&self, fixture: &FixtureRef) -> Result<DriverOutput, String> {
+        let document: Value =
+            serde_json::from_str(AMS_FIXTURES).map_err(|error| error.to_string())?;
+        let case = document["cases"]
+            .as_array()
+            .and_then(|cases| {
+                cases
+                    .iter()
+                    .find(|case| case["id"].as_str() == Some(fixture.as_str()))
+            })
+            .ok_or_else(|| format!("unknown AMS fixture {}", fixture.as_str()))?;
+        let control = case["control"]
+            .as_str()
+            .ok_or_else(|| "AMS fixture control is missing".to_string())?;
+        validate_idcams_control(control.as_bytes()).map_err(|problem| problem.to_string())?;
+        let parsed =
+            parse_idcams_control(control.as_bytes()).map_err(|problem| problem.to_string())?;
+        let [AmsStatement::Command(command)] = parsed.as_slice() else {
+            return Err("AMS fixture did not produce exactly one command".into());
+        };
+        let output = format!(
+            "command={};label={};capability={}",
+            command.id(),
+            command.label(),
+            command.capability().unwrap_or("none")
+        );
+        DriverOutput::new(output.into_bytes(), ConformanceLimits::default())
+            .map_err(|problem| problem.to_string())
+    }
+}
 
 impl ConformanceDriver for DatasetOrganizationDriver {
     fn execute(&self, fixture: &FixtureRef) -> Result<DriverOutput, String> {
@@ -106,7 +187,12 @@ impl ConformanceObservation for ExpectedObservation {
 }
 
 fn fixture_expected(id: &str) -> Result<String, String> {
-    let document: Value = serde_json::from_str(FIXTURES).map_err(|error| error.to_string())?;
+    let source = if id.starts_with("ams.") {
+        AMS_FIXTURES
+    } else {
+        FIXTURES
+    };
+    let document: Value = serde_json::from_str(source).map_err(|error| error.to_string())?;
     document["cases"]
         .as_array()
         .and_then(|cases| cases.iter().find(|case| case["id"].as_str() == Some(id)))
@@ -503,6 +589,13 @@ mod tests {
         for id in FIXTURE_IDS {
             let expected = fixture_expected(id).unwrap();
             let output = DatasetOrganizationDriver
+                .execute(&FixtureRef::new(id, ConformanceLimits::default()).unwrap())
+                .unwrap();
+            assert_eq!(output.bytes(), expected.as_bytes());
+        }
+        for id in AMS_FIXTURE_IDS {
+            let expected = fixture_expected(id).unwrap();
+            let output = AmsCommandDriver
                 .execute(&FixtureRef::new(id, ConformanceLimits::default()).unwrap())
                 .unwrap();
             assert_eq!(output.bytes(), expected.as_bytes());

@@ -2498,6 +2498,9 @@ impl ProductServer {
         if let DatasetRequest::DefineAlias { target, .. } = &request {
             self.authorize_resource(principal, "DATASET", target.as_str(), AccessIntent::Read)?;
         }
+        if let DatasetRequest::BuildAlternateIndex { base, .. } = &request {
+            self.authorize_resource(principal, "DATASET", base.as_str(), AccessIntent::Read)?;
+        }
         if let DatasetRequest::TvsStatus { owner, .. }
         | DatasetRequest::AcquireLock { owner, .. }
         | DatasetRequest::ReleaseLock { owner, .. }
@@ -2554,6 +2557,7 @@ impl ProductServer {
             | DatasetRequest::ReadNext { dataset, .. }
             | DatasetRequest::EndBrowse { dataset, .. } => Some(dataset.as_str()),
             DatasetRequest::DefinePath { path, .. } => Some(path.as_str()),
+            DatasetRequest::BuildAlternateIndex { index, .. } => Some(index.as_str()),
             DatasetRequest::StageTvs { operation, .. } => Some(match operation {
                 mainframe_env_host_api::TvsRecordOperation::Insert { dataset, .. }
                 | mainframe_env_host_api::TvsRecordOperation::Rewrite { dataset, .. }
@@ -3652,6 +3656,7 @@ fn dataset_mutation(request: &DatasetRequest) -> Option<&Mutation> {
         | DatasetRequest::DeleteRelative { mutation, .. }
         | DatasetRequest::WriteRba { mutation, .. }
         | DatasetRequest::DefineAlternateIndex { mutation, .. }
+        | DatasetRequest::BuildAlternateIndex { mutation, .. }
         | DatasetRequest::DefinePath { mutation, .. }
         | DatasetRequest::DefineGenerationGroup { mutation, .. }
         | DatasetRequest::CreateGeneration { mutation, .. }

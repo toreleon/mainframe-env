@@ -1,3 +1,6 @@
+use crate::ams::{
+    AmsCommand, AmsRegister, AmsStatement, compare, numeric_operand, operand, pair_operand,
+};
 use crate::controller::{
     BatchControllerRegistry, BatchControllerRegistryState, MAX_CONTROLLER_STATE_BYTES,
     ResolvedBatchController,
@@ -528,17 +531,19 @@ impl BatchService {
                     dds,
                 };
                 let execution = program_execution(&step.program);
-                if execution == ProgramExecution::Idcams {
-                    self.execute_idcams(
+                let idcams_return_code = if execution == ProgramExecution::Idcams {
+                    Some(self.execute_idcams(
                         invocation,
                         job,
                         step,
                         &dataset_resolutions,
                         &input,
                         &mut effect_sequence,
-                    )?;
-                }
-                let output = match execution {
+                    )?)
+                } else {
+                    None
+                };
+                let mut output = match execution {
                     ProgramExecution::Sdsf => {
                         self.execute_sdsf(invocation, job, step, &input, &mut effect_sequence)?
                     }
@@ -563,6 +568,9 @@ impl BatchService {
                         )?,
                     ProgramExecution::Unsupported => return Err(HostProblem::Unsupported),
                 };
+                if let Some(return_code) = idcams_return_code {
+                    output.return_code = return_code;
+                }
                 self.write_dd_outputs(
                     invocation,
                     job,
@@ -1290,111 +1298,867 @@ impl BatchService {
         dataset_resolutions: &BTreeMap<String, String>,
         input: &ProgramInput,
         effect_sequence: &mut u64,
-    ) -> Result<(), HostProblem> {
+    ) -> Result<i32, HostProblem> {
         let control = input_dd_text(input, "SYSIN")?;
-        let statements = idcams_statements(&control)?;
+        crate::ams::validate_idcams_control(control.as_bytes())?;
+        let statements = crate::ams::parse_idcams_control(control.as_bytes())?;
+        let mut max_cc = 0u8;
+        let mut last_cc = 0u8;
         for statement in &statements {
-            let operation = statement
-                .split_whitespace()
-                .next()
-                .ok_or(HostProblem::Malformed)?;
-            if !matches!(
-                operation,
-                "DELETE" | "DEFINE" | "REPRO" | "LISTCAT" | "BLDINDEX" | "IF" | "SET"
-            ) {
-                return Err(HostProblem::Unsupported);
-            }
+            self.execute_ams_statement(
+                invocation,
+                job,
+                step,
+                dataset_resolutions,
+                input,
+                effect_sequence,
+                statement,
+                &mut max_cc,
+                &mut last_cc,
+            )?;
         }
-        for statement in statements {
-            let operation = statement
-                .split_whitespace()
-                .next()
-                .ok_or(HostProblem::Malformed)?;
-            match operation {
-                "IF" | "SET" | "BLDINDEX" => {}
-                "REPRO" => {
-                    let input_name = parenthesized_operand(&statement, &["INFILE", "IFILE"])
-                        .ok_or(HostProblem::Malformed)?;
-                    let output_name = parenthesized_operand(&statement, &["OUTFILE", "OFILE"])
-                        .ok_or(HostProblem::Malformed)?;
-                    let records = input_dd_records(input, &input_name)?;
-                    self.write_dd_outputs(
+        Ok(i32::from(max_cc))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn execute_ams_statement(
+        &self,
+        invocation: &Invocation,
+        job: &mut Job,
+        step: &StepPlan,
+        dataset_resolutions: &BTreeMap<String, String>,
+        input: &ProgramInput,
+        effect_sequence: &mut u64,
+        statement: &AmsStatement,
+        max_cc: &mut u8,
+        last_cc: &mut u8,
+    ) -> Result<(), HostProblem> {
+        match statement {
+            AmsStatement::Set { register, value } => match register {
+                AmsRegister::MaxCc => *max_cc = *value,
+                AmsRegister::LastCc => *last_cc = *value,
+            },
+            AmsStatement::If {
+                register,
+                comparison,
+                value,
+                action,
+            } => {
+                let current = match register {
+                    AmsRegister::MaxCc => *max_cc,
+                    AmsRegister::LastCc => *last_cc,
+                };
+                if compare(current, *comparison, *value) {
+                    self.execute_ams_statement(
                         invocation,
                         job,
                         step,
                         dataset_resolutions,
-                        &BTreeMap::from([(output_name, records)]),
+                        input,
                         effect_sequence,
+                        action,
+                        max_cc,
+                        last_cc,
                     )?;
                 }
-                "DELETE" => {
-                    let name = statement
-                        .split_whitespace()
-                        .nth(1)
-                        .map(|value| value.trim_matches(['(', ')']).to_ascii_uppercase())
-                        .ok_or(HostProblem::Malformed)?;
-                    let sequence = next_effect_sequence(invocation, effect_sequence)?;
-                    let key = effect_key(job, step, sequence)?;
-                    let result = self.host.invoke(
-                        invocation,
-                        invocation.deadline_tick.saturating_sub(1),
-                        false,
-                        EffectRequest {
-                            run_unit: invocation.run_unit_id.clone(),
-                            sequence,
-                            deadline_tick: invocation.deadline_tick,
-                            idempotency_key: Some(key.clone()),
-                            request: HostRequest::Dataset(DatasetRequest::Delete {
-                                dataset: DatasetName::new(name, 128)
-                                    .map_err(|_| HostProblem::Malformed)?,
-                                member: None,
-                                expected_version: None,
-                                mutation: Mutation {
-                                    sequence,
-                                    idempotency_key: key,
-                                    transaction: Some(job.id.clone()),
-                                },
-                            }),
+            }
+            AmsStatement::Command(command) => {
+                *last_cc = match self.execute_ams_command(
+                    invocation,
+                    job,
+                    step,
+                    dataset_resolutions,
+                    input,
+                    effect_sequence,
+                    command,
+                ) {
+                    Ok(()) => 0,
+                    Err(problem) => {
+                        let code = ams_condition_code(&problem);
+                        append_spool(
+                            job,
+                            "SYSPRINT",
+                            format!("IDCAMS {} CC={code:02} {problem:?}", command.label())
+                                .into_bytes(),
+                            self.limits,
+                        )?;
+                        code
+                    }
+                };
+                *max_cc = (*max_cc).max(*last_cc);
+            }
+        }
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn execute_ams_command(
+        &self,
+        invocation: &Invocation,
+        job: &mut Job,
+        step: &StepPlan,
+        dataset_resolutions: &BTreeMap<String, String>,
+        input: &ProgramInput,
+        effect_sequence: &mut u64,
+        command: &AmsCommand,
+    ) -> Result<(), HostProblem> {
+        self.authorize_ams_command(invocation, command, effect_sequence)?;
+        if let Some(capability) = command.capability() {
+            return Err(HostProblem::UnsupportedCapability {
+                capability: capability.into(),
+                detail: format!(
+                    "{} requires provider capability {capability}",
+                    command.label()
+                ),
+            });
+        }
+        if let Some((capability, operand)) = unimplemented_ams_operand(command.source()) {
+            return Err(HostProblem::UnsupportedCapability {
+                capability: capability.into(),
+                detail: format!("{operand} is not implemented by the AMS adapter"),
+            });
+        }
+        match command.id() {
+            "define-alias"
+            | "define-alternateindex"
+            | "define-cluster"
+            | "define-generationdatagroup"
+            | "define-nonvsam"
+            | "define-path"
+            | "define-usercatalog" => {
+                self.define_idcams(invocation, job, step, command.source(), effect_sequence)
+            }
+            "repro" => self.repro_idcams(
+                invocation,
+                job,
+                step,
+                dataset_resolutions,
+                input,
+                effect_sequence,
+                command.source(),
+            ),
+            "delete" => {
+                self.delete_idcams(invocation, job, step, effect_sequence, command.source())
+            }
+            "listcat" => self.listcat_idcams(invocation, job, effect_sequence, command.source()),
+            _ => self.execute_ams_typed_command(
+                invocation,
+                job,
+                step,
+                dataset_resolutions,
+                input,
+                effect_sequence,
+                command,
+            ),
+        }
+    }
+
+    fn authorize_ams_command(
+        &self,
+        invocation: &Invocation,
+        command: &AmsCommand,
+        effect_sequence: &mut u64,
+    ) -> Result<(), HostProblem> {
+        let source = command.source();
+        let mut resources = Vec::<(String, AccessIntent)>::new();
+        let mut push = |value: Option<String>, intent| {
+            if let Some(value) = value {
+                resources.push((value, intent));
+            }
+        };
+        match command.id() {
+            "define-alias" => {
+                push(operand(source, &["NAME"]), AccessIntent::Update);
+                push(operand(source, &["RELATE"]), AccessIntent::Read);
+            }
+            "define-alternateindex" | "bldindex" => {
+                push(
+                    operand(source, &["RELATE", "INDATASET"]),
+                    AccessIntent::Read,
+                );
+                push(
+                    operand(source, &["NAME", "OUTDATASET"]),
+                    AccessIntent::Update,
+                );
+            }
+            "define-path" => {
+                push(operand(source, &["PATHENTRY"]), AccessIntent::Read);
+                push(operand(source, &["NAME"]), AccessIntent::Update);
+            }
+            "repro" => {
+                push(operand(source, &["INDATASET"]), AccessIntent::Read);
+                push(operand(source, &["OUTDATASET"]), AccessIntent::Update);
+            }
+            "export" | "export-disconnect" => push(
+                operand(source, &["ENTRIES", "INDATASET"]),
+                if command.id() == "export-disconnect" {
+                    AccessIntent::Update
+                } else {
+                    AccessIntent::Read
+                },
+            ),
+            "diagnose" | "examine" | "listdata" | "print" | "shcds" => push(
+                operand(source, &["INDATASET", "DATASET", "ENTRIES"])
+                    .or_else(|| crate::ams::bare_target(source, command.label())),
+                AccessIntent::Read,
+            ),
+            "verify" | "recover" | "alter" | "delete" => push(
+                operand(source, &["INDATASET", "DATASET"])
+                    .or_else(|| crate::ams::bare_target(source, command.label())),
+                AccessIntent::Update,
+            ),
+            "allocate"
+            | "define-cluster"
+            | "define-generationdatagroup"
+            | "define-nonvsam"
+            | "define-usercatalog"
+            | "define-pagespace" => {
+                push(operand(source, &["DATASET", "NAME"]), AccessIntent::Update)
+            }
+            _ => {}
+        }
+        resources.sort_by(|left, right| left.0.cmp(&right.0));
+        resources.dedup();
+        for (resource, intent) in resources {
+            self.authorize(
+                invocation,
+                "DATASET",
+                &resource,
+                intent,
+                next_effect_sequence(invocation, effect_sequence)?,
+            )?;
+        }
+        Ok(())
+    }
+
+    fn ams_dataset_read(
+        &self,
+        invocation: &Invocation,
+        effect_sequence: &mut u64,
+        request: DatasetRequest,
+    ) -> Result<DatasetResult, HostProblem> {
+        let sequence = next_effect_sequence(invocation, effect_sequence)?;
+        match self
+            .host
+            .invoke(
+                invocation,
+                invocation.deadline_tick.saturating_sub(1),
+                false,
+                EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence,
+                    deadline_tick: invocation.deadline_tick,
+                    idempotency_key: None,
+                    request: HostRequest::Dataset(request),
+                },
+            )
+            .effect
+            .outcome?
+        {
+            HostResult::Dataset(result) => Ok(result),
+            _ => Err(HostProblem::ProviderFailure),
+        }
+    }
+
+    fn ams_dataset_mutation(
+        &self,
+        invocation: &Invocation,
+        job: &Job,
+        step: &StepPlan,
+        effect_sequence: &mut u64,
+        build: impl FnOnce(Mutation) -> DatasetRequest,
+    ) -> Result<DatasetResult, HostProblem> {
+        let sequence = next_effect_sequence(invocation, effect_sequence)?;
+        let key = effect_key(job, step, sequence)?;
+        let request = build(Mutation {
+            sequence,
+            idempotency_key: key.clone(),
+            transaction: Some(job.id.clone()),
+        });
+        match self
+            .host
+            .invoke(
+                invocation,
+                invocation.deadline_tick.saturating_sub(1),
+                false,
+                EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence,
+                    deadline_tick: invocation.deadline_tick,
+                    idempotency_key: Some(key),
+                    request: HostRequest::Dataset(request),
+                },
+            )
+            .effect
+            .outcome?
+        {
+            HostResult::Dataset(result) => Ok(result),
+            _ => Err(HostProblem::ProviderFailure),
+        }
+    }
+
+    fn delete_idcams(
+        &self,
+        invocation: &Invocation,
+        job: &Job,
+        step: &StepPlan,
+        effect_sequence: &mut u64,
+        statement: &str,
+    ) -> Result<(), HostProblem> {
+        let name = crate::ams::bare_target(statement, "DELETE").ok_or(HostProblem::Malformed)?;
+        let dataset = dataset_name(&name)?;
+        self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
+            DatasetRequest::Delete {
+                dataset,
+                member: None,
+                expected_version: None,
+                mutation,
+            }
+        })?;
+        Ok(())
+    }
+
+    fn listcat_idcams(
+        &self,
+        invocation: &Invocation,
+        job: &mut Job,
+        effect_sequence: &mut u64,
+        statement: &str,
+    ) -> Result<(), HostProblem> {
+        let pattern =
+            operand(statement, &["ENTRIES", "ENTRY", "LEVEL"]).unwrap_or_else(|| "**".into());
+        let DatasetResult::Listed { names, more } = self.ams_dataset_read(
+            invocation,
+            effect_sequence,
+            DatasetRequest::List {
+                pattern,
+                start: None,
+                max_items: 4_096,
+            },
+        )?
+        else {
+            return Err(HostProblem::ProviderFailure);
+        };
+        for name in names {
+            append_spool(
+                job,
+                "SYSPRINT",
+                name.as_str().as_bytes().to_vec(),
+                self.limits,
+            )?;
+        }
+        if more {
+            append_spool(
+                job,
+                "SYSPRINT",
+                b"IDCAMS LISTCAT MORE".to_vec(),
+                self.limits,
+            )?;
+        }
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn repro_idcams(
+        &self,
+        invocation: &Invocation,
+        job: &mut Job,
+        step: &StepPlan,
+        dataset_resolutions: &BTreeMap<String, String>,
+        input: &ProgramInput,
+        effect_sequence: &mut u64,
+        statement: &str,
+    ) -> Result<(), HostProblem> {
+        let records = if let Some(input_name) = operand(statement, &["INFILE", "IFILE"]) {
+            input_dd_records(input, &input_name)?
+        } else {
+            let dataset =
+                dataset_name(&operand(statement, &["INDATASET"]).ok_or(HostProblem::Malformed)?)?;
+            let DatasetResult::Records { records, .. } = self.ams_dataset_read(
+                invocation,
+                effect_sequence,
+                DatasetRequest::Read {
+                    dataset,
+                    member: None,
+                    key: None,
+                    max_records: 4_096,
+                },
+            )?
+            else {
+                return Err(HostProblem::ProviderFailure);
+            };
+            records
+        };
+        if let Some(output_name) = operand(statement, &["OUTFILE", "OFILE"]) {
+            self.write_dd_outputs(
+                invocation,
+                job,
+                step,
+                dataset_resolutions,
+                &BTreeMap::from([(output_name, records)]),
+                effect_sequence,
+            )?;
+        } else {
+            let dataset =
+                dataset_name(&operand(statement, &["OUTDATASET"]).ok_or(HostProblem::Malformed)?)?;
+            self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
+                DatasetRequest::Write {
+                    dataset,
+                    member: None,
+                    records,
+                    expected_version: None,
+                    mutation,
+                }
+            })?;
+        }
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn execute_ams_typed_command(
+        &self,
+        invocation: &Invocation,
+        job: &mut Job,
+        step: &StepPlan,
+        dataset_resolutions: &BTreeMap<String, String>,
+        input: &ProgramInput,
+        effect_sequence: &mut u64,
+        command: &AmsCommand,
+    ) -> Result<(), HostProblem> {
+        let statement = command.source();
+        match command.id() {
+            "allocate" => {
+                let name =
+                    operand(statement, &["DATASET", "NAME"]).ok_or(HostProblem::Malformed)?;
+                let dataset = dataset_name(&name)?;
+                let (_, maximum) = pair_operand(statement, "RECORDSIZE").unwrap_or((80, 80));
+                self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
+                    DatasetRequest::Create {
+                        dataset,
+                        attributes: DatasetAttributes {
+                            organization: DatasetOrganization::Sequential,
+                            record_format: RecordFormat::Fixed,
+                            logical_record_length: maximum,
+                            key_offset: None,
+                            key_length: None,
+                            ccsid: Some(37),
                         },
-                    );
-                    match result.effect.outcome {
-                        Ok(HostResult::Dataset(_)) | Err(HostProblem::NotFound) => {}
+                        mutation,
+                    }
+                })?;
+            }
+            "alter" => self.alter_idcams(invocation, job, step, effect_sequence, statement)?,
+            "bldindex" => {
+                let base = dataset_name(
+                    &operand(statement, &["INDATASET"]).ok_or(HostProblem::Malformed)?,
+                )?;
+                let index = dataset_name(
+                    &operand(statement, &["OUTDATASET"]).ok_or(HostProblem::Malformed)?,
+                )?;
+                self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
+                    DatasetRequest::BuildAlternateIndex {
+                        base,
+                        index,
+                        mutation,
+                    }
+                })?;
+            }
+            "dcollect" => {
+                let DatasetResult::Listed { names, .. } = self.ams_dataset_read(
+                    invocation,
+                    effect_sequence,
+                    DatasetRequest::List {
+                        pattern: "**".into(),
+                        start: None,
+                        max_items: 256,
+                    },
+                )?
+                else {
+                    return Err(HostProblem::ProviderFailure);
+                };
+                let dd = operand(statement, &["OUTFILE", "OFILE"]).ok_or(HostProblem::Malformed)?;
+                let mut collected = Vec::with_capacity(names.len());
+                for name in names {
+                    let record = match self.ams_dataset_read(
+                        invocation,
+                        effect_sequence,
+                        DatasetRequest::Describe {
+                            dataset: name.clone(),
+                        },
+                    ) {
+                        Ok(DatasetResult::Description(description)) => format!(
+                            "{}|{:?}|{}|{}",
+                            name.as_str(),
+                            description.definition.attributes.organization,
+                            description.version,
+                            description.used_bytes
+                        )
+                        .into_bytes(),
+                        Err(HostProblem::NotFound) | Err(HostProblem::Unsupported) => {
+                            format!("{}|CATALOG|0|0", name.as_str()).into_bytes()
+                        }
                         Ok(_) => return Err(HostProblem::ProviderFailure),
                         Err(problem) => return Err(problem),
-                    }
+                    };
+                    collected.push(record);
                 }
-                "DEFINE" => {
-                    self.define_idcams(invocation, job, step, &statement, effect_sequence)?
-                }
-                "LISTCAT" => {
-                    let pattern = parenthesized_operand(&statement, &["ENTRIES", "ENTRY"])
-                        .unwrap_or_else(|| "**".into());
-                    let sequence = next_effect_sequence(invocation, effect_sequence)?;
-                    let result = self.host.invoke(
-                        invocation,
-                        invocation.deadline_tick.saturating_sub(1),
-                        false,
-                        EffectRequest {
-                            run_unit: invocation.run_unit_id.clone(),
-                            sequence,
-                            deadline_tick: invocation.deadline_tick,
-                            idempotency_key: None,
-                            request: HostRequest::Dataset(DatasetRequest::List {
-                                pattern,
-                                start: None,
-                                max_items: 4_096,
-                            }),
-                        },
-                    );
-                    if !matches!(
-                        result.effect.outcome?,
-                        HostResult::Dataset(DatasetResult::Listed { .. })
-                    ) {
-                        return Err(HostProblem::ProviderFailure);
-                    }
-                }
-                _ => return Err(HostProblem::Unsupported),
+                self.write_dd_outputs(
+                    invocation,
+                    job,
+                    step,
+                    dataset_resolutions,
+                    &BTreeMap::from([(dd, collected)]),
+                    effect_sequence,
+                )?;
             }
+            "diagnose" | "examine" => {
+                let target = ams_target(command)?;
+                if command.id() == "examine" {
+                    let DatasetResult::Attributes { attributes, .. } = self.ams_dataset_read(
+                        invocation,
+                        effect_sequence,
+                        DatasetRequest::Attributes {
+                            dataset: target.clone(),
+                        },
+                    )?
+                    else {
+                        return Err(HostProblem::ProviderFailure);
+                    };
+                    if attributes.organization != DatasetOrganization::KeySequenced {
+                        return Err(HostProblem::Unsupported);
+                    }
+                }
+                let result = self.ams_dataset_read(
+                    invocation,
+                    effect_sequence,
+                    DatasetRequest::Diagnose { dataset: target },
+                )?;
+                append_spool(
+                    job,
+                    "SYSPRINT",
+                    format!("{} {result:?}", command.label()).into_bytes(),
+                    self.limits,
+                )?;
+            }
+            "export" | "export-disconnect" => self.export_idcams(
+                invocation,
+                job,
+                step,
+                dataset_resolutions,
+                effect_sequence,
+                statement,
+                command.id() == "export-disconnect",
+            )?,
+            "import" | "import-connect" => {
+                self.import_idcams(invocation, job, step, input, effect_sequence, statement)?
+            }
+            "listdata" => {
+                let result = self.ams_dataset_read(
+                    invocation,
+                    effect_sequence,
+                    DatasetRequest::Describe {
+                        dataset: ams_target(command)?,
+                    },
+                )?;
+                append_spool(
+                    job,
+                    "SYSPRINT",
+                    format!("LISTDATA {result:?}").into_bytes(),
+                    self.limits,
+                )?;
+            }
+            "print" => {
+                let dataset = dataset_name(
+                    &operand(statement, &["INDATASET"]).ok_or(HostProblem::Malformed)?,
+                )?;
+                let DatasetResult::Records { records, .. } = self.ams_dataset_read(
+                    invocation,
+                    effect_sequence,
+                    DatasetRequest::Read {
+                        dataset,
+                        member: None,
+                        key: None,
+                        max_records: 4_096,
+                    },
+                )?
+                else {
+                    return Err(HostProblem::ProviderFailure);
+                };
+                for record in records {
+                    let record = if statement.contains(" HEX") {
+                        hex_bytes(&record).into_bytes()
+                    } else {
+                        record
+                    };
+                    append_spool(job, "SYSPRINT", record, self.limits)?;
+                }
+            }
+            "recover" => {
+                self.import_idcams(invocation, job, step, input, effect_sequence, statement)?
+            }
+            "shcds" => {
+                let result = if let Some(dataset) = operand(statement, &["DATASET"]) {
+                    let now_tick = effect_sequence
+                        .checked_add(1)
+                        .ok_or(HostProblem::ResourceExhausted)?;
+                    self.ams_dataset_read(
+                        invocation,
+                        effect_sequence,
+                        DatasetRequest::ListLocks {
+                            dataset: dataset_name(&dataset)?,
+                            now_tick,
+                            max_items: 4_096,
+                        },
+                    )?
+                } else {
+                    let transaction =
+                        operand(statement, &["TRANSACTION"]).ok_or(HostProblem::Malformed)?;
+                    self.ams_dataset_read(
+                        invocation,
+                        effect_sequence,
+                        DatasetRequest::TvsStatus {
+                            transaction,
+                            owner: invocation.principal.id().clone(),
+                        },
+                    )?
+                };
+                append_spool(
+                    job,
+                    "SYSPRINT",
+                    format!("SHCDS {result:?}").into_bytes(),
+                    self.limits,
+                )?;
+            }
+            "verify" => {
+                self.verify_idcams(invocation, job, step, effect_sequence, ams_target(command)?)?
+            }
+            _ => return Err(HostProblem::Unsupported),
+        }
+        Ok(())
+    }
+
+    fn alter_idcams(
+        &self,
+        invocation: &Invocation,
+        job: &Job,
+        step: &StepPlan,
+        effect_sequence: &mut u64,
+        statement: &str,
+    ) -> Result<(), HostProblem> {
+        let from = dataset_name(
+            &crate::ams::bare_target(statement, "ALTER").ok_or(HostProblem::Malformed)?,
+        )?;
+        if let Some(new_name) = operand(statement, &["NEWNAME"]) {
+            let to = dataset_name(&new_name)?;
+            self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
+                DatasetRequest::Rename { from, to, mutation }
+            })?;
+            return Ok(());
+        }
+        let next = if statement.contains(" RECOVERYREQUIRED") {
+            mainframe_env_host_api::DatasetLifecycleState::RecoveryRequired
+        } else if statement.contains(" CLOSED") {
+            mainframe_env_host_api::DatasetLifecycleState::Closed
+        } else if statement.contains(" OPEN") {
+            mainframe_env_host_api::DatasetLifecycleState::Open
+        } else {
+            return Err(HostProblem::Unsupported);
+        };
+        self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
+            DatasetRequest::SetLifecycle {
+                dataset: from,
+                state: next,
+                expected_version: None,
+                mutation,
+            }
+        })?;
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn export_idcams(
+        &self,
+        invocation: &Invocation,
+        job: &mut Job,
+        step: &StepPlan,
+        dataset_resolutions: &BTreeMap<String, String>,
+        effect_sequence: &mut u64,
+        statement: &str,
+        disconnect: bool,
+    ) -> Result<(), HostProblem> {
+        let target = dataset_name(
+            &operand(statement, &["ENTRIES", "INDATASET"]).ok_or(HostProblem::Malformed)?,
+        )?;
+        let dd = operand(statement, &["OUTFILE", "OFILE"]).ok_or(HostProblem::Malformed)?;
+        let records = if disconnect {
+            let header = format!("MEAMSCAT1|{}", target.as_str()).into_bytes();
+            self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
+                DatasetRequest::SetCatalogConnection {
+                    catalog: target.clone(),
+                    connected: false,
+                    expected_version: None,
+                    mutation,
+                }
+            })?;
+            vec![header]
+        } else {
+            let DatasetResult::Attributes { attributes, .. } = self.ams_dataset_read(
+                invocation,
+                effect_sequence,
+                DatasetRequest::Attributes {
+                    dataset: target.clone(),
+                },
+            )?
+            else {
+                return Err(HostProblem::ProviderFailure);
+            };
+            let DatasetResult::Records { records, .. } = self.ams_dataset_read(
+                invocation,
+                effect_sequence,
+                DatasetRequest::Read {
+                    dataset: target.clone(),
+                    member: None,
+                    key: None,
+                    max_records: 4_096,
+                },
+            )?
+            else {
+                return Err(HostProblem::ProviderFailure);
+            };
+            let mut snapshot = vec![encode_ams_snapshot_header(&target, &attributes).into_bytes()];
+            snapshot.extend(records);
+            snapshot
+        };
+        self.write_dd_outputs(
+            invocation,
+            job,
+            step,
+            dataset_resolutions,
+            &BTreeMap::from([(dd, records)]),
+            effect_sequence,
+        )
+    }
+
+    fn import_idcams(
+        &self,
+        invocation: &Invocation,
+        job: &Job,
+        step: &StepPlan,
+        input: &ProgramInput,
+        effect_sequence: &mut u64,
+        statement: &str,
+    ) -> Result<(), HostProblem> {
+        let dd = operand(statement, &["INFILE", "IFILE"]).ok_or(HostProblem::Malformed)?;
+        let mut records = input_dd_records(input, &dd)?;
+        if records.is_empty() {
+            return Err(HostProblem::Malformed);
+        }
+        let header = String::from_utf8(records.remove(0)).map_err(|_| HostProblem::Malformed)?;
+        if let Some(catalog) = header.strip_prefix("MEAMSCAT1|") {
+            let catalog = dataset_name(catalog)?;
+            self.authorize(
+                invocation,
+                "DATASET",
+                catalog.as_str(),
+                AccessIntent::Update,
+                next_effect_sequence(invocation, effect_sequence)?,
+            )?;
+            self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
+                DatasetRequest::SetCatalogConnection {
+                    catalog,
+                    connected: true,
+                    expected_version: None,
+                    mutation,
+                }
+            })?;
+            return Ok(());
+        }
+        let (snapshot_name, attributes) = decode_ams_snapshot_header(&header)?;
+        let target = operand(statement, &["OUTDATASET", "INDATASET", "DATASET"])
+            .map_or(Ok(snapshot_name), |name| dataset_name(&name))?;
+        self.authorize(
+            invocation,
+            "DATASET",
+            target.as_str(),
+            AccessIntent::Update,
+            next_effect_sequence(invocation, effect_sequence)?,
+        )?;
+        let current = self.ams_dataset_read(
+            invocation,
+            effect_sequence,
+            DatasetRequest::Attributes {
+                dataset: target.clone(),
+            },
+        );
+        let expected_version = match current {
+            Ok(DatasetResult::Attributes { version, .. }) => {
+                self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
+                    DatasetRequest::Truncate {
+                        dataset: target.clone(),
+                        expected_version: Some(version),
+                        mutation,
+                    }
+                })?;
+                version
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?
+            }
+            Err(HostProblem::NotFound) => {
+                self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
+                    DatasetRequest::Create {
+                        dataset: target.clone(),
+                        attributes,
+                        mutation,
+                    }
+                })?;
+                1
+            }
+            Ok(_) => return Err(HostProblem::ProviderFailure),
+            Err(problem) => return Err(problem),
+        };
+        if !records.is_empty() {
+            self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
+                DatasetRequest::Write {
+                    dataset: target,
+                    member: None,
+                    records,
+                    expected_version: Some(expected_version),
+                    mutation,
+                }
+            })?;
+        }
+        Ok(())
+    }
+
+    fn verify_idcams(
+        &self,
+        invocation: &Invocation,
+        job: &Job,
+        step: &StepPlan,
+        effect_sequence: &mut u64,
+        dataset: DatasetName,
+    ) -> Result<(), HostProblem> {
+        let DatasetResult::Description(description) = self.ams_dataset_read(
+            invocation,
+            effect_sequence,
+            DatasetRequest::Describe {
+                dataset: dataset.clone(),
+            },
+        )?
+        else {
+            return Err(HostProblem::ProviderFailure);
+        };
+        if description.definition.lifecycle.state
+            == mainframe_env_host_api::DatasetLifecycleState::RecoveryRequired
+        {
+            self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
+                DatasetRequest::SetLifecycle {
+                    dataset,
+                    state: mainframe_env_host_api::DatasetLifecycleState::Closed,
+                    expected_version: Some(description.version),
+                    mutation,
+                }
+            })?;
         }
         Ok(())
     }
@@ -1409,16 +2173,63 @@ impl BatchService {
     ) -> Result<(), HostProblem> {
         let sequence = next_effect_sequence(invocation, effect_sequence)?;
         let key = effect_key(job, step, sequence)?;
-        let request = if statement.contains(" PATH ") || statement.starts_with("DEFINE PATH") {
+        let request = if statement.starts_with("DEFINE ALIAS") {
+            DatasetRequest::DefineAlias {
+                alias: dataset_name(&operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?)?,
+                target: dataset_name(
+                    &operand(statement, &["RELATE"]).ok_or(HostProblem::Malformed)?,
+                )?,
+                mutation: Mutation {
+                    sequence,
+                    idempotency_key: key.clone(),
+                    transaction: Some(job.id.clone()),
+                },
+            }
+        } else if statement.starts_with("DEFINE USERCATALOG") {
+            DatasetRequest::DefineCatalog {
+                catalog: dataset_name(
+                    &operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?,
+                )?,
+                kind: mainframe_env_host_api::CatalogKind::User,
+                mutation: Mutation {
+                    sequence,
+                    idempotency_key: key.clone(),
+                    transaction: Some(job.id.clone()),
+                },
+            }
+        } else if statement.starts_with("DEFINE NONVSAM") {
+            let (minimum, maximum) = pair_operand(statement, "RECORDSIZE").unwrap_or((80, 80));
+            DatasetRequest::Create {
+                dataset: dataset_name(
+                    &operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?,
+                )?,
+                attributes: DatasetAttributes {
+                    organization: DatasetOrganization::Sequential,
+                    record_format: if minimum == maximum {
+                        RecordFormat::Fixed
+                    } else {
+                        RecordFormat::Variable
+                    },
+                    logical_record_length: maximum,
+                    key_offset: None,
+                    key_length: None,
+                    ccsid: Some(37),
+                },
+                mutation: Mutation {
+                    sequence,
+                    idempotency_key: key.clone(),
+                    transaction: Some(job.id.clone()),
+                },
+            }
+        } else if statement.contains(" PATH ") || statement.starts_with("DEFINE PATH") {
             DatasetRequest::DefinePath {
                 path: DatasetName::new(
-                    parenthesized_operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?,
+                    operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?,
                     128,
                 )
                 .map_err(|_| HostProblem::Malformed)?,
                 index: DatasetName::new(
-                    parenthesized_operand(statement, &["PATHENTRY"])
-                        .ok_or(HostProblem::Malformed)?,
+                    operand(statement, &["PATHENTRY"]).ok_or(HostProblem::Malformed)?,
                     128,
                 )
                 .map_err(|_| HostProblem::Malformed)?,
@@ -1431,11 +2242,11 @@ impl BatchService {
         } else if statement.contains("GENERATIONDATAGROUP") {
             DatasetRequest::DefineGenerationGroup {
                 base: DatasetName::new(
-                    parenthesized_operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?,
+                    operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?,
                     128,
                 )
                 .map_err(|_| HostProblem::Malformed)?,
-                limit: numeric_parenthesized_operand(statement, "LIMIT").unwrap_or(255),
+                limit: numeric_operand(statement, "LIMIT").unwrap_or(255),
                 scratch: !statement.contains("NOSCRATCH"),
                 empty: statement.contains(" EMPTY") && !statement.contains("NOEMPTY"),
                 mutation: Mutation {
@@ -1446,58 +2257,93 @@ impl BatchService {
             }
         } else if statement.contains("ALTERNATEINDEX") {
             let (key_length, key_offset) =
-                pair_parenthesized_operand(statement, "KEYS").ok_or(HostProblem::Malformed)?;
+                pair_operand(statement, "KEYS").ok_or(HostProblem::Malformed)?;
             DatasetRequest::DefineAlternateIndex {
                 base: DatasetName::new(
-                    parenthesized_operand(statement, &["RELATE"]).ok_or(HostProblem::Malformed)?,
+                    operand(statement, &["RELATE"]).ok_or(HostProblem::Malformed)?,
                     128,
                 )
                 .map_err(|_| HostProblem::Malformed)?,
                 index: DatasetName::new(
-                    parenthesized_operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?,
+                    operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?,
                     128,
                 )
                 .map_err(|_| HostProblem::Malformed)?,
                 key_offset,
                 key_length,
                 allow_duplicates: statement.contains("NONUNIQUEKEY"),
+                upgrade: !statement.contains("NOUPGRADE"),
                 mutation: Mutation {
                     sequence,
                     idempotency_key: key.clone(),
                     transaction: Some(job.id.clone()),
                 },
             }
-        } else if statement.contains("CLUSTER") {
-            let (minimum, maximum) =
-                pair_parenthesized_operand(statement, "RECORDSIZE").unwrap_or((80, 80));
-            let keys = pair_parenthesized_operand(statement, "KEYS");
-            let organization = if statement.contains("NUMBERED") {
+        } else if statement.starts_with("DEFINE CLUSTER") {
+            let (minimum, maximum) = pair_operand(statement, "RECORDSIZE").unwrap_or((80, 80));
+            let keys = pair_operand(statement, "KEYS");
+            let organization = if statement.contains(" LINEAR") {
+                DatasetOrganization::Linear
+            } else if statement.contains("NUMBERED") && minimum != maximum {
+                DatasetOrganization::VariableRelative
+            } else if statement.contains("NUMBERED") {
                 DatasetOrganization::Relative
             } else if statement.contains("NONINDEXED") {
                 DatasetOrganization::EntrySequenced
-            } else if statement.contains("INDEXED") {
-                DatasetOrganization::KeySequenced
             } else {
-                DatasetOrganization::Sequential
+                DatasetOrganization::KeySequenced
             };
-            DatasetRequest::Create {
-                dataset: DatasetName::new(
-                    parenthesized_operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?,
-                    128,
-                )
-                .map_err(|_| HostProblem::Malformed)?,
-                attributes: DatasetAttributes {
+            let spanned = statement.contains(" SPANNED");
+            let record_format = if organization == DatasetOrganization::Linear {
+                RecordFormat::Undefined
+            } else if spanned && statement.contains(" BLOCKED") {
+                RecordFormat::VariableBlockedSpanned
+            } else if spanned {
+                RecordFormat::VariableSpanned
+            } else if minimum == maximum {
+                RecordFormat::Fixed
+            } else {
+                RecordFormat::Variable
+            };
+            let mut definition =
+                mainframe_env_host_api::DatasetDefinition::compatibility(DatasetAttributes {
                     organization,
-                    record_format: if minimum == maximum {
-                        RecordFormat::Fixed
-                    } else {
-                        RecordFormat::Variable
-                    },
+                    record_format,
                     logical_record_length: maximum,
                     key_offset: keys.map(|(_, offset)| offset),
                     key_length: keys.map(|(length, _)| length),
                     ccsid: Some(37),
-                },
+                });
+            definition.vsam.control_interval_size =
+                operand(statement, &["CONTROLINTERVALSIZE", "CISZ"])
+                    .map(|value| value.parse().map_err(|_| HostProblem::Malformed))
+                    .transpose()?;
+            definition.vsam.control_area_size = operand(statement, &["CONTROLAREASIZE"])
+                .map(|value| value.parse().map_err(|_| HostProblem::Malformed))
+                .transpose()?;
+            if let Some((cross_region, cross_system)) = pair_operand(statement, "SHAREOPTIONS") {
+                definition.vsam.share_options = mainframe_env_host_api::DatasetShareOptions {
+                    cross_region: u8::try_from(cross_region).map_err(|_| HostProblem::Malformed)?,
+                    cross_system: u8::try_from(cross_system).map_err(|_| HostProblem::Malformed)?,
+                };
+            }
+            definition.vsam.access_mode = if statement.contains(" TVS") {
+                mainframe_env_host_api::VsamAccessMode::Tvs
+            } else if statement.contains(" RLS") {
+                mainframe_env_host_api::VsamAccessMode::Rls
+            } else {
+                mainframe_env_host_api::VsamAccessMode::NonRls
+            };
+            definition.vsam.spanned = spanned;
+            definition.vsam.reuse = statement.contains(" REUSE");
+            definition.vsam.speed = statement.contains(" SPEED");
+            definition.vsam.write_check = statement.contains(" WRITECHECK");
+            definition.vsam.erase_on_delete = statement.contains(" ERASE");
+            DatasetRequest::Define {
+                dataset: dataset_name(
+                    &operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?,
+                )?,
+                definition: Box::new(definition),
                 mutation: Mutation {
                     sequence,
                     idempotency_key: key.clone(),
@@ -2429,124 +3275,195 @@ fn parse_sdsf_file_controls(control: &str) -> Result<Vec<SdsfFileControl>, HostP
     }
 }
 
-fn idcams_statements(control: &str) -> Result<Vec<String>, HostProblem> {
-    let mut statements = Vec::new();
-    let mut current = String::new();
-    for line in control.lines() {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('*') {
-            continue;
-        }
-        let raw_operation = line.split_whitespace().next().unwrap_or_default();
-        let operation = raw_operation.split('(').next().unwrap_or_default();
-        let starts_statement = matches!(
-            operation,
-            "DELETE" | "DEFINE" | "REPRO" | "LISTCAT" | "BLDINDEX" | "IF" | "SET"
-        );
-        let continuation = raw_operation.starts_with('(')
-            || matches!(
-                operation,
-                "CLUSTER"
-                    | "ALTERNATEINDEX"
-                    | "DATA"
-                    | "INDEX"
-                    | "NAME"
-                    | "RELATE"
-                    | "KEYS"
-                    | "RECORDSIZE"
-                    | "SHAREOPTIONS"
-                    | "ERASE"
-                    | "INDEXED"
-                    | "NONINDEXED"
-                    | "NUMBERED"
-                    | "VOLUMES"
-                    | "CYL"
-                    | "CYLINDERS"
-                    | "TRACKS"
-                    | "KILOBYTES"
-                    | "MEGABYTES"
-                    | "FREESPACE"
-                    | "CISZ"
-                    | "REUSE"
-                    | "UNIQUEKEY"
-                    | "NONUNIQUEKEY"
-                    | "UPGRADE"
-                    | "NOUPGRADE"
-                    | "PATHENTRY"
-                    | "INDATASET"
-                    | "OUTDATASET"
-                    | "LIMIT"
-                    | "SCRATCH"
-                    | "NOSCRATCH"
-                    | "EMPTY"
-                    | "NOEMPTY"
-                    | "PURGE"
-                    | ")"
-            );
-        if (starts_statement || (!continuation && !current.is_empty())) && !current.is_empty() {
-            statements.push(current.trim().to_string());
-            current.clear();
-        }
-        if !current.is_empty() {
-            current.push(' ');
-        }
-        current.push_str(line.trim_end_matches('-').trim_end());
-        if current.len() > 1024 * 1024 {
-            return Err(HostProblem::ResourceExhausted);
-        }
+fn ams_condition_code(problem: &HostProblem) -> u8 {
+    match problem {
+        HostProblem::NotFound => 8,
+        HostProblem::Condition { response, .. } if *response <= 4 => 4,
+        HostProblem::Condition { response, .. } if *response <= 8 => 8,
+        HostProblem::Condition { response, .. } if *response <= 12 => 12,
+        HostProblem::Unsupported
+        | HostProblem::UnsupportedCapability { .. }
+        | HostProblem::Malformed
+        | HostProblem::Unauthorized
+        | HostProblem::IdempotencyConflict => 12,
+        _ => 16,
     }
-    if !current.is_empty() {
-        statements.push(current.trim().to_string());
-    }
-    if statements.is_empty() {
-        return Err(HostProblem::Malformed);
-    }
-    Ok(statements)
 }
 
-pub fn validate_idcams_control(control: &[u8]) -> Result<usize, HostProblem> {
-    let control = std::str::from_utf8(control)
-        .map_err(|_| HostProblem::Malformed)?
-        .to_ascii_uppercase();
-    let statements = idcams_statements(&control)?;
-    if statements.iter().any(|statement| {
-        !matches!(
-            statement.split_whitespace().next().unwrap_or_default(),
-            "DELETE" | "DEFINE" | "REPRO" | "LISTCAT" | "BLDINDEX" | "IF" | "SET"
-        )
-    }) {
-        return Err(HostProblem::Unsupported);
-    }
-    Ok(statements.len())
-}
-
-fn parenthesized_operand(statement: &str, names: &[&str]) -> Option<String> {
-    names.iter().find_map(|name| {
-        let compact = format!("{name}(");
-        let spaced = format!("{name} (");
-        let start = statement
-            .find(&compact)
-            .map(|at| at + compact.len())
-            .or_else(|| statement.find(&spaced).map(|at| at + spaced.len()))?;
-        let end = statement[start..].find(')')? + start;
-        let value = statement[start..end].trim().trim_matches(['\'', '"']);
-        (!value.is_empty()).then(|| value.to_string())
+fn unimplemented_ams_operand(statement: &str) -> Option<(&'static str, &'static str)> {
+    [
+        (
+            "physical-volumes",
+            "VOLUMES",
+            [" VOLUMES(", " VOLUME(", " UNIT("],
+        ),
+        (
+            "ams-allocation-extents",
+            "physical SPACE/FREESPACE",
+            [" CYL(", " CYLINDERS(", " TRACKS("],
+        ),
+        (
+            "ams-allocation-extents",
+            "kilobyte/megabyte SPACE",
+            [" KILOBYTES(", " MEGABYTES(", " SPACE("],
+        ),
+        (
+            "sms-classes",
+            "SMS class selection",
+            [" DATACLAS(", " MGMTCLAS(", " STORCLAS("],
+        ),
+        (
+            "buffering",
+            "BUFNO/BUFSIZE",
+            [" BUFNO(", " BUFSIZE(", " BUFFERING("],
+        ),
+        (
+            "catalog-metadata",
+            "OWNER/RETPD",
+            [" OWNER(", " RETPD(", " EXPIRATION("],
+        ),
+        (
+            "catalog-routing",
+            "CATALOG selection",
+            [" CATALOG(", " CATALOG (", " CATALOG("],
+        ),
+        (
+            "vsam-components",
+            "DATA/INDEX component override",
+            [" DATA(", " INDEX(", " FREESPACE("],
+        ),
+        (
+            "retention-override",
+            "PURGE",
+            [" PURGE ", " PURGE)", " PURGE"],
+        ),
+    ]
+    .into_iter()
+    .find_map(|(capability, operand, needles)| {
+        needles
+            .iter()
+            .any(|needle| statement.contains(needle))
+            .then_some((capability, operand))
     })
 }
 
-fn numeric_parenthesized_operand(statement: &str, name: &str) -> Option<u32> {
-    parenthesized_operand(statement, &[name])?.parse().ok()
+fn dataset_name(value: &str) -> Result<DatasetName, HostProblem> {
+    DatasetName::new(value.to_ascii_uppercase(), 128).map_err(|_| HostProblem::Malformed)
 }
 
-fn pair_parenthesized_operand(statement: &str, name: &str) -> Option<(u32, u32)> {
-    let value = parenthesized_operand(statement, &[name])?;
-    let values = value
-        .split(|ch: char| ch == ',' || ch.is_whitespace())
-        .filter(|value| !value.is_empty())
-        .map(str::parse)
-        .collect::<Result<Vec<u32>, _>>()
-        .ok()?;
-    (values.len() == 2).then(|| (values[0], values[1]))
+fn ams_target(command: &AmsCommand) -> Result<DatasetName, HostProblem> {
+    let value = operand(command.source(), &["INDATASET", "DATASET", "ENTRIES"])
+        .or_else(|| crate::ams::bare_target(command.source(), command.label()))
+        .ok_or(HostProblem::Malformed)?;
+    dataset_name(&value)
+}
+
+fn encode_ams_snapshot_header(dataset: &DatasetName, attributes: &DatasetAttributes) -> String {
+    format!(
+        "MEAMS1|{}|{}|{}|{}|{}|{}|{}",
+        dataset.as_str(),
+        ams_org_tag(attributes.organization),
+        ams_recfm_tag(attributes.record_format),
+        attributes.logical_record_length,
+        attributes
+            .key_offset
+            .map_or_else(|| "-".into(), |value| value.to_string()),
+        attributes
+            .key_length
+            .map_or_else(|| "-".into(), |value| value.to_string()),
+        attributes
+            .ccsid
+            .map_or_else(|| "-".into(), |value| value.to_string()),
+    )
+}
+
+fn decode_ams_snapshot_header(
+    header: &str,
+) -> Result<(DatasetName, DatasetAttributes), HostProblem> {
+    let fields = header.split('|').collect::<Vec<_>>();
+    if fields.len() != 8 || fields[0] != "MEAMS1" {
+        return Err(HostProblem::Malformed);
+    }
+    let organization = match fields[2] {
+        "PS" => DatasetOrganization::Sequential,
+        "PDS" => DatasetOrganization::Partitioned,
+        "PDSE" => DatasetOrganization::PartitionedExtended,
+        "KSDS" => DatasetOrganization::KeySequenced,
+        "ESDS" => DatasetOrganization::EntrySequenced,
+        "RRDS" => DatasetOrganization::Relative,
+        "VRRDS" => DatasetOrganization::VariableRelative,
+        "LDS" => DatasetOrganization::Linear,
+        _ => return Err(HostProblem::Malformed),
+    };
+    let record_format = match fields[3] {
+        "F" => RecordFormat::Fixed,
+        "FB" => RecordFormat::FixedBlocked,
+        "FBS" => RecordFormat::FixedBlockedStandard,
+        "V" => RecordFormat::Variable,
+        "VB" => RecordFormat::VariableBlocked,
+        "VS" => RecordFormat::VariableSpanned,
+        "VBS" => RecordFormat::VariableBlockedSpanned,
+        "U" => RecordFormat::Undefined,
+        "LINE" => RecordFormat::Line,
+        _ => return Err(HostProblem::Malformed),
+    };
+    let optional_u32 = |value: &str| {
+        if value == "-" {
+            Ok(None)
+        } else {
+            value
+                .parse::<u32>()
+                .map(Some)
+                .map_err(|_| HostProblem::Malformed)
+        }
+    };
+    let ccsid = if fields[7] == "-" {
+        None
+    } else {
+        Some(fields[7].parse().map_err(|_| HostProblem::Malformed)?)
+    };
+    Ok((
+        dataset_name(fields[1])?,
+        DatasetAttributes {
+            organization,
+            record_format,
+            logical_record_length: fields[4].parse().map_err(|_| HostProblem::Malformed)?,
+            key_offset: optional_u32(fields[5])?,
+            key_length: optional_u32(fields[6])?,
+            ccsid,
+        },
+    ))
+}
+
+const fn ams_org_tag(organization: DatasetOrganization) -> &'static str {
+    match organization {
+        DatasetOrganization::Sequential => "PS",
+        DatasetOrganization::Partitioned => "PDS",
+        DatasetOrganization::PartitionedExtended => "PDSE",
+        DatasetOrganization::KeySequenced => "KSDS",
+        DatasetOrganization::EntrySequenced => "ESDS",
+        DatasetOrganization::Relative => "RRDS",
+        DatasetOrganization::VariableRelative => "VRRDS",
+        DatasetOrganization::Linear => "LDS",
+    }
+}
+
+const fn ams_recfm_tag(record_format: RecordFormat) -> &'static str {
+    match record_format {
+        RecordFormat::Fixed => "F",
+        RecordFormat::FixedBlocked => "FB",
+        RecordFormat::FixedBlockedStandard => "FBS",
+        RecordFormat::Variable => "V",
+        RecordFormat::VariableBlocked => "VB",
+        RecordFormat::VariableSpanned => "VS",
+        RecordFormat::VariableBlockedSpanned => "VBS",
+        RecordFormat::Undefined => "U",
+        RecordFormat::Line => "LINE",
+    }
+}
+
+fn hex_bytes(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02X}")).collect()
 }
 
 fn dataset_resolution_key(dd: &crate::DdPlan, raw: &str) -> String {
@@ -2636,6 +3553,7 @@ fn store_error(error: StoreError) -> HostProblem {
 mod tests {
     use super::*;
     use crate::{Program, ProgramOutput, ProgramRouter};
+    use mainframe_env_dataset::{DatasetLimits, DatasetService, dataset_providers};
     use mainframe_env_execution_api::{
         ArtifactRef, CapabilityId, ExecutionId, Principal, RequestId, ResourceLimits, RunUnitId,
         Selector, ServiceClass, TraceId,
@@ -2760,7 +3678,10 @@ mod tests {
                         state.insert(dataset.as_str().into(), records);
                         HostResult::Dataset(DatasetResult::Mutated { version: 2 })
                     }),
-                HostRequest::Dataset(DatasetRequest::Create { dataset, .. }) => self
+                HostRequest::Dataset(
+                    DatasetRequest::Create { dataset, .. }
+                    | DatasetRequest::Define { dataset, .. },
+                ) => self
                     .records
                     .lock()
                     .map_err(|_| HostProblem::InfrastructureFailure)
@@ -2854,6 +3775,16 @@ mod tests {
                             .into_bytes()],
                         );
                         HostResult::Dataset(DatasetResult::Mutated { version: 1 })
+                    }),
+                HostRequest::Dataset(DatasetRequest::BuildAlternateIndex { index, .. }) => self
+                    .records
+                    .lock()
+                    .map_err(|_| HostProblem::InfrastructureFailure)
+                    .and_then(|state| {
+                        state
+                            .contains_key(index.as_str())
+                            .then_some(HostResult::Dataset(DatasetResult::Mutated { version: 2 }))
+                            .ok_or(HostProblem::NotFound)
                     }),
                 HostRequest::Dataset(DatasetRequest::DefinePath { path, index, .. }) => self
                     .records
@@ -3045,6 +3976,68 @@ mod tests {
             Default::default(),
         )
         .unwrap()
+    }
+
+    fn service_with_real_datasets() -> (Arc<BatchService>, Arc<DatasetService>) {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let dataset_store: Arc<dyn ProviderStateStore> = store.clone();
+        let dataset = DatasetService::open(dataset_store, DatasetLimits::default()).unwrap();
+        let providers = dataset_providers(dataset.clone(), InvocationLimits::default());
+        let batch_store: Arc<dyn ProviderStateStore> = store;
+        let batch = BatchService::open(
+            host_with(builtins(), providers),
+            batch_store,
+            Default::default(),
+            Default::default(),
+        )
+        .unwrap();
+        (batch, dataset)
+    }
+
+    fn dataset_test_mutation(sequence: u64) -> Mutation {
+        Mutation {
+            sequence,
+            idempotency_key: IdempotencyKey::new(
+                format!("ams-real-{sequence}"),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            transaction: None,
+        }
+    }
+
+    fn seed_real_dataset(
+        dataset: &DatasetService,
+        name: &str,
+        records: Vec<Vec<u8>>,
+        sequence: u64,
+    ) {
+        let name = DatasetName::new(name, 128).unwrap();
+        dataset
+            .invoke(DatasetRequest::Create {
+                dataset: name.clone(),
+                attributes: DatasetAttributes {
+                    organization: DatasetOrganization::Sequential,
+                    record_format: RecordFormat::Variable,
+                    logical_record_length: 256,
+                    key_offset: None,
+                    key_length: None,
+                    ccsid: Some(37),
+                },
+                mutation: dataset_test_mutation(sequence),
+            })
+            .unwrap();
+        if !records.is_empty() {
+            dataset
+                .invoke(DatasetRequest::Write {
+                    dataset: name,
+                    member: None,
+                    records,
+                    expected_version: Some(1),
+                    mutation: dataset_test_mutation(sequence + 1),
+                })
+                .unwrap();
+        }
     }
 
     #[test]
@@ -3539,6 +4532,237 @@ mod tests {
         assert_eq!(
             records.lock().unwrap()["IBMUSER.TARGET"],
             vec![b"FIRST".to_vec(), b"SECOND".to_vec()]
+        );
+    }
+
+    #[test]
+    fn generated_idcams_handlers_route_metadata_catalog_and_modal_commands() {
+        let (service, dataset) = service_with_real_datasets();
+        seed_real_dataset(&dataset, "USER.COLLECT", Vec::new(), 500);
+        let invocation = invocation();
+        let submitted = service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//AMSJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//OUT DD DSN=USER.COLLECT,DISP=OLD\n//SYSIN DD *\n ALLOCATE DATASET(USER.PS) RECORDSIZE(80 80)\n ALTER USER.PS OPEN\n DEFINE CLUSTER (NAME(USER.KSDS) INDEXED KEYS(2 0) RECORDSIZE(4 4))\n DEFINE NONVSAM (NAME(USER.NV) RECORDSIZE(16 32))\n DEFINE USERCATALOG (NAME(USER.CAT))\n DEFINE ALIAS (NAME(USER.CATALIAS) RELATE(USER.CAT))\n DIAGNOSE USER.PS\n EXAMINE USER.KSDS\n LISTDATA USER.PS\n PRINT INDATASET(USER.PS)\n VERIFY USER.PS\n LISTCAT\n DCOLLECT OUTFILE(OUT)\n/*\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("ams-generated-handlers", InvocationLimits::default())
+                    .unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed
+        );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Describe {
+                dataset: DatasetName::new("USER.PS", 128).unwrap(),
+            }),
+            Ok(DatasetResult::Description(ref description))
+                if description.definition.lifecycle.state
+                    == mainframe_env_host_api::DatasetLifecycleState::Open
+        ));
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::List {
+                pattern: "USER.CATALIAS".into(),
+                start: None,
+                max_items: 8,
+            }),
+            Ok(DatasetResult::Listed { names, more: false })
+                if names.iter().any(|name| name.as_str() == "USER.CATALIAS")
+        ));
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Read {
+                dataset: DatasetName::new("USER.COLLECT", 128).unwrap(),
+                member: None,
+                key: None,
+                max_records: 64,
+            }),
+            Ok(DatasetResult::Records { records, .. })
+                if records.iter().any(|record| record.starts_with(b"USER.PS|"))
+        ));
+        assert!(
+            service
+                .spool(&submitted.id, "SYSPRINT", 0, 64)
+                .unwrap()
+                .0
+                .iter()
+                .any(|record| String::from_utf8_lossy(record).contains("LISTDATA"))
+        );
+    }
+
+    #[test]
+    fn idcams_export_import_and_recover_preserve_snapshot_records() {
+        let (service, dataset) = service_with_real_datasets();
+        seed_real_dataset(
+            &dataset,
+            "USER.SOURCE",
+            vec![b"FIRST".to_vec(), b"SECOND".to_vec()],
+            520,
+        );
+        seed_real_dataset(&dataset, "USER.SNAPSHOT", Vec::new(), 522);
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//EXPJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//OUT DD DSN=USER.SNAPSHOT,DISP=OLD\n//SYSIN DD *\n EXPORT ENTRIES(USER.SOURCE) OUTFILE(OUT)\n/*\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("ams-export", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed
+        );
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//IMPJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//IN DD DSN=USER.SNAPSHOT,DISP=SHR\n//SYSIN DD *\n IMPORT INFILE(IN) OUTDATASET(USER.RESTORED)\n/*\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("ams-import", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed
+        );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Read {
+                dataset: DatasetName::new("USER.RESTORED", 128).unwrap(),
+                member: None,
+                key: None,
+                max_records: 8,
+            }),
+            Ok(DatasetResult::Records { records, .. })
+                if records == [b"FIRST".to_vec(), b"SECOND".to_vec()]
+        ));
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//RECJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//IN DD DSN=USER.SNAPSHOT,DISP=SHR\n//SYSIN DD *\n RECOVER INDATASET(USER.RESTORED) INFILE(IN)\n/*\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("ams-recover", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed
+        );
+    }
+
+    #[test]
+    fn capability_gated_ams_handlers_return_explicit_condition_codes() {
+        let (service, _) = service_with_real_datasets();
+        let invocation = invocation();
+        let submitted = service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//CAPJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//SYSIN DD *\n ALTER LIBRARYENTRY NAME(LIB)\n ALTER VOLUMEENTRY NAME(VOL001)\n CREATE LIBRARYENTRY NAME(LIB)\n CREATE VOLUMEENTRY NAME(VOL001)\n DEFINE PAGESPACE (NAME(PAGE.ONE))\n SETCACHE NAME(VOL001)\n/*\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("ams-capabilities", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let completed = service.run_next(&invocation, false).unwrap().unwrap();
+        assert_eq!(completed.state, JobState::Completed);
+        assert_eq!(completed.return_code, Some(12));
+        let syprint = service.spool(&submitted.id, "SYSPRINT", 0, 64).unwrap().0;
+        for label in [
+            "ALTER LIBRARYENTRY",
+            "ALTER VOLUMEENTRY",
+            "CREATE LIBRARYENTRY",
+            "CREATE VOLUMEENTRY",
+            "DEFINE PAGESPACE",
+            "SETCACHE",
+        ] {
+            assert!(syprint.iter().any(|record| {
+                let record = String::from_utf8_lossy(record);
+                record.contains(label) && record.contains("UnsupportedCapability")
+            }));
+        }
+    }
+
+    #[test]
+    fn idcams_export_disconnect_and_import_connect_transition_catalog_state() {
+        let (service, dataset) = service_with_real_datasets();
+        dataset
+            .invoke(DatasetRequest::DefineCatalog {
+                catalog: DatasetName::new("USER.EXPCAT", 128).unwrap(),
+                kind: mainframe_env_host_api::CatalogKind::User,
+                mutation: dataset_test_mutation(540),
+            })
+            .unwrap();
+        seed_real_dataset(&dataset, "USER.CATIMAGE", Vec::new(), 541);
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//DISCJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//OUT DD DSN=USER.CATIMAGE,DISP=OLD\n//SYSIN DD *\n EXPORT DISCONNECT ENTRIES(USER.EXPCAT) OUTFILE(OUT)\n/*\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("ams-disconnect", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service
+                .run_next(&invocation, false)
+                .unwrap()
+                .unwrap()
+                .return_code,
+            Some(0)
+        );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Read {
+                dataset: DatasetName::new("USER.CATIMAGE", 128).unwrap(),
+                member: None,
+                key: None,
+                max_records: 4,
+            }),
+            Ok(DatasetResult::Records { records, .. })
+                if records == [b"MEAMSCAT1|USER.EXPCAT".to_vec()]
+        ));
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//CONNJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//IN DD DSN=USER.CATIMAGE,DISP=SHR\n//SYSIN DD *\n IMPORT CONNECT INFILE(IN)\n/*\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("ams-connect", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service
+                .run_next(&invocation, false)
+                .unwrap()
+                .unwrap()
+                .return_code,
+            Some(0)
+        );
+        assert_eq!(
+            dataset.invoke(DatasetRequest::SetCatalogConnection {
+                catalog: DatasetName::new("USER.EXPCAT", 128).unwrap(),
+                connected: false,
+                expected_version: Some(3),
+                mutation: dataset_test_mutation(543),
+            }),
+            Ok(DatasetResult::Mutated { version: 4 })
         );
     }
 

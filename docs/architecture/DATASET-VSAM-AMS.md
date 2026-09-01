@@ -156,6 +156,32 @@ generations from relative selection, but only `SCRATCH` removes dataset state.
 `NOEMPTY` retires only the overflow. Alias-dependent scratch is rejected before
 mutation until atomic dependent cleanup is available.
 
+## Generated AMS language and handlers
+
+`conformance/0.6/ams/grammar.json` is the 31-command modal grammar inventory.
+`cargo xtask dataset-contract` validates it against the frozen AMS command order
+and the detailed programming surface, then generates the batch grammar table.
+The parser owns bounded continuation, parenthesis, command/subcommand, `IF
+MAXCC|LASTCC ... THEN`, and `SET MAXCC|LASTCC` forms. It parses and validates the
+entire control stream before the first effect, so an unknown later statement
+cannot leave earlier catalog mutations behind.
+
+Every generated command ID has a dispatch path. Required commands invoke typed
+dataset, catalog, AIX, lifecycle, or bounded snapshot operations; tape library,
+tape volume, page-space, and controller-cache commands return an explicit
+capability condition. Command failures update `LASTCC` and the monotonic `MAXCC`;
+modal statements may reset either code, and the final maximum becomes the
+IDCAMS program return code rather than an infrastructure failure.
+
+AMS dataset operands are authorized through the shared principal/resource
+authority before host effects. `BLDINDEX` is a durable AIX rebuild/version
+transition rather than a no-op. `UPGRADE` is represented in the typed AIX state;
+`NOUPGRADE` currently returns the explicit `alternate-index-no-upgrade`
+capability until a materialized stale-index adapter exists. Export/import uses a
+bounded provider-neutral header followed by exact records and never exposes the
+provider codec. Export-disconnect/import-connect atomically use catalog
+connection transitions.
+
 ## Evolution rules
 
 - Writers emit only the current state version; readers support the documented
