@@ -5993,15 +5993,18 @@ impl ReferenceMachine {
         let from = position(args, "FROM")
             .and_then(|i| args.get(i + 1))
             .ok_or(MachineProblem::InvalidOperation)?;
-        let generated = if json
-            && let Some(layout) = self.layout(from).cloned()
+        let generated = if let Some(layout) = self.layout(from).cloned()
             && is_group(layout.category)
         {
-            serde_json::to_string(&BTreeMap::from([(
-                layout.simple_name.clone(),
-                self.json_layout_value(&layout)?,
-            )]))
-            .map_err(|_| MachineProblem::DataException)?
+            if json {
+                serde_json::to_string(&BTreeMap::from([(
+                    layout.simple_name.clone(),
+                    self.json_layout_value(&layout)?,
+                )]))
+                .map_err(|_| MachineProblem::DataException)?
+            } else {
+                self.xml_layout_value(&layout)?
+            }
         } else {
             let value = String::from_utf8_lossy(&self.resolve(from)?)
                 .trim()
@@ -6096,6 +6099,55 @@ impl ReferenceMachine {
             String::from_utf8(bytes).map_err(|_| MachineProblem::DataException)?
         };
         Ok(serde_json::Value::String(text.trim_end().into()))
+    }
+
+    fn xml_layout_value(&self, layout: &LayoutMetadata) -> Result<String, MachineProblem> {
+        let value = if is_group(layout.category) {
+            let mut children = self
+                .layouts
+                .values()
+                .filter(|candidate| candidate.parent.as_deref() == Some(layout.name.as_str()))
+                .filter(|candidate| {
+                    candidate.simple_name != "FILLER"
+                        && !matches!(
+                            candidate.category,
+                            LayoutCategory::Condition | LayoutCategory::Rename
+                        )
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+            children.sort_by(|left, right| {
+                left.offset
+                    .cmp(&right.offset)
+                    .then_with(|| left.name.cmp(&right.name))
+            });
+            if children.is_empty() {
+                return Err(MachineProblem::DataException);
+            }
+            children
+                .iter()
+                .map(|child| self.xml_layout_value(child))
+                .collect::<Result<Vec<_>, _>>()?
+                .concat()
+        } else if is_numeric(layout.category) {
+            decimal_string(decode_decimal(layout, &self.read(&layout.name)?)?)
+        } else {
+            let bytes = self.read(&layout.name)?;
+            let text = if matches!(
+                layout.category,
+                LayoutCategory::National | LayoutCategory::NationalEdited
+            ) {
+                String::from_utf8(national_to_utf8(&bytes)?)
+                    .map_err(|_| MachineProblem::DataException)?
+            } else {
+                String::from_utf8(bytes).map_err(|_| MachineProblem::DataException)?
+            };
+            xml_escape(text.trim_end())
+        };
+        Ok(format!(
+            "<{}>{value}</{}>",
+            layout.simple_name, layout.simple_name
+        ))
     }
 
     fn parse_generated(&mut self, args: &[String], json: bool) -> Result<(), MachineProblem> {

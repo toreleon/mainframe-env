@@ -278,6 +278,13 @@
       "obligation_id": "phrase-group-atomic-exception",
       "source": "IDENTIFICATION DIVISION. PROGRAM-ID. JSONPARSEATOMIC. DATA DIVISION. WORKING-STORAGE SECTION. 01 JSON-X PIC X(80) VALUE '{\"GREETING\":{\"COUNT-X\":34,\"MSG\":99}}'. 01 GREETING. 05 COUNT-X PIC 99 VALUE 12. 05 MSG PIC X(5) VALUE 'Hello'. PROCEDURE DIVISION. JSON PARSE JSON-X INTO GREETING ON EXCEPTION DISPLAY COUNT-X MSG NOT ON EXCEPTION DISPLAY 'BAD' END-JSON. STOP RUN.",
       "expected_output": "12Hello\n"
+    },
+    {
+      "id": "xml-generate-group-hierarchy",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0043",
+      "obligation_id": "phrase-group-hierarchy",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. XMLGROUP. DATA DIVISION. WORKING-STORAGE SECTION. 01 GREETING. 05 COUNT-X PIC 99 VALUE 12. 05 MSG PIC X(3) VALUE 'A&B'. 01 XML-X PIC X(128). 01 LEN-X PIC 999. PROCEDURE DIVISION. XML GENERATE XML-X FROM GREETING COUNT IN LEN-X. DISPLAY XML-X(1:LEN-X). STOP RUN.",
+      "expected_output": "<GREETING><COUNT-X>12</COUNT-X><MSG>A&amp;B</MSG></GREETING>\n"
     }
   ]
 }
