@@ -262,7 +262,9 @@
       "label": "ADD statement",
       "source_locator": "pdf-page:343;outline:ADD statement",
       "forms": [
-        "ADD operands TO target [GIVING target] [ROUNDED] [ON SIZE ERROR statements] [END-ADD]"
+        "ADD operands TO targets [GIVING targets] [ROUNDED] [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-ADD]",
+        "ADD operands GIVING targets [ROUNDED] [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-ADD]",
+        "ADD CORRESPONDING group TO group [ROUNDED] [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-ADD]"
       ]
     },
     {
@@ -307,7 +309,8 @@
       "label": "CLOSE statement",
       "source_locator": "pdf-page:360;outline:CLOSE statement",
       "forms": [
-        "CLOSE file-name..."
+        "CLOSE file-name [REEL|UNIT] [WITH NO REWIND|FOR REMOVAL] ...",
+        "CLOSE file-name [WITH LOCK] ..."
       ]
     },
     {
@@ -515,7 +518,8 @@
       "label": "READ statement",
       "source_locator": "pdf-page:461;outline:READ statement",
       "forms": [
-        "READ file [NEXT RECORD] [INTO item] [KEY IS data] [AT END statements] [INVALID KEY statements] [END-READ]"
+        "READ file [NEXT|PREVIOUS RECORD] [INTO item] [WITH LOCK|WITH KEPT LOCK|WITH NO LOCK|IGNORE LOCK] [WAIT|NO WAIT] [AT END statements] [NOT AT END statements] [END-READ]",
+        "READ file [RECORD] [INTO item] [KEY IS data] [WITH LOCK|WITH KEPT LOCK|WITH NO LOCK|IGNORE LOCK] [WAIT|NO WAIT] [INVALID KEY statements] [NOT INVALID KEY statements] [END-READ]"
       ]
     },
     {

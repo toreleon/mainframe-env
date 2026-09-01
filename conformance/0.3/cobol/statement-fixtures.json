@@ -11,7 +11,7 @@
       ],
       "invalid": [
         {"source":"ACCEPT","class":"missing-required"},
-        {"source":"ACCEPT A @","class":"unknown-suffix"},
+        {"source":"ACCEPT A WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"ACCEPT A FROM B FROM C","class":"duplicate-or-exclusive"},
         {"source":"ACCEPT A B FROM C","class":"reordered-or-cardinality"}
       ]
@@ -25,7 +25,7 @@
       ],
       "invalid": [
         {"source":"ADD 1","class":"missing-required"},
-        {"source":"ADD 1 TO A @","class":"unknown-suffix"},
+        {"source":"ADD 1 TO A WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"ADD 1 TO A GIVING B GIVING C","class":"duplicate-or-exclusive"},
         {"source":"ADD TO A","class":"reordered-or-cardinality"}
       ]
@@ -39,7 +39,7 @@
       ],
       "invalid": [
         {"source":"ALLOCATE","class":"missing-required"},
-        {"source":"ALLOCATE 10 @","class":"unknown-suffix"},
+        {"source":"ALLOCATE 10 WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"ALLOCATE 10 RETURNING PTR RETURNING PTR","class":"duplicate-or-exclusive"},
         {"source":"ALLOCATE 10 RETURNING PTR INITIALIZED","class":"reordered-or-cardinality"}
       ]
@@ -53,7 +53,7 @@
       ],
       "invalid": [
         {"source":"ALTER TARGET","class":"missing-required"},
-        {"source":"ALTER TARGET TO TARGET-EXIT @","class":"unknown-suffix"},
+        {"source":"ALTER TARGET TO TARGET-EXIT WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"ALTER TARGET TO PROCEED TO TARGET-EXIT TO TARGET","class":"duplicate-or-exclusive"},
         {"source":"ALTER TO TARGET","class":"reordered-or-cardinality"}
       ]
@@ -67,7 +67,7 @@
       ],
       "invalid": [
         {"source":"CALL","class":"missing-required"},
-        {"source":"CALL 'SUB' @","class":"unknown-suffix"},
+        {"source":"CALL 'SUB' WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"CALL 'SUB' RETURNING C RETURNING B","class":"duplicate-or-exclusive"},
         {"source":"CALL 'SUB' RETURNING C USING A","class":"reordered-or-cardinality"}
       ]
@@ -81,7 +81,7 @@
       ],
       "invalid": [
         {"source":"CANCEL","class":"missing-required"},
-        {"source":"CANCEL 'SUB' @","class":"unknown-suffix"},
+        {"source":"CANCEL 'SUB' WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"CANCEL 'SUB' ()","class":"reordered-or-cardinality"},
         {"source":"CANCEL , 'SUB'","class":"duplicate-or-exclusive"}
       ]
@@ -91,11 +91,16 @@
       "valid": [
         {"source":"CLOSE TEST-FILE","class":"base"},
         {"source":"CLOSE TEST-FILE OUT-FILE","class":"alternative"},
+        {"source":"CLOSE TEST-FILE WITH LOCK","class":"optional-phrase"},
+        {"source":"CLOSE TEST-FILE REEL WITH NO REWIND","class":"optional-phrase"},
+        {"source":"CLOSE TEST-FILE UNIT FOR REMOVAL","class":"optional-phrase"},
         {"source":"CLOSE TEST-FILE DISPLAY B","class":"same-line-sequence","expected_targets":["close","display"]}
       ],
       "invalid": [
         {"source":"CLOSE","class":"missing-required"},
-        {"source":"CLOSE TEST-FILE @","class":"unknown-suffix"},
+        {"source":"CLOSE TEST-FILE WITH BOGUS","class":"alphabetic-near-miss"},
+        {"source":"CLOSE TEST-FILE REEL WITH LOCK","class":"duplicate-or-exclusive"},
+        {"source":"CLOSE TEST-FILE FOR REMOVAL","class":"reordered-or-cardinality"},
         {"source":"CLOSE TEST-FILE ()","class":"reordered-or-cardinality"},
         {"source":"CLOSE , TEST-FILE","class":"duplicate-or-exclusive"}
       ]
@@ -109,7 +114,7 @@
       ],
       "invalid": [
         {"source":"COMPUTE A 1","class":"missing-required"},
-        {"source":"COMPUTE A = 1 @","class":"unknown-suffix"},
+        {"source":"COMPUTE A = 1 WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"COMPUTE A = 1 = 2","class":"duplicate-or-exclusive"},
         {"source":"COMPUTE = 1","class":"reordered-or-cardinality"}
       ]
@@ -123,7 +128,7 @@
       ],
       "invalid": [
         {"source":"CONTINUE EXTRA","class":"arity-boundary"},
-        {"source":"CONTINUE @","class":"unknown-suffix"},
+        {"source":"CONTINUE WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"CONTINUE ()","class":"reordered-or-cardinality"},
         {"source":"CONTINUE ,","class":"duplicate-or-exclusive"}
       ]
@@ -137,7 +142,7 @@
       ],
       "invalid": [
         {"source":"DELETE TEST-FILE","class":"missing-required"},
-        {"source":"DELETE TEST-FILE RECORD @","class":"unknown-suffix"},
+        {"source":"DELETE TEST-FILE RECORD WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"DELETE TEST-FILE RECORD RECORD","class":"duplicate-or-exclusive"},
         {"source":"DELETE RECORD TEST-FILE","class":"reordered-or-cardinality"}
       ]
@@ -151,7 +156,7 @@
       ],
       "invalid": [
         {"source":"DISPLAY","class":"missing-required"},
-        {"source":"DISPLAY A @","class":"unknown-suffix"},
+        {"source":"DISPLAY A WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"DISPLAY A UPON C UPON C","class":"duplicate-or-exclusive"},
         {"source":"DISPLAY A WITH NO ADVANCING UPON C","class":"reordered-or-cardinality"}
       ]
@@ -165,7 +170,7 @@
       ],
       "invalid": [
         {"source":"DIVIDE A B","class":"missing-required"},
-        {"source":"DIVIDE A INTO B @","class":"unknown-suffix"},
+        {"source":"DIVIDE A INTO B WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"DIVIDE A INTO B GIVING C GIVING A","class":"duplicate-or-exclusive"},
         {"source":"DIVIDE INTO B","class":"reordered-or-cardinality"}
       ]
@@ -179,7 +184,7 @@
       ],
       "invalid": [
         {"source":"ENTRY","class":"missing-required"},
-        {"source":"ENTRY 'ALT' @","class":"unknown-suffix"},
+        {"source":"ENTRY 'ALT' WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"ENTRY 'ALT' USING A USING B","class":"duplicate-or-exclusive"},
         {"source":"ENTRY A USING B","class":"reordered-or-cardinality"}
       ]
@@ -193,7 +198,7 @@
       ],
       "invalid": [
         {"source":"EVALUATE","class":"missing-required"},
-        {"source":"EVALUATE A WHEN 1 CONTINUE @ END-EVALUATE","class":"unknown-suffix"},
+        {"source":"EVALUATE A WHEN 1 CONTINUE WITH BOGUS END-EVALUATE","class":"alphabetic-near-miss"},
         {"source":"EVALUATE A WHEN OTHER CONTINUE WHEN 2 CONTINUE END-EVALUATE","class":"duplicate-or-exclusive"},
         {"source":"EVALUATE A CONTINUE WHEN 1 CONTINUE END-EVALUATE","class":"reordered-or-cardinality"},
         {"source":"EVALUATE A WHEN 1 CONTINUE END-IF","class":"malformed-nesting"}
@@ -208,7 +213,7 @@
       ],
       "invalid": [
         {"source":"EXIT BOGUS","class":"arity-boundary"},
-        {"source":"EXIT PROGRAM @","class":"unknown-suffix"},
+        {"source":"EXIT PROGRAM WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"EXIT PROGRAM PROGRAM","class":"duplicate-or-exclusive"},
         {"source":"EXIT PROGRAM METHOD","class":"reordered-or-cardinality"}
       ]
@@ -222,7 +227,7 @@
       ],
       "invalid": [
         {"source":"FREE","class":"missing-required"},
-        {"source":"FREE PTR @","class":"unknown-suffix"},
+        {"source":"FREE PTR WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"FREE PTR ()","class":"reordered-or-cardinality"},
         {"source":"FREE , PTR","class":"duplicate-or-exclusive"}
       ]
@@ -236,7 +241,7 @@
       ],
       "invalid": [
         {"source":"GOBACK EXTRA","class":"arity-boundary"},
-        {"source":"GOBACK @","class":"unknown-suffix"},
+        {"source":"GOBACK WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"GO BACK BACK","class":"duplicate-or-exclusive"},
         {"source":"GO BACK EXTRA EXTRA","class":"reordered-or-cardinality"}
       ]
@@ -250,7 +255,7 @@
       ],
       "invalid": [
         {"source":"GO TO","class":"missing-required"},
-        {"source":"GO TO TARGET @","class":"unknown-suffix"},
+        {"source":"GO TO TARGET WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"GO TO TARGET DEPENDING ON A DEPENDING ON B","class":"duplicate-or-exclusive"},
         {"source":"GO TO DEPENDING ON A","class":"reordered-or-cardinality"}
       ]
@@ -264,7 +269,7 @@
       ],
       "invalid": [
         {"source":"IF","class":"missing-required"},
-        {"source":"IF A = 1 CONTINUE @ END-IF","class":"unknown-suffix"},
+        {"source":"IF A = 1 CONTINUE WITH BOGUS END-IF","class":"alphabetic-near-miss"},
         {"source":"IF A = 1 CONTINUE ELSE CONTINUE ELSE CONTINUE END-IF","class":"duplicate-or-exclusive"},
         {"source":"IF A = 1 ELSE CONTINUE END-IF","class":"reordered-or-cardinality"},
         {"source":"IF A = 1 CONTINUE END-EVALUATE","class":"malformed-nesting"}
@@ -279,7 +284,7 @@
       ],
       "invalid": [
         {"source":"INITIALIZE","class":"missing-required"},
-        {"source":"INITIALIZE A @","class":"unknown-suffix"},
+        {"source":"INITIALIZE A WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"INITIALIZE A WITH FILLER WITH FILLER","class":"duplicate-or-exclusive"},
         {"source":"INITIALIZE A REPLACING BY B","class":"reordered-or-cardinality"}
       ]
@@ -293,7 +298,7 @@
       ],
       "invalid": [
         {"source":"INSPECT A","class":"missing-required"},
-        {"source":"INSPECT A TALLYING B @","class":"unknown-suffix"},
+        {"source":"INSPECT A TALLYING B WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"INSPECT A TALLYING B REPLACING A","class":"duplicate-or-exclusive"},
         {"source":"INSPECT TALLYING A","class":"reordered-or-cardinality"}
       ]
@@ -307,7 +312,7 @@
       ],
       "invalid": [
         {"source":"INVOKE A","class":"missing-required"},
-        {"source":"INVOKE A 'METHOD' @","class":"unknown-suffix"},
+        {"source":"INVOKE A 'METHOD' WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"INVOKE A 'METHOD' RETURNING C RETURNING B","class":"duplicate-or-exclusive"},
         {"source":"INVOKE A 'METHOD' RETURNING C USING B","class":"reordered-or-cardinality"}
       ]
@@ -321,7 +326,7 @@
       ],
       "invalid": [
         {"source":"JSON GENERATE C A","class":"missing-required"},
-        {"source":"JSON GENERATE C FROM A @","class":"unknown-suffix"},
+        {"source":"JSON GENERATE C FROM A WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"JSON GENERATE C FROM A COUNT IN B COUNT IN A","class":"duplicate-or-exclusive"},
         {"source":"JSON GENERATE FROM A","class":"reordered-or-cardinality"}
       ]
@@ -335,7 +340,7 @@
       ],
       "invalid": [
         {"source":"JSON PARSE C A","class":"missing-required"},
-        {"source":"JSON PARSE C INTO A @","class":"unknown-suffix"},
+        {"source":"JSON PARSE C INTO A WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"JSON PARSE C INTO A INTO B","class":"duplicate-or-exclusive"},
         {"source":"JSON PARSE INTO A","class":"reordered-or-cardinality"}
       ]
@@ -349,7 +354,7 @@
       ],
       "invalid": [
         {"source":"MERGE SORT-FILE","class":"missing-required"},
-        {"source":"MERGE SORT-FILE USING TEST-FILE GIVING OUT-FILE @","class":"unknown-suffix"},
+        {"source":"MERGE SORT-FILE USING TEST-FILE GIVING OUT-FILE WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"MERGE SORT-FILE USING TEST-FILE USING OUT-FILE GIVING OUT-FILE","class":"duplicate-or-exclusive"},
         {"source":"MERGE SORT-FILE GIVING OUT-FILE USING TEST-FILE","class":"reordered-or-cardinality"}
       ]
@@ -363,7 +368,7 @@
       ],
       "invalid": [
         {"source":"MOVE A B","class":"missing-required"},
-        {"source":"MOVE A TO B @","class":"unknown-suffix"},
+        {"source":"MOVE A TO B WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"MOVE A TO B TO C","class":"duplicate-or-exclusive"},
         {"source":"MOVE TO B","class":"reordered-or-cardinality"}
       ]
@@ -377,7 +382,7 @@
       ],
       "invalid": [
         {"source":"MULTIPLY A B","class":"missing-required"},
-        {"source":"MULTIPLY A BY B @","class":"unknown-suffix"},
+        {"source":"MULTIPLY A BY B WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"MULTIPLY A BY B GIVING C GIVING A","class":"duplicate-or-exclusive"},
         {"source":"MULTIPLY BY B","class":"reordered-or-cardinality"}
       ]
@@ -391,7 +396,7 @@
       ],
       "invalid": [
         {"source":"OPEN TEST-FILE","class":"missing-required"},
-        {"source":"OPEN INPUT TEST-FILE @","class":"unknown-suffix"},
+        {"source":"OPEN INPUT TEST-FILE WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"OPEN INPUT TEST-FILE INPUT","class":"duplicate-or-exclusive"},
         {"source":"OPEN INPUT OUTPUT OUT-FILE","class":"reordered-or-cardinality"}
       ]
@@ -405,7 +410,7 @@
       ],
       "invalid": [
         {"source":"PERFORM","class":"missing-required"},
-        {"source":"PERFORM TARGET @","class":"unknown-suffix"},
+        {"source":"PERFORM TARGET WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"PERFORM TARGET THROUGH TARGET-EXIT THROUGH TARGET","class":"duplicate-or-exclusive"},
         {"source":"PERFORM UNTIL A = B END-PERFORM","class":"reordered-or-cardinality"},
         {"source":"PERFORM UNTIL A = B CONTINUE END-IF","class":"malformed-nesting"}
@@ -416,11 +421,16 @@
       "valid": [
         {"source":"READ TEST-FILE INTO TEST-RECORD AT END CONTINUE END-READ","class":"base","expected_targets":["read","continue"]},
         {"source":"READ TEST-FILE KEY IS A","class":"alternative"},
+        {"source":"READ TEST-FILE WITH NO LOCK","class":"optional-phrase"},
+        {"source":"READ TEST-FILE NEXT RECORD INTO TEST-RECORD WITH KEPT LOCK WAIT","class":"optional-phrase"},
+        {"source":"READ TEST-FILE PREVIOUS RECORD IGNORE LOCK NO WAIT","class":"optional-phrase"},
         {"source":"READ TEST-FILE DISPLAY B","class":"same-line-sequence","expected_targets":["read","display"]}
       ],
       "invalid": [
         {"source":"READ","class":"missing-required"},
-        {"source":"READ TEST-FILE @","class":"unknown-suffix"},
+        {"source":"READ TEST-FILE WITH BOGUS","class":"alphabetic-near-miss"},
+        {"source":"READ TEST-FILE WITH LOCK WITH NO LOCK","class":"duplicate-or-exclusive"},
+        {"source":"READ TEST-FILE NEXT RECORD KEY IS A","class":"reordered-or-cardinality"},
         {"source":"READ TEST-FILE INTO A INTO B","class":"duplicate-or-exclusive"},
         {"source":"READ TEST-FILE KEY INTO A","class":"reordered-or-cardinality"}
       ]
@@ -434,7 +444,7 @@
       ],
       "invalid": [
         {"source":"RELEASE","class":"missing-required"},
-        {"source":"RELEASE SORT-RECORD @","class":"unknown-suffix"},
+        {"source":"RELEASE SORT-RECORD WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"RELEASE SORT-RECORD FROM A FROM B","class":"duplicate-or-exclusive"},
         {"source":"RELEASE FROM A","class":"reordered-or-cardinality"}
       ]
@@ -448,7 +458,7 @@
       ],
       "invalid": [
         {"source":"RETURN","class":"missing-required"},
-        {"source":"RETURN SORT-FILE RECORD @","class":"unknown-suffix"},
+        {"source":"RETURN SORT-FILE RECORD WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"RETURN SORT-FILE RECORD INTO A INTO B","class":"duplicate-or-exclusive"},
         {"source":"RETURN RECORD SORT-FILE","class":"reordered-or-cardinality"}
       ]
@@ -462,7 +472,7 @@
       ],
       "invalid": [
         {"source":"REWRITE","class":"missing-required"},
-        {"source":"REWRITE TEST-RECORD @","class":"unknown-suffix"},
+        {"source":"REWRITE TEST-RECORD WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"REWRITE TEST-RECORD FROM A FROM B","class":"duplicate-or-exclusive"},
         {"source":"REWRITE FROM A","class":"reordered-or-cardinality"}
       ]
@@ -476,7 +486,7 @@
       ],
       "invalid": [
         {"source":"SEARCH","class":"missing-required"},
-        {"source":"SEARCH TABLE-ITEM WHEN A = 1 CONTINUE @ END-SEARCH","class":"unknown-suffix"},
+        {"source":"SEARCH TABLE-ITEM WHEN A = 1 CONTINUE WITH BOGUS END-SEARCH","class":"alphabetic-near-miss"},
         {"source":"SEARCH TABLE-ITEM AT END CONTINUE AT END CONTINUE WHEN A = 1 CONTINUE END-SEARCH","class":"duplicate-or-exclusive"},
         {"source":"SEARCH TABLE-ITEM CONTINUE WHEN A = 1 CONTINUE END-SEARCH","class":"reordered-or-cardinality"},
         {"source":"SEARCH TABLE-ITEM WHEN A = 1 CONTINUE END-IF","class":"malformed-nesting"}
@@ -491,7 +501,7 @@
       ],
       "invalid": [
         {"source":"SET A","class":"missing-required"},
-        {"source":"SET A TO 1 @","class":"unknown-suffix"},
+        {"source":"SET A TO 1 WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"SET A TO 1 TO 2","class":"duplicate-or-exclusive"},
         {"source":"SET A UP 1","class":"reordered-or-cardinality"}
       ]
@@ -505,7 +515,7 @@
       ],
       "invalid": [
         {"source":"SORT SORT-FILE","class":"missing-required"},
-        {"source":"SORT SORT-FILE USING TEST-FILE GIVING OUT-FILE @","class":"unknown-suffix"},
+        {"source":"SORT SORT-FILE USING TEST-FILE GIVING OUT-FILE WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"SORT SORT-FILE USING TEST-FILE USING OUT-FILE GIVING OUT-FILE","class":"duplicate-or-exclusive"},
         {"source":"SORT SORT-FILE GIVING OUT-FILE USING TEST-FILE","class":"reordered-or-cardinality"}
       ]
@@ -519,7 +529,7 @@
       ],
       "invalid": [
         {"source":"START","class":"missing-required"},
-        {"source":"START TEST-FILE BOGUS","class":"unknown-suffix"},
+        {"source":"START TEST-FILE BOGUS","class":"alphabetic-near-miss"},
         {"source":"START TEST-FILE KEY IS = A KEY IS = B","class":"duplicate-or-exclusive"},
         {"source":"START TEST-FILE KEY A","class":"reordered-or-cardinality"}
       ]
@@ -533,7 +543,7 @@
       ],
       "invalid": [
         {"source":"STOP RUN EXTRA","class":"arity-boundary"},
-        {"source":"STOP RUN @","class":"unknown-suffix"},
+        {"source":"STOP RUN WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"STOP RUN RETURNING A RETURNING B","class":"duplicate-or-exclusive"},
         {"source":"STOP RUN A RETURNING B","class":"reordered-or-cardinality"}
       ]
@@ -547,7 +557,7 @@
       ],
       "invalid": [
         {"source":"STRING A","class":"missing-required"},
-        {"source":"STRING A DELIMITED BY SIZE INTO C @","class":"unknown-suffix"},
+        {"source":"STRING A DELIMITED BY SIZE INTO C WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"STRING A DELIMITED BY SIZE INTO C INTO B","class":"duplicate-or-exclusive"},
         {"source":"STRING A INTO C DELIMITED BY SIZE","class":"reordered-or-cardinality"}
       ]
@@ -561,7 +571,7 @@
       ],
       "invalid": [
         {"source":"SUBTRACT A B","class":"missing-required"},
-        {"source":"SUBTRACT A FROM B @","class":"unknown-suffix"},
+        {"source":"SUBTRACT A FROM B WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"SUBTRACT A FROM B GIVING C GIVING A","class":"duplicate-or-exclusive"},
         {"source":"SUBTRACT FROM B","class":"reordered-or-cardinality"}
       ]
@@ -575,7 +585,7 @@
       ],
       "invalid": [
         {"source":"UNSTRING C","class":"missing-required"},
-        {"source":"UNSTRING C DELIMITED BY SPACE INTO A @","class":"unknown-suffix"},
+        {"source":"UNSTRING C DELIMITED BY SPACE INTO A WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"UNSTRING C DELIMITED BY SPACE INTO A INTO B","class":"duplicate-or-exclusive"},
         {"source":"UNSTRING C INTO A DELIMITED BY SPACE","class":"reordered-or-cardinality"}
       ]
@@ -589,7 +599,7 @@
       ],
       "invalid": [
         {"source":"WRITE","class":"missing-required"},
-        {"source":"WRITE TEST-RECORD @","class":"unknown-suffix"},
+        {"source":"WRITE TEST-RECORD WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"WRITE TEST-RECORD FROM A FROM B","class":"duplicate-or-exclusive"},
         {"source":"WRITE TEST-RECORD LINES 1","class":"reordered-or-cardinality"}
       ]
@@ -603,7 +613,7 @@
       ],
       "invalid": [
         {"source":"XML GENERATE C A","class":"missing-required"},
-        {"source":"XML GENERATE C FROM A @","class":"unknown-suffix"},
+        {"source":"XML GENERATE C FROM A WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"XML GENERATE C FROM A COUNT IN B COUNT IN A","class":"duplicate-or-exclusive"},
         {"source":"XML GENERATE FROM A","class":"reordered-or-cardinality"}
       ]
@@ -617,7 +627,7 @@
       ],
       "invalid": [
         {"source":"XML PARSE C TARGET","class":"missing-required"},
-        {"source":"XML PARSE C INTO A @","class":"unknown-suffix"},
+        {"source":"XML PARSE C INTO A WITH BOGUS","class":"alphabetic-near-miss"},
         {"source":"XML PARSE C INTO A INTO B","class":"duplicate-or-exclusive"},
         {"source":"XML PARSE INTO A","class":"reordered-or-cardinality"}
       ]

@@ -25000,355 +25000,355 @@
         "id": "cobol.semantic.file-value-of.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.accept.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.accept.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.add.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.add.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.allocate.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.allocate.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.alter.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.alter.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.call.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.call.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.cancel.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.cancel.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.close.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.close.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.compute.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.compute.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.continue.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.continue.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.delete.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.delete.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.display.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.display.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.divide.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.divide.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.entry.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.entry.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.evaluate.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.evaluate.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.exit.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.exit.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.free.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.free.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.go-to.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.go-to.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.goback.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.goback.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.if.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.if.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.initialize.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.initialize.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.inspect.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.inspect.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.invoke.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.invoke.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.json-generate.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.json-generate.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.json-parse.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.json-parse.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.merge.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.merge.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.move.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.move.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.multiply.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.multiply.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.open.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.open.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.perform.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.perform.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.read.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.read.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.release.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.release.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.return.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.return.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.rewrite.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.rewrite.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.search.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.search.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.set.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.set.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.sort.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.sort.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.start.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.start.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.stop.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.stop.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.string.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.string.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.subtract.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.subtract.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.unstring.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.unstring.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.write.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.write.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.xml-generate.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.xml-generate.valid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.xml-parse.invalid"
       },
       {
-        "digest": "sha256:0b3572ad853ac2b812c7770eae82d7d46a7a4d598cda8435c280dc14c1f9eb79",
+        "digest": "sha256:fd495ed14d3868e99e9170791f9fbe37560734683a534410f0eb7b01bc75fc20",
         "id": "cobol.statement.xml-parse.valid"
       },
       {

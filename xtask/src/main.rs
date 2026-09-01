@@ -1396,7 +1396,7 @@ fn render_cobol_language(root: &Path) -> TaskResult<Vec<u8>> {
     source.push_str("    pub kind: K,\n    pub id: &'static str,\n    pub row_id: &'static str,\n    pub label: &'static str,\n    pub source_locator: &'static str,\n    pub forms: &'static [&'static str],\n    pub placement: &'static str,\n}\n\n");
     source.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
     source.push_str("pub struct ProcedureStatementDescriptor {\n");
-    source.push_str("    pub kind: ProcedureStatementKind,\n    pub id: &'static str,\n    pub row_id: &'static str,\n    pub label: &'static str,\n    pub source_locator: &'static str,\n    pub forms: &'static [&'static str],\n}\n\n");
+    source.push_str("    pub kind: ProcedureStatementKind,\n    pub id: &'static str,\n    pub row_id: &'static str,\n    pub label: &'static str,\n    pub source_locator: &'static str,\n    pub forms: &'static [&'static str],\n    pub grammar_keywords: &'static [&'static str],\n}\n\n");
     source.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
     source.push_str("pub struct IntrinsicSignature {\n    pub arguments: &'static [&'static [IntrinsicArgumentClass]],\n    pub variadic: bool,\n    pub homogeneous: bool,\n    pub result: IntrinsicResultRule,\n}\n\n");
     source.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
@@ -1455,6 +1455,11 @@ fn render_cobol_language(root: &Path) -> TaskResult<Vec<u8>> {
             source.push_str(&literal(
                 form.as_str().ok_or("COBOL form is not a string")?,
             )?);
+            source.push(',');
+        }
+        source.push_str("],\n        grammar_keywords: &[");
+        for keyword in cobol_form_keywords(entry, &path)? {
+            source.push_str(&literal(&keyword)?);
             source.push(',');
         }
         source.push_str("],\n    },\n");
@@ -1670,6 +1675,27 @@ fn render_cobol_language(root: &Path) -> TaskResult<Vec<u8>> {
     source.push_str("\npub fn special_register_descriptor(kind: SpecialRegisterKind) -> &'static SpecialRegisterDescriptor {\n    SPECIAL_REGISTERS.iter().find(|entry| entry.kind == kind).expect(\"generated special register kind\")\n}\n");
     source.push_str("\npub fn special_register_named(name: &str) -> Option<&'static SpecialRegisterDescriptor> {\n    SPECIAL_REGISTERS.iter().find(|entry| entry.name.eq_ignore_ascii_case(name))\n}\n");
     format_generated_rust(root, source.into_bytes())
+}
+
+fn cobol_form_keywords(entry: &Value, path: &Path) -> TaskResult<Vec<String>> {
+    let mut keywords = BTreeSet::new();
+    for form in array(entry, "forms", path)? {
+        let form = form.as_str().ok_or("COBOL form is not a string")?;
+        for word in
+            form.split(|character: char| !(character.is_ascii_alphanumeric() || character == '-'))
+        {
+            if !word.is_empty()
+                && word.bytes().any(|byte| byte.is_ascii_alphabetic())
+                && word
+                    .bytes()
+                    .filter(|byte| byte.is_ascii_alphabetic())
+                    .all(|byte| byte.is_ascii_uppercase())
+            {
+                keywords.insert(word.to_string());
+            }
+        }
+    }
+    Ok(keywords.into_iter().collect())
 }
 
 fn format_generated_rust(root: &Path, source: Vec<u8>) -> TaskResult<Vec<u8>> {

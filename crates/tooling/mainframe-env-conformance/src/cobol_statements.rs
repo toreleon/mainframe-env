@@ -126,7 +126,7 @@ pub fn verify_cobol_statement_fixtures() -> Result<(), String> {
             || !invalid_classes
                 .iter()
                 .any(|class| matches!(*class, "missing-required" | "arity-boundary"))
-            || !invalid_classes.contains("unknown-suffix")
+            || !invalid_classes.contains("alphabetic-near-miss")
             || !invalid_classes.iter().any(|class| {
                 matches!(
                     *class,
@@ -524,5 +524,33 @@ mod tests {
             permissive_mutant.target_diagnostic_hits = 0;
             assert!(!check(&permissive_mutant, &REJECTED_OBSERVATION).matched);
         }
+    }
+
+    #[test]
+    fn permissive_operand_and_omitted_valid_phrase_mutants_are_killed() {
+        let invalid = [detailed_case(
+            "CLOSE TEST-FILE WITH BOGUS",
+            "alphabetic-near-miss",
+            &[],
+        )];
+        let rejected = execute_cases(&fixture("close"), &invalid).unwrap();
+        assert!(check(&rejected, &REJECTED_OBSERVATION).matched);
+        let mut permissive_operand = rejected;
+        permissive_operand.accepted = 1;
+        permissive_operand.target_diagnostic_hits = 0;
+        assert!(!check(&permissive_operand, &REJECTED_OBSERVATION).matched);
+
+        let valid = [detailed_case(
+            "READ TEST-FILE WITH NO LOCK",
+            "optional-phrase",
+            &["read"],
+        )];
+        let accepted = execute_cases(&fixture("read"), &valid).unwrap();
+        assert!(check(&accepted, &ACCEPTED_OBSERVATION).matched);
+        let mut omitted_valid_phrase = accepted;
+        omitted_valid_phrase.accepted = 0;
+        omitted_valid_phrase.target_hits = 0;
+        omitted_valid_phrase.sequence_hits = 0;
+        assert!(!check(&omitted_valid_phrase, &ACCEPTED_OBSERVATION).matched);
     }
 }

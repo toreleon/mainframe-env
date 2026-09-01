@@ -564,6 +564,7 @@ pub struct ProcedureStatementDescriptor {
     pub label: &'static str,
     pub source_locator: &'static str,
     pub forms: &'static [&'static str],
+    pub grammar_keywords: &'static [&'static str],
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -767,6 +768,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         forms: &[
             "ACCEPT identifier [FROM source] [ON EXCEPTION statements] [NOT ON EXCEPTION statements] [END-ACCEPT]",
         ],
+        grammar_keywords: &["ACCEPT", "END-ACCEPT", "EXCEPTION", "FROM", "NOT", "ON"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Add,
@@ -775,7 +777,21 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "ADD statement",
         source_locator: "pdf-page:343;outline:ADD statement",
         forms: &[
-            "ADD operands TO target [GIVING target] [ROUNDED] [ON SIZE ERROR statements] [END-ADD]",
+            "ADD operands TO targets [GIVING targets] [ROUNDED] [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-ADD]",
+            "ADD operands GIVING targets [ROUNDED] [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-ADD]",
+            "ADD CORRESPONDING group TO group [ROUNDED] [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-ADD]",
+        ],
+        grammar_keywords: &[
+            "ADD",
+            "CORRESPONDING",
+            "END-ADD",
+            "ERROR",
+            "GIVING",
+            "NOT",
+            "ON",
+            "ROUNDED",
+            "SIZE",
+            "TO",
         ],
     },
     ProcedureStatementDescriptor {
@@ -785,6 +801,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "ALLOCATE statement",
         source_locator: "pdf-page:345;outline:ALLOCATE statement",
         forms: &["ALLOCATE target [CHARACTERS] [INITIALIZED] [RETURNING pointer]"],
+        grammar_keywords: &["ALLOCATE", "CHARACTERS", "INITIALIZED", "RETURNING"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Alter,
@@ -793,6 +810,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "ALTER statement",
         source_locator: "pdf-page:350;outline:ALTER statement",
         forms: &["ALTER procedure TO [PROCEED TO] procedure"],
+        grammar_keywords: &["ALTER", "PROCEED", "TO"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Call,
@@ -803,6 +821,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         forms: &[
             "CALL target [USING arguments] [RETURNING item] [ON EXCEPTION statements] [END-CALL]",
         ],
+        grammar_keywords: &["CALL", "END-CALL", "EXCEPTION", "ON", "RETURNING", "USING"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Cancel,
@@ -811,6 +830,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "CANCEL statement",
         source_locator: "pdf-page:359;outline:CANCEL statement",
         forms: &["CANCEL target..."],
+        grammar_keywords: &["CANCEL"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Close,
@@ -818,7 +838,13 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0007",
         label: "CLOSE statement",
         source_locator: "pdf-page:360;outline:CLOSE statement",
-        forms: &["CLOSE file-name..."],
+        forms: &[
+            "CLOSE file-name [REEL|UNIT] [WITH NO REWIND|FOR REMOVAL] ...",
+            "CLOSE file-name [WITH LOCK] ...",
+        ],
+        grammar_keywords: &[
+            "CLOSE", "FOR", "LOCK", "NO", "REEL", "REMOVAL", "REWIND", "UNIT", "WITH",
+        ],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Compute,
@@ -827,6 +853,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "COMPUTE statement",
         source_locator: "pdf-page:363;outline:COMPUTE statement",
         forms: &["COMPUTE target [ROUNDED] = expression [ON SIZE ERROR statements] [END-COMPUTE]"],
+        grammar_keywords: &["COMPUTE", "END-COMPUTE", "ERROR", "ON", "ROUNDED", "SIZE"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Continue,
@@ -835,6 +862,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "CONTINUE statement",
         source_locator: "pdf-page:364;outline:CONTINUE statement",
         forms: &["CONTINUE"],
+        grammar_keywords: &["CONTINUE"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Delete,
@@ -843,6 +871,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "DELETE statement",
         source_locator: "pdf-page:364;outline:DELETE statement",
         forms: &["DELETE file-name RECORD [INVALID KEY statements] [END-DELETE]"],
+        grammar_keywords: &["DELETE", "END-DELETE", "INVALID", "KEY", "RECORD"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Display,
@@ -851,6 +880,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "DISPLAY statement",
         source_locator: "pdf-page:366;outline:DISPLAY statement",
         forms: &["DISPLAY operands [UPON target] [WITH NO ADVANCING]"],
+        grammar_keywords: &["ADVANCING", "DISPLAY", "NO", "UPON", "WITH"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Divide,
@@ -861,6 +891,18 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         forms: &[
             "DIVIDE operand INTO|BY target [GIVING target] [REMAINDER target] [ROUNDED] [ON SIZE ERROR statements] [END-DIVIDE]",
         ],
+        grammar_keywords: &[
+            "BY",
+            "DIVIDE",
+            "END-DIVIDE",
+            "ERROR",
+            "GIVING",
+            "INTO",
+            "ON",
+            "REMAINDER",
+            "ROUNDED",
+            "SIZE",
+        ],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Entry,
@@ -869,6 +911,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "ENTRY statement",
         source_locator: "pdf-page:371;outline:ENTRY statement",
         forms: &["ENTRY literal [USING arguments]"],
+        grammar_keywords: &["ENTRY", "USING"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Evaluate,
@@ -877,6 +920,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "EVALUATE statement",
         source_locator: "pdf-page:372;outline:EVALUATE statement",
         forms: &["EVALUATE subjects WHEN objects statements [WHEN OTHER statements] END-EVALUATE"],
+        grammar_keywords: &["END-EVALUATE", "EVALUATE", "OTHER", "WHEN"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Exit,
@@ -885,6 +929,15 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "EXIT statement",
         source_locator: "pdf-page:375;outline:EXIT statement",
         forms: &["EXIT [PROGRAM|METHOD|FUNCTION|PERFORM|PARAGRAPH|SECTION]"],
+        grammar_keywords: &[
+            "EXIT",
+            "FUNCTION",
+            "METHOD",
+            "PARAGRAPH",
+            "PERFORM",
+            "PROGRAM",
+            "SECTION",
+        ],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Free,
@@ -893,6 +946,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "FREE statement",
         source_locator: "pdf-page:378;outline:FREE statement",
         forms: &["FREE pointer..."],
+        grammar_keywords: &["FREE"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Goback,
@@ -901,6 +955,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "GOBACK statement",
         source_locator: "pdf-page:378;outline:GOBACK statement",
         forms: &["GOBACK"],
+        grammar_keywords: &["GOBACK"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::GoTo,
@@ -909,6 +964,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "GO TO statement",
         source_locator: "pdf-page:379;outline:GO TO statement",
         forms: &["GO TO procedure [DEPENDING ON identifier]"],
+        grammar_keywords: &["DEPENDING", "GO", "ON", "TO"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::If,
@@ -917,6 +973,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "IF statement",
         source_locator: "pdf-page:381;outline:IF statement",
         forms: &["IF condition statements [ELSE statements] [END-IF]"],
+        grammar_keywords: &["ELSE", "END-IF", "IF"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Initialize,
@@ -927,6 +984,16 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         forms: &[
             "INITIALIZE targets [WITH FILLER] [REPLACING categories BY values] [THEN TO DEFAULT]",
         ],
+        grammar_keywords: &[
+            "BY",
+            "DEFAULT",
+            "FILLER",
+            "INITIALIZE",
+            "REPLACING",
+            "THEN",
+            "TO",
+            "WITH",
+        ],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Inspect,
@@ -935,6 +1002,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "INSPECT statement",
         source_locator: "pdf-page:386;outline:INSPECT statement",
         forms: &["INSPECT identifier TALLYING|REPLACING|CONVERTING operands"],
+        grammar_keywords: &["CONVERTING", "INSPECT", "REPLACING", "TALLYING"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Invoke,
@@ -943,6 +1011,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "INVOKE statement",
         source_locator: "pdf-page:395;outline:INVOKE statement",
         forms: &["INVOKE target method [USING arguments] [RETURNING item] [END-INVOKE]"],
+        grammar_keywords: &["END-INVOKE", "INVOKE", "RETURNING", "USING"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::JsonGenerate,
@@ -952,6 +1021,16 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         source_locator: "pdf-page:402;outline:JSON GENERATE statement",
         forms: &[
             "JSON GENERATE receiver FROM source [COUNT IN item] [ON EXCEPTION statements] [END-JSON]",
+        ],
+        grammar_keywords: &[
+            "COUNT",
+            "END-JSON",
+            "EXCEPTION",
+            "FROM",
+            "GENERATE",
+            "IN",
+            "JSON",
+            "ON",
         ],
     },
     ProcedureStatementDescriptor {
@@ -963,6 +1042,16 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         forms: &[
             "JSON PARSE source INTO target [WITH DETAIL] [ON EXCEPTION statements] [END-JSON]",
         ],
+        grammar_keywords: &[
+            "DETAIL",
+            "END-JSON",
+            "EXCEPTION",
+            "INTO",
+            "JSON",
+            "ON",
+            "PARSE",
+            "WITH",
+        ],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Merge,
@@ -971,6 +1060,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "MERGE statement",
         source_locator: "pdf-page:433;outline:MERGE statement",
         forms: &["MERGE file ON keys USING files GIVING files"],
+        grammar_keywords: &["GIVING", "MERGE", "ON", "USING"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Move,
@@ -979,6 +1069,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "MOVE statement",
         source_locator: "pdf-page:437;outline:MOVE statement",
         forms: &["MOVE [CORRESPONDING] source TO targets"],
+        grammar_keywords: &["CORRESPONDING", "MOVE", "TO"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Multiply,
@@ -989,6 +1080,16 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         forms: &[
             "MULTIPLY operand BY target [GIVING target] [ROUNDED] [ON SIZE ERROR statements] [END-MULTIPLY]",
         ],
+        grammar_keywords: &[
+            "BY",
+            "END-MULTIPLY",
+            "ERROR",
+            "GIVING",
+            "MULTIPLY",
+            "ON",
+            "ROUNDED",
+            "SIZE",
+        ],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Open,
@@ -997,6 +1098,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "OPEN statement",
         source_locator: "pdf-page:445;outline:OPEN statement",
         forms: &["OPEN INPUT|OUTPUT|I-O|EXTEND file..."],
+        grammar_keywords: &["EXTEND", "I-O", "INPUT", "OPEN", "OUTPUT"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Perform,
@@ -1008,6 +1110,16 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
             "PERFORM procedure [THROUGH procedure] [TIMES|UNTIL|VARYING]",
             "PERFORM [WITH TEST] UNTIL|VARYING statements END-PERFORM",
         ],
+        grammar_keywords: &[
+            "END-PERFORM",
+            "PERFORM",
+            "TEST",
+            "THROUGH",
+            "TIMES",
+            "UNTIL",
+            "VARYING",
+            "WITH",
+        ],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Read,
@@ -1016,7 +1128,12 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "READ statement",
         source_locator: "pdf-page:461;outline:READ statement",
         forms: &[
-            "READ file [NEXT RECORD] [INTO item] [KEY IS data] [AT END statements] [INVALID KEY statements] [END-READ]",
+            "READ file [NEXT|PREVIOUS RECORD] [INTO item] [WITH LOCK|WITH KEPT LOCK|WITH NO LOCK|IGNORE LOCK] [WAIT|NO WAIT] [AT END statements] [NOT AT END statements] [END-READ]",
+            "READ file [RECORD] [INTO item] [KEY IS data] [WITH LOCK|WITH KEPT LOCK|WITH NO LOCK|IGNORE LOCK] [WAIT|NO WAIT] [INVALID KEY statements] [NOT INVALID KEY statements] [END-READ]",
+        ],
+        grammar_keywords: &[
+            "AT", "END", "END-READ", "IGNORE", "INTO", "INVALID", "IS", "KEPT", "KEY", "LOCK",
+            "NEXT", "NO", "NOT", "PREVIOUS", "READ", "RECORD", "WAIT", "WITH",
         ],
     },
     ProcedureStatementDescriptor {
@@ -1026,6 +1143,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "RELEASE statement",
         source_locator: "pdf-page:466;outline:RELEASE statement",
         forms: &["RELEASE record [FROM identifier]"],
+        grammar_keywords: &["FROM", "RELEASE"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Return,
@@ -1034,6 +1152,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "RETURN statement",
         source_locator: "pdf-page:467;outline:RETURN statement",
         forms: &["RETURN sort-file RECORD [INTO item] [AT END statements] [END-RETURN]"],
+        grammar_keywords: &["AT", "END", "END-RETURN", "INTO", "RECORD", "RETURN"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Rewrite,
@@ -1042,6 +1161,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "REWRITE statement",
         source_locator: "pdf-page:469;outline:REWRITE statement",
         forms: &["REWRITE record [FROM identifier] [INVALID KEY statements] [END-REWRITE]"],
+        grammar_keywords: &["END-REWRITE", "FROM", "INVALID", "KEY", "REWRITE"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Search,
@@ -1052,6 +1172,15 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         forms: &[
             "SEARCH [ALL] table [VARYING index] [AT END statements] WHEN condition statements END-SEARCH",
         ],
+        grammar_keywords: &[
+            "ALL",
+            "AT",
+            "END",
+            "END-SEARCH",
+            "SEARCH",
+            "VARYING",
+            "WHEN",
+        ],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Set,
@@ -1060,6 +1189,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "SET statement",
         source_locator: "pdf-page:477;outline:SET statement",
         forms: &["SET targets TO|UP BY|DOWN BY value"],
+        grammar_keywords: &["BY", "DOWN", "SET", "TO", "UP"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Sort,
@@ -1068,6 +1198,15 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "SORT statement",
         source_locator: "pdf-page:484;outline:SORT statement",
         forms: &["SORT file ON keys USING|INPUT PROCEDURE GIVING|OUTPUT PROCEDURE files"],
+        grammar_keywords: &[
+            "GIVING",
+            "INPUT",
+            "ON",
+            "OUTPUT",
+            "PROCEDURE",
+            "SORT",
+            "USING",
+        ],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Start,
@@ -1076,6 +1215,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "START statement",
         source_locator: "pdf-page:492;outline:START statement",
         forms: &["START file [KEY IS relation data] [INVALID KEY statements] [END-START]"],
+        grammar_keywords: &["END-START", "INVALID", "IS", "KEY", "START"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Stop,
@@ -1084,6 +1224,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         label: "STOP statement",
         source_locator: "pdf-page:494;outline:STOP statement",
         forms: &["STOP RUN [RETURNING value]"],
+        grammar_keywords: &["RETURNING", "RUN", "STOP"],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::String,
@@ -1093,6 +1234,17 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         source_locator: "pdf-page:494;outline:STRING statement",
         forms: &[
             "STRING senders DELIMITED BY values INTO target [WITH POINTER item] [ON OVERFLOW statements] [END-STRING]",
+        ],
+        grammar_keywords: &[
+            "BY",
+            "DELIMITED",
+            "END-STRING",
+            "INTO",
+            "ON",
+            "OVERFLOW",
+            "POINTER",
+            "STRING",
+            "WITH",
         ],
     },
     ProcedureStatementDescriptor {
@@ -1104,6 +1256,16 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         forms: &[
             "SUBTRACT operands FROM target [GIVING target] [ROUNDED] [ON SIZE ERROR statements] [END-SUBTRACT]",
         ],
+        grammar_keywords: &[
+            "END-SUBTRACT",
+            "ERROR",
+            "FROM",
+            "GIVING",
+            "ON",
+            "ROUNDED",
+            "SIZE",
+            "SUBTRACT",
+        ],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::Unstring,
@@ -1113,6 +1275,19 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         source_locator: "pdf-page:502;outline:UNSTRING statement",
         forms: &[
             "UNSTRING source DELIMITED BY values INTO targets [WITH POINTER item] [TALLYING IN item] [ON OVERFLOW statements] [END-UNSTRING]",
+        ],
+        grammar_keywords: &[
+            "BY",
+            "DELIMITED",
+            "END-UNSTRING",
+            "IN",
+            "INTO",
+            "ON",
+            "OVERFLOW",
+            "POINTER",
+            "TALLYING",
+            "UNSTRING",
+            "WITH",
         ],
     },
     ProcedureStatementDescriptor {
@@ -1124,6 +1299,18 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         forms: &[
             "WRITE record [FROM identifier] [AFTER|BEFORE ADVANCING] [AT END-OF-PAGE statements] [INVALID KEY statements] [END-WRITE]",
         ],
+        grammar_keywords: &[
+            "ADVANCING",
+            "AFTER",
+            "AT",
+            "BEFORE",
+            "END-OF-PAGE",
+            "END-WRITE",
+            "FROM",
+            "INVALID",
+            "KEY",
+            "WRITE",
+        ],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::XmlGenerate,
@@ -1134,6 +1321,16 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         forms: &[
             "XML GENERATE receiver FROM source [COUNT IN item] [ON EXCEPTION statements] [END-XML]",
         ],
+        grammar_keywords: &[
+            "COUNT",
+            "END-XML",
+            "EXCEPTION",
+            "FROM",
+            "GENERATE",
+            "IN",
+            "ON",
+            "XML",
+        ],
     },
     ProcedureStatementDescriptor {
         kind: ProcedureStatementKind::XmlParse,
@@ -1143,6 +1340,16 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         source_locator: "pdf-page:526;outline:XML PARSE statement",
         forms: &[
             "XML PARSE source PROCESSING PROCEDURE procedure [THROUGH procedure] [ON EXCEPTION statements] [END-XML]",
+        ],
+        grammar_keywords: &[
+            "END-XML",
+            "EXCEPTION",
+            "ON",
+            "PARSE",
+            "PROCEDURE",
+            "PROCESSING",
+            "THROUGH",
+            "XML",
         ],
     },
 ];

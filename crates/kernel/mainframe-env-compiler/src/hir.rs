@@ -1373,6 +1373,20 @@ mod tests {
                 .count(),
             7
         );
+        assert!(crate::PROCEDURE_STATEMENTS.iter().all(|descriptor| {
+            !descriptor.grammar_keywords.is_empty()
+                && descriptor
+                    .grammar_keywords
+                    .windows(2)
+                    .all(|pair| pair[0] < pair[1])
+                && descriptor.grammar_keywords.iter().all(|keyword| {
+                    keyword.bytes().any(|byte| byte.is_ascii_alphabetic())
+                        && keyword
+                            .bytes()
+                            .filter(|byte| byte.is_ascii_alphabetic())
+                            .all(|byte| byte.is_ascii_uppercase())
+                })
+        }));
     }
     #[test]
     fn token_parser_does_not_split_decimal() {

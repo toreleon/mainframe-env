@@ -2,6 +2,7 @@ use super::{
     ControlEdgeKind, ControlScope, HirProblem, StatementKind, StatementOption, StatementOptionKind,
     statement_options,
 };
+use crate::PROCEDURE_STATEMENTS;
 use std::collections::BTreeSet;
 use std::ops::Range;
 
@@ -1219,9 +1220,8 @@ fn validate_simple_header(kind: StatementKind, tokens: &[Token<'_>]) -> Result<(
         StatementKind::Allocate => validate_allocate(tokens),
         StatementKind::Alter => validate_alter(tokens),
         StatementKind::Call => validate_call_like(tokens, false),
-        StatementKind::Cancel | StatementKind::Close | StatementKind::Free => {
-            validate_variadic_operands(tokens, 1)
-        }
+        StatementKind::Cancel | StatementKind::Free => validate_variadic_operands(tokens, 1),
+        StatementKind::Close => validate_close(tokens),
         StatementKind::Compute => validate_compute(tokens),
         StatementKind::Continue | StatementKind::NextSentence => {
             if tokens.len() == keyword_length(kind) {
@@ -1363,6 +1363,43 @@ fn validate_call_like(tokens: &[Token<'_>], invoke: bool) -> Result<(), &'static
     cursor.finish()
 }
 
+fn validate_close(tokens: &[Token<'_>]) -> Result<(), &'static str> {
+    let mut cursor = Cursor::new(tokens, 1);
+    let mut files = 0usize;
+    while !cursor.done() {
+        cursor.operand()?;
+        files += 1;
+        let reel_or_unit = cursor.eat("REEL") || cursor.eat("UNIT");
+        if cursor.eat("WITH") {
+            if cursor.eat("LOCK") {
+                if reel_or_unit {
+                    return Err("WITH LOCK cannot follow REEL or UNIT");
+                }
+            } else {
+                cursor.expect("NO")?;
+                cursor.expect("REWIND")?;
+            }
+        } else if cursor.eat("FOR") {
+            if !reel_or_unit {
+                return Err("FOR REMOVAL requires REEL or UNIT");
+            }
+            cursor.expect("REMOVAL")?;
+        }
+        if cursor.at("REEL")
+            || cursor.at("UNIT")
+            || cursor.at("WITH")
+            || cursor.at("FOR")
+            || cursor.at("NO")
+            || cursor.at("LOCK")
+            || cursor.at("REMOVAL")
+            || cursor.at("REWIND")
+        {
+            return Err("duplicate, conflicting, or misplaced CLOSE phrase");
+        }
+    }
+    (files > 0).then_some(()).ok_or("CLOSE requires a file")
+}
+
 fn validate_variadic_operands(tokens: &[Token<'_>], start: usize) -> Result<(), &'static str> {
     validate_operand_list(&tokens[start..], 1)
 }
@@ -1377,7 +1414,7 @@ fn validate_compute(tokens: &[Token<'_>]) -> Result<(), &'static str> {
         targets = &targets[..targets.len() - 1];
     }
     validate_operand_list(targets, 1)?;
-    if !validate_expression(&tokens[equal + 1..]) {
+    if !validate_arithmetic_expression(&tokens[equal + 1..]) {
         return Err("COMPUTE expression is malformed");
     }
     Ok(())
@@ -1506,7 +1543,8 @@ fn validate_inspect(tokens: &[Token<'_>]) -> Result<(), &'static str> {
     let mut cursor = Cursor::new(tokens, 1);
     cursor.operand()?;
     let alternatives = ["TALLYING", "REPLACING", "CONVERTING"];
-    let matched = alternatives.iter().filter(|word| cursor.eat(word)).count();
+    let operation = alternatives.iter().find(|word| cursor.eat(word)).copied();
+    let matched = usize::from(operation.is_some());
     if matched != 1 || cursor.done() || !validate_expression(&tokens[cursor.position..]) {
         return Err("INSPECT requires one operation and operands");
     }
@@ -1515,6 +1553,35 @@ fn validate_inspect(tokens: &[Token<'_>]) -> Result<(), &'static str> {
         .any(|token| alternatives.iter().any(|word| token.is(word)))
     {
         return Err("INSPECT operation is duplicated or mutually exclusive");
+    }
+    let allowed = match operation {
+        Some("TALLYING") => &[
+            "FOR",
+            "ALL",
+            "LEADING",
+            "CHARACTERS",
+            "BEFORE",
+            "AFTER",
+            "INITIAL",
+        ][..],
+        Some("REPLACING") => &[
+            "ALL",
+            "LEADING",
+            "FIRST",
+            "CHARACTERS",
+            "BY",
+            "BEFORE",
+            "AFTER",
+            "INITIAL",
+        ][..],
+        Some("CONVERTING") => &["TO", "BEFORE", "AFTER", "INITIAL"][..],
+        _ => &[],
+    };
+    if tokens[cursor.position..]
+        .iter()
+        .any(|token| is_grammar_keyword(token) && !allowed.iter().any(|word| token.is(word)))
+    {
+        return Err("INSPECT contains an unknown or misplaced phrase");
     }
     Ok(())
 }
@@ -1655,17 +1722,37 @@ fn validate_open(tokens: &[Token<'_>]) -> Result<(), &'static str> {
 fn validate_read(tokens: &[Token<'_>]) -> Result<(), &'static str> {
     let mut cursor = Cursor::new(tokens, 1);
     cursor.operand()?;
-    if cursor.eat("NEXT") {
+    let sequential = if cursor.eat("NEXT") || cursor.eat("PREVIOUS") {
         cursor.expect("RECORD")?;
+        true
     } else {
         cursor.eat("RECORD");
-    }
+        false
+    };
     if cursor.eat("INTO") {
         cursor.operand()?;
     }
     if cursor.eat("KEY") {
+        if sequential {
+            return Err("KEY cannot be combined with NEXT or PREVIOUS RECORD");
+        }
         cursor.eat("IS");
         cursor.operand()?;
+    }
+    if cursor.eat("WITH") {
+        if cursor.eat("NO") {
+            cursor.expect("LOCK")?;
+        } else {
+            cursor.eat("KEPT");
+            cursor.expect("LOCK")?;
+        }
+    } else if cursor.eat("IGNORE") {
+        cursor.expect("LOCK")?;
+    }
+    if cursor.eat("NO") {
+        cursor.expect("WAIT")?;
+    } else {
+        cursor.eat("WAIT");
     }
     cursor.finish()
 }
@@ -1781,7 +1868,12 @@ fn validate_string(tokens: &[Token<'_>]) -> Result<(), &'static str> {
                 return Err("DELIMITED requires BY");
             }
             position += 1;
-            position = consume_operand(senders, position).ok_or("delimiter value is missing")?;
+            if senders.get(position).is_some_and(|token| token.is("SIZE")) {
+                position += 1;
+            } else {
+                position =
+                    consume_operand(senders, position).ok_or("delimiter value is missing")?;
+            }
         }
         count += 1;
     }
@@ -1938,6 +2030,18 @@ fn validate_expression(tokens: &[Token<'_>]) -> bool {
     })
 }
 
+fn validate_arithmetic_expression(tokens: &[Token<'_>]) -> bool {
+    validate_expression(tokens)
+        && !tokens.iter().any(|token| {
+            PROCEDURE_STATEMENTS.iter().any(|descriptor| {
+                descriptor
+                    .grammar_keywords
+                    .iter()
+                    .any(|keyword| token.is(keyword))
+            })
+        })
+}
+
 fn validate_operand_list(tokens: &[Token<'_>], minimum: usize) -> Result<(), &'static str> {
     let mut position = 0usize;
     let mut count = 0usize;
@@ -2019,10 +2123,20 @@ fn is_operand_atom(token: &Token<'_>) -> bool {
         token.kind,
         TokenKind::Word | TokenKind::Number | TokenKind::Literal
     ) && classify(std::slice::from_ref(token), 0).is_none()
+        && !is_grammar_keyword(token)
         && !matches!(
             token.text.to_ascii_uppercase().as_str(),
             "ELSE" | "WHEN" | "THROUGH" | "THRU"
         )
+}
+
+fn is_grammar_keyword(token: &Token<'_>) -> bool {
+    PROCEDURE_STATEMENTS.iter().any(|descriptor| {
+        descriptor
+            .grammar_keywords
+            .iter()
+            .any(|keyword| token.is(keyword))
+    })
 }
 
 fn matching_parenthesis(tokens: &[Token<'_>], start: usize) -> Option<usize> {
