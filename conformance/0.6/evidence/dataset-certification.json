@@ -7,7 +7,15 @@
     "ams_commands": 31,
     "organizations": 5,
     "detailed_descriptors": 131,
-    "local_bindings": 118
+    "local_bindings": 180,
+    "local_gates": {
+      "recognized": 36,
+      "validated": 36,
+      "executed": 36,
+      "conditioned": 36,
+      "recovered": 36,
+      "differential": 0
+    }
   },
   "state": {
     "writer": "MEDS6",
@@ -28,7 +36,12 @@
     "backup_restore": "pass",
     "migration": "pass",
     "scale": "pass",
-    "carddemo_exactness": "pass"
+    "carddemo_exactness": "pass",
+    "volume_vtoc": "pass",
+    "owner_security": "pass",
+    "operand_rejection": "pass",
+    "lifecycle_invalidation": "pass",
+    "snapshot_all_organizations": "pass"
   },
   "validation": [
     "cargo test --workspace --all-targets",

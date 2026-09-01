@@ -1275,6 +1275,7 @@ name = "mainframe-env-host-api"
 version = "0.2.0"
 dependencies = [
  "mainframe-env-execution-api",
+ "serde",
 ]
 
 [[package]]

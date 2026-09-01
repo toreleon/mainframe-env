@@ -2520,7 +2520,10 @@ impl ProductServer {
             | DatasetRequest::BeginTvs { .. }
             | DatasetRequest::CompleteTvs { .. }
             | DatasetRequest::ReconcileTvs { .. } => None,
-            DatasetRequest::List { pattern, .. } => Some(pattern.as_str()),
+            DatasetRequest::List { pattern, .. } | DatasetRequest::ListCatalog { pattern, .. } => {
+                Some(pattern.as_str())
+            }
+            DatasetRequest::ListVolumes { .. } => Some("VOLUME.**"),
             DatasetRequest::ReadConcatenation { .. } => None,
             DatasetRequest::Rename { from, .. } => Some(from.as_str()),
             DatasetRequest::ResolveCatalog { name } => Some(name.as_str()),
@@ -2537,11 +2540,14 @@ impl ProductServer {
             | DatasetRequest::ReadRelative { dataset, .. }
             | DatasetRequest::ReadRba { dataset, .. }
             | DatasetRequest::ReadSequential { dataset, .. }
+            | DatasetRequest::Snapshot { dataset, .. }
             | DatasetRequest::ReadMemberGeneration { dataset, .. }
             | DatasetRequest::Create { dataset, .. }
             | DatasetRequest::Define { dataset, .. }
             | DatasetRequest::Alter { dataset, .. }
             | DatasetRequest::SetLifecycle { dataset, .. }
+            | DatasetRequest::RecordBackup { dataset, .. }
+            | DatasetRequest::Restore { dataset, .. }
             | DatasetRequest::DefineMemberAlias { dataset, .. }
             | DatasetRequest::WriteMemberGeneration { dataset, .. }
             | DatasetRequest::DeleteMemberGeneration { dataset, .. }
@@ -2591,10 +2597,13 @@ impl ProductServer {
                         | DatasetRequest::ReadRelative { .. }
                         | DatasetRequest::ReadRba { .. }
                         | DatasetRequest::ReadSequential { .. }
+                        | DatasetRequest::Snapshot { .. }
                         | DatasetRequest::ReadMemberGeneration { .. }
                         | DatasetRequest::ResolveCatalog { .. }
                         | DatasetRequest::ResolveGeneration { .. }
                         | DatasetRequest::List { .. }
+                        | DatasetRequest::ListCatalog { .. }
+                        | DatasetRequest::ListVolumes { .. }
                         | DatasetRequest::StartBrowse { .. }
                         | DatasetRequest::ReadNext { .. }
                         | DatasetRequest::EndBrowse { .. }
@@ -3641,6 +3650,8 @@ fn dataset_mutation(request: &DatasetRequest) -> Option<&Mutation> {
         | DatasetRequest::Define { mutation, .. }
         | DatasetRequest::Alter { mutation, .. }
         | DatasetRequest::SetLifecycle { mutation, .. }
+        | DatasetRequest::RecordBackup { mutation, .. }
+        | DatasetRequest::Restore { mutation, .. }
         | DatasetRequest::DefineCatalog { mutation, .. }
         | DatasetRequest::SetCatalogConnection { mutation, .. }
         | DatasetRequest::DefineAlias { mutation, .. }

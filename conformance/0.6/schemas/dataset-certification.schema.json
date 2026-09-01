@@ -11,13 +11,25 @@
     "baseline_id": { "const": "ibm-zos-3.2-dfsms-ams-2026-06" },
     "surface": {
       "type": "object", "additionalProperties": false,
-      "required": ["official_rows", "ams_commands", "organizations", "detailed_descriptors", "local_bindings"],
+      "required": ["official_rows", "ams_commands", "organizations", "detailed_descriptors", "local_bindings", "local_gates"],
       "properties": {
         "official_rows": { "const": 36 },
         "ams_commands": { "const": 31 },
         "organizations": { "const": 5 },
         "detailed_descriptors": { "const": 131 },
-        "local_bindings": { "const": 118 }
+        "local_bindings": { "const": 180 },
+        "local_gates": {
+          "type": "object", "additionalProperties": false,
+          "required": ["recognized", "validated", "executed", "conditioned", "recovered", "differential"],
+          "properties": {
+            "recognized": { "const": 36 },
+            "validated": { "const": 36 },
+            "executed": { "const": 36 },
+            "conditioned": { "const": 36 },
+            "recovered": { "const": 36 },
+            "differential": { "const": 0 }
+          }
+        }
       }
     },
     "state": {
@@ -32,7 +44,7 @@
     },
     "matrices": {
       "type": "object", "additionalProperties": { "const": "pass" },
-      "required": ["base_aix_atomicity", "gdg_atomicity", "disp_cleanup", "locks", "rls_tvs", "restart", "unknown_outcome", "concurrent_mutation", "corruption", "backup_restore", "migration", "scale", "carddemo_exactness"]
+      "required": ["base_aix_atomicity", "gdg_atomicity", "disp_cleanup", "locks", "rls_tvs", "restart", "unknown_outcome", "concurrent_mutation", "corruption", "backup_restore", "migration", "scale", "carddemo_exactness", "volume_vtoc", "owner_security", "operand_rejection", "lifecycle_invalidation", "snapshot_all_organizations"]
     },
     "validation": {
       "type": "array", "minItems": 1, "maxItems": 32,

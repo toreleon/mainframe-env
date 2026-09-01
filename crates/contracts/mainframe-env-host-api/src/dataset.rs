@@ -1,8 +1,9 @@
-use crate::names::DatasetName;
+use crate::names::{DatasetName, MemberName};
 use crate::request::{
     DatasetAttributes, DatasetOrganization, HostLimits, HostProblem, RecordFormat,
 };
 use mainframe_env_execution_api::PrincipalId;
+use serde::{Deserialize, Serialize};
 
 pub const DATASET_DEFINITION_CONTRACT: &str = "mainframe-env.dataset-definition@1";
 pub const DATASET_REQUEST_CONTRACT: &str = "mainframe-env.host.dataset-request@2";
@@ -11,7 +12,8 @@ pub const DATASET_PROVIDER_CAPABILITY_CONTRACT: &str =
     "mainframe-env.dataset-provider-capabilities@1";
 pub const DATASET_STATE_SCHEMA_VERSION: u16 = 6;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum SpaceUnit {
     Tracks,
     Cylinders,
@@ -21,7 +23,7 @@ pub enum SpaceUnit {
     Records,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AllocationSpace {
     pub unit: SpaceUnit,
     pub primary: u64,
@@ -32,7 +34,7 @@ pub struct AllocationSpace {
     pub round_to_cylinder: bool,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct DcbOptions {
     pub block_size: u32,
     pub buffer_count: u16,
@@ -63,14 +65,15 @@ impl Default for AllocationSpace {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum VolumeKind {
     Abstract,
     PhysicalDisk,
     Tape,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct VolumeSelection {
     pub kind: VolumeKind,
     pub volume_ids: Vec<String>,
@@ -89,7 +92,7 @@ impl Default for VolumeSelection {
     }
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SmsClasses {
     pub data_class: Option<String>,
     pub management_class: Option<String>,
@@ -100,14 +103,16 @@ pub struct SmsClasses {
     pub extended_addressable: bool,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum CompressionMode {
     None,
     Generic,
     Tailored,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum BufferingMode {
     System,
     NonsharedResources,
@@ -115,7 +120,8 @@ pub enum BufferingMode {
     GlobalSharedResources,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum VsamAccessMode {
     NonRls,
     Rls,
@@ -181,7 +187,7 @@ pub struct TvsUnitOfWorkReceipt {
     pub version: u64,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct DatasetShareOptions {
     pub cross_region: u8,
     pub cross_system: u8,
@@ -196,7 +202,7 @@ impl Default for DatasetShareOptions {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct VsamAttributes {
     pub control_interval_size: Option<u32>,
     pub control_area_size: Option<u64>,
@@ -229,7 +235,7 @@ impl Default for VsamAttributes {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct DataSecurity {
     pub encryption_key_label: Option<String>,
     pub compression: CompressionMode,
@@ -244,7 +250,8 @@ impl Default for DataSecurity {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum CatalogEntryKind {
     Dataset,
     AlternateIndex,
@@ -274,6 +281,14 @@ pub struct CatalogResolution {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CatalogListEntry {
+    pub name: DatasetName,
+    pub kind: CatalogEntryKind,
+    pub related: Option<DatasetName>,
+    pub version: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CatalogMetadata {
     pub entry_kind: CatalogEntryKind,
     pub catalog: Option<DatasetName>,
@@ -296,7 +311,8 @@ impl Default for CatalogMetadata {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum DatasetLifecycleState {
     Allocated,
     Cataloged,
@@ -307,7 +323,7 @@ pub enum DatasetLifecycleState {
     RecoveryRequired,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct LifecycleMetadata {
     pub state: DatasetLifecycleState,
     pub migration_level: u8,
@@ -402,7 +418,7 @@ impl DatasetProviderCapabilities {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct DatasetDefinition {
     pub attributes: DatasetAttributes,
     pub dcb: DcbOptions,
@@ -454,7 +470,18 @@ impl DatasetDefinition {
             || self.allocation.directory_blocks as usize > limits.max_records
             || self.volumes.volume_ids.is_empty()
             || self.volumes.volume_ids.len() > limits.max_records
+            || self
+                .volumes
+                .volume_ids
+                .iter()
+                .enumerate()
+                .any(|(position, volume)| self.volumes.volume_ids[..position].contains(volume))
             || self.volumes.unit_count == 0
+            || self
+                .catalog
+                .catalog
+                .as_ref()
+                .is_some_and(|catalog| catalog.as_str().len() > limits.max_name_bytes)
         {
             return Err(HostProblem::Malformed);
         }
@@ -496,7 +523,7 @@ impl DatasetDefinition {
             .into_iter()
             .flatten()
         {
-            if !(1900001..=9999366).contains(&date) || date % 1000 == 0 || date % 1000 > 366 {
+            if !valid_julian_date(date) {
                 return Err(HostProblem::Malformed);
             }
         }
@@ -533,6 +560,13 @@ impl DatasetDefinition {
                 | DatasetOrganization::VariableRelative
                 | DatasetOrganization::Linear
         );
+        let is_partitioned = matches!(
+            self.attributes.organization,
+            DatasetOrganization::Partitioned | DatasetOrganization::PartitionedExtended
+        );
+        if is_partitioned != (self.allocation.directory_blocks != 0) {
+            return Err(HostProblem::Malformed);
+        }
         if !is_vsam && self.vsam != VsamAttributes::default() {
             return Err(HostProblem::Malformed);
         }
@@ -702,8 +736,56 @@ pub struct DatasetDescription {
 pub struct DatasetExtent {
     pub ordinal: u32,
     pub start: u64,
+    pub volume_start: u64,
     pub length: u64,
     pub volume_id: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct DatasetVolumeExtent {
+    pub dataset: DatasetName,
+    pub dataset_extent_ordinal: u32,
+    pub logical_start: u64,
+    pub volume_start: u64,
+    pub length: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct DatasetVolumeDescription {
+    pub volume_id: String,
+    pub allocated_bytes: u64,
+    pub used_bytes: u64,
+    pub extents: Vec<DatasetVolumeExtent>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct DatasetSnapshot {
+    pub definition: DatasetDefinition,
+    pub records: Vec<Vec<u8>>,
+    pub relative_records: Vec<DatasetRelativeRecordSnapshot>,
+    pub members: Vec<DatasetMemberSnapshot>,
+    pub linear_data: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct DatasetRelativeRecordSnapshot {
+    pub record_number: u64,
+    pub record: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct DatasetMemberSnapshot {
+    pub name: MemberName,
+    pub records: Vec<Vec<u8>>,
+    pub generations: Vec<DatasetMemberGenerationSnapshot>,
+    pub alias_of: Option<MemberName>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct DatasetMemberGenerationSnapshot {
+    pub generation: u64,
+    pub program_object: bool,
+    pub records: Vec<Vec<u8>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -722,6 +804,13 @@ fn validate_label(value: &str, limits: HostLimits) -> Result<(), HostProblem> {
     } else {
         Ok(())
     }
+}
+
+fn valid_julian_date(date: u32) -> bool {
+    let year = date / 1000;
+    let day = date % 1000;
+    let leap = year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400));
+    (1900..=9999).contains(&year) && day != 0 && day <= if leap { 366 } else { 365 }
 }
 
 fn require_capability(ok: bool, capability: &str, operand: &str) -> Result<(), HostProblem> {
@@ -855,5 +944,28 @@ mod tests {
             DatasetDefinition::compatibility(attributes(DatasetOrganization::Sequential));
         definition.volumes.device_type = Some("3390".into());
         rejected!(definition, "physical-volumes");
+    }
+
+    #[test]
+    fn catalog_dates_validate_real_julian_leap_year_boundaries() {
+        let mut definition =
+            DatasetDefinition::compatibility(attributes(DatasetOrganization::Sequential));
+        definition.catalog.creation_date = Some(2_024_366);
+        assert!(
+            definition
+                .validate(
+                    HostLimits::default(),
+                    DatasetProviderCapabilities::all_contract_capabilities(),
+                )
+                .is_ok()
+        );
+        definition.catalog.creation_date = Some(2_025_366);
+        assert_eq!(
+            definition.validate(
+                HostLimits::default(),
+                DatasetProviderCapabilities::all_contract_capabilities(),
+            ),
+            Err(HostProblem::Malformed)
+        );
     }
 }

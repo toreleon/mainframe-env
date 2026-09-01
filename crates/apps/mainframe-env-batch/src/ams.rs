@@ -337,17 +337,63 @@ pub(crate) fn compare(left: u8, comparison: AmsComparison, right: u8) -> bool {
 }
 
 pub(crate) fn operand(statement: &str, names: &[&str]) -> Option<String> {
-    names.iter().find_map(|name| {
-        let compact = format!("{name}(");
-        let spaced = format!("{name} (");
-        let start = statement
-            .find(&compact)
-            .map(|at| at + compact.len())
-            .or_else(|| statement.find(&spaced).map(|at| at + spaced.len()))?;
-        let end = statement[start..].find(')')? + start;
-        let value = statement[start..end].trim().trim_matches(['\'', '"']);
-        (!value.is_empty()).then(|| value.to_string())
-    })
+    names
+        .iter()
+        .find_map(|name| balanced_operand(statement, name))
+}
+
+fn balanced_operand(statement: &str, name: &str) -> Option<String> {
+    let bytes = statement.as_bytes();
+    let mut search_from = 0usize;
+    while let Some(relative) = statement.get(search_from..)?.find(name) {
+        let at = search_from.checked_add(relative)?;
+        let after_name = at.checked_add(name.len())?;
+        let left_boundary = at == 0
+            || !bytes
+                .get(at.checked_sub(1)?)
+                .is_some_and(u8::is_ascii_alphanumeric);
+        let mut open = after_name;
+        while bytes.get(open).is_some_and(u8::is_ascii_whitespace) {
+            open = open.checked_add(1)?;
+        }
+        if left_boundary && bytes.get(open) == Some(&b'(') {
+            let value_start = open.checked_add(1)?;
+            let mut depth = 1u32;
+            let mut quote = None;
+            let mut position = value_start;
+            while let Some(byte) = bytes.get(position).copied() {
+                if matches!(byte, b'\'' | b'"') {
+                    if quote == Some(byte) {
+                        quote = None;
+                    } else if quote.is_none() {
+                        quote = Some(byte);
+                    }
+                } else if quote.is_none() {
+                    if byte == b'(' {
+                        depth = depth.checked_add(1)?;
+                    } else if byte == b')' {
+                        depth = depth.checked_sub(1)?;
+                        if depth == 0 {
+                            let value = statement.get(value_start..position)?.trim();
+                            let value = if value.len() >= 2
+                                && matches!(value.as_bytes().first(), Some(b'\'' | b'"'))
+                                && value.as_bytes().first() == value.as_bytes().last()
+                            {
+                                value.get(1..value.len().checked_sub(1)?)?
+                            } else {
+                                value
+                            };
+                            return (!value.is_empty()).then(|| value.to_string());
+                        }
+                    }
+                }
+                position = position.checked_add(1)?;
+            }
+            return None;
+        }
+        search_from = after_name;
+    }
+    None
 }
 
 pub(crate) fn numeric_operand(statement: &str, name: &str) -> Option<u32> {
@@ -389,6 +435,18 @@ mod tests {
             );
             assert_eq!(command.label, command.keywords.join(" "));
         }
+    }
+
+    #[test]
+    fn operand_parser_preserves_nested_values_and_token_boundaries() {
+        let statement = "DEFINE CLUSTER (NAME(USER.A) SPACE(TRACKS(2 1)) NEWNAME(USER.B))";
+        assert_eq!(
+            operand(statement, &["SPACE"]).as_deref(),
+            Some("TRACKS(2 1)")
+        );
+        assert_eq!(operand(statement, &["TRACKS"]).as_deref(), Some("2 1"));
+        assert_eq!(operand(statement, &["NAME"]).as_deref(), Some("USER.A"));
+        assert_eq!(operand(statement, &["NEWNAME"]).as_deref(), Some("USER.B"));
     }
 
     #[test]

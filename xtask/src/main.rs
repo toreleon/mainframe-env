@@ -716,9 +716,15 @@ fn augment_ams_spec(root: &Path, spec: &mut Value) -> TaskResult {
         new_obligations.push(json!({
             "row_id": row_id,
             "obligation_id": "command-contract",
-            "applicable_gates": ["recognized", "validated", "executed"]
+            "applicable_gates": ["recognized", "validated", "executed", "conditioned", "recovered"]
         }));
-        for gate in ["recognized", "validated", "executed"] {
+        for gate in [
+            "recognized",
+            "validated",
+            "executed",
+            "conditioned",
+            "recovered",
+        ] {
             new_bindings.push(json!({
                 "spec_version": "mainframe-env.conformance-ir@1",
                 "row_id": row_id,

@@ -1,18 +1,28 @@
-use mainframe_env_batch::{AmsStatement, parse_idcams_control, validate_idcams_control};
+use mainframe_env_batch::{
+    AmsStatement, BatchService, JclBundle, JobState, ProgramRouter, parse_idcams_control,
+    validate_idcams_control,
+};
 use mainframe_env_coverage::{
     CompiledSpec, ConformanceDriver, ConformanceLimits, ConformanceObservation,
     ConformanceRunReport, ConformanceRunner, DriverOutput, DriverRef, FixtureRef, ObservationCheck,
     ObservationRef, RunnerContext, RunnerSelection, RuntimeRegistry,
 };
-use mainframe_env_dataset::{DatasetLimits, DatasetService};
-use mainframe_env_execution_api::{IdempotencyKey, InvocationLimits};
+use mainframe_env_dataset::{DatasetLimits, DatasetService, dataset_providers};
+use mainframe_env_execution_api::{
+    ArtifactRef, CapabilityId, ExecutionId, IdempotencyKey, Invocation, InvocationLimits,
+    Principal, PrincipalId, RequestId, ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
+};
 use mainframe_env_host_api::{
-    DatasetAttributes, DatasetName, DatasetOrganization, DatasetRequest, DatasetResult,
-    HostProblem, Mutation, RecordFormat,
+    CapabilityDescriptor, CatalogKind, DatasetAttributes, DatasetLifecycleState, DatasetName,
+    DatasetOrganization, DatasetRequest, DatasetResult, EffectRequest, EffectResult, HostLimits,
+    HostProblem, HostProvider, HostRequest, HostResult, Mutation, RecordFormat, RegistrySnapshot,
+    ScopedHostService, SecurityDecision,
 };
 use mainframe_env_store::{MemoryStore, StoreLimits};
 use mainframe_env_store_api::ProviderStateStore;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 const FIXTURES: &str =
@@ -136,6 +146,7 @@ impl ConformanceDriver for AmsCommandDriver {
         let [AmsStatement::Command(command)] = parsed.as_slice() else {
             return Err("AMS fixture did not produce exactly one command".into());
         };
+        execute_ams_command_fixture(control, command)?;
         let output = format!(
             "command={};label={};capability={}",
             command.id(),
@@ -199,6 +210,519 @@ fn fixture_expected(id: &str) -> Result<String, String> {
         .and_then(|case| case["expected"].as_str())
         .map(str::to_string)
         .ok_or_else(|| format!("dataset fixture expectation is missing for {id}"))
+}
+
+struct AllowSecurityProvider {
+    descriptor: CapabilityDescriptor,
+}
+
+impl HostProvider for AllowSecurityProvider {
+    fn descriptor(&self) -> &CapabilityDescriptor {
+        &self.descriptor
+    }
+
+    fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
+        let outcome = match effect.request {
+            HostRequest::Security(_) => Ok(HostResult::Security(SecurityDecision::Allow)),
+            _ => Err(HostProblem::Malformed),
+        };
+        EffectResult {
+            sequence: effect.sequence,
+            outcome,
+        }
+    }
+}
+
+fn ams_host(dataset: Arc<DatasetService>) -> Result<Arc<ScopedHostService>, String> {
+    let limits = InvocationLimits::default();
+    let security: Arc<dyn HostProvider> = Arc::new(AllowSecurityProvider {
+        descriptor: CapabilityDescriptor {
+            capability: CapabilityId::new("host.security.authorize", limits)
+                .map_err(|problem| problem.to_string())?,
+            provider_id: "dataset-conformance-security".into(),
+            generation: "1".into(),
+            request_schema: "security@1".into(),
+            result_schema: "decision@1".into(),
+            max_request_bytes: 65_536,
+            max_result_bytes: 65_536,
+            ready: true,
+        },
+    });
+    let program: Arc<dyn HostProvider> = ProgramRouter::with_builtins(limits);
+    let mut providers = vec![security, program];
+    providers.extend(dataset_providers(dataset, limits));
+    Ok(Arc::new(ScopedHostService::new(
+        Arc::new(
+            RegistrySnapshot::new(1, providers, limits).map_err(|problem| problem.to_string())?,
+        ),
+        HostLimits::default(),
+    )))
+}
+
+fn ams_invocation() -> Result<Invocation, String> {
+    let limits = InvocationLimits::default();
+    let grants = [
+        "host.security.authorize",
+        "host.program.invoke",
+        "host.dataset.read",
+        "host.dataset.write",
+    ]
+    .into_iter()
+    .map(|capability| CapabilityId::new(capability, limits))
+    .collect::<Result<BTreeSet<_>, _>>()
+    .map_err(|problem| problem.to_string())?;
+    Invocation::new(
+        RequestId::new("ams-conformance-request", limits).map_err(|problem| problem.to_string())?,
+        ExecutionId::new("ams-conformance-execution", limits)
+            .map_err(|problem| problem.to_string())?,
+        RunUnitId::new("ams-conformance-run", limits).map_err(|problem| problem.to_string())?,
+        None,
+        Selector::new("jes:submit", limits).map_err(|problem| problem.to_string())?,
+        ArtifactRef::new("ams-conformance-jcl", limits).map_err(|problem| problem.to_string())?,
+        Principal::new(
+            PrincipalId::new("IBMUSER", limits).map_err(|problem| problem.to_string())?,
+            grants,
+            limits,
+        )
+        .map_err(|problem| problem.to_string())?,
+        ServiceClass::Batch,
+        0,
+        100,
+        TraceId::new("ams-conformance-trace", limits).map_err(|problem| problem.to_string())?,
+        IdempotencyKey::new("ams-conformance-invocation", limits)
+            .map_err(|problem| problem.to_string())?,
+        1,
+        ResourceLimits::default(),
+        Default::default(),
+        limits,
+    )
+    .map_err(|problem| problem.to_string())
+}
+
+fn ams_fixture_mutation(command: &str, sequence: &mut u64) -> Result<Mutation, String> {
+    *sequence = sequence
+        .checked_add(1)
+        .ok_or_else(|| "AMS fixture sequence overflow".to_string())?;
+    Ok(Mutation {
+        sequence: *sequence,
+        idempotency_key: IdempotencyKey::new(
+            format!("ams-{command}-setup-{sequence}"),
+            InvocationLimits::default(),
+        )
+        .map_err(|problem| problem.to_string())?,
+        transaction: None,
+    })
+}
+
+fn seed_ams_dataset(
+    service: &DatasetService,
+    command: &str,
+    sequence: &mut u64,
+    dataset: &str,
+    organization: DatasetOrganization,
+    records: Vec<Vec<u8>>,
+) -> Result<(), String> {
+    let attributes = DatasetAttributes {
+        organization,
+        record_format: if organization == DatasetOrganization::Linear {
+            RecordFormat::Undefined
+        } else if matches!(
+            organization,
+            DatasetOrganization::Sequential | DatasetOrganization::EntrySequenced
+        ) {
+            RecordFormat::Variable
+        } else {
+            RecordFormat::Fixed
+        },
+        logical_record_length: if matches!(
+            organization,
+            DatasetOrganization::Sequential | DatasetOrganization::EntrySequenced
+        ) {
+            1_024
+        } else {
+            4
+        },
+        key_offset: (organization == DatasetOrganization::KeySequenced).then_some(0),
+        key_length: (organization == DatasetOrganization::KeySequenced).then_some(2),
+        ccsid: Some(37),
+    };
+    let dataset = name(dataset);
+    service
+        .invoke(DatasetRequest::Create {
+            dataset: dataset.clone(),
+            attributes,
+            mutation: ams_fixture_mutation(command, sequence)?,
+        })
+        .map_err(|problem| problem.to_string())?;
+    if !records.is_empty() {
+        service
+            .invoke(DatasetRequest::Write {
+                dataset,
+                member: None,
+                records,
+                expected_version: Some(1),
+                mutation: ams_fixture_mutation(command, sequence)?,
+            })
+            .map_err(|problem| problem.to_string())?;
+    }
+    Ok(())
+}
+
+fn define_ams_catalog(
+    service: &DatasetService,
+    command: &str,
+    sequence: &mut u64,
+) -> Result<(), String> {
+    service
+        .invoke(DatasetRequest::DefineCatalog {
+            catalog: name("USER.CAT"),
+            kind: CatalogKind::User,
+            mutation: ams_fixture_mutation(command, sequence)?,
+        })
+        .map_err(|problem| problem.to_string())?;
+    Ok(())
+}
+
+fn define_ams_aix(
+    service: &DatasetService,
+    command: &str,
+    sequence: &mut u64,
+) -> Result<(), String> {
+    service
+        .invoke(DatasetRequest::DefineAlternateIndex {
+            base: name("USER.A"),
+            index: name("USER.A.AIX"),
+            key_offset: 2,
+            key_length: 2,
+            allow_duplicates: false,
+            upgrade: true,
+            mutation: ams_fixture_mutation(command, sequence)?,
+        })
+        .map_err(|problem| problem.to_string())?;
+    Ok(())
+}
+
+fn snapshot_digest(domain: &[u8], core: &str, manifest: &[u8]) -> String {
+    let mut digest = Sha256::new();
+    digest.update(domain);
+    digest.update((core.len() as u64).to_be_bytes());
+    digest.update(core.as_bytes());
+    digest.update((manifest.len() as u64).to_be_bytes());
+    digest.update(manifest);
+    digest.update(0u64.to_be_bytes());
+    format!("sha256:{:x}", digest.finalize())
+}
+
+fn write_ams_input(
+    service: &DatasetService,
+    command: &str,
+    sequence: &mut u64,
+    records: Vec<Vec<u8>>,
+) -> Result<(), String> {
+    service
+        .invoke(DatasetRequest::Write {
+            dataset: name("CONF.INPUT"),
+            member: None,
+            records,
+            expected_version: Some(1),
+            mutation: ams_fixture_mutation(command, sequence)?,
+        })
+        .map_err(|problem| problem.to_string())?;
+    Ok(())
+}
+
+fn prepare_definition_snapshot_input(
+    service: &DatasetService,
+    command: &str,
+    sequence: &mut u64,
+) -> Result<(), String> {
+    let DatasetResult::Snapshot { snapshot, .. } = service
+        .invoke(DatasetRequest::Snapshot {
+            dataset: name("USER.A"),
+            max_records: 32,
+            max_members: 32,
+        })
+        .map_err(|problem| problem.to_string())?
+    else {
+        return Err("AMS snapshot setup returned an unexpected result".into());
+    };
+    let manifest = serde_json::to_vec(snapshot.as_ref()).map_err(|error| error.to_string())?;
+    let chunks = manifest.chunks(192).map(<[u8]>::to_vec).collect::<Vec<_>>();
+    let core = format!("MEAMS2|USER.A|{}", chunks.len());
+    let header = format!(
+        "{core}|{}",
+        snapshot_digest(b"mainframe-env.ams-definition-snapshot@2", &core, &manifest,)
+    )
+    .into_bytes();
+    let mut records = Vec::with_capacity(chunks.len() + 1);
+    records.push(header);
+    records.extend(chunks);
+    write_ams_input(service, command, sequence, records)
+}
+
+fn prepare_catalog_snapshot_input(
+    service: &DatasetService,
+    command: &str,
+    sequence: &mut u64,
+) -> Result<(), String> {
+    define_ams_catalog(service, command, sequence)?;
+    service
+        .invoke(DatasetRequest::SetCatalogConnection {
+            catalog: name("USER.CAT"),
+            connected: false,
+            expected_version: Some(1),
+            mutation: ams_fixture_mutation(command, sequence)?,
+        })
+        .map_err(|problem| problem.to_string())?;
+    let core = "MEAMSCAT1|USER.CAT";
+    let mut digest = Sha256::new();
+    digest.update(b"mainframe-env.ams-snapshot@1");
+    digest.update((core.len() as u64).to_be_bytes());
+    digest.update(core.as_bytes());
+    digest.update(0u64.to_be_bytes());
+    write_ams_input(
+        service,
+        command,
+        sequence,
+        vec![format!("{core}|sha256:{:x}", digest.finalize()).into_bytes()],
+    )
+}
+
+fn execute_ams_command_fixture(
+    control: &str,
+    command: &mainframe_env_batch::AmsCommand,
+) -> Result<(), String> {
+    let store = Arc::new(MemoryStore::new(StoreLimits::default()));
+    let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+    let dataset = DatasetService::open(provider_store, DatasetLimits::default())
+        .map_err(|problem| problem.to_string())?;
+    let mut sequence = 0u64;
+    seed_ams_dataset(
+        &dataset,
+        command.id(),
+        &mut sequence,
+        "CONF.INPUT",
+        DatasetOrganization::Sequential,
+        Vec::new(),
+    )?;
+    seed_ams_dataset(
+        &dataset,
+        command.id(),
+        &mut sequence,
+        "CONF.OUTPUT",
+        DatasetOrganization::Sequential,
+        Vec::new(),
+    )?;
+    if !matches!(
+        command.id(),
+        "allocate" | "define-cluster" | "define-nonvsam"
+    ) {
+        seed_ams_dataset(
+            &dataset,
+            command.id(),
+            &mut sequence,
+            "USER.A",
+            DatasetOrganization::KeySequenced,
+            vec![b"AA11".to_vec()],
+        )?;
+    }
+    match command.id() {
+        "bldindex" | "define-path" => {
+            define_ams_aix(&dataset, command.id(), &mut sequence)?;
+        }
+        "export-disconnect" => {
+            define_ams_catalog(&dataset, command.id(), &mut sequence)?;
+        }
+        "import" | "recover" => {
+            prepare_definition_snapshot_input(&dataset, command.id(), &mut sequence)?;
+        }
+        "import-connect" => {
+            prepare_catalog_snapshot_input(&dataset, command.id(), &mut sequence)?;
+        }
+        "repro" => {
+            seed_ams_dataset(
+                &dataset,
+                command.id(),
+                &mut sequence,
+                "USER.B",
+                DatasetOrganization::KeySequenced,
+                Vec::new(),
+            )?;
+        }
+        _ => {}
+    }
+    let host = ams_host(dataset.clone())?;
+    let batch_store: Arc<dyn ProviderStateStore> = store.clone();
+    let batch = BatchService::open(host, batch_store, Default::default(), Default::default())
+        .map_err(|problem| problem.to_string())?;
+    let invocation = ams_invocation()?;
+    let job = batch
+        .submit(
+            &invocation,
+            &JclBundle {
+                primary: format!(
+                    "//AMSJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//IN DD DSN=CONF.INPUT,DISP=SHR\n//OUT DD DSN=CONF.OUTPUT,DISP=OLD\n//SYSIN DD *\n {control}\n/*\n"
+                ),
+                ..Default::default()
+            },
+            &IdempotencyKey::new(
+                format!("ams-conformance-{}", command.id()),
+                InvocationLimits::default(),
+            )
+            .map_err(|problem| problem.to_string())?,
+            false,
+        )
+        .map_err(|problem| problem.to_string())?;
+    let completed = batch
+        .run_next(&invocation, false)
+        .map_err(|problem| problem.to_string())?
+        .ok_or_else(|| "AMS conformance job did not run".to_string())?;
+    let expected_cc = if command.capability().is_some() {
+        12
+    } else {
+        0
+    };
+    if completed.state != JobState::Completed || completed.return_code != Some(expected_cc) {
+        return Err(format!(
+            "{} completed with state {:?} and return code {:?}, expected {expected_cc}",
+            command.id(),
+            completed.state,
+            completed.return_code
+        ));
+    }
+    let reopened_provider_store: Arc<dyn ProviderStateStore> = store.clone();
+    let reopened_dataset = DatasetService::open(reopened_provider_store, DatasetLimits::default())
+        .map_err(|problem| problem.to_string())?;
+    let reopened_host = ams_host(reopened_dataset.clone())?;
+    let reopened_batch_store: Arc<dyn ProviderStateStore> = store;
+    let reopened_batch = BatchService::open(
+        reopened_host,
+        reopened_batch_store,
+        Default::default(),
+        Default::default(),
+    )
+    .map_err(|problem| problem.to_string())?;
+    let recovered = reopened_batch
+        .get(&job.id)
+        .map_err(|problem| problem.to_string())?;
+    if recovered.state != JobState::Completed || recovered.return_code != Some(expected_cc) {
+        return Err(format!(
+            "{} terminal result changed after restart",
+            command.id()
+        ));
+    }
+    verify_ams_command_effect(command, &reopened_batch, &reopened_dataset, &job.id)
+}
+
+fn catalog_contains(service: &DatasetService, entry_name: &str) -> Result<bool, String> {
+    match service
+        .invoke(DatasetRequest::ListCatalog {
+            pattern: entry_name.into(),
+            start: None,
+            max_items: 32,
+        })
+        .map_err(|problem| problem.to_string())?
+    {
+        DatasetResult::CatalogEntries { entries, .. } => Ok(entries
+            .iter()
+            .any(|entry| entry.name.as_str() == entry_name)),
+        result => Err(format!("unexpected catalog result {result:?}")),
+    }
+}
+
+fn dataset_records(service: &DatasetService, dataset: &str) -> Result<Vec<Vec<u8>>, String> {
+    match service
+        .invoke(DatasetRequest::Read {
+            dataset: name(dataset),
+            member: None,
+            key: None,
+            max_records: 4_096,
+        })
+        .map_err(|problem| problem.to_string())?
+    {
+        DatasetResult::Records { records, .. } => Ok(records),
+        result => Err(format!("unexpected record result {result:?}")),
+    }
+}
+
+fn verify_ams_command_effect(
+    command: &mainframe_env_batch::AmsCommand,
+    batch: &BatchService,
+    dataset: &DatasetService,
+    job_id: &str,
+) -> Result<(), String> {
+    if let Some(capability) = command.capability() {
+        let (records, _) = batch
+            .spool(job_id, "SYSPRINT", 0, 64)
+            .map_err(|problem| problem.to_string())?;
+        return records
+            .iter()
+            .map(|record| String::from_utf8_lossy(record))
+            .any(|record| record.contains("UnsupportedCapability") && record.contains(capability))
+            .then_some(())
+            .ok_or_else(|| format!("{} did not retain its capability condition", command.id()));
+    }
+    let ok = match command.id() {
+        "allocate" | "define-cluster" => dataset
+            .invoke(DatasetRequest::Attributes {
+                dataset: name("USER.A"),
+            })
+            .is_ok(),
+        "define-nonvsam" => dataset
+            .invoke(DatasetRequest::Attributes {
+                dataset: name("USER.PS"),
+            })
+            .is_ok(),
+        "alter" => matches!(
+            dataset.invoke(DatasetRequest::Describe {
+                dataset: name("USER.A"),
+            }),
+            Ok(DatasetResult::Description(description))
+                if description.definition.lifecycle.state == DatasetLifecycleState::Open
+        ),
+        "bldindex" => catalog_contains(dataset, "USER.A.AIX")?,
+        "dcollect" => !dataset_records(dataset, "CONF.OUTPUT")?.is_empty(),
+        "define-alias" => catalog_contains(dataset, "USER.ALIAS")?,
+        "define-alternateindex" => catalog_contains(dataset, "USER.A.AIX")?,
+        "define-generationdatagroup" => catalog_contains(dataset, "USER.GDG")?,
+        "define-path" => catalog_contains(dataset, "USER.A.PATH")?,
+        "define-usercatalog" => catalog_contains(dataset, "USER.CAT")?,
+        "delete" => {
+            dataset.invoke(DatasetRequest::Attributes {
+                dataset: name("USER.A"),
+            }) == Err(HostProblem::NotFound)
+        }
+        "export" => dataset_records(dataset, "CONF.OUTPUT")?
+            .first()
+            .is_some_and(|record| record.starts_with(b"MEAMS2|USER.A|")),
+        "export-disconnect" => dataset_records(dataset, "CONF.OUTPUT")?
+            .first()
+            .is_some_and(|record| record.starts_with(b"MEAMSCAT1|USER.CAT|")),
+        "import" => dataset_records(dataset, "USER.A")? == [b"AA11".to_vec()],
+        "import-connect" => catalog_contains(dataset, "USER.CAT")?,
+        "recover" => matches!(
+            dataset.invoke(DatasetRequest::Describe {
+                dataset: name("USER.A"),
+            }),
+            Ok(DatasetResult::Description(description))
+                if description.definition.lifecycle.state == DatasetLifecycleState::Closed
+                    && dataset_records(dataset, "USER.A")? == [b"AA11".to_vec()]
+        ),
+        "repro" => dataset_records(dataset, "USER.B")? == [b"AA11".to_vec()],
+        "diagnose" | "examine" | "listcat" | "listdata" | "print" | "shcds" => !batch
+            .spool(job_id, "SYSPRINT", 0, 64)
+            .map_err(|problem| problem.to_string())?
+            .0
+            .is_empty(),
+        "verify" => dataset
+            .invoke(DatasetRequest::Attributes {
+                dataset: name("USER.A"),
+            })
+            .is_ok(),
+        _ => false,
+    };
+    ok.then_some(())
+        .ok_or_else(|| format!("{} did not retain its typed effect", command.id()))
 }
 
 fn dataset_service() -> (Arc<dyn ProviderStateStore>, Arc<DatasetService>) {

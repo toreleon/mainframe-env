@@ -1,9 +1,27 @@
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
 macro_rules! host_name {
     ($name:ident, $validate:expr) => {
         #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
         pub struct $name(String);
+        impl Serialize for $name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: Serializer,
+            {
+                serializer.serialize_str(&self.0)
+            }
+        }
+        impl<'de> Deserialize<'de> for $name {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                let value = String::deserialize(deserializer)?;
+                Self::new(value, 246).map_err(serde::de::Error::custom)
+            }
+        }
         impl $name {
             pub fn new(
                 value: impl Into<String>,

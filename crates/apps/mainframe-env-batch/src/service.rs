@@ -1413,7 +1413,7 @@ impl BatchService {
                 ),
             });
         }
-        if let Some((capability, operand)) = unimplemented_ams_operand(command.source()) {
+        if let Some((capability, operand)) = unimplemented_ams_operand(command) {
             return Err(HostProblem::UnsupportedCapability {
                 capability: capability.into(),
                 detail: format!("{operand} is not implemented by the AMS adapter"),
@@ -1468,6 +1468,11 @@ impl BatchService {
             }
         };
         match command.id() {
+            "listcat" => push(
+                operand(source, &["ENTRIES", "ENTRY", "LEVEL"]).or_else(|| Some("**".into())),
+                AccessIntent::Read,
+            ),
+            "dcollect" => push(Some("**".into()), AccessIntent::Read),
             "define-alias" => {
                 push(operand(source, &["NAME"]), AccessIntent::Update);
                 push(operand(source, &["RELATE"]), AccessIntent::Read);
@@ -1495,14 +1500,16 @@ impl BatchService {
                 if command.id() == "export-disconnect" {
                     AccessIntent::Update
                 } else {
-                    AccessIntent::Read
+                    AccessIntent::Control
                 },
             ),
-            "diagnose" | "examine" | "listdata" | "print" | "shcds" => push(
+            "diagnose" | "examine" | "listdata" => push(
                 operand(source, &["INDATASET", "DATASET", "ENTRIES"])
                     .or_else(|| crate::ams::bare_target(source, command.label())),
                 AccessIntent::Read,
             ),
+            "shcds" => push(operand(source, &["DATASET"]), AccessIntent::Read),
+            "print" => push(operand(source, &["INDATASET"]), AccessIntent::Read),
             "verify" | "recover" | "alter" | "delete" => push(
                 operand(source, &["INDATASET", "DATASET"])
                     .or_else(|| crate::ams::bare_target(source, command.label())),
@@ -1609,7 +1616,9 @@ impl BatchService {
         let name = crate::ams::bare_target(statement, "DELETE").ok_or(HostProblem::Malformed)?;
         let dataset = dataset_name(&name)?;
         let purge = statement.contains(" PURGE");
-        let current_date = numeric_operand(statement, "CURRENTDATE");
+        let current_date = operand(statement, &["CURRENTDATE"])
+            .map(|value| value.parse().map_err(|_| HostProblem::Malformed))
+            .transpose()?;
         self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
             DatasetRequest::Delete {
                 dataset,
@@ -1632,10 +1641,10 @@ impl BatchService {
     ) -> Result<(), HostProblem> {
         let pattern =
             operand(statement, &["ENTRIES", "ENTRY", "LEVEL"]).unwrap_or_else(|| "**".into());
-        let DatasetResult::Listed { names, more } = self.ams_dataset_read(
+        let DatasetResult::CatalogEntries { entries, more } = self.ams_dataset_read(
             invocation,
             effect_sequence,
-            DatasetRequest::List {
+            DatasetRequest::ListCatalog {
                 pattern,
                 start: None,
                 max_items: 4_096,
@@ -1644,11 +1653,18 @@ impl BatchService {
         else {
             return Err(HostProblem::ProviderFailure);
         };
-        for name in names {
+        for entry in entries {
             append_spool(
                 job,
                 "SYSPRINT",
-                name.as_str().as_bytes().to_vec(),
+                format!(
+                    "{} {:?} VERSION={} RELATE={}",
+                    entry.name.as_str(),
+                    entry.kind,
+                    entry.version,
+                    entry.related.as_ref().map_or("-", DatasetName::as_str)
+                )
+                .into_bytes(),
                 self.limits,
             )?;
         }
@@ -1694,6 +1710,22 @@ impl BatchService {
             };
             records
         };
+        let skip = operand(statement, &["SKIP"])
+            .map(|value| value.parse::<usize>().map_err(|_| HostProblem::Malformed))
+            .transpose()?
+            .unwrap_or(0);
+        let count = operand(statement, &["COUNT"])
+            .map(|value| value.parse::<usize>().map_err(|_| HostProblem::Malformed))
+            .transpose()?
+            .unwrap_or(4_096);
+        if skip > 4_096 || count > 4_096 {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let records = records
+            .into_iter()
+            .skip(skip)
+            .take(count)
+            .collect::<Vec<_>>();
         if let Some(output_name) = operand(statement, &["OUTFILE", "OFILE"]) {
             self.write_dd_outputs(
                 invocation,
@@ -1794,21 +1826,68 @@ impl BatchService {
                             dataset: name.clone(),
                         },
                     ) {
-                        Ok(DatasetResult::Description(description)) => format!(
-                            "{}|{:?}|{}|{}",
-                            name.as_str(),
-                            description.definition.attributes.organization,
-                            description.version,
-                            description.used_bytes
-                        )
-                        .into_bytes(),
+                        Ok(DatasetResult::Description(description)) => {
+                            let extents = description
+                                .extents
+                                .iter()
+                                .map(|extent| {
+                                    format!(
+                                        "{}:{}:{}:{}:{}",
+                                        extent.ordinal,
+                                        extent.start,
+                                        extent.volume_start,
+                                        extent.length,
+                                        extent.volume_id
+                                    )
+                                })
+                                .collect::<Vec<_>>()
+                                .join(",");
+                            format!(
+                                "{}|ORG={:?}|VERSION={}|USED={}|ALLOCATED={}|VOLUMES={}|EXTENTS={extents}|LIFECYCLE={:?}|BACKUP={}",
+                                name.as_str(),
+                                description.definition.attributes.organization,
+                                description.version,
+                                description.used_bytes,
+                                description.allocated_bytes,
+                                description.definition.volumes.volume_ids.join(","),
+                                description.definition.lifecycle.state,
+                                description.definition.lifecycle.backup_generation,
+                            )
+                            .into_bytes()
+                        }
                         Err(HostProblem::NotFound) | Err(HostProblem::Unsupported) => {
-                            format!("{}|CATALOG|0|0", name.as_str()).into_bytes()
+                            format!("{}|TYPE=CATALOG|VERSION=0|USED=0", name.as_str()).into_bytes()
                         }
                         Ok(_) => return Err(HostProblem::ProviderFailure),
                         Err(problem) => return Err(problem),
                     };
                     collected.push(record);
+                }
+                let DatasetResult::Volumes { volumes, more } = self.ams_dataset_read(
+                    invocation,
+                    effect_sequence,
+                    DatasetRequest::ListVolumes {
+                        start: None,
+                        max_items: 4_096,
+                    },
+                )?
+                else {
+                    return Err(HostProblem::ProviderFailure);
+                };
+                for volume in volumes {
+                    collected.push(
+                        format!(
+                            "VOLUME|{}|ALLOCATED={}|USED={}|EXTENTS={}",
+                            volume.volume_id,
+                            volume.allocated_bytes,
+                            volume.used_bytes,
+                            volume.extents.len(),
+                        )
+                        .into_bytes(),
+                    );
+                }
+                if more {
+                    collected.push(b"VOLUME|MORE".to_vec());
                 }
                 self.write_dd_outputs(
                     invocation,
@@ -1876,23 +1955,39 @@ impl BatchService {
                 )?;
             }
             "print" => {
-                let dataset = dataset_name(
-                    &operand(statement, &["INDATASET"]).ok_or(HostProblem::Malformed)?,
-                )?;
-                let DatasetResult::Records { records, .. } = self.ams_dataset_read(
-                    invocation,
-                    effect_sequence,
-                    DatasetRequest::Read {
-                        dataset,
-                        member: None,
-                        key: None,
-                        max_records: 4_096,
-                    },
-                )?
-                else {
-                    return Err(HostProblem::ProviderFailure);
+                let records = if let Some(input_name) = operand(statement, &["INFILE", "IFILE"]) {
+                    input_dd_records(input, &input_name)?
+                } else {
+                    let dataset = dataset_name(
+                        &operand(statement, &["INDATASET"]).ok_or(HostProblem::Malformed)?,
+                    )?;
+                    let DatasetResult::Records { records, .. } = self.ams_dataset_read(
+                        invocation,
+                        effect_sequence,
+                        DatasetRequest::Read {
+                            dataset,
+                            member: None,
+                            key: None,
+                            max_records: 4_096,
+                        },
+                    )?
+                    else {
+                        return Err(HostProblem::ProviderFailure);
+                    };
+                    records
                 };
-                for record in records {
+                let skip = operand(statement, &["SKIP"])
+                    .map(|value| value.parse::<usize>().map_err(|_| HostProblem::Malformed))
+                    .transpose()?
+                    .unwrap_or(0);
+                let count = operand(statement, &["COUNT"])
+                    .map(|value| value.parse::<usize>().map_err(|_| HostProblem::Malformed))
+                    .transpose()?
+                    .unwrap_or(4_096);
+                if skip > 4_096 || count > 4_096 {
+                    return Err(HostProblem::ResourceExhausted);
+                }
+                for record in records.into_iter().skip(skip).take(count) {
                     let record = if statement.contains(" HEX") {
                         hex_bytes(&record).into_bytes()
                     } else {
@@ -1921,14 +2016,29 @@ impl BatchService {
                 } else {
                     let transaction =
                         operand(statement, &["TRANSACTION"]).ok_or(HostProblem::Malformed)?;
-                    self.ams_dataset_read(
-                        invocation,
-                        effect_sequence,
-                        DatasetRequest::TvsStatus {
-                            transaction,
-                            owner: invocation.principal.id().clone(),
-                        },
-                    )?
+                    if statement.contains(" COMMIT") || statement.contains(" ROLLBACK") {
+                        self.ams_dataset_mutation(
+                            invocation,
+                            job,
+                            step,
+                            effect_sequence,
+                            |mutation| DatasetRequest::ReconcileTvs {
+                                transaction,
+                                owner: invocation.principal.id().clone(),
+                                committed: statement.contains(" COMMIT"),
+                                mutation,
+                            },
+                        )?
+                    } else {
+                        self.ams_dataset_read(
+                            invocation,
+                            effect_sequence,
+                            DatasetRequest::TvsStatus {
+                                transaction,
+                                owner: invocation.principal.id().clone(),
+                            },
+                        )?
+                    }
                 };
                 append_spool(
                     job,
@@ -1958,28 +2068,93 @@ impl BatchService {
         )?;
         if let Some(new_name) = operand(statement, &["NEWNAME"]) {
             let to = dataset_name(&new_name)?;
+            let normalized = statement
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+                .replace("NEWNAME (", "NEWNAME(");
+            if normalized != format!("ALTER {} NEWNAME({})", from.as_str(), to.as_str()) {
+                return Err(HostProblem::UnsupportedCapability {
+                    capability: "ams-combined-alter".into(),
+                    detail: "rename ALTER cannot be combined with definition operands".into(),
+                });
+            }
             self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
                 DatasetRequest::Rename { from, to, mutation }
             })?;
             return Ok(());
         }
         let next = if statement.contains(" RECOVERYREQUIRED") {
-            mainframe_env_host_api::DatasetLifecycleState::RecoveryRequired
+            Some((
+                "RECOVERYREQUIRED",
+                mainframe_env_host_api::DatasetLifecycleState::RecoveryRequired,
+            ))
+        } else if statement.contains(" MIGRATE") || statement.contains(" MIGRATED") {
+            Some((
+                if statement.contains(" MIGRATED") {
+                    "MIGRATED"
+                } else {
+                    "MIGRATE"
+                },
+                mainframe_env_host_api::DatasetLifecycleState::Migrated,
+            ))
+        } else if statement.contains(" RECALL") {
+            Some((
+                if statement.contains(" RECALLPENDING") {
+                    "RECALLPENDING"
+                } else {
+                    "RECALL"
+                },
+                mainframe_env_host_api::DatasetLifecycleState::RecallPending,
+            ))
         } else if statement.contains(" CLOSED") {
-            mainframe_env_host_api::DatasetLifecycleState::Closed
+            Some((
+                "CLOSED",
+                mainframe_env_host_api::DatasetLifecycleState::Closed,
+            ))
         } else if statement.contains(" OPEN") {
-            mainframe_env_host_api::DatasetLifecycleState::Open
+            Some(("OPEN", mainframe_env_host_api::DatasetLifecycleState::Open))
         } else {
-            return Err(HostProblem::Unsupported);
+            None
         };
-        self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
-            DatasetRequest::SetLifecycle {
-                dataset: from,
-                state: next,
-                expected_version: None,
-                mutation,
+        if let Some((keyword, next)) = next {
+            let normalized = statement.split_whitespace().collect::<Vec<_>>().join(" ");
+            if normalized != format!("ALTER {} {keyword}", from.as_str()) {
+                return Err(HostProblem::UnsupportedCapability {
+                    capability: "ams-combined-alter".into(),
+                    detail: "lifecycle ALTER cannot be combined with definition operands".into(),
+                });
             }
-        })?;
+            self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
+                DatasetRequest::SetLifecycle {
+                    dataset: from,
+                    state: next,
+                    expected_version: None,
+                    mutation,
+                }
+            })?;
+        } else {
+            let DatasetResult::Description(description) = self.ams_dataset_read(
+                invocation,
+                effect_sequence,
+                DatasetRequest::Describe {
+                    dataset: from.clone(),
+                },
+            )?
+            else {
+                return Err(HostProblem::ProviderFailure);
+            };
+            let mut definition = description.definition;
+            apply_ams_definition_operands(statement, &mut definition)?;
+            self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
+                DatasetRequest::Alter {
+                    dataset: from,
+                    definition: Box::new(definition),
+                    expected_version: Some(description.version),
+                    mutation,
+                }
+            })?;
+        }
         Ok(())
     }
 
@@ -1998,6 +2173,7 @@ impl BatchService {
             &operand(statement, &["ENTRIES", "INDATASET"]).ok_or(HostProblem::Malformed)?,
         )?;
         let dd = operand(statement, &["OUTFILE", "OFILE"]).ok_or(HostProblem::Malformed)?;
+        let mut backup_version = None;
         let records = if disconnect {
             let core = format!("MEAMSCAT1|{}", target.as_str());
             let header = format!("{core}|{}", ams_snapshot_digest(&core, &[])).into_bytes();
@@ -2011,33 +2187,20 @@ impl BatchService {
             })?;
             vec![header]
         } else {
-            let DatasetResult::Attributes { attributes, .. } = self.ams_dataset_read(
+            let DatasetResult::Snapshot { snapshot, version } = self.ams_dataset_read(
                 invocation,
                 effect_sequence,
-                DatasetRequest::Attributes {
+                DatasetRequest::Snapshot {
                     dataset: target.clone(),
-                },
-            )?
-            else {
-                return Err(HostProblem::ProviderFailure);
-            };
-            let DatasetResult::Records { records, .. } = self.ams_dataset_read(
-                invocation,
-                effect_sequence,
-                DatasetRequest::Read {
-                    dataset: target.clone(),
-                    member: None,
-                    key: None,
                     max_records: 4_096,
+                    max_members: 4_096,
                 },
             )?
             else {
                 return Err(HostProblem::ProviderFailure);
             };
-            let mut snapshot =
-                vec![encode_ams_snapshot_header(&target, &attributes, &records).into_bytes()];
-            snapshot.extend(records);
-            snapshot
+            backup_version = Some(version);
+            encode_ams_snapshot(&target, &snapshot)?
         };
         self.write_dd_outputs(
             invocation,
@@ -2046,7 +2209,17 @@ impl BatchService {
             dataset_resolutions,
             &BTreeMap::from([(dd, records)]),
             effect_sequence,
-        )
+        )?;
+        if let Some(version) = backup_version {
+            self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
+                DatasetRequest::RecordBackup {
+                    dataset: target,
+                    expected_version: Some(version),
+                    mutation,
+                }
+            })?;
+        }
+        Ok(())
     }
 
     fn import_idcams(
@@ -2088,7 +2261,7 @@ impl BatchService {
             })?;
             return Ok(());
         }
-        let (snapshot_name, attributes) = decode_ams_snapshot_header(&header, &records)?;
+        let (snapshot_name, mut snapshot) = decode_ams_snapshot(&header, &mut records)?;
         let target = operand(statement, &["OUTDATASET", "INDATASET", "DATASET"])
             .map_or(Ok(snapshot_name), |name| dataset_name(&name))?;
         self.authorize(
@@ -2098,6 +2271,10 @@ impl BatchService {
             AccessIntent::Update,
             next_effect_sequence(invocation, effect_sequence)?,
         )?;
+        if statement.starts_with("RECOVER") {
+            snapshot.definition.lifecycle.state =
+                mainframe_env_host_api::DatasetLifecycleState::Closed;
+        }
         let current = self.ams_dataset_read(
             invocation,
             effect_sequence,
@@ -2106,42 +2283,19 @@ impl BatchService {
             },
         );
         let expected_version = match current {
-            Ok(DatasetResult::Attributes { version, .. }) => {
-                self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
-                    DatasetRequest::Truncate {
-                        dataset: target.clone(),
-                        expected_version: Some(version),
-                        mutation,
-                    }
-                })?;
-                version
-                    .checked_add(1)
-                    .ok_or(HostProblem::ResourceExhausted)?
-            }
-            Err(HostProblem::NotFound) => {
-                self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
-                    DatasetRequest::Create {
-                        dataset: target.clone(),
-                        attributes,
-                        mutation,
-                    }
-                })?;
-                1
-            }
+            Ok(DatasetResult::Attributes { version, .. }) => Some(version),
+            Err(HostProblem::NotFound) => None,
             Ok(_) => return Err(HostProblem::ProviderFailure),
             Err(problem) => return Err(problem),
         };
-        if !records.is_empty() {
-            self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
-                DatasetRequest::Write {
-                    dataset: target,
-                    member: None,
-                    records,
-                    expected_version: Some(expected_version),
-                    mutation,
-                }
-            })?;
-        }
+        self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
+            DatasetRequest::Restore {
+                dataset: target,
+                snapshot: Box::new(snapshot),
+                expected_version,
+                mutation,
+            }
+        })?;
         Ok(())
     }
 
@@ -3311,26 +3465,248 @@ fn ams_condition_code(problem: &HostProblem) -> u8 {
     }
 }
 
-fn unimplemented_ams_operand(statement: &str) -> Option<(&'static str, &'static str)> {
-    [
-        (
-            "ams-allocation-extents",
-            "nested SPACE",
-            [" SPACE(", " SPACE (", " SPACE("],
-        ),
-        (
-            "vsam-components",
-            "DATA/INDEX component override",
-            [" DATA(", " INDEX(", " FREESPACE("],
-        ),
-    ]
-    .into_iter()
-    .find_map(|(capability, operand, needles)| {
-        needles
-            .iter()
-            .any(|needle| statement.contains(needle))
-            .then_some((capability, operand))
-    })
+fn unimplemented_ams_operand(command: &AmsCommand) -> Option<(&'static str, &'static str)> {
+    let terms = ams_top_level_terms(command);
+    if terms
+        .iter()
+        .any(|term| matches!(term.as_str(), "DATA" | "INDEX" | "FREESPACE"))
+    {
+        return Some(("vsam-components", "DATA/INDEX component override"));
+    }
+    terms
+        .iter()
+        .find(|term| !ams_operand_allowed(command.id(), term))
+        .map(|_| ("ams-operand", "unknown or inapplicable AMS operand"))
+}
+
+fn ams_top_level_terms(command: &AmsCommand) -> Vec<String> {
+    let mut rest = command
+        .source()
+        .strip_prefix(command.label())
+        .unwrap_or_default()
+        .trim();
+    if rest.starts_with('(') && rest.ends_with(')') {
+        rest = &rest[1..rest.len().saturating_sub(1)];
+    }
+    let bytes = rest.as_bytes();
+    let mut at = 0usize;
+    let mut terms = Vec::<(String, bool)>::new();
+    while at < bytes.len() {
+        while bytes
+            .get(at)
+            .is_some_and(|byte| byte.is_ascii_whitespace() || matches!(byte, b',' | b'(' | b')'))
+        {
+            at += 1;
+        }
+        let start = at;
+        while bytes
+            .get(at)
+            .is_some_and(|byte| !byte.is_ascii_whitespace() && !matches!(byte, b',' | b'(' | b')'))
+        {
+            at += 1;
+        }
+        if start == at {
+            break;
+        }
+        let token = rest[start..at]
+            .trim_matches(['\'', '"'])
+            .to_ascii_uppercase();
+        while bytes.get(at).is_some_and(u8::is_ascii_whitespace) {
+            at += 1;
+        }
+        let parenthesized = bytes.get(at) == Some(&b'(');
+        terms.push((token, parenthesized));
+        if parenthesized {
+            let mut depth = 0u32;
+            let mut quote = None;
+            while let Some(byte) = bytes.get(at).copied() {
+                if matches!(byte, b'\'' | b'"') {
+                    if quote == Some(byte) {
+                        quote = None;
+                    } else if quote.is_none() {
+                        quote = Some(byte);
+                    }
+                } else if quote.is_none() {
+                    if byte == b'(' {
+                        depth = depth.saturating_add(1);
+                    } else if byte == b')' {
+                        depth = depth.saturating_sub(1);
+                        if depth == 0 {
+                            at += 1;
+                            break;
+                        }
+                    }
+                }
+                at += 1;
+            }
+        }
+    }
+    if matches!(
+        command.id(),
+        "alter" | "delete" | "diagnose" | "examine" | "listdata" | "verify"
+    ) && terms
+        .first()
+        .is_some_and(|(_, parenthesized)| !parenthesized)
+    {
+        terms.remove(0);
+    }
+    terms.into_iter().map(|(term, _)| term).collect()
+}
+
+fn ams_operand_allowed(command: &str, operand: &str) -> bool {
+    const DEFINITION: &[&str] = &[
+        "NAME",
+        "DATASET",
+        "DSORG",
+        "RECORDSIZE",
+        "LRECL",
+        "RECFM",
+        "BLKSIZE",
+        "BUFNO",
+        "BUFSIZE",
+        "CCSID",
+        "KEYLEN",
+        "KEYOFF",
+        "KEYS",
+        "TRACKS",
+        "CYLINDERS",
+        "BLOCKS",
+        "KILOBYTES",
+        "MEGABYTES",
+        "RECORDS",
+        "SPACE",
+        "PRIMARY",
+        "SECONDARY",
+        "DIRECTORY",
+        "RLSE",
+        "NORLSE",
+        "CONTIG",
+        "NOCONTIG",
+        "ROUND",
+        "NOROUND",
+        "VOLUMES",
+        "VOLUME",
+        "UNITCOUNT",
+        "UNIT",
+        "TAPE",
+        "DATACLAS",
+        "MGMTCLAS",
+        "STORCLAS",
+        "ACSROUTINE",
+        "GUARANTEEDSPACE",
+        "NOGUARANTEEDSPACE",
+        "EXTENDEDADDRESSABLE",
+        "NOEXTENDEDADDRESSABLE",
+        "EXTENDED",
+        "NOEXTENDED",
+        "COMPRESS",
+        "NOCOMPRESS",
+        "KEYLABEL",
+        "STRIPECOUNT",
+        "CATALOG",
+        "OWNER",
+        "ENTRYTYPE",
+        "CREATEDATE",
+        "TO",
+        "EXPIRATION",
+        "FOR",
+        "RETPD",
+        "CONTROLINTERVALSIZE",
+        "CISZ",
+        "CONTROLAREASIZE",
+        "SHAREOPTIONS",
+        "BUFFERING",
+        "NONRLS",
+        "RLS",
+        "TVS",
+        "REUSE",
+        "NOREUSE",
+        "SPEED",
+        "RECOVERY",
+        "WRITECHECK",
+        "NOWRITECHECK",
+        "ERASE",
+        "NOERASE",
+        "SPANNED",
+        "NOSPANNED",
+        "BLOCKED",
+        "LINE",
+        "INDEXED",
+        "NONINDEXED",
+        "NUMBERED",
+        "LINEAR",
+        "UNIQUEKEY",
+        "DATA",
+        "INDEX",
+        "FREESPACE",
+    ];
+    if matches!(command, "allocate" | "define-cluster" | "define-nonvsam") {
+        return DEFINITION.contains(&operand);
+    }
+    if command == "alter" {
+        return DEFINITION.contains(&operand)
+            || matches!(
+                operand,
+                "NEWNAME"
+                    | "OPEN"
+                    | "CLOSED"
+                    | "RECOVERYREQUIRED"
+                    | "MIGRATE"
+                    | "MIGRATED"
+                    | "RECALL"
+                    | "RECALLPENDING"
+            );
+    }
+    let allowed: &[&str] = match command {
+        "bldindex" => &["INDATASET", "OUTDATASET"],
+        "dcollect" => &["OUTFILE", "OFILE"],
+        "define-alias" => &["NAME", "RELATE"],
+        "define-alternateindex" => &[
+            "NAME",
+            "RELATE",
+            "KEYS",
+            "UNIQUEKEY",
+            "NONUNIQUEKEY",
+            "UPGRADE",
+            "NOUPGRADE",
+            "DATA",
+            "INDEX",
+            "FREESPACE",
+        ],
+        "define-generationdatagroup" => {
+            &["NAME", "LIMIT", "SCRATCH", "NOSCRATCH", "EMPTY", "NOEMPTY"]
+        }
+        "define-path" => &["NAME", "PATHENTRY"],
+        "define-usercatalog" => &["NAME"],
+        "delete" => &["PURGE", "CURRENTDATE"],
+        "diagnose" | "examine" | "listdata" | "verify" => &["INDATASET", "DATASET", "ENTRIES"],
+        "export" | "export-disconnect" => &["ENTRIES", "INDATASET", "OUTFILE", "OFILE"],
+        "import" | "import-connect" => &["INFILE", "IFILE", "OUTDATASET", "INDATASET", "DATASET"],
+        "listcat" => &["ENTRIES", "ENTRY", "LEVEL", "ALL"],
+        "print" => &[
+            "INDATASET",
+            "INFILE",
+            "IFILE",
+            "HEX",
+            "CHAR",
+            "SKIP",
+            "COUNT",
+        ],
+        "repro" => &[
+            "INDATASET",
+            "INFILE",
+            "IFILE",
+            "OUTDATASET",
+            "OUTFILE",
+            "OFILE",
+            "SKIP",
+            "COUNT",
+        ],
+        "recover" => &["INDATASET", "DATASET", "INFILE", "IFILE"],
+        "shcds" => &["DATASET", "TRANSACTION", "COMMIT", "ROLLBACK"],
+        _ => &[],
+    };
+    allowed.contains(&operand)
 }
 
 fn ams_values(statement: &str, name: &str) -> Option<Vec<String>> {
@@ -3342,6 +3718,12 @@ fn ams_values(statement: &str, name: &str) -> Option<Vec<String>> {
             .map(str::to_string)
             .collect(),
     )
+}
+
+fn ams_word(statement: &str, word: &str) -> bool {
+    statement
+        .split(|character: char| !character.is_ascii_alphanumeric())
+        .any(|candidate| candidate == word)
 }
 
 fn ams_u64_values(statement: &str, name: &str) -> Result<Option<Vec<u64>>, HostProblem> {
@@ -3359,6 +3741,156 @@ fn apply_ams_definition_operands(
     statement: &str,
     definition: &mut mainframe_env_host_api::DatasetDefinition,
 ) -> Result<(), HostProblem> {
+    for name in [
+        "LRECL",
+        "BLKSIZE",
+        "BUFNO",
+        "BUFSIZE",
+        "CCSID",
+        "KEYLEN",
+        "KEYOFF",
+        "DIRECTORY",
+        "UNITCOUNT",
+        "CONTROLINTERVALSIZE",
+        "CISZ",
+        "CONTROLAREASIZE",
+        "STRIPECOUNT",
+        "CREATEDATE",
+        "TO",
+        "EXPIRATION",
+        "FOR",
+        "RETPD",
+    ] {
+        if operand(statement, &[name]).is_some() && numeric_operand(statement, name).is_none() {
+            return Err(HostProblem::Malformed);
+        }
+    }
+    for name in ["RECORDSIZE", "KEYS", "SHAREOPTIONS"] {
+        if operand(statement, &[name]).is_some() && pair_operand(statement, name).is_none() {
+            return Err(HostProblem::Malformed);
+        }
+    }
+    let indexed = ams_word(statement, "INDEXED");
+    let nonindexed = ams_word(statement, "NONINDEXED");
+    let numbered = ams_word(statement, "NUMBERED");
+    let linear = ams_word(statement, "LINEAR");
+    if usize::from(operand(statement, &["DSORG"]).is_some())
+        + usize::from(indexed)
+        + usize::from(nonindexed)
+        + usize::from(numbered)
+        + usize::from(linear)
+        > 1
+    {
+        return Err(HostProblem::Malformed);
+    }
+    if let Some(dsorg) = operand(statement, &["DSORG"]) {
+        definition.attributes.organization = match dsorg.as_str() {
+            "PS" => DatasetOrganization::Sequential,
+            "PO" => DatasetOrganization::Partitioned,
+            "PO-E" | "POE" => DatasetOrganization::PartitionedExtended,
+            _ => return Err(HostProblem::Malformed),
+        };
+        definition.allocation.directory_blocks = if matches!(
+            definition.attributes.organization,
+            DatasetOrganization::Partitioned | DatasetOrganization::PartitionedExtended
+        ) {
+            definition.allocation.directory_blocks.max(1)
+        } else {
+            0
+        };
+    }
+    if let Some((minimum, maximum)) = pair_operand(statement, "RECORDSIZE") {
+        definition.attributes.logical_record_length = maximum;
+        definition.attributes.record_format = if minimum == maximum {
+            RecordFormat::Fixed
+        } else {
+            RecordFormat::Variable
+        };
+    }
+    if let Some(value) = numeric_operand(statement, "LRECL") {
+        definition.attributes.logical_record_length = value;
+    }
+    if let Some(recfm) = operand(statement, &["RECFM"]) {
+        definition.attributes.record_format = match recfm.as_str() {
+            "F" => RecordFormat::Fixed,
+            "FB" => RecordFormat::FixedBlocked,
+            "FBS" => RecordFormat::FixedBlockedStandard,
+            "V" => RecordFormat::Variable,
+            "VB" => RecordFormat::VariableBlocked,
+            "VS" => RecordFormat::VariableSpanned,
+            "VBS" => RecordFormat::VariableBlockedSpanned,
+            "U" => RecordFormat::Undefined,
+            "LINE" => RecordFormat::Line,
+            _ => return Err(HostProblem::Malformed),
+        };
+        definition.vsam.spanned = matches!(
+            definition.attributes.record_format,
+            RecordFormat::VariableSpanned | RecordFormat::VariableBlockedSpanned
+        );
+    }
+    if statement.contains(" NOSPANNED") {
+        definition.vsam.spanned = false;
+        definition.attributes.record_format = match definition.attributes.record_format {
+            RecordFormat::VariableSpanned => RecordFormat::Variable,
+            RecordFormat::VariableBlockedSpanned => RecordFormat::VariableBlocked,
+            value => value,
+        };
+    } else if statement.contains(" SPANNED") {
+        definition.vsam.spanned = true;
+        definition.attributes.record_format = match definition.attributes.record_format {
+            RecordFormat::Variable => RecordFormat::VariableSpanned,
+            RecordFormat::VariableBlocked => RecordFormat::VariableBlockedSpanned,
+            value => value,
+        };
+    }
+    if ams_word(statement, "BLOCKED") {
+        definition.attributes.record_format = match definition.attributes.record_format {
+            RecordFormat::Fixed => RecordFormat::FixedBlocked,
+            RecordFormat::Variable => RecordFormat::VariableBlocked,
+            RecordFormat::VariableSpanned => RecordFormat::VariableBlockedSpanned,
+            value => value,
+        };
+    }
+    if ams_word(statement, "LINE") {
+        definition.attributes.record_format = RecordFormat::Line;
+    }
+    if linear {
+        definition.attributes.organization = DatasetOrganization::Linear;
+        definition.attributes.record_format = RecordFormat::Undefined;
+        definition.attributes.key_offset = None;
+        definition.attributes.key_length = None;
+        definition.vsam.spanned = false;
+    } else if numbered {
+        definition.attributes.organization = if matches!(
+            definition.attributes.record_format,
+            RecordFormat::Variable
+                | RecordFormat::VariableBlocked
+                | RecordFormat::VariableSpanned
+                | RecordFormat::VariableBlockedSpanned
+        ) {
+            DatasetOrganization::VariableRelative
+        } else {
+            DatasetOrganization::Relative
+        };
+        definition.attributes.key_offset = None;
+        definition.attributes.key_length = None;
+    } else if nonindexed {
+        definition.attributes.organization = DatasetOrganization::EntrySequenced;
+        definition.attributes.key_offset = None;
+        definition.attributes.key_length = None;
+    } else if indexed {
+        definition.attributes.organization = DatasetOrganization::KeySequenced;
+    }
+    if let Some((length, offset)) = pair_operand(statement, "KEYS") {
+        definition.attributes.key_length = Some(length);
+        definition.attributes.key_offset = Some(offset);
+    }
+    if let Some(value) = numeric_operand(statement, "KEYLEN") {
+        definition.attributes.key_length = Some(value);
+    }
+    if let Some(value) = numeric_operand(statement, "KEYOFF") {
+        definition.attributes.key_offset = Some(value);
+    }
     if let Some(value) = numeric_operand(statement, "BLKSIZE") {
         definition.dcb.block_size = value;
     }
@@ -3371,7 +3903,59 @@ fn apply_ams_definition_operands(
         definition.attributes.ccsid =
             Some(u16::try_from(value).map_err(|_| HostProblem::Malformed)?);
     }
+    definition.vsam.control_interval_size = operand(statement, &["CONTROLINTERVALSIZE", "CISZ"])
+        .map(|value| value.parse().map_err(|_| HostProblem::Malformed))
+        .transpose()?
+        .or(definition.vsam.control_interval_size);
+    definition.vsam.control_area_size = operand(statement, &["CONTROLAREASIZE"])
+        .map(|value| value.parse().map_err(|_| HostProblem::Malformed))
+        .transpose()?
+        .or(definition.vsam.control_area_size);
+    if let Some((cross_region, cross_system)) = pair_operand(statement, "SHAREOPTIONS") {
+        definition.vsam.share_options = mainframe_env_host_api::DatasetShareOptions {
+            cross_region: u8::try_from(cross_region).map_err(|_| HostProblem::Malformed)?,
+            cross_system: u8::try_from(cross_system).map_err(|_| HostProblem::Malformed)?,
+        };
+    }
+    if let Some(buffering) = operand(statement, &["BUFFERING"]) {
+        definition.vsam.buffering = match buffering.as_str() {
+            "SYSTEM" => mainframe_env_host_api::BufferingMode::System,
+            "NSR" => mainframe_env_host_api::BufferingMode::NonsharedResources,
+            "LSR" => mainframe_env_host_api::BufferingMode::LocalSharedResources,
+            "GSR" => mainframe_env_host_api::BufferingMode::GlobalSharedResources,
+            _ => return Err(HostProblem::Malformed),
+        };
+    }
+    if statement.contains(" NONRLS") {
+        definition.vsam.access_mode = mainframe_env_host_api::VsamAccessMode::NonRls;
+    } else if statement.contains(" TVS") {
+        definition.vsam.access_mode = mainframe_env_host_api::VsamAccessMode::Tvs;
+    } else if statement.contains(" RLS") {
+        definition.vsam.access_mode = mainframe_env_host_api::VsamAccessMode::Rls;
+    }
+    if statement.contains(" NOREUSE") {
+        definition.vsam.reuse = false;
+    } else if statement.contains(" REUSE") {
+        definition.vsam.reuse = true;
+    }
+    if statement.contains(" RECOVERY") {
+        definition.vsam.speed = false;
+    } else if statement.contains(" SPEED") {
+        definition.vsam.speed = true;
+    }
+    if statement.contains(" NOWRITECHECK") {
+        definition.vsam.write_check = false;
+    } else if statement.contains(" WRITECHECK") {
+        definition.vsam.write_check = true;
+    }
+    if statement.contains(" NOERASE") {
+        definition.vsam.erase_on_delete = false;
+    } else if statement.contains(" ERASE") {
+        definition.vsam.erase_on_delete = true;
+    }
 
+    let nested_space = operand(statement, &["SPACE"]).is_some();
+    let mut applied_space = false;
     for (operand_name, unit) in [
         ("TRACKS", mainframe_env_host_api::SpaceUnit::Tracks),
         ("CYLINDERS", mainframe_env_host_api::SpaceUnit::Cylinders),
@@ -3387,24 +3971,42 @@ fn apply_ams_definition_operands(
             definition.allocation.unit = unit;
             definition.allocation.primary = values[0];
             definition.allocation.secondary = values.get(1).copied().unwrap_or(0);
+            applied_space = true;
         }
     }
     if let Some(value) =
         ams_u64_values(statement, "PRIMARY")?.and_then(|values| values.first().copied())
     {
         definition.allocation.primary = value;
+        applied_space = true;
     }
     if let Some(value) =
         ams_u64_values(statement, "SECONDARY")?.and_then(|values| values.first().copied())
     {
         definition.allocation.secondary = value;
+        applied_space = true;
+    }
+    if nested_space && !applied_space {
+        return Err(HostProblem::Malformed);
     }
     if let Some(value) = numeric_operand(statement, "DIRECTORY") {
         definition.allocation.directory_blocks = value;
     }
-    definition.allocation.release_unused = statement.contains(" RLSE");
-    definition.allocation.contiguous = statement.contains(" CONTIG");
-    definition.allocation.round_to_cylinder = statement.contains(" ROUND");
+    if statement.contains(" NORLSE") {
+        definition.allocation.release_unused = false;
+    } else if statement.contains(" RLSE") {
+        definition.allocation.release_unused = true;
+    }
+    if statement.contains(" NOCONTIG") {
+        definition.allocation.contiguous = false;
+    } else if statement.contains(" CONTIG") {
+        definition.allocation.contiguous = true;
+    }
+    if statement.contains(" NOROUND") {
+        definition.allocation.round_to_cylinder = false;
+    } else if statement.contains(" ROUND") {
+        definition.allocation.round_to_cylinder = true;
+    }
 
     if let Some(volumes) =
         ams_values(statement, "VOLUMES").or_else(|| ams_values(statement, "VOLUME"))
@@ -3414,10 +4016,38 @@ fn apply_ams_definition_operands(
         }
         definition.volumes.volume_ids = volumes;
     }
-    if let Some(value) =
-        numeric_operand(statement, "UNITCOUNT").or_else(|| numeric_operand(statement, "UNIT"))
-    {
+    if statement.contains(" TAPE") {
+        definition.volumes.kind = mainframe_env_host_api::VolumeKind::Tape;
+        definition.volumes.device_type =
+            operand(statement, &["TAPE"]).or_else(|| Some("TAPE".into()));
+    }
+    if let Some(value) = numeric_operand(statement, "UNITCOUNT") {
         definition.volumes.unit_count = u16::try_from(value).map_err(|_| HostProblem::Malformed)?;
+    } else if let Some(unit) = ams_values(statement, "UNIT") {
+        if unit.is_empty() || unit.len() > 2 {
+            return Err(HostProblem::Malformed);
+        }
+        if unit.len() == 1
+            && unit[0]
+                .parse::<u16>()
+                .is_ok_and(|count| (1..=255).contains(&count))
+        {
+            definition.volumes.unit_count = unit[0].parse().map_err(|_| HostProblem::Malformed)?;
+        } else {
+            definition.volumes.device_type = Some(unit[0].clone());
+            definition.volumes.kind = if definition.volumes.kind
+                == mainframe_env_host_api::VolumeKind::Tape
+                || unit[0].contains("TAPE")
+            {
+                mainframe_env_host_api::VolumeKind::Tape
+            } else {
+                mainframe_env_host_api::VolumeKind::PhysicalDisk
+            };
+            if let Some(count) = unit.get(1) {
+                definition.volumes.unit_count =
+                    count.parse().map_err(|_| HostProblem::Malformed)?;
+            }
+        }
     }
 
     definition.sms.data_class =
@@ -3426,22 +4056,76 @@ fn apply_ams_definition_operands(
         operand(statement, &["MGMTCLAS"]).or(definition.sms.management_class.take());
     definition.sms.storage_class =
         operand(statement, &["STORCLAS"]).or(definition.sms.storage_class.take());
-    definition.sms.guaranteed_space = statement.contains(" GUARANTEEDSPACE");
-    definition.sms.extended_format = statement.contains(" EXTENDED");
-    definition.sms.extended_addressable = statement.contains(" EXTENDEDADDRESSABLE");
+    definition.sms.acs_routine =
+        operand(statement, &["ACSROUTINE"]).or(definition.sms.acs_routine.take());
+    if statement.contains(" NOGUARANTEEDSPACE") {
+        definition.sms.guaranteed_space = false;
+    } else if statement.contains(" GUARANTEEDSPACE") {
+        definition.sms.guaranteed_space = true;
+    }
+    if statement.contains(" NOEXTENDEDADDRESSABLE") {
+        definition.sms.extended_addressable = false;
+    } else if statement.contains(" EXTENDEDADDRESSABLE") {
+        definition.sms.extended_addressable = true;
+    }
+    if statement.contains(" NOEXTENDED") {
+        definition.sms.extended_format = false;
+    } else if statement.contains(" EXTENDED") {
+        definition.sms.extended_format = true;
+    }
+    if statement.contains(" NOCOMPRESS") {
+        definition.security.compression = mainframe_env_host_api::CompressionMode::None;
+    } else if let Some(compression) = operand(statement, &["COMPRESS"]) {
+        definition.security.compression = match compression.as_str() {
+            "GENERIC" => mainframe_env_host_api::CompressionMode::Generic,
+            "TAILORED" => mainframe_env_host_api::CompressionMode::Tailored,
+            _ => return Err(HostProblem::Malformed),
+        };
+    } else if statement.contains(" COMPRESS") {
+        definition.security.compression = mainframe_env_host_api::CompressionMode::Generic;
+    }
+    definition.security.encryption_key_label =
+        operand(statement, &["KEYLABEL"]).or(definition.security.encryption_key_label.take());
+    if let Some(value) = numeric_operand(statement, "STRIPECOUNT") {
+        definition.vsam.stripe_count = u16::try_from(value).map_err(|_| HostProblem::Malformed)?;
+    }
 
     if let Some(catalog) = operand(statement, &["CATALOG"]) {
         definition.catalog.catalog = Some(dataset_name(&catalog)?);
     }
     definition.catalog.owner = operand(statement, &["OWNER"]).or(definition.catalog.owner.take());
+    if let Some(entry_type) = operand(statement, &["ENTRYTYPE"]) {
+        definition.catalog.entry_kind = match entry_type.as_str() {
+            "DATASET" | "NONVSAM" | "CLUSTER" => mainframe_env_host_api::CatalogEntryKind::Dataset,
+            "ALTERNATEINDEX" => mainframe_env_host_api::CatalogEntryKind::AlternateIndex,
+            "PATH" => mainframe_env_host_api::CatalogEntryKind::Path,
+            "ALIAS" => mainframe_env_host_api::CatalogEntryKind::Alias,
+            "GENERATIONDATAGROUP" => mainframe_env_host_api::CatalogEntryKind::GenerationDataGroup,
+            "USERCATALOG" => mainframe_env_host_api::CatalogEntryKind::UserCatalog,
+            "MASTERCATALOG" => mainframe_env_host_api::CatalogEntryKind::MasterCatalog,
+            "LIBRARY" => mainframe_env_host_api::CatalogEntryKind::Library,
+            "VOLUME" => mainframe_env_host_api::CatalogEntryKind::Volume,
+            "PAGESPACE" => mainframe_env_host_api::CatalogEntryKind::PageSpace,
+            _ => return Err(HostProblem::Malformed),
+        };
+    }
     definition.catalog.creation_date =
         numeric_operand(statement, "CREATEDATE").or(definition.catalog.creation_date);
-    definition.catalog.retention_days = numeric_operand(statement, "RETPD")
-        .map(|value| u16::try_from(value).map_err(|_| HostProblem::Malformed))
-        .transpose()?
-        .or(definition.catalog.retention_days);
-    definition.catalog.expiration_date =
-        numeric_operand(statement, "EXPIRATION").or(definition.catalog.expiration_date);
+    let expiration =
+        numeric_operand(statement, "TO").or_else(|| numeric_operand(statement, "EXPIRATION"));
+    let retention =
+        numeric_operand(statement, "FOR").or_else(|| numeric_operand(statement, "RETPD"));
+    if expiration.is_some() && retention.is_some() {
+        return Err(HostProblem::Malformed);
+    }
+    if let Some(expiration) = expiration {
+        definition.catalog.expiration_date = Some(expiration);
+        definition.catalog.retention_days = None;
+    } else if let Some(retention) = retention {
+        definition.catalog.retention_days =
+            Some(u16::try_from(retention).map_err(|_| HostProblem::Malformed)?);
+        definition.catalog.expiration_date = None;
+    }
     Ok(())
 }
 
@@ -3456,91 +4140,64 @@ fn ams_target(command: &AmsCommand) -> Result<DatasetName, HostProblem> {
     dataset_name(&value)
 }
 
-fn encode_ams_snapshot_header(
+fn encode_ams_snapshot(
     dataset: &DatasetName,
-    attributes: &DatasetAttributes,
-    records: &[Vec<u8>],
-) -> String {
-    let core = format!(
-        "MEAMS1|{}|{}|{}|{}|{}|{}|{}",
-        dataset.as_str(),
-        ams_org_tag(attributes.organization),
-        ams_recfm_tag(attributes.record_format),
-        attributes.logical_record_length,
-        attributes
-            .key_offset
-            .map_or_else(|| "-".into(), |value| value.to_string()),
-        attributes
-            .key_length
-            .map_or_else(|| "-".into(), |value| value.to_string()),
-        attributes
-            .ccsid
-            .map_or_else(|| "-".into(), |value| value.to_string()),
+    snapshot: &mainframe_env_host_api::DatasetSnapshot,
+) -> Result<Vec<Vec<u8>>, HostProblem> {
+    let manifest = serde_json::to_vec(snapshot).map_err(|_| HostProblem::InfrastructureFailure)?;
+    let chunks = manifest.chunks(192).map(<[u8]>::to_vec).collect::<Vec<_>>();
+    if chunks.is_empty() || chunks.len() > 4_096 {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let core = format!("MEAMS2|{}|{}", dataset.as_str(), chunks.len());
+    let header = format!(
+        "{core}|{}",
+        ams_definition_snapshot_digest(&core, &manifest, &[])
+    )
+    .into_bytes();
+    let mut encoded = Vec::with_capacity(
+        1usize
+            .checked_add(chunks.len())
+            .ok_or(HostProblem::ResourceExhausted)?,
     );
-    format!("{core}|{}", ams_snapshot_digest(&core, records))
+    encoded.push(header);
+    encoded.extend(chunks);
+    Ok(encoded)
 }
 
-fn decode_ams_snapshot_header(
+fn decode_ams_snapshot(
     header: &str,
-    records: &[Vec<u8>],
-) -> Result<(DatasetName, DatasetAttributes), HostProblem> {
+    records: &mut Vec<Vec<u8>>,
+) -> Result<(DatasetName, mainframe_env_host_api::DatasetSnapshot), HostProblem> {
     let fields = header.split('|').collect::<Vec<_>>();
-    if fields.len() != 9 || fields[0] != "MEAMS1" {
+    if fields.len() != 4 || fields[0] != "MEAMS2" {
         return Err(HostProblem::Malformed);
     }
-    let core = fields[..8].join("|");
-    if fields[8] != ams_snapshot_digest(&core, records) {
+    let chunk_count = fields[2]
+        .parse::<usize>()
+        .map_err(|_| HostProblem::Malformed)?;
+    if chunk_count == 0 || chunk_count > 4_096 || records.len() < chunk_count {
+        return Err(HostProblem::Malformed);
+    }
+    let manifest_chunks = records.drain(..chunk_count).collect::<Vec<_>>();
+    let manifest_length = manifest_chunks.iter().try_fold(0usize, |total, chunk| {
+        total
+            .checked_add(chunk.len())
+            .ok_or(HostProblem::ResourceExhausted)
+    })?;
+    let mut manifest = Vec::with_capacity(manifest_length);
+    for chunk in manifest_chunks {
+        manifest.extend_from_slice(&chunk);
+    }
+    if !records.is_empty() {
+        return Err(HostProblem::Malformed);
+    }
+    let core = fields[..3].join("|");
+    if fields[3] != ams_definition_snapshot_digest(&core, &manifest, &[]) {
         return Err(HostProblem::IdempotencyConflict);
     }
-    let organization = match fields[2] {
-        "PS" => DatasetOrganization::Sequential,
-        "PDS" => DatasetOrganization::Partitioned,
-        "PDSE" => DatasetOrganization::PartitionedExtended,
-        "KSDS" => DatasetOrganization::KeySequenced,
-        "ESDS" => DatasetOrganization::EntrySequenced,
-        "RRDS" => DatasetOrganization::Relative,
-        "VRRDS" => DatasetOrganization::VariableRelative,
-        "LDS" => DatasetOrganization::Linear,
-        _ => return Err(HostProblem::Malformed),
-    };
-    let record_format = match fields[3] {
-        "F" => RecordFormat::Fixed,
-        "FB" => RecordFormat::FixedBlocked,
-        "FBS" => RecordFormat::FixedBlockedStandard,
-        "V" => RecordFormat::Variable,
-        "VB" => RecordFormat::VariableBlocked,
-        "VS" => RecordFormat::VariableSpanned,
-        "VBS" => RecordFormat::VariableBlockedSpanned,
-        "U" => RecordFormat::Undefined,
-        "LINE" => RecordFormat::Line,
-        _ => return Err(HostProblem::Malformed),
-    };
-    let optional_u32 = |value: &str| {
-        if value == "-" {
-            Ok(None)
-        } else {
-            value
-                .parse::<u32>()
-                .map(Some)
-                .map_err(|_| HostProblem::Malformed)
-        }
-    };
-    let ccsid = if fields[7] == "-" {
-        None
-    } else {
-        Some(fields[7].parse().map_err(|_| HostProblem::Malformed)?)
-    };
-    Ok((
-        dataset_name(fields[1])?,
-        DatasetAttributes {
-            organization,
-            record_format,
-            logical_record_length: fields[4].parse().map_err(|_| HostProblem::Malformed)?,
-            key_offset: optional_u32(fields[5])?,
-            key_length: optional_u32(fields[6])?,
-            ccsid,
-        },
-    ))
+    let snapshot = serde_json::from_slice(&manifest).map_err(|_| HostProblem::Malformed)?;
+    Ok((dataset_name(fields[1])?, snapshot))
 }
 
 fn ams_snapshot_digest(core: &str, records: &[Vec<u8>]) -> String {
@@ -3556,31 +4213,19 @@ fn ams_snapshot_digest(core: &str, records: &[Vec<u8>]) -> String {
     format!("sha256:{:x}", digest.finalize())
 }
 
-const fn ams_org_tag(organization: DatasetOrganization) -> &'static str {
-    match organization {
-        DatasetOrganization::Sequential => "PS",
-        DatasetOrganization::Partitioned => "PDS",
-        DatasetOrganization::PartitionedExtended => "PDSE",
-        DatasetOrganization::KeySequenced => "KSDS",
-        DatasetOrganization::EntrySequenced => "ESDS",
-        DatasetOrganization::Relative => "RRDS",
-        DatasetOrganization::VariableRelative => "VRRDS",
-        DatasetOrganization::Linear => "LDS",
+fn ams_definition_snapshot_digest(core: &str, manifest: &[u8], records: &[Vec<u8>]) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"mainframe-env.ams-definition-snapshot@2");
+    digest.update((core.len() as u64).to_be_bytes());
+    digest.update(core.as_bytes());
+    digest.update((manifest.len() as u64).to_be_bytes());
+    digest.update(manifest);
+    digest.update((records.len() as u64).to_be_bytes());
+    for record in records {
+        digest.update((record.len() as u64).to_be_bytes());
+        digest.update(record);
     }
-}
-
-const fn ams_recfm_tag(record_format: RecordFormat) -> &'static str {
-    match record_format {
-        RecordFormat::Fixed => "F",
-        RecordFormat::FixedBlocked => "FB",
-        RecordFormat::FixedBlockedStandard => "FBS",
-        RecordFormat::Variable => "V",
-        RecordFormat::VariableBlocked => "VB",
-        RecordFormat::VariableSpanned => "VS",
-        RecordFormat::VariableBlockedSpanned => "VBS",
-        RecordFormat::Undefined => "U",
-        RecordFormat::Line => "LINE",
-    }
+    format!("sha256:{:x}", digest.finalize())
 }
 
 fn hex_bytes(bytes: &[u8]) -> String {
@@ -4639,7 +5284,7 @@ mod tests {
             .submit(
                 &invocation,
                 &JclBundle {
-                    primary: "//AMSJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//INPUT DD DSN=IBMUSER.INPUT,DISP=SHR\n//OUTPUT DD DSN=IBMUSER.TARGET,DISP=OLD\n//SYSIN DD *\n DELETE IBMUSER.TARGET\n IF MAXCC LE 08 THEN SET MAXCC = 0\n DEFINE CLUSTER (NAME(IBMUSER.TARGET) NONINDEXED RECORDSIZE(6 6))\n REPRO INFILE(INPUT) OUTFILE(OUTPUT)\n/*\n".into(),
+                    primary: "//AMSJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//INPUT DD DSN=IBMUSER.INPUT,DISP=SHR\n//OUTPUT DD DSN=IBMUSER.TARGET,DISP=OLD\n//SYSIN DD *\n DELETE IBMUSER.TARGET\n IF MAXCC LE 08 THEN SET MAXCC = 0\n DEFINE CLUSTER (NAME(IBMUSER.TARGET) NONINDEXED RECORDSIZE(6 6))\n REPRO INFILE(INPUT) OUTFILE(OUTPUT) SKIP(1) COUNT(1)\n/*\n".into(),
                     ..Default::default()
                 },
                 &IdempotencyKey::new("idcams-mutations", InvocationLimits::default()).unwrap(),
@@ -4652,7 +5297,7 @@ mod tests {
         );
         assert_eq!(
             records.lock().unwrap()["IBMUSER.TARGET"],
-            vec![b"FIRST".to_vec(), b"SECOND".to_vec()]
+            vec![b"SECOND".to_vec()]
         );
     }
 
@@ -4665,7 +5310,7 @@ mod tests {
             .submit(
                 &invocation,
                 &JclBundle {
-                    primary: "//AMSJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//OUT DD DSN=USER.COLLECT,DISP=OLD\n//SYSIN DD *\n ALLOCATE DATASET(USER.PS) RECORDSIZE(80 80) TRACKS(2 1) CONTIG ROUND BUFNO(3) BUFSIZE(128) DATACLAS(STD) MGMTCLAS(ACT) STORCLAS(ABS) EXTENDED EXTENDEDADDRESSABLE VOLUMES(VOLA VOLB) UNIT(2) OWNER(IBMUSER) CREATEDATE(2026001) RETPD(30)\n ALTER USER.PS OPEN\n DEFINE CLUSTER (NAME(USER.KSDS) INDEXED KEYS(2 0) RECORDSIZE(4 4))\n DEFINE NONVSAM (NAME(USER.NV) RECORDSIZE(16 32))\n DEFINE USERCATALOG (NAME(USER.CAT))\n DEFINE ALIAS (NAME(USER.CATALIAS) RELATE(USER.CAT))\n DIAGNOSE USER.PS\n EXAMINE USER.KSDS\n LISTDATA USER.PS\n PRINT INDATASET(USER.PS)\n VERIFY USER.PS\n LISTCAT\n DCOLLECT OUTFILE(OUT)\n/*\n".into(),
+                    primary: "//AMSJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//OUT DD DSN=USER.COLLECT,DISP=OLD\n//SYSIN DD *\n ALLOCATE DATASET(USER.PS) RECORDSIZE(80 80) SPACE(TRACKS(2 1)) CONTIG ROUND BUFNO(3) BUFSIZE(128) DATACLAS(STD) MGMTCLAS(ACT) STORCLAS(ABS) EXTENDED EXTENDEDADDRESSABLE VOLUMES(VOLA VOLB) UNIT(2) OWNER(IBMUSER) CREATEDATE(2026001) RETPD(30)\n ALTER USER.PS OPEN\n ALTER USER.PS BUFNO(4)\n DEFINE CLUSTER (NAME(USER.KSDS) INDEXED KEYS(2 0) RECORDSIZE(4 4))\n DEFINE NONVSAM (NAME(USER.NV) RECORDSIZE(16 32))\n DEFINE USERCATALOG (NAME(USER.CAT))\n DEFINE ALIAS (NAME(USER.CATALIAS) RELATE(USER.CAT))\n DIAGNOSE USER.PS\n EXAMINE USER.KSDS\n LISTDATA USER.PS\n PRINT INDATASET(USER.PS)\n VERIFY USER.PS\n LISTCAT\n DCOLLECT OUTFILE(OUT)\n/*\n".into(),
                     ..Default::default()
                 },
                 &IdempotencyKey::new("ams-generated-handlers", InvocationLimits::default())
@@ -4687,7 +5332,7 @@ mod tests {
                     && description.allocated_bytes == 849_960
                     && description.extents.len() == 1
                     && description.extents[0].volume_id == "VOLA"
-                    && description.buffer_bytes == 384
+                    && description.buffer_bytes == 512
                     && description.max_rba == u64::MAX
                     && description.definition.catalog.owner.as_deref() == Some("IBMUSER")
                     && description.definition.catalog.creation_date == Some(2_026_001)
@@ -4710,7 +5355,13 @@ mod tests {
                 max_records: 64,
             }),
             Ok(DatasetResult::Records { records, .. })
-                if records.iter().any(|record| record.starts_with(b"USER.PS|"))
+                if records.iter().any(|record| {
+                    let record = String::from_utf8_lossy(record);
+                    record.starts_with("USER.PS|")
+                        && record.contains("VOLUMES=VOLA,VOLB")
+                        && record.contains("EXTENTS=0:0:0:849960:VOLA")
+                        && record.contains("LIFECYCLE=Open")
+                }) && records.iter().any(|record| record.starts_with(b"VOLUME|VOLA|"))
         ));
         assert!(
             service
@@ -4719,6 +5370,167 @@ mod tests {
                 .0
                 .iter()
                 .any(|record| String::from_utf8_lossy(record).contains("LISTDATA"))
+        );
+        let syprint = service.spool(&submitted.id, "SYSPRINT", 0, 64).unwrap().0;
+        assert!(syprint.iter().any(|record| {
+            let record = String::from_utf8_lossy(record);
+            record.contains("USER.CAT") && record.contains("UserCatalog")
+        }));
+        assert!(syprint.iter().any(|record| {
+            let record = String::from_utf8_lossy(record);
+            record.contains("USER.CATALIAS") && record.contains("Alias")
+        }));
+    }
+
+    #[test]
+    fn ams_expiration_forms_are_unambiguous_and_replace_each_other() {
+        let mut definition =
+            mainframe_env_host_api::DatasetDefinition::compatibility(DatasetAttributes {
+                organization: DatasetOrganization::Sequential,
+                record_format: RecordFormat::Fixed,
+                logical_record_length: 80,
+                key_offset: None,
+                key_length: None,
+                ccsid: Some(37),
+            });
+        apply_ams_definition_operands("ALTER USER.A FOR(30)", &mut definition).unwrap();
+        assert_eq!(definition.catalog.retention_days, Some(30));
+        assert_eq!(definition.catalog.expiration_date, None);
+        apply_ams_definition_operands("ALTER USER.A TO(2026100)", &mut definition).unwrap();
+        assert_eq!(definition.catalog.retention_days, None);
+        assert_eq!(definition.catalog.expiration_date, Some(2_026_100));
+        assert_eq!(
+            apply_ams_definition_operands("ALTER USER.A TO(2026200) RETPD(10)", &mut definition,),
+            Err(HostProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn ams_dcb_access_and_capability_operands_populate_typed_definition() {
+        let mut definition =
+            mainframe_env_host_api::DatasetDefinition::compatibility(DatasetAttributes {
+                organization: DatasetOrganization::KeySequenced,
+                record_format: RecordFormat::Variable,
+                logical_record_length: 80,
+                key_offset: Some(0),
+                key_length: Some(2),
+                ccsid: Some(37),
+            });
+        apply_ams_definition_operands(
+            "ALTER USER.A RECFM(VBS) LRECL(512) BLKSIZE(1024) KEYLEN(4) KEYOFF(8) \
+             BUFNO(7) BUFSIZE(2048) BUFFERING(LSR) CONTROLINTERVALSIZE(4096) \
+             CONTROLAREASIZE(65536) SHAREOPTIONS(2 3) RLS REUSE SPEED WRITECHECK ERASE \
+             ACSROUTINE(STANDARD) COMPRESS(TAILORED) KEYLABEL(KEY.ONE) STRIPECOUNT(2) \
+             UNIT(3390 2) ENTRYTYPE(DATASET)",
+            &mut definition,
+        )
+        .unwrap();
+        assert_eq!(
+            definition.attributes.record_format,
+            RecordFormat::VariableBlockedSpanned
+        );
+        assert_eq!(definition.attributes.logical_record_length, 512);
+        assert_eq!(definition.attributes.key_length, Some(4));
+        assert_eq!(definition.attributes.key_offset, Some(8));
+        assert_eq!(definition.dcb.block_size, 1024);
+        assert_eq!(definition.dcb.buffer_count, 7);
+        assert_eq!(definition.dcb.buffer_size, Some(2048));
+        assert_eq!(
+            definition.vsam.buffering,
+            mainframe_env_host_api::BufferingMode::LocalSharedResources
+        );
+        assert_eq!(definition.vsam.control_interval_size, Some(4096));
+        assert_eq!(definition.vsam.control_area_size, Some(65_536));
+        assert_eq!(definition.vsam.share_options.cross_region, 2);
+        assert_eq!(
+            definition.vsam.access_mode,
+            mainframe_env_host_api::VsamAccessMode::Rls
+        );
+        assert!(
+            definition.vsam.spanned
+                && definition.vsam.reuse
+                && definition.vsam.speed
+                && definition.vsam.write_check
+                && definition.vsam.erase_on_delete
+        );
+        assert_eq!(definition.sms.acs_routine.as_deref(), Some("STANDARD"));
+        assert_eq!(
+            definition.security.compression,
+            mainframe_env_host_api::CompressionMode::Tailored
+        );
+        assert_eq!(
+            definition.security.encryption_key_label.as_deref(),
+            Some("KEY.ONE")
+        );
+        assert_eq!(definition.vsam.stripe_count, 2);
+        assert_eq!(
+            definition.volumes.kind,
+            mainframe_env_host_api::VolumeKind::PhysicalDisk
+        );
+        assert_eq!(definition.volumes.device_type.as_deref(), Some("3390"));
+        assert_eq!(definition.volumes.unit_count, 2);
+
+        let mut partitioned =
+            mainframe_env_host_api::DatasetDefinition::compatibility(DatasetAttributes {
+                organization: DatasetOrganization::Sequential,
+                record_format: RecordFormat::Fixed,
+                logical_record_length: 80,
+                key_offset: None,
+                key_length: None,
+                ccsid: Some(37),
+            });
+        apply_ams_definition_operands(
+            "ALLOCATE DATASET(USER.PDS) DSORG(PO) RECFM(FBS) LRECL(80) DIRECTORY(3)",
+            &mut partitioned,
+        )
+        .unwrap();
+        assert_eq!(
+            partitioned.attributes.organization,
+            DatasetOrganization::Partitioned
+        );
+        assert_eq!(
+            partitioned.attributes.record_format,
+            RecordFormat::FixedBlockedStandard
+        );
+        assert_eq!(partitioned.allocation.directory_blocks, 3);
+    }
+
+    #[test]
+    fn idcams_print_reads_dd_input_and_preserves_hex_bytes() {
+        let (service, dataset) = service_with_real_datasets();
+        seed_real_dataset(
+            &dataset,
+            "USER.PRINTIN",
+            vec![vec![0x00, 0x41, 0xff], vec![0x10, 0x20]],
+            510,
+        );
+        let invocation = invocation();
+        let job = service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//PRTJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//IN DD DSN=USER.PRINTIN,DISP=SHR\n//SYSIN DD *\n PRINT INFILE(IN) HEX SKIP(1) COUNT(1)\n/*\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("ams-print-infile", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service
+                .run_next(&invocation, false)
+                .unwrap()
+                .unwrap()
+                .return_code,
+            Some(0)
+        );
+        assert!(
+            service
+                .spool(&job.id, "SYSPRINT", 0, 8)
+                .unwrap()
+                .0
+                .iter()
+                .any(|record| record == b"1020")
         );
     }
 
@@ -4732,6 +5544,15 @@ mod tests {
             520,
         );
         seed_real_dataset(&dataset, "USER.SNAPSHOT", Vec::new(), 522);
+        let DatasetResult::Description(source_description) = dataset
+            .invoke(DatasetRequest::Describe {
+                dataset: DatasetName::new("USER.SOURCE", 128).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("expected source description");
+        };
+        let source_definition = source_description.definition;
         let invocation = invocation();
         service
             .submit(
@@ -4748,6 +5569,14 @@ mod tests {
             service.run_next(&invocation, false).unwrap().unwrap().state,
             JobState::Completed
         );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Describe {
+                dataset: DatasetName::new("USER.SOURCE", 128).unwrap(),
+            }),
+            Ok(DatasetResult::Description(ref description))
+                if description.version == 3
+                    && description.definition.lifecycle.backup_generation == 1
+        ));
         service
             .submit(
                 &invocation,
@@ -4772,6 +5601,13 @@ mod tests {
             }),
             Ok(DatasetResult::Records { records, .. })
                 if records == [b"FIRST".to_vec(), b"SECOND".to_vec()]
+        ));
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Describe {
+                dataset: DatasetName::new("USER.RESTORED", 128).unwrap(),
+            }),
+            Ok(DatasetResult::Description(ref description))
+                if description.definition == source_definition
         ));
         service
             .submit(
@@ -4846,7 +5682,7 @@ mod tests {
             .submit(
                 &invocation,
                 &JclBundle {
-                    primary: "//CAPJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//SYSIN DD *\n ALTER LIBRARYENTRY NAME(LIB)\n ALTER VOLUMEENTRY NAME(VOL001)\n CREATE LIBRARYENTRY NAME(LIB)\n CREATE VOLUMEENTRY NAME(VOL001)\n DEFINE PAGESPACE (NAME(PAGE.ONE))\n SETCACHE NAME(VOL001)\n/*\n".into(),
+                    primary: "//CAPJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//SYSIN DD *\n ALTER LIBRARYENTRY NAME(LIB)\n ALTER VOLUMEENTRY NAME(VOL001)\n CREATE LIBRARYENTRY NAME(LIB)\n CREATE VOLUMEENTRY NAME(VOL001)\n DEFINE PAGESPACE (NAME(PAGE.ONE))\n SETCACHE NAME(VOL001)\n ALLOCATE DATASET(USER.PHYS) UNIT(3390)\n ALLOCATE DATASET(USER.TAPE) TAPE UNIT(3490)\n ALLOCATE DATASET(USER.ACS) ACSROUTINE(STANDARD)\n ALLOCATE DATASET(USER.COMP) COMPRESS(GENERIC)\n ALLOCATE DATASET(USER.UNKNOWN) FROBULATE(1)\n DEFINE CLUSTER (NAME(USER.REUSE) INDEXED KEYS(2 0) RECORDSIZE(4 4) REUSE)\n DEFINE CLUSTER (NAME(USER.COMPNT) INDEXED KEYS(2 0) RECORDSIZE(4 4) DATA(RECORDSIZE(4 4)))\n ALTER USER.A MIGRATE\n ALTER USER.A OPEN BUFNO(8)\n/*\n".into(),
                     ..Default::default()
                 },
                 &IdempotencyKey::new("ams-capabilities", InvocationLimits::default()).unwrap(),
@@ -4868,6 +5704,22 @@ mod tests {
             assert!(syprint.iter().any(|record| {
                 let record = String::from_utf8_lossy(record);
                 record.contains(label) && record.contains("UnsupportedCapability")
+            }));
+        }
+        for capability in [
+            "physical-volumes",
+            "tape",
+            "sms-acs",
+            "compression",
+            "vsam-data-options",
+            "vsam-components",
+            "migration-recall",
+            "ams-combined-alter",
+            "ams-operand",
+        ] {
+            assert!(syprint.iter().any(|record| {
+                let record = String::from_utf8_lossy(record);
+                record.contains("UnsupportedCapability") && record.contains(capability)
             }));
         }
     }

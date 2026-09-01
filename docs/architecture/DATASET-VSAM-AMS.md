@@ -91,7 +91,11 @@ buffer byte count. SMS class names, guaranteed-space, extended format,
 extended addressability, and abstract unit count feed a stable placement
 identity; guaranteed space rejects an over-limit definition before publication.
 Explicit volume names remain abstract placement labels unless a physical-volume
-adapter is declared.
+adapter is declared. The provider also derives one sorted `ListVolumes` VTOC
+view: every extent carries both its dataset-logical start and deterministic
+volume-relative start. Guaranteed allocations reserve aggregate per-volume
+capacity before publication; non-guaranteed abstract allocations remain an
+explicitly overcommittable model rather than a physical-space claim.
 
 ## Organization and access model
 
@@ -155,8 +159,10 @@ the dataset definition, and finally the connected master catalog. Resolution
 returns the requested name, resolved name, selected catalog, bounded alias
 chain, and maximum participating version. Disconnected catalogs fail with an
 exact catalog condition; they do not silently fall through to another catalog.
-Dataset catalog owners are enforced against the invocation principal. Creation,
-expiration, and retained-day metadata persist in MEDS6. Non-purge delete must
+Dataset catalog owners are enforced against the invocation principal for every
+existing-dataset mutation, including record, member, lifecycle, lock, backup,
+restore, rename, AIX-build, and TVS paths. Creation, expiration, and retained-day
+metadata persist in MEDS6. Non-purge delete must
 supply a valid current Julian date and fails `PROTECTED` before expiry; PURGE
 still requires the owner and is explicit in the request digest.
 
@@ -197,8 +203,20 @@ transition rather than a no-op. `UPGRADE` and `NOUPGRADE` are represented in
 typed `MEAIX4` state: upgrading indexes are atomically rebuilt with base
 mutation, while non-upgrading indexes retain their materialized identity map
 until `BLDINDEX`. Export/import uses a bounded provider-neutral header followed
-by exact records and never exposes the provider codec. Export-disconnect/
-import-connect atomically use catalog connection transitions.
+by a digest-protected `DatasetSnapshot` manifest that preserves sequential,
+keyed, relative, PDS, PDSE-generation/alias, and LDS content without exposing
+the provider codec. Export-disconnect/import-connect atomically use catalog
+connection transitions.
+
+The AMS operand scanner is balanced and command-specific. Nested
+`SPACE(TRACKS|CYLINDERS|...)`, DCB/RECFM/LRECL, buffering, SMS, volume/device,
+catalog-date, VSAM access/data-option, and PRINT/REPRO positioning operands are
+either applied to typed requests or rejected with an exact capability. Unknown
+or command-inapplicable operands cannot become generic success. The local
+Conformance IR driver executes every one of the 31 commands as a real IDCAMS
+job, checks its terminal condition, reopens both JES and dataset authorities,
+and verifies the durable typed effect; this supplies 180 local bindings across
+recognized, validated, executed, conditioned, and recovered for all 36 rows.
 
 ## Evolution rules
 
