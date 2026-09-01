@@ -3207,7 +3207,8 @@ mod tests {
     use mainframe_env_host_api::{AccessIntent, ResourceName, SecretRef, SecurityDecision};
     use mainframe_env_store::MemoryStore;
     use mainframe_env_store_api::{
-        ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
+        ProviderStateMutation, ProviderStateRecord, ProviderStateStore, ProviderStateWrite,
+        StoreError,
     };
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -3287,6 +3288,13 @@ mod tests {
             writes: Vec<ProviderStateWrite>,
         ) -> Result<(), StoreError> {
             self.inner.put_provider_states_atomic(writes)
+        }
+
+        fn mutate_provider_states_atomic(
+            &self,
+            mutations: Vec<ProviderStateMutation>,
+        ) -> Result<(), StoreError> {
+            self.inner.mutate_provider_states_atomic(mutations)
         }
     }
 
