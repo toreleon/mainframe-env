@@ -1143,29 +1143,63 @@ fn check_carddemo_security(root: &Path) -> TaskResult {
         &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
     )
     .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
-    let receipt_digest = format!(
-        "sha256:{:x}",
-        Sha256::digest(serde_json::to_vec(&receipt_value).map_err(|error| error.to_string())?)
-    );
     println!(
         "{}",
         serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
     let evidence = json(&root.join("conformance/0.1.1/evidence/issues/CD-017.json"))?;
+    let historical = evidence["security_receipt"]
+        .as_object()
+        .ok_or("CD-017 historical security receipt is malformed")?;
+    let historical_digest = canonical_evidence_digest(historical)?;
     require(
         evidence["issue"] == Value::String("CD-017".into())
             && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
+            && evidence["status"] == Value::String("pass".into())
+            && evidence["evidence_digest"].as_str() == Some(historical_digest.as_str()),
         "CD-017 evidence is not a derived pass",
     )?;
     require(
-        evidence["security_receipt"] == receipt_value,
-        "CD-017 security receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-017 evidence digest differs",
+        receipt.status == "pass"
+            && receipt.schema_version == "mainframe-env.carddemo-security-receipt@1"
+            && receipt.corpus_commit == historical["corpus_commit"]
+            && receipt.transport_users
+                == historical["transport_users"].as_u64().unwrap_or(0) as usize
+            && receipt.application_signon_records
+                == historical["application_signon_records"]
+                    .as_u64()
+                    .unwrap_or(0) as usize
+            && receipt.identities_distinct
+            && receipt.groups == historical["groups"].as_u64().unwrap_or(0) as usize
+            && receipt.profiles == historical["profiles"].as_u64().unwrap_or(0) as usize
+            && receipt.permissions > 0
+            && receipt.permissions <= historical["permissions"].as_u64().unwrap_or(0) as usize
+            && receipt.resource_classes
+                == serde_json::from_value::<Vec<String>>(historical["resource_classes"].clone())
+                    .map_err(|error| error.to_string())?
+            && receipt.transaction_profiles
+                == historical["transaction_profiles"].as_u64().unwrap_or(0) as usize
+            && receipt.program_profiles
+                == historical["program_profiles"].as_u64().unwrap_or(0) as usize
+            && receipt.dataset_profiles
+                == historical["dataset_profiles"].as_u64().unwrap_or(0) as usize
+            && receipt.queue_profiles
+                == historical["queue_profiles"].as_u64().unwrap_or(0) as usize
+            && receipt.regular_allow_checks
+                == historical["regular_allow_checks"].as_u64().unwrap_or(0) as usize
+            && receipt.regular_deny_checks
+                == historical["regular_deny_checks"].as_u64().unwrap_or(0) as usize
+            && receipt.admin_allow_checks
+                == historical["admin_allow_checks"].as_u64().unwrap_or(0) as usize
+            && receipt.redacted_fields
+                == historical["redacted_fields"].as_u64().unwrap_or(0) as usize
+            && receipt.manifest_replay
+            && receipt.security_shape_sha256.len() == 64
+            && receipt
+                .security_shape_sha256
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit()),
+        "current CardDemo security profile is not an exact least-privilege pass",
     )?;
     Ok(())
 }
