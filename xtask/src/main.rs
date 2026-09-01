@@ -1370,6 +1370,7 @@ fn check_cobol_statement_bindings(
                 expected_obligations.insert("phrase-attribute-events");
                 expected_obligations.insert("phrase-group-hierarchy");
                 expected_obligations.insert("phrase-nested-processing-events");
+                expected_obligations.insert("phrase-numeric-character-reference");
                 expected_obligations.insert("phrase-occurs-elements");
                 expected_obligations.insert("phrase-processing-procedure-through");
             }

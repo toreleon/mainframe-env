@@ -11693,7 +11693,7 @@ fn xml_unescape(value: &str) -> Result<String, MachineProblem> {
         output.push_str(&rest[..at]);
         rest = &rest[at..];
         let (decoded, length) = if rest.starts_with("&amp;") {
-            ('&', 5)
+            ('&', 5usize)
         } else if rest.starts_with("&lt;") {
             ('<', 4)
         } else if rest.starts_with("&gt;") {
@@ -11702,6 +11702,23 @@ fn xml_unescape(value: &str) -> Result<String, MachineProblem> {
             ('"', 6)
         } else if rest.starts_with("&apos;") {
             ('\'', 6)
+        } else if let Some(reference) = rest.strip_prefix("&#") {
+            let end = reference.find(';').ok_or(MachineProblem::DataException)?;
+            let (digits, radix) = reference
+                .get(..end)
+                .and_then(|digits| {
+                    digits
+                        .strip_prefix(['x', 'X'])
+                        .map(|digits| (digits, 16))
+                        .or(Some((digits, 10)))
+                })
+                .ok_or(MachineProblem::DataException)?;
+            let scalar = u32::from_str_radix(digits, radix)
+                .ok()
+                .and_then(char::from_u32)
+                .filter(|character| xml_character_allowed(*character))
+                .ok_or(MachineProblem::DataException)?;
+            (scalar, end + 3)
         } else {
             return Err(MachineProblem::DataException);
         };
@@ -11710,6 +11727,13 @@ fn xml_unescape(value: &str) -> Result<String, MachineProblem> {
     }
     output.push_str(rest);
     Ok(output)
+}
+
+fn xml_character_allowed(character: char) -> bool {
+    matches!(character, '\u{9}' | '\u{a}' | '\u{d}')
+        || ('\u{20}'..='\u{d7ff}').contains(&character)
+        || ('\u{e000}'..='\u{fffd}').contains(&character)
+        || ('\u{10000}'..='\u{10ffff}').contains(&character)
 }
 
 fn xml_document(source: &str) -> Result<XmlNode, MachineProblem> {
