@@ -11790,8 +11790,25 @@ fn xml_node(source: &str, at: &mut usize, depth: usize) -> Result<XmlNode, Machi
     let opening = source
         .get(*at + 1..open_end)
         .ok_or(MachineProblem::DataException)?;
+    let empty = opening.trim_end().ends_with('/');
+    let opening = if empty {
+        opening
+            .trim_end()
+            .strip_suffix('/')
+            .ok_or(MachineProblem::DataException)?
+    } else {
+        opening
+    };
     let (name, attributes) = xml_opening_tag(opening)?;
     *at = open_end + 1;
+    if empty {
+        return Ok(XmlNode {
+            name,
+            attributes,
+            text: String::new(),
+            children: Vec::new(),
+        });
+    }
     let mut text = String::new();
     let mut children = Vec::new();
     loop {

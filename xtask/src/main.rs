@@ -1368,6 +1368,7 @@ fn check_cobol_statement_bindings(
             }
             Some("0044") => {
                 expected_obligations.insert("phrase-attribute-events");
+                expected_obligations.insert("phrase-empty-element-events");
                 expected_obligations.insert("phrase-group-hierarchy");
                 expected_obligations.insert("phrase-namespace-events");
                 expected_obligations.insert("phrase-nested-processing-events");
