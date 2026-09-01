@@ -167,20 +167,49 @@ record the decision in the target status ledger.
   evidence, provenance, or transport. They do not contribute coverage by their
   presence and may not become a native-code fallback for product execution.
 
-### Validation and evidence
+### Risk-tiered validation and evidence
 
-For every work package, run focused package tests and affected architecture,
-profile, schema, inventory, and evidence checks. Before declaring the minor
-complete, run the repository's current full validation floor on one unchanged
-candidate, including formatting, workspace check/tests, strict Clippy, docs,
-architecture/runtime-architecture, profiles, schemas, inventories, evidence,
-conformance, dependency/license/advisory checks, release-mode bounded load, and
-`git diff --check`. Use actual commands discovered in the current repository;
-record commands, versions, exit codes, source digest, and artifact digest.
+Conformance protects IBM-observable product semantics; it is not a gate on every
+developer edit. Classify the change before selecting validation. A change to
+language/runtime behavior, a public contract, durable state, transactions,
+security, restart/recovery, or a selected product route is semantic. A change
+limited to documentation, generated evidence, CI plumbing, or repository
+tooling is non-semantic unless it changes what the product ships or claims.
 
-Direct unit tests supplement but never replace public selected-route evidence.
-Every failure must preserve the correct diagnostic/status/condition and prove
-that forbidden state changes did not occur.
+Use these validation tiers:
+
+1. **Inner loop:** run the smallest focused package tests and affected schema,
+   inventory, architecture, or conformance shard. Do not run full workspace,
+   CardDemo, PostgreSQL, Zowe, dual-target release, or licensed-oracle gates.
+2. **Work-package/PR:** run formatting, compile/check, focused tests, every
+   affected public-route conformance shard, required negative/condition tests,
+   and `git diff --check`. Add restart/rollback/security checks only when the
+   change crosses those boundaries. A tooling-only PR runs tooling/schema tests
+   and does not rerun application environments.
+3. **Minor integration/exit:** after all work packages are integrated, run the
+   workspace and the target minor's complete affected-subsystem conformance once
+   on one unchanged candidate. Regress prior profiles that consume the changed
+   contracts or routes; do not rerun unrelated subsystem matrices.
+4. **Nightly/release certification:** run global CardDemo 20/20, PostgreSQL,
+   live Zowe, bounded load, backup/restore, dual-target release reproduction,
+   cross-subsystem replay, and licensed IBM differential gates. Run this tier
+   for 0.16/0.17, release candidates, scheduled integration, or earlier only
+   when the changed scope actually affects the corresponding environment.
+
+Unless a target is 0.16/0.17 or its dossier explicitly marks an environment as
+affected, references to “full validation” in an individual minor prompt mean
+tier-3 complete affected-scope validation, not tier-4 global certification.
+
+Maintain an explicit path/contract-to-gate map and fail closed when affected
+scope is ambiguous. Never skip the focused malformed, condition/status,
+authorization, failure, and forbidden-state-mutation tests for changed product
+semantics. Direct unit tests supplement rather than replace public selected-route
+evidence for behavior that changed.
+
+Generate evidence once from the final accepted run for the applicable tier.
+Evidence records identity and results but does not make a gate pass; CI and the
+actual test process remain authoritative. Do not repeat an expensive successful
+gate merely to refresh hashes, prose, receipts, or commit metadata.
 
 ### Change and release boundary
 

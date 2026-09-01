@@ -71,7 +71,9 @@ All versions inherit these invariants:
    exhaustive code; generated code still requires semantic handlers and tests.
 6. Product semantics remain deterministic; infrastructure and licensed oracle
    adapters stay outside the semantic kernels.
-7. The prior released profile and CardDemo 20-journey regression remain green.
+7. Every prior profile affected by changed contracts or routes remains green.
+   The global CardDemo 20-journey regression runs at scheduled integration,
+   0.16/0.17, and release-candidate certification rather than on every PR.
 8. No future-version incomplete provider, hidden fallback, or generic-success
    stub ships in the `core-server` closure.
 9. A licensed IBM environment is required for a `differential=pass` result.
@@ -94,10 +96,24 @@ Every minor version must produce:
 - release notes, known limitations, and upgrade instructions; and
 - licensed IBM differential receipts when required by the version exit gate.
 
-## Common validation floor
+## Risk-tiered validation floor
 
-At minimum, an unchanged candidate runs formatting, workspace check/tests,
-strict Clippy, documentation, architecture, runtime architecture, profiles,
-schemas, inventories, evidence, conformance, dependency/license/advisory checks,
-release-mode bounded load, and `git diff --check`. Each plan adds subsystem and
-oracle gates on top of this floor.
+Validation cost follows risk and lifecycle stage:
+
+| Tier | Required scope |
+|---|---|
+| Inner loop | Focused package test and affected schema/inventory/conformance shard |
+| Work-package/PR | Formatting, compile/check, focused positive and negative semantics, affected public routes, and `git diff --check` |
+| Minor exit | Workspace plus complete affected-subsystem conformance once on one unchanged integrated candidate |
+| Nightly/release | Global CardDemo, PostgreSQL, Zowe, load/recovery, dual-target artifacts, cross-subsystem replay, and required licensed IBM differential |
+
+Public or durable contract changes add schema compatibility, migration,
+restart, rollback, backup/restore, and security gates as applicable. Tooling,
+documentation, CI, and evidence-only changes do not rerun application
+environments unless they alter shipped artifacts or the corresponding gate.
+
+Every plan may add focused subsystem gates, but it may not promote partial
+recognition to semantic coverage or silently skip malformed, condition/status,
+authorization, failure, and forbidden-mutation checks for behavior it changes.
+Evidence is generated from the final accepted run; it is not a reason to repeat
+an otherwise unchanged expensive gate.

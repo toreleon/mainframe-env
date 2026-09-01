@@ -105,8 +105,11 @@ the 0.11 `core-server` profile.
    and review receipt.
 4. A later-version lane may rebase on earlier releases but may not backport an
    incomplete public surface.
-5. Integration merges one lane at a time, runs narrow gates after each merge,
-   then runs the complete candidate gate once for the unchanged tree.
+5. Integration merges one lane at a time and runs narrow affected gates after
+   each merge. Run tier-3 complete affected-scope validation once for the final
+   unchanged minor candidate; reserve global tier-4 environments for scheduled
+   integration, 0.16/0.17, or release certification unless the lane changed
+   their consumed contracts or routes.
 6. Conflicts are resolved by the authority owner; no duplicate default route or
    fallback is introduced to make branches coexist.
 
