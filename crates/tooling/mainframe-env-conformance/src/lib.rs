@@ -56,7 +56,7 @@ pub use carddemo::{
     verify_carddemo_vsam_from_env,
 };
 pub use jcl::{JclExitReceipt, JclFixtureRuntime, jcl_fixture_runtime, verify_jcl_exit};
-pub use racf::racf_runtime;
+pub use racf::{racf_runtime, racf_runtime_with};
 pub use racf_oracle::{RACF_ORACLE_RELATIVE_PATH, RacfOracleCampaign, RacfOracleCase};
 
 pub const HELLO_SOURCE: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. HELLO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MSG PIC X(12) VALUE 'HELLO WORLD!'.\nPROCEDURE DIVISION.\nDISPLAY MSG.\nSTOP RUN.\n";

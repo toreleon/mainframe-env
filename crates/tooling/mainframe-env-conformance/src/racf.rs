@@ -30,29 +30,41 @@ static RACF_READY: RacfReady = RacfReady;
 static RACF_PASSED: RacfPassed = RacfPassed;
 
 pub fn racf_runtime(spec: &CompiledSpec) -> Result<RuntimeRegistry<'static>, SpecProblem> {
-    let limits = ConformanceLimits::default();
-    RuntimeRegistry::new(
+    racf_runtime_with(
         spec,
-        vec![
-            (
-                DriverRef::new("racf.command.driver", limits)?,
-                &RACF_DRIVER as &dyn ConformanceDriver,
-            ),
-            (
-                DriverRef::new("racf.racroute.driver", limits)?,
-                &RACROUTE_DRIVER as &dyn ConformanceDriver,
-            ),
-        ],
-        vec![(
-            PredicateRef::new("racf.authority.ready", limits)?,
-            &RACF_READY,
-        )],
-        vec![(
-            ObservationRef::new("racf.command.passed", limits)?,
-            &RACF_PASSED,
-        )],
-        limits,
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        ConformanceLimits::default(),
     )
+}
+
+pub fn racf_runtime_with<'a>(
+    spec: &CompiledSpec,
+    mut drivers: Vec<(DriverRef, &'a dyn ConformanceDriver)>,
+    mut predicates: Vec<(PredicateRef, &'a dyn ConformancePredicate)>,
+    mut observations: Vec<(ObservationRef, &'a dyn ConformanceObservation)>,
+    limits: ConformanceLimits,
+) -> Result<RuntimeRegistry<'a>, SpecProblem> {
+    drivers.extend([
+        (
+            DriverRef::new("racf.command.driver", limits)?,
+            &RACF_DRIVER as &dyn ConformanceDriver,
+        ),
+        (
+            DriverRef::new("racf.racroute.driver", limits)?,
+            &RACROUTE_DRIVER as &dyn ConformanceDriver,
+        ),
+    ]);
+    predicates.push((
+        PredicateRef::new("racf.authority.ready", limits)?,
+        &RACF_READY as &dyn ConformancePredicate,
+    ));
+    observations.push((
+        ObservationRef::new("racf.command.passed", limits)?,
+        &RACF_PASSED as &dyn ConformanceObservation,
+    ));
+    RuntimeRegistry::new(spec, drivers, predicates, observations, limits)
 }
 
 impl ConformanceDriver for RacfCommandDriver {

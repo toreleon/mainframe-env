@@ -651,7 +651,7 @@ impl JclConformanceRuntime {
         spec: &CompiledSpec,
         limits: ConformanceLimits,
     ) -> Result<RuntimeRegistry<'a>, SpecProblem> {
-        RuntimeRegistry::new(
+        mainframe_env_conformance::racf_runtime_with(
             spec,
             vec![(
                 DriverRef::new("jcl.driver.convert", limits)?,

@@ -10,21 +10,21 @@ mod work_package_seal;
 
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use mainframe_env_conformance::{
-    RACF_ORACLE_RELATIVE_PATH, RacfOracleCampaign, racf_runtime,
-    verify_carddemo_application_package_from_env, verify_carddemo_base_batch_from_env,
-    verify_carddemo_base_online_from_env, verify_carddemo_batch_programs_from_env,
-    verify_carddemo_cics_abi_from_env, verify_carddemo_cics_runtime_from_env,
-    verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
-    verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
-    verify_carddemo_dataset_catalog_from_env, verify_carddemo_db2_from_env,
-    verify_carddemo_file_call_semantics_from_env, verify_carddemo_full_from_env,
-    verify_carddemo_host_operands_from_env, verify_carddemo_ims_from_env,
-    verify_carddemo_jcl_from_env, verify_carddemo_mq_authorization_from_env,
-    verify_carddemo_program_routing_from_env, verify_carddemo_resources_from_env,
-    verify_carddemo_security_from_env, verify_carddemo_seeds_from_env,
-    verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
-    verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
-    verify_carddemo_vsam_from_env, verify_host_abi_libraries, verify_jcl_exit,
+    RACF_ORACLE_RELATIVE_PATH, RacfOracleCampaign, verify_carddemo_application_package_from_env,
+    verify_carddemo_base_batch_from_env, verify_carddemo_base_online_from_env,
+    verify_carddemo_batch_programs_from_env, verify_carddemo_cics_abi_from_env,
+    verify_carddemo_cics_runtime_from_env, verify_carddemo_control_flow_from_env,
+    verify_carddemo_core_semantics_from_env, verify_carddemo_corpus_from_env,
+    verify_carddemo_data_layouts_from_env, verify_carddemo_dataset_catalog_from_env,
+    verify_carddemo_db2_from_env, verify_carddemo_file_call_semantics_from_env,
+    verify_carddemo_full_from_env, verify_carddemo_host_operands_from_env,
+    verify_carddemo_ims_from_env, verify_carddemo_jcl_from_env,
+    verify_carddemo_mq_authorization_from_env, verify_carddemo_program_routing_from_env,
+    verify_carddemo_resources_from_env, verify_carddemo_security_from_env,
+    verify_carddemo_seeds_from_env, verify_carddemo_source_closures_from_env,
+    verify_carddemo_source_preprocessing_from_env, verify_carddemo_terminal_from_env,
+    verify_carddemo_utilities_from_env, verify_carddemo_vsam_from_env, verify_host_abi_libraries,
+    verify_jcl_exit,
 };
 use mainframe_env_coverage::{
     BindingKey, CompiledSpec, ConformanceDriver, ConformanceLimits, ConformanceObservation,
@@ -777,7 +777,10 @@ fn run_focused_racf(
     };
     let context = RunnerContext::new(repository_digest(root)?, "local-deterministic", limits)
         .map_err(|problem| problem.to_string())?;
-    let runtime = racf_runtime(spec).map_err(|problem| problem.to_string())?;
+    let handlers = jcl_conformance::runtime();
+    let runtime = handlers
+        .registry(spec, limits)
+        .map_err(|problem| problem.to_string())?;
     let report = ConformanceRunner::new(spec, runtime, limits)
         .run(&selection, &context)
         .map_err(|problem| problem.to_string())?;
