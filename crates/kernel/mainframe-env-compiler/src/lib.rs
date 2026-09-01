@@ -28,8 +28,8 @@ pub use lower::{CORE_NAMESPACE, core_mir_catalog, core_mir_profile};
 pub use semantic::{
     CobolClauseKind, CobolClauseNode, CobolDataDescription, CobolDivisionKind, CobolDivisionNode,
     CobolFileBinding, CobolFileDescription, CobolLayout, CobolScope, CobolScopeId, CobolScopeKind,
-    CobolSectionKind, CobolSectionNode, DataCategory, DataReference, ResolutionProblem,
-    SemanticModel, StorageSection,
+    CobolSectionKind, CobolSectionNode, CobolTableKey, CobolUsage, DataCategory, DataReference,
+    ResolutionProblem, SemanticModel, StorageSection,
 };
 pub use service::{CobolAnalysis, CobolCompiler, CobolCompilerLimits};
 pub use syntax::{

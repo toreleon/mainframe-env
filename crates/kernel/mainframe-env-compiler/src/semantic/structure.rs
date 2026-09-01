@@ -744,22 +744,47 @@ fn validate_data_clause(
                 .iter()
                 .position(|word| word == "OCCURS")
                 .ok_or_else(invalid)?;
-            let minimum = words
-                .get(index + 1)
-                .and_then(|word| word.parse::<usize>().ok())
-                .ok_or_else(invalid)?;
-            let maximum = if words.get(index + 2).is_some_and(|word| word == "TO") {
-                words
-                    .get(index + 3)
-                    .and_then(|word| word.parse::<usize>().ok())
-                    .ok_or_else(invalid)?
-            } else {
-                minimum
-            };
-            if minimum == 0 || minimum > maximum || matches!(level, 66 | 78 | 88) {
+            if matches!(level, 1 | 66 | 77 | 78 | 88) {
                 return Err(invalid());
             }
-            Ok(vec![minimum.to_string(), maximum.to_string()])
+            let (minimum, maximum, unbounded) =
+                if words.get(index + 1).is_some_and(|word| word == "UNBOUNDED") {
+                    (1, 0, true)
+                } else {
+                    let minimum = words
+                        .get(index + 1)
+                        .and_then(|word| word.parse::<usize>().ok())
+                        .ok_or_else(invalid)?;
+                    let maximum_word = if words.get(index + 2).is_some_and(|word| word == "TO") {
+                        words.get(index + 3).ok_or_else(invalid)?
+                    } else {
+                        words.get(index + 1).ok_or_else(invalid)?
+                    };
+                    if maximum_word == "UNBOUNDED" {
+                        (minimum, 0, true)
+                    } else {
+                        (
+                            minimum,
+                            maximum_word.parse::<usize>().map_err(|_| invalid())?,
+                            false,
+                        )
+                    }
+                };
+            let variable = contains(words, &["DEPENDING", "ON"]);
+            if (!unbounded && (maximum == 0 || minimum > maximum))
+                || (!variable && minimum == 0)
+                || (unbounded && !variable)
+            {
+                return Err(invalid());
+            }
+            Ok(vec![
+                minimum.to_string(),
+                if unbounded {
+                    "UNBOUNDED".into()
+                } else {
+                    maximum.to_string()
+                },
+            ])
         }
         K::Picture => {
             let picture = picture_operand(words).ok_or_else(invalid)?;
@@ -872,6 +897,11 @@ fn validate_data_clause(
                 .skip(2)
                 .find(|word| usage_value(word))
                 .ok_or_else(invalid)?;
+            if representation == "OBJECT"
+                && !words.windows(2).any(|pair| pair == ["OBJECT", "REFERENCE"])
+            {
+                return Err(invalid());
+            }
             Ok(vec![representation.clone()])
         }
         K::Value => {

@@ -207,219 +207,219 @@
       },
       {
         "id": "cobol.semantic.file-external.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.file-external.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.file-global.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.file-global.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.file-block-contains.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.file-block-contains.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.file-record.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.file-record.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.file-label-records.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.file-label-records.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.file-value-of.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.file-value-of.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.file-data-records.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.file-data-records.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.file-linage.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.file-linage.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.file-recording-mode.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.file-recording-mode.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.file-code-set.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.file-code-set.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-blank-when-zero.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-blank-when-zero.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-dynamic-length.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-dynamic-length.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-external.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-external.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-global.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-global.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-justified.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-justified.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-group-usage.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-group-usage.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-occurs.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-occurs.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-picture.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-picture.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-redefines.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-redefines.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-renames.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-renames.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-sign.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-sign.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-synchronized.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-synchronized.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-typedef.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-typedef.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-type.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-type.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-usage.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-usage.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-value.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-value.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-volatile.valid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.semantic.data-volatile.invalid",
-        "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+        "digest": "sha256:ea0de12ff794a343f61ede4f12d53009f116fc7f18da68d5215e8c6a8d5eb0f9"
       },
       {
         "id": "cobol.statement.accept.valid",

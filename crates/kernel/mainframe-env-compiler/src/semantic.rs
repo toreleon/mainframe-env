@@ -6,20 +6,61 @@ pub use structure::{
     CobolSectionNode,
 };
 
-use crate::syntax::SourceOrigin;
+use crate::syntax::{SourceOrigin, SourceSpan};
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DataCategory {
+    Alphabetic,
     Alphanumeric,
+    AlphanumericEdited,
+    Dbcs,
+    National,
+    NationalEdited,
+    Utf8,
     NumericDisplay,
     NumericEdited,
     PackedDecimal,
     Binary,
+    FloatShort,
+    FloatLong,
+    Index,
     Pointer,
+    Pointer32,
+    ProcedurePointer,
+    FunctionPointer,
+    ObjectReference,
     Group,
+    NationalGroup,
+    Utf8Group,
     Condition,
     Rename,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum CobolUsage {
+    Display,
+    Display1,
+    National,
+    Utf8,
+    Binary,
+    NativeBinary,
+    PackedDecimal,
+    FloatShort,
+    FloatLong,
+    Index,
+    Pointer,
+    Pointer32,
+    ProcedurePointer,
+    FunctionPointer,
+    ObjectReference,
+    Group,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CobolTableKey {
+    pub name: String,
+    pub descending: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -41,19 +82,37 @@ pub struct CobolLayout {
     pub length: usize,
     pub element_length: usize,
     pub category: DataCategory,
+    pub usage: CobolUsage,
     pub picture: Option<String>,
+    pub byte_length: Option<usize>,
     pub digits: usize,
     pub scale: usize,
     pub signed: bool,
+    pub sign_leading: bool,
     pub sign_separate: bool,
     pub justified_right: bool,
+    pub blank_when_zero: bool,
+    pub synchronized: bool,
+    pub alignment: usize,
     pub initial: Vec<u8>,
     pub alias_of: Option<String>,
     pub occurs: usize,
     pub occurs_min: usize,
+    pub unbounded: bool,
     pub depending_on: Option<String>,
     pub indexes: Vec<String>,
+    pub keys: Vec<CobolTableKey>,
     pub condition_values: Vec<String>,
+    pub dynamic: bool,
+    pub dynamic_limit: Option<usize>,
+    pub external_name: Option<String>,
+    pub global: bool,
+    pub volatile: bool,
+    pub typedef: bool,
+    pub type_name: Option<String>,
+    pub object_class: Option<String>,
+    pub allocated: bool,
+    pub source: Vec<SourceSpan>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -106,12 +165,13 @@ impl SemanticModel {
         max_storage: usize,
         max_items: usize,
     ) -> Result<Self, SemanticProblem> {
-        Self::analyze_with_origins(source, &[], max_storage, max_items)
+        Self::analyze_with_origins(source, &[], 4, max_storage, max_items)
     }
 
     pub(crate) fn analyze_with_origins(
         source: &str,
         origins: &[SourceOrigin],
+        pointer_bytes: usize,
         max_storage: usize,
         max_items: usize,
     ) -> Result<Self, SemanticProblem> {
@@ -141,6 +201,7 @@ impl SemanticModel {
             .map_or(cleaned.len(), |relative| data_start + relative);
         let declarations = declaration_sentences(&cleaned[data_start..data_end]);
         let specs = parse_specs(&declarations, max_items)?;
+        validate_spec_constraints(&specs)?;
         let mut layouts = vec![None; specs.len()];
         let mut cursor = 0usize;
         let roots = specs
@@ -149,9 +210,22 @@ impl SemanticModel {
             .filter(|(_, spec)| spec.parent.is_none() && !matches!(spec.level, 66 | 88))
             .map(|(index, _)| index)
             .collect::<Vec<_>>();
-        layout_siblings(&roots, &specs, &mut layouts, &mut cursor, max_storage)?;
+        layout_siblings(
+            &roots,
+            &specs,
+            &mut layouts,
+            &mut cursor,
+            pointer_bytes,
+            None,
+            None,
+            false,
+            false,
+            false,
+            true,
+            max_storage,
+        )?;
         layout_specials(&specs, &mut layouts)?;
-        let layouts = layouts
+        let mut layouts = layouts
             .into_iter()
             .enumerate()
             .map(|(index, layout)| {
@@ -160,6 +234,9 @@ impl SemanticModel {
                 })
             })
             .collect::<Result<Vec<_>, _>>()?;
+        attach_layout_sources(&specs, &mut layouts, &structure.data_descriptions)?;
+        validate_layout_relationships(&specs, &layouts)?;
+        validate_file_layouts(&files, &structure.file_descriptions, &layouts)?;
         let mut by_qualified = BTreeMap::new();
         let mut by_simple = BTreeMap::<String, Vec<usize>>::new();
         for (index, layout) in layouts.iter().enumerate() {
@@ -251,11 +328,18 @@ impl SemanticModel {
         let mut offset = layout.offset;
         let mut length = layout.length;
         if let Some(subscript) = subscript {
-            if layout.occurs <= 1 || subscript == 0 || subscript > layout.occurs {
+            if (!layout.unbounded && layout.occurs <= 1)
+                || subscript == 0
+                || (!layout.unbounded && subscript > layout.occurs)
+            {
                 return Err(ResolutionProblem::InvalidSubscript);
             }
             offset = offset
-                .checked_add((subscript - 1) * layout.element_length)
+                .checked_add(
+                    (subscript - 1)
+                        .checked_mul(layout.element_length)
+                        .ok_or(ResolutionProblem::InvalidSubscript)?,
+                )
                 .ok_or(ResolutionProblem::InvalidSubscript)?;
             length = layout.element_length;
         }
@@ -271,6 +355,15 @@ impl SemanticModel {
             offset,
             length,
         })
+    }
+
+    #[must_use]
+    pub fn execution_incomplete_layouts(&self) -> BTreeSet<String> {
+        self.layouts
+            .iter()
+            .filter(|layout| layout.dynamic || layout.unbounded)
+            .map(|layout| layout.qualified_name.clone())
+            .collect()
     }
 }
 
@@ -424,8 +517,21 @@ struct DataSpec {
     redefines: Option<String>,
     occurs_min: usize,
     occurs_max: usize,
+    unbounded: bool,
     depending_on: Option<String>,
     indexes: Vec<String>,
+    keys: Vec<CobolTableKey>,
+    typedef: bool,
+    type_template: Option<usize>,
+    from_type: bool,
+    source_template: Option<usize>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct OccursSpec {
+    minimum: usize,
+    maximum: usize,
+    unbounded: bool,
 }
 
 fn parse_specs(sentences: &[String], max_items: usize) -> Result<Vec<DataSpec>, SemanticProblem> {
@@ -510,7 +616,43 @@ fn parse_specs(sentences: &[String], max_items: usize) -> Result<Vec<DataSpec>, 
                 return Err(SemanticProblem::DuplicateQualifiedName(qualified));
             }
         }
-        let (occurs_min, occurs_max) = occurs_range(&words)?;
+        let type_template = type_target(&words)
+            .map(|target| {
+                specs
+                    .iter()
+                    .enumerate()
+                    .rev()
+                    .find(|(_, spec)| spec.typedef && spec.name == target)
+                    .map(|(index, _)| index)
+                    .ok_or_else(|| {
+                        SemanticProblem::InvalidDeclaration(format!(
+                            "TYPE target {target} is not a prior TYPEDEF"
+                        ))
+                    })
+            })
+            .transpose()?;
+        let own_occurs = occurs_range(&words)?;
+        let occurs = if words.iter().any(|word| word == "OCCURS") {
+            own_occurs
+        } else {
+            type_template.map_or(own_occurs, |template| OccursSpec {
+                minimum: specs[template].occurs_min,
+                maximum: specs[template].occurs_max,
+                unbounded: specs[template].unbounded,
+            })
+        };
+        let indexes = values_after(&words, "INDEXED", "BY");
+        let indexes = if indexes.is_empty() {
+            type_template.map_or_else(Vec::new, |template| specs[template].indexes.clone())
+        } else {
+            indexes
+        };
+        let keys = table_keys(&words)?;
+        let keys = if keys.is_empty() {
+            type_template.map_or_else(Vec::new, |template| specs[template].keys.clone())
+        } else {
+            keys
+        };
         let spec = DataSpec {
             level,
             name,
@@ -520,11 +662,17 @@ fn parse_specs(sentences: &[String], max_items: usize) -> Result<Vec<DataSpec>, 
             section,
             redefines: find_after_owned(&words, "REDEFINES"),
             depending_on: find_sequence_after(&words, &["DEPENDING", "ON"]),
-            indexes: values_after(&words, "INDEXED", "BY"),
+            indexes,
+            keys,
+            typedef: words.iter().any(|word| word == "TYPEDEF"),
+            type_template,
+            from_type: false,
+            source_template: None,
             words,
             sentence: sentence.clone(),
-            occurs_min,
-            occurs_max,
+            occurs_min: occurs.minimum,
+            occurs_max: occurs.maximum,
+            unbounded: occurs.unbounded,
         };
         let index = specs.len();
         specs.push(spec);
@@ -536,110 +684,570 @@ fn parse_specs(sentences: &[String], max_items: usize) -> Result<Vec<DataSpec>, 
         if !matches!(level, 66 | 78 | 88) {
             stack.push(index);
         }
+        if let Some(template) = type_template {
+            clone_type_children(&mut specs, template, index, max_items)?;
+        }
     }
+    validate_type_children(&specs)?;
     Ok(specs)
 }
 
+fn type_target(words: &[String]) -> Option<String> {
+    let index = words.iter().position(|word| word == "TYPE")?;
+    words
+        .get(index + 1 + usize::from(words.get(index + 1).is_some_and(|word| word == "TO")))
+        .cloned()
+}
+
+fn table_keys(words: &[String]) -> Result<Vec<CobolTableKey>, SemanticProblem> {
+    let mut keys = Vec::new();
+    let mut cursor = 0usize;
+    while cursor < words.len() {
+        let descending = match words[cursor].as_str() {
+            "ASCENDING" => false,
+            "DESCENDING" => true,
+            _ => {
+                cursor += 1;
+                continue;
+            }
+        };
+        if words.get(cursor + 1).is_none_or(|word| word != "KEY") {
+            return Err(SemanticProblem::InvalidOccurs);
+        }
+        cursor += 2 + usize::from(words.get(cursor + 2).is_some_and(|word| word == "IS"));
+        let start = keys.len();
+        while let Some(name) = words.get(cursor) {
+            if matches!(
+                name.as_str(),
+                "ASCENDING"
+                    | "DESCENDING"
+                    | "INDEXED"
+                    | "DEPENDING"
+                    | "PIC"
+                    | "PICTURE"
+                    | "VALUE"
+                    | "VALUES"
+                    | "REDEFINES"
+                    | "TYPE"
+                    | "TYPEDEF"
+                    | "USAGE"
+            ) || usage_word(name).is_some()
+            {
+                break;
+            }
+            keys.push(CobolTableKey {
+                name: name.clone(),
+                descending,
+            });
+            cursor += 1;
+        }
+        if keys.len() == start {
+            return Err(SemanticProblem::InvalidOccurs);
+        }
+    }
+    if keys.len() > 12 {
+        return Err(SemanticProblem::InvalidOccurs);
+    }
+    Ok(keys)
+}
+
+fn clone_type_children(
+    specs: &mut Vec<DataSpec>,
+    template: usize,
+    instance: usize,
+    max_items: usize,
+) -> Result<(), SemanticProblem> {
+    let children = specs
+        .iter()
+        .enumerate()
+        .filter(|(_, candidate)| candidate.parent == Some(template))
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    for child in children {
+        if specs.len() >= max_items {
+            return Err(SemanticProblem::ItemLimitExceeded);
+        }
+        let mut cloned = specs[child].clone();
+        let level =
+            if matches!(cloned.level, 66 | 88) {
+                cloned.level
+            } else {
+                instance_level(specs, instance)?
+                    .checked_add(cloned.level.checked_sub(specs[template].level).ok_or_else(
+                        || SemanticProblem::InvalidDeclaration(cloned.sentence.clone()),
+                    )?)
+                    .filter(|level| *level <= 49)
+                    .ok_or_else(|| SemanticProblem::InvalidDeclaration(cloned.sentence.clone()))?
+            };
+        let component = cloned
+            .qualified
+            .rsplit('.')
+            .next()
+            .unwrap_or(&cloned.name)
+            .to_string();
+        cloned.level = level;
+        cloned.parent = Some(instance);
+        cloned.qualified = format!("{}.{}", specs[instance].qualified, component);
+        cloned.children.clear();
+        cloned.typedef = false;
+        cloned.from_type = true;
+        cloned.source_template = Some(child);
+        let cloned_index = specs.len();
+        specs.push(cloned);
+        if !matches!(level, 66 | 88) {
+            specs[instance].children.push(cloned_index);
+        }
+        clone_type_children(specs, child, cloned_index, max_items)?;
+    }
+    Ok(())
+}
+
+fn instance_level(specs: &[DataSpec], instance: usize) -> Result<u8, SemanticProblem> {
+    specs
+        .get(instance)
+        .map(|spec| spec.level)
+        .ok_or_else(|| SemanticProblem::InvalidDeclaration("missing TYPE instance".into()))
+}
+
+fn validate_type_children(specs: &[DataSpec]) -> Result<(), SemanticProblem> {
+    for (index, spec) in specs
+        .iter()
+        .enumerate()
+        .filter(|(_, spec)| spec.type_template.is_some())
+    {
+        if specs
+            .iter()
+            .any(|candidate| candidate.parent == Some(index) && !candidate.from_type)
+        {
+            return Err(SemanticProblem::InvalidDeclaration(format!(
+                "TYPE instance {} has explicit subordinate entries",
+                spec.name
+            )));
+        }
+        if spec.level == 77
+            && specs
+                .iter()
+                .any(|candidate| candidate.parent == spec.type_template)
+        {
+            return Err(SemanticProblem::InvalidDeclaration(format!(
+                "level 77 TYPE instance {} requires an elementary type",
+                spec.name
+            )));
+        }
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
 fn layout_siblings(
     siblings: &[usize],
     specs: &[DataSpec],
     layouts: &mut [Option<CobolLayout>],
     cursor: &mut usize,
+    pointer_bytes: usize,
+    inherited_usage: Option<CobolUsage>,
+    inherited_external: Option<String>,
+    inherited_global: bool,
+    inherited_volatile: bool,
+    force_synchronized: bool,
+    allocated: bool,
     max_storage: usize,
 ) -> Result<(), SemanticProblem> {
     for index in siblings {
-        let spec = &specs[*index];
-        let target = spec
-            .redefines
-            .as_deref()
-            .map(|name| resolve_sibling_layout(name, spec.parent, specs, layouts))
-            .transpose()?
-            .map(|layout| (layout.offset, layout.qualified_name.clone()));
-        let start = target.as_ref().map_or(*cursor, |(offset, _)| *offset);
-        let picture = picture(&spec.words);
-        let category = picture.category;
-        let elementary_length = picture.length;
-        let mut child_cursor = start;
-        if !spec.children.is_empty() {
-            layout_siblings(
-                &spec.children,
+        if specs[*index].typedef {
+            let mut template_cursor = 0usize;
+            layout_one(
+                *index,
                 specs,
                 layouts,
-                &mut child_cursor,
+                &mut template_cursor,
+                pointer_bytes,
+                inherited_usage,
+                inherited_external.clone(),
+                inherited_global,
+                inherited_volatile,
+                force_synchronized,
+                false,
+                max_storage,
+            )?;
+        } else {
+            layout_one(
+                *index,
+                specs,
+                layouts,
+                cursor,
+                pointer_bytes,
+                inherited_usage,
+                inherited_external.clone(),
+                inherited_global,
+                inherited_volatile,
+                force_synchronized,
+                allocated,
                 max_storage,
             )?;
         }
-        let element_length = if spec.children.is_empty() {
-            elementary_length
-        } else {
-            child_cursor.saturating_sub(start).max(elementary_length)
-        };
-        let length = element_length
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn layout_one(
+    index: usize,
+    specs: &[DataSpec],
+    layouts: &mut [Option<CobolLayout>],
+    cursor: &mut usize,
+    pointer_bytes: usize,
+    inherited_usage: Option<CobolUsage>,
+    inherited_external: Option<String>,
+    inherited_global: bool,
+    inherited_volatile: bool,
+    force_synchronized: bool,
+    allocated: bool,
+    max_storage: usize,
+) -> Result<(), SemanticProblem> {
+    let spec = &specs[index];
+    let description = effective_description(spec, specs);
+    let words = &description.words;
+    let is_group = !spec.children.is_empty();
+    let picture = picture(words, is_group, inherited_usage, pointer_bytes)?;
+    validate_elementary_clauses(spec, words, &picture, is_group)?;
+    let own_synchronized = contains_word(words, "SYNC") || contains_word(words, "SYNCHRONIZED");
+    let synchronized = own_synchronized || force_synchronized;
+    let target = spec
+        .redefines
+        .as_deref()
+        .map(|name| resolve_sibling_layout(name, spec.parent, specs, layouts))
+        .transpose()?
+        .map(|layout| (layout.offset, layout.qualified_name.clone()));
+    let mut alignment = natural_alignment(picture.usage, picture.length, synchronized);
+    if allocated && spec.level == 1 && spec.section == StorageSection::Working && target.is_none() {
+        alignment = alignment.max(8);
+    }
+    let start = target
+        .as_ref()
+        .map_or_else(|| align_up(*cursor, alignment), |(offset, _)| *offset);
+    if target.is_some() && start % alignment != 0 {
+        return Err(SemanticProblem::InvalidRedefines(format!(
+            "{} does not satisfy alignment {alignment}",
+            spec.name
+        )));
+    }
+    let own_external = external_name(&spec.words, &spec.name)?;
+    let external = own_external.or(inherited_external);
+    let global = inherited_global || contains_word(&spec.words, "GLOBAL");
+    let volatile = inherited_volatile || contains_word(&spec.words, "VOLATILE");
+    let child_usage = match picture.usage {
+        CobolUsage::Group => inherited_usage,
+        usage => Some(usage),
+    };
+    let mut child_cursor = start;
+    if is_group {
+        layout_siblings(
+            &spec.children,
+            specs,
+            layouts,
+            &mut child_cursor,
+            pointer_bytes,
+            child_usage,
+            external.clone(),
+            global,
+            volatile,
+            synchronized,
+            allocated,
+            max_storage,
+        )?;
+        alignment = alignment.max(
+            spec.children
+                .iter()
+                .filter_map(|child| layouts[*child].as_ref())
+                .map(|layout| layout.alignment)
+                .max()
+                .unwrap_or(1),
+        );
+    }
+    let mut element_length = if is_group {
+        child_cursor.saturating_sub(start).max(picture.length)
+    } else {
+        picture.length
+    };
+    if is_group && (spec.occurs_max > 1 || spec.unbounded) {
+        element_length = align_up(element_length, alignment);
+    }
+    let dynamic = contains_word(words, "DYNAMIC");
+    let dynamic_limit = dynamic.then(|| dynamic_limit(words)).transpose()?.flatten();
+    let length = if dynamic || spec.unbounded {
+        0
+    } else {
+        element_length
             .checked_mul(spec.occurs_max)
-            .ok_or(SemanticProblem::StorageLimitExceeded)?;
-        let end = start
-            .checked_add(length)
-            .ok_or(SemanticProblem::StorageLimitExceeded)?;
-        if end > max_storage {
-            return Err(SemanticProblem::StorageLimitExceeded);
-        }
-        let initial = if spec.children.is_empty() {
-            if spec.section == StorageSection::Linkage
-                && keyword_index(&spec.sentence, "VALUE").is_none()
-            {
-                vec![0; element_length.saturating_mul(spec.occurs_max)]
-            } else {
-                initial_value(&spec.sentence, &spec.words, element_length, category)
-                    .repeat(spec.occurs_max)
-            }
+            .ok_or(SemanticProblem::StorageLimitExceeded)?
+    };
+    let end = start
+        .checked_add(length)
+        .ok_or(SemanticProblem::StorageLimitExceeded)?;
+    if allocated && end > max_storage {
+        return Err(SemanticProblem::StorageLimitExceeded);
+    }
+    let value_source =
+        if contains_word(&spec.words, "VALUE") || contains_word(&spec.words, "VALUES") {
+            spec
         } else {
-            group_initial(
-                *index,
-                start,
-                element_length,
-                spec.occurs_max,
-                specs,
-                layouts,
-            )
+            description
         };
-        layouts[*index] = Some(CobolLayout {
-            name: spec.name.clone(),
-            qualified_name: spec.qualified.clone(),
-            level: spec.level,
-            section: spec.section,
-            parent: spec.parent.map(|parent| specs[parent].qualified.clone()),
-            offset: start,
-            length,
+    let initial = if dynamic || spec.unbounded {
+        Vec::new()
+    } else if !is_group {
+        if spec.section == StorageSection::Linkage
+            && keyword_index(&value_source.sentence, "VALUE").is_none()
+        {
+            vec![0; length]
+        } else {
+            initial_value(
+                &value_source.sentence,
+                &value_source.words,
+                element_length,
+                picture.category,
+            )
+            .repeat(spec.occurs_max)
+        }
+    } else {
+        group_initial(
+            index,
+            start,
             element_length,
-            category: if spec.children.is_empty() {
-                category
-            } else {
-                DataCategory::Group
-            },
-            picture: spec
-                .children
-                .is_empty()
-                .then(|| picture.picture.clone())
-                .flatten(),
-            digits: usize::from(spec.children.is_empty()) * picture.digits,
-            scale: usize::from(spec.children.is_empty()) * picture.scale,
-            signed: spec.children.is_empty() && picture.signed,
-            sign_separate: spec.children.is_empty() && picture.sign_separate,
-            justified_right: spec.children.is_empty()
-                && (spec.sentence.to_ascii_uppercase().contains("JUST RIGHT")
-                    || spec
-                        .sentence
-                        .to_ascii_uppercase()
-                        .contains("JUSTIFIED RIGHT")),
-            initial,
-            alias_of: target.map(|(_, qualified)| qualified),
-            occurs: spec.occurs_max,
-            occurs_min: spec.occurs_min,
-            depending_on: spec.depending_on.clone(),
-            indexes: spec.indexes.clone(),
-            condition_values: Vec::new(),
-        });
-        *cursor = (*cursor).max(end);
+            spec.occurs_max,
+            specs,
+            layouts,
+        )
+    };
+    let blank_when_zero = contains_sequence(words, &["BLANK", "WHEN"]);
+    let category = if blank_when_zero && picture.category == DataCategory::NumericDisplay {
+        DataCategory::NumericEdited
+    } else {
+        picture.category
+    };
+    layouts[index] = Some(CobolLayout {
+        name: spec.name.clone(),
+        qualified_name: spec.qualified.clone(),
+        level: spec.level,
+        section: spec.section,
+        parent: spec.parent.map(|parent| specs[parent].qualified.clone()),
+        offset: start,
+        length,
+        element_length,
+        category,
+        usage: picture.usage,
+        picture: picture.picture,
+        byte_length: picture.byte_length,
+        digits: usize::from(!is_group) * picture.digits,
+        scale: usize::from(!is_group) * picture.scale,
+        signed: !is_group && picture.signed,
+        sign_leading: !is_group && sign_leading(words),
+        sign_separate: !is_group && picture.sign_separate,
+        justified_right: !is_group
+            && (contains_sequence(words, &["JUST", "RIGHT"])
+                || contains_sequence(words, &["JUSTIFIED", "RIGHT"])
+                || contains_word(words, "JUSTIFIED")),
+        blank_when_zero,
+        synchronized,
+        alignment,
+        initial,
+        alias_of: target.map(|(_, qualified)| qualified),
+        occurs: spec.occurs_max,
+        occurs_min: spec.occurs_min,
+        unbounded: spec.unbounded,
+        depending_on: spec
+            .depending_on
+            .clone()
+            .or_else(|| description.depending_on.clone()),
+        indexes: spec.indexes.clone(),
+        keys: spec.keys.clone(),
+        condition_values: Vec::new(),
+        dynamic,
+        dynamic_limit,
+        external_name: external,
+        global,
+        volatile,
+        typedef: is_type_definition(index, specs),
+        type_name: type_target(&spec.words),
+        object_class: picture.object_class,
+        allocated,
+        source: Vec::new(),
+    });
+    *cursor = (*cursor).max(end);
+    Ok(())
+}
+
+fn effective_description<'a>(spec: &'a DataSpec, specs: &'a [DataSpec]) -> &'a DataSpec {
+    spec.type_template
+        .and_then(|template| specs.get(template))
+        .map_or(spec, |template| effective_description(template, specs))
+}
+
+fn is_type_definition(index: usize, specs: &[DataSpec]) -> bool {
+    let mut current = Some(index);
+    while let Some(index) = current {
+        if specs[index].typedef {
+            return true;
+        }
+        current = specs[index].parent;
+    }
+    false
+}
+
+fn contains_word(words: &[String], expected: &str) -> bool {
+    words.iter().any(|word| word == expected)
+}
+
+fn contains_sequence(words: &[String], sequence: &[&str]) -> bool {
+    words.windows(sequence.len()).any(|window| {
+        window
+            .iter()
+            .zip(sequence)
+            .all(|(word, expected)| word == expected)
+    })
+}
+
+fn external_name(words: &[String], default: &str) -> Result<Option<String>, SemanticProblem> {
+    let Some(index) = words.iter().position(|word| word == "EXTERNAL") else {
+        return Ok(None);
+    };
+    let name = if words.get(index + 1).is_some_and(|word| word == "AS") {
+        words
+            .get(index + 2)
+            .map(|name| name.trim_matches(['\'', '"']).to_string())
+            .filter(|name| !name.is_empty())
+            .ok_or_else(|| {
+                SemanticProblem::InvalidDeclaration("EXTERNAL AS requires a name".into())
+            })?
+    } else {
+        default.to_string()
+    };
+    Ok(Some(name))
+}
+
+fn dynamic_limit(words: &[String]) -> Result<Option<usize>, SemanticProblem> {
+    let Some(index) = words.iter().position(|word| word == "LIMIT") else {
+        return Ok(None);
+    };
+    words
+        .get(index + 1 + usize::from(words.get(index + 1).is_some_and(|word| word == "IS")))
+        .and_then(|word| word.parse::<usize>().ok())
+        .filter(|value| (1..=999_999_999).contains(value))
+        .map(Some)
+        .ok_or_else(|| SemanticProblem::InvalidDeclaration("invalid DYNAMIC LIMIT".into()))
+}
+
+fn sign_leading(words: &[String]) -> bool {
+    words
+        .iter()
+        .position(|word| word == "SIGN")
+        .is_some_and(|index| {
+            words[index + 1..]
+                .iter()
+                .take(2)
+                .any(|word| word == "LEADING")
+        })
+}
+
+fn natural_alignment(usage: CobolUsage, length: usize, synchronized: bool) -> usize {
+    if !synchronized {
+        return 1;
+    }
+    match usage {
+        CobolUsage::Binary | CobolUsage::NativeBinary => length.clamp(1, 4),
+        CobolUsage::FloatShort => 4,
+        CobolUsage::FloatLong | CobolUsage::ProcedurePointer => 8,
+        CobolUsage::Index
+        | CobolUsage::Pointer
+        | CobolUsage::Pointer32
+        | CobolUsage::FunctionPointer
+        | CobolUsage::ObjectReference => length.max(1),
+        _ => 1,
+    }
+}
+
+fn align_up(value: usize, alignment: usize) -> usize {
+    let remainder = value % alignment.max(1);
+    if remainder == 0 {
+        value
+    } else {
+        value.saturating_add(alignment - remainder)
+    }
+}
+
+fn validate_elementary_clauses(
+    spec: &DataSpec,
+    words: &[String],
+    picture: &PictureSpec,
+    is_group: bool,
+) -> Result<(), SemanticProblem> {
+    if contains_word(words, "DYNAMIC")
+        && (is_group
+            || !matches!(
+                picture.category,
+                DataCategory::Alphanumeric | DataCategory::Utf8
+            )
+            || picture
+                .picture
+                .as_deref()
+                .is_none_or(|pic| !matches!(pic, "X" | "U"))
+            || spec.unbounded)
+    {
+        return Err(SemanticProblem::InvalidUsage(
+            "DYNAMIC requires an elementary PIC X or PIC U item".into(),
+        ));
+    }
+    if contains_sequence(words, &["BLANK", "WHEN"])
+        && (!matches!(
+            picture.category,
+            DataCategory::NumericDisplay
+                | DataCategory::NumericEdited
+                | DataCategory::National
+                | DataCategory::NationalEdited
+        ) || picture.signed
+            || picture
+                .picture
+                .as_deref()
+                .is_some_and(|value| value.contains('*')))
+    {
+        return Err(SemanticProblem::InvalidUsage(
+            "BLANK WHEN ZERO requires unsigned DISPLAY/NATIONAL numeric data".into(),
+        ));
+    }
+    if (contains_word(words, "JUST") || contains_word(words, "JUSTIFIED"))
+        && !matches!(
+            picture.category,
+            DataCategory::Alphabetic
+                | DataCategory::Alphanumeric
+                | DataCategory::Dbcs
+                | DataCategory::National
+        )
+    {
+        return Err(SemanticProblem::InvalidUsage(
+            "JUSTIFIED is incompatible with the data category".into(),
+        ));
+    }
+    let values = values_clause(&spec.words);
+    if matches!(
+        picture.usage,
+        CobolUsage::Pointer
+            | CobolUsage::Pointer32
+            | CobolUsage::ProcedurePointer
+            | CobolUsage::FunctionPointer
+            | CobolUsage::ObjectReference
+    ) && values
+        .iter()
+        .any(|value| !matches!(value.as_str(), "IS" | "NULL" | "NULLS"))
+    {
+        return Err(SemanticProblem::InvalidUsage(
+            "pointer and object VALUE must be NULL".into(),
+        ));
+    }
+    if picture.usage == CobolUsage::Index && !values.is_empty() {
+        return Err(SemanticProblem::InvalidUsage(
+            "INDEX items cannot have VALUE".into(),
+        ));
     }
     Ok(())
 }
@@ -693,19 +1301,37 @@ fn layout_specials(
                 length: 0,
                 element_length: 0,
                 category: DataCategory::Condition,
+                usage: target.usage,
                 picture: None,
+                byte_length: None,
                 digits: 0,
                 scale: 0,
                 signed: false,
+                sign_leading: false,
                 sign_separate: false,
                 justified_right: false,
+                blank_when_zero: false,
+                synchronized: false,
+                alignment: 1,
                 initial: Vec::new(),
                 alias_of: Some(target.qualified_name.clone()),
                 occurs: 1,
                 occurs_min: 1,
+                unbounded: false,
                 depending_on: None,
                 indexes: Vec::new(),
+                keys: Vec::new(),
                 condition_values: values_clause(&spec.words),
+                dynamic: false,
+                dynamic_limit: None,
+                external_name: target.external_name.clone(),
+                global: target.global,
+                volatile: target.volatile,
+                typedef: is_type_definition(index, specs),
+                type_name: None,
+                object_class: None,
+                allocated: false,
+                source: Vec::new(),
             });
         } else if spec.level == 66 {
             let start_name = find_after_owned(&spec.words, "RENAMES")
@@ -716,6 +1342,11 @@ fn layout_specials(
                 .map(|name| resolve_nearby_layout(&name, spec, specs, layouts))
                 .transpose()?
                 .unwrap_or(start);
+            if end.offset < start.offset
+                || end.offset.saturating_add(end.length) < start.offset.saturating_add(start.length)
+            {
+                return Err(SemanticProblem::InvalidRename);
+            }
             let length = end
                 .offset
                 .checked_add(end.length)
@@ -731,19 +1362,37 @@ fn layout_specials(
                 length,
                 element_length: length,
                 category: DataCategory::Rename,
+                usage: CobolUsage::Group,
                 picture: None,
+                byte_length: None,
                 digits: 0,
                 scale: 0,
                 signed: false,
+                sign_leading: false,
                 sign_separate: false,
                 justified_right: false,
+                blank_when_zero: false,
+                synchronized: false,
+                alignment: 1,
                 initial: Vec::new(),
                 alias_of: Some(start.qualified_name.clone()),
                 occurs: 1,
                 occurs_min: 1,
+                unbounded: false,
                 depending_on: None,
                 indexes: Vec::new(),
+                keys: Vec::new(),
                 condition_values: Vec::new(),
+                dynamic: false,
+                dynamic_limit: None,
+                external_name: start.external_name.clone(),
+                global: start.global,
+                volatile: start.volatile,
+                typedef: is_type_definition(index, specs),
+                type_name: None,
+                object_class: None,
+                allocated: false,
+                source: Vec::new(),
             });
         } else if spec.level == 78 {
             layouts[index] = Some(CobolLayout {
@@ -756,19 +1405,37 @@ fn layout_specials(
                 length: 0,
                 element_length: 0,
                 category: DataCategory::Condition,
+                usage: CobolUsage::Display,
                 picture: None,
+                byte_length: None,
                 digits: 0,
                 scale: 0,
                 signed: false,
+                sign_leading: false,
                 sign_separate: false,
                 justified_right: false,
+                blank_when_zero: false,
+                synchronized: false,
+                alignment: 1,
                 initial: Vec::new(),
                 alias_of: None,
                 occurs: 1,
                 occurs_min: 1,
+                unbounded: false,
                 depending_on: None,
                 indexes: Vec::new(),
+                keys: Vec::new(),
                 condition_values: values_clause(&spec.words),
+                dynamic: false,
+                dynamic_limit: None,
+                external_name: None,
+                global: false,
+                volatile: false,
+                typedef: false,
+                type_name: None,
+                object_class: None,
+                allocated: false,
+                source: Vec::new(),
             });
         }
     }
@@ -802,11 +1469,309 @@ fn resolve_nearby_layout<'a>(
     specs
         .iter()
         .enumerate()
-        .find(|(_, candidate)| {
-            candidate.section == spec.section && candidate.name.eq_ignore_ascii_case(name)
+        .find(|(index, candidate)| {
+            candidate.section == spec.section
+                && candidate.name.eq_ignore_ascii_case(name)
+                && !matches!(candidate.level, 1 | 66 | 77 | 88)
+                && spec
+                    .parent
+                    .is_some_and(|root| is_descendant_of(*index, root, specs))
+                && !has_occurs_through(*index, spec.parent, specs)
+                && !is_type_definition(*index, specs)
         })
         .and_then(|(index, _)| layouts[index].as_ref())
         .ok_or(SemanticProblem::InvalidRename)
+}
+
+fn is_descendant_of(mut index: usize, ancestor: usize, specs: &[DataSpec]) -> bool {
+    while let Some(parent) = specs[index].parent {
+        if parent == ancestor {
+            return true;
+        }
+        index = parent;
+    }
+    false
+}
+
+fn has_occurs_through(mut index: usize, stop: Option<usize>, specs: &[DataSpec]) -> bool {
+    loop {
+        if specs[index].occurs_max != 1 || specs[index].unbounded {
+            return true;
+        }
+        let Some(parent) = specs[index].parent else {
+            return false;
+        };
+        if Some(parent) == stop {
+            return false;
+        }
+        index = parent;
+    }
+}
+
+fn validate_spec_constraints(specs: &[DataSpec]) -> Result<(), SemanticProblem> {
+    for (index, spec) in specs.iter().enumerate() {
+        let has_occurs = spec.occurs_min != 1 || spec.occurs_max != 1 || spec.unbounded;
+        if has_occurs {
+            if matches!(spec.level, 1 | 66 | 77 | 78 | 88)
+                || spec.redefines.is_some()
+                || (spec.occurs_min != spec.occurs_max && spec.depending_on.is_none())
+                || (spec.unbounded && spec.depending_on.is_none())
+            {
+                return Err(SemanticProblem::InvalidOccurs);
+            }
+            let mut dimensions = 1usize;
+            let mut parent = spec.parent;
+            while let Some(ancestor) = parent {
+                let candidate = &specs[ancestor];
+                if candidate.occurs_max != 1 || candidate.unbounded {
+                    dimensions += 1;
+                }
+                parent = candidate.parent;
+            }
+            if dimensions > 7
+                || spec.indexes.len() > 12
+                || spec.indexes.iter().collect::<BTreeSet<_>>().len() != spec.indexes.len()
+            {
+                return Err(SemanticProblem::InvalidOccurs);
+            }
+        } else if !spec.indexes.is_empty() || !spec.keys.is_empty() || spec.depending_on.is_some() {
+            return Err(SemanticProblem::InvalidOccurs);
+        }
+        if contains_word(&spec.words, "DYNAMIC") {
+            if spec.section == StorageSection::File && !matches!(spec.level, 1 | 77) {
+                return Err(SemanticProblem::InvalidUsage(
+                    "FILE SECTION dynamic item must be level 01 or 77".into(),
+                ));
+            }
+            let mut parent = spec.parent;
+            while let Some(ancestor) = parent {
+                if specs[ancestor].occurs_min != specs[ancestor].occurs_max
+                    || specs[ancestor].unbounded
+                {
+                    return Err(SemanticProblem::InvalidUsage(
+                        "dynamic item cannot be subordinate to a variable table".into(),
+                    ));
+                }
+                parent = specs[ancestor].parent;
+            }
+        }
+        if let Some(target_name) = &spec.redefines {
+            if contains_word(&spec.words, "EXTERNAL")
+                || contains_word(&spec.words, "VALUE")
+                || specs.iter().any(|candidate| {
+                    candidate.parent == Some(index) && contains_word(&candidate.words, "VALUE")
+                })
+            {
+                return Err(SemanticProblem::InvalidRedefines(spec.name.clone()));
+            }
+            let target = specs[..index]
+                .iter()
+                .rev()
+                .find(|target| target.parent == spec.parent && target.name == *target_name)
+                .ok_or_else(|| SemanticProblem::UnknownRedefines(target_name.clone()))?;
+            if target.occurs_max != 1 || target.unbounded || target.typedef {
+                return Err(SemanticProblem::InvalidRedefines(spec.name.clone()));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn attach_layout_sources(
+    specs: &[DataSpec],
+    layouts: &mut [CobolLayout],
+    descriptions: &[CobolDataDescription],
+) -> Result<(), SemanticProblem> {
+    let originals = specs
+        .iter()
+        .enumerate()
+        .filter(|(_, spec)| !spec.from_type)
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    if originals.len() != descriptions.len() {
+        return Err(SemanticProblem::InvalidDeclaration(
+            "semantic structure/layout declaration closure drifted".into(),
+        ));
+    }
+    let mut sources = BTreeMap::new();
+    for (index, description) in originals.into_iter().zip(descriptions) {
+        sources.insert(index, description.source.clone());
+    }
+    for (index, layout) in layouts.iter_mut().enumerate() {
+        let mut spans = sources.get(&index).cloned().unwrap_or_default();
+        if let Some(template) = specs[index].type_template {
+            for span in sources.get(&template).into_iter().flatten() {
+                if !spans.contains(span) {
+                    spans.push(span.clone());
+                }
+            }
+        }
+        if let Some(template) = specs[index].source_template {
+            for span in sources.get(&template).into_iter().flatten() {
+                if !spans.contains(span) {
+                    spans.push(span.clone());
+                }
+            }
+            let mut parent = specs[index].parent;
+            while let Some(ancestor) = parent {
+                if let Some(source) = sources.get(&ancestor) {
+                    for span in source {
+                        if !spans.contains(span) {
+                            spans.push(span.clone());
+                        }
+                    }
+                    break;
+                }
+                parent = specs[ancestor].parent;
+            }
+        }
+        layout.source = spans;
+    }
+    Ok(())
+}
+
+fn validate_layout_relationships(
+    specs: &[DataSpec],
+    layouts: &[CobolLayout],
+) -> Result<(), SemanticProblem> {
+    for (index, spec) in specs.iter().enumerate() {
+        if let Some(name) = &layouts[index].depending_on {
+            let target = resolve_layout_name(name, spec, specs, layouts)?;
+            if !matches!(
+                target.category,
+                DataCategory::NumericDisplay | DataCategory::PackedDecimal | DataCategory::Binary
+            ) || target.scale != 0
+                || target.dynamic
+                || target
+                    .qualified_name
+                    .starts_with(&format!("{}.", spec.qualified))
+            {
+                return Err(SemanticProblem::InvalidOccurs);
+            }
+        }
+        for key in &layouts[index].keys {
+            let target = resolve_layout_name(&key.name, spec, specs, layouts)?;
+            if target.qualified_name != spec.qualified
+                && !target
+                    .qualified_name
+                    .starts_with(&format!("{}.", spec.qualified))
+            {
+                return Err(SemanticProblem::InvalidOccurs);
+            }
+        }
+        if let Some(alias) = &layouts[index].alias_of {
+            let target = layouts
+                .iter()
+                .find(|layout| layout.qualified_name == *alias)
+                .ok_or_else(|| SemanticProblem::UnknownRedefines(alias.clone()))?;
+            if target.external_name.is_some() && layouts[index].length > target.length {
+                return Err(SemanticProblem::InvalidRedefines(
+                    layouts[index].name.clone(),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn resolve_layout_name<'a>(
+    name: &str,
+    _spec: &DataSpec,
+    specs: &[DataSpec],
+    layouts: &'a [CobolLayout],
+) -> Result<&'a CobolLayout, SemanticProblem> {
+    let normalized = name.to_ascii_uppercase();
+    let candidates = specs
+        .iter()
+        .enumerate()
+        .filter(|(_, candidate)| candidate.name == normalized || candidate.qualified == normalized)
+        .filter_map(|(index, _)| layouts.get(index))
+        .collect::<Vec<_>>();
+    match candidates.as_slice() {
+        [layout] => Ok(*layout),
+        [] => Err(SemanticProblem::InvalidReference(normalized)),
+        _ => Err(SemanticProblem::InvalidReference(format!(
+            "ambiguous {normalized}"
+        ))),
+    }
+}
+
+fn validate_file_layouts(
+    files: &[CobolFileBinding],
+    descriptions: &[CobolFileDescription],
+    layouts: &[CobolLayout],
+) -> Result<(), SemanticProblem> {
+    for file in files {
+        let Some(record_name) = &file.record_name else {
+            continue;
+        };
+        let record = layouts
+            .iter()
+            .find(|layout| layout.name == *record_name && layout.section == StorageSection::File)
+            .ok_or_else(|| SemanticProblem::InvalidFileLayout(record_name.clone()))?;
+        if let Some(description) = descriptions
+            .iter()
+            .find(|entry| entry.name == file.select_name)
+        {
+            for clause in &description.clauses {
+                if let CobolClauseKind::File(crate::FileDescriptionClauseKind::Record) = clause.kind
+                    && let [minimum, maximum, ..] = clause.operands.as_slice()
+                    && let (Ok(minimum), Ok(maximum)) =
+                        (minimum.parse::<usize>(), maximum.parse::<usize>())
+                    && !(minimum..=maximum).contains(&record.length)
+                {
+                    return Err(SemanticProblem::InvalidFileLayout(record_name.clone()));
+                }
+                if let CobolClauseKind::File(crate::FileDescriptionClauseKind::DataRecords) =
+                    clause.kind
+                    && clause.operands.iter().any(|name| {
+                        !layouts.iter().any(|layout| {
+                            layout.name == *name && layout.section == StorageSection::File
+                        })
+                    })
+                {
+                    return Err(SemanticProblem::InvalidFileLayout(record_name.clone()));
+                }
+            }
+        }
+        let record_end = record.offset.saturating_add(record.length);
+        for key in file
+            .record_key
+            .iter()
+            .chain(file.alternate_record_keys.iter())
+        {
+            let key = layouts
+                .iter()
+                .find(|layout| layout.name == *key)
+                .ok_or_else(|| SemanticProblem::InvalidFileLayout(key.clone()))?;
+            if key.offset < record.offset || key.offset.saturating_add(key.length) > record_end {
+                return Err(SemanticProblem::InvalidFileLayout(key.name.clone()));
+            }
+        }
+        if let Some(relative_key) = &file.relative_key {
+            let key = layouts
+                .iter()
+                .find(|layout| layout.name == *relative_key)
+                .ok_or_else(|| SemanticProblem::InvalidFileLayout(relative_key.clone()))?;
+            if !matches!(
+                key.category,
+                DataCategory::NumericDisplay | DataCategory::PackedDecimal | DataCategory::Binary
+            ) || key.scale != 0
+            {
+                return Err(SemanticProblem::InvalidFileLayout(relative_key.clone()));
+            }
+        }
+        if let Some(status) = &file.file_status {
+            let status = layouts
+                .iter()
+                .find(|layout| layout.name == *status)
+                .ok_or_else(|| SemanticProblem::InvalidFileLayout(status.clone()))?;
+            if status.length != 2 {
+                return Err(SemanticProblem::InvalidFileLayout(status.name.clone()));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn strip_comments(source: &str) -> String {
@@ -905,103 +1870,375 @@ fn values_after(words: &[String], first: &str, second: &str) -> Vec<String> {
         .collect()
 }
 
-fn occurs_range(words: &[String]) -> Result<(usize, usize), SemanticProblem> {
+fn occurs_range(words: &[String]) -> Result<OccursSpec, SemanticProblem> {
     let Some(index) = words.iter().position(|word| word == "OCCURS") else {
-        return Ok((1, 1));
+        return Ok(OccursSpec {
+            minimum: 1,
+            maximum: 1,
+            unbounded: false,
+        });
     };
-    let minimum = words
-        .get(index + 1)
-        .and_then(|value| value.parse::<usize>().ok())
-        .ok_or(SemanticProblem::InvalidOccurs)?;
-    let maximum = if words.get(index + 2).is_some_and(|word| word == "TO") {
-        words
-            .get(index + 3)
+    let (minimum, maximum_word) = if words.get(index + 1).is_some_and(|word| word == "UNBOUNDED") {
+        (1, words.get(index + 1))
+    } else {
+        let minimum = words
+            .get(index + 1)
+            .and_then(|value| value.parse::<usize>().ok())
+            .ok_or(SemanticProblem::InvalidOccurs)?;
+        let maximum = if words.get(index + 2).is_some_and(|word| word == "TO") {
+            words.get(index + 3)
+        } else {
+            words.get(index + 1)
+        };
+        (minimum, maximum)
+    };
+    let unbounded = maximum_word.is_some_and(|value| value == "UNBOUNDED");
+    let maximum = if unbounded {
+        0
+    } else {
+        maximum_word
             .and_then(|value| value.parse::<usize>().ok())
             .ok_or(SemanticProblem::InvalidOccurs)?
-    } else {
-        minimum
     };
-    if maximum == 0 || minimum > maximum || maximum > 1_000_000 {
+    let variable = words.iter().any(|word| word == "DEPENDING");
+    if (!unbounded && (maximum == 0 || minimum > maximum || maximum > 1_000_000))
+        || (!variable && minimum == 0)
+        || (unbounded && !variable)
+    {
         return Err(SemanticProblem::InvalidOccurs);
     }
-    Ok((minimum, maximum))
+    Ok(OccursSpec {
+        minimum,
+        maximum,
+        unbounded,
+    })
+}
+
+fn explicit_usage(words: &[String]) -> Result<Option<CobolUsage>, SemanticProblem> {
+    let mut found = Vec::new();
+    for (index, word) in words.iter().enumerate().skip(2) {
+        if let Some(usage) = usage_word(word) {
+            found.push((index, usage));
+        }
+    }
+    found.sort_by_key(|(index, _)| *index);
+    found.dedup_by_key(|(_, usage)| *usage);
+    match found.as_slice() {
+        [] => Ok(None),
+        [(_, usage)] => Ok(Some(*usage)),
+        multiple
+            if multiple.len() == 2
+                && multiple[0].1 == CobolUsage::ObjectReference
+                && multiple[1].1 == CobolUsage::ObjectReference =>
+        {
+            Ok(Some(CobolUsage::ObjectReference))
+        }
+        _ => Err(SemanticProblem::InvalidUsage(
+            "multiple incompatible USAGE representations".into(),
+        )),
+    }
+}
+
+fn usage_word(word: &str) -> Option<CobolUsage> {
+    Some(match word {
+        "BINARY" | "COMP" | "COMP-4" | "COMPUTATIONAL" | "COMPUTATIONAL-4" => CobolUsage::Binary,
+        "COMP-5" | "COMPUTATIONAL-5" => CobolUsage::NativeBinary,
+        "COMP-3" | "COMPUTATIONAL-3" | "PACKED-DECIMAL" => CobolUsage::PackedDecimal,
+        "COMP-1" | "COMPUTATIONAL-1" => CobolUsage::FloatShort,
+        "COMP-2" | "COMPUTATIONAL-2" => CobolUsage::FloatLong,
+        "DISPLAY" => CobolUsage::Display,
+        "DISPLAY-1" => CobolUsage::Display1,
+        "INDEX" => CobolUsage::Index,
+        "NATIONAL" => CobolUsage::National,
+        "UTF-8" => CobolUsage::Utf8,
+        "POINTER" => CobolUsage::Pointer,
+        "POINTER-32" => CobolUsage::Pointer32,
+        "PROCEDURE-POINTER" => CobolUsage::ProcedurePointer,
+        "FUNCTION-POINTER" => CobolUsage::FunctionPointer,
+        "OBJECT" => CobolUsage::ObjectReference,
+        _ => return None,
+    })
+}
+
+fn picture_operand_semantic(words: &[String]) -> Option<String> {
+    let index = words
+        .iter()
+        .position(|word| matches!(word.as_str(), "PIC" | "PICTURE"))?;
+    words
+        .get(index + 1 + usize::from(words.get(index + 1).is_some_and(|word| word == "IS")))
+        .cloned()
+}
+
+fn byte_length(words: &[String]) -> Result<Option<usize>, SemanticProblem> {
+    let Some(index) = words.iter().position(|word| word == "BYTE-LENGTH") else {
+        return Ok(None);
+    };
+    let value = words
+        .get(index + 1 + usize::from(words.get(index + 1).is_some_and(|word| word == "IS")))
+        .and_then(|word| word.parse::<usize>().ok())
+        .filter(|value| *value > 0)
+        .ok_or_else(|| SemanticProblem::InvalidPicture("invalid BYTE-LENGTH".into()))?;
+    Ok(Some(value))
+}
+
+fn object_class(words: &[String]) -> Option<String> {
+    let index = words
+        .windows(2)
+        .position(|pair| pair[0] == "OBJECT" && pair[1] == "REFERENCE")?;
+    words
+        .get(index + 2)
+        .filter(|word| {
+            !matches!(
+                word.as_str(),
+                "GLOBAL" | "EXTERNAL" | "OCCURS" | "VALUE" | "VOLATILE" | "SYNC" | "SYNCHRONIZED"
+            )
+        })
+        .cloned()
+}
+
+fn require_numeric_picture(
+    details: &PictureDetails,
+    usage: CobolUsage,
+) -> Result<(), SemanticProblem> {
+    if details.numeric
+        && !details.edited
+        && !details.alphabetic
+        && !details.national
+        && !details.utf8
+        && !details.dbcs
+    {
+        Ok(())
+    } else {
+        Err(SemanticProblem::InvalidUsage(format!(
+            "{usage:?} requires an unedited numeric PICTURE"
+        )))
+    }
+}
+
+const fn binary_length(digits: usize) -> Option<usize> {
+    match digits {
+        1..=4 => Some(2),
+        5..=9 => Some(4),
+        10..=18 => Some(8),
+        _ => None,
+    }
 }
 
 struct PictureSpec {
     category: DataCategory,
+    usage: CobolUsage,
     length: usize,
     picture: Option<String>,
+    byte_length: Option<usize>,
     digits: usize,
     scale: usize,
     signed: bool,
     sign_separate: bool,
+    object_class: Option<String>,
 }
 
-fn picture(words: &[String]) -> PictureSpec {
-    let Some(pic) = find_after_owned(words, "PIC").or_else(|| find_after_owned(words, "PICTURE"))
-    else {
-        if words
-            .iter()
-            .any(|word| word == "POINTER" || word == "INDEX")
-        {
-            return PictureSpec {
-                category: DataCategory::Pointer,
-                length: 8,
-                picture: None,
-                digits: 0,
-                scale: 0,
-                signed: false,
-                sign_separate: false,
-            };
+fn picture(
+    words: &[String],
+    is_group: bool,
+    inherited_usage: Option<CobolUsage>,
+    pointer_bytes: usize,
+) -> Result<PictureSpec, SemanticProblem> {
+    let explicit_usage = explicit_usage(words)?;
+    if inherited_usage.is_some() && explicit_usage.is_some() && inherited_usage != explicit_usage {
+        return Err(SemanticProblem::InvalidUsage(
+            "subordinate USAGE contradicts group usage".into(),
+        ));
+    }
+    let pic = picture_operand_semantic(words);
+    let inferred_usage = pic.as_deref().and_then(|picture| {
+        picture
+            .bytes()
+            .any(|byte| byte.eq_ignore_ascii_case(&b'U'))
+            .then_some(CobolUsage::Utf8)
+            .or_else(|| {
+                picture
+                    .bytes()
+                    .any(|byte| byte.eq_ignore_ascii_case(&b'N'))
+                    .then_some(CobolUsage::National)
+            })
+    });
+    let usage = explicit_usage
+        .or(inherited_usage)
+        .or(inferred_usage)
+        .unwrap_or(if is_group {
+            CobolUsage::Group
+        } else {
+            CobolUsage::Display
+        });
+    if is_group {
+        if pic.is_some() {
+            return Err(SemanticProblem::InvalidPicture(
+                "group item cannot have PICTURE".into(),
+            ));
         }
-        return PictureSpec {
-            category: DataCategory::Group,
+        return Ok(PictureSpec {
+            category: match usage {
+                CobolUsage::National => DataCategory::NationalGroup,
+                CobolUsage::Utf8 => DataCategory::Utf8Group,
+                _ => DataCategory::Group,
+            },
+            usage,
             length: 0,
             picture: None,
+            byte_length: None,
             digits: 0,
             scale: 0,
             signed: false,
             sign_separate: false,
+            object_class: None,
+        });
+    }
+    if matches!(
+        usage,
+        CobolUsage::FloatShort
+            | CobolUsage::FloatLong
+            | CobolUsage::Index
+            | CobolUsage::Pointer
+            | CobolUsage::Pointer32
+            | CobolUsage::ProcedurePointer
+            | CobolUsage::FunctionPointer
+            | CobolUsage::ObjectReference
+    ) {
+        if pic.is_some() {
+            return Err(SemanticProblem::InvalidUsage(format!(
+                "{usage:?} cannot have PICTURE"
+            )));
+        }
+        let (category, length) = match usage {
+            CobolUsage::FloatShort => (DataCategory::FloatShort, 4),
+            CobolUsage::FloatLong => (DataCategory::FloatLong, 8),
+            CobolUsage::Index => (DataCategory::Index, pointer_bytes),
+            CobolUsage::Pointer => (DataCategory::Pointer, pointer_bytes),
+            CobolUsage::Pointer32 => (DataCategory::Pointer32, 4),
+            CobolUsage::ProcedurePointer => (DataCategory::ProcedurePointer, 8),
+            CobolUsage::FunctionPointer => (DataCategory::FunctionPointer, pointer_bytes),
+            CobolUsage::ObjectReference => (DataCategory::ObjectReference, pointer_bytes),
+            _ => unreachable!(),
         };
-    };
-    let usage = words.iter().map(String::as_str).collect::<BTreeSet<_>>();
-    let details = picture_details(&pic);
+        return Ok(PictureSpec {
+            category,
+            usage,
+            length,
+            picture: None,
+            byte_length: None,
+            digits: 0,
+            scale: 0,
+            signed: false,
+            sign_separate: false,
+            object_class: object_class(words),
+        });
+    }
+    let pic = pic.ok_or_else(|| {
+        SemanticProblem::InvalidPicture("elementary item requires PICTURE or pointer usage".into())
+    })?;
+    let details = picture_details(&pic)?;
     let separate = words
         .windows(2)
         .any(|pair| pair[0] == "SIGN" && pair[1] == "SEPARATE")
         || words.iter().any(|word| word == "SEPARATE");
-    let (category, length) = if usage.contains("COMP-3") || usage.contains("PACKED-DECIMAL") {
-        (DataCategory::PackedDecimal, (details.digits + 2) / 2)
-    } else if usage.contains("COMP") || usage.contains("BINARY") || usage.contains("COMP-5") {
-        (
-            DataCategory::Binary,
-            if details.digits <= 4 {
-                2
-            } else if details.digits <= 9 {
-                4
+    let byte_length = byte_length(words)?;
+    let (category, length) = match usage {
+        CobolUsage::Binary | CobolUsage::NativeBinary => {
+            require_numeric_picture(&details, usage)?;
+            (
+                DataCategory::Binary,
+                binary_length(details.digits).ok_or_else(|| {
+                    SemanticProblem::InvalidPicture("binary PICTURE exceeds 18 digits".into())
+                })?,
+            )
+        }
+        CobolUsage::PackedDecimal => {
+            require_numeric_picture(&details, usage)?;
+            if details.digits > 31 {
+                return Err(SemanticProblem::InvalidPicture(
+                    "packed PICTURE exceeds 31 digits".into(),
+                ));
+            }
+            (DataCategory::PackedDecimal, (details.digits + 2) / 2)
+        }
+        CobolUsage::Display => {
+            if byte_length.is_some() || details.utf8 || details.national || details.dbcs {
+                return Err(SemanticProblem::InvalidUsage(
+                    "DISPLAY usage contradicts PICTURE symbols".into(),
+                ));
+            }
+            if details.numeric {
+                (
+                    if details.edited {
+                        DataCategory::NumericEdited
+                    } else {
+                        DataCategory::NumericDisplay
+                    },
+                    details.storage.max(1) + usize::from(details.signed && separate),
+                )
+            } else if details.alphabetic {
+                (DataCategory::Alphabetic, details.storage.max(1))
             } else {
-                8
-            },
-        )
-    } else if details.numeric && details.edited {
-        (DataCategory::NumericEdited, details.storage.max(1))
-    } else if details.numeric {
-        (
-            DataCategory::NumericDisplay,
-            details.storage.max(1) + usize::from(details.signed && separate),
-        )
-    } else {
-        (DataCategory::Alphanumeric, details.storage.max(1))
+                (
+                    if details.edited {
+                        DataCategory::AlphanumericEdited
+                    } else {
+                        DataCategory::Alphanumeric
+                    },
+                    details.storage.max(1),
+                )
+            }
+        }
+        CobolUsage::Display1 => {
+            if !details.dbcs || details.numeric || byte_length.is_some() {
+                return Err(SemanticProblem::InvalidUsage(
+                    "DISPLAY-1 requires a DBCS PICTURE".into(),
+                ));
+            }
+            (DataCategory::Dbcs, details.storage.max(1) * 2)
+        }
+        CobolUsage::National => {
+            if details.utf8 || details.dbcs || byte_length.is_some() {
+                return Err(SemanticProblem::InvalidUsage(
+                    "NATIONAL usage contradicts PICTURE symbols".into(),
+                ));
+            }
+            (
+                if details.numeric && details.edited {
+                    DataCategory::NationalEdited
+                } else if details.numeric {
+                    DataCategory::NumericDisplay
+                } else {
+                    DataCategory::National
+                },
+                details.storage.max(1) * 2 + usize::from(details.signed && separate) * 2,
+            )
+        }
+        CobolUsage::Utf8 => {
+            if !details.utf8 || details.storage == 0 || details.numeric || details.edited {
+                return Err(SemanticProblem::InvalidUsage(
+                    "UTF-8 usage requires only U PICTURE symbols".into(),
+                ));
+            }
+            (
+                DataCategory::Utf8,
+                byte_length.unwrap_or(details.storage.saturating_mul(4)),
+            )
+        }
+        _ => unreachable!(),
     };
-    PictureSpec {
+    Ok(PictureSpec {
         category,
+        usage,
         length,
         picture: Some(pic),
+        byte_length,
         digits: details.digits,
         scale: details.scale,
         signed: details.signed,
         sign_separate: details.signed && separate,
-    }
+        object_class: None,
+    })
 }
 
 struct PictureDetails {
@@ -1011,10 +2248,14 @@ struct PictureDetails {
     numeric: bool,
     edited: bool,
     signed: bool,
+    alphabetic: bool,
+    national: bool,
+    utf8: bool,
+    dbcs: bool,
 }
 
-fn picture_details(pic: &str) -> PictureDetails {
-    let bytes = expanded_picture_symbols(pic);
+fn picture_details(pic: &str) -> Result<PictureDetails, SemanticProblem> {
+    let bytes = expanded_picture_symbols(pic)?;
     let mut storage = 0usize;
     let mut digits = 0usize;
     let mut numeric = false;
@@ -1022,6 +2263,10 @@ fn picture_details(pic: &str) -> PictureDetails {
     let mut signed = false;
     let mut scale = 0usize;
     let mut fractional = false;
+    let mut alphabetic = true;
+    let mut national = false;
+    let mut utf8 = false;
+    let mut dbcs = false;
     let mut index = 0usize;
     while index < bytes.len() {
         let byte = bytes[index].to_ascii_uppercase();
@@ -1029,15 +2274,36 @@ fn picture_details(pic: &str) -> PictureDetails {
         match byte {
             b'9' => {
                 numeric = true;
+                alphabetic = false;
                 digits += repeat;
                 if fractional {
                     scale += repeat;
                 }
                 storage += repeat;
             }
-            b'X' | b'A' => storage += repeat,
+            b'X' => {
+                alphabetic = false;
+                storage += repeat;
+            }
+            b'A' => storage += repeat,
+            b'G' => {
+                alphabetic = false;
+                dbcs = true;
+                storage += repeat;
+            }
+            b'N' => {
+                alphabetic = false;
+                national = true;
+                storage += repeat;
+            }
+            b'U' => {
+                alphabetic = false;
+                utf8 = true;
+                storage += repeat;
+            }
             b'Z' | b'*' => {
                 numeric = true;
+                alphabetic = false;
                 edited = true;
                 digits += repeat;
                 if fractional {
@@ -1045,13 +2311,18 @@ fn picture_details(pic: &str) -> PictureDetails {
                 }
                 storage += repeat;
             }
-            b'S' => signed = true,
+            b'S' => {
+                alphabetic = false;
+                signed = true;
+            }
             b'V' => {
                 numeric = true;
+                alphabetic = false;
                 fractional = true;
             }
             b'P' => {
                 numeric = true;
+                alphabetic = false;
                 digits += repeat;
                 if fractional {
                     scale += repeat;
@@ -1059,6 +2330,7 @@ fn picture_details(pic: &str) -> PictureDetails {
             }
             b'+' | b'-' => {
                 numeric = true;
+                alphabetic = false;
                 edited = true;
                 signed = true;
                 if bytes.get(index.wrapping_sub(1)) == Some(&byte)
@@ -1072,29 +2344,51 @@ fn picture_details(pic: &str) -> PictureDetails {
                 storage += repeat;
             }
             b'.' => {
+                alphabetic = false;
                 edited = true;
                 fractional = true;
                 storage += repeat;
             }
             b',' | b'$' | b'/' | b'B' | b'0' => {
+                alphabetic = false;
                 edited = true;
                 storage += repeat;
             }
-            _ => {}
+            b'C' | b'R' | b'D' | b'E' => {
+                alphabetic = false;
+                numeric = true;
+                edited = true;
+                storage += repeat;
+            }
+            _ => {
+                return Err(SemanticProblem::InvalidPicture(format!(
+                    "unsupported PICTURE symbol {}",
+                    char::from(byte)
+                )));
+            }
         }
         index += 1;
     }
-    PictureDetails {
+    if storage == 0 && digits == 0 {
+        return Err(SemanticProblem::InvalidPicture(
+            "PICTURE has no data positions".into(),
+        ));
+    }
+    Ok(PictureDetails {
         storage,
         digits,
         scale,
         numeric,
         edited,
         signed,
-    }
+        alphabetic,
+        national,
+        utf8,
+        dbcs,
+    })
 }
 
-fn expanded_picture_symbols(pic: &str) -> Vec<u8> {
+fn expanded_picture_symbols(pic: &str) -> Result<Vec<u8>, SemanticProblem> {
     let bytes = pic.as_bytes();
     let mut symbols = Vec::with_capacity(bytes.len());
     let mut index = 0usize;
@@ -1102,25 +2396,29 @@ fn expanded_picture_symbols(pic: &str) -> Vec<u8> {
         let symbol = bytes[index].to_ascii_uppercase();
         index += 1;
         let repeat = if bytes.get(index) == Some(&b'(') {
-            let Some(relative_close) = bytes[index + 1..].iter().position(|byte| *byte == b')')
-            else {
-                symbols.push(symbol);
-                continue;
-            };
+            let relative_close = bytes[index + 1..]
+                .iter()
+                .position(|byte| *byte == b')')
+                .ok_or_else(|| SemanticProblem::InvalidPicture("unclosed repeat".into()))?;
             let close = index + 1 + relative_close;
             let repeat = std::str::from_utf8(&bytes[index + 1..close])
                 .ok()
                 .and_then(|value| value.parse::<usize>().ok())
-                .filter(|value| *value > 0)
-                .unwrap_or(1);
+                .filter(|value| (1..=1_000_000).contains(value))
+                .ok_or_else(|| SemanticProblem::InvalidPicture("invalid repeat".into()))?;
             index = close + 1;
             repeat
         } else {
             1
         };
+        if symbols.len().saturating_add(repeat) > 1_000_000 {
+            return Err(SemanticProblem::InvalidPicture(
+                "expanded PICTURE exceeds limit".into(),
+            ));
+        }
         symbols.extend(std::iter::repeat_n(symbol, repeat));
     }
-    symbols
+    Ok(symbols)
 }
 
 fn initial_value(
@@ -1132,11 +2430,28 @@ fn initial_value(
     let mut result = vec![
         if matches!(
             category,
-            DataCategory::NumericDisplay | DataCategory::NumericEdited
+            DataCategory::Alphabetic
+                | DataCategory::Alphanumeric
+                | DataCategory::AlphanumericEdited
+                | DataCategory::Dbcs
+                | DataCategory::National
+                | DataCategory::NationalEdited
+                | DataCategory::Utf8
+                | DataCategory::NumericDisplay
+                | DataCategory::NumericEdited
         ) {
-            b'0'
+            if matches!(
+                category,
+                DataCategory::NumericDisplay
+                    | DataCategory::NumericEdited
+                    | DataCategory::NationalEdited
+            ) {
+                b'0'
+            } else {
+                b' '
+            }
         } else {
-            b' '
+            0
         };
         length
     ];
@@ -1314,12 +2629,23 @@ pub(crate) enum SemanticProblem {
     ItemLimitExceeded,
     StorageLimitExceeded,
     InvalidClause(String),
+    InvalidPicture(String),
+    InvalidUsage(String),
+    InvalidRedefines(String),
+    InvalidReference(String),
+    InvalidFileLayout(String),
     ScopeLimitExceeded,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn program(declarations: &str) -> String {
+        format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. TYPES. DATA DIVISION. WORKING-STORAGE SECTION. {declarations}. PROCEDURE DIVISION. STOP RUN."
+        )
+    }
 
     #[test]
     fn hierarchical_duplicates_qualification_and_group_layout_are_exact() {
@@ -1328,7 +2654,7 @@ mod tests {
         assert!(model.layout("VALUE-X").is_none());
         assert_eq!(model.layout("VALUE-X OF ROOT-A").unwrap().initial, b"AA");
         assert_eq!(model.layout("ROOT-A").unwrap().length, 2);
-        assert_eq!(model.layout("ROOT-B").unwrap().offset, 2);
+        assert_eq!(model.layout("ROOT-B").unwrap().offset, 8);
     }
 
     #[test]
@@ -1383,8 +2709,134 @@ mod tests {
     }
 
     #[test]
+    fn complete_usage_classes_have_stable_size_and_identity() {
+        let source = program(
+            "01 ALPHA PIC A(3). 01 ALNUM PIC X(3). 01 DBCS-ITEM PIC G(2) DISPLAY-1. 01 NATIONAL-ITEM PIC N(2) NATIONAL. 01 UTF8-ITEM PIC U(3) BYTE-LENGTH 9 UTF-8. 01 SHORT-FLOAT COMP-1. 01 LONG-FLOAT COMP-2. 01 INDEX-ITEM INDEX. 01 DATA-PTR POINTER. 01 PTR32 POINTER-32. 01 PROC-PTR PROCEDURE-POINTER. 01 FUNC-PTR FUNCTION-POINTER. 01 OBJ OBJECT REFERENCE. 01 DYNAMIC-ITEM PIC X DYNAMIC LENGTH LIMIT IS 100",
+        );
+        let model = SemanticModel::analyze(&source, 4096, 64).unwrap();
+        for (name, category, usage, length) in [
+            ("ALPHA", DataCategory::Alphabetic, CobolUsage::Display, 3),
+            ("ALNUM", DataCategory::Alphanumeric, CobolUsage::Display, 3),
+            ("DBCS-ITEM", DataCategory::Dbcs, CobolUsage::Display1, 4),
+            (
+                "NATIONAL-ITEM",
+                DataCategory::National,
+                CobolUsage::National,
+                4,
+            ),
+            ("UTF8-ITEM", DataCategory::Utf8, CobolUsage::Utf8, 9),
+            (
+                "SHORT-FLOAT",
+                DataCategory::FloatShort,
+                CobolUsage::FloatShort,
+                4,
+            ),
+            (
+                "LONG-FLOAT",
+                DataCategory::FloatLong,
+                CobolUsage::FloatLong,
+                8,
+            ),
+            ("INDEX-ITEM", DataCategory::Index, CobolUsage::Index, 4),
+            ("DATA-PTR", DataCategory::Pointer, CobolUsage::Pointer, 4),
+            ("PTR32", DataCategory::Pointer32, CobolUsage::Pointer32, 4),
+            (
+                "PROC-PTR",
+                DataCategory::ProcedurePointer,
+                CobolUsage::ProcedurePointer,
+                8,
+            ),
+            (
+                "FUNC-PTR",
+                DataCategory::FunctionPointer,
+                CobolUsage::FunctionPointer,
+                4,
+            ),
+            (
+                "OBJ",
+                DataCategory::ObjectReference,
+                CobolUsage::ObjectReference,
+                4,
+            ),
+        ] {
+            let layout = model.layout(name).unwrap();
+            assert_eq!(
+                (layout.category, layout.usage, layout.length),
+                (category, usage, length)
+            );
+        }
+        let dynamic = model.layout("DYNAMIC-ITEM").unwrap();
+        assert!(dynamic.dynamic);
+        assert_eq!((dynamic.length, dynamic.dynamic_limit), (0, Some(100)));
+        assert_eq!(
+            model.execution_incomplete_layouts(),
+            BTreeSet::from(["DYNAMIC-ITEM".into()])
+        );
+    }
+
+    #[test]
+    fn synchronized_groups_group_usage_and_types_preserve_layout_contracts() {
+        let source = program(
+            "01 ALIGNED. 05 PREFIX PIC X. 05 FULL PIC S9(9) BINARY SYNC. 05 HALF PIC S9(4) BINARY SYNC. 01 TABLE-ROOT. 05 TABLE-ITEM OCCURS 2 TIMES. 10 FLAG PIC X. 10 VALUE-X PIC S9(9) BINARY SYNC. 01 NATIONAL-ROOT GROUP-USAGE NATIONAL. 05 NATIONAL-CHAR PIC N(2). 01 UTF8-ROOT GROUP-USAGE UTF-8. 05 UTF8-CHAR PIC U(2) BYTE-LENGTH 6. 01 PART-T TYPEDEF. 05 CODE-X PIC X(2). 05 QTY-X PIC 9(3) COMP-3. 01 PART TYPE PART-T",
+        );
+        let model = SemanticModel::analyze(&source, 4096, 128).unwrap();
+        assert_eq!(model.layout("FULL").unwrap().offset, 4);
+        assert_eq!(model.layout("HALF").unwrap().offset, 8);
+        assert_eq!(model.layout("ALIGNED").unwrap().length, 10);
+        let table = model.layout("TABLE-ITEM").unwrap();
+        assert_eq!(
+            (table.element_length, table.length, table.alignment),
+            (8, 16, 4)
+        );
+        assert_eq!(
+            model.layout("NATIONAL-ROOT").unwrap().category,
+            DataCategory::NationalGroup
+        );
+        assert_eq!(
+            model.layout("NATIONAL-CHAR").unwrap().usage,
+            CobolUsage::National
+        );
+        assert_eq!(
+            model.layout("UTF8-ROOT").unwrap().category,
+            DataCategory::Utf8Group
+        );
+        let template = model.layout("PART-T").unwrap();
+        assert!(template.typedef && !template.allocated);
+        assert_eq!(template.length, 4);
+        let part = model.layout("PART").unwrap();
+        assert!(part.allocated && !part.typedef);
+        assert_eq!(part.length, 4);
+        assert_eq!(model.layout("PART.CODE-X").unwrap().length, 2);
+        assert_eq!(
+            model.layout("PART.QTY-X").unwrap().category,
+            DataCategory::PackedDecimal
+        );
+    }
+
+    #[test]
+    fn invalid_usage_table_alias_and_type_combinations_fail_closed() {
+        for declarations in [
+            "01 BAD PIC X COMP",
+            "01 BAD PIC 9 COMP-1",
+            "01 BAD PIC X POINTER",
+            "01 BAD PIC X(2) DYNAMIC",
+            "01 BAD OCCURS 2 TIMES PIC X",
+            "01 COUNT-X PIC X. 01 ROOT. 05 BAD OCCURS 1 TO 2 TIMES DEPENDING ON COUNT-X PIC X",
+            "01 ROOT GROUP-USAGE NATIONAL. 05 BAD PIC X DISPLAY",
+            "01 BAD POINTER VALUE 1",
+            "01 ROOT. 05 BASE PIC X VALUE 'A'. 05 BAD REDEFINES BASE PIC X VALUE 'B'",
+            "01 PART-T TYPEDEF. 05 CODE-X PIC X. 01 PART TYPE PART-T. 05 EXTRA PIC X",
+        ] {
+            assert!(
+                SemanticModel::analyze(&program(declarations), 4096, 128).is_err(),
+                "accepted invalid declaration: {declarations}"
+            );
+        }
+    }
+
+    #[test]
     fn file_and_linkage_roots_keep_section_and_reference_identity() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. T. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT INPUT-FILE ASSIGN TO INPUTDD ORGANIZATION IS INDEXED ACCESS MODE IS RANDOM RECORD KEY IS INPUT-ID FILE STATUS IS FILE-STATUS. SELECT REL-FILE ASSIGN TO RELDD ORGANIZATION IS RELATIVE ACCESS MODE IS RANDOM RELATIVE KEY IS REL-NUM FILE STATUS IS REL-STATUS. DATA DIVISION. FILE SECTION. FD INPUT-FILE. 01 INPUT-RECORD. 05 INPUT-ID PIC X(8). WORKING-STORAGE SECTION. 77 FLAG-X PIC X. 77 FILE-STATUS PIC XX. 77 REL-NUM PIC 9(4). 77 REL-STATUS PIC XX. LINKAGE SECTION. 01 DFHCOMMAREA. 05 LINK-BYTE PIC X OCCURS 1 TO 8 TIMES DEPENDING ON FLAG-X. PROCEDURE DIVISION. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. T. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT INPUT-FILE ASSIGN TO INPUTDD ORGANIZATION IS INDEXED ACCESS MODE IS RANDOM RECORD KEY IS INPUT-ID FILE STATUS IS FILE-STATUS. SELECT REL-FILE ASSIGN TO RELDD ORGANIZATION IS RELATIVE ACCESS MODE IS RANDOM RELATIVE KEY IS REL-NUM FILE STATUS IS REL-STATUS. DATA DIVISION. FILE SECTION. FD INPUT-FILE. 01 INPUT-RECORD. 05 INPUT-ID PIC X(8). WORKING-STORAGE SECTION. 77 FLAG-X PIC 9. 77 FILE-STATUS PIC XX. 77 REL-NUM PIC 9(4). 77 REL-STATUS PIC XX. LINKAGE SECTION. 01 DFHCOMMAREA. 05 LINK-BYTE PIC X OCCURS 1 TO 8 TIMES DEPENDING ON FLAG-X. PROCEDURE DIVISION. STOP RUN.";
         let model = SemanticModel::analyze(source, 1024, 32).unwrap();
         assert_eq!(
             model.layout("INPUT-RECORD").unwrap().section,
@@ -1416,7 +2868,7 @@ mod tests {
 
     #[test]
     fn all_file_and_data_clause_identities_are_typed_and_validated() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CLAUSES. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT PRINT-FILE ASSIGN TO PRINTDD. DATA DIVISION. FILE SECTION. FD PRINT-FILE EXTERNAL GLOBAL BLOCK CONTAINS 1 TO 10 CHARACTERS RECORD CONTAINS 1 TO 80 CHARACTERS LABEL RECORDS ARE STANDARD VALUE OF FILE-ID IS 'PRINT' DATA RECORDS ARE PRINT-REC LINAGE IS 60 LINES WITH FOOTING AT 55 LINES AT TOP 3 LINES AT BOTTOM 2 RECORDING MODE IS V CODE-SET IS EBCDIC. 01 PRINT-REC PIC X(80). WORKING-STORAGE SECTION. 01 EDITED PIC ZZ9 BLANK WHEN ZERO. 01 DYN-ITEM PIC X DYNAMIC LENGTH LIMIT IS 100. 01 EXTERNAL-REC EXTERNAL GLOBAL. 01 JUSTIFIED-ITEM PIC X JUST RIGHT. 01 NATIONAL-GROUP GROUP-USAGE IS NATIONAL. 05 NATIONAL-ITEM PIC N. 01 TABLE-REC. 05 TABLE-ITEM OCCURS 1 TO 3 TIMES DEPENDING ON TABLE-COUNT PIC X. 01 TABLE-COUNT PIC 9. 01 BASE-ITEM PIC X. 01 ALIAS-ITEM REDEFINES BASE-ITEM PIC X. 66 RENAMED-ITEM RENAMES BASE-ITEM THRU ALIAS-ITEM. 77 SIGNED-ITEM PIC S9(4) SIGN IS LEADING SEPARATE CHARACTER SYNC RIGHT USAGE DISPLAY VALUE -1. 01 PRICE-T TYPEDEF PIC 9(5). 01 PRICE TYPE PRICE-T VALUE 1. 01 VOLATILE-ITEM PIC X VOLATILE. PROCEDURE DIVISION. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CLAUSES. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT PRINT-FILE ASSIGN TO PRINTDD. DATA DIVISION. FILE SECTION. FD PRINT-FILE EXTERNAL GLOBAL BLOCK CONTAINS 1 TO 10 CHARACTERS RECORD CONTAINS 1 TO 80 CHARACTERS LABEL RECORDS ARE STANDARD VALUE OF FILE-ID IS 'PRINT' DATA RECORDS ARE PRINT-REC LINAGE IS 60 LINES WITH FOOTING AT 55 LINES AT TOP 3 LINES AT BOTTOM 2 RECORDING MODE IS V CODE-SET IS EBCDIC. 01 PRINT-REC PIC X(80). WORKING-STORAGE SECTION. 01 EDITED PIC ZZ9 BLANK WHEN ZERO. 01 DYN-ITEM PIC X DYNAMIC LENGTH LIMIT IS 100. 01 EXTERNAL-REC PIC X EXTERNAL GLOBAL. 01 JUSTIFIED-ITEM PIC X JUST RIGHT. 01 NATIONAL-GROUP GROUP-USAGE IS NATIONAL. 05 NATIONAL-ITEM PIC N. 01 TABLE-REC. 05 TABLE-ITEM OCCURS 1 TO 3 TIMES DEPENDING ON TABLE-COUNT PIC X. 01 TABLE-COUNT PIC 9. 01 BASE-GROUP. 05 BASE-ITEM PIC X. 05 ALIAS-ITEM REDEFINES BASE-ITEM PIC X. 66 RENAMED-ITEM RENAMES BASE-ITEM THRU ALIAS-ITEM. 77 SIGNED-ITEM PIC S9(4) SIGN IS LEADING SEPARATE CHARACTER SYNC RIGHT USAGE DISPLAY VALUE -1. 01 PRICE-T TYPEDEF PIC 9(5). 01 PRICE TYPE PRICE-T VALUE 1. 01 VOLATILE-ITEM PIC X VOLATILE. PROCEDURE DIVISION. STOP RUN.";
         let model = SemanticModel::analyze(source, 4096, 128).unwrap();
         let file_kinds = model.file_descriptions[0]
             .clauses

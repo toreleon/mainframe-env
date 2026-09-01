@@ -71,6 +71,11 @@ impl CobolCompiler {
         let semantic = match SemanticModel::analyze_with_origins(
             syntax.semantic_text(),
             syntax.semantic_origins(),
+            if syntax.compiler_options().value("LP") == Some(Some("(64)")) {
+                8
+            } else {
+                4
+            },
             self.limits.max_storage_bytes,
             self.limits.max_data_items,
         ) {
@@ -110,6 +115,19 @@ impl CobolCompiler {
                 format!(
                     "{} is explicitly unsupported by the frozen 0.1 executable profile",
                     kind.slug()
+                ),
+            ));
+        }
+        for layout in semantic.execution_incomplete_layouts() {
+            if diagnostics.len() >= self.limits.max_diagnostics {
+                break;
+            }
+            diagnostics.push(diagnostic(
+                "MECOB0201",
+                Phase::Lower,
+                FailureCategory::Unsupported,
+                format!(
+                    "{layout} has bounded semantic metadata but requires 0.4 dynamic storage execution"
                 ),
             ));
         }
@@ -442,7 +460,58 @@ mod tests {
                 .all(|node| !node.source.is_empty()
                     && node.clauses.iter().all(|clause| !clause.source.is_empty()))
         );
+        assert!(
+            semantic
+                .layouts
+                .iter()
+                .all(|layout| !layout.source.is_empty())
+        );
         assert_eq!(analysis.completeness, Completeness::Complete);
+    }
+
+    #[test]
+    fn lp64_types_and_dynamic_layouts_are_typed_but_dynamic_execution_is_blocked() {
+        let source = "PROCESS LP(64)\nIDENTIFICATION DIVISION. PROGRAM-ID. STORAGE. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR POINTER. 01 OBJ OBJECT REFERENCE. 01 DYNAMIC-ITEM PIC X DYNAMIC LENGTH LIMIT IS 64. PROCEDURE DIVISION. STOP RUN.";
+        let analysis = CobolCompiler::default().analyze(&bundle(source));
+        let semantic = analysis.semantic.as_ref().expect("semantic metadata");
+        assert_eq!(semantic.layout("PTR").unwrap().length, 8);
+        assert_eq!(semantic.layout("OBJ").unwrap().length, 8);
+        assert_eq!(
+            semantic.layout("DYNAMIC-ITEM").unwrap().dynamic_limit,
+            Some(64)
+        );
+        assert_eq!(analysis.completeness, Completeness::Unsupported);
+        assert!(analysis.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code().as_str() == "MECOB0201"
+                && diagnostic.public_message().contains("DYNAMIC-ITEM")
+        }));
+        assert!(matches!(
+            CobolCompiler::default()
+                .compile(request(source, CompilationMode::Executable))
+                .unwrap(),
+            CompilerResult::Failed {
+                completeness: Completeness::Unsupported,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn type_instances_retain_definition_and_instance_provenance() {
+        let source = "IDENTIFICATION DIVISION.\nPROGRAM-ID. TYPES.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PART-T TYPEDEF.\n 05 CODE-X PIC X(2).\n 05 QTY-X PIC 9(3) COMP-3.\n01 PART TYPE PART-T.\nPROCEDURE DIVISION.\nSTOP RUN.\n";
+        let analysis = CobolCompiler::default().analyze(&bundle(source));
+        let semantic = analysis.semantic.expect("semantic metadata");
+        assert!(
+            semantic
+                .layouts
+                .iter()
+                .all(|layout| !layout.source.is_empty())
+        );
+        assert!(
+            semantic
+                .layout("PART.CODE-X")
+                .is_some_and(|layout| layout.source.len() >= 2)
+        );
     }
 
     #[test]

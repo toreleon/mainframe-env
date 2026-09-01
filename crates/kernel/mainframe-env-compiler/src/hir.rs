@@ -434,6 +434,7 @@ fn build_module(
     let mut storage = BTreeMap::new();
     let mut backing_lengths = layouts
         .iter()
+        .filter(|layout| layout.allocated)
         .map(|layout| (layout.qualified_name.clone(), layout.length))
         .collect::<BTreeMap<_, _>>();
     for layout in layouts {
@@ -442,7 +443,10 @@ fn build_module(
             *required = (*required).max(layout.length);
         }
     }
-    for layout in layouts.iter().filter(|layout| layout.length > 0) {
+    for layout in layouts
+        .iter()
+        .filter(|layout| layout.allocated && layout.length > 0)
+    {
         let alias = layout
             .alias_of
             .as_ref()

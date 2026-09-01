@@ -23,4 +23,9 @@ The semantic data model uses unique qualified identities while retaining simple
 COBOL names for resolution. Recursive groups, sibling REDEFINES, levels
 66/77/78/88, OCCURS ranges/dependencies/indexes, FILE/LINKAGE roots, subscripts,
 reference modification, and reached display/binary/packed/edited bytes are
-bounded explicitly.
+bounded explicitly. It also owns canonical USAGE/data-class identity,
+NATIONAL/UTF-8/DBCS and pointer/object/floating layouts, LP-sensitive sizes,
+SYNCHRONIZED alignment, inherited group usage, non-allocating TYPEDEF templates,
+TYPE instance expansion, dynamic/unbounded metadata, and source provenance.
+Dynamic and unbounded layouts remain analyzable but block executable publication
+until their runtime storage semantics are implemented by the 0.4 profile.

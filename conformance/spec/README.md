@@ -13,6 +13,11 @@ reviewed row specification, mandatory obligations, executable bindings, and
 verdict events. Verdict and ledger schemas define projections; committed
 per-row or per-obligation verdict files are prohibited.
 
+CB-304 strengthens the existing 27 clause bindings without changing the
+official denominator: each accepted clause case now carries independently
+reviewed layout expectations for data class, USAGE, size/alignment, table and
+alias metadata, initialization, allocation, and provenance where applicable.
+
 Cross-subsystem cases use the separate bounded `ScenarioSpec` section. A
 scenario contains only typed participant drivers, ordered step references,
 failure-point references, and exact credits to already registered

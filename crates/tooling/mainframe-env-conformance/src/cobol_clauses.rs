@@ -1,6 +1,6 @@
 use mainframe_env_compiler::{
-    CobolClauseKind, CobolCompiler, data_description_clause_descriptor,
-    file_description_clause_descriptor,
+    CobolClauseKind, CobolCompiler, CobolLayout, CobolUsage, DataCategory,
+    data_description_clause_descriptor, file_description_clause_descriptor,
 };
 use mainframe_env_coverage::{
     ConformanceDriver, ConformanceLimits, ConformanceObservation, ConformancePredicate,
@@ -46,6 +46,42 @@ enum TargetKind {
 #[serde(deny_unknown_fields)]
 struct FixtureCase {
     declaration: String,
+    #[serde(default)]
+    expect: Vec<LayoutExpectation>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LayoutExpectation {
+    name: String,
+    category: Option<String>,
+    usage: Option<String>,
+    byte_length: Option<usize>,
+    offset: Option<usize>,
+    length: Option<usize>,
+    element_length: Option<usize>,
+    alignment: Option<usize>,
+    signed: Option<bool>,
+    sign_leading: Option<bool>,
+    sign_separate: Option<bool>,
+    justified_right: Option<bool>,
+    blank_when_zero: Option<bool>,
+    synchronized: Option<bool>,
+    occurs_min: Option<usize>,
+    occurs_max: Option<usize>,
+    unbounded: Option<bool>,
+    alias_of: Option<String>,
+    depending_on: Option<String>,
+    dynamic: Option<bool>,
+    dynamic_limit: Option<usize>,
+    external_name: Option<String>,
+    global: Option<bool>,
+    volatile: Option<bool>,
+    typedef: Option<bool>,
+    allocated: Option<bool>,
+    object_class: Option<String>,
+    initial_hex: Option<String>,
+    source_spans_min: Option<usize>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -53,6 +89,7 @@ struct SemanticOutput {
     total: usize,
     accepted: usize,
     target_hits: usize,
+    expectation_hits: usize,
     details: Vec<String>,
 }
 
@@ -81,12 +118,20 @@ pub fn verify_cobol_semantic_fixtures() -> Result<(), String> {
             || !rows.insert(fixture.row_id.clone())
             || fixture.valid.is_empty()
             || fixture.invalid.is_empty()
+            || fixture.valid.iter().any(|case| case.expect.is_empty())
         {
             return Err(format!("invalid COBOL semantic fixture {}", fixture.id));
         }
         for case in fixture.valid.iter().chain(&fixture.invalid) {
             if case.declaration.is_empty() || case.declaration.len() > 8192 {
                 return Err(format!("invalid COBOL semantic case {}", fixture.id));
+            }
+            if case
+                .expect
+                .iter()
+                .any(|expectation| expectation.name.is_empty())
+            {
+                return Err(format!("invalid COBOL layout expectation {}", fixture.id));
             }
         }
     }
@@ -157,6 +202,7 @@ impl ConformanceDriver for SemanticDriver {
             total: cases.len(),
             accepted: 0,
             target_hits: 0,
+            expectation_hits: 0,
             details: Vec::new(),
         };
         for (index, case) in cases.iter().enumerate() {
@@ -191,9 +237,15 @@ impl ConformanceDriver for SemanticDriver {
                 }),
             };
             output.target_hits += usize::from(hit);
-            output
-                .details
-                .push(format!("case-{index}:accepted=true;target={hit}"));
+            let expectations_match = case.expect.iter().all(|expectation| {
+                semantic
+                    .layout(&expectation.name)
+                    .is_some_and(|layout| layout_matches(layout, expectation))
+            });
+            output.expectation_hits += usize::from(expectations_match);
+            output.details.push(format!(
+                "case-{index}:accepted=true;target={hit};layout={expectations_match}"
+            ));
         }
         DriverOutput::new(
             serde_json::to_vec(&output).map_err(|error| error.to_string())?,
@@ -209,11 +261,16 @@ impl ConformanceObservation for AcceptedObservation {
         ObservationCheck::new(
             output.total > 0
                 && output.accepted == output.total
-                && output.target_hits == output.total,
-            "all valid clause forms accepted with the generated typed target",
+                && output.target_hits == output.total
+                && output.expectation_hits == output.total,
+            "all valid clause forms accepted with the generated typed target and reviewed layout",
             format!(
-                "total={};accepted={};target_hits={};details={:?}",
-                output.total, output.accepted, output.target_hits, output.details
+                "total={};accepted={};target_hits={};expectation_hits={};details={:?}",
+                output.total,
+                output.accepted,
+                output.target_hits,
+                output.expectation_hits,
+                output.details
             ),
             ConformanceLimits::default(),
         )
@@ -284,6 +341,147 @@ fn bundle(kind: TargetKind, case: &FixtureCase) -> Result<SourceBundle, String> 
 
 fn parse_output(output: &DriverOutput) -> Result<SemanticOutput, String> {
     serde_json::from_slice(output.bytes()).map_err(|error| error.to_string())
+}
+
+fn layout_matches(layout: &CobolLayout, expected: &LayoutExpectation) -> bool {
+    expected
+        .category
+        .as_deref()
+        .is_none_or(|value| value == category_slug(layout.category))
+        && expected
+            .usage
+            .as_deref()
+            .is_none_or(|value| value == usage_slug(layout.usage))
+        && expected
+            .byte_length
+            .is_none_or(|value| layout.byte_length == Some(value))
+        && expected.offset.is_none_or(|value| value == layout.offset)
+        && expected.length.is_none_or(|value| value == layout.length)
+        && expected
+            .element_length
+            .is_none_or(|value| value == layout.element_length)
+        && expected
+            .alignment
+            .is_none_or(|value| value == layout.alignment)
+        && expected.signed.is_none_or(|value| value == layout.signed)
+        && expected
+            .sign_leading
+            .is_none_or(|value| value == layout.sign_leading)
+        && expected
+            .sign_separate
+            .is_none_or(|value| value == layout.sign_separate)
+        && expected
+            .justified_right
+            .is_none_or(|value| value == layout.justified_right)
+        && expected
+            .blank_when_zero
+            .is_none_or(|value| value == layout.blank_when_zero)
+        && expected
+            .synchronized
+            .is_none_or(|value| value == layout.synchronized)
+        && expected
+            .occurs_min
+            .is_none_or(|value| value == layout.occurs_min)
+        && expected
+            .occurs_max
+            .is_none_or(|value| value == layout.occurs)
+        && expected
+            .unbounded
+            .is_none_or(|value| value == layout.unbounded)
+        && expected
+            .alias_of
+            .as_deref()
+            .is_none_or(|value| layout.alias_of.as_deref() == Some(value))
+        && expected
+            .depending_on
+            .as_deref()
+            .is_none_or(|value| layout.depending_on.as_deref() == Some(value))
+        && expected.dynamic.is_none_or(|value| value == layout.dynamic)
+        && expected
+            .dynamic_limit
+            .is_none_or(|value| layout.dynamic_limit == Some(value))
+        && expected
+            .external_name
+            .as_deref()
+            .is_none_or(|value| layout.external_name.as_deref() == Some(value))
+        && expected.global.is_none_or(|value| value == layout.global)
+        && expected
+            .volatile
+            .is_none_or(|value| value == layout.volatile)
+        && expected.typedef.is_none_or(|value| value == layout.typedef)
+        && expected
+            .allocated
+            .is_none_or(|value| value == layout.allocated)
+        && expected
+            .object_class
+            .as_deref()
+            .is_none_or(|value| layout.object_class.as_deref() == Some(value))
+        && expected
+            .initial_hex
+            .as_deref()
+            .is_none_or(|value| value == bytes_hex(&layout.initial))
+        && expected
+            .source_spans_min
+            .is_none_or(|value| layout.source.len() >= value)
+}
+
+fn bytes_hex(bytes: &[u8]) -> String {
+    let mut output = String::with_capacity(bytes.len().saturating_mul(2));
+    for byte in bytes {
+        use std::fmt::Write;
+        let _ = write!(output, "{byte:02x}");
+    }
+    output
+}
+
+const fn category_slug(category: DataCategory) -> &'static str {
+    match category {
+        DataCategory::Alphabetic => "alphabetic",
+        DataCategory::Alphanumeric => "alphanumeric",
+        DataCategory::AlphanumericEdited => "alphanumeric-edited",
+        DataCategory::Dbcs => "dbcs",
+        DataCategory::National => "national",
+        DataCategory::NationalEdited => "national-edited",
+        DataCategory::Utf8 => "utf8",
+        DataCategory::NumericDisplay => "numeric-display",
+        DataCategory::NumericEdited => "numeric-edited",
+        DataCategory::PackedDecimal => "packed-decimal",
+        DataCategory::Binary => "binary",
+        DataCategory::FloatShort => "float-short",
+        DataCategory::FloatLong => "float-long",
+        DataCategory::Index => "index",
+        DataCategory::Pointer => "pointer",
+        DataCategory::Pointer32 => "pointer-32",
+        DataCategory::ProcedurePointer => "procedure-pointer",
+        DataCategory::FunctionPointer => "function-pointer",
+        DataCategory::ObjectReference => "object-reference",
+        DataCategory::Group => "group",
+        DataCategory::NationalGroup => "national-group",
+        DataCategory::Utf8Group => "utf8-group",
+        DataCategory::Condition => "condition",
+        DataCategory::Rename => "rename",
+    }
+}
+
+const fn usage_slug(usage: CobolUsage) -> &'static str {
+    match usage {
+        CobolUsage::Display => "display",
+        CobolUsage::Display1 => "display-1",
+        CobolUsage::National => "national",
+        CobolUsage::Utf8 => "utf8",
+        CobolUsage::Binary => "binary",
+        CobolUsage::NativeBinary => "native-binary",
+        CobolUsage::PackedDecimal => "packed-decimal",
+        CobolUsage::FloatShort => "float-short",
+        CobolUsage::FloatLong => "float-long",
+        CobolUsage::Index => "index",
+        CobolUsage::Pointer => "pointer",
+        CobolUsage::Pointer32 => "pointer-32",
+        CobolUsage::ProcedurePointer => "procedure-pointer",
+        CobolUsage::FunctionPointer => "function-pointer",
+        CobolUsage::ObjectReference => "object-reference",
+        CobolUsage::Group => "group",
+    }
 }
 
 #[cfg(test)]

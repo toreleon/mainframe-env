@@ -175,11 +175,12 @@ pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, 
             )
             .map_err(|_| LowerProblem::LimitExceeded)?;
     }
-    for layout in hir
-        .layouts
-        .iter()
-        .filter(|layout| layout.length > 0 && layout.parent.is_none() && layout.alias_of.is_none())
-    {
+    for layout in hir.layouts.iter().filter(|layout| {
+        layout.allocated
+            && layout.length > 0
+            && layout.parent.is_none()
+            && layout.alias_of.is_none()
+    }) {
         let id = *storage
             .get(&layout.qualified_name)
             .ok_or(LowerProblem::InvalidLayout)?;
@@ -335,12 +336,16 @@ fn lower_structured(
 }
 
 fn runtime_root_initial(root: &crate::CobolLayout, layouts: &[crate::CobolLayout]) -> Vec<u8> {
-    if root.category != DataCategory::Group {
+    if !matches!(
+        root.category,
+        DataCategory::Group | DataCategory::NationalGroup | DataCategory::Utf8Group
+    ) {
         return root.initial.clone();
     }
     let mut element = vec![b' '; root.element_length];
     for child in layouts.iter().filter(|layout| {
         layout.parent.as_deref() == Some(root.qualified_name.as_str())
+            && layout.allocated
             && layout.alias_of.is_none()
             && layout.length > 0
     }) {
@@ -504,13 +509,28 @@ const fn edge_attribute(kind: ControlEdgeKind) -> &'static str {
 
 const fn category_slug(category: DataCategory) -> &'static str {
     match category {
+        DataCategory::Alphabetic => "alphabetic",
         DataCategory::Alphanumeric => "alphanumeric",
+        DataCategory::AlphanumericEdited => "alphanumeric_edited",
+        DataCategory::Dbcs => "dbcs",
+        DataCategory::National => "national",
+        DataCategory::NationalEdited => "national_edited",
+        DataCategory::Utf8 => "utf8",
         DataCategory::NumericDisplay => "numeric_display",
         DataCategory::NumericEdited => "numeric_edited",
         DataCategory::PackedDecimal => "packed_decimal",
         DataCategory::Binary => "binary",
+        DataCategory::FloatShort => "float_short",
+        DataCategory::FloatLong => "float_long",
+        DataCategory::Index => "index",
         DataCategory::Pointer => "pointer",
+        DataCategory::Pointer32 => "pointer_32",
+        DataCategory::ProcedurePointer => "procedure_pointer",
+        DataCategory::FunctionPointer => "function_pointer",
+        DataCategory::ObjectReference => "object_reference",
         DataCategory::Group => "group",
+        DataCategory::NationalGroup => "national_group",
+        DataCategory::Utf8Group => "utf8_group",
         DataCategory::Condition => "condition",
         DataCategory::Rename => "rename",
     }
