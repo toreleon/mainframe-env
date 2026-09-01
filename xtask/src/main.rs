@@ -1648,6 +1648,9 @@ fn check_cobol_function_bindings(
             Some("0034") => {
                 expected_obligations.insert("boundary-national-character-count");
             }
+            Some("0037" | "0074") => {
+                expected_obligations.insert("boundary-national-case-map");
+            }
             Some("0046") => {
                 expected_obligations.insert("boundary-currency-symbol");
             }
@@ -1656,6 +1659,9 @@ fn check_cobol_function_bindings(
             }
             Some("0053") => {
                 expected_obligations.insert("boundary-sequence-and-reseed");
+            }
+            Some("0056") => {
+                expected_obligations.insert("boundary-national-character-reversal");
             }
             Some("0067" | "0068") => {
                 expected_obligations.insert("boundary-error-position");
@@ -1668,6 +1674,9 @@ fn check_cobol_function_bindings(
             }
             Some("0069") => {
                 expected_obligations.insert("boundary-currency-position");
+            }
+            Some("0071") => {
+                expected_obligations.insert("boundary-national-space-trim");
             }
             Some("0072") => {
                 expected_obligations.insert("boundary-byte-aligned-slice");

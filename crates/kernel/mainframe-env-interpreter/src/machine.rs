@@ -6253,6 +6253,19 @@ impl ReferenceMachine {
         let bytes = |index: usize| -> Result<Vec<u8>, MachineProblem> {
             value_bytes(self.eval_value(argument(index)?)?)
         };
+        let national = |index: usize| -> Result<bool, MachineProblem> {
+            Ok(self
+                .reference(argument(index)?)
+                .ok()
+                .is_some_and(|reference| {
+                    matches!(
+                        reference.layout.category,
+                        LayoutCategory::National
+                            | LayoutCategory::NationalEdited
+                            | LayoutCategory::NationalGroup
+                    )
+                }))
+        };
         let numeric = || -> Result<Vec<Decimal>, MachineProblem> {
             (0..arguments.len()).map(&decimal).collect()
         };
@@ -6377,18 +6390,8 @@ impl ReferenceMachine {
             )
             .map(CobolValue::Decimal),
             "INTEGER-PART" => decimal_rescale(decimal(0)?, 0).map(CobolValue::Decimal),
-            "UPPER-CASE" => {
-                let bytes = bytes(0)?;
-                Ok(CobolValue::Bytes(
-                    String::from_utf8_lossy(&bytes).to_uppercase().into_bytes(),
-                ))
-            }
-            "LOWER-CASE" => {
-                let bytes = bytes(0)?;
-                Ok(CobolValue::Bytes(
-                    String::from_utf8_lossy(&bytes).to_lowercase().into_bytes(),
-                ))
-            }
+            "UPPER-CASE" => text_case(&bytes(0)?, national(0)?, true).map(CobolValue::Bytes),
+            "LOWER-CASE" => text_case(&bytes(0)?, national(0)?, false).map(CobolValue::Bytes),
             "LENGTH" => {
                 let value = bytes(0)?;
                 let length = self.reference(argument(0)?).ok().map_or_else(
@@ -6484,13 +6487,7 @@ impl ReferenceMachine {
             "RANDOM" => self.random(arguments.first().map(|_| integer(0)).transpose()?),
             "RANGE" => decimal_range(&numeric()?).map(CobolValue::Decimal),
             "REM" => decimal_mod(decimal(0)?, decimal(1)?, false).map(CobolValue::Decimal),
-            "REVERSE" => Ok(CobolValue::Bytes(
-                String::from_utf8_lossy(&bytes(0)?)
-                    .chars()
-                    .rev()
-                    .collect::<String>()
-                    .into_bytes(),
-            )),
+            "REVERSE" => text_reverse(&bytes(0)?, national(0)?).map(CobolValue::Bytes),
             "SECONDS-FROM-FORMATTED-TIME" => seconds_from_formatted_time(
                 &String::from_utf8_lossy(&bytes(0)?),
                 &String::from_utf8_lossy(&bytes(1)?),
@@ -6523,16 +6520,11 @@ impl ReferenceMachine {
             }
             "TEST-NUMVAL-F" => Ok(integer_value(test_numval(&bytes(0)?, true, None) as i128)),
             "TRIM" => {
-                let value = String::from_utf8_lossy(&bytes(0)?).into_owned();
                 let mode = arguments
                     .get(1)
                     .and_then(|tokens| tokens.first())
                     .map(String::as_str);
-                Ok(CobolValue::Bytes(match mode {
-                    Some("LEADING") => value.trim_start().as_bytes().to_vec(),
-                    Some("TRAILING") => value.trim_end().as_bytes().to_vec(),
-                    _ => value.trim().as_bytes().to_vec(),
-                }))
+                text_trim(&bytes(0)?, national(0)?, mode).map(CobolValue::Bytes)
             }
             "ULENGTH" => unicode_length(
                 &bytes(0)?,
@@ -9525,6 +9517,50 @@ fn national_of(source: &[u8], ccsid: u16) -> Result<Vec<u8>, MachineProblem> {
         _ => return Err(MachineProblem::UnsupportedForm),
     };
     utf8_to_national(&utf8)
+}
+
+fn function_text(bytes: &[u8], national: bool) -> Result<String, MachineProblem> {
+    let utf8 = if national {
+        national_to_utf8(bytes)?
+    } else {
+        bytes.to_vec()
+    };
+    String::from_utf8(utf8).map_err(|_| MachineProblem::DataException)
+}
+
+fn function_text_bytes(value: String, national: bool) -> Vec<u8> {
+    if national {
+        value.encode_utf16().flat_map(u16::to_be_bytes).collect()
+    } else {
+        value.into_bytes()
+    }
+}
+
+fn text_case(bytes: &[u8], national: bool, uppercase: bool) -> Result<Vec<u8>, MachineProblem> {
+    let value = function_text(bytes, national)?;
+    Ok(function_text_bytes(
+        if uppercase {
+            value.to_uppercase()
+        } else {
+            value.to_lowercase()
+        },
+        national,
+    ))
+}
+
+fn text_reverse(bytes: &[u8], national: bool) -> Result<Vec<u8>, MachineProblem> {
+    let value = function_text(bytes, national)?;
+    Ok(function_text_bytes(value.chars().rev().collect(), national))
+}
+
+fn text_trim(bytes: &[u8], national: bool, mode: Option<&str>) -> Result<Vec<u8>, MachineProblem> {
+    let value = function_text(bytes, national)?;
+    let value = match mode {
+        Some("LEADING") => value.trim_start_matches(' '),
+        Some("TRAILING") => value.trim_end_matches(' '),
+        _ => value.trim_matches(' '),
+    };
+    Ok(function_text_bytes(value.to_string(), national))
 }
 
 fn unicode_length(

@@ -134,6 +134,34 @@
       "obligation_id": "boundary-explicit-input-ccsid",
       "source": "IDENTIFICATION DIVISION. PROGRAM-ID. NATIONALCCSID. DATA DIVISION. WORKING-STORAGE SECTION. 01 SOURCE-X PIC X(2). 01 HEX-X PIC X(8). PROCEDURE DIVISION. MOVE FUNCTION HEX-TO-CHAR('C1C2') TO SOURCE-X. MOVE FUNCTION HEX-OF(FUNCTION NATIONAL-OF(SOURCE-X, 37)) TO HEX-X. DISPLAY HEX-X. STOP RUN.",
       "expected_output": "00410042\n"
+    },
+    {
+      "id": "reverse-national-surrogate-pair",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0056",
+      "obligation_id": "boundary-national-character-reversal",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. REVERSENATIONAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 NAT-X PIC N(4) NATIONAL. 01 HEX-X PIC X(16). PROCEDURE DIVISION. MOVE 'A🙂B' TO NAT-X. MOVE FUNCTION HEX-OF(FUNCTION REVERSE(NAT-X)) TO HEX-X. DISPLAY HEX-X. STOP RUN.",
+      "expected_output": "0042D83DDE420041\n"
+    },
+    {
+      "id": "upper-case-national",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0074",
+      "obligation_id": "boundary-national-case-map",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. UPPERNATIONAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 NAT-X PIC N(2) NATIONAL. 01 HEX-X PIC X(8). PROCEDURE DIVISION. MOVE 'éa' TO NAT-X. MOVE FUNCTION HEX-OF(FUNCTION UPPER-CASE(NAT-X)) TO HEX-X. DISPLAY HEX-X. STOP RUN.",
+      "expected_output": "00C90041\n"
+    },
+    {
+      "id": "lower-case-national",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0037",
+      "obligation_id": "boundary-national-case-map",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. LOWERNATIONAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 NAT-X PIC N(2) NATIONAL. 01 HEX-X PIC X(8). PROCEDURE DIVISION. MOVE 'ÉA' TO NAT-X. MOVE FUNCTION HEX-OF(FUNCTION LOWER-CASE(NAT-X)) TO HEX-X. DISPLAY HEX-X. STOP RUN.",
+      "expected_output": "00E90061\n"
+    },
+    {
+      "id": "trim-national-spaces",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0071",
+      "obligation_id": "boundary-national-space-trim",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. TRIMNATIONAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 NAT-X PIC N(4) NATIONAL. 01 HEX-X PIC X(4). PROCEDURE DIVISION. MOVE '  A ' TO NAT-X. MOVE FUNCTION HEX-OF(FUNCTION TRIM(NAT-X)) TO HEX-X. DISPLAY HEX-X. STOP RUN.",
+      "expected_output": "0041\n"
     }
   ]
 }
