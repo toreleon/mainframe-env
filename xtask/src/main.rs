@@ -2127,6 +2127,7 @@ fn check_declared_dependency_graph(root: &Path) -> TaskResult {
         root.join("conformance/0.1.1/inventory/dependency-graph-additions.json"),
         root.join("conformance/0.2/inventory/dependency-additions.json"),
         root.join("conformance/0.3/inventory/dependency-additions.json"),
+        root.join("conformance/0.6/inventory/dependency-additions.json"),
     ] {
         if !additions_path.is_file() {
             continue;
@@ -2452,6 +2453,14 @@ fn check_schemas(root: &Path) -> TaskResult {
         &json(&schema_path)?,
         &json(&inventory_path)?,
         &inventory_path,
+    )?;
+    let dependency_path = root.join("conformance/0.6/inventory/dependency-additions.json");
+    let dependency_schema =
+        root.join("conformance/0.6/schemas/dataset-dependency-additions.schema.json");
+    validate_schema_instance(
+        &json(&dependency_schema)?,
+        &json(&dependency_path)?,
+        &dependency_path,
     )?;
     let migration_path = root.join("conformance/0.6/migrations/dataset-state-v2-to-v3.json");
     let migration_schema = root.join("conformance/0.6/schemas/dataset-state-migration.schema.json");

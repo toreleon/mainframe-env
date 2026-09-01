@@ -46,6 +46,7 @@
   "validation": [
     "cargo test --workspace --all-targets",
     "cargo clippy --workspace --all-targets -- -D warnings",
+    "cargo xtask architecture --check",
     "cargo xtask schemas --check",
     "cargo xtask dataset-contract --check",
     "cargo xtask spec --check",
