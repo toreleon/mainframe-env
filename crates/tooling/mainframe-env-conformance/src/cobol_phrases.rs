@@ -4,6 +4,7 @@ use mainframe_env_coverage::{
     DriverOutput, DriverRef, FixtureRef, ObservationCheck, ObservationRef, PredicateRef,
 };
 use mainframe_env_execution_api::{Machine, MachineDrive, MachineResume, Quantum};
+use mainframe_env_host_api::{DatasetLockMode, DatasetReadControl, DatasetRequest, HostRequest};
 use mainframe_env_interpreter::ReferenceMachine;
 use mainframe_env_ir::CodecLimits;
 use serde::{Deserialize, Serialize};
@@ -29,6 +30,7 @@ struct Fixture {
     obligation_id: String,
     source: String,
     expected_output: String,
+    expected_effects: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -67,6 +69,9 @@ pub fn verify_cobol_statement_phrase_runtime_fixtures() -> Result<(), String> {
             || !fixture.obligation_id.starts_with("phrase-")
             || fixture.source.len() > 16_384
             || fixture.expected_output.len() > 16_384
+            || fixture.expected_effects.as_ref().is_some_and(|effects| {
+                effects.len() > 64 || effects.iter().any(|effect| effect.len() > 256)
+            })
         {
             return Err(format!(
                 "invalid COBOL statement phrase fixture {}",
@@ -166,6 +171,7 @@ fn execute(fixture: &Fixture) -> Result<Output, String> {
     )
     .map_err(|error| format!("{error:?}"))?;
     let mut resume = MachineResume::Start;
+    let mut effects = Vec::new();
     let completion = loop {
         match machine.drive(
             resume,
@@ -173,6 +179,7 @@ fn execute(fixture: &Fixture) -> Result<Output, String> {
         ) {
             MachineDrive::Continue => resume = MachineResume::Start,
             MachineDrive::HostCall(effect) => {
+                effects.push(phrase_effect(&effect.request));
                 resume = MachineResume::HostResult(crate::cobol_runtime::effect_result(&effect)?)
             }
             MachineDrive::Completed(completion) => break completion,
@@ -180,13 +187,53 @@ fn execute(fixture: &Fixture) -> Result<Output, String> {
         }
     };
     Ok(Output {
-        matched: completion.output.bytes() == fixture.expected_output.as_bytes(),
-        expected: format!("output={:?}", fixture.expected_output),
+        matched: completion.output.bytes() == fixture.expected_output.as_bytes()
+            && fixture
+                .expected_effects
+                .as_ref()
+                .is_none_or(|expected| expected == &effects),
+        expected: format!(
+            "output={:?};effects={:?}",
+            fixture.expected_output, fixture.expected_effects
+        ),
         actual: format!(
-            "output={:?}",
-            String::from_utf8_lossy(completion.output.bytes())
+            "output={:?};effects={effects:?}",
+            String::from_utf8_lossy(completion.output.bytes()),
         ),
     })
+}
+
+fn phrase_effect(request: &HostRequest) -> String {
+    let control = |control: &DatasetReadControl| {
+        format!(
+            "lock={},wait={}",
+            match control.lock {
+                DatasetLockMode::Default => "default",
+                DatasetLockMode::Lock => "lock",
+                DatasetLockMode::KeptLock => "kept-lock",
+                DatasetLockMode::NoLock => "no-lock",
+                DatasetLockMode::IgnoreLock => "ignore-lock",
+            },
+            match control.wait {
+                None => "default",
+                Some(true) => "wait",
+                Some(false) => "no-wait",
+            }
+        )
+    };
+    match request {
+        HostRequest::Dataset(DatasetRequest::Read { control: value, .. }) => {
+            format!("dataset.read:{}", control(value))
+        }
+        HostRequest::Dataset(DatasetRequest::ReadNext { control: value, .. }) => {
+            format!("dataset.read-next:{}", control(value))
+        }
+        HostRequest::Dataset(_) => "dataset.other".into(),
+        HostRequest::Terminal(_) => "terminal".into(),
+        HostRequest::Clock(_) => "clock".into(),
+        HostRequest::Program(_) => "program".into(),
+        _ => "host.other".into(),
+    }
 }
 
 fn catalog() -> Result<Catalog, String> {

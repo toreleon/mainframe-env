@@ -273,6 +273,22 @@ mod tests {
         assert!(machine.variable("BLOCK").is_none());
     }
     #[test]
+    fn allocate_linkage_target_initializes_declared_values_and_can_omit_returning() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. HEAPINIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR POINTER. LINKAGE SECTION. 01 BLOCK. 05 TEXT-X PIC X(2) VALUE 'AB'. 05 NUM-X PIC 99 VALUE 12. PROCEDURE DIVISION. ALLOCATE BLOCK INITIALIZED. DISPLAY BLOCK. SET PTR TO ADDRESS OF BLOCK. FREE PTR. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"AB12\n"),
+            other => panic!("{other:?}"),
+        }
+
+        let rounded = "IDENTIFICATION DIVISION. PROGRAM-ID. HEAPROUND. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR POINTER. LINKAGE SECTION. 01 BLOCK PIC X(2). PROCEDURE DIVISION. ALLOCATE 1.1 CHARACTERS INITIALIZED RETURNING PTR. SET ADDRESS OF BLOCK TO PTR. MOVE 'OK' TO BLOCK. DISPLAY BLOCK. FREE PTR. STOP RUN.";
+        let artifact = compile(rounded).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"OK\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
     fn nested_occurs_accepts_ordered_multidimensional_subscripts() {
         let artifact = compile(
             "IDENTIFICATION DIVISION.\nPROGRAM-ID. MULTIDIM.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 TABLE-A.\n 05 ROW-A OCCURS 2 TIMES.\n  10 CELL-A OCCURS 3 TIMES PIC X.\nPROCEDURE DIVISION.\nMOVE 'Z' TO CELL-A(2 3).\nIF CELL-A(2 3) = 'Z' DISPLAY 'OK' ELSE DISPLAY 'BAD' END-IF.\nSTOP RUN.\n",
@@ -889,6 +905,30 @@ mod tests {
             other => panic!("{other:?}"),
         }
     }
+    #[test]
+    fn xml_parse_processing_procedure_receives_ordered_events_and_through_range() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. XMLPROCESS. DATA DIVISION. WORKING-STORAGE SECTION. 01 XML-X PIC X(32) VALUE '<ROOT>A&amp;B</ROOT>'. PROCEDURE DIVISION. XML PARSE XML-X PROCESSING PROCEDURE HANDLE THRU HANDLE-END. DISPLAY 'DONE'. STOP RUN. HANDLE. DISPLAY XML-EVENT ':' XML-TEXT. HANDLE-END. EXIT. NEXT-P. DISPLAY 'BAD'.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 4096) {
+            MachineDrive::Completed(done) => assert_eq!(
+                done.output.bytes(),
+                b"START-OF-DOCUMENT:\nSTART-OF-ELEMENT:ROOT\nCONTENT-CHARACTERS:A&B\nEND-OF-ELEMENT:ROOT\nEND-OF-DOCUMENT:\nDONE\n"
+            ),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn json_parse_with_detail_emits_a_deterministic_exception_message() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. JSONDETAIL. DATA DIVISION. WORKING-STORAGE SECTION. 01 BAD-X PIC X(3) VALUE 'BAD'. 01 OUT-X PIC X(8). PROCEDURE DIVISION. JSON PARSE BAD-X INTO OUT-X WITH DETAIL ON EXCEPTION DISPLAY 'ERR' NOT ON EXCEPTION DISPLAY 'BAD' END-JSON. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(
+                done.output.bytes(),
+                b"IGZ0335W JSON PARSE input is invalid\nERR\n"
+            ),
+            other => panic!("{other:?}"),
+        }
+    }
 
     #[test]
     fn call_exception_state_ignores_conflicting_prior_file_status() {
@@ -991,6 +1031,15 @@ mod tests {
         }
     }
     #[test]
+    fn inspect_leading_first_characters_and_delimited_ranges_are_exact() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. INSPECTPHRASE. DATA DIVISION. WORKING-STORAGE SECTION. 01 TEXT-X PIC X(9) VALUE '000CABACA'. 01 COUNT-X PIC 99 VALUE 1. PROCEDURE DIVISION. INSPECT TEXT-X TALLYING COUNT-X FOR LEADING '0'. INSPECT TEXT-X REPLACING FIRST 'A' BY '2' AFTER INITIAL 'C'. INSPECT TEXT-X REPLACING LEADING '0' BY 'X' BEFORE INITIAL 'C'. INSPECT TEXT-X REPLACING CHARACTERS BY '*' AFTER INITIAL 'B' BEFORE INITIAL 'C'. DISPLAY COUNT-X. DISPLAY TEXT-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"04\nXXXC2B*CA\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
     fn initialize_resolves_multiple_qualified_targets() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. INITQUAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 GROUP-X. 05 FIRST-X PIC X VALUE 'A'. 05 SECOND-X PIC X VALUE 'B'. 01 THIRD-X PIC X VALUE 'C'. PROCEDURE DIVISION. INITIALIZE FIRST-X OF GROUP-X SECOND-X OF GROUP-X THIRD-X. DISPLAY GROUP-X. DISPLAY THIRD-X. STOP RUN.";
         let artifact = compile(source).unwrap();
@@ -1005,6 +1054,15 @@ mod tests {
         let artifact = compile(source).unwrap();
         match execute(&artifact, 1024) {
             MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"A \n  \n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn initialize_replacing_multiple_categories_and_then_default_are_distinct() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. INITREPL. DATA DIVISION. WORKING-STORAGE SECTION. 01 GROUP-X. 05 TEXT-X PIC X(2) VALUE 'AB'. 05 NUMBER-X PIC 99 VALUE 12. 05 LETTER-X PIC A VALUE 'Z'. PROCEDURE DIVISION. INITIALIZE GROUP-X REPLACING ALPHANUMERIC DATA BY 'X' NUMERIC DATA BY 7. DISPLAY GROUP-X. MOVE 'AB' TO TEXT-X. MOVE 12 TO NUMBER-X. MOVE 'Z' TO LETTER-X. INITIALIZE GROUP-X REPLACING ALPHANUMERIC DATA BY 'X' NUMERIC DATA BY 7 THEN TO DEFAULT. DISPLAY GROUP-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"X 07Z\nX 07 \n"),
             other => panic!("{other:?}"),
         }
     }
@@ -1168,6 +1226,15 @@ mod tests {
         }
     }
     #[test]
+    fn exit_section_skips_remaining_paragraphs_until_the_next_section() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. EXITSECT. PROCEDURE DIVISION. GO TO WORK-P. FIRST-S SECTION. WORK-P. DISPLAY 'WORK'. EXIT SECTION. DISPLAY 'BAD'. LATE-P. DISPLAY 'LATE'. SECOND-S SECTION. DISPLAY 'NEXT'. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"WORK\nNEXT\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
     fn nested_read_perform_takes_at_end_branch_before_loop_reentry() {
         use mainframe_env_host_api::{DatasetResult, EffectResult, HostRequest, HostResult};
 
@@ -1285,6 +1352,15 @@ mod tests {
         let artifact = compile(source).unwrap();
         match execute(&artifact, 1024) {
             MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"1222\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn set_to_applies_one_value_or_address_to_every_target() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SETMULTI. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 99 VALUE 1. 01 B PIC 99 VALUE 2. 01 ITEM-X PIC X VALUE 'X'. 01 P POINTER. 01 Q POINTER. PROCEDURE DIVISION. SET A B TO 7. SET P Q TO ADDRESS OF ITEM-X. SET P Q TO NULL. DISPLAY A B. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"0707\n"),
             other => panic!("{other:?}"),
         }
     }
@@ -1610,6 +1686,112 @@ mod tests {
             ),
             MachineDrive::Completed(done) if done.output.bytes() == b"ABC\n00\n"
         ));
+    }
+    #[test]
+    fn read_lock_and_wait_phrases_survive_in_the_typed_dataset_effect() {
+        use mainframe_env_host_api::{
+            DatasetLockMode, DatasetReadControl, DatasetRequest, HostRequest,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. READCONTROL. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT TEST-FILE ASSIGN TO TESTDD ORGANIZATION IS INDEXED ACCESS MODE IS RANDOM RECORD KEY IS REC-KEY. DATA DIVISION. FILE SECTION. FD TEST-FILE. 01 TEST-REC. 05 REC-KEY PIC X(2) VALUE 'AA'. 05 DATA-X PIC X(2). PROCEDURE DIVISION. READ TEST-FILE RECORD KEY IS REC-KEY WITH KEPT LOCK NO WAIT. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 4096).unwrap())
+        else {
+            panic!("READ did not emit a host effect");
+        };
+        assert!(matches!(
+            effect.request,
+            HostRequest::Dataset(DatasetRequest::Read {
+                control: DatasetReadControl {
+                    lock: DatasetLockMode::KeptLock,
+                    wait: Some(false),
+                },
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn open_and_close_apply_every_file_and_retain_each_close_phrase() {
+        use mainframe_env_host_api::{DatasetRequest, HostRequest};
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. MULTIFILE. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT FIRST-FILE ASSIGN TO FIRSTDD ORGANIZATION IS SEQUENTIAL. SELECT SECOND-FILE ASSIGN TO SECONDDD ORGANIZATION IS SEQUENTIAL. DATA DIVISION. FILE SECTION. FD FIRST-FILE. 01 FIRST-REC PIC X. FD SECOND-FILE. 01 SECOND-REC PIC X. PROCEDURE DIVISION. OPEN OUTPUT FIRST-FILE SECOND-FILE. CLOSE FIRST-FILE WITH LOCK SECOND-FILE. DISPLAY 'DONE'. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let mut resume = MachineResume::Start;
+        let mut requests = Vec::new();
+        loop {
+            match machine.drive(resume, Quantum::new(256, 4096).unwrap()) {
+                MachineDrive::Continue => resume = MachineResume::Start,
+                MachineDrive::HostCall(effect) => {
+                    let HostRequest::Dataset(request) = &effect.request else {
+                        panic!("unexpected effect: {:?}", effect.request);
+                    };
+                    let (kind, dataset) = match request {
+                        DatasetRequest::Truncate { dataset, .. } => ("truncate", dataset.as_str()),
+                        DatasetRequest::Attributes { dataset } => ("close", dataset.as_str()),
+                        other => panic!("unexpected dataset request: {other:?}"),
+                    };
+                    requests.push(format!("{kind}:{dataset}"));
+                    resume = MachineResume::HostResult(
+                        crate::cobol_runtime::effect_result(&effect).unwrap(),
+                    );
+                }
+                MachineDrive::Completed(done) => {
+                    assert_eq!(done.output.bytes(), b"DONE\n");
+                    break;
+                }
+                other => panic!("{other:?}"),
+            }
+        }
+        assert_eq!(
+            requests,
+            [
+                "truncate:FIRSTDD",
+                "truncate:SECONDDD",
+                "close:FIRSTDD",
+                "close:SECONDDD",
+            ]
+        );
+    }
+    #[test]
+    fn write_advancing_updates_linage_and_selects_end_of_page_branches() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. WRITEPAGE. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT PRINT-FILE ASSIGN TO PRINTDD ORGANIZATION IS SEQUENTIAL. DATA DIVISION. FILE SECTION. FD PRINT-FILE LINAGE IS 3 LINES. 01 PRINT-REC PIC X. WORKING-STORAGE SECTION. 01 VALUE-X PIC X VALUE 'A'. PROCEDURE DIVISION. WRITE PRINT-REC FROM VALUE-X AFTER ADVANCING 2 LINES AT END-OF-PAGE DISPLAY 'EOP' NOT AT END-OF-PAGE DISPLAY 'BAD1' END-WRITE. WRITE PRINT-REC FROM VALUE-X BEFORE ADVANCING PAGE AT END-OF-PAGE DISPLAY 'PAGE' NOT AT END-OF-PAGE DISPLAY 'BAD2' END-WRITE. DISPLAY LINAGE-COUNTER. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let mut resume = MachineResume::Start;
+        loop {
+            match machine.drive(resume, Quantum::new(256, 4096).unwrap()) {
+                MachineDrive::Continue => resume = MachineResume::Start,
+                MachineDrive::HostCall(effect) => {
+                    resume = MachineResume::HostResult(
+                        crate::cobol_runtime::effect_result(&effect).unwrap(),
+                    );
+                }
+                MachineDrive::Completed(done) => {
+                    assert_eq!(done.output.bytes(), b"EOP\nPAGE\n1\n");
+                    break;
+                }
+                other => panic!("{other:?}"),
+            }
+        }
     }
 
     #[test]

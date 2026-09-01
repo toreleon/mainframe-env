@@ -1159,12 +1159,23 @@ impl ProcedureParser {
         }
     }
 
-    fn push_label(&mut self, sentence: usize, line: usize, name: &str, range: Range<usize>) {
+    fn push_label(
+        &mut self,
+        sentence: usize,
+        line: usize,
+        name: &str,
+        section: bool,
+        range: Range<usize>,
+    ) {
         let statement = self.statements.len();
         self.statements.push(HirStatement {
             kind: StatementKind::Label,
             official: None,
-            arguments: vec![name.to_string()],
+            arguments: if section {
+                vec![name.to_string(), "SECTION".into()]
+            } else {
+                vec![name.to_string()]
+            },
             options: Vec::new(),
             line,
             source: Vec::new(),
@@ -1329,8 +1340,13 @@ fn parse_procedure(source: &str, max_statements: usize) -> Result<ParsedProcedur
             ProcedureEvent::Terminator { range, line } => {
                 parser.push_terminator(sentence, line, &source[range.clone()], range);
             }
-            ProcedureEvent::Label { name, range, line } => {
-                parser.push_label(sentence, line, &name, range);
+            ProcedureEvent::Label {
+                name,
+                section,
+                range,
+                line,
+            } => {
+                parser.push_label(sentence, line, &name, section, range);
             }
         }
     }

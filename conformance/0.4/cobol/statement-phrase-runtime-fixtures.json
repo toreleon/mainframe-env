@@ -10,6 +10,13 @@
       "expected_output": "1223T\n"
     },
     {
+      "id": "allocate-initialized-linkage",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0003",
+      "obligation_id": "phrase-initialized-linkage",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. HEAPINIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR POINTER. LINKAGE SECTION. 01 BLOCK. 05 TEXT-X PIC X(2) VALUE 'AB'. 05 NUM-X PIC 99 VALUE 12. PROCEDURE DIVISION. ALLOCATE BLOCK INITIALIZED. DISPLAY BLOCK. SET PTR TO ADDRESS OF BLOCK. FREE PTR. STOP RUN.",
+      "expected_output": "AB12\n"
+    },
+    {
       "id": "display-upon-no-advancing",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0011",
       "obligation_id": "phrase-upon-no-advancing",
@@ -31,11 +38,32 @@
       "expected_output": "WORK\nDONE\n"
     },
     {
+      "id": "exit-section",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0015",
+      "obligation_id": "phrase-section",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. EXITSECT. PROCEDURE DIVISION. GO TO WORK-P. FIRST-S SECTION. WORK-P. DISPLAY 'WORK'. EXIT SECTION. DISPLAY 'BAD'. LATE-P. DISPLAY 'LATE'. SECOND-S SECTION. DISPLAY 'NEXT'. STOP RUN.",
+      "expected_output": "WORK\nNEXT\n"
+    },
+    {
       "id": "initialize-with-filler",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0020",
       "obligation_id": "phrase-with-filler",
       "source": "IDENTIFICATION DIVISION. PROGRAM-ID. INITFILL. DATA DIVISION. WORKING-STORAGE SECTION. 01 GROUP-A. 05 FILLER PIC X VALUE 'A'. 05 VALUE-A PIC X VALUE 'B'. 01 GROUP-B. 05 FILLER PIC X VALUE 'C'. 05 VALUE-B PIC X VALUE 'D'. PROCEDURE DIVISION. INITIALIZE GROUP-A. INITIALIZE GROUP-B WITH FILLER. DISPLAY GROUP-A. DISPLAY GROUP-B. STOP RUN.",
       "expected_output": "A \n  \n"
+    },
+    {
+      "id": "initialize-replacing-default",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0020",
+      "obligation_id": "phrase-replacing-then-default",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. INITREPL. DATA DIVISION. WORKING-STORAGE SECTION. 01 GROUP-X. 05 TEXT-X PIC X(2) VALUE 'AB'. 05 NUMBER-X PIC 99 VALUE 12. 05 LETTER-X PIC A VALUE 'Z'. PROCEDURE DIVISION. INITIALIZE GROUP-X REPLACING ALPHANUMERIC DATA BY 'X' NUMERIC DATA BY 7. DISPLAY GROUP-X. MOVE 'AB' TO TEXT-X. MOVE 12 TO NUMBER-X. MOVE 'Z' TO LETTER-X. INITIALIZE GROUP-X REPLACING ALPHANUMERIC DATA BY 'X' NUMERIC DATA BY 7 THEN TO DEFAULT. DISPLAY GROUP-X. STOP RUN.",
+      "expected_output": "X 07Z\nX 07 \n"
+    },
+    {
+      "id": "inspect-modes-and-ranges",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0021",
+      "obligation_id": "phrase-leading-first-before-after",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. INSPECTPHRASE. DATA DIVISION. WORKING-STORAGE SECTION. 01 TEXT-X PIC X(9) VALUE '000CABACA'. 01 COUNT-X PIC 99 VALUE 1. PROCEDURE DIVISION. INSPECT TEXT-X TALLYING COUNT-X FOR LEADING '0'. INSPECT TEXT-X REPLACING FIRST 'A' BY '2' AFTER INITIAL 'C'. INSPECT TEXT-X REPLACING LEADING '0' BY 'X' BEFORE INITIAL 'C'. INSPECT TEXT-X REPLACING CHARACTERS BY '*' AFTER INITIAL 'B' BEFORE INITIAL 'C'. DISPLAY COUNT-X. DISPLAY TEXT-X. STOP RUN.",
+      "expected_output": "04\nXXXC2B*CA\n"
     },
     {
       "id": "move-corresponding",
@@ -59,11 +87,33 @@
       "expected_output": "WORK\nDONE\n"
     },
     {
+      "id": "open-multiple-files",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0028",
+      "obligation_id": "phrase-multiple-files-and-modes",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. MULTIOPEN. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT FIRST-FILE ASSIGN TO FIRSTDD ORGANIZATION IS SEQUENTIAL. SELECT SECOND-FILE ASSIGN TO SECONDDD ORGANIZATION IS SEQUENTIAL. DATA DIVISION. FILE SECTION. FD FIRST-FILE. 01 FIRST-REC PIC X. FD SECOND-FILE. 01 SECOND-REC PIC X. PROCEDURE DIVISION. OPEN OUTPUT FIRST-FILE SECOND-FILE. DISPLAY 'DONE'. STOP RUN.",
+      "expected_output": "DONE\n"
+    },
+    {
+      "id": "close-multiple-with-lock",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0007",
+      "obligation_id": "phrase-multiple-with-lock",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. MULTICLOSE. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT FIRST-FILE ASSIGN TO FIRSTDD ORGANIZATION IS SEQUENTIAL. SELECT SECOND-FILE ASSIGN TO SECONDDD ORGANIZATION IS SEQUENTIAL. DATA DIVISION. FILE SECTION. FD FIRST-FILE. 01 FIRST-REC PIC X. FD SECOND-FILE. 01 SECOND-REC PIC X. PROCEDURE DIVISION. CLOSE FIRST-FILE WITH LOCK SECOND-FILE. DISPLAY 'DONE'. STOP RUN.",
+      "expected_output": "DONE\n"
+    },
+    {
       "id": "read-next-record",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0030",
       "obligation_id": "phrase-next-record",
       "source": "IDENTIFICATION DIVISION. PROGRAM-ID. READNEXT. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT TEST-FILE ASSIGN TO TESTDD ORGANIZATION IS SEQUENTIAL ACCESS MODE IS SEQUENTIAL. DATA DIVISION. FILE SECTION. FD TEST-FILE. 01 TEST-RECORD PIC X(8). WORKING-STORAGE SECTION. 01 OUT-X PIC X(8). PROCEDURE DIVISION. OPEN INPUT TEST-FILE. READ TEST-FILE NEXT RECORD INTO OUT-X AT END DISPLAY 'BAD' END-READ. DISPLAY OUT-X. CLOSE TEST-FILE. STOP RUN.",
       "expected_output": "RECORD  \n"
+    },
+    {
+      "id": "read-lock-no-wait",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0030",
+      "obligation_id": "phrase-lock-wait",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. READCONTROL. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT TEST-FILE ASSIGN TO TESTDD ORGANIZATION IS INDEXED ACCESS MODE IS RANDOM RECORD KEY IS REC-KEY. DATA DIVISION. FILE SECTION. FD TEST-FILE. 01 TEST-REC. 05 REC-KEY PIC X(2) VALUE 'AA'. 05 DATA-X PIC X(6). PROCEDURE DIVISION. READ TEST-FILE RECORD KEY IS REC-KEY WITH KEPT LOCK NO WAIT. DISPLAY 'DONE'. STOP RUN.",
+      "expected_output": "DONE\n",
+      "expected_effects": ["dataset.read:lock=kept-lock,wait=no-wait"]
     },
     {
       "id": "release-from",
@@ -85,6 +135,13 @@
       "obligation_id": "phrase-up-down-by",
       "source": "IDENTIFICATION DIVISION. PROGRAM-ID. SETDELTA. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 99 VALUE 10. 01 B PIC 99 VALUE 20. PROCEDURE DIVISION. SET A B UP BY 3. SET A B DOWN BY 1. DISPLAY A B. STOP RUN.",
       "expected_output": "1222\n"
+    },
+    {
+      "id": "set-multiple-to",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0035",
+      "obligation_id": "phrase-multiple-to",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. SETMULTI. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 99 VALUE 1. 01 B PIC 99 VALUE 2. PROCEDURE DIVISION. SET A B TO 7. DISPLAY A B. STOP RUN.",
+      "expected_output": "0707\n"
     },
     {
       "id": "search-all",
@@ -115,11 +172,32 @@
       "expected_output": "18\n"
     },
     {
+      "id": "json-parse-with-detail",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
+      "obligation_id": "phrase-with-detail",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. JSONDETAIL. DATA DIVISION. WORKING-STORAGE SECTION. 01 BAD-X PIC X(3) VALUE 'BAD'. 01 OUT-X PIC X(8). PROCEDURE DIVISION. JSON PARSE BAD-X INTO OUT-X WITH DETAIL ON EXCEPTION DISPLAY 'ERR' NOT ON EXCEPTION DISPLAY 'BAD' END-JSON. STOP RUN.",
+      "expected_output": "IGZ0335W JSON PARSE input is invalid\nERR\n"
+    },
+    {
       "id": "xml-generate-count",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0043",
       "obligation_id": "phrase-count-in",
       "source": "IDENTIFICATION DIVISION. PROGRAM-ID. XMLCOUNT. DATA DIVISION. WORKING-STORAGE SECTION. 01 SOURCE-X PIC X(3) VALUE 'A&B'. 01 XML-X PIC X(64). 01 XML-N PIC 99. PROCEDURE DIVISION. XML GENERATE XML-X FROM SOURCE-X COUNT IN XML-N. DISPLAY XML-N. STOP RUN.",
       "expected_output": "28\n"
+    },
+    {
+      "id": "write-advancing-end-page",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0042",
+      "obligation_id": "phrase-advancing-end-page",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. WRITEPAGE. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT PRINT-FILE ASSIGN TO PRINTDD ORGANIZATION IS SEQUENTIAL. DATA DIVISION. FILE SECTION. FD PRINT-FILE LINAGE IS 3 LINES. 01 PRINT-REC PIC X. WORKING-STORAGE SECTION. 01 VALUE-X PIC X VALUE 'A'. PROCEDURE DIVISION. WRITE PRINT-REC FROM VALUE-X AFTER ADVANCING 2 LINES AT END-OF-PAGE DISPLAY 'EOP' NOT AT END-OF-PAGE DISPLAY 'BAD1' END-WRITE. WRITE PRINT-REC FROM VALUE-X BEFORE ADVANCING PAGE AT END-OF-PAGE DISPLAY 'PAGE' NOT AT END-OF-PAGE DISPLAY 'BAD2' END-WRITE. DISPLAY LINAGE-COUNTER. STOP RUN.",
+      "expected_output": "EOP\nPAGE\n1\n"
+    },
+    {
+      "id": "xml-parse-processing-procedure",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044",
+      "obligation_id": "phrase-processing-procedure-through",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. XMLPROCESS. DATA DIVISION. WORKING-STORAGE SECTION. 01 XML-X PIC X(32) VALUE '<ROOT>A&amp;B</ROOT>'. PROCEDURE DIVISION. XML PARSE XML-X PROCESSING PROCEDURE HANDLE THRU HANDLE-END. DISPLAY 'DONE'. STOP RUN. HANDLE. DISPLAY XML-EVENT ':' XML-TEXT. HANDLE-END. EXIT. NEXT-P. DISPLAY 'BAD'.",
+      "expected_output": "START-OF-DOCUMENT:\nSTART-OF-ELEMENT:ROOT\nCONTENT-CHARACTERS:A&B\nEND-OF-ELEMENT:ROOT\nEND-OF-DOCUMENT:\nDONE\n"
     }
   ]
 }

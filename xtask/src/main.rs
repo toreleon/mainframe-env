@@ -1253,27 +1253,46 @@ fn check_cobol_statement_bindings(
             Some("0002" | "0026") => {
                 expected_obligations.insert("phrase-corresponding");
             }
+            Some("0003") => {
+                expected_obligations.insert("phrase-initialized-linkage");
+            }
+            Some("0007") => {
+                expected_obligations.insert("phrase-multiple-with-lock");
+            }
             Some("0011") => {
                 expected_obligations.insert("phrase-upon-no-advancing");
             }
             Some("0015") => {
                 expected_obligations.insert("phrase-paragraph");
                 expected_obligations.insert("phrase-perform");
+                expected_obligations.insert("phrase-section");
             }
             Some("0020") => {
+                expected_obligations.insert("phrase-replacing-then-default");
                 expected_obligations.insert("phrase-with-filler");
+            }
+            Some("0021") => {
+                expected_obligations.insert("phrase-leading-first-before-after");
             }
             Some("0023" | "0043") => {
                 expected_obligations.insert("phrase-count-in");
+            }
+            Some("0024") => {
+                expected_obligations.insert("phrase-with-detail");
             }
             Some("0029") => {
                 expected_obligations.insert("phrase-inline-varying");
                 expected_obligations.insert("phrase-through");
             }
+            Some("0028") => {
+                expected_obligations.insert("phrase-multiple-files-and-modes");
+            }
             Some("0030") => {
+                expected_obligations.insert("phrase-lock-wait");
                 expected_obligations.insert("phrase-next-record");
             }
             Some("0035") => {
+                expected_obligations.insert("phrase-multiple-to");
                 expected_obligations.insert("phrase-up-down-by");
             }
             Some("0031") => {
@@ -1290,6 +1309,12 @@ fn check_cobol_statement_bindings(
             }
             Some("0041") => {
                 expected_obligations.insert("phrase-pointer-tally");
+            }
+            Some("0042") => {
+                expected_obligations.insert("phrase-advancing-end-page");
+            }
+            Some("0044") => {
+                expected_obligations.insert("phrase-processing-procedure-through");
             }
             _ => {}
         }

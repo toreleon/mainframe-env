@@ -12,11 +12,11 @@ use mainframe_env_execution_api::{
 };
 use mainframe_env_host_api::{
     CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, ClassName,
-    ClockRequest, DatasetName, DatasetRequest, Db2HostVariable, Db2Operation, Db2Request,
-    EffectRequest, EffectResult, HostLimits, HostProblem, HostRequest, HostResult, ImsOperation,
-    ImsQualifier, ImsRequest, KeyRelation, MethodName, MqOperation, MqRequest, Mutation,
-    ProgramName, ProgramRequest, RuntimeServiceKind, RuntimeServiceName, RuntimeServiceSelector,
-    TerminalRequest,
+    ClockRequest, DatasetLockMode, DatasetName, DatasetReadControl, DatasetRequest,
+    Db2HostVariable, Db2Operation, Db2Request, EffectRequest, EffectResult, HostLimits,
+    HostProblem, HostRequest, HostResult, ImsOperation, ImsQualifier, ImsRequest, KeyRelation,
+    MethodName, MqOperation, MqRequest, Mutation, ProgramName, ProgramRequest, RuntimeServiceKind,
+    RuntimeServiceName, RuntimeServiceSelector, TerminalRequest,
 };
 use mainframe_env_ir::{
     Attribute, CodecLimits, Module, Operation, OperationIdentity, StorageId, decode_binary,
@@ -194,6 +194,7 @@ struct ConditionStatus {
     unstring_overflow: bool,
     json_exception: bool,
     xml_exception: bool,
+    end_of_page: bool,
 }
 
 impl ConditionStatus {
@@ -205,12 +206,10 @@ impl ConditionStatus {
             | u8::from(self.unstring_overflow) << 4
             | u8::from(self.json_exception) << 5
             | u8::from(self.xml_exception) << 6
+            | u8::from(self.end_of_page) << 7
     }
 
     fn from_bits(bits: u8) -> Option<Self> {
-        if bits & 0x80 != 0 {
-            return None;
-        }
         Some(Self {
             arithmetic_size_error: bits & 1 != 0,
             accept_exception: bits & (1 << 1) != 0,
@@ -219,6 +218,7 @@ impl ConditionStatus {
             unstring_overflow: bits & (1 << 4) != 0,
             json_exception: bits & (1 << 5) != 0,
             xml_exception: bits & (1 << 6) != 0,
+            end_of_page: bits & (1 << 7) != 0,
         })
     }
 }
@@ -242,7 +242,9 @@ enum PendingKind {
     DatasetStatus {
         status: Option<String>,
         cursor: Option<DatasetCursorAction>,
-        increment_linage: bool,
+        linage_advance: usize,
+        linage_limit: Option<usize>,
+        page_advance: bool,
     },
     ProgramCall {
         targets: Vec<String>,
@@ -1240,7 +1242,9 @@ impl ReferenceMachine {
                 PendingKind::DatasetStatus {
                     status,
                     cursor: None,
-                    increment_linage,
+                    linage_advance,
+                    linage_limit,
+                    page_advance,
                 },
                 HostResult::Dataset(_),
             ) => {
@@ -1248,21 +1252,36 @@ impl ReferenceMachine {
                 if let Some(status) = status {
                     self.write(&status, b"00")?;
                 }
-                if increment_linage
+                self.condition_status.end_of_page = false;
+                if page_advance {
+                    self.condition_status.end_of_page = true;
+                    self.implicit.insert(
+                        "LINAGE-COUNTER".into(),
+                        CobolValue::Decimal(Decimal {
+                            coefficient: 1,
+                            scale: 0,
+                        }),
+                    );
+                } else if linage_advance > 0
                     && let Some(CobolValue::Decimal(counter)) =
                         self.implicit.get("LINAGE-COUNTER").cloned()
                 {
-                    self.implicit.insert(
-                        "LINAGE-COUNTER".into(),
-                        CobolValue::Decimal(decimal_add(
-                            self.arithmetic_mode,
-                            counter,
-                            Decimal {
-                                coefficient: 1,
-                                scale: 0,
-                            },
-                        )?),
-                    );
+                    let next = decimal_add(
+                        self.arithmetic_mode,
+                        counter,
+                        Decimal {
+                            coefficient: i128::try_from(linage_advance)
+                                .map_err(|_| MachineProblem::ResourceExhausted)?,
+                            scale: 0,
+                        },
+                    )?;
+                    self.condition_status.end_of_page = linage_limit.is_some_and(|limit| {
+                        next.scale == 0
+                            && usize::try_from(next.coefficient)
+                                .is_ok_and(|counter| counter >= limit)
+                    });
+                    self.implicit
+                        .insert("LINAGE-COUNTER".into(), CobolValue::Decimal(next));
                 }
             }
             (
@@ -1677,6 +1696,32 @@ impl ReferenceMachine {
                 self.condition_status.unstring_overflow = self.unstring_op(&args)?;
             }
             "inspect" => self.inspect_op(&args)?,
+            "xml_parse" if position(&args, "PROCESSING").is_some() => {
+                match self.xml_processing_step(&args) {
+                    Ok(step) => {
+                        self.condition_status.xml_exception = false;
+                        self.implicit.insert(
+                            "XML-CODE".into(),
+                            CobolValue::Decimal(Decimal {
+                                coefficient: 0,
+                                scale: 0,
+                            }),
+                        );
+                        return Ok(step);
+                    }
+                    Err(_problem) if self.has_condition_handler(operation, "ON EXCEPTION") => {
+                        self.condition_status.xml_exception = true;
+                        self.implicit.insert(
+                            "XML-CODE".into(),
+                            CobolValue::Decimal(Decimal {
+                                coefficient: -1,
+                                scale: 0,
+                            }),
+                        );
+                    }
+                    Err(problem) => return Err(problem),
+                }
+            }
             "json_generate" | "json_parse" | "xml_generate" | "xml_parse" => {
                 let json = name.starts_with("json_");
                 let result = if name.ends_with("_generate") {
@@ -1686,7 +1731,14 @@ impl ReferenceMachine {
                 };
                 let failed = match result {
                     Ok(()) => false,
-                    Err(_problem) if self.has_condition_handler(operation, "ON EXCEPTION") => true,
+                    Err(_problem) if self.has_condition_handler(operation, "ON EXCEPTION") => {
+                        if name == "json_parse"
+                            && args.windows(2).any(|window| window == ["WITH", "DETAIL"])
+                        {
+                            self.append_output(b"IGZ0335W JSON PARSE input is invalid\n")?;
+                        }
+                        true
+                    }
                     Err(problem) => return Err(problem),
                 };
                 if json {
@@ -1736,11 +1788,10 @@ impl ReferenceMachine {
             "exit" if args.iter().any(|argument| argument == "PERFORM") => {
                 return self.exit_perform_step(operation);
             }
-            "exit"
-                if args
-                    .iter()
-                    .any(|argument| matches!(argument.as_str(), "PARAGRAPH" | "SECTION")) =>
-            {
+            "exit" if args.iter().any(|argument| argument == "SECTION") => {
+                return self.exit_section_step();
+            }
+            "exit" if args.iter().any(|argument| argument == "PARAGRAPH") => {
                 return self.exit_paragraph_step();
             }
             "exit" => {}
@@ -1926,6 +1977,7 @@ impl ReferenceMachine {
             let positive = match (text.to_ascii_uppercase().as_str(), parent_name) {
                 ("AT END", Some("search")) => search_result.map(|found| !found),
                 ("AT END", _) => Some(self.last_file_status == "10"),
+                ("AT END-OF-PAGE", Some("write")) => Some(self.condition_status.end_of_page),
                 ("INVALID KEY", _) => Some(self.last_file_status != "00"),
                 ("ON SIZE ERROR", Some("add" | "compute" | "divide" | "multiply" | "subtract")) => {
                     Some(self.condition_status.arithmetic_size_error)
@@ -1951,6 +2003,7 @@ impl ReferenceMachine {
             positive.or_else(|| match (text.to_ascii_uppercase().as_str(), parent_name) {
                 ("NOT AT END", Some("search")) => search_result,
                 ("NOT AT END", _) => Some(self.last_file_status != "10"),
+                ("NOT AT END-OF-PAGE", Some("write")) => Some(!self.condition_status.end_of_page),
                 ("NOT INVALID KEY", _) => Some(self.last_file_status == "00"),
                 (
                     "NOT ON SIZE ERROR",
@@ -2252,6 +2305,30 @@ impl ReferenceMachine {
         Ok(Step::Jump(next))
     }
 
+    fn exit_section_step(&mut self) -> Result<Step, MachineProblem> {
+        if let Some(call_pc) = self.perform_stack.last().copied()
+            && self
+                .perform_endpoint(call_pc)
+                .is_some_and(|endpoint| self.pc <= endpoint)
+        {
+            return self.finish_perform().map(Step::Jump);
+        }
+        let next = self
+            .operations
+            .iter()
+            .enumerate()
+            .skip(self.pc.saturating_add(1))
+            .find(|(_, operation)| {
+                operation.identity.name() == "label"
+                    && arguments(operation)
+                        .get(1)
+                        .is_some_and(|marker| marker == "SECTION")
+            })
+            .map(|(pc, _)| pc)
+            .unwrap_or_else(|| self.operations.len().saturating_sub(1));
+        Ok(Step::Jump(next))
+    }
+
     fn at_perform_endpoint(&self) -> bool {
         let Some(call_pc) = self.perform_stack.last().copied() else {
             return false;
@@ -2274,6 +2351,14 @@ impl ReferenceMachine {
             let target =
                 sort_procedure_end(&args, kind).or_else(|| sort_procedure_target(&args, kind))?;
             return self.paragraph_endpoint(&target);
+        }
+        if call.identity.name() == "xml_parse" {
+            let target = position(&args, "THRU")
+                .or_else(|| position(&args, "THROUGH"))
+                .and_then(|index| args.get(index + 1))
+                .map(String::as_str)
+                .or_else(|| xml_processing_target(&args))?;
+            return self.paragraph_endpoint(target);
         }
         let target = position(&args, "THRU")
             .or_else(|| position(&args, "THROUGH"))
@@ -2350,6 +2435,34 @@ impl ReferenceMachine {
                 }
                 SortProcedurePhase::Output => Ok(call_pc.saturating_add(1)),
             };
+        }
+        if operation.identity.name() == "xml_parse" {
+            let arguments = arguments(&operation);
+            let source = String::from_utf8(
+                self.resolve(arguments.first().ok_or(MachineProblem::InvalidOperation)?)?,
+            )
+            .map_err(|_| MachineProblem::DataException)?;
+            let events = xml_document_events(source.trim())?;
+            let key = xml_state_key(call_pc);
+            let next = self
+                .loop_counts
+                .get(&key)
+                .copied()
+                .and_then(|next| usize::try_from(next).ok())
+                .ok_or(MachineProblem::InvalidOperation)?;
+            if let Some(event) = events.get(next) {
+                self.install_xml_event(event);
+                self.loop_counts.insert(
+                    key,
+                    i128::try_from(next.saturating_add(1))
+                        .map_err(|_| MachineProblem::ResourceExhausted)?,
+                );
+                self.perform_stack.push(call_pc);
+                return self.label(
+                    xml_processing_target(&arguments).ok_or(MachineProblem::InvalidOperation)?,
+                );
+            }
+            self.loop_counts.remove(&key);
         }
         if optional_integer_attribute(&operation, "edge_loop").is_some() {
             return match self.perform_control_end(&operation)? {
@@ -3029,6 +3142,7 @@ impl ReferenceMachine {
                 key: None,
                 max_records: u32::try_from(maximum)
                     .map_err(|_| MachineProblem::ResourceExhausted)?,
+                control: Default::default(),
             }),
             PendingKind::SortRead,
         )
@@ -3305,6 +3419,26 @@ impl ReferenceMachine {
             .as_ref()
             .is_some_and(|file| file.organization == "SEQUENTIAL");
         let current_cursor = self.dataset_cursors.get(&dataset_name).cloned();
+        let read_control = DatasetReadControl {
+            lock: if args.windows(2).any(|window| window == ["WITH", "KEPT"]) {
+                DatasetLockMode::KeptLock
+            } else if args.windows(2).any(|window| window == ["WITH", "NO"]) {
+                DatasetLockMode::NoLock
+            } else if args.iter().any(|token| token == "IGNORE") {
+                DatasetLockMode::IgnoreLock
+            } else if args.windows(2).any(|window| window == ["WITH", "LOCK"]) {
+                DatasetLockMode::Lock
+            } else {
+                DatasetLockMode::Default
+            },
+            wait: if args.windows(2).any(|window| window == ["NO", "WAIT"]) {
+                Some(false)
+            } else if args.iter().any(|token| token == "WAIT") {
+                Some(true)
+            } else {
+                None
+            },
+        };
         let (request, cursor_action) = match name {
             "read"
                 if current_cursor.is_some()
@@ -3318,6 +3452,7 @@ impl ReferenceMachine {
                         dataset,
                         cursor: current_cursor.ok_or(MachineProblem::InvalidOperation)?,
                         reverse: args.iter().any(|argument| argument == "PREVIOUS"),
+                        control: read_control,
                     },
                     None,
                 )
@@ -3334,6 +3469,7 @@ impl ReferenceMachine {
                         .transpose()?
                         .or(default_key),
                     max_records: 1,
+                    control: read_control,
                 },
                 None,
             ),
@@ -3473,11 +3609,18 @@ impl ReferenceMachine {
                 ccsid,
             }
         } else {
+            let (linage_advance, page_advance) =
+                if name == "write" && file.as_ref().is_some_and(|file| file.linage.is_some()) {
+                    write_linage_advance(self, args)?
+                } else {
+                    (0, false)
+                };
             PendingKind::DatasetStatus {
                 status,
                 cursor: cursor_action,
-                increment_linage: name == "write"
-                    && file.as_ref().is_some_and(|file| file.linage.is_some()),
+                linage_advance,
+                linage_limit: file.as_ref().and_then(|file| file.linage),
+                page_advance,
             }
         };
         self.effect(HostRequest::Dataset(request), pending)
@@ -4162,83 +4305,157 @@ impl ReferenceMachine {
             }
             return Ok(());
         }
-        if args.len() < 3 || args[1] != "TO" {
+        let to = position(args, "TO").ok_or(MachineProblem::InvalidOperation)?;
+        if to == 0 || to + 1 >= args.len() {
             return Err(MachineProblem::InvalidOperation);
         }
-        if args.get(2).is_some_and(|argument| argument == "ADDRESS")
-            && args.get(3).is_some_and(|argument| argument == "OF")
+        let targets = self
+            .arithmetic_items(&args[..to], true)?
+            .into_iter()
+            .map(|(target, _)| target)
+            .collect::<Vec<_>>();
+        if targets.is_empty() {
+            return Err(MachineProblem::InvalidOperation);
+        }
+        if args
+            .get(to + 1)
+            .is_some_and(|argument| argument == "ADDRESS")
+            && args.get(to + 2).is_some_and(|argument| argument == "OF")
         {
-            let source = self.reference(&args[4..])?;
-            let target = self.reference(&args[..1])?;
-            if !is_pointer_like(target.layout.category) {
+            let source = self.reference(&args[to + 3..])?;
+            let resolved = targets
+                .iter()
+                .map(|target| self.reference(target))
+                .collect::<Result<Vec<_>, _>>()?;
+            if resolved
+                .iter()
+                .any(|target| !is_pointer_like(target.layout.category))
+            {
                 return Err(MachineProblem::DataException);
             }
-            let address = self.address_bytes(&source, target.length)?;
-            return self.write_reference(&target, &address);
+            for target in resolved {
+                let address = self.address_bytes(&source, target.length)?;
+                self.write_reference(&target, &address)?;
+            }
+            return Ok(());
         }
-        if args.get(2).is_some_and(|argument| argument == "NULL") {
-            let target = self.reference(&args[..1])?;
-            if !is_pointer_like(target.layout.category) {
+        if args.get(to + 1).is_some_and(|argument| argument == "NULL") {
+            let resolved = targets
+                .iter()
+                .map(|target| self.reference(target))
+                .collect::<Result<Vec<_>, _>>()?;
+            if resolved
+                .iter()
+                .any(|target| !is_pointer_like(target.layout.category))
+            {
                 return Err(MachineProblem::DataException);
             }
-            return self.write_reference(&target, &vec![0; target.length]);
+            for target in resolved {
+                self.write_reference(&target, &vec![0; target.length])?;
+            }
+            return Ok(());
         }
-        if args[2] == "TRUE" {
-            let condition = self
-                .layout(&args[0])
-                .filter(|layout| layout.category == LayoutCategory::Condition)
-                .cloned()
-                .ok_or(MachineProblem::InvalidOperation)?;
-            let parent = condition.parent.ok_or(MachineProblem::InvalidOperation)?;
-            let value = condition
-                .condition_values
-                .first()
-                .ok_or(MachineProblem::InvalidOperation)?;
-            let parent_layout = self
-                .layouts
-                .get(&parent)
-                .cloned()
-                .ok_or(MachineProblem::UnknownStorage)?;
-            let normalized = normalize(value);
-            let value = match normalized.as_str() {
-                "SPACE" | "SPACES" => CobolValue::Bytes(vec![b' '; parent_layout.length]),
-                "LOW-VALUE" | "LOW-VALUES" => CobolValue::Bytes(vec![0; parent_layout.length]),
-                "HIGH-VALUE" | "HIGH-VALUES" => CobolValue::Bytes(vec![0xff; parent_layout.length]),
-                "ZERO" | "ZEROS" | "ZEROES" if is_numeric(parent_layout.category) => {
-                    CobolValue::Decimal(Decimal {
-                        coefficient: 0,
-                        scale: parent_layout.scale,
-                    })
+        if args[to + 1] == "TRUE" {
+            for target in targets {
+                let condition = self.reference(&target)?.layout;
+                if condition.category != LayoutCategory::Condition {
+                    return Err(MachineProblem::InvalidOperation);
                 }
-                "ZERO" | "ZEROS" | "ZEROES" => CobolValue::Bytes(vec![b'0'; parent_layout.length]),
-                _ if is_numeric(parent_layout.category) => {
-                    CobolValue::Decimal(decimal_text(value).ok_or(MachineProblem::DataException)?)
-                }
-                _ => CobolValue::Bytes(value.trim_matches(['\'', '"']).as_bytes().to_vec()),
-            };
-            return self.write_reference_value(&[parent], &value);
+                let parent = condition.parent.ok_or(MachineProblem::InvalidOperation)?;
+                let literal = condition
+                    .condition_values
+                    .first()
+                    .ok_or(MachineProblem::InvalidOperation)?;
+                let parent_layout = self
+                    .layouts
+                    .get(&parent)
+                    .cloned()
+                    .ok_or(MachineProblem::UnknownStorage)?;
+                let normalized = normalize(literal);
+                let value = match normalized.as_str() {
+                    "SPACE" | "SPACES" => CobolValue::Bytes(vec![b' '; parent_layout.length]),
+                    "LOW-VALUE" | "LOW-VALUES" => CobolValue::Bytes(vec![0; parent_layout.length]),
+                    "HIGH-VALUE" | "HIGH-VALUES" => {
+                        CobolValue::Bytes(vec![0xff; parent_layout.length])
+                    }
+                    "ZERO" | "ZEROS" | "ZEROES" if is_numeric(parent_layout.category) => {
+                        CobolValue::Decimal(Decimal {
+                            coefficient: 0,
+                            scale: parent_layout.scale,
+                        })
+                    }
+                    "ZERO" | "ZEROS" | "ZEROES" => {
+                        CobolValue::Bytes(vec![b'0'; parent_layout.length])
+                    }
+                    _ if is_numeric(parent_layout.category) => CobolValue::Decimal(
+                        decimal_text(literal).ok_or(MachineProblem::DataException)?,
+                    ),
+                    _ => CobolValue::Bytes(literal.trim_matches(['\'', '"']).as_bytes().to_vec()),
+                };
+                self.write_reference_value(&[parent], &value)?;
+            }
+            return Ok(());
         }
-        let value = self.eval_value(&args[2..3])?;
-        self.write_value(&args[0], &value)
+        let value = self.eval_value(&args[to + 1..])?;
+        for target in targets {
+            self.write_reference_value(&target, &value)?;
+        }
+        Ok(())
     }
 
     fn allocate_op(&mut self, args: &[String]) -> Result<(), MachineProblem> {
-        let returning = position(args, "RETURNING").ok_or(MachineProblem::InvalidOperation)?;
-        let target_name = args
-            .get(returning + 1)
-            .ok_or(MachineProblem::InvalidOperation)?;
-        let target = self.reference(std::slice::from_ref(target_name))?;
-        if !is_pointer_like(target.layout.category) {
-            return Err(MachineProblem::DataException);
-        }
-        let size = if args.get(1).is_some_and(|value| value == "CHARACTERS") {
-            let value = self.decimal(args.first().ok_or(MachineProblem::InvalidOperation)?)?;
-            if value.scale != 0 || value.coefficient <= 0 {
+        let returning = position(args, "RETURNING");
+        let pointer = returning
+            .map(|returning| {
+                let target_name = args
+                    .get(returning + 1)
+                    .ok_or(MachineProblem::InvalidOperation)?;
+                let target = self.reference(std::slice::from_ref(target_name))?;
+                if !is_pointer_like(target.layout.category) {
+                    return Err(MachineProblem::DataException);
+                }
+                Ok(target)
+            })
+            .transpose()?;
+        let characters = position(args, "CHARACTERS");
+        let initialized = args.iter().any(|token| token == "INITIALIZED");
+        let data_target = if characters.is_none() {
+            let end = [position(args, "INITIALIZED"), returning]
+                .into_iter()
+                .flatten()
+                .min()
+                .unwrap_or(args.len());
+            let target = self.reference(&args[..end])?;
+            if !target.layout.linkage || target.layout.parent.is_some() {
                 return Err(MachineProblem::DataException);
             }
-            usize::try_from(value.coefficient).map_err(|_| MachineProblem::ResourceExhausted)?
+            Some(target)
         } else {
-            self.reference(&args[..returning])?.length
+            None
+        };
+        if characters.is_some() && pointer.is_none() {
+            return Err(MachineProblem::InvalidOperation);
+        }
+        let size = if let Some(characters) = characters {
+            let value = value_decimal(self.eval_value(&args[..characters])?)?;
+            if value.coefficient <= 0 {
+                if let Some(pointer) = &pointer {
+                    return self.write_reference(pointer, &vec![0; pointer.length]);
+                }
+                return Err(MachineProblem::InvalidOperation);
+            }
+            let divisor = ten_power(value.scale)?;
+            let rounded = value
+                .coefficient
+                .checked_add(divisor - 1)
+                .ok_or(MachineProblem::ResourceExhausted)?
+                / divisor;
+            usize::try_from(rounded).map_err(|_| MachineProblem::ResourceExhausted)?
+        } else {
+            data_target
+                .as_ref()
+                .ok_or(MachineProblem::InvalidOperation)?
+                .length
         };
         let allocated_count = self.bases.len().saturating_sub(self.static_base_count);
         let used = self
@@ -4254,9 +4471,39 @@ impl ReferenceMachine {
             return Err(MachineProblem::ResourceExhausted);
         }
         let base = self.bases.len();
-        let address = self.address_bytes_for(base, 0, target.length)?;
-        self.bases.push(vec![0; size]);
-        self.write_reference(&target, &address)
+        let bytes = if initialized {
+            data_target
+                .as_ref()
+                .and_then(|target| {
+                    self.operations.iter().find_map(|operation| {
+                        (operation.identity.name() == "init"
+                            && optional_text_attribute(operation, "name")
+                                .is_some_and(|name| normalize(name) == target.layout.name))
+                        .then(|| {
+                            bytes_attribute(operation, "initial")
+                                .ok()
+                                .map(<[u8]>::to_vec)
+                        })
+                        .flatten()
+                    })
+                })
+                .map(|bytes| FixedValue::fit(&bytes, size, false).bytes().to_vec())
+                .unwrap_or_else(|| vec![0; size])
+        } else {
+            vec![0; size]
+        };
+        let address = pointer
+            .as_ref()
+            .map(|pointer| self.address_bytes_for(base, 0, pointer.length))
+            .transpose()?;
+        self.bases.push(bytes);
+        if let Some(target) = &data_target {
+            self.assign_linkage_address(&target.layout.name, Some((base, 0)))?;
+        }
+        if let (Some(pointer), Some(address)) = (pointer, address) {
+            self.write_reference(&pointer, &address)?;
+        }
+        Ok(())
     }
 
     fn free_op(&mut self, args: &[String]) -> Result<(), MachineProblem> {
@@ -5205,6 +5452,7 @@ impl ReferenceMachine {
             .unwrap_or(args.len());
         let reference = self.reference(&args[..control])?;
         let source = self.read_reference(&reference)?;
+        let range = self.inspect_range(&source, args)?;
         if let Some(converting) = position(args, "CONVERTING") {
             if args.get(converting + 2).is_none_or(|token| token != "TO") {
                 return Err(MachineProblem::InvalidOperation);
@@ -5220,62 +5468,188 @@ impl ReferenceMachine {
             if from.is_empty() || from.len() != to.len() {
                 return Err(MachineProblem::DataException);
             }
-            let converted = source
-                .iter()
-                .map(|byte| {
-                    from.iter()
-                        .position(|candidate| candidate == byte)
-                        .map_or(*byte, |index| to[index])
-                })
-                .collect::<Vec<_>>();
+            let mut converted = source.clone();
+            for byte in &mut converted[range.clone()] {
+                *byte = from
+                    .iter()
+                    .position(|candidate| candidate == byte)
+                    .map_or(*byte, |index| to[index]);
+            }
             self.write_reference(&reference, &converted)?;
         } else if let Some(replacing) = position(args, "REPLACING") {
-            if args.get(replacing + 1).is_none_or(|token| token != "ALL")
-                || args.get(replacing + 3).is_none_or(|token| token != "BY")
-            {
-                return Err(MachineProblem::UnsupportedForm);
+            let mode = args
+                .get(replacing + 1)
+                .ok_or(MachineProblem::InvalidOperation)?;
+            let by = position(args, "BY").ok_or(MachineProblem::InvalidOperation)?;
+            let to = self.resolve(args.get(by + 1).ok_or(MachineProblem::InvalidOperation)?)?;
+            let mut replaced = source.clone();
+            match mode.as_str() {
+                "CHARACTERS" => {
+                    if to.len() != 1 {
+                        return Err(MachineProblem::DataException);
+                    }
+                    replaced[range.clone()].fill(to[0]);
+                }
+                "ALL" | "LEADING" | "FIRST" => {
+                    let from = self.resolve(
+                        args.get(replacing + 2)
+                            .ok_or(MachineProblem::InvalidOperation)?,
+                    )?;
+                    if from.is_empty() || from.len() != to.len() {
+                        return Err(MachineProblem::DataException);
+                    }
+                    let inspected = &mut replaced[range.clone()];
+                    if mode == "LEADING" {
+                        let mut offset = 0usize;
+                        while inspected
+                            .get(offset..offset.saturating_add(from.len()))
+                            .is_some_and(|candidate| candidate == from)
+                        {
+                            inspected[offset..offset + from.len()].copy_from_slice(&to);
+                            offset += from.len();
+                        }
+                    } else if mode == "FIRST" {
+                        if let Some(at) = find_bytes(inspected, &from) {
+                            inspected[at..at + from.len()].copy_from_slice(&to);
+                        }
+                    } else {
+                        let all = replace_bytes(inspected, &from, &to)?;
+                        inspected.copy_from_slice(&all);
+                    }
+                }
+                _ => return Err(MachineProblem::UnsupportedForm),
             }
-            let from = self.resolve(
-                args.get(replacing + 2)
-                    .ok_or(MachineProblem::InvalidOperation)?,
-            )?;
-            let to = self.resolve(
-                args.get(replacing + 4)
-                    .ok_or(MachineProblem::InvalidOperation)?,
-            )?;
-            let replaced = replace_bytes(&source, &from, &to)?;
             self.write_reference(&reference, &replaced)?;
         } else if let Some(tallying) = position(args, "TALLYING") {
             let target = args
                 .get(tallying + 1)
                 .ok_or(MachineProblem::InvalidOperation)?;
-            let all = args
-                .iter()
-                .skip(tallying + 2)
-                .position(|token| token == "ALL")
-                .map(|offset| tallying + 2 + offset)
-                .ok_or(MachineProblem::UnsupportedForm)?;
-            let needle =
-                self.resolve(args.get(all + 1).ok_or(MachineProblem::InvalidOperation)?)?;
-            let count = count_bytes(&source, &needle)?;
-            self.write_decimal(
-                target,
+            let for_at = position(args, "FOR").ok_or(MachineProblem::InvalidOperation)?;
+            let mode = args
+                .get(for_at + 1)
+                .ok_or(MachineProblem::InvalidOperation)?;
+            let inspected = &source[range];
+            let count = match mode.as_str() {
+                "CHARACTERS" => inspected.len(),
+                "ALL" | "LEADING" => {
+                    let needle = self.resolve(
+                        args.get(for_at + 2)
+                            .ok_or(MachineProblem::InvalidOperation)?,
+                    )?;
+                    if mode == "ALL" {
+                        count_bytes(inspected, &needle)?
+                    } else if needle.is_empty() {
+                        return Err(MachineProblem::InvalidOperation);
+                    } else {
+                        let mut offset = 0usize;
+                        while inspected
+                            .get(offset..offset.saturating_add(needle.len()))
+                            .is_some_and(|candidate| candidate == needle)
+                        {
+                            offset += needle.len();
+                        }
+                        offset / needle.len()
+                    }
+                }
+                _ => return Err(MachineProblem::UnsupportedForm),
+            };
+            let next = decimal_add(
+                self.arithmetic_mode,
+                self.decimal(target)?,
                 Decimal {
-                    coefficient: count as i128,
+                    coefficient: i128::try_from(count)
+                        .map_err(|_| MachineProblem::ResourceExhausted)?,
                     scale: 0,
                 },
             )?;
+            self.write_decimal(target, next)?;
         }
         Ok(())
+    }
+
+    fn inspect_range(
+        &self,
+        source: &[u8],
+        args: &[String],
+    ) -> Result<std::ops::Range<usize>, MachineProblem> {
+        let delimiter = |keyword: &str| -> Result<Option<Vec<u8>>, MachineProblem> {
+            position(args, keyword)
+                .map(|at| {
+                    let at = at
+                        + 1
+                        + usize::from(args.get(at + 1).is_some_and(|token| token == "INITIAL"));
+                    self.resolve(args.get(at).ok_or(MachineProblem::InvalidOperation)?)
+                })
+                .transpose()
+        };
+        let after = delimiter("AFTER")?;
+        let before = delimiter("BEFORE")?;
+        let start = if let Some(after) = after {
+            let Some(at) = find_bytes(source, &after) else {
+                return Ok(source.len()..source.len());
+            };
+            at.checked_add(after.len())
+                .ok_or(MachineProblem::ResourceExhausted)?
+        } else {
+            0
+        };
+        let end = before
+            .as_ref()
+            .and_then(|before| find_bytes(&source[start..], before))
+            .map_or(source.len(), |at| start + at);
+        Ok(start..end)
     }
 
     fn initialize_op(&mut self, args: &[String]) -> Result<(), MachineProblem> {
         let with_filler = args
             .windows(2)
             .any(|window| window[0] == "WITH" && window[1] == "FILLER");
+        let replacements = if let Some(replacing) = position(args, "REPLACING") {
+            let mut replacements = BTreeMap::new();
+            let mut at = replacing + 1;
+            while at < args.len() && args[at] != "THEN" {
+                let category = args[at].clone();
+                if !matches!(
+                    category.as_str(),
+                    "ALPHABETIC"
+                        | "ALPHANUMERIC"
+                        | "ALPHANUMERIC-EDITED"
+                        | "DBCS"
+                        | "EGCS"
+                        | "NATIONAL"
+                        | "NATIONAL-EDITED"
+                        | "NUMERIC"
+                        | "NUMERIC-EDITED"
+                        | "UTF-8"
+                ) || replacements.contains_key(&category)
+                {
+                    return Err(MachineProblem::InvalidOperation);
+                }
+                at += 1;
+                if args.get(at).is_some_and(|token| token == "DATA") {
+                    at += 1;
+                }
+                if args.get(at).is_none_or(|token| token != "BY") {
+                    return Err(MachineProblem::InvalidOperation);
+                }
+                at += 1;
+                let value = self.eval_value(std::slice::from_ref(
+                    args.get(at).ok_or(MachineProblem::InvalidOperation)?,
+                ))?;
+                replacements.insert(category, value);
+                at += 1;
+            }
+            replacements
+        } else {
+            BTreeMap::new()
+        };
+        let initialize_unmatched = replacements.is_empty()
+            || args
+                .windows(3)
+                .any(|window| window == ["THEN", "TO", "DEFAULT"]);
         let control = args
             .iter()
-            .position(|target| matches!(target.as_str(), "REPLACING" | "WITH"))
+            .position(|target| matches!(target.as_str(), "REPLACING" | "WITH" | "THEN"))
             .unwrap_or(args.len());
         let mut at = 0usize;
         while at < control {
@@ -5302,7 +5676,13 @@ impl ReferenceMachine {
                 vec![layout]
             };
             for target in targets {
-                if is_numeric(target.category) {
+                if let Some(value) = initialize_category(target.category)
+                    .and_then(|category| replacements.get(category))
+                {
+                    self.write_reference_value(&[target.name.clone()], value)?;
+                } else if !initialize_unmatched {
+                    continue;
+                } else if is_numeric(target.category) {
                     self.write_decimal(
                         &target.name,
                         Decimal {
@@ -5312,6 +5692,19 @@ impl ReferenceMachine {
                     )?;
                 } else if is_pointer_like(target.category) {
                     self.write_raw(&target.name, &vec![0; target.length])?;
+                } else if matches!(
+                    target.category,
+                    LayoutCategory::National | LayoutCategory::NationalEdited
+                ) {
+                    self.write_raw(
+                        &target.name,
+                        &[0x00, 0x20].repeat(target.length.saturating_add(1) / 2)[..target.length],
+                    )?;
+                } else if target.category == LayoutCategory::Dbcs {
+                    self.write_raw(
+                        &target.name,
+                        &[0x40, 0x40].repeat(target.length.saturating_add(1) / 2)[..target.length],
+                    )?;
                 } else {
                     self.write_raw(&target.name, &vec![b' '; target.length])?;
                 }
@@ -5407,6 +5800,32 @@ impl ReferenceMachine {
             xml_unescape(body)?
         };
         self.write(target, value.as_bytes())
+    }
+
+    fn xml_processing_step(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
+        let source =
+            String::from_utf8(self.resolve(args.first().ok_or(MachineProblem::InvalidOperation)?)?)
+                .map_err(|_| MachineProblem::DataException)?;
+        let events = xml_document_events(source.trim())?;
+        let event = events.first().ok_or(MachineProblem::DataException)?;
+        self.install_xml_event(event);
+        self.loop_counts.insert(xml_state_key(self.pc), 1);
+        let target = xml_processing_target(args).ok_or(MachineProblem::InvalidOperation)?;
+        self.perform_stack.push(self.pc);
+        self.label(target).map(Step::Jump)
+    }
+
+    fn install_xml_event(&mut self, event: &(String, Vec<u8>)) {
+        self.implicit.insert(
+            "XML-EVENT".into(),
+            CobolValue::Bytes(event.0.as_bytes().to_vec()),
+        );
+        self.implicit
+            .insert("XML-TEXT".into(), CobolValue::Bytes(event.1.clone()));
+        self.implicit.insert(
+            "XML-NTEXT".into(),
+            CobolValue::Bytes(utf8_to_national(&event.1).unwrap_or_default()),
+        );
     }
 
     fn eval_value(&self, tokens: &[String]) -> Result<CobolValue, MachineProblem> {
@@ -8809,6 +9228,25 @@ const fn is_numeric(category: LayoutCategory) -> bool {
     )
 }
 
+const fn initialize_category(category: LayoutCategory) -> Option<&'static str> {
+    match category {
+        LayoutCategory::Alphabetic => Some("ALPHABETIC"),
+        LayoutCategory::Alphanumeric => Some("ALPHANUMERIC"),
+        LayoutCategory::AlphanumericEdited => Some("ALPHANUMERIC-EDITED"),
+        LayoutCategory::Dbcs => Some("DBCS"),
+        LayoutCategory::National => Some("NATIONAL"),
+        LayoutCategory::NationalEdited => Some("NATIONAL-EDITED"),
+        LayoutCategory::NumericDisplay
+        | LayoutCategory::PackedDecimal
+        | LayoutCategory::Binary
+        | LayoutCategory::FloatShort
+        | LayoutCategory::FloatLong => Some("NUMERIC"),
+        LayoutCategory::NumericEdited => Some("NUMERIC-EDITED"),
+        LayoutCategory::Utf8 => Some("UTF-8"),
+        _ => None,
+    }
+}
+
 const fn is_group(category: LayoutCategory) -> bool {
     matches!(
         category,
@@ -9490,6 +9928,36 @@ fn dataset_file_status(name: &str, response: i32) -> String {
     .into()
 }
 
+fn write_linage_advance(
+    machine: &ReferenceMachine,
+    args: &[String],
+) -> Result<(usize, bool), MachineProblem> {
+    let Some(mut at) = [position(args, "AFTER"), position(args, "BEFORE")]
+        .into_iter()
+        .flatten()
+        .min()
+        .map(|at| at + 1)
+    else {
+        return Ok((1, false));
+    };
+    if args.get(at).is_some_and(|token| token == "ADVANCING") {
+        at += 1;
+    }
+    let Some(value) = args.get(at) else {
+        return Ok((1, false));
+    };
+    if value == "PAGE" {
+        return Ok((0, true));
+    }
+    let value = value_decimal(machine.eval_value(std::slice::from_ref(value))?)?;
+    if value.scale != 0 || value.coefficient < 0 {
+        return Err(MachineProblem::DataException);
+    }
+    usize::try_from(value.coefficient)
+        .map(|value| (value, false))
+        .map_err(|_| MachineProblem::ResourceExhausted)
+}
+
 fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     (!needle.is_empty())
         .then(|| {
@@ -9533,6 +10001,45 @@ fn xml_unescape(value: &str) -> Result<String, MachineProblem> {
     }
     output.push_str(rest);
     Ok(output)
+}
+
+fn xml_processing_target(args: &[String]) -> Option<&str> {
+    position(args, "PROCESSING")
+        .and_then(|at| {
+            args.get(at + 1)
+                .filter(|token| token.as_str() == "PROCEDURE")
+        })
+        .and_then(|_| position(args, "PROCESSING"))
+        .and_then(|at| args.get(at + 2))
+        .map(String::as_str)
+}
+
+const fn xml_state_key(pc: usize) -> usize {
+    pc | (1usize << (usize::BITS - 1))
+}
+
+fn xml_document_events(source: &str) -> Result<Vec<(String, Vec<u8>)>, MachineProblem> {
+    let open_end = source.find('>').ok_or(MachineProblem::DataException)?;
+    let name = source
+        .get(1..open_end)
+        .filter(|name| !name.is_empty() && !name.contains(['<', '>', ' ', '/']))
+        .ok_or(MachineProblem::DataException)?;
+    let closing = format!("</{name}>");
+    let body = source
+        .strip_suffix(&closing)
+        .and_then(|value| value.get(open_end + 1..))
+        .ok_or(MachineProblem::DataException)?;
+    if body.contains('<') || body.contains('>') {
+        return Err(MachineProblem::DataException);
+    }
+    let body = xml_unescape(body)?.into_bytes();
+    Ok(vec![
+        ("START-OF-DOCUMENT".into(), Vec::new()),
+        ("START-OF-ELEMENT".into(), name.as_bytes().to_vec()),
+        ("CONTENT-CHARACTERS".into(), body),
+        ("END-OF-ELEMENT".into(), name.as_bytes().to_vec()),
+        ("END-OF-DOCUMENT".into(), Vec::new()),
+    ])
 }
 
 fn replace_bytes(source: &[u8], from: &[u8], to: &[u8]) -> Result<Vec<u8>, MachineProblem> {

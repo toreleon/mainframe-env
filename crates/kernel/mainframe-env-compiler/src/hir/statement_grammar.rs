@@ -45,6 +45,7 @@ pub(super) enum ProcedureEvent {
     },
     Label {
         name: String,
+        section: bool,
         range: Range<usize>,
         line: usize,
     },
@@ -152,7 +153,8 @@ impl<'a> GrammarParser<'a> {
         let line = self.tokens[start].line;
         let name = self.tokens[start].text.to_ascii_uppercase();
         self.position += 1;
-        if self.at_word("SECTION") {
+        let section = self.at_word("SECTION");
+        if section {
             self.position += 1;
         }
         if !self.at_period() {
@@ -160,6 +162,7 @@ impl<'a> GrammarParser<'a> {
         }
         self.push_event(ProcedureEvent::Label {
             name,
+            section,
             range: self.token_range(start, self.position),
             line,
         });
@@ -1658,12 +1661,35 @@ fn validate_initialize(tokens: &[Token<'_>]) -> Result<(), &'static str> {
         cursor.expect("FILLER")?;
     }
     if cursor.eat("REPLACING") {
-        let by = cursor.find("BY").ok_or("REPLACING requires BY")?;
-        if by == cursor.position || by + 1 >= tokens.len() {
+        let categories = [
+            "ALPHABETIC",
+            "ALPHANUMERIC",
+            "ALPHANUMERIC-EDITED",
+            "DBCS",
+            "EGCS",
+            "NATIONAL",
+            "NATIONAL-EDITED",
+            "NUMERIC",
+            "NUMERIC-EDITED",
+            "UTF-8",
+        ];
+        let mut seen = BTreeSet::new();
+        while !cursor.done() && !tokens[cursor.position].is("THEN") {
+            let category = categories
+                .iter()
+                .find(|category| cursor.eat(category))
+                .copied()
+                .ok_or("REPLACING category is missing or invalid")?;
+            if !seen.insert(category) {
+                return Err("REPLACING category is duplicated");
+            }
+            cursor.eat("DATA");
+            cursor.expect("BY")?;
+            cursor.operand()?;
+        }
+        if seen.is_empty() {
             return Err("REPLACING category or value is missing");
         }
-        cursor.position = by + 1;
-        cursor.operand()?;
     }
     if cursor.eat("THEN") {
         cursor.expect("TO")?;

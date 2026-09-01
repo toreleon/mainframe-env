@@ -20,7 +20,12 @@
           "row_id": { "type": "string", "pattern": "^ibm-enterprise-cobol-6\\.5-2026-05-31:procedure-statements:[0-9]{4}$" },
           "obligation_id": { "type": "string", "pattern": "^phrase-[a-z0-9]+(?:-[a-z0-9]+)*$", "maxLength": 128 },
           "source": { "type": "string", "minLength": 1, "maxLength": 16384 },
-          "expected_output": { "type": "string", "maxLength": 16384 }
+          "expected_output": { "type": "string", "maxLength": 16384 },
+          "expected_effects": {
+            "type": "array",
+            "maxItems": 64,
+            "items": { "type": "string", "maxLength": 256 }
+          }
         }
       }
     }

@@ -563,50 +563,153 @@ fn lower_statement(
     builder: &mut ModuleBuilder,
     block: mainframe_env_ir::BlockId,
     storage: &BTreeMap<String, mainframe_env_ir::StorageId>,
-    mut attributes: BTreeMap<String, Attribute>,
+    attributes: BTreeMap<String, Attribute>,
 ) -> Result<(), LowerProblem> {
     let name = match statement.kind {
         StatementKind::ProgramEnd => "halt",
         other => other.slug(),
     };
-    attributes.insert("line".into(), Attribute::Integer(statement.line as i64));
-    attributes.insert(
-        "arguments".into(),
-        Attribute::Bytes(encode_arguments(&statement.arguments)),
-    );
-    let mut references = Vec::new();
-    let mut seen = BTreeSet::new();
-    for argument in &statement.arguments {
-        let normalized = argument.trim_matches(['\'', '"']).to_ascii_uppercase();
-        if seen.insert(normalized.clone())
-            && let Some(layout) = hir
-                .layouts
-                .iter()
-                .find(|layout| layout.name == normalized && layout.length > 0)
-        {
-            let id = *storage
-                .get(&layout.qualified_name)
-                .ok_or(LowerProblem::InvalidLayout)?;
-            references.push(StorageReference {
-                storage: id,
-                offset: 0,
-                length: layout.length as u64,
-            });
+    let groups = statement_argument_groups(statement)?;
+    let last = groups.len().saturating_sub(1);
+    for (index, arguments) in groups.into_iter().enumerate() {
+        let mut operation_attributes = attributes.clone();
+        operation_attributes.insert("line".into(), Attribute::Integer(statement.line as i64));
+        operation_attributes.insert(
+            "arguments".into(),
+            Attribute::Bytes(encode_arguments(&arguments)),
+        );
+        if index > 0 {
+            for key in [
+                "control_node",
+                "control_role",
+                "control_scope",
+                "control_parent",
+            ] {
+                operation_attributes.remove(key);
+            }
         }
+        if index < last {
+            operation_attributes.retain(|key, _| !key.starts_with("edge_"));
+        }
+        let mut references = Vec::new();
+        let mut seen = BTreeSet::new();
+        for argument in &arguments {
+            let normalized = argument.trim_matches(['\'', '"']).to_ascii_uppercase();
+            if seen.insert(normalized.clone())
+                && let Some(layout) = hir
+                    .layouts
+                    .iter()
+                    .find(|layout| layout.name == normalized && layout.length > 0)
+            {
+                let id = *storage
+                    .get(&layout.qualified_name)
+                    .ok_or(LowerProblem::InvalidLayout)?;
+                references.push(StorageReference {
+                    storage: id,
+                    offset: 0,
+                    length: layout.length as u64,
+                });
+            }
+        }
+        builder
+            .add_operation(
+                block,
+                core_identity(name)?,
+                Vec::new(),
+                0,
+                operation_attributes,
+                crate::hir::effects(statement.kind),
+                references,
+                None,
+            )
+            .map_err(|_| LowerProblem::LimitExceeded)?;
     }
-    builder
-        .add_operation(
-            block,
-            core_identity(name)?,
-            Vec::new(),
-            0,
-            attributes,
-            crate::hir::effects(statement.kind),
-            references,
-            None,
-        )
-        .map_err(|_| LowerProblem::LimitExceeded)?;
     Ok(())
+}
+
+fn statement_argument_groups(
+    statement: &crate::HirStatement,
+) -> Result<Vec<Vec<String>>, LowerProblem> {
+    if statement.kind == StatementKind::Open {
+        let mut groups = Vec::new();
+        let mut at = 0usize;
+        while at < statement.arguments.len() {
+            let mode = statement.arguments[at].clone();
+            if !matches!(mode.as_str(), "INPUT" | "OUTPUT" | "I-O" | "EXTEND") {
+                return Err(LowerProblem::InvalidOperation);
+            }
+            at += 1;
+            let start = at;
+            while at < statement.arguments.len()
+                && !matches!(
+                    statement.arguments[at].as_str(),
+                    "INPUT" | "OUTPUT" | "I-O" | "EXTEND"
+                )
+            {
+                groups.push(vec![mode.clone(), statement.arguments[at].clone()]);
+                at += 1;
+            }
+            if at == start {
+                return Err(LowerProblem::InvalidOperation);
+            }
+        }
+        return Ok(groups);
+    }
+    if statement.kind == StatementKind::Close {
+        let mut groups = Vec::new();
+        let mut at = 0usize;
+        while at < statement.arguments.len() {
+            let mut group = vec![statement.arguments[at].clone()];
+            at += 1;
+            if statement
+                .arguments
+                .get(at)
+                .is_some_and(|token| matches!(token.as_str(), "REEL" | "UNIT"))
+            {
+                group.push(statement.arguments[at].clone());
+                at += 1;
+            }
+            if statement
+                .arguments
+                .get(at)
+                .is_some_and(|token| token == "WITH")
+            {
+                group.push(statement.arguments[at].clone());
+                at += 1;
+                if statement
+                    .arguments
+                    .get(at)
+                    .is_some_and(|token| token == "NO")
+                {
+                    group.push(statement.arguments[at].clone());
+                    at += 1;
+                }
+                group.push(
+                    statement
+                        .arguments
+                        .get(at)
+                        .cloned()
+                        .ok_or(LowerProblem::InvalidOperation)?,
+                );
+                at += 1;
+            } else if statement
+                .arguments
+                .get(at)
+                .is_some_and(|token| token == "FOR")
+            {
+                group.extend_from_slice(
+                    statement
+                        .arguments
+                        .get(at..at + 2)
+                        .ok_or(LowerProblem::InvalidOperation)?,
+                );
+                at += 2;
+            }
+            groups.push(group);
+        }
+        return Ok(groups);
+    }
+    Ok(vec![statement.arguments.clone()])
 }
 
 fn encode_arguments(arguments: &[String]) -> Vec<u8> {

@@ -34169,6 +34169,193 @@
       "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0076",
       "spec_version": "mainframe-env.conformance-ir@1",
       "test_id": "jcl.output.parameters-0076.validated"
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0003",
+      "gate": "executed",
+      "obligation_id": "phrase-initialized-linkage",
+      "test_id": "cobol.statement-phrase-runtime.allocate-initialized-linkage",
+      "input": "cobol.statement-phrase-runtime.allocate-initialized-linkage",
+      "driver": "cobol.statement-phrase-runtime.driver",
+      "preconditions": [
+        "cobol.statement-phrase-runtime.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement-phrase-runtime.executed"
+      ],
+      "oracle": "cobol.enterprise-6.5.licensed",
+      "recovery": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0015",
+      "gate": "executed",
+      "obligation_id": "phrase-section",
+      "test_id": "cobol.statement-phrase-runtime.exit-section",
+      "input": "cobol.statement-phrase-runtime.exit-section",
+      "driver": "cobol.statement-phrase-runtime.driver",
+      "preconditions": [
+        "cobol.statement-phrase-runtime.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement-phrase-runtime.executed"
+      ],
+      "oracle": "cobol.enterprise-6.5.licensed",
+      "recovery": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0020",
+      "gate": "executed",
+      "obligation_id": "phrase-replacing-then-default",
+      "test_id": "cobol.statement-phrase-runtime.initialize-replacing-default",
+      "input": "cobol.statement-phrase-runtime.initialize-replacing-default",
+      "driver": "cobol.statement-phrase-runtime.driver",
+      "preconditions": [
+        "cobol.statement-phrase-runtime.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement-phrase-runtime.executed"
+      ],
+      "oracle": "cobol.enterprise-6.5.licensed",
+      "recovery": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0021",
+      "gate": "executed",
+      "obligation_id": "phrase-leading-first-before-after",
+      "test_id": "cobol.statement-phrase-runtime.inspect-modes-and-ranges",
+      "input": "cobol.statement-phrase-runtime.inspect-modes-and-ranges",
+      "driver": "cobol.statement-phrase-runtime.driver",
+      "preconditions": [
+        "cobol.statement-phrase-runtime.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement-phrase-runtime.executed"
+      ],
+      "oracle": "cobol.enterprise-6.5.licensed",
+      "recovery": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0028",
+      "gate": "executed",
+      "obligation_id": "phrase-multiple-files-and-modes",
+      "test_id": "cobol.statement-phrase-runtime.open-multiple-files",
+      "input": "cobol.statement-phrase-runtime.open-multiple-files",
+      "driver": "cobol.statement-phrase-runtime.driver",
+      "preconditions": [
+        "cobol.statement-phrase-runtime.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement-phrase-runtime.executed"
+      ],
+      "oracle": "cobol.enterprise-6.5.licensed",
+      "recovery": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0007",
+      "gate": "executed",
+      "obligation_id": "phrase-multiple-with-lock",
+      "test_id": "cobol.statement-phrase-runtime.close-multiple-with-lock",
+      "input": "cobol.statement-phrase-runtime.close-multiple-with-lock",
+      "driver": "cobol.statement-phrase-runtime.driver",
+      "preconditions": [
+        "cobol.statement-phrase-runtime.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement-phrase-runtime.executed"
+      ],
+      "oracle": "cobol.enterprise-6.5.licensed",
+      "recovery": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0030",
+      "gate": "executed",
+      "obligation_id": "phrase-lock-wait",
+      "test_id": "cobol.statement-phrase-runtime.read-lock-no-wait",
+      "input": "cobol.statement-phrase-runtime.read-lock-no-wait",
+      "driver": "cobol.statement-phrase-runtime.driver",
+      "preconditions": [
+        "cobol.statement-phrase-runtime.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement-phrase-runtime.executed"
+      ],
+      "oracle": "cobol.enterprise-6.5.licensed",
+      "recovery": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0035",
+      "gate": "executed",
+      "obligation_id": "phrase-multiple-to",
+      "test_id": "cobol.statement-phrase-runtime.set-multiple-to",
+      "input": "cobol.statement-phrase-runtime.set-multiple-to",
+      "driver": "cobol.statement-phrase-runtime.driver",
+      "preconditions": [
+        "cobol.statement-phrase-runtime.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement-phrase-runtime.executed"
+      ],
+      "oracle": "cobol.enterprise-6.5.licensed",
+      "recovery": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
+      "gate": "executed",
+      "obligation_id": "phrase-with-detail",
+      "test_id": "cobol.statement-phrase-runtime.json-parse-with-detail",
+      "input": "cobol.statement-phrase-runtime.json-parse-with-detail",
+      "driver": "cobol.statement-phrase-runtime.driver",
+      "preconditions": [
+        "cobol.statement-phrase-runtime.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement-phrase-runtime.executed"
+      ],
+      "oracle": "cobol.enterprise-6.5.licensed",
+      "recovery": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0042",
+      "gate": "executed",
+      "obligation_id": "phrase-advancing-end-page",
+      "test_id": "cobol.statement-phrase-runtime.write-advancing-end-page",
+      "input": "cobol.statement-phrase-runtime.write-advancing-end-page",
+      "driver": "cobol.statement-phrase-runtime.driver",
+      "preconditions": [
+        "cobol.statement-phrase-runtime.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement-phrase-runtime.executed"
+      ],
+      "oracle": "cobol.enterprise-6.5.licensed",
+      "recovery": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044",
+      "gate": "executed",
+      "obligation_id": "phrase-processing-procedure-through",
+      "test_id": "cobol.statement-phrase-runtime.xml-parse-processing-procedure",
+      "input": "cobol.statement-phrase-runtime.xml-parse-processing-procedure",
+      "driver": "cobol.statement-phrase-runtime.driver",
+      "preconditions": [
+        "cobol.statement-phrase-runtime.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement-phrase-runtime.executed"
+      ],
+      "oracle": "cobol.enterprise-6.5.licensed",
+      "recovery": null
     }
   ],
   "catalog_digest": "sha256:074f7385b1d1e1127f9cf83dbbc4e0bc46903cfa7739a2515c4085f7d2037f01",
@@ -46820,6 +47007,83 @@
       ],
       "obligation_id": "output.parameters-0076.valid",
       "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0076"
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0003",
+      "obligation_id": "phrase-initialized-linkage",
+      "applicable_gates": [
+        "executed"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0015",
+      "obligation_id": "phrase-section",
+      "applicable_gates": [
+        "executed"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0020",
+      "obligation_id": "phrase-replacing-then-default",
+      "applicable_gates": [
+        "executed"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0021",
+      "obligation_id": "phrase-leading-first-before-after",
+      "applicable_gates": [
+        "executed"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0028",
+      "obligation_id": "phrase-multiple-files-and-modes",
+      "applicable_gates": [
+        "executed"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0007",
+      "obligation_id": "phrase-multiple-with-lock",
+      "applicable_gates": [
+        "executed"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0030",
+      "obligation_id": "phrase-lock-wait",
+      "applicable_gates": [
+        "executed"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0035",
+      "obligation_id": "phrase-multiple-to",
+      "applicable_gates": [
+        "executed"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
+      "obligation_id": "phrase-with-detail",
+      "applicable_gates": [
+        "executed"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0042",
+      "obligation_id": "phrase-advancing-end-page",
+      "applicable_gates": [
+        "executed"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044",
+      "obligation_id": "phrase-processing-procedure-through",
+      "applicable_gates": [
+        "executed"
+      ]
     }
   ],
   "registries": {
@@ -48391,71 +48655,71 @@
         "id": "cobol.semantic.file-value-of.valid"
       },
       {
-        "digest": "sha256:e54cc1219723af871e4bc78da40fd326313220cca088f860af629be5eea49c12",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994",
         "id": "cobol.statement-phrase-runtime.add-corresponding"
       },
       {
-        "digest": "sha256:e54cc1219723af871e4bc78da40fd326313220cca088f860af629be5eea49c12",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994",
         "id": "cobol.statement-phrase-runtime.display-upon-no-advancing"
       },
       {
-        "digest": "sha256:e54cc1219723af871e4bc78da40fd326313220cca088f860af629be5eea49c12",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994",
         "id": "cobol.statement-phrase-runtime.exit-paragraph"
       },
       {
-        "digest": "sha256:e54cc1219723af871e4bc78da40fd326313220cca088f860af629be5eea49c12",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994",
         "id": "cobol.statement-phrase-runtime.exit-perform"
       },
       {
-        "digest": "sha256:e54cc1219723af871e4bc78da40fd326313220cca088f860af629be5eea49c12",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994",
         "id": "cobol.statement-phrase-runtime.initialize-with-filler"
       },
       {
-        "digest": "sha256:e54cc1219723af871e4bc78da40fd326313220cca088f860af629be5eea49c12",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994",
         "id": "cobol.statement-phrase-runtime.json-generate-count"
       },
       {
-        "digest": "sha256:e54cc1219723af871e4bc78da40fd326313220cca088f860af629be5eea49c12",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994",
         "id": "cobol.statement-phrase-runtime.move-corresponding"
       },
       {
-        "digest": "sha256:e54cc1219723af871e4bc78da40fd326313220cca088f860af629be5eea49c12",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994",
         "id": "cobol.statement-phrase-runtime.perform-inline-varying"
       },
       {
-        "digest": "sha256:e54cc1219723af871e4bc78da40fd326313220cca088f860af629be5eea49c12",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994",
         "id": "cobol.statement-phrase-runtime.perform-through"
       },
       {
-        "digest": "sha256:e54cc1219723af871e4bc78da40fd326313220cca088f860af629be5eea49c12",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994",
         "id": "cobol.statement-phrase-runtime.read-next-record"
       },
       {
-        "digest": "sha256:e54cc1219723af871e4bc78da40fd326313220cca088f860af629be5eea49c12",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994",
         "id": "cobol.statement-phrase-runtime.release-from"
       },
       {
-        "digest": "sha256:e54cc1219723af871e4bc78da40fd326313220cca088f860af629be5eea49c12",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994",
         "id": "cobol.statement-phrase-runtime.return-into-at-end"
       },
       {
-        "digest": "sha256:e54cc1219723af871e4bc78da40fd326313220cca088f860af629be5eea49c12",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994",
         "id": "cobol.statement-phrase-runtime.search-all"
       },
       {
-        "digest": "sha256:e54cc1219723af871e4bc78da40fd326313220cca088f860af629be5eea49c12",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994",
         "id": "cobol.statement-phrase-runtime.set-up-down-by"
       },
       {
-        "digest": "sha256:e54cc1219723af871e4bc78da40fd326313220cca088f860af629be5eea49c12",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994",
         "id": "cobol.statement-phrase-runtime.string-with-pointer"
       },
       {
-        "digest": "sha256:e54cc1219723af871e4bc78da40fd326313220cca088f860af629be5eea49c12",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994",
         "id": "cobol.statement-phrase-runtime.unstring-pointer-tally"
       },
       {
-        "digest": "sha256:e54cc1219723af871e4bc78da40fd326313220cca088f860af629be5eea49c12",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994",
         "id": "cobol.statement-phrase-runtime.xml-generate-count"
       },
       {
@@ -50881,6 +51145,50 @@
       {
         "digest": "sha256:882e659cbc74c7c5294f98bbcb11110eab3355ca01bd93d5c56bf64cbe7d1aaf",
         "id": "jcl.fixture.output-parameters.0076.valid"
+      },
+      {
+        "id": "cobol.statement-phrase-runtime.allocate-initialized-linkage",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994"
+      },
+      {
+        "id": "cobol.statement-phrase-runtime.exit-section",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994"
+      },
+      {
+        "id": "cobol.statement-phrase-runtime.initialize-replacing-default",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994"
+      },
+      {
+        "id": "cobol.statement-phrase-runtime.inspect-modes-and-ranges",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994"
+      },
+      {
+        "id": "cobol.statement-phrase-runtime.open-multiple-files",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994"
+      },
+      {
+        "id": "cobol.statement-phrase-runtime.close-multiple-with-lock",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994"
+      },
+      {
+        "id": "cobol.statement-phrase-runtime.read-lock-no-wait",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994"
+      },
+      {
+        "id": "cobol.statement-phrase-runtime.set-multiple-to",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994"
+      },
+      {
+        "id": "cobol.statement-phrase-runtime.json-parse-with-detail",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994"
+      },
+      {
+        "id": "cobol.statement-phrase-runtime.write-advancing-end-page",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994"
+      },
+      {
+        "id": "cobol.statement-phrase-runtime.xml-parse-processing-procedure",
+        "digest": "sha256:b039c347e3aef6bb2fceea8fc531738cbc5963fc2727fb72d936699b7461a994"
       }
     ],
     "input_shapes": [
@@ -56611,6 +56919,7 @@
         "checkpoint-identity",
         "invalid-forms",
         "licensed-equivalence",
+        "phrase-initialized-linkage",
         "quantum-identity",
         "resource-exhaustion",
         "runtime-cancellation",
@@ -56625,6 +56934,7 @@
         "cobol.assurance.quantum-invariant",
         "cobol.assurance.resource-conditioned",
         "cobol.licensed.row-equivalent",
+        "cobol.statement-phrase-runtime.executed",
         "cobol.statement-runtime.executed",
         "cobol.statement.accepted",
         "cobol.statement.rejected"
@@ -56632,6 +56942,7 @@
       "preconditions": [
         "cobol.assurance.fixture.available",
         "cobol.licensed.receipt.available",
+        "cobol.statement-phrase-runtime.fixture.available",
         "cobol.statement-runtime.fixture.available",
         "cobol.statement.fixture.available"
       ],
@@ -56794,6 +57105,7 @@
         "checkpoint-identity",
         "invalid-forms",
         "licensed-equivalence",
+        "phrase-multiple-with-lock",
         "quantum-identity",
         "resource-exhaustion",
         "runtime-cancellation",
@@ -56808,6 +57120,7 @@
         "cobol.assurance.quantum-invariant",
         "cobol.assurance.resource-conditioned",
         "cobol.licensed.row-equivalent",
+        "cobol.statement-phrase-runtime.executed",
         "cobol.statement-runtime.executed",
         "cobol.statement.accepted",
         "cobol.statement.rejected"
@@ -56815,6 +57128,7 @@
       "preconditions": [
         "cobol.assurance.fixture.available",
         "cobol.licensed.receipt.available",
+        "cobol.statement-phrase-runtime.fixture.available",
         "cobol.statement-runtime.fixture.available",
         "cobol.statement.fixture.available"
       ],
@@ -57159,6 +57473,7 @@
         "licensed-equivalence",
         "phrase-paragraph",
         "phrase-perform",
+        "phrase-section",
         "quantum-identity",
         "resource-exhaustion",
         "runtime-cancellation",
@@ -57386,6 +57701,7 @@
         "checkpoint-identity",
         "invalid-forms",
         "licensed-equivalence",
+        "phrase-replacing-then-default",
         "phrase-with-filler",
         "quantum-identity",
         "resource-exhaustion",
@@ -57434,6 +57750,7 @@
         "checkpoint-identity",
         "invalid-forms",
         "licensed-equivalence",
+        "phrase-leading-first-before-after",
         "quantum-identity",
         "resource-exhaustion",
         "runtime-cancellation",
@@ -57448,6 +57765,7 @@
         "cobol.assurance.quantum-invariant",
         "cobol.assurance.resource-conditioned",
         "cobol.licensed.row-equivalent",
+        "cobol.statement-phrase-runtime.executed",
         "cobol.statement-runtime.executed",
         "cobol.statement.accepted",
         "cobol.statement.rejected"
@@ -57455,6 +57773,7 @@
       "preconditions": [
         "cobol.assurance.fixture.available",
         "cobol.licensed.receipt.available",
+        "cobol.statement-phrase-runtime.fixture.available",
         "cobol.statement-runtime.fixture.available",
         "cobol.statement.fixture.available"
       ],
@@ -57575,6 +57894,7 @@
         "checkpoint-identity",
         "invalid-forms",
         "licensed-equivalence",
+        "phrase-with-detail",
         "quantum-identity",
         "resource-exhaustion",
         "runtime-cancellation",
@@ -57591,6 +57911,7 @@
         "cobol.assurance.resource-conditioned",
         "cobol.condition.exact",
         "cobol.licensed.row-equivalent",
+        "cobol.statement-phrase-runtime.executed",
         "cobol.statement-runtime.executed",
         "cobol.statement.accepted",
         "cobol.statement.rejected"
@@ -57599,6 +57920,7 @@
         "cobol.assurance.fixture.available",
         "cobol.condition.fixture.available",
         "cobol.licensed.receipt.available",
+        "cobol.statement-phrase-runtime.fixture.available",
         "cobol.statement-runtime.fixture.available",
         "cobol.statement.fixture.available"
       ],
@@ -57761,6 +58083,7 @@
         "checkpoint-identity",
         "invalid-forms",
         "licensed-equivalence",
+        "phrase-multiple-files-and-modes",
         "quantum-identity",
         "resource-exhaustion",
         "runtime-cancellation",
@@ -57775,6 +58098,7 @@
         "cobol.assurance.quantum-invariant",
         "cobol.assurance.resource-conditioned",
         "cobol.licensed.row-equivalent",
+        "cobol.statement-phrase-runtime.executed",
         "cobol.statement-runtime.executed",
         "cobol.statement.accepted",
         "cobol.statement.rejected"
@@ -57782,6 +58106,7 @@
       "preconditions": [
         "cobol.assurance.fixture.available",
         "cobol.licensed.receipt.available",
+        "cobol.statement-phrase-runtime.fixture.available",
         "cobol.statement-runtime.fixture.available",
         "cobol.statement.fixture.available"
       ],
@@ -57855,6 +58180,7 @@
         "checkpoint-identity",
         "invalid-forms",
         "licensed-equivalence",
+        "phrase-lock-wait",
         "phrase-next-record",
         "quantum-identity",
         "resource-exhaustion",
@@ -58104,6 +58430,7 @@
         "checkpoint-identity",
         "invalid-forms",
         "licensed-equivalence",
+        "phrase-multiple-to",
         "phrase-up-down-by",
         "quantum-identity",
         "resource-exhaustion",
@@ -58440,6 +58767,7 @@
         "checkpoint-identity",
         "invalid-forms",
         "licensed-equivalence",
+        "phrase-advancing-end-page",
         "quantum-identity",
         "resource-exhaustion",
         "runtime-cancellation",
@@ -58454,6 +58782,7 @@
         "cobol.assurance.quantum-invariant",
         "cobol.assurance.resource-conditioned",
         "cobol.licensed.row-equivalent",
+        "cobol.statement-phrase-runtime.executed",
         "cobol.statement-runtime.executed",
         "cobol.statement.accepted",
         "cobol.statement.rejected"
@@ -58461,6 +58790,7 @@
       "preconditions": [
         "cobol.assurance.fixture.available",
         "cobol.licensed.receipt.available",
+        "cobol.statement-phrase-runtime.fixture.available",
         "cobol.statement-runtime.fixture.available",
         "cobol.statement.fixture.available"
       ],
@@ -58533,6 +58863,7 @@
         "checkpoint-identity",
         "invalid-forms",
         "licensed-equivalence",
+        "phrase-processing-procedure-through",
         "quantum-identity",
         "resource-exhaustion",
         "runtime-cancellation",
@@ -58549,6 +58880,7 @@
         "cobol.assurance.resource-conditioned",
         "cobol.condition.exact",
         "cobol.licensed.row-equivalent",
+        "cobol.statement-phrase-runtime.executed",
         "cobol.statement-runtime.executed",
         "cobol.statement.accepted",
         "cobol.statement.rejected"
@@ -58557,6 +58889,7 @@
         "cobol.assurance.fixture.available",
         "cobol.condition.fixture.available",
         "cobol.licensed.receipt.available",
+        "cobol.statement-phrase-runtime.fixture.available",
         "cobol.statement-runtime.fixture.available",
         "cobol.statement.fixture.available"
       ],
