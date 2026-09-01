@@ -25,13 +25,20 @@ outside production/release closure. If the required environment is unavailable,
 prepare reproducible harnesses and mark the final differential gate blocked; do
 not fabricate a pass.
 
+The accepted 0.6 implementation enters this gate with its dataset/VSAM/AMS
+licensed differential explicitly pending at 0/36. Its independent reference
+simulation is development assurance only and grants no CER-1702 or differential
+credit. CER-1702 must run the real pinned 36-row dataset campaign and produce a
+reviewed candidate-bound licensed receipt before release certification can pass.
+
 ## Implement in this order
 
 1. Implement **CER-1701** pinned environment manifests for product levels,
    APAR/PTF/service state, configuration, locale/CCSID, topology, authority,
    fixtures, tools, redaction and reproducible oracle commands.
 2. Run **CER-1702** independent per-subsystem differential campaigns against the
-   same source identity. Normalize only documented nondeterministic fields.
+   same source identity, including the deferred 0.6 dataset/VSAM/AMS 36-row
+   campaign. Normalize only documented nondeterministic fields.
 3. Triage each mismatch to an implementation defect, baseline correction or
    explicit out-of-scope row. Add a focused regression before every code fix and
    invalidate/rerun all affected receipts after a merge.

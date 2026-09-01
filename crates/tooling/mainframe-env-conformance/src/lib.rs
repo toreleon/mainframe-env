@@ -22,6 +22,7 @@ use std::collections::{BTreeMap, BTreeSet};
 mod abi;
 mod carddemo;
 mod dataset;
+mod dataset_reference;
 
 pub use abi::{
     HostAbiInventoryReceipt, HostAbiLibraryReceipt, HostAbiMemberReceipt, verify_host_abi_libraries,
@@ -53,6 +54,7 @@ pub use carddemo::{
     verify_carddemo_vsam_from_env,
 };
 pub use dataset::run_dataset_conformance;
+pub use dataset_reference::{DatasetReferenceSimulationReport, run_dataset_reference_simulation};
 
 pub const HELLO_SOURCE: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. HELLO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MSG PIC X(12) VALUE 'HELLO WORLD!'.\nPROCEDURE DIVISION.\nDISPLAY MSG.\nSTOP RUN.\n";
 

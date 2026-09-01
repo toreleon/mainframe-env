@@ -223,6 +223,26 @@ implemented capability, and explicit unavailable-capability evidence. Contract
 validation rejects stale inventory digests, missing/surplus descriptors,
 incompatible dispositions, and test identities that no longer resolve.
 
+## Independent reference simulation
+
+DAT-606 includes a tooling-only bounded pure-state reference simulation. It
+owns its organization, record, catalog, alias, AIX, path, GDG, snapshot,
+register, condition, and transition types and reads only the frozen official
+catalog plus reviewed 0.6 fixtures. A repository check rejects imports or calls
+to production dataset, AMS, host, or provider-store authorities from the model.
+
+The simulation covers the five VSAM organization rows and all 31 AMS command
+identities, deterministic properties for access ordering, lifecycle,
+REPRO/snapshot, base/AIX, GDG, alias, failure atomicity, restart and
+backup/restore, and explicit capability/unknown boundaries for physical or
+installation-defined behavior. Named mutants cover generic success, ignored
+attributes, wrong access, reordered outcomes, missing registers, AIX drift,
+partial publication, and production-derived expectation reuse.
+
+Focused dataset conformance requires the simulation to pass, but it introduces
+no coverage gate or licensed evidence. Its differential credit is fixed at
+zero, and `dataset-oracle --check` still requires the external reviewed receipt.
+
 ## Evolution rules
 
 - Writers emit only the current state version; readers support the documented

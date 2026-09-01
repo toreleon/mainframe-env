@@ -6,20 +6,21 @@ mod evidence_seal;
 
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use mainframe_env_conformance::{
-    run_dataset_conformance, verify_carddemo_application_package_from_env,
-    verify_carddemo_base_batch_from_env, verify_carddemo_base_online_from_env,
-    verify_carddemo_batch_programs_from_env, verify_carddemo_cics_abi_from_env,
-    verify_carddemo_cics_runtime_from_env, verify_carddemo_control_flow_from_env,
-    verify_carddemo_core_semantics_from_env, verify_carddemo_corpus_from_env,
-    verify_carddemo_data_layouts_from_env, verify_carddemo_dataset_catalog_from_env,
-    verify_carddemo_db2_from_env, verify_carddemo_file_call_semantics_from_env,
-    verify_carddemo_full_from_env, verify_carddemo_host_operands_from_env,
-    verify_carddemo_ims_from_env, verify_carddemo_jcl_from_env,
-    verify_carddemo_mq_authorization_from_env, verify_carddemo_program_routing_from_env,
-    verify_carddemo_resources_from_env, verify_carddemo_security_from_env,
-    verify_carddemo_seeds_from_env, verify_carddemo_source_closures_from_env,
-    verify_carddemo_source_preprocessing_from_env, verify_carddemo_terminal_from_env,
-    verify_carddemo_utilities_from_env, verify_carddemo_vsam_from_env, verify_host_abi_libraries,
+    run_dataset_conformance, run_dataset_reference_simulation,
+    verify_carddemo_application_package_from_env, verify_carddemo_base_batch_from_env,
+    verify_carddemo_base_online_from_env, verify_carddemo_batch_programs_from_env,
+    verify_carddemo_cics_abi_from_env, verify_carddemo_cics_runtime_from_env,
+    verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
+    verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
+    verify_carddemo_dataset_catalog_from_env, verify_carddemo_db2_from_env,
+    verify_carddemo_file_call_semantics_from_env, verify_carddemo_full_from_env,
+    verify_carddemo_host_operands_from_env, verify_carddemo_ims_from_env,
+    verify_carddemo_jcl_from_env, verify_carddemo_mq_authorization_from_env,
+    verify_carddemo_program_routing_from_env, verify_carddemo_resources_from_env,
+    verify_carddemo_security_from_env, verify_carddemo_seeds_from_env,
+    verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
+    verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
+    verify_carddemo_vsam_from_env, verify_host_abi_libraries,
 };
 use mainframe_env_coverage::{
     BindingKey, CompiledSpec, ConformanceLimits, CoverageGate, DerivedConformanceLedger, DriverRef,
@@ -881,6 +882,7 @@ fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> T
         )
         .map_err(|problem| problem.to_string())?;
         let report = run_dataset_conformance(&spec, &selection, &context)?;
+        let simulation = run_dataset_reference_simulation()?;
         let failures = report
             .batches
             .iter()
@@ -898,8 +900,13 @@ fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> T
             .map(|batch| batch.events.len())
             .sum::<usize>();
         println!(
-            "dataset-conformance bindings={selected} events={events} batches={}",
-            report.batches.len()
+            "dataset-conformance bindings={selected} events={events} batches={} reference-organizations={} reference-commands={} reference-properties={} mutants-killed={} differential-credit={}",
+            report.batches.len(),
+            simulation.organization_rows,
+            simulation.command_rows,
+            simulation.property_cases,
+            simulation.mutants_killed,
+            simulation.differential_credit,
         );
         return Ok(());
     }
@@ -2532,9 +2539,14 @@ fn compile_draft_2020_12_schema(schema: &Value, path: &Path) -> TaskResult<jsons
 }
 
 fn check_dataset_oracle(root: &Path) -> TaskResult {
-    let receipt_path = env::var_os("MAINFRAME_ENV_ZOS_AMS_ORACLE_RECEIPT")
-        .map(PathBuf::from)
-        .ok_or(
+    check_dataset_oracle_receipt(
+        root,
+        env::var_os("MAINFRAME_ENV_ZOS_AMS_ORACLE_RECEIPT").map(PathBuf::from),
+    )
+}
+
+fn check_dataset_oracle_receipt(root: &Path, receipt_path: Option<PathBuf>) -> TaskResult {
+    let receipt_path = receipt_path.ok_or(
             "licensed z/OS 3.2 differential is pending; set MAINFRAME_ENV_ZOS_AMS_ORACLE_RECEIPT to a reviewed receipt",
         )?;
     require(
@@ -2804,7 +2816,94 @@ fn check_dataset_contract(root: &Path) -> TaskResult {
             == render_ams_grammar(root)?,
         "generated AMS grammar is stale; run cargo xtask dataset-contract",
     )?;
-    check_dataset_surface_audit(root)
+    check_dataset_surface_audit(root)?;
+    check_dataset_reference_independence(root)
+}
+
+fn check_dataset_reference_independence(root: &Path) -> TaskResult {
+    let path = root.join("crates/tooling/mainframe-env-conformance/src/dataset_reference.rs");
+    let source = read(&path)?;
+    for forbidden in [
+        "mainframe_env_batch",
+        "mainframe_env_dataset",
+        "mainframe_env_host_api",
+        "mainframe_env_store",
+        "DatasetRequest",
+        "DatasetResult",
+        "DatasetService",
+        "AmsCommand",
+        "HostProblem",
+        "ProviderState",
+        "MAINFRAME_ENV_ZOS_AMS_ORACLE_RECEIPT",
+    ] {
+        require(
+            !source.contains(forbidden),
+            &format!(
+                "independent dataset reference simulation contains forbidden product authority {forbidden}"
+            ),
+        )?;
+    }
+    for line in source
+        .lines()
+        .map(str::trim)
+        .filter(|line| line.starts_with("use "))
+    {
+        require(
+            line.starts_with("use serde_json::")
+                || line.starts_with("use sha2::")
+                || line.starts_with("use std::")
+                || line == "use super::*;",
+            &format!("independent dataset reference simulation has disallowed import {line}"),
+        )?;
+    }
+    for required in [
+        "conformance/0.2/catalogs/dataset-vsam-ams.json",
+        "conformance/0.6/fixtures/dataset-organizations.json",
+        "conformance/0.6/fixtures/ams-commands.json",
+        "const MAX_DATASETS",
+        "const MAX_RECORDS",
+        "const MAX_TOTAL_BYTES",
+        "differential_credit: 0",
+        "production-observation-reuse",
+        "partial-failure-publication",
+        "physical-installation-unknown-boundaries",
+    ] {
+        require(
+            source.contains(required),
+            &format!("independent dataset reference simulation omits {required}"),
+        )?;
+    }
+    let integration_path = root.join("crates/tooling/mainframe-env-conformance/src/dataset.rs");
+    require(
+        read(&integration_path)?.contains("run_dataset_reference_simulation"),
+        "focused dataset conformance does not execute the independent reference simulation",
+    )?;
+    for relative in [
+        "docs/prompts/coverage-versions/IMPLEMENT_0_6_0.md",
+        "docs/delivery/coverage-versions/0.6.0.md",
+        "docs/delivery/coverage-versions/status/0.6.0.md",
+    ] {
+        let document = read(&root.join(relative))?;
+        require(
+            document.contains("pass-with-licensed-differential-pending")
+                && document.contains("0/36"),
+            &format!("{relative} omits the approved 0.6 pending-differential disposition"),
+        )?;
+    }
+    for relative in [
+        "docs/prompts/coverage-versions/IMPLEMENT_0_17_0.md",
+        "docs/delivery/coverage-versions/0.17.0.md",
+    ] {
+        let document = read(&root.join(relative))?;
+        require(
+            document.contains("0/36")
+                && document.contains("36-row")
+                && document.contains("reference")
+                && document.contains("simulation"),
+            &format!("{relative} omits the deferred licensed dataset campaign handoff"),
+        )?;
+    }
+    Ok(())
 }
 
 fn check_dataset_surface_audit(root: &Path) -> TaskResult {
@@ -7443,6 +7542,19 @@ fn require(condition: bool, message: &str) -> TaskResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dataset_reference_simulation_cannot_satisfy_the_licensed_receipt_gate() {
+        let root = repository_root().expect("repository root");
+        let pending = check_dataset_oracle_receipt(&root, None)
+            .expect_err("missing licensed receipt must remain pending");
+        assert!(pending.contains("licensed z/OS 3.2 differential is pending"));
+        let simulation =
+            root.join("crates/tooling/mainframe-env-conformance/src/dataset_reference.rs");
+        assert!(check_dataset_oracle_receipt(&root, Some(simulation)).is_err());
+        let local_certification = root.join("conformance/0.6/evidence/dataset-certification.json");
+        assert!(check_dataset_oracle_receipt(&root, Some(local_certification)).is_err());
+    }
 
     #[test]
     fn strict_cli_rejects_unknown_duplicate_and_surplus_arguments() {

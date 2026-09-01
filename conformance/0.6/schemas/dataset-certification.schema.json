@@ -4,11 +4,20 @@
   "title": "Dataset VSAM AMS local certification evidence",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "target_version", "baseline_id", "surface", "state", "matrices", "validation", "oracle"],
+  "required": ["schema_version", "target_version", "baseline_id", "completion_policy", "surface", "state", "reference_simulation", "matrices", "validation", "oracle"],
   "properties": {
     "schema_version": { "const": "mainframe-env.dataset-certification@1" },
     "target_version": { "const": "0.6.0" },
     "baseline_id": { "const": "ibm-zos-3.2-dfsms-ams-2026-06" },
+    "completion_policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "differential", "release_hard_gate"],
+      "properties": {
+        "status": { "const": "pass-with-licensed-differential-pending" },
+        "differential": { "const": "pending" },
+        "release_hard_gate": { "const": "0.17.0" }
+      }
+    },
     "surface": {
       "type": "object", "additionalProperties": false,
       "required": ["official_rows", "ams_commands", "organizations", "detailed_descriptors", "local_bindings", "detailed_surface_audit", "local_gates"],
@@ -52,9 +61,22 @@
         "migrations": { "const": ["2-to-3", "3-to-4", "4-to-5", "5-to-6"] }
       }
     },
+    "reference_simulation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "model_kind", "organizations", "commands", "properties", "mutants_killed", "differential_credit"],
+      "properties": {
+        "status": { "const": "pass" },
+        "model_kind": { "const": "independent-bounded-pure-state" },
+        "organizations": { "const": 5 },
+        "commands": { "const": 31 },
+        "properties": { "const": 13 },
+        "mutants_killed": { "const": 8 },
+        "differential_credit": { "const": 0 }
+      }
+    },
     "matrices": {
       "type": "object", "additionalProperties": { "const": "pass" },
-      "required": ["base_aix_atomicity", "gdg_atomicity", "disp_cleanup", "locks", "rls_tvs", "restart", "unknown_outcome", "concurrent_mutation", "corruption", "backup_restore", "migration", "scale", "carddemo_exactness", "volume_vtoc", "owner_security", "operand_rejection", "lifecycle_invalidation", "snapshot_all_organizations", "detailed_surface_audit"]
+      "required": ["base_aix_atomicity", "gdg_atomicity", "disp_cleanup", "locks", "rls_tvs", "restart", "unknown_outcome", "concurrent_mutation", "corruption", "backup_restore", "migration", "scale", "carddemo_exactness", "volume_vtoc", "owner_security", "operand_rejection", "lifecycle_invalidation", "snapshot_all_organizations", "detailed_surface_audit", "reference_simulation"]
     },
     "validation": {
       "type": "array", "minItems": 1, "maxItems": 32,
@@ -62,11 +84,12 @@
     },
     "oracle": {
       "type": "object", "additionalProperties": false,
-      "required": ["status", "required_environment", "receipt"],
+      "required": ["status", "required_environment", "receipt", "deferred_to"],
       "properties": {
-        "status": { "enum": ["pending", "pass"] },
+        "status": { "const": "pending" },
         "required_environment": { "const": "licensed-zos-3.2" },
-        "receipt": { "type": ["string", "null"], "maxLength": 256 }
+        "receipt": { "type": "null" },
+        "deferred_to": { "const": "0.17.0" }
       }
     }
   }

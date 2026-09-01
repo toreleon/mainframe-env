@@ -80,6 +80,14 @@ pub fn run_dataset_conformance(
     selection: &RunnerSelection,
     context: &RunnerContext,
 ) -> Result<ConformanceRunReport, String> {
+    let simulation = crate::run_dataset_reference_simulation()?;
+    if simulation.official_rows != 36
+        || simulation.organization_rows != 5
+        || simulation.command_rows != 31
+        || simulation.differential_credit != 0
+    {
+        return Err("dataset reference simulation denominator or evidence boundary drifted".into());
+    }
     let limits = ConformanceLimits::default();
     let driver = DatasetOrganizationDriver;
     let ams_driver = AmsCommandDriver;

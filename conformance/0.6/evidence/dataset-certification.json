@@ -2,6 +2,11 @@
   "schema_version": "mainframe-env.dataset-certification@1",
   "target_version": "0.6.0",
   "baseline_id": "ibm-zos-3.2-dfsms-ams-2026-06",
+  "completion_policy": {
+    "status": "pass-with-licensed-differential-pending",
+    "differential": "pending",
+    "release_hard_gate": "0.17.0"
+  },
   "surface": {
     "official_rows": 36,
     "ams_commands": 31,
@@ -29,6 +34,15 @@
     "aix_writer": "MEAIX4",
     "migrations": ["2-to-3", "3-to-4", "4-to-5", "5-to-6"]
   },
+  "reference_simulation": {
+    "status": "pass",
+    "model_kind": "independent-bounded-pure-state",
+    "organizations": 5,
+    "commands": 31,
+    "properties": 13,
+    "mutants_killed": 8,
+    "differential_credit": 0
+  },
   "matrices": {
     "base_aix_atomicity": "pass",
     "gdg_atomicity": "pass",
@@ -48,7 +62,8 @@
     "operand_rejection": "pass",
     "lifecycle_invalidation": "pass",
     "snapshot_all_organizations": "pass",
-    "detailed_surface_audit": "pass"
+    "detailed_surface_audit": "pass",
+    "reference_simulation": "pass"
   },
   "validation": [
     "cargo test --workspace --all-targets",
@@ -63,6 +78,7 @@
   "oracle": {
     "status": "pending",
     "required_environment": "licensed-zos-3.2",
-    "receipt": null
+    "receipt": null,
+    "deferred_to": "0.17.0"
   }
 }
