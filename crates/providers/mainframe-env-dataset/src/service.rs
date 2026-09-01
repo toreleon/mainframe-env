@@ -61,6 +61,7 @@ struct Replay {
     result: Option<DatasetResult>,
 }
 type BrowseIdentity = (Vec<u8>, Vec<u8>);
+type SequentialRecord = (Vec<u8>, Vec<u8>);
 #[derive(Clone, Debug)]
 struct Cursor {
     dataset: String,
@@ -440,6 +441,11 @@ impl DatasetService {
     }
 
     pub fn invoke(&self, request: DatasetRequest) -> Result<DatasetResult, HostProblem> {
+        HostRequest::Dataset(request.clone()).validate(mainframe_env_host_api::HostLimits {
+            max_record_bytes: self.limits.max_record_bytes,
+            max_records: self.limits.max_records,
+            ..Default::default()
+        })?;
         let mutation = mutation(&request);
         let mut state = self
             .state
@@ -810,6 +816,66 @@ impl DatasetService {
                 Ok(DatasetResult::Records {
                     records: vec![record],
                     identities: vec![record_number.to_be_bytes().to_vec()],
+                    version: entry.version,
+                })
+            }
+            DatasetRequest::ReadRba {
+                dataset,
+                rba,
+                max_bytes,
+            } => {
+                let entry = entry(state, dataset)?;
+                match entry.attributes.organization {
+                    mainframe_env_host_api::DatasetOrganization::Linear => {
+                        let content = linear_content(entry)?;
+                        let start =
+                            usize::try_from(*rba).map_err(|_| HostProblem::ResourceExhausted)?;
+                        if start >= content.len() {
+                            return Err(condition("NOTFND", 13));
+                        }
+                        let end = start
+                            .checked_add(*max_bytes as usize)
+                            .map_or(content.len(), |end| end.min(content.len()));
+                        let data = content[start..end].to_vec();
+                        Ok(DatasetResult::Rba {
+                            data,
+                            record: false,
+                            rba: *rba,
+                            next_rba: u64::try_from(end)
+                                .map_err(|_| HostProblem::ResourceExhausted)?,
+                            version: entry.version,
+                        })
+                    }
+                    mainframe_env_host_api::DatasetOrganization::EntrySequenced => {
+                        let (record, next_rba) = esds_record_at_rba(entry, *rba)?;
+                        if record.len() > *max_bytes as usize {
+                            return Err(condition("LENGERR", 22));
+                        }
+                        Ok(DatasetResult::Rba {
+                            data: record.clone(),
+                            record: true,
+                            rba: *rba,
+                            next_rba,
+                            version: entry.version,
+                        })
+                    }
+                    _ => Err(HostProblem::Unsupported),
+                }
+            }
+            DatasetRequest::ReadSequential {
+                dataset,
+                member,
+                start,
+                reverse,
+                max_records,
+            } => {
+                let entry = entry(state, dataset)?;
+                let ordered = sequential_records(entry, member.as_ref())?;
+                let selected =
+                    select_sequential(&ordered, *start, *reverse, *max_records as usize)?;
+                Ok(DatasetResult::Records {
+                    records: selected.iter().map(|(_, record)| record.clone()).collect(),
+                    identities: selected.into_iter().map(|(identity, _)| identity).collect(),
                     version: entry.version,
                 })
             }
@@ -1276,6 +1342,72 @@ impl DatasetService {
                 let mut next = current.clone();
                 if next.relative_records.remove(record_number).is_none() {
                     return Err(condition("NOTFND", 13));
+                }
+                next.version = next
+                    .version
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?;
+                let result = DatasetResult::Mutated {
+                    version: next.version,
+                };
+                self.persist_with_indexes(
+                    state,
+                    dataset.as_str(),
+                    &current,
+                    &next,
+                    mutation,
+                    request_digest(request)?,
+                    &result,
+                )?;
+                Ok(result)
+            }
+            DatasetRequest::WriteRba {
+                dataset,
+                rba,
+                data,
+                expected_version,
+                mutation,
+            } => {
+                if data.is_empty() {
+                    return Err(HostProblem::Malformed);
+                }
+                if data.len() > self.limits.max_record_bytes {
+                    return Err(HostProblem::ResourceExhausted);
+                }
+                let current = entry(state, dataset)?.clone();
+                if expected_version.is_some_and(|expected| expected != current.version) {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+                let mut next = current.clone();
+                match current.attributes.organization {
+                    mainframe_env_host_api::DatasetOrganization::Linear => {
+                        let mut content = linear_content(&current)?;
+                        let start =
+                            usize::try_from(*rba).map_err(|_| HostProblem::ResourceExhausted)?;
+                        if start > content.len() {
+                            return Err(condition("NOTFND", 13));
+                        }
+                        let end = start
+                            .checked_add(data.len())
+                            .ok_or(HostProblem::ResourceExhausted)?;
+                        if end > self.limits.max_total_bytes {
+                            return Err(HostProblem::ResourceExhausted);
+                        }
+                        content.resize(end.max(content.len()), 0);
+                        content[start..end].copy_from_slice(data);
+                        next.records = content
+                            .chunks(self.limits.max_record_bytes)
+                            .map(<[u8]>::to_vec)
+                            .collect();
+                    }
+                    mainframe_env_host_api::DatasetOrganization::EntrySequenced => {
+                        let position = esds_position_at_rba(&current, *rba)?;
+                        if current.records[position].len() != data.len() {
+                            return Err(condition("LENGERR", 22));
+                        }
+                        next.records[position] = data.clone();
+                    }
+                    _ => return Err(HostProblem::Unsupported),
                 }
                 next.version = next
                     .version
@@ -2049,6 +2181,9 @@ fn validate_keyed_entry(entry: &mut Entry) -> Result<(), HostProblem> {
 }
 
 fn ordered_records(entry: &Entry) -> Result<Vec<&Vec<u8>>, HostProblem> {
+    if entry.attributes.organization == mainframe_env_host_api::DatasetOrganization::Linear {
+        return Err(HostProblem::Unsupported);
+    }
     let mut records = entry.records.iter().collect::<Vec<_>>();
     if entry.attributes.organization == mainframe_env_host_api::DatasetOrganization::KeySequenced {
         records.sort_by_key(|record| primary_key(entry, record).unwrap_or_default());
@@ -2059,12 +2194,185 @@ fn ordered_records(entry: &Entry) -> Result<Vec<&Vec<u8>>, HostProblem> {
 fn record_identity(entry: &Entry, record: &[u8], position: usize) -> Result<Vec<u8>, HostProblem> {
     if entry.attributes.organization == mainframe_env_host_api::DatasetOrganization::KeySequenced {
         primary_key(entry, record)
+    } else if entry.attributes.organization
+        == mainframe_env_host_api::DatasetOrganization::EntrySequenced
+    {
+        let rba = entry
+            .records
+            .iter()
+            .take(position)
+            .try_fold(0u64, |total, preceding| {
+                total
+                    .checked_add(
+                        u64::try_from(preceding.len())
+                            .map_err(|_| HostProblem::ResourceExhausted)?,
+                    )
+                    .ok_or(HostProblem::ResourceExhausted)
+            })?;
+        Ok(rba.to_be_bytes().to_vec())
     } else {
         Ok(u64::try_from(position)
             .map_err(|_| HostProblem::ResourceExhausted)?
             .to_be_bytes()
             .to_vec())
     }
+}
+
+fn linear_content(entry: &Entry) -> Result<Vec<u8>, HostProblem> {
+    if entry.attributes.organization != mainframe_env_host_api::DatasetOrganization::Linear {
+        return Err(HostProblem::Unsupported);
+    }
+    let length = entry.records.iter().try_fold(0usize, |total, chunk| {
+        total
+            .checked_add(chunk.len())
+            .ok_or(HostProblem::ResourceExhausted)
+    })?;
+    let mut content = Vec::with_capacity(length);
+    for chunk in &entry.records {
+        content.extend_from_slice(chunk);
+    }
+    Ok(content)
+}
+
+fn esds_position_at_rba(entry: &Entry, target: u64) -> Result<usize, HostProblem> {
+    if entry.attributes.organization != mainframe_env_host_api::DatasetOrganization::EntrySequenced
+    {
+        return Err(HostProblem::Unsupported);
+    }
+    let mut rba = 0u64;
+    for (position, record) in entry.records.iter().enumerate() {
+        if rba == target {
+            return Ok(position);
+        }
+        rba = rba
+            .checked_add(u64::try_from(record.len()).map_err(|_| HostProblem::ResourceExhausted)?)
+            .ok_or(HostProblem::ResourceExhausted)?;
+    }
+    Err(condition("NOTFND", 13))
+}
+
+fn esds_record_at_rba(entry: &Entry, rba: u64) -> Result<(&Vec<u8>, u64), HostProblem> {
+    let position = esds_position_at_rba(entry, rba)?;
+    let record = &entry.records[position];
+    let next = rba
+        .checked_add(u64::try_from(record.len()).map_err(|_| HostProblem::ResourceExhausted)?)
+        .ok_or(HostProblem::ResourceExhausted)?;
+    Ok((record, next))
+}
+
+fn sequential_records(
+    entry: &Entry,
+    member: Option<&MemberName>,
+) -> Result<Vec<SequentialRecord>, HostProblem> {
+    if partitioned(entry.attributes.organization) {
+        let member = member.ok_or(HostProblem::Malformed)?;
+        return entry
+            .members
+            .get(member.as_str())
+            .ok_or(HostProblem::NotFound)?
+            .iter()
+            .enumerate()
+            .map(|(position, record)| {
+                Ok((
+                    u64::try_from(position)
+                        .map_err(|_| HostProblem::ResourceExhausted)?
+                        .to_be_bytes()
+                        .to_vec(),
+                    record.clone(),
+                ))
+            })
+            .collect();
+    }
+    if member.is_some() {
+        return Err(HostProblem::Malformed);
+    }
+    if relative(entry.attributes.organization) {
+        return Ok(entry
+            .relative_records
+            .iter()
+            .map(|(rrn, record)| (rrn.to_be_bytes().to_vec(), record.clone()))
+            .collect());
+    }
+    match entry.attributes.organization {
+        mainframe_env_host_api::DatasetOrganization::KeySequenced => ordered_records(entry)?
+            .into_iter()
+            .map(|record| Ok((primary_key(entry, record)?, record.clone())))
+            .collect(),
+        mainframe_env_host_api::DatasetOrganization::EntrySequenced => {
+            let mut rba = 0u64;
+            let mut records = Vec::with_capacity(entry.records.len());
+            for record in &entry.records {
+                records.push((rba.to_be_bytes().to_vec(), record.clone()));
+                rba = rba
+                    .checked_add(
+                        u64::try_from(record.len()).map_err(|_| HostProblem::ResourceExhausted)?,
+                    )
+                    .ok_or(HostProblem::ResourceExhausted)?;
+            }
+            Ok(records)
+        }
+        mainframe_env_host_api::DatasetOrganization::Sequential => entry
+            .records
+            .iter()
+            .enumerate()
+            .map(|(position, record)| {
+                Ok((
+                    u64::try_from(position)
+                        .map_err(|_| HostProblem::ResourceExhausted)?
+                        .to_be_bytes()
+                        .to_vec(),
+                    record.clone(),
+                ))
+            })
+            .collect(),
+        mainframe_env_host_api::DatasetOrganization::Linear => Err(HostProblem::Unsupported),
+        mainframe_env_host_api::DatasetOrganization::Partitioned
+        | mainframe_env_host_api::DatasetOrganization::PartitionedExtended
+        | mainframe_env_host_api::DatasetOrganization::Relative
+        | mainframe_env_host_api::DatasetOrganization::VariableRelative => {
+            Err(HostProblem::InfrastructureFailure)
+        }
+    }
+}
+
+fn select_sequential(
+    records: &[SequentialRecord],
+    start: Option<u64>,
+    reverse: bool,
+    max: usize,
+) -> Result<Vec<SequentialRecord>, HostProblem> {
+    if records.is_empty() {
+        return Ok(Vec::new());
+    }
+    let default = if reverse { records.len() - 1 } else { 0 };
+    let start = start
+        .map(usize::try_from)
+        .transpose()
+        .map_err(|_| HostProblem::ResourceExhausted)?
+        .unwrap_or(default);
+    if start >= records.len() {
+        return Err(condition("NOTFND", 13));
+    }
+    let mut selected = Vec::with_capacity(max.min(records.len()));
+    let mut position = start;
+    loop {
+        selected.push(records[position].clone());
+        if selected.len() == max {
+            break;
+        }
+        if reverse {
+            if position == 0 {
+                break;
+            }
+            position -= 1;
+        } else {
+            position += 1;
+            if position == records.len() {
+                break;
+            }
+        }
+    }
+    Ok(selected)
 }
 
 fn alternate_key(index: &AlternateIndex, record: &[u8]) -> Result<Vec<u8>, HostProblem> {
@@ -2664,6 +2972,7 @@ fn mutation(request: &DatasetRequest) -> Option<&mainframe_env_host_api::Mutatio
         | DatasetRequest::DefinePath { mutation, .. }
         | DatasetRequest::WriteRelative { mutation, .. }
         | DatasetRequest::DeleteRelative { mutation, .. }
+        | DatasetRequest::WriteRba { mutation, .. }
         | DatasetRequest::DefineGenerationGroup { mutation, .. }
         | DatasetRequest::CreateGeneration { mutation, .. }
         | DatasetRequest::Rename { mutation, .. }
@@ -2687,6 +2996,7 @@ fn atomic_dataset_request(request: &DatasetRequest) -> bool {
             | DatasetRequest::DefinePath { .. }
             | DatasetRequest::WriteRelative { .. }
             | DatasetRequest::DeleteRelative { .. }
+            | DatasetRequest::WriteRba { .. }
             | DatasetRequest::DefineGenerationGroup { .. }
             | DatasetRequest::CreateGeneration { .. }
     )
@@ -2942,6 +3252,30 @@ fn request_digest(request: &DatasetRequest) -> Result<[u8; 32], HostProblem> {
             digest_field(&mut digest, dataset.as_str().as_bytes());
             digest_field(&mut digest, &record_number.to_be_bytes());
         }
+        DatasetRequest::ReadRba {
+            dataset,
+            rba,
+            max_bytes,
+        } => {
+            digest_field(&mut digest, b"read-rba");
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_field(&mut digest, &rba.to_be_bytes());
+            digest_field(&mut digest, &max_bytes.to_be_bytes());
+        }
+        DatasetRequest::ReadSequential {
+            dataset,
+            member,
+            start,
+            reverse,
+            max_records,
+        } => {
+            digest_field(&mut digest, b"read-sequential");
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_optional_member(&mut digest, member.as_ref());
+            digest_optional_u64(&mut digest, *start);
+            digest_field(&mut digest, &[u8::from(*reverse)]);
+            digest_field(&mut digest, &max_records.to_be_bytes());
+        }
         DatasetRequest::Create {
             dataset,
             attributes,
@@ -3076,6 +3410,20 @@ fn request_digest(request: &DatasetRequest) -> Result<[u8; 32], HostProblem> {
             digest_field(&mut digest, b"delete-relative");
             digest_field(&mut digest, dataset.as_str().as_bytes());
             digest_field(&mut digest, &record_number.to_be_bytes());
+            digest_optional_u64(&mut digest, *expected_version);
+            digest_mutation(&mut digest, mutation);
+        }
+        DatasetRequest::WriteRba {
+            dataset,
+            rba,
+            data,
+            expected_version,
+            mutation,
+        } => {
+            digest_field(&mut digest, b"write-rba");
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_field(&mut digest, &rba.to_be_bytes());
+            digest_field(&mut digest, data);
             digest_optional_u64(&mut digest, *expected_version);
             digest_mutation(&mut digest, mutation);
         }
@@ -3551,6 +3899,236 @@ mod tests {
             "1073af8abde37f8c6c11b5aa253c9d8fe8cda29c21565f9db47f4762d96adb29"
         );
         assert_eq!(request_digest(&request).unwrap(), digest);
+    }
+
+    #[test]
+    fn complete_vsam_organizations_and_access_modes_are_durable() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let dataset = service(store.clone());
+
+        let esds = DatasetName::new("USER.ESDS", 44).unwrap();
+        let esds_attributes = DatasetAttributes {
+            organization: DatasetOrganization::EntrySequenced,
+            record_format: RecordFormat::Variable,
+            logical_record_length: 8,
+            key_offset: None,
+            key_length: None,
+            ccsid: Some(37),
+        };
+        dataset
+            .invoke(DatasetRequest::Create {
+                dataset: esds.clone(),
+                attributes: esds_attributes,
+                mutation: mutation(100),
+            })
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::Write {
+                dataset: esds.clone(),
+                member: None,
+                records: vec![b"AA".to_vec(), b"BBB".to_vec(), b"CCCC".to_vec()],
+                expected_version: Some(1),
+                mutation: mutation(101),
+            })
+            .unwrap();
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::ReadRba {
+                dataset: esds.clone(),
+                rba: 2,
+                max_bytes: 8,
+            }),
+            Ok(DatasetResult::Rba {
+                ref data,
+                record: true,
+                rba: 2,
+                next_rba: 5,
+                version: 2,
+            }) if data == b"BBB"
+        ));
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::ReadRba {
+                dataset: esds.clone(),
+                rba: 3,
+                max_bytes: 8,
+            }),
+            Err(HostProblem::Condition { ref name, response: 13, .. }) if name == "NOTFND"
+        ));
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::ReadSequential {
+                dataset: esds.clone(),
+                member: None,
+                start: None,
+                reverse: true,
+                max_records: 2,
+            }),
+            Ok(DatasetResult::Records { records, identities, .. })
+                if records == [b"CCCC".to_vec(), b"BBB".to_vec()]
+                    && identities == [5u64.to_be_bytes().to_vec(), 2u64.to_be_bytes().to_vec()]
+        ));
+        assert_eq!(
+            dataset.invoke(DatasetRequest::WriteRba {
+                dataset: esds.clone(),
+                rba: 2,
+                data: b"XYZ".to_vec(),
+                expected_version: Some(2),
+                mutation: mutation(102),
+            }),
+            Ok(DatasetResult::Mutated { version: 3 })
+        );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::WriteRba {
+                dataset: esds.clone(),
+                rba: 2,
+                data: b"TOO-LONG".to_vec(),
+                expected_version: Some(3),
+                mutation: mutation(103),
+            }),
+            Err(HostProblem::Condition { ref name, response: 22, .. }) if name == "LENGERR"
+        ));
+
+        let fixed_rrds = DatasetName::new("USER.RRDS", 44).unwrap();
+        dataset
+            .invoke(DatasetRequest::Create {
+                dataset: fixed_rrds.clone(),
+                attributes: attrs(DatasetOrganization::Relative),
+                mutation: mutation(104),
+            })
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::WriteRelative {
+                dataset: fixed_rrds.clone(),
+                record_number: 2,
+                record: b"F002".to_vec(),
+                expected_version: Some(1),
+                mutation: mutation(105),
+            })
+            .unwrap();
+
+        let variable_rrds = DatasetName::new("USER.VRRDS", 44).unwrap();
+        dataset
+            .invoke(DatasetRequest::Create {
+                dataset: variable_rrds.clone(),
+                attributes: DatasetAttributes {
+                    organization: DatasetOrganization::VariableRelative,
+                    record_format: RecordFormat::Variable,
+                    logical_record_length: 8,
+                    key_offset: None,
+                    key_length: None,
+                    ccsid: Some(37),
+                },
+                mutation: mutation(106),
+            })
+            .unwrap();
+        for (sequence, rrn, record, version) in [
+            (107, 4, b"FOUR".as_slice(), 1),
+            (108, 1, b"ONE".as_slice(), 2),
+        ] {
+            dataset
+                .invoke(DatasetRequest::WriteRelative {
+                    dataset: variable_rrds.clone(),
+                    record_number: rrn,
+                    record: record.to_vec(),
+                    expected_version: Some(version),
+                    mutation: mutation(sequence),
+                })
+                .unwrap();
+        }
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::ReadSequential {
+                dataset: variable_rrds.clone(),
+                member: None,
+                start: None,
+                reverse: false,
+                max_records: 8,
+            }),
+            Ok(DatasetResult::Records { records, identities, version: 3 })
+                if records == [b"ONE".to_vec(), b"FOUR".to_vec()]
+                    && identities == [1u64.to_be_bytes().to_vec(), 4u64.to_be_bytes().to_vec()]
+        ));
+
+        let lds = DatasetName::new("USER.LDS", 44).unwrap();
+        dataset
+            .invoke(DatasetRequest::Create {
+                dataset: lds.clone(),
+                attributes: DatasetAttributes {
+                    organization: DatasetOrganization::Linear,
+                    record_format: RecordFormat::Undefined,
+                    logical_record_length: 1024,
+                    key_offset: None,
+                    key_length: None,
+                    ccsid: None,
+                },
+                mutation: mutation(109),
+            })
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::WriteRba {
+                dataset: lds.clone(),
+                rba: 0,
+                data: b"HELLO".to_vec(),
+                expected_version: Some(1),
+                mutation: mutation(110),
+            })
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::WriteRba {
+                dataset: lds.clone(),
+                rba: 5,
+                data: b" WORLD".to_vec(),
+                expected_version: Some(2),
+                mutation: mutation(111),
+            })
+            .unwrap();
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::ReadRba {
+                dataset: lds.clone(),
+                rba: 3,
+                max_bytes: 5,
+            }),
+            Ok(DatasetResult::Rba {
+                ref data,
+                record: false,
+                rba: 3,
+                next_rba: 8,
+                version: 3,
+            }) if data == b"LO WO"
+        ));
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::WriteRba {
+                dataset: lds.clone(),
+                rba: 20,
+                data: b"X".to_vec(),
+                expected_version: Some(3),
+                mutation: mutation(112),
+            }),
+            Err(HostProblem::Condition { ref name, response: 13, .. }) if name == "NOTFND"
+        ));
+
+        let restarted = service(store);
+        assert!(matches!(
+            restarted.invoke(DatasetRequest::ReadRba {
+                dataset: lds,
+                rba: 0,
+                max_bytes: 11,
+            }),
+            Ok(DatasetResult::Rba { ref data, version: 3, .. }) if data == b"HELLO WORLD"
+        ));
+        assert!(matches!(
+            restarted.invoke(DatasetRequest::ReadRelative {
+                dataset: fixed_rrds,
+                record_number: 2,
+            }),
+            Ok(DatasetResult::Records { records, version: 2, .. })
+                if records == [b"F002".to_vec()]
+        ));
+        assert!(matches!(
+            restarted.invoke(DatasetRequest::ReadRelative {
+                dataset: variable_rrds,
+                record_number: 4,
+            }),
+            Ok(DatasetResult::Records { records, version: 3, .. })
+                if records == [b"FOUR".to_vec()]
+        ));
     }
 
     #[test]

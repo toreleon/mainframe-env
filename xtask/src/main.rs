@@ -6,25 +6,25 @@ mod evidence_seal;
 
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use mainframe_env_conformance::{
-    verify_carddemo_application_package_from_env, verify_carddemo_base_batch_from_env,
-    verify_carddemo_base_online_from_env, verify_carddemo_batch_programs_from_env,
-    verify_carddemo_cics_abi_from_env, verify_carddemo_cics_runtime_from_env,
-    verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
-    verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
-    verify_carddemo_dataset_catalog_from_env, verify_carddemo_db2_from_env,
-    verify_carddemo_file_call_semantics_from_env, verify_carddemo_full_from_env,
-    verify_carddemo_host_operands_from_env, verify_carddemo_ims_from_env,
-    verify_carddemo_jcl_from_env, verify_carddemo_mq_authorization_from_env,
-    verify_carddemo_program_routing_from_env, verify_carddemo_resources_from_env,
-    verify_carddemo_security_from_env, verify_carddemo_seeds_from_env,
-    verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
-    verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
-    verify_carddemo_vsam_from_env, verify_host_abi_libraries,
+    run_dataset_conformance, verify_carddemo_application_package_from_env,
+    verify_carddemo_base_batch_from_env, verify_carddemo_base_online_from_env,
+    verify_carddemo_batch_programs_from_env, verify_carddemo_cics_abi_from_env,
+    verify_carddemo_cics_runtime_from_env, verify_carddemo_control_flow_from_env,
+    verify_carddemo_core_semantics_from_env, verify_carddemo_corpus_from_env,
+    verify_carddemo_data_layouts_from_env, verify_carddemo_dataset_catalog_from_env,
+    verify_carddemo_db2_from_env, verify_carddemo_file_call_semantics_from_env,
+    verify_carddemo_full_from_env, verify_carddemo_host_operands_from_env,
+    verify_carddemo_ims_from_env, verify_carddemo_jcl_from_env,
+    verify_carddemo_mq_authorization_from_env, verify_carddemo_program_routing_from_env,
+    verify_carddemo_resources_from_env, verify_carddemo_security_from_env,
+    verify_carddemo_seeds_from_env, verify_carddemo_source_closures_from_env,
+    verify_carddemo_source_preprocessing_from_env, verify_carddemo_terminal_from_env,
+    verify_carddemo_utilities_from_env, verify_carddemo_vsam_from_env, verify_host_abi_libraries,
 };
 use mainframe_env_coverage::{
     BindingKey, CompiledSpec, ConformanceLimits, CoverageGate, DerivedConformanceLedger, DriverRef,
-    FixtureRef, ObligationId, OfficialCatalogRow, OfficialRowId, RunnerContext, TestId, Verdict,
-    VerdictEvent,
+    FixtureRef, ObligationId, OfficialCatalogRow, OfficialRowId, RunnerContext, RunnerSelection,
+    TestId, Verdict, VerdictEvent,
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -509,6 +509,7 @@ fn check_spec(root: &Path) -> TaskResult {
         &inventory_path,
     )?;
     let spec = compile_shared_spec(root)?;
+    check_dataset_fixture_bindings(root, &spec)?;
     validate_conformance_projections(&schema_directory, &spec)?;
     require(
         !root.join("conformance/spec/verdicts").exists()
@@ -529,6 +530,34 @@ fn check_spec(root: &Path) -> TaskResult {
     Ok(())
 }
 
+fn check_dataset_fixture_bindings(root: &Path, spec: &CompiledSpec) -> TaskResult {
+    let path = root.join("conformance/0.6/fixtures/dataset-organizations.json");
+    let fixture = json(&path)?;
+    let rows = array(&fixture, "cases", &path)?;
+    unique_rows(rows, "id", &path)?;
+    require(
+        rows.len() == 10,
+        "dataset organization fixture denominator must be 10",
+    )?;
+    let expected_digest = format!("sha256:{}", file_digest(&path)?);
+    let expected_ids = rows
+        .iter()
+        .map(|row| text(row, "id", &path).map(str::to_string))
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    let actual = spec
+        .registries()
+        .fixtures()
+        .iter()
+        .filter(|(fixture, _)| fixture.as_str().starts_with("dataset."))
+        .map(|(fixture, digest)| (fixture.as_str().to_string(), digest.clone()))
+        .collect::<BTreeMap<_, _>>();
+    require(
+        actual.keys().cloned().collect::<BTreeSet<_>>() == expected_ids
+            && actual.values().all(|digest| digest == &expected_digest),
+        "dataset organization fixture registry is stale or incomplete",
+    )
+}
+
 fn validate_conformance_projections(schema_directory: &Path, spec: &CompiledSpec) -> TaskResult {
     let limits = ConformanceLimits::default();
     let context = RunnerContext::new(
@@ -537,7 +566,7 @@ fn validate_conformance_projections(schema_directory: &Path, spec: &CompiledSpec
         limits,
     )
     .map_err(|problem| problem.to_string())?;
-    let ledger = DerivedConformanceLedger::derive_complete(spec, &context, Vec::new())
+    let ledger = DerivedConformanceLedger::derive_partial(spec, &context, Vec::new())
         .map_err(|problem| problem.to_string())?;
     let ledger_path = schema_directory.join("derived-ledger.schema.json");
     let ledger_bytes = ledger
@@ -692,6 +721,54 @@ fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> T
         selected > 0,
         "focused conformance selection has no executable bindings",
     )?;
+    let is_dataset = args.subsystem.as_deref() == Some("dataset-vsam-ams")
+        || args
+            .replay
+            .as_deref()
+            .is_some_and(|test| test.starts_with("dataset."));
+    if is_dataset {
+        let selection = if let Some(replay) = args.replay.as_deref() {
+            RunnerSelection::replay(replay, ConformanceLimits::default())
+        } else {
+            RunnerSelection::focused(
+                args.subsystem
+                    .as_deref()
+                    .ok_or("dataset conformance subsystem is missing")?,
+                gate,
+                args.shard,
+                ConformanceLimits::default(),
+            )
+        }
+        .map_err(|problem| problem.to_string())?;
+        let context = RunnerContext::new(
+            repository_digest(root)?,
+            "local-focused",
+            ConformanceLimits::default(),
+        )
+        .map_err(|problem| problem.to_string())?;
+        let report = run_dataset_conformance(&spec, &selection, &context)?;
+        let failures = report
+            .batches
+            .iter()
+            .flat_map(|batch| &batch.events)
+            .filter(|event| event.verdict != Verdict::Pass)
+            .map(|event| format!("{}: {}", event.test_id, event.actual))
+            .collect::<Vec<_>>();
+        require(
+            failures.is_empty(),
+            &format!("dataset conformance failures: {failures:?}"),
+        )?;
+        let events = report
+            .batches
+            .iter()
+            .map(|batch| batch.events.len())
+            .sum::<usize>();
+        println!(
+            "dataset-conformance bindings={selected} events={events} batches={}",
+            report.batches.len()
+        );
+        return Ok(());
+    }
     Err(format!(
         "{selected} binding(s) selected, but their product driver registry is not installed by CI-300"
     ))
@@ -2248,6 +2325,14 @@ fn check_schemas(root: &Path) -> TaskResult {
         &json(&migration_schema)?,
         &json(&migration_path)?,
         &migration_path,
+    )?;
+    let organization_fixture = root.join("conformance/0.6/fixtures/dataset-organizations.json");
+    let organization_schema =
+        root.join("conformance/0.6/schemas/dataset-organization-fixtures.schema.json");
+    validate_schema_instance(
+        &json(&organization_schema)?,
+        &json(&organization_fixture)?,
+        &organization_fixture,
     )
 }
 

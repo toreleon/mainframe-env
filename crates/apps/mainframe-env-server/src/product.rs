@@ -2506,6 +2506,8 @@ impl ProductServer {
             | DatasetRequest::ListMembers { dataset, .. }
             | DatasetRequest::Read { dataset, .. }
             | DatasetRequest::ReadRelative { dataset, .. }
+            | DatasetRequest::ReadRba { dataset, .. }
+            | DatasetRequest::ReadSequential { dataset, .. }
             | DatasetRequest::Create { dataset, .. }
             | DatasetRequest::Define { dataset, .. }
             | DatasetRequest::Alter { dataset, .. }
@@ -2517,6 +2519,7 @@ impl ProductServer {
             | DatasetRequest::DeleteRecord { dataset, .. }
             | DatasetRequest::WriteRelative { dataset, .. }
             | DatasetRequest::DeleteRelative { dataset, .. }
+            | DatasetRequest::WriteRba { dataset, .. }
             | DatasetRequest::Delete { dataset, .. }
             | DatasetRequest::StartBrowse { dataset, .. }
             | DatasetRequest::ReadNext { dataset, .. }
@@ -2540,6 +2543,8 @@ impl ProductServer {
                         | DatasetRequest::ListMembers { .. }
                         | DatasetRequest::Read { .. }
                         | DatasetRequest::ReadRelative { .. }
+                        | DatasetRequest::ReadRba { .. }
+                        | DatasetRequest::ReadSequential { .. }
                         | DatasetRequest::ResolveGeneration { .. }
                         | DatasetRequest::List { .. }
                         | DatasetRequest::StartBrowse { .. }
@@ -3593,6 +3598,7 @@ fn dataset_mutation(request: &DatasetRequest) -> Option<&Mutation> {
         | DatasetRequest::DeleteRecord { mutation, .. }
         | DatasetRequest::WriteRelative { mutation, .. }
         | DatasetRequest::DeleteRelative { mutation, .. }
+        | DatasetRequest::WriteRba { mutation, .. }
         | DatasetRequest::DefineAlternateIndex { mutation, .. }
         | DatasetRequest::DefinePath { mutation, .. }
         | DatasetRequest::DefineGenerationGroup { mutation, .. }

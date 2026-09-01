@@ -76,6 +76,30 @@ LRECL. These values model deterministic allocation behavior only. They do not
 claim a real device geometry, VTOC placement, tape operation, compression
 ratio, encryption, or stripe layout.
 
+## Organization and access model
+
+The five frozen VSAM organizations select distinct state and access rules:
+
+- KSDS owns sorted unique primary-key records; key access and sequential access
+  return the primary key as identity.
+- ESDS preserves arrival order. Its deterministic data-component RBA is the
+  cumulative byte length of preceding logical records. Reads require an exact
+  record-start RBA and RBA rewrites preserve record length.
+- LDS stores one bounded logical byte stream behind chunked durable storage.
+  RBA reads and writes cross chunk boundaries without exposing chunks, and
+  sparse writes are rejected.
+- fixed RRDS maps exact-length records to one-based RRNs; empty slots do not
+  renumber later records.
+- variable RRDS uses the same stable one-based RRN authority while enforcing
+  the declared maximum logical record length.
+
+Explicit sequential access uses a zero-based logical position and a direction;
+returned identities remain organization-specific (key, RBA, RRN, or ordinal).
+All mutating RBA/RRN/key paths publish data and idempotency result in the same
+provider-state transaction, and restart reconstructs the same identities.
+Control-interval/control-area placement and spanned-fragment behavior are added
+by DAT-604 without leaking a physical page manager into this interface.
+
 ## Evolution rules
 
 - Writers emit only the current state version; readers support the documented

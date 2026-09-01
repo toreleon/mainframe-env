@@ -176,6 +176,18 @@ pub enum DatasetRequest {
         dataset: DatasetName,
         record_number: u64,
     },
+    ReadRba {
+        dataset: DatasetName,
+        rba: u64,
+        max_bytes: u32,
+    },
+    ReadSequential {
+        dataset: DatasetName,
+        member: Option<MemberName>,
+        start: Option<u64>,
+        reverse: bool,
+        max_records: u32,
+    },
     Create {
         dataset: DatasetName,
         attributes: DatasetAttributes,
@@ -240,6 +252,13 @@ pub enum DatasetRequest {
     DeleteRelative {
         dataset: DatasetName,
         record_number: u64,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
+    WriteRba {
+        dataset: DatasetName,
+        rba: u64,
+        data: Vec<u8>,
         expected_version: Option<u64>,
         mutation: Mutation,
     },
@@ -323,6 +342,13 @@ pub enum DatasetResult {
     Records {
         records: Vec<Vec<u8>>,
         identities: Vec<Vec<u8>>,
+        version: u64,
+    },
+    Rba {
+        data: Vec<u8>,
+        record: bool,
+        rba: u64,
+        next_rba: u64,
         version: u64,
     },
     Created {
@@ -832,6 +858,8 @@ impl HostRequest {
                 | DatasetRequest::Read { .. }
                 | DatasetRequest::ReadConcatenation { .. }
                 | DatasetRequest::ReadRelative { .. }
+                | DatasetRequest::ReadRba { .. }
+                | DatasetRequest::ReadSequential { .. }
                 | DatasetRequest::ResolveGeneration { .. }
                 | DatasetRequest::ReadNext { .. }
                 | DatasetRequest::StartBrowse { .. }
@@ -875,6 +903,7 @@ impl HostRequest {
                     | DatasetRequest::DefinePath { .. }
                     | DatasetRequest::WriteRelative { .. }
                     | DatasetRequest::DeleteRelative { .. }
+                    | DatasetRequest::WriteRba { .. }
                     | DatasetRequest::DefineGenerationGroup { .. }
                     | DatasetRequest::CreateGeneration { .. }
                     | DatasetRequest::Rename { .. }
@@ -914,6 +943,7 @@ impl HostRequest {
                 | DatasetRequest::DefinePath { mutation, .. }
                 | DatasetRequest::WriteRelative { mutation, .. }
                 | DatasetRequest::DeleteRelative { mutation, .. }
+                | DatasetRequest::WriteRba { mutation, .. }
                 | DatasetRequest::DefineGenerationGroup { mutation, .. }
                 | DatasetRequest::CreateGeneration { mutation, .. }
                 | DatasetRequest::Rename { mutation, .. }
@@ -1143,6 +1173,18 @@ impl HostResult {
                     Ok(())
                 }
             }
+            Self::Dataset(DatasetResult::Rba {
+                data,
+                rba,
+                next_rba,
+                ..
+            }) if data.len() > limits.max_record_bytes
+                || *next_rba < *rba
+                || next_rba.saturating_sub(*rba)
+                    != u64::try_from(data.len()).unwrap_or(u64::MAX) =>
+            {
+                Err(HostProblem::Malformed)
+            }
             Self::Dataset(DatasetResult::Browse {
                 record,
                 identity,
@@ -1352,6 +1394,16 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
         DatasetRequest::ReadRelative { record_number, .. } if *record_number == 0 => {
             Err(HostProblem::Malformed)
         }
+        DatasetRequest::ReadRba { max_bytes, .. }
+            if *max_bytes == 0 || *max_bytes as usize > limits.max_record_bytes =>
+        {
+            Err(HostProblem::ResourceExhausted)
+        }
+        DatasetRequest::ReadSequential { max_records, .. }
+            if *max_records == 0 || *max_records as usize > limits.max_records =>
+        {
+            Err(HostProblem::ResourceExhausted)
+        }
         DatasetRequest::Create {
             attributes,
             mutation,
@@ -1444,6 +1496,15 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
         } => {
             if *record_number == 0 {
                 Err(HostProblem::Malformed)
+            } else {
+                mutation.validate(limits)
+            }
+        }
+        DatasetRequest::WriteRba { data, mutation, .. } => {
+            if data.is_empty() {
+                Err(HostProblem::Malformed)
+            } else if data.len() > limits.max_record_bytes {
+                Err(HostProblem::ResourceExhausted)
             } else {
                 mutation.validate(limits)
             }
