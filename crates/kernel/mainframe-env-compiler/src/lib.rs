@@ -14,14 +14,15 @@ pub use generated::cobol_language::{
     ClauseDescriptor, CompilerDirectingDescriptor, CompilerDirectingKind,
     CompilerDirectiveDescriptor, CompilerDirectiveGroup, CompilerDirectiveGroupDescriptor,
     CompilerDirectiveKind, DATA_DESCRIPTION_CLAUSES, DataDescriptionClauseKind,
-    FILE_DESCRIPTION_CLAUSES, FileDescriptionClauseKind, compiler_directing_descriptor,
+    FILE_DESCRIPTION_CLAUSES, FileDescriptionClauseKind, PROCEDURE_STATEMENTS,
+    ProcedureStatementDescriptor, ProcedureStatementKind, compiler_directing_descriptor,
     compiler_directive_descriptor, data_description_clause_descriptor,
-    file_description_clause_descriptor,
+    file_description_clause_descriptor, procedure_statement_descriptor,
 };
 
 pub use hir::{
     CobolHir, ControlEdge, ControlEdgeKind, ControlNode, ControlRole, ControlScope, HirStatement,
-    StatementKind, cobol_hir_catalog,
+    StatementKind, StatementOption, StatementOptionKind, cobol_hir_catalog,
 };
 pub use lower::{CORE_NAMESPACE, core_mir_catalog, core_mir_profile};
 pub use semantic::{

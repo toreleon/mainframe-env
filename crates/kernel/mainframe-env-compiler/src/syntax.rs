@@ -2026,7 +2026,7 @@ fn slice_origins(
         .collect()
 }
 
-fn source_spans(origins: &[SourceOrigin], range: Range<usize>) -> Vec<SourceSpan> {
+pub(crate) fn source_spans(origins: &[SourceOrigin], range: Range<usize>) -> Vec<SourceSpan> {
     slice_origins(origins, range, 0)
         .into_iter()
         .map(|origin| SourceSpan {

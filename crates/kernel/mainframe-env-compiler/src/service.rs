@@ -444,4 +444,41 @@ mod tests {
         );
         assert_eq!(analysis.completeness, Completeness::Complete);
     }
+
+    #[test]
+    fn statement_hir_retains_generated_identity_options_and_source() {
+        let source = "IDENTIFICATION DIVISION.\nPROGRAM-ID. OPTIONS.\nENVIRONMENT DIVISION.\nINPUT-OUTPUT SECTION.\nFILE-CONTROL.\nSELECT INPUT-FILE ASSIGN TO INPUTDD.\nDATA DIVISION.\nFILE SECTION.\nFD INPUT-FILE.\n01 INPUT-RECORD PIC X(8).\nPROCEDURE DIVISION.\nREAD INPUT-FILE INTO INPUT-RECORD AT END CONTINUE END-READ.\nSTOP RUN.\n";
+        let analysis = CobolCompiler::default().analyze(&bundle(source));
+        let hir = analysis.hir.expect("valid statement HIR");
+        let statement = hir
+            .statements
+            .iter()
+            .find(|statement| statement.kind == crate::StatementKind::Read)
+            .expect("typed READ statement");
+        assert_eq!(
+            statement.official,
+            Some(crate::ProcedureStatementKind::Read)
+        );
+        assert!(
+            [
+                crate::StatementOptionKind::AtEnd,
+                crate::StatementOptionKind::Into,
+                crate::StatementOptionKind::ExplicitTerminator,
+            ]
+            .into_iter()
+            .all(|kind| statement.options.iter().any(|option| option.kind == kind))
+        );
+        assert_eq!(
+            statement
+                .options
+                .iter()
+                .find(|option| option.kind == crate::StatementOptionKind::Into)
+                .map(|option| option.operands.as_slice()),
+            Some(["INPUT-RECORD".to_string()].as_slice())
+        );
+        assert!(statement.source.iter().all(|span| {
+            span.source.as_str() == "HELLO.cbl" && span.source_start < span.source_end
+        }));
+        assert!(!statement.source.is_empty());
+    }
 }

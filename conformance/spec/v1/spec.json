@@ -6,35 +6,43 @@
   "registries": {
     "operations": [
       "cobol.frontend.analyze",
-      "cobol.semantic.analyze"
+      "cobol.semantic.analyze",
+      "cobol.statement.parse"
     ],
     "input_shapes": [
       "cobol.frontend.source-bundle",
-      "cobol.semantic.source-bundle"
+      "cobol.semantic.source-bundle",
+      "cobol.statement.source-bundle"
     ],
     "predicates": [
       "cobol.fixture.available",
-      "cobol.semantic.fixture.available"
+      "cobol.semantic.fixture.available",
+      "cobol.statement.fixture.available"
     ],
     "transitions": [
       "cobol.frontend.parse-and-preprocess",
-      "cobol.semantic.resolve-clauses"
+      "cobol.semantic.resolve-clauses",
+      "cobol.statement.build-typed-ast"
     ],
     "observations": [
       "cobol.frontend.accepted",
       "cobol.frontend.rejected",
       "cobol.semantic.accepted",
-      "cobol.semantic.rejected"
+      "cobol.semantic.rejected",
+      "cobol.statement.accepted",
+      "cobol.statement.rejected"
     ],
     "conditions": [
       "cobol.frontend.syntax-diagnostic",
-      "cobol.semantic.diagnostic"
+      "cobol.semantic.diagnostic",
+      "cobol.statement.diagnostic"
     ],
     "recoveries": [],
     "oracles": [],
     "drivers": [
       "cobol.frontend.driver",
-      "cobol.semantic.driver"
+      "cobol.semantic.driver",
+      "cobol.statement.driver"
     ],
     "fixtures": [
       {
@@ -412,6 +420,358 @@
       {
         "id": "cobol.semantic.data-volatile.invalid",
         "digest": "sha256:e33a7581c9dce16226f5a5a79263508fc731bd3bebbc1e3d193365b723dab7a6"
+      },
+      {
+        "id": "cobol.statement.accept.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.accept.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.add.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.add.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.allocate.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.allocate.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.alter.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.alter.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.call.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.call.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.cancel.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.cancel.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.close.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.close.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.compute.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.compute.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.continue.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.continue.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.delete.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.delete.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.display.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.display.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.divide.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.divide.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.entry.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.entry.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.evaluate.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.evaluate.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.exit.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.exit.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.free.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.free.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.goback.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.goback.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.go-to.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.go-to.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.if.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.if.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.initialize.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.initialize.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.inspect.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.inspect.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.invoke.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.invoke.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.json-generate.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.json-generate.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.json-parse.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.json-parse.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.merge.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.merge.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.move.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.move.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.multiply.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.multiply.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.open.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.open.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.perform.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.perform.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.read.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.read.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.release.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.release.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.return.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.return.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.rewrite.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.rewrite.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.search.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.search.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.set.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.set.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.sort.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.sort.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.start.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.start.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.stop.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.stop.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.string.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.string.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.subtract.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.subtract.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.unstring.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.unstring.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.write.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.write.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.xml-generate.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.xml-generate.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.xml-parse.valid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
+      },
+      {
+        "id": "cobol.statement.xml-parse.invalid",
+        "digest": "sha256:fe0186a7082cd5dcd6a785a0235f8f22bfcede301560876316e691137990e1d8"
       }
     ],
     "scenario_steps": [],
@@ -1827,6 +2187,1326 @@
         "valid-forms",
         "invalid-forms"
       ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0001",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0002",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0003",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0004",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0005",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0006",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0007",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0008",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0009",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0010",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0011",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0012",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0013",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0014",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0015",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0016",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0017",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0018",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0019",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0020",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0021",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0022",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0023",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0025",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0026",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0027",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0028",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0029",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0030",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0031",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0032",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0033",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0034",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0035",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0036",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0037",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0038",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0039",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0040",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0041",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0042",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0043",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044",
+      "operation": "cobol.statement.parse",
+      "input": "cobol.statement.source-bundle",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "transition": "cobol.statement.build-typed-ast",
+      "postconditions": [
+        "cobol.statement.accepted",
+        "cobol.statement.rejected"
+      ],
+      "conditions": [
+        "cobol.statement.diagnostic"
+      ],
+      "recovery": null,
+      "oracle": null,
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligations": [
+        "valid-forms",
+        "invalid-forms"
+      ]
     }
   ],
   "obligations": [
@@ -2483,6 +4163,622 @@
     },
     {
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0017",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0001",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0001",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0002",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0002",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0003",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0003",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0004",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0004",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0005",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0005",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0006",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0006",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0007",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0007",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0008",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0008",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0009",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0009",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0010",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0010",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0011",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0011",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0012",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0012",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0013",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0013",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0014",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0014",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0015",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0015",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0016",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0016",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0017",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0017",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0018",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0018",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0019",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0019",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0020",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0020",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0021",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0021",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0022",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0022",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0023",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0023",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0025",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0025",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0026",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0026",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0027",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0027",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0028",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0028",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0029",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0029",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0030",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0030",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0031",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0031",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0032",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0032",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0033",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0033",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0034",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0034",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0035",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0035",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0036",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0036",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0037",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0037",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0038",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0038",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0039",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0039",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0040",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0040",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0041",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0041",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0042",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0042",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0043",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0043",
+      "obligation_id": "invalid-forms",
+      "applicable_gates": [
+        "validated"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044",
+      "obligation_id": "valid-forms",
+      "applicable_gates": [
+        "recognized"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044",
       "obligation_id": "invalid-forms",
       "applicable_gates": [
         "validated"
@@ -4084,6 +6380,1502 @@
       ],
       "expected": [
         "cobol.semantic.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0001",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.accept.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.accept.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0001",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.accept.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.accept.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0002",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.add.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.add.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0002",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.add.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.add.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0003",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.allocate.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.allocate.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0003",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.allocate.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.allocate.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0004",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.alter.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.alter.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0004",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.alter.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.alter.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0005",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.call.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.call.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0005",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.call.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.call.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0006",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.cancel.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.cancel.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0006",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.cancel.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.cancel.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0007",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.close.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.close.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0007",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.close.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.close.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0008",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.compute.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.compute.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0008",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.compute.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.compute.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0009",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.continue.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.continue.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0009",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.continue.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.continue.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0010",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.delete.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.delete.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0010",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.delete.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.delete.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0011",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.display.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.display.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0011",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.display.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.display.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0012",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.divide.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.divide.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0012",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.divide.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.divide.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0013",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.entry.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.entry.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0013",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.entry.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.entry.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0014",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.evaluate.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.evaluate.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0014",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.evaluate.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.evaluate.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0015",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.exit.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.exit.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0015",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.exit.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.exit.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0016",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.free.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.free.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0016",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.free.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.free.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0017",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.goback.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.goback.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0017",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.goback.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.goback.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0018",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.go-to.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.go-to.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0018",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.go-to.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.go-to.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0019",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.if.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.if.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0019",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.if.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.if.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0020",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.initialize.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.initialize.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0020",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.initialize.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.initialize.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0021",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.inspect.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.inspect.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0021",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.inspect.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.inspect.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0022",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.invoke.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.invoke.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0022",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.invoke.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.invoke.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0023",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.json-generate.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.json-generate.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0023",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.json-generate.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.json-generate.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.json-parse.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.json-parse.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.json-parse.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.json-parse.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0025",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.merge.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.merge.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0025",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.merge.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.merge.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0026",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.move.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.move.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0026",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.move.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.move.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0027",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.multiply.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.multiply.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0027",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.multiply.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.multiply.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0028",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.open.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.open.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0028",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.open.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.open.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0029",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.perform.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.perform.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0029",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.perform.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.perform.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0030",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.read.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.read.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0030",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.read.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.read.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0031",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.release.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.release.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0031",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.release.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.release.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0032",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.return.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.return.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0032",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.return.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.return.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0033",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.rewrite.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.rewrite.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0033",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.rewrite.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.rewrite.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0034",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.search.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.search.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0034",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.search.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.search.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0035",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.set.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.set.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0035",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.set.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.set.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0036",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.sort.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.sort.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0036",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.sort.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.sort.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0037",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.start.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.start.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0037",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.start.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.start.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0038",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.stop.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.stop.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0038",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.stop.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.stop.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0039",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.string.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.string.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0039",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.string.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.string.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0040",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.subtract.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.subtract.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0040",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.subtract.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.subtract.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0041",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.unstring.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.unstring.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0041",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.unstring.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.unstring.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0042",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.write.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.write.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0042",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.write.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.write.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0043",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.xml-generate.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.xml-generate.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0043",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.xml-generate.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.xml-generate.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044",
+      "obligation_id": "valid-forms",
+      "gate": "recognized",
+      "test_id": "cobol.statement.xml-parse.valid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.xml-parse.valid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.accepted"
+      ],
+      "recovery": null,
+      "oracle": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044",
+      "obligation_id": "invalid-forms",
+      "gate": "validated",
+      "test_id": "cobol.statement.xml-parse.invalid",
+      "driver": "cobol.statement.driver",
+      "input": "cobol.statement.xml-parse.invalid",
+      "preconditions": [
+        "cobol.statement.fixture.available"
+      ],
+      "expected": [
+        "cobol.statement.rejected"
       ],
       "recovery": null,
       "oracle": null

@@ -440,13 +440,14 @@ pub fn core_mir_catalog() -> OperationCatalog {
     let mut init = OperationSchema::pure(core_identity("init").expect("static identity"), 0, 0);
     init.allowed_effects = BTreeSet::from([Effect::MemoryWrite]);
     catalog.register(init).expect("unique init");
-    for kind in StatementKind::frozen()
+    for kind in StatementKind::official()
         .into_iter()
         .filter(|kind| kind.supported())
         .chain([
             StatementKind::NextSentence,
+            StatementKind::ExecCics,
             StatementKind::ExecDli,
-            StatementKind::Rewrite,
+            StatementKind::ExecSql,
             StatementKind::Label,
             StatementKind::ProgramEnd,
         ])

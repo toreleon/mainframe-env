@@ -1,4 +1,7 @@
-use crate::{CobolFileBinding, CobolLayout, LosslessSyntax, SemanticModel};
+use crate::{
+    CobolFileBinding, CobolLayout, LosslessSyntax, ProcedureStatementKind, SemanticModel,
+    SourceSpan,
+};
 use mainframe_env_ir::{
     Attribute, Effect, IrLimits, Module, ModuleBuilder, OperationCatalog, OperationIdentity,
     OperationSchema, StorageReference,
@@ -16,6 +19,7 @@ pub enum StatementKind {
     Close,
     Compute,
     Continue,
+    Delete,
     Display,
     Divide,
     DuplicateLabel,
@@ -47,6 +51,7 @@ pub enum StatementKind {
     Search,
     Set,
     Sort,
+    Start,
     StopRun,
     StructuredControl,
     String,
@@ -72,6 +77,7 @@ impl StatementKind {
             Self::Close => "close",
             Self::Compute => "compute",
             Self::Continue => "continue",
+            Self::Delete => "delete",
             Self::Display => "display",
             Self::Divide => "divide",
             Self::DuplicateLabel => "duplicate_label",
@@ -103,6 +109,7 @@ impl StatementKind {
             Self::Search => "search",
             Self::Set => "set",
             Self::Sort => "sort",
+            Self::Start => "start",
             Self::StopRun => "stop_run",
             Self::StructuredControl => "structured_control",
             Self::String => "string",
@@ -126,12 +133,14 @@ impl StatementKind {
                 | Self::Release
                 | Self::ReturnStatement
                 | Self::Sort
+                | Self::Delete
+                | Self::Start
                 | Self::StructuredControl
         )
     }
 
     #[must_use]
-    pub const fn frozen() -> [Self; 43] {
+    pub const fn official() -> [Self; 44] {
         [
             Self::Accept,
             Self::Add,
@@ -142,12 +151,11 @@ impl StatementKind {
             Self::Close,
             Self::Compute,
             Self::Continue,
+            Self::Delete,
             Self::Display,
             Self::Divide,
             Self::Entry,
             Self::Evaluate,
-            Self::ExecCics,
-            Self::ExecSql,
             Self::Exit,
             Self::Free,
             Self::GoBack,
@@ -166,9 +174,11 @@ impl StatementKind {
             Self::Read,
             Self::Release,
             Self::ReturnStatement,
+            Self::Rewrite,
             Self::Search,
             Self::Set,
             Self::Sort,
+            Self::Start,
             Self::StopRun,
             Self::String,
             Self::Subtract,
@@ -178,13 +188,96 @@ impl StatementKind {
             Self::XmlParse,
         ]
     }
+
+    #[must_use]
+    pub const fn official_kind(self) -> Option<ProcedureStatementKind> {
+        use ProcedureStatementKind as P;
+        Some(match self {
+            Self::Accept => P::Accept,
+            Self::Add => P::Add,
+            Self::Allocate => P::Allocate,
+            Self::Alter => P::Alter,
+            Self::Call => P::Call,
+            Self::Cancel => P::Cancel,
+            Self::Close => P::Close,
+            Self::Compute => P::Compute,
+            Self::Continue => P::Continue,
+            Self::Delete => P::Delete,
+            Self::Display => P::Display,
+            Self::Divide => P::Divide,
+            Self::Entry => P::Entry,
+            Self::Evaluate => P::Evaluate,
+            Self::Exit => P::Exit,
+            Self::Free => P::Free,
+            Self::GoBack => P::Goback,
+            Self::GoTo => P::GoTo,
+            Self::If => P::If,
+            Self::Initialize => P::Initialize,
+            Self::Inspect => P::Inspect,
+            Self::Invoke => P::Invoke,
+            Self::JsonGenerate => P::JsonGenerate,
+            Self::JsonParse => P::JsonParse,
+            Self::Merge => P::Merge,
+            Self::Move => P::Move,
+            Self::Multiply => P::Multiply,
+            Self::Open => P::Open,
+            Self::Perform => P::Perform,
+            Self::Read => P::Read,
+            Self::Release => P::Release,
+            Self::ReturnStatement => P::Return,
+            Self::Rewrite => P::Rewrite,
+            Self::Search => P::Search,
+            Self::Set => P::Set,
+            Self::Sort => P::Sort,
+            Self::Start => P::Start,
+            Self::StopRun => P::Stop,
+            Self::String => P::String,
+            Self::Subtract => P::Subtract,
+            Self::Unstring => P::Unstring,
+            Self::Write => P::Write,
+            Self::XmlGenerate => P::XmlGenerate,
+            Self::XmlParse => P::XmlParse,
+            _ => return None,
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum StatementOptionKind {
+    AtEnd,
+    NotAtEnd,
+    InvalidKey,
+    NotInvalidKey,
+    OnException,
+    NotOnException,
+    OnOverflow,
+    NotOnOverflow,
+    OnSizeError,
+    NotOnSizeError,
+    Rounded,
+    Giving,
+    Remainder,
+    Returning,
+    Using,
+    Into,
+    From,
+    ExplicitTerminator,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StatementOption {
+    pub kind: StatementOptionKind,
+    pub operands: Vec<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HirStatement {
     pub kind: StatementKind,
+    pub official: Option<ProcedureStatementKind>,
     pub arguments: Vec<String>,
+    pub options: Vec<StatementOption>,
     pub line: usize,
+    pub source: Vec<SourceSpan>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -255,17 +348,37 @@ impl CobolHir {
         semantic: &SemanticModel,
         limits: IrLimits,
     ) -> Result<Self, HirProblem> {
-        let procedure =
+        let (procedure_offset, procedure) =
             procedure_text(syntax.semantic_text()).ok_or(HirProblem::MissingProcedure)?;
-        let parsed = parse_procedure(procedure, limits.max_operations.saturating_sub(1))?;
+        let mut parsed = parse_procedure(procedure, limits.max_operations.saturating_sub(1))?;
+        for statement in &mut parsed.statements {
+            if let Some(range) = line_range(procedure, statement.line) {
+                statement.source = crate::syntax::source_spans(
+                    syntax.semantic_origins(),
+                    procedure_offset + range.start..procedure_offset + range.end,
+                );
+            }
+        }
         let mut statements = parsed.statements;
         if statements.len() > limits.max_operations.saturating_sub(1) {
             return Err(HirProblem::StatementLimitExceeded);
         }
         statements.push(HirStatement {
             kind: StatementKind::ProgramEnd,
+            official: None,
             arguments: Vec::new(),
+            options: Vec::new(),
             line: syntax.semantic_text().lines().count(),
+            source: syntax
+                .semantic_text()
+                .len()
+                .checked_sub(1)
+                .map_or_else(Vec::new, |start| {
+                    crate::syntax::source_spans(
+                        syntax.semantic_origins(),
+                        start..syntax.semantic_text().len(),
+                    )
+                }),
         });
         let module = build_module(&statements, &semantic.layouts, limits)?;
         Ok(Self {
@@ -291,10 +404,11 @@ impl CobolHir {
 
 pub fn cobol_hir_catalog() -> OperationCatalog {
     let mut catalog = OperationCatalog::default();
-    for kind in StatementKind::frozen().into_iter().chain([
+    for kind in StatementKind::official().into_iter().chain([
         StatementKind::NextSentence,
+        StatementKind::ExecCics,
         StatementKind::ExecDli,
-        StatementKind::Rewrite,
+        StatementKind::ExecSql,
         StatementKind::DuplicateLabel,
         StatementKind::StructuredControl,
         StatementKind::Label,
@@ -408,8 +522,8 @@ pub(crate) fn effects(kind: StatementKind) -> Vec<Effect> {
         | K::Entry
         | K::Exit
         | K::StopRun => vec![Effect::ProgramControl],
-        K::Open | K::Close | K::Read => vec![Effect::DatasetRead],
-        K::Rewrite | K::Write => vec![Effect::DatasetWrite],
+        K::Open | K::Close | K::Read | K::Start => vec![Effect::DatasetRead],
+        K::Delete | K::Rewrite | K::Write => vec![Effect::DatasetWrite],
         K::ExecCics | K::ExecDli | K::ExecSql => {
             vec![
                 Effect::ProgramControl,
@@ -437,12 +551,83 @@ pub(crate) fn effects(kind: StatementKind) -> Vec<Effect> {
     }
 }
 
-fn procedure_text(source: &str) -> Option<&str> {
+fn procedure_text(source: &str) -> Option<(usize, &str)> {
     let upper = source.to_ascii_uppercase();
     let start = upper.find("PROCEDURE DIVISION")?;
     let rest = &source[start..];
     let dot = rest.find('.')?;
-    Some(&rest[dot + 1..])
+    Some((start + dot + 1, &rest[dot + 1..]))
+}
+
+fn line_range(source: &str, line: usize) -> Option<std::ops::Range<usize>> {
+    if line == 0 {
+        return None;
+    }
+    let mut current = 1usize;
+    let mut start = 0usize;
+    for (index, byte) in source.bytes().enumerate() {
+        if current == line && byte == b'\n' {
+            return Some(start..index);
+        }
+        if byte == b'\n' {
+            current += 1;
+            start = index + 1;
+        }
+    }
+    (current == line).then_some(start..source.len())
+}
+
+fn statement_options(text: &str) -> Vec<StatementOption> {
+    let upper = text.to_ascii_uppercase();
+    let tokens = semantic_tokens(text);
+    let mut options = Vec::new();
+    for (phrase, kind) in [
+        ("NOT AT END", StatementOptionKind::NotAtEnd),
+        ("AT END", StatementOptionKind::AtEnd),
+        ("NOT INVALID KEY", StatementOptionKind::NotInvalidKey),
+        ("INVALID KEY", StatementOptionKind::InvalidKey),
+        ("NOT ON EXCEPTION", StatementOptionKind::NotOnException),
+        ("ON EXCEPTION", StatementOptionKind::OnException),
+        ("NOT ON OVERFLOW", StatementOptionKind::NotOnOverflow),
+        ("ON OVERFLOW", StatementOptionKind::OnOverflow),
+        ("NOT ON SIZE ERROR", StatementOptionKind::NotOnSizeError),
+        ("ON SIZE ERROR", StatementOptionKind::OnSizeError),
+    ] {
+        if upper.contains(phrase) {
+            options.push(StatementOption {
+                kind,
+                operands: Vec::new(),
+            });
+        }
+    }
+    for (word, kind) in [
+        ("ROUNDED", StatementOptionKind::Rounded),
+        ("GIVING", StatementOptionKind::Giving),
+        ("REMAINDER", StatementOptionKind::Remainder),
+        ("RETURNING", StatementOptionKind::Returning),
+        ("USING", StatementOptionKind::Using),
+        ("INTO", StatementOptionKind::Into),
+        ("FROM", StatementOptionKind::From),
+    ] {
+        if let Some(index) = tokens.iter().position(|token| token == word) {
+            options.push(StatementOption {
+                kind,
+                operands: tokens.get(index + 1).into_iter().cloned().collect(),
+            });
+        }
+    }
+    if upper
+        .split_whitespace()
+        .any(|word| word.starts_with("END-"))
+    {
+        options.push(StatementOption {
+            kind: StatementOptionKind::ExplicitTerminator,
+            operands: Vec::new(),
+        });
+    }
+    options.sort_by_key(|option| option.kind);
+    options.dedup_by_key(|option| option.kind);
+    options
 }
 
 #[derive(Debug)]
@@ -514,6 +699,7 @@ impl ProcedureParser {
         }
         for statement in &self.statements {
             validate_form(statement.kind, &statement.arguments)?;
+            validate_statement_options(statement.kind, &statement.options)?;
         }
         let mut labels = BTreeMap::new();
         let mut label_order = Vec::new();
@@ -699,8 +885,11 @@ impl ProcedureParser {
         let statement = self.statements.len();
         self.statements.push(HirStatement {
             kind,
+            official: kind.official_kind(),
             arguments,
+            options: statement_options(text),
             line,
+            source: Vec::new(),
         });
         let scope = scope_for(kind, text);
         let role = statement_role(kind, scope);
@@ -1013,8 +1202,11 @@ fn parse_procedure(source: &str, max_statements: usize) -> Result<ParsedProcedur
                     .ok_or(HirProblem::UnknownStatement(line_number))?;
                 parser.statements.push(HirStatement {
                     kind: StatementKind::Label,
+                    official: None,
                     arguments: vec![label.to_string()],
+                    options: Vec::new(),
                     line: line_number,
+                    source: Vec::new(),
                 });
                 parser.push_node(
                     sentence_index,
@@ -1210,6 +1402,7 @@ fn classify(sentence: &str) -> Option<StatementKind> {
         "CLOSE" => StatementKind::Close,
         "COMPUTE" => StatementKind::Compute,
         "CONTINUE" => StatementKind::Continue,
+        "DELETE" => StatementKind::Delete,
         "DISPLAY" => StatementKind::Display,
         "DIVIDE" => StatementKind::Divide,
         "ENTRY" => StatementKind::Entry,
@@ -1232,6 +1425,7 @@ fn classify(sentence: &str) -> Option<StatementKind> {
         "SEARCH" => StatementKind::Search,
         "SET" => StatementKind::Set,
         "SORT" => StatementKind::Sort,
+        "START" => StatementKind::Start,
         "STRING" => StatementKind::String,
         "SUBTRACT" => StatementKind::Subtract,
         "UNSTRING" => StatementKind::Unstring,
@@ -1476,37 +1670,140 @@ fn validate_form(kind: StatementKind, arguments: &[String]) -> Result<(), HirPro
     use StatementKind as K;
     let contains = |value: &str| arguments.iter().any(|argument| argument == value);
     let valid = match kind {
-        K::Perform => !arguments.is_empty(),
-        K::If | K::Evaluate | K::Search => !arguments.is_empty(),
-        K::JsonParse | K::XmlParse => contains("INTO"),
-        K::Move => contains("TO"),
-        K::Add => contains("TO"),
+        K::Accept
+        | K::Allocate
+        | K::Call
+        | K::Cancel
+        | K::Close
+        | K::Display
+        | K::Entry
+        | K::Free
+        | K::Initialize
+        | K::Read
+        | K::Release
+        | K::ReturnStatement
+        | K::Rewrite
+        | K::Search
+        | K::Write => !arguments.is_empty(),
+        K::Add => contains("TO") || contains("GIVING"),
+        K::Alter => contains("TO"),
+        K::Compute => arguments.first().is_some_and(|argument| argument != "=") && contains("="),
+        K::Continue | K::GoBack => arguments.is_empty(),
+        K::Delete => contains("RECORD") && !arguments.is_empty(),
         K::Subtract => contains("FROM"),
         K::Multiply => contains("BY"),
         K::Divide => contains("INTO") || contains("BY"),
-        K::Compute => contains("="),
+        K::Evaluate | K::If | K::Perform => !arguments.is_empty(),
+        K::Exit => arguments.first().is_none_or(|argument| {
+            matches!(
+                argument.as_str(),
+                "PROGRAM" | "METHOD" | "FUNCTION" | "PERFORM" | "PARAGRAPH" | "SECTION"
+            )
+        }),
+        K::GoTo => contains("TO") && arguments.len() >= 2,
+        K::Inspect => {
+            arguments.len() >= 2
+                && arguments.iter().any(|argument| {
+                    matches!(argument.as_str(), "TALLYING" | "REPLACING" | "CONVERTING")
+                })
+        }
+        K::Invoke => arguments.len() >= 2,
+        K::JsonGenerate | K::XmlGenerate => arguments.len() >= 3 && contains("FROM"),
+        K::JsonParse => arguments.len() >= 3 && contains("INTO"),
+        K::XmlParse => arguments.len() >= 4 && contains("PROCESSING") && contains("PROCEDURE"),
+        K::Merge => contains("USING") && contains("GIVING"),
+        K::Move => contains("TO"),
+        K::Open => {
+            arguments.first().is_some_and(|argument| {
+                matches!(argument.as_str(), "INPUT" | "OUTPUT" | "I-O" | "EXTEND")
+            }) && arguments.len() >= 2
+        }
+        K::Set => contains("TO") || contains("BY"),
+        K::Sort => {
+            !arguments.is_empty()
+                && arguments.iter().any(|argument| {
+                    matches!(argument.as_str(), "USING" | "INPUT" | "GIVING" | "OUTPUT")
+                })
+        }
+        K::Start => !arguments.is_empty(),
+        K::StopRun => {
+            arguments == ["RUN"]
+                || (arguments.first().is_some_and(|argument| argument == "RUN")
+                    && arguments
+                        .get(1)
+                        .is_some_and(|argument| argument == "RETURNING")
+                    && arguments.len() == 3)
+        }
         K::String | K::Unstring => contains("INTO"),
-        K::GoTo
-        | K::Call
-        | K::Cancel
-        | K::Accept
-        | K::Display
-        | K::Initialize
-        | K::Inspect
-        | K::Allocate
-        | K::Free
-        | K::Set
-        | K::Open
-        | K::Close
-        | K::Read
-        | K::Rewrite
-        | K::Write
-        | K::ExecCics
-        | K::ExecDli
-        | K::ExecSql => !arguments.is_empty(),
+        K::ExecCics | K::ExecDli | K::ExecSql => !arguments.is_empty(),
         _ => true,
     };
     if valid {
+        Ok(())
+    } else {
+        Err(HirProblem::UnsupportedForm)
+    }
+}
+
+fn validate_statement_options(
+    kind: StatementKind,
+    options: &[StatementOption],
+) -> Result<(), HirProblem> {
+    use StatementKind as K;
+    use StatementOptionKind as O;
+    let allowed = |option: O| match option {
+        O::AtEnd | O::NotAtEnd => matches!(kind, K::Read | K::ReturnStatement),
+        O::InvalidKey | O::NotInvalidKey => {
+            matches!(kind, K::Delete | K::Read | K::Rewrite | K::Start | K::Write)
+        }
+        O::OnException | O::NotOnException => matches!(
+            kind,
+            K::Accept
+                | K::Call
+                | K::Invoke
+                | K::JsonGenerate
+                | K::JsonParse
+                | K::XmlGenerate
+                | K::XmlParse
+        ),
+        O::OnOverflow | O::NotOnOverflow => matches!(kind, K::String | K::Unstring),
+        O::OnSizeError | O::NotOnSizeError | O::Rounded => {
+            matches!(
+                kind,
+                K::Add | K::Compute | K::Divide | K::Multiply | K::Subtract
+            )
+        }
+        O::Giving => matches!(
+            kind,
+            K::Add | K::Divide | K::Merge | K::Multiply | K::Sort | K::Subtract
+        ),
+        O::Remainder => kind == K::Divide,
+        O::Returning => matches!(kind, K::Allocate | K::Call | K::Invoke | K::StopRun),
+        O::Using => matches!(kind, K::Call | K::Entry | K::Invoke | K::Merge | K::Sort),
+        O::Into => matches!(
+            kind,
+            K::Divide
+                | K::ExecSql
+                | K::JsonParse
+                | K::Read
+                | K::ReturnStatement
+                | K::String
+                | K::Unstring
+        ),
+        O::From => matches!(
+            kind,
+            K::ExecSql
+                | K::JsonGenerate
+                | K::Perform
+                | K::Release
+                | K::Rewrite
+                | K::Subtract
+                | K::Write
+                | K::XmlGenerate
+        ),
+        O::ExplicitTerminator => true,
+    };
+    if options.iter().all(|option| allowed(option.kind)) {
         Ok(())
     } else {
         Err(HirProblem::UnsupportedForm)
@@ -1530,14 +1827,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn registry_freezes_43_statement_variants() {
-        assert_eq!(StatementKind::frozen().len(), 43);
+    fn generated_registry_closes_all_44_official_statement_families() {
+        assert_eq!(StatementKind::official().len(), 44);
+        assert_eq!(ProcedureStatementKind::ALL.len(), 44);
         assert_eq!(
-            StatementKind::frozen()
+            StatementKind::official()
+                .iter()
+                .filter_map(|kind| kind.official_kind())
+                .collect::<BTreeSet<_>>(),
+            ProcedureStatementKind::ALL.into_iter().collect()
+        );
+        assert_eq!(
+            StatementKind::official()
                 .iter()
                 .filter(|kind| !kind.supported())
                 .count(),
-            5
+            7
         );
     }
     #[test]
