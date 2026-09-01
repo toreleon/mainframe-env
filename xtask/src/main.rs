@@ -6252,6 +6252,9 @@ fn build_release_target(root: &Path, target: &str) -> TaskResult {
 }
 
 fn generate_release_artifacts(root: &Path, target: &str) -> TaskResult {
+    if retained_accepted_release(root)?.is_some() {
+        return validate_retained_accepted_release(root, target);
+    }
     build_release_target(root, target)?;
     let documents = release_documents(root, target)?;
     validate_release_documents(&documents, target)?;
@@ -6266,6 +6269,9 @@ fn generate_release_artifacts(root: &Path, target: &str) -> TaskResult {
 }
 
 fn check_release_artifacts(root: &Path, target: &str) -> TaskResult {
+    if retained_accepted_release(root)?.is_some() {
+        return validate_retained_accepted_release(root, target);
+    }
     let retained = retained_release_documents(root, target)?;
     build_release_target(root, target)?;
     let documents = release_documents(root, target)?;
@@ -6273,6 +6279,45 @@ fn check_release_artifacts(root: &Path, target: &str) -> TaskResult {
     compare_release_documents(&retained, &documents)?;
     validate_checked_in_release_targets(root)?;
     Ok(())
+}
+
+fn retained_accepted_release(root: &Path) -> TaskResult<Option<String>> {
+    if read(&root.join("VERSION"))?.trim() != "0.2.0" {
+        return Ok(None);
+    }
+    let accepted = accepted_0_2_completion(root)?;
+    let head = command_text(root, "git", &["rev-parse", "HEAD"])?;
+    if head == accepted {
+        return Ok(None);
+    }
+    let status = Command::new("git")
+        .args(["merge-base", "--is-ancestor", &accepted, &head])
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("git merge-base for accepted 0.2 release: {error}"))?;
+    require(
+        status.success(),
+        "live tree is not descended from the accepted 0.2 release candidate",
+    )?;
+    Ok(Some(accepted))
+}
+
+fn validate_retained_accepted_release(root: &Path, target: &str) -> TaskResult {
+    let accepted = retained_accepted_release(root)?
+        .ok_or("retained accepted-release validation requires a later descendant")?;
+    let retained = retained_release_documents(root, target)?;
+    validate_release_documents(&retained, target)?;
+    for (relative, actual) in &retained {
+        let expected = git_file_bytes(root, &accepted, &relative.to_string_lossy())?;
+        require(
+            actual == &expected,
+            &format!(
+                "accepted 0.2 release document drifted after completion: {}",
+                relative.display()
+            ),
+        )?;
+    }
+    validate_checked_in_release_targets(root)
 }
 
 fn compare_release_documents(
@@ -7211,6 +7256,12 @@ mod tests {
         );
         check_work_package_amendments(&root)
             .expect("0.2 amendments remain bound to accepted candidate");
+        assert_eq!(
+            retained_accepted_release(&root).expect("accepted release mode"),
+            Some("e8dfa89583d866a365f496297d50aeb602e468bf".into())
+        );
+        validate_retained_accepted_release(&root, "x86_64-unknown-linux-gnu")
+            .expect("retained Linux release remains byte-bound to accepted 0.2");
     }
 
     #[test]
