@@ -6845,6 +6845,8 @@ async fn exercise_full_certification() -> Result<FullCertificationExercise, Corp
             dataset: DatasetName::new(&dataset, 128).expect("bounded test dataset"),
             member: None,
             expected_version: None,
+            purge: true,
+            current_date: None,
             mutation: Mutation {
                 sequence: postgres_sequence,
                 idempotency_key: IdempotencyKey::new(

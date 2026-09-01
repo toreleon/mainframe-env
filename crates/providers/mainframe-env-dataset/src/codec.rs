@@ -81,10 +81,15 @@ impl Entry {
 }
 
 pub(crate) fn encode(entry: &Entry) -> Result<Vec<u8>, ()> {
-    encode_state(entry, b"MEDS5", true)
+    encode_state(entry, b"MEDS6", true, true)
 }
 
-fn encode_state(entry: &Entry, schema: &[u8; 5], include_access_mode: bool) -> Result<Vec<u8>, ()> {
+fn encode_state(
+    entry: &Entry,
+    schema: &[u8; 5],
+    include_access_mode: bool,
+    include_creation_date: bool,
+) -> Result<Vec<u8>, ()> {
     let mut out = schema.to_vec();
     out.push(org(entry.attributes.organization));
     out.push(recfm(entry.attributes.record_format));
@@ -93,7 +98,7 @@ fn encode_state(entry: &Entry, schema: &[u8; 5], include_access_mode: bool) -> R
     optional_u32(&mut out, entry.attributes.key_length);
     optional_u16(&mut out, entry.attributes.ccsid);
     u64v(&mut out, entry.version);
-    encode_metadata(&mut out, entry, include_access_mode)?;
+    encode_metadata(&mut out, entry, include_access_mode, include_creation_date)?;
     records(&mut out, &entry.records)?;
     u32v(
         &mut out,
@@ -145,7 +150,7 @@ pub(crate) fn encode_definition_digest_v2(definition: &DatasetDefinition) -> Res
     optional_u32(&mut out, entry.attributes.key_length);
     optional_u16(&mut out, entry.attributes.ccsid);
     u64v(&mut out, 0);
-    encode_metadata(&mut out, &entry, false)?;
+    encode_metadata(&mut out, &entry, false, false)?;
     records(&mut out, &[])?;
     u32v(&mut out, 0);
     u32v(&mut out, 0);
@@ -162,7 +167,10 @@ pub(crate) fn decode(
         at: 0,
     };
     let schema = r.take(5)?;
-    if !matches!(schema, b"MEDS1" | b"MEDS2" | b"MEDS3" | b"MEDS4" | b"MEDS5") {
+    if !matches!(
+        schema,
+        b"MEDS1" | b"MEDS2" | b"MEDS3" | b"MEDS4" | b"MEDS5" | b"MEDS6"
+    ) {
         return Err(());
     }
     let organization = org_back(r.byte()?)?;
@@ -180,8 +188,14 @@ pub(crate) fn decode(
         key_length,
         ccsid,
     });
-    if matches!(schema, b"MEDS3" | b"MEDS4" | b"MEDS5") {
-        decode_metadata(&mut r, &mut definition, max_records, schema == b"MEDS5")?;
+    if matches!(schema, b"MEDS3" | b"MEDS4" | b"MEDS5" | b"MEDS6") {
+        decode_metadata(
+            &mut r,
+            &mut definition,
+            max_records,
+            matches!(schema, b"MEDS5" | b"MEDS6"),
+            schema == b"MEDS6",
+        )?;
     }
     let records = r.records(max_records, max_record)?;
     let count = usize::try_from(r.u32()?).map_err(|_| ())?;
@@ -199,7 +213,7 @@ pub(crate) fn decode(
         }
     }
     let mut relative_records = BTreeMap::new();
-    if matches!(schema, b"MEDS2" | b"MEDS3" | b"MEDS4" | b"MEDS5") {
+    if matches!(schema, b"MEDS2" | b"MEDS3" | b"MEDS4" | b"MEDS5" | b"MEDS6") {
         let count = usize::try_from(r.u32()?).map_err(|_| ())?;
         if count > max_records {
             return Err(());
@@ -215,14 +229,14 @@ pub(crate) fn decode(
             }
         }
     }
-    if !matches!(schema, b"MEDS4" | b"MEDS5") && r.at != bytes_in.len() {
+    if !matches!(schema, b"MEDS4" | b"MEDS5" | b"MEDS6") && r.at != bytes_in.len() {
         return Err(());
     }
     let mut entry = Entry::from_definition(definition, version);
     entry.records = records;
     entry.members = members;
     entry.relative_records = relative_records;
-    if matches!(schema, b"MEDS4" | b"MEDS5") {
+    if matches!(schema, b"MEDS4" | b"MEDS5" | b"MEDS6") {
         let member_count = usize::try_from(r.u32()?).map_err(|_| ())?;
         if member_count > max_members {
             return Err(());
@@ -325,7 +339,12 @@ fn recfm_back(value: u8) -> Result<RecordFormat, ()> {
     }
 }
 
-fn encode_metadata(out: &mut Vec<u8>, entry: &Entry, include_access_mode: bool) -> Result<(), ()> {
+fn encode_metadata(
+    out: &mut Vec<u8>,
+    entry: &Entry,
+    include_access_mode: bool,
+    include_creation_date: bool,
+) -> Result<(), ()> {
     u32v(out, entry.dcb.block_size);
     u16v(out, entry.dcb.buffer_count);
     optional_u32(out, entry.dcb.buffer_size);
@@ -377,6 +396,9 @@ fn encode_metadata(out: &mut Vec<u8>, entry: &Entry, include_access_mode: bool) 
     out.push(catalog_kind(entry.catalog.entry_kind));
     optional_string(out, entry.catalog.catalog.as_ref().map(DatasetName::as_str))?;
     optional_string(out, entry.catalog.owner.as_deref())?;
+    if include_creation_date {
+        optional_u32(out, entry.catalog.creation_date);
+    }
     optional_u32(out, entry.catalog.expiration_date);
     optional_u16(out, entry.catalog.retention_days);
 
@@ -391,6 +413,7 @@ fn decode_metadata(
     definition: &mut DatasetDefinition,
     max_items: usize,
     has_access_mode: bool,
+    has_creation_date: bool,
 ) -> Result<(), ()> {
     definition.dcb = DcbOptions {
         block_size: reader.u32()?,
@@ -462,6 +485,11 @@ fn decode_metadata(
             .transpose()
             .map_err(|_| ())?,
         owner: reader.optional_string(128)?,
+        creation_date: if has_creation_date {
+            reader.optional_u32()?
+        } else {
+            None
+        },
         expiration_date: reader.optional_u32()?,
         retention_days: reader.optional_u16()?,
     };
@@ -762,7 +790,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn meds2_state_upgrades_to_the_typed_meds5_definition() {
+    fn meds2_state_upgrades_to_the_typed_meds6_definition() {
         let mut legacy = b"MEDS2".to_vec();
         legacy.extend_from_slice(&[0, 0]);
         legacy.extend_from_slice(&4u32.to_be_bytes());
@@ -790,12 +818,12 @@ mod tests {
             })
         );
         let upgraded = encode(&decoded).unwrap();
-        assert_eq!(&upgraded[..5], b"MEDS5");
+        assert_eq!(&upgraded[..5], b"MEDS6");
         assert_eq!(decode(&upgraded, 8, 80, 8).unwrap(), decoded);
     }
 
     #[test]
-    fn meds3_definition_upgrades_to_meds5_with_empty_pdse_directory() {
+    fn meds3_definition_upgrades_to_meds6_with_empty_pdse_directory() {
         let definition = DatasetDefinition::compatibility(DatasetAttributes {
             organization: DatasetOrganization::PartitionedExtended,
             record_format: RecordFormat::Fixed,
@@ -810,7 +838,7 @@ mod tests {
         assert!(decoded.member_generations.is_empty());
         assert!(decoded.member_aliases.is_empty());
         let upgraded = encode(&decoded).unwrap();
-        assert_eq!(&upgraded[..5], b"MEDS5");
+        assert_eq!(&upgraded[..5], b"MEDS6");
         assert_eq!(decode(&upgraded, 8, 80, 8).unwrap(), decoded);
     }
 
@@ -826,13 +854,32 @@ mod tests {
         });
         let mut original = Entry::from_definition(definition, 7);
         original.records = vec![b"AA11".to_vec(), b"BB22".to_vec()];
-        let legacy = encode_state(&original, b"MEDS4", false).unwrap();
+        let legacy = encode_state(&original, b"MEDS4", false, false).unwrap();
         let decoded = decode(&legacy, 8, 80, 8).unwrap();
         assert_eq!(decoded.vsam.access_mode, VsamAccessMode::NonRls);
         assert_eq!(decoded.records, original.records);
         assert_eq!(decoded.version, 7);
         let upgraded = encode(&decoded).unwrap();
-        assert_eq!(&upgraded[..5], b"MEDS5");
+        assert_eq!(&upgraded[..5], b"MEDS6");
         assert_eq!(decode(&upgraded, 8, 80, 8).unwrap(), decoded);
+    }
+
+    #[test]
+    fn meds6_persists_catalog_creation_and_retention_dates() {
+        let mut definition = DatasetDefinition::compatibility(DatasetAttributes {
+            organization: DatasetOrganization::Sequential,
+            record_format: RecordFormat::Fixed,
+            logical_record_length: 4,
+            key_offset: None,
+            key_length: None,
+            ccsid: Some(37),
+        });
+        definition.catalog.owner = Some("OWNER1".into());
+        definition.catalog.creation_date = Some(2_026_001);
+        definition.catalog.retention_days = Some(30);
+        let entry = Entry::from_definition(definition, 3);
+        let encoded = encode(&entry).unwrap();
+        assert_eq!(&encoded[..5], b"MEDS6");
+        assert_eq!(decode(&encoded, 8, 80, 8).unwrap(), entry);
     }
 }

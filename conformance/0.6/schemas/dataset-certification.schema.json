@@ -24,10 +24,10 @@
       "type": "object", "additionalProperties": false,
       "required": ["writer", "readers", "aix_writer", "migrations"],
       "properties": {
-        "writer": { "const": "MEDS5" },
-        "readers": { "const": ["MEDS1", "MEDS2", "MEDS3", "MEDS4", "MEDS5"] },
+        "writer": { "const": "MEDS6" },
+        "readers": { "const": ["MEDS1", "MEDS2", "MEDS3", "MEDS4", "MEDS5", "MEDS6"] },
         "aix_writer": { "const": "MEAIX4" },
-        "migrations": { "const": ["2-to-3", "3-to-4", "4-to-5"] }
+        "migrations": { "const": ["2-to-3", "3-to-4", "4-to-5", "5-to-6"] }
       }
     },
     "matrices": {

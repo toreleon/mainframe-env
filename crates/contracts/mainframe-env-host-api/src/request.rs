@@ -186,6 +186,11 @@ pub enum DatasetRequest {
         key: Option<Vec<u8>>,
         max_records: u32,
     },
+    ReadGeneric {
+        dataset: DatasetName,
+        key_prefix: Vec<u8>,
+        max_records: u32,
+    },
     ReadConcatenation {
         datasets: Vec<DatasetName>,
         member: Option<MemberName>,
@@ -403,6 +408,8 @@ pub enum DatasetRequest {
         dataset: DatasetName,
         member: Option<MemberName>,
         expected_version: Option<u64>,
+        purge: bool,
+        current_date: Option<u32>,
         mutation: Mutation,
     },
     StartBrowse {
@@ -974,6 +981,7 @@ impl HostRequest {
                 | DatasetRequest::ListMembers { .. }
                 | DatasetRequest::ReadMemberGeneration { .. }
                 | DatasetRequest::Read { .. }
+                | DatasetRequest::ReadGeneric { .. }
                 | DatasetRequest::ReadConcatenation { .. }
                 | DatasetRequest::ReadRelative { .. }
                 | DatasetRequest::ReadRba { .. }
@@ -1275,7 +1283,36 @@ impl HostResult {
                 description.definition.validate(
                     limits,
                     DatasetProviderCapabilities::all_contract_capabilities(),
-                )
+                )?;
+                if description.extents.is_empty()
+                    || description.extents.len() > limits.max_records
+                    || description.buffer_bytes == 0
+                    || description.abstract_placement.is_empty()
+                    || description.abstract_placement.len() > limits.max_name_bytes
+                {
+                    return Err(HostProblem::Malformed);
+                }
+                let mut next_start = 0u64;
+                for (position, extent) in description.extents.iter().enumerate() {
+                    if extent.ordinal != u32::try_from(position).unwrap_or(u32::MAX)
+                        || extent.start != next_start
+                        || extent.length == 0
+                        || extent.volume_id.is_empty()
+                        || extent.volume_id.len() > limits.max_name_bytes
+                    {
+                        return Err(HostProblem::Malformed);
+                    }
+                    next_start = next_start
+                        .checked_add(extent.length)
+                        .ok_or(HostProblem::ResourceExhausted)?;
+                }
+                if next_start != description.allocated_bytes
+                    || description.high_used_rba > description.max_rba
+                {
+                    Err(HostProblem::Malformed)
+                } else {
+                    Ok(())
+                }
             }
             Self::Dataset(DatasetResult::Catalog(resolution))
                 if resolution.alias_chain.len() > limits.max_records || resolution.version == 0 =>
@@ -1587,6 +1624,17 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
         {
             Err(HostProblem::ResourceExhausted)
         }
+        DatasetRequest::ReadGeneric {
+            key_prefix,
+            max_records,
+            ..
+        } if key_prefix.is_empty()
+            || key_prefix.len() > limits.max_record_bytes
+            || *max_records == 0
+            || *max_records as usize > limits.max_records =>
+        {
+            Err(HostProblem::ResourceExhausted)
+        }
         DatasetRequest::ReadConcatenation {
             datasets,
             max_records,
@@ -1820,8 +1868,17 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
         DatasetRequest::ResolveGeneration { relative, .. } if *relative > 0 => {
             Err(HostProblem::Malformed)
         }
-        DatasetRequest::Rename { mutation, .. } | DatasetRequest::Delete { mutation, .. } => {
-            mutation.validate(limits)
+        DatasetRequest::Rename { mutation, .. } => mutation.validate(limits),
+        DatasetRequest::Delete {
+            current_date,
+            mutation,
+            ..
+        } => {
+            if current_date.is_some_and(|date| !valid_julian_date(date)) {
+                Err(HostProblem::Malformed)
+            } else {
+                mutation.validate(limits)
+            }
         }
         DatasetRequest::StartBrowse { key, .. } if key.len() > limits.max_record_bytes => {
             Err(HostProblem::ResourceExhausted)
@@ -1855,6 +1912,12 @@ fn validate_transaction(transaction: &str, limits: HostLimits) -> Result<(), Hos
     } else {
         Ok(())
     }
+}
+fn valid_julian_date(date: u32) -> bool {
+    let year = date / 1000;
+    let day = date % 1000;
+    let leap = year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400));
+    (1900..=9999).contains(&year) && day != 0 && day <= if leap { 366 } else { 365 }
 }
 fn validate_tvs_operation(
     operation: &TvsRecordOperation,

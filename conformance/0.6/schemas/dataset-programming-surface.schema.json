@@ -16,7 +16,7 @@
     "schema_version": { "const": "mainframe-env.dataset-programming-surface@1" },
     "target_version": { "const": "0.6.0" },
     "baseline_id": { "const": "ibm-zos-3.2-dfsms-ams-2026-06" },
-    "state_schema_version": { "const": 5 },
+    "state_schema_version": { "const": 6 },
     "source": {
       "type": "object",
       "additionalProperties": false,

@@ -9,7 +9,7 @@ pub const DATASET_REQUEST_CONTRACT: &str = "mainframe-env.host.dataset-request@2
 pub const DATASET_RESULT_CONTRACT: &str = "mainframe-env.host.dataset-result@2";
 pub const DATASET_PROVIDER_CAPABILITY_CONTRACT: &str =
     "mainframe-env.dataset-provider-capabilities@1";
-pub const DATASET_STATE_SCHEMA_VERSION: u16 = 5;
+pub const DATASET_STATE_SCHEMA_VERSION: u16 = 6;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SpaceUnit {
@@ -278,6 +278,7 @@ pub struct CatalogMetadata {
     pub entry_kind: CatalogEntryKind,
     pub catalog: Option<DatasetName>,
     pub owner: Option<String>,
+    pub creation_date: Option<u32>,
     pub expiration_date: Option<u32>,
     pub retention_days: Option<u16>,
 }
@@ -288,6 +289,7 @@ impl Default for CatalogMetadata {
             entry_kind: CatalogEntryKind::Dataset,
             catalog: None,
             owner: None,
+            creation_date: None,
             expiration_date: None,
             retention_days: None,
         }
@@ -485,11 +487,22 @@ impl DatasetDefinition {
         {
             validate_label(value, limits)?;
         }
-        if self.catalog.expiration_date.is_some() && self.catalog.retention_days.is_some() {
+        if self.catalog.expiration_date.is_some() && self.catalog.retention_days.is_some()
+            || self.catalog.retention_days.is_some() && self.catalog.creation_date.is_none()
+        {
             return Err(HostProblem::Malformed);
         }
-        if let Some(date) = self.catalog.expiration_date
-            && (!(1900001..=9999366).contains(&date) || date % 1000 == 0 || date % 1000 > 366)
+        for date in [self.catalog.creation_date, self.catalog.expiration_date]
+            .into_iter()
+            .flatten()
+        {
+            if !(1900001..=9999366).contains(&date) || date % 1000 == 0 || date % 1000 > 366 {
+                return Err(HostProblem::Malformed);
+            }
+        }
+        if let (Some(created), Some(expires)) =
+            (self.catalog.creation_date, self.catalog.expiration_date)
+            && created > expires
         {
             return Err(HostProblem::Malformed);
         }
@@ -641,9 +654,7 @@ impl DatasetDefinition {
             "VOLUME/UNIT",
         )?;
         require_capability(
-            (self.volumes.kind == VolumeKind::Abstract
-                && self.volumes.device_type.is_none()
-                && self.volumes.unit_count == 1)
+            (self.volumes.kind == VolumeKind::Abstract && self.volumes.device_type.is_none())
                 || capabilities.physical_volumes
                 || capabilities.tape,
             "physical-volumes",
@@ -681,6 +692,18 @@ pub struct DatasetDescription {
     pub control_intervals: u64,
     pub control_areas: u64,
     pub high_used_rba: u64,
+    pub max_rba: u64,
+    pub extents: Vec<DatasetExtent>,
+    pub buffer_bytes: u64,
+    pub abstract_placement: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DatasetExtent {
+    pub ordinal: u32,
+    pub start: u64,
+    pub length: u64,
+    pub volume_id: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

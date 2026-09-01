@@ -1946,6 +1946,8 @@ impl ProductServer {
                         dataset: dataset_name(&dataset)?,
                         member: member_name(member)?,
                         expected_version: None,
+                        purge: false,
+                        current_date: None,
                         mutation: self.mutation().map_err(gateway_problem)?,
                     },
                 )?;
@@ -2531,6 +2533,7 @@ impl ProductServer {
             | DatasetRequest::ListLocks { dataset, .. }
             | DatasetRequest::ListMembers { dataset, .. }
             | DatasetRequest::Read { dataset, .. }
+            | DatasetRequest::ReadGeneric { dataset, .. }
             | DatasetRequest::ReadRelative { dataset, .. }
             | DatasetRequest::ReadRba { dataset, .. }
             | DatasetRequest::ReadSequential { dataset, .. }
@@ -2584,6 +2587,7 @@ impl ProductServer {
                         | DatasetRequest::TvsStatus { .. }
                         | DatasetRequest::ListMembers { .. }
                         | DatasetRequest::Read { .. }
+                        | DatasetRequest::ReadGeneric { .. }
                         | DatasetRequest::ReadRelative { .. }
                         | DatasetRequest::ReadRba { .. }
                         | DatasetRequest::ReadSequential { .. }
@@ -2976,6 +2980,8 @@ impl ProductServer {
                         dataset: dataset_name(name)?,
                         member: None,
                         expected_version: None,
+                        purge: false,
+                        current_date: None,
                         mutation: self.mutation().map_err(gateway_problem)?,
                     },
                 )?;

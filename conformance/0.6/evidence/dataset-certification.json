@@ -10,10 +10,10 @@
     "local_bindings": 118
   },
   "state": {
-    "writer": "MEDS5",
-    "readers": ["MEDS1", "MEDS2", "MEDS3", "MEDS4", "MEDS5"],
+    "writer": "MEDS6",
+    "readers": ["MEDS1", "MEDS2", "MEDS3", "MEDS4", "MEDS5", "MEDS6"],
     "aix_writer": "MEAIX4",
-    "migrations": ["2-to-3", "3-to-4", "4-to-5"]
+    "migrations": ["2-to-3", "3-to-4", "4-to-5", "5-to-6"]
   },
   "matrices": {
     "base_aix_atomicity": "pass",

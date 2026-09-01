@@ -25,6 +25,7 @@ use mainframe_env_host_api::{
 };
 use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
@@ -1607,11 +1608,15 @@ impl BatchService {
     ) -> Result<(), HostProblem> {
         let name = crate::ams::bare_target(statement, "DELETE").ok_or(HostProblem::Malformed)?;
         let dataset = dataset_name(&name)?;
+        let purge = statement.contains(" PURGE");
+        let current_date = numeric_operand(statement, "CURRENTDATE");
         self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
             DatasetRequest::Delete {
                 dataset,
                 member: None,
                 expected_version: None,
+                purge,
+                current_date,
                 mutation,
             }
         })?;
@@ -1732,17 +1737,20 @@ impl BatchService {
                     operand(statement, &["DATASET", "NAME"]).ok_or(HostProblem::Malformed)?;
                 let dataset = dataset_name(&name)?;
                 let (_, maximum) = pair_operand(statement, "RECORDSIZE").unwrap_or((80, 80));
+                let mut definition =
+                    mainframe_env_host_api::DatasetDefinition::compatibility(DatasetAttributes {
+                        organization: DatasetOrganization::Sequential,
+                        record_format: RecordFormat::Fixed,
+                        logical_record_length: maximum,
+                        key_offset: None,
+                        key_length: None,
+                        ccsid: Some(37),
+                    });
+                apply_ams_definition_operands(statement, &mut definition)?;
                 self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
-                    DatasetRequest::Create {
+                    DatasetRequest::Define {
                         dataset,
-                        attributes: DatasetAttributes {
-                            organization: DatasetOrganization::Sequential,
-                            record_format: RecordFormat::Fixed,
-                            logical_record_length: maximum,
-                            key_offset: None,
-                            key_length: None,
-                            ccsid: Some(37),
-                        },
+                        definition: Box::new(definition),
                         mutation,
                     }
                 })?;
@@ -1991,7 +1999,8 @@ impl BatchService {
         )?;
         let dd = operand(statement, &["OUTFILE", "OFILE"]).ok_or(HostProblem::Malformed)?;
         let records = if disconnect {
-            let header = format!("MEAMSCAT1|{}", target.as_str()).into_bytes();
+            let core = format!("MEAMSCAT1|{}", target.as_str());
+            let header = format!("{core}|{}", ams_snapshot_digest(&core, &[])).into_bytes();
             self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
                 DatasetRequest::SetCatalogConnection {
                     catalog: target.clone(),
@@ -2025,7 +2034,8 @@ impl BatchService {
             else {
                 return Err(HostProblem::ProviderFailure);
             };
-            let mut snapshot = vec![encode_ams_snapshot_header(&target, &attributes).into_bytes()];
+            let mut snapshot =
+                vec![encode_ams_snapshot_header(&target, &attributes, &records).into_bytes()];
             snapshot.extend(records);
             snapshot
         };
@@ -2054,7 +2064,12 @@ impl BatchService {
             return Err(HostProblem::Malformed);
         }
         let header = String::from_utf8(records.remove(0)).map_err(|_| HostProblem::Malformed)?;
-        if let Some(catalog) = header.strip_prefix("MEAMSCAT1|") {
+        if let Some(rest) = header.strip_prefix("MEAMSCAT1|") {
+            let (catalog, digest) = rest.rsplit_once('|').ok_or(HostProblem::Malformed)?;
+            let core = format!("MEAMSCAT1|{catalog}");
+            if digest != ams_snapshot_digest(&core, &[]) {
+                return Err(HostProblem::IdempotencyConflict);
+            }
             let catalog = dataset_name(catalog)?;
             self.authorize(
                 invocation,
@@ -2073,7 +2088,7 @@ impl BatchService {
             })?;
             return Ok(());
         }
-        let (snapshot_name, attributes) = decode_ams_snapshot_header(&header)?;
+        let (snapshot_name, attributes) = decode_ams_snapshot_header(&header, &records)?;
         let target = operand(statement, &["OUTDATASET", "INDATASET", "DATASET"])
             .map_or(Ok(snapshot_name), |name| dataset_name(&name))?;
         self.authorize(
@@ -2199,11 +2214,8 @@ impl BatchService {
             }
         } else if statement.starts_with("DEFINE NONVSAM") {
             let (minimum, maximum) = pair_operand(statement, "RECORDSIZE").unwrap_or((80, 80));
-            DatasetRequest::Create {
-                dataset: dataset_name(
-                    &operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?,
-                )?,
-                attributes: DatasetAttributes {
+            let mut definition =
+                mainframe_env_host_api::DatasetDefinition::compatibility(DatasetAttributes {
                     organization: DatasetOrganization::Sequential,
                     record_format: if minimum == maximum {
                         RecordFormat::Fixed
@@ -2214,7 +2226,13 @@ impl BatchService {
                     key_offset: None,
                     key_length: None,
                     ccsid: Some(37),
-                },
+                });
+            apply_ams_definition_operands(statement, &mut definition)?;
+            DatasetRequest::Define {
+                dataset: dataset_name(
+                    &operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?,
+                )?,
+                definition: Box::new(definition),
                 mutation: Mutation {
                     sequence,
                     idempotency_key: key.clone(),
@@ -2339,6 +2357,7 @@ impl BatchService {
             definition.vsam.speed = statement.contains(" SPEED");
             definition.vsam.write_check = statement.contains(" WRITECHECK");
             definition.vsam.erase_on_delete = statement.contains(" ERASE");
+            apply_ams_definition_operands(statement, &mut definition)?;
             DatasetRequest::Define {
                 dataset: dataset_name(
                     &operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?,
@@ -2807,6 +2826,8 @@ impl BatchService {
                     .map(|member| MemberName::new(member, 8).map_err(|_| HostProblem::Malformed))
                     .transpose()?,
                 expected_version: None,
+                purge: true,
+                current_date: None,
                 mutation: Mutation {
                     sequence,
                     idempotency_key: key.clone(),
@@ -3293,49 +3314,14 @@ fn ams_condition_code(problem: &HostProblem) -> u8 {
 fn unimplemented_ams_operand(statement: &str) -> Option<(&'static str, &'static str)> {
     [
         (
-            "physical-volumes",
-            "VOLUMES",
-            [" VOLUMES(", " VOLUME(", " UNIT("],
-        ),
-        (
             "ams-allocation-extents",
-            "physical SPACE/FREESPACE",
-            [" CYL(", " CYLINDERS(", " TRACKS("],
-        ),
-        (
-            "ams-allocation-extents",
-            "kilobyte/megabyte SPACE",
-            [" KILOBYTES(", " MEGABYTES(", " SPACE("],
-        ),
-        (
-            "sms-classes",
-            "SMS class selection",
-            [" DATACLAS(", " MGMTCLAS(", " STORCLAS("],
-        ),
-        (
-            "buffering",
-            "BUFNO/BUFSIZE",
-            [" BUFNO(", " BUFSIZE(", " BUFFERING("],
-        ),
-        (
-            "catalog-metadata",
-            "OWNER/RETPD",
-            [" OWNER(", " RETPD(", " EXPIRATION("],
-        ),
-        (
-            "catalog-routing",
-            "CATALOG selection",
-            [" CATALOG(", " CATALOG (", " CATALOG("],
+            "nested SPACE",
+            [" SPACE(", " SPACE (", " SPACE("],
         ),
         (
             "vsam-components",
             "DATA/INDEX component override",
             [" DATA(", " INDEX(", " FREESPACE("],
-        ),
-        (
-            "retention-override",
-            "PURGE",
-            [" PURGE ", " PURGE)", " PURGE"],
         ),
     ]
     .into_iter()
@@ -3345,6 +3331,118 @@ fn unimplemented_ams_operand(statement: &str) -> Option<(&'static str, &'static 
             .any(|needle| statement.contains(needle))
             .then_some((capability, operand))
     })
+}
+
+fn ams_values(statement: &str, name: &str) -> Option<Vec<String>> {
+    let value = operand(statement, &[name])?;
+    Some(
+        value
+            .split(|character: char| character == ',' || character.is_whitespace())
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+            .collect(),
+    )
+}
+
+fn ams_u64_values(statement: &str, name: &str) -> Result<Option<Vec<u64>>, HostProblem> {
+    ams_values(statement, name)
+        .map(|values| {
+            values
+                .into_iter()
+                .map(|value| value.parse().map_err(|_| HostProblem::Malformed))
+                .collect()
+        })
+        .transpose()
+}
+
+fn apply_ams_definition_operands(
+    statement: &str,
+    definition: &mut mainframe_env_host_api::DatasetDefinition,
+) -> Result<(), HostProblem> {
+    if let Some(value) = numeric_operand(statement, "BLKSIZE") {
+        definition.dcb.block_size = value;
+    }
+    if let Some(value) = numeric_operand(statement, "BUFNO") {
+        definition.dcb.buffer_count = u16::try_from(value).map_err(|_| HostProblem::Malformed)?;
+    }
+    definition.dcb.buffer_size =
+        numeric_operand(statement, "BUFSIZE").or(definition.dcb.buffer_size);
+    if let Some(value) = numeric_operand(statement, "CCSID") {
+        definition.attributes.ccsid =
+            Some(u16::try_from(value).map_err(|_| HostProblem::Malformed)?);
+    }
+
+    for (operand_name, unit) in [
+        ("TRACKS", mainframe_env_host_api::SpaceUnit::Tracks),
+        ("CYLINDERS", mainframe_env_host_api::SpaceUnit::Cylinders),
+        ("BLOCKS", mainframe_env_host_api::SpaceUnit::Blocks),
+        ("KILOBYTES", mainframe_env_host_api::SpaceUnit::Kilobytes),
+        ("MEGABYTES", mainframe_env_host_api::SpaceUnit::Megabytes),
+        ("RECORDS", mainframe_env_host_api::SpaceUnit::Records),
+    ] {
+        if let Some(values) = ams_u64_values(statement, operand_name)? {
+            if values.is_empty() || values.len() > 2 {
+                return Err(HostProblem::Malformed);
+            }
+            definition.allocation.unit = unit;
+            definition.allocation.primary = values[0];
+            definition.allocation.secondary = values.get(1).copied().unwrap_or(0);
+        }
+    }
+    if let Some(value) =
+        ams_u64_values(statement, "PRIMARY")?.and_then(|values| values.first().copied())
+    {
+        definition.allocation.primary = value;
+    }
+    if let Some(value) =
+        ams_u64_values(statement, "SECONDARY")?.and_then(|values| values.first().copied())
+    {
+        definition.allocation.secondary = value;
+    }
+    if let Some(value) = numeric_operand(statement, "DIRECTORY") {
+        definition.allocation.directory_blocks = value;
+    }
+    definition.allocation.release_unused = statement.contains(" RLSE");
+    definition.allocation.contiguous = statement.contains(" CONTIG");
+    definition.allocation.round_to_cylinder = statement.contains(" ROUND");
+
+    if let Some(volumes) =
+        ams_values(statement, "VOLUMES").or_else(|| ams_values(statement, "VOLUME"))
+    {
+        if volumes.is_empty() {
+            return Err(HostProblem::Malformed);
+        }
+        definition.volumes.volume_ids = volumes;
+    }
+    if let Some(value) =
+        numeric_operand(statement, "UNITCOUNT").or_else(|| numeric_operand(statement, "UNIT"))
+    {
+        definition.volumes.unit_count = u16::try_from(value).map_err(|_| HostProblem::Malformed)?;
+    }
+
+    definition.sms.data_class =
+        operand(statement, &["DATACLAS"]).or(definition.sms.data_class.take());
+    definition.sms.management_class =
+        operand(statement, &["MGMTCLAS"]).or(definition.sms.management_class.take());
+    definition.sms.storage_class =
+        operand(statement, &["STORCLAS"]).or(definition.sms.storage_class.take());
+    definition.sms.guaranteed_space = statement.contains(" GUARANTEEDSPACE");
+    definition.sms.extended_format = statement.contains(" EXTENDED");
+    definition.sms.extended_addressable = statement.contains(" EXTENDEDADDRESSABLE");
+
+    if let Some(catalog) = operand(statement, &["CATALOG"]) {
+        definition.catalog.catalog = Some(dataset_name(&catalog)?);
+    }
+    definition.catalog.owner = operand(statement, &["OWNER"]).or(definition.catalog.owner.take());
+    definition.catalog.creation_date =
+        numeric_operand(statement, "CREATEDATE").or(definition.catalog.creation_date);
+    definition.catalog.retention_days = numeric_operand(statement, "RETPD")
+        .map(|value| u16::try_from(value).map_err(|_| HostProblem::Malformed))
+        .transpose()?
+        .or(definition.catalog.retention_days);
+    definition.catalog.expiration_date =
+        numeric_operand(statement, "EXPIRATION").or(definition.catalog.expiration_date);
+    Ok(())
 }
 
 fn dataset_name(value: &str) -> Result<DatasetName, HostProblem> {
@@ -3358,8 +3456,12 @@ fn ams_target(command: &AmsCommand) -> Result<DatasetName, HostProblem> {
     dataset_name(&value)
 }
 
-fn encode_ams_snapshot_header(dataset: &DatasetName, attributes: &DatasetAttributes) -> String {
-    format!(
+fn encode_ams_snapshot_header(
+    dataset: &DatasetName,
+    attributes: &DatasetAttributes,
+    records: &[Vec<u8>],
+) -> String {
+    let core = format!(
         "MEAMS1|{}|{}|{}|{}|{}|{}|{}",
         dataset.as_str(),
         ams_org_tag(attributes.organization),
@@ -3374,15 +3476,21 @@ fn encode_ams_snapshot_header(dataset: &DatasetName, attributes: &DatasetAttribu
         attributes
             .ccsid
             .map_or_else(|| "-".into(), |value| value.to_string()),
-    )
+    );
+    format!("{core}|{}", ams_snapshot_digest(&core, records))
 }
 
 fn decode_ams_snapshot_header(
     header: &str,
+    records: &[Vec<u8>],
 ) -> Result<(DatasetName, DatasetAttributes), HostProblem> {
     let fields = header.split('|').collect::<Vec<_>>();
-    if fields.len() != 8 || fields[0] != "MEAMS1" {
+    if fields.len() != 9 || fields[0] != "MEAMS1" {
         return Err(HostProblem::Malformed);
+    }
+    let core = fields[..8].join("|");
+    if fields[8] != ams_snapshot_digest(&core, records) {
+        return Err(HostProblem::IdempotencyConflict);
     }
     let organization = match fields[2] {
         "PS" => DatasetOrganization::Sequential,
@@ -3433,6 +3541,19 @@ fn decode_ams_snapshot_header(
             ccsid,
         },
     ))
+}
+
+fn ams_snapshot_digest(core: &str, records: &[Vec<u8>]) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"mainframe-env.ams-snapshot@1");
+    digest.update((core.len() as u64).to_be_bytes());
+    digest.update(core.as_bytes());
+    digest.update((records.len() as u64).to_be_bytes());
+    for record in records {
+        digest.update((record.len() as u64).to_be_bytes());
+        digest.update(record);
+    }
+    format!("sha256:{:x}", digest.finalize())
 }
 
 const fn ams_org_tag(organization: DatasetOrganization) -> &'static str {
@@ -4544,7 +4665,7 @@ mod tests {
             .submit(
                 &invocation,
                 &JclBundle {
-                    primary: "//AMSJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//OUT DD DSN=USER.COLLECT,DISP=OLD\n//SYSIN DD *\n ALLOCATE DATASET(USER.PS) RECORDSIZE(80 80)\n ALTER USER.PS OPEN\n DEFINE CLUSTER (NAME(USER.KSDS) INDEXED KEYS(2 0) RECORDSIZE(4 4))\n DEFINE NONVSAM (NAME(USER.NV) RECORDSIZE(16 32))\n DEFINE USERCATALOG (NAME(USER.CAT))\n DEFINE ALIAS (NAME(USER.CATALIAS) RELATE(USER.CAT))\n DIAGNOSE USER.PS\n EXAMINE USER.KSDS\n LISTDATA USER.PS\n PRINT INDATASET(USER.PS)\n VERIFY USER.PS\n LISTCAT\n DCOLLECT OUTFILE(OUT)\n/*\n".into(),
+                    primary: "//AMSJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//OUT DD DSN=USER.COLLECT,DISP=OLD\n//SYSIN DD *\n ALLOCATE DATASET(USER.PS) RECORDSIZE(80 80) TRACKS(2 1) CONTIG ROUND BUFNO(3) BUFSIZE(128) DATACLAS(STD) MGMTCLAS(ACT) STORCLAS(ABS) EXTENDED EXTENDEDADDRESSABLE VOLUMES(VOLA VOLB) UNIT(2) OWNER(IBMUSER) CREATEDATE(2026001) RETPD(30)\n ALTER USER.PS OPEN\n DEFINE CLUSTER (NAME(USER.KSDS) INDEXED KEYS(2 0) RECORDSIZE(4 4))\n DEFINE NONVSAM (NAME(USER.NV) RECORDSIZE(16 32))\n DEFINE USERCATALOG (NAME(USER.CAT))\n DEFINE ALIAS (NAME(USER.CATALIAS) RELATE(USER.CAT))\n DIAGNOSE USER.PS\n EXAMINE USER.KSDS\n LISTDATA USER.PS\n PRINT INDATASET(USER.PS)\n VERIFY USER.PS\n LISTCAT\n DCOLLECT OUTFILE(OUT)\n/*\n".into(),
                     ..Default::default()
                 },
                 &IdempotencyKey::new("ams-generated-handlers", InvocationLimits::default())
@@ -4563,6 +4684,14 @@ mod tests {
             Ok(DatasetResult::Description(ref description))
                 if description.definition.lifecycle.state
                     == mainframe_env_host_api::DatasetLifecycleState::Open
+                    && description.allocated_bytes == 849_960
+                    && description.extents.len() == 1
+                    && description.extents[0].volume_id == "VOLA"
+                    && description.buffer_bytes == 384
+                    && description.max_rba == u64::MAX
+                    && description.definition.catalog.owner.as_deref() == Some("IBMUSER")
+                    && description.definition.catalog.creation_date == Some(2_026_001)
+                    && description.definition.catalog.retention_days == Some(30)
         ));
         assert!(matches!(
             dataset.invoke(DatasetRequest::List {
@@ -4659,6 +4788,54 @@ mod tests {
             service.run_next(&invocation, false).unwrap().unwrap().state,
             JobState::Completed
         );
+        let snapshot = DatasetName::new("USER.SNAPSHOT", 128).unwrap();
+        let DatasetResult::Records { mut records, .. } = dataset
+            .invoke(DatasetRequest::Read {
+                dataset: snapshot.clone(),
+                member: None,
+                key: None,
+                max_records: 8,
+            })
+            .unwrap()
+        else {
+            panic!("expected exported snapshot records");
+        };
+        let last = records[0].len() - 1;
+        records[0][last] = if records[0][last] == b'0' { b'1' } else { b'0' };
+        dataset
+            .invoke(DatasetRequest::Write {
+                dataset: snapshot,
+                member: None,
+                records,
+                expected_version: Some(2),
+                mutation: dataset_test_mutation(530),
+            })
+            .unwrap();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//BADJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//IN DD DSN=USER.SNAPSHOT,DISP=SHR\n//SYSIN DD *\n IMPORT INFILE(IN) OUTDATASET(USER.BADREST)\n/*\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("ams-corrupt-import", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service
+                .run_next(&invocation, false)
+                .unwrap()
+                .unwrap()
+                .return_code,
+            Some(12)
+        );
+        assert_eq!(
+            dataset.invoke(DatasetRequest::Attributes {
+                dataset: DatasetName::new("USER.BADREST", 128).unwrap(),
+            }),
+            Err(HostProblem::NotFound)
+        );
     }
 
     #[test]
@@ -4734,7 +4911,8 @@ mod tests {
                 max_records: 4,
             }),
             Ok(DatasetResult::Records { records, .. })
-                if records == [b"MEAMSCAT1|USER.EXPCAT".to_vec()]
+                if records.len() == 1
+                    && records[0].starts_with(b"MEAMSCAT1|USER.EXPCAT|sha256:")
         ));
         service
             .submit(

@@ -9,8 +9,8 @@
     "pdse_directory", "allocated_bytes", "used_bytes", "content_digest"
   ],
   "properties": {
-    "schema_version": { "const": "mainframe-env.dataset-state@5" },
-    "state_schema_version": { "const": 5 },
+    "schema_version": { "const": "mainframe-env.dataset-state@6" },
+    "state_schema_version": { "const": 6 },
     "dataset": { "$ref": "#/$defs/name" },
     "version": { "type": "integer", "minimum": 1 },
     "allocated_bytes": { "type": "integer", "minimum": 0 },
@@ -153,11 +153,12 @@
         },
         "catalog": {
           "type": "object", "additionalProperties": false,
-          "required": ["entry_kind", "catalog", "owner", "expiration_date", "retention_days"],
+          "required": ["entry_kind", "catalog", "owner", "creation_date", "expiration_date", "retention_days"],
           "properties": {
             "entry_kind": { "enum": ["dataset", "alternate-index", "path", "alias", "generation-data-group", "user-catalog", "master-catalog", "library", "volume", "page-space"] },
             "catalog": { "$ref": "#/$defs/optionalName" },
             "owner": { "type": ["string", "null"], "maxLength": 128 },
+            "creation_date": { "type": ["integer", "null"], "minimum": 1900001, "maximum": 9999366 },
             "expiration_date": { "type": ["integer", "null"], "minimum": 1900001, "maximum": 9999366 },
             "retention_days": { "type": ["integer", "null"], "minimum": 0, "maximum": 65535 }
           }

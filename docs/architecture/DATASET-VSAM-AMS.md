@@ -45,18 +45,20 @@ or descriptor generation grants no behavior coverage.
 - catalog type, catalog selection, owner, expiration, and retention; and
 - lifecycle, migration level, and backup generation.
 
-The deterministic provider advertises abstract-volume, CI/CA, RLS, bounded
-SHAREOPTIONS, and KSDS TVS support. Physical disk, tape, ACS, encryption,
-compression, striping, and migration/recall remain false until their adapter or
-semantic work package passes. An operand
+The deterministic provider advertises abstract-volume allocation/extents,
+buffer reservation, SMS-class placement, extended-format/addressability,
+catalog metadata, CI/CA, RLS, bounded SHAREOPTIONS, and KSDS TVS support.
+Physical disk, tape, ACS, encryption, compression, striping, and
+migration/recall remain false until their adapter or semantic work package
+passes. An operand
 that requires a false capability returns `UnsupportedCapability` with both the
 capability and affected operand; it cannot be silently stored, ignored, or
 reported as successful.
 
 ## Durable state and migration
 
-Dataset state writer version 5 (`MEDS5`) is a bounded owned binary codec. The
-reader accepts `MEDS1` through `MEDS5`. Older records materialize reviewed
+Dataset state writer version 6 (`MEDS6`) is a bounded owned binary codec. The
+reader accepts `MEDS1` through `MEDS6`. Older records materialize reviewed
 compatibility defaults and are fully validated before any current-version write.
 Corrupt, over-limit, cross-reference-invalid, or capability-invalid state fails
 before publication.
@@ -64,8 +66,10 @@ before publication.
 The portable state, diagnostic, capability, and migration schemas live in
 `conformance/0.6/schemas`. The non-destructive migration contract is
 `conformance/0.6/migrations/dataset-state-v2-to-v3.json`,
-`dataset-state-v3-to-v4.json`, and `dataset-state-v4-to-v5.json`. MEDS4 records
-materialize `NONRLS`; MEDS5 persists the explicit access mode. Rollback restores a
+`dataset-state-v3-to-v4.json`, `dataset-state-v4-to-v5.json`, and
+`dataset-state-v5-to-v6.json`. MEDS4 records materialize `NONRLS`; MEDS5 persists
+the explicit access mode, and MEDS6 persists catalog creation dates for
+retention enforcement. Rollback restores a
 digest-verified pre-migration provider snapshot atomically; partial migrated
 state is never selected. Backup/restore and broad injected-failure evidence belongs
 to DAT-606.
@@ -78,6 +82,16 @@ block allocations use explicit BLKSIZE or LRECL, and record allocations use
 LRECL. These values model deterministic allocation behavior only. They do not
 claim a real device geometry, VTOC placement, tape operation, compression
 ratio, encryption, or stripe layout.
+
+Primary and secondary quantities produce ordered observable extents. CONTIG
+collapses them into one extent, ROUND rounds the selected total to the abstract
+cylinder constant, and RLSE on lifecycle close releases unused secondary space
+without shrinking below primary. BUFNO and BUFSIZE produce a bounded reserved
+buffer byte count. SMS class names, guaranteed-space, extended format,
+extended addressability, and abstract unit count feed a stable placement
+identity; guaranteed space rejects an over-limit definition before publication.
+Explicit volume names remain abstract placement labels unless a physical-volume
+adapter is declared.
 
 ## Organization and access model
 
@@ -141,13 +155,17 @@ the dataset definition, and finally the connected master catalog. Resolution
 returns the requested name, resolved name, selected catalog, bounded alias
 chain, and maximum participating version. Disconnected catalogs fail with an
 exact catalog condition; they do not silently fall through to another catalog.
+Dataset catalog owners are enforced against the invocation principal. Creation,
+expiration, and retained-day metadata persist in MEDS6. Non-purge delete must
+supply a valid current Julian date and fails `PROTECTED` before expiry; PURGE
+still requires the owner and is explicit in the request digest.
 
 PDS retains one bounded member record stream per directory name. PDSE uses a
 separate ordered generation list per member; normal member reads select the
 latest generation and an explicit non-positive relative generation selects
 history. Each generation records whether it is a program object. Member aliases
 resolve to the same generation authority and cannot shadow members or form
-cycles. `MEDS5` persists generations and aliases without duplicating a selected
+cycles. `MEDS6` persists generations and aliases without duplicating a selected
 member projection.
 
 GDG roll-in distinguishes `SCRATCH` from `NOSCRATCH`: both remove old
