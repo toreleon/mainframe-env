@@ -42,7 +42,6 @@
         "mainframe-env-execution-api",
         "mainframe-env-host-api",
         "mainframe-env-store-api",
-        "mainframe-env-coverage",
         "mainframe-env-compiler",
         "mainframe-env-application",
         "mainframe-env-interpreter",

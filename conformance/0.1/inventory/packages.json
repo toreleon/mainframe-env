@@ -10,7 +10,6 @@
     {"name":"mainframe-env-execution-api","layer":"contracts","phase":"ME.V1","justification":"Invocation, limits, outcomes, events, and machine drive contract"},
     {"name":"mainframe-env-host-api","layer":"contracts","phase":"ME.V1","justification":"Dataset, terminal, program, spool, security, audit, clock, state, and CICS effects"},
     {"name":"mainframe-env-store-api","layer":"contracts","phase":"ME.V1","justification":"Execution, work, event, checkpoint, session, artifact, and idempotency stores"},
-    {"name":"mainframe-env-coverage","layer":"contracts","phase":"ME.V2","justification":"Shared Conformance IR compiler, typed registries, obligation runner, shard/cache identity, and derived ledger"},
     {"name":"mainframe-env-compiler","layer":"kernel","phase":"ME.V2","justification":"COBOL syntax, semantics, HIR/MIR lowering, legality, and compiler service"},
     {"name":"mainframe-env-application","layer":"kernel","phase":"ME.V2","justification":"Generic content-addressed application manifests and atomic installation readiness"},
     {"name":"mainframe-env-interpreter","layer":"kernel","phase":"ME.V2","justification":"Reference MIR machine and bounded execution coordinator"},
