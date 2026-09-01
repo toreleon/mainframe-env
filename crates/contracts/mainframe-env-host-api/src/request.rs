@@ -1,3 +1,7 @@
+use crate::dataset::{
+    DatasetDefinition, DatasetDescription, DatasetDiagnostic, DatasetLifecycleState,
+    DatasetProviderCapabilities,
+};
 use crate::{DatasetName, JobName, MemberName, ProgramName, ResourceName, SessionId};
 use mainframe_env_execution_api::{
     BoundedPayload, CapabilityId, IdempotencyKey, InvocationLimits, PrincipalId, RunUnitId,
@@ -31,16 +35,22 @@ impl Default for HostLimits {
 pub enum DatasetOrganization {
     Sequential,
     Partitioned,
+    PartitionedExtended,
     KeySequenced,
     EntrySequenced,
     Relative,
+    VariableRelative,
+    Linear,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RecordFormat {
     Fixed,
     FixedBlocked,
+    FixedBlockedStandard,
     Variable,
     VariableBlocked,
+    VariableSpanned,
+    VariableBlockedSpanned,
     Undefined,
     Line,
 }
@@ -131,12 +141,19 @@ impl Mutation {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DatasetRequest {
+    Capabilities,
     List {
         pattern: String,
         start: Option<DatasetName>,
         max_items: u32,
     },
     Attributes {
+        dataset: DatasetName,
+    },
+    Describe {
+        dataset: DatasetName,
+    },
+    Diagnose {
         dataset: DatasetName,
     },
     ListMembers {
@@ -162,6 +179,23 @@ pub enum DatasetRequest {
     Create {
         dataset: DatasetName,
         attributes: DatasetAttributes,
+        mutation: Mutation,
+    },
+    Define {
+        dataset: DatasetName,
+        definition: Box<DatasetDefinition>,
+        mutation: Mutation,
+    },
+    Alter {
+        dataset: DatasetName,
+        definition: Box<DatasetDefinition>,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
+    SetLifecycle {
+        dataset: DatasetName,
+        state: DatasetLifecycleState,
+        expected_version: Option<u64>,
         mutation: Mutation,
     },
     Write {
@@ -267,6 +301,9 @@ pub enum DatasetRequest {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DatasetResult {
+    Capabilities {
+        capabilities: DatasetProviderCapabilities,
+    },
     Listed {
         names: Vec<DatasetName>,
         more: bool,
@@ -278,6 +315,10 @@ pub enum DatasetResult {
     Attributes {
         attributes: DatasetAttributes,
         version: u64,
+    },
+    Description(Box<DatasetDescription>),
+    Diagnostics {
+        diagnostics: Vec<DatasetDiagnostic>,
     },
     Records {
         records: Vec<Vec<u8>>,
@@ -782,8 +823,11 @@ impl HostRequest {
     pub fn required_capability(&self, limits: InvocationLimits) -> CapabilityId {
         let name = match self {
             Self::Dataset(
-                DatasetRequest::List { .. }
+                DatasetRequest::Capabilities
+                | DatasetRequest::List { .. }
                 | DatasetRequest::Attributes { .. }
+                | DatasetRequest::Describe { .. }
+                | DatasetRequest::Diagnose { .. }
                 | DatasetRequest::ListMembers { .. }
                 | DatasetRequest::Read { .. }
                 | DatasetRequest::ReadConcatenation { .. }
@@ -819,6 +863,9 @@ impl HostRequest {
             self,
             Self::Dataset(
                 DatasetRequest::Create { .. }
+                    | DatasetRequest::Define { .. }
+                    | DatasetRequest::Alter { .. }
+                    | DatasetRequest::SetLifecycle { .. }
                     | DatasetRequest::Write { .. }
                     | DatasetRequest::Append { .. }
                     | DatasetRequest::Truncate { .. }
@@ -855,6 +902,9 @@ impl HostRequest {
         match self {
             Self::Dataset(
                 DatasetRequest::Create { mutation, .. }
+                | DatasetRequest::Define { mutation, .. }
+                | DatasetRequest::Alter { mutation, .. }
+                | DatasetRequest::SetLifecycle { mutation, .. }
                 | DatasetRequest::Write { mutation, .. }
                 | DatasetRequest::Append { mutation, .. }
                 | DatasetRequest::Truncate { mutation, .. }
@@ -1047,6 +1097,26 @@ pub enum HostResult {
 impl HostResult {
     pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
         match self {
+            Self::Dataset(DatasetResult::Description(description)) => {
+                description.definition.validate(
+                    limits,
+                    DatasetProviderCapabilities::all_contract_capabilities(),
+                )
+            }
+            Self::Dataset(DatasetResult::Diagnostics { diagnostics })
+                if diagnostics.len() > limits.max_records
+                    || diagnostics.iter().any(|diagnostic| {
+                        diagnostic.code.is_empty()
+                            || diagnostic.code.len() > limits.max_name_bytes
+                            || diagnostic
+                                .field
+                                .as_ref()
+                                .is_some_and(|field| field.len() > limits.max_name_bytes)
+                            || diagnostic.detail.len() > limits.max_state_bytes
+                    }) =>
+            {
+                Err(HostProblem::ResourceExhausted)
+            }
             Self::Dataset(DatasetResult::Listed { names, .. })
                 if names.len() > limits.max_records =>
             {
@@ -1232,8 +1302,9 @@ impl EffectResult {
         if self.sequence == 0 || self.sequence != expected_sequence {
             return Err(HostProblem::Malformed);
         }
-        if let Ok(result) = &self.outcome {
-            result.validate(limits)?;
+        match &self.outcome {
+            Ok(result) => result.validate(limits)?,
+            Err(problem) => problem.validate(limits)?,
         }
         Ok(())
     }
@@ -1241,6 +1312,9 @@ impl EffectResult {
 
 fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), HostProblem> {
     match request {
+        DatasetRequest::Capabilities
+        | DatasetRequest::Describe { .. }
+        | DatasetRequest::Diagnose { .. } => Ok(()),
         DatasetRequest::List {
             max_items, pattern, ..
         } if *max_items == 0
@@ -1286,6 +1360,23 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
             attributes.validate(limits)?;
             mutation.validate(limits)
         }
+        DatasetRequest::Define {
+            definition,
+            mutation,
+            ..
+        }
+        | DatasetRequest::Alter {
+            definition,
+            mutation,
+            ..
+        } => {
+            definition.validate(
+                limits,
+                DatasetProviderCapabilities::all_contract_capabilities(),
+            )?;
+            mutation.validate(limits)
+        }
+        DatasetRequest::SetLifecycle { mutation, .. } => mutation.validate(limits),
         DatasetRequest::Write {
             records, mutation, ..
         } => {
@@ -1424,6 +1515,10 @@ fn validate_fields(fields: &[TerminalField], limits: HostLimits) -> Result<(), H
 pub enum HostProblem {
     Malformed,
     Unsupported,
+    UnsupportedCapability {
+        capability: String,
+        detail: String,
+    },
     NotFound,
     Condition {
         name: String,
@@ -1446,6 +1541,27 @@ impl fmt::Display for HostProblem {
     }
 }
 impl std::error::Error for HostProblem {}
+
+impl HostProblem {
+    fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
+        match self {
+            Self::UnsupportedCapability { capability, detail }
+                if capability.is_empty()
+                    || capability.len() > limits.max_name_bytes
+                    || detail.is_empty()
+                    || detail.len() > limits.max_state_bytes =>
+            {
+                Err(HostProblem::Malformed)
+            }
+            Self::Condition { name, .. }
+                if name.is_empty() || name.len() > limits.max_name_bytes =>
+            {
+                Err(HostProblem::Malformed)
+            }
+            _ => Ok(()),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

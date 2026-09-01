@@ -120,6 +120,7 @@ enum XtaskCommand {
     #[command(name = "review-repair-round-5")]
     ReviewRepairRound5(CheckArgs),
     SemanticIdentities(CheckArgs),
+    DatasetContract(CheckArgs),
     Spec(CheckArgs),
     Conformance(ConformanceArgs),
     Certification(CheckArgs),
@@ -304,6 +305,15 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
                 check_semantic_identities(root)
             } else {
                 generate_semantic_identities(root)
+            }
+        ),
+        XtaskCommand::DatasetContract(args) => checked!(
+            "dataset-contract",
+            args,
+            if args.check {
+                check_dataset_contract(root)
+            } else {
+                generate_dataset_contract(root)
             }
         ),
         XtaskCommand::Spec(args) => checked!("spec", args, check_spec(root)),
@@ -505,6 +515,7 @@ fn check_spec(root: &Path) -> TaskResult {
             && !root.join("conformance/spec/ledgers").exists(),
         "committed per-run verdict or ledger directories are prohibited",
     )?;
+    check_dataset_contract(root)?;
     println!(
         "spec-version={} catalog-rows={} claimed-rows={} obligations={} bindings={} scenarios={} shards={}",
         spec.spec_version(),
@@ -2199,6 +2210,11 @@ fn check_schemas(root: &Path) -> TaskResult {
         OsStr::new("json"),
         &mut files,
     )?;
+    collect_extension(
+        &root.join("conformance/0.6/schemas"),
+        OsStr::new("json"),
+        &mut files,
+    )?;
     require(!files.is_empty(), "no evidence schemas found")?;
     files.sort();
     for file in &files {
@@ -2218,7 +2234,21 @@ fn check_schemas(root: &Path) -> TaskResult {
         )?;
         compile_draft_2020_12_schema(&value, file)?;
     }
-    validate_0_2_schema_artifacts(root)
+    validate_0_2_schema_artifacts(root)?;
+    let inventory_path = root.join("conformance/0.6/inventory/dataset-programming-surface.json");
+    let schema_path = root.join("conformance/0.6/schemas/dataset-programming-surface.schema.json");
+    validate_schema_instance(
+        &json(&schema_path)?,
+        &json(&inventory_path)?,
+        &inventory_path,
+    )?;
+    let migration_path = root.join("conformance/0.6/migrations/dataset-state-v2-to-v3.json");
+    let migration_schema = root.join("conformance/0.6/schemas/dataset-state-migration.schema.json");
+    validate_schema_instance(
+        &json(&migration_schema)?,
+        &json(&migration_path)?,
+        &migration_path,
+    )
 }
 
 fn compile_draft_2020_12_schema(schema: &Value, path: &Path) -> TaskResult<jsonschema::Validator> {
@@ -2445,6 +2475,203 @@ struct GeneratedSemanticRow {
     subsystem: String,
     unit: String,
     label: String,
+}
+
+fn generate_dataset_contract(root: &Path) -> TaskResult {
+    let path = root.join(
+        "crates/contracts/mainframe-env-host-api/src/generated/dataset_programming_surface.rs",
+    );
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
+    }
+    fs::write(&path, render_dataset_contract(root)?)
+        .map_err(|error| format!("{}: {error}", path.display()))
+}
+
+fn check_dataset_contract(root: &Path) -> TaskResult {
+    let path = root.join(
+        "crates/contracts/mainframe-env-host-api/src/generated/dataset_programming_surface.rs",
+    );
+    let expected = render_dataset_contract(root)?;
+    require(
+        fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))? == expected,
+        "generated dataset programming surface is stale; run cargo xtask dataset-contract",
+    )
+}
+
+fn render_dataset_contract(root: &Path) -> TaskResult<Vec<u8>> {
+    let inventory_path = root.join("conformance/0.6/inventory/dataset-programming-surface.json");
+    let schema_path = root.join("conformance/0.6/schemas/dataset-programming-surface.schema.json");
+    let inventory = json(&inventory_path)?;
+    validate_schema_instance(&json(&schema_path)?, &inventory, &inventory_path)?;
+    let expected_counts = BTreeMap::from([
+        ("access-modes", 5usize),
+        ("allocation", 12),
+        ("ams-commands", 31),
+        ("catalog", 12),
+        ("dcb", 12),
+        ("lifecycle", 10),
+        ("organizations", 12),
+        ("provider-capabilities", 19),
+        ("sms", 9),
+        ("volume", 8),
+    ]);
+    let families = array(&inventory, "families", &inventory_path)?;
+    let actual_counts = families
+        .iter()
+        .map(|family| {
+            Ok((
+                text(family, "id", &inventory_path)?,
+                array(family, "items", &inventory_path)?.len(),
+            ))
+        })
+        .collect::<TaskResult<BTreeMap<_, _>>>()?;
+    require(
+        actual_counts == expected_counts,
+        "dataset programming family inventory count drifted",
+    )?;
+
+    let official_path = root.join("conformance/0.2/catalogs/dataset-vsam-ams.json");
+    let official = json(&official_path)?;
+    let official_rows = array(&official, "units", &official_path)?
+        .iter()
+        .flat_map(|unit| array(unit, "rows", &official_path).into_iter().flatten())
+        .map(|row| text(row, "id", &official_path).map(str::to_string))
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        official_rows.len() == 36,
+        "dataset contract did not load the frozen 36-row official denominator",
+    )?;
+
+    let mut descriptors = Vec::new();
+    let mut identities = BTreeSet::new();
+    let mut ams_rows = Vec::new();
+    let mut organization_rows = BTreeSet::new();
+    for family in families {
+        let family_id = text(family, "id", &inventory_path)?;
+        for item in array(family, "items", &inventory_path)? {
+            let item_id = text(item, "id", &inventory_path)?;
+            require(
+                identities.insert(format!("{family_id}:{item_id}")),
+                &format!("duplicate dataset surface identity {family_id}:{item_id}"),
+            )?;
+            let rows = array(item, "official_rows", &inventory_path)?;
+            for row in rows {
+                let row_id = row.as_str().ok_or_else(|| {
+                    format!("{} official row is not text", inventory_path.display())
+                })?;
+                require(
+                    official_rows.contains(row_id),
+                    &format!("dataset surface references unknown official row {row_id}"),
+                )?;
+                if family_id == "ams-commands" {
+                    ams_rows.push(row_id.to_string());
+                } else if family_id == "organizations" {
+                    organization_rows.insert(row_id.to_string());
+                }
+            }
+            require(
+                text(item, "implementation", &inventory_path)? != "capability-gated"
+                    || text(item, "effect", &inventory_path)?
+                        .to_ascii_lowercase()
+                        .contains("capability"),
+                &format!("{family_id}:{item_id} does not state its capability behavior"),
+            )?;
+            descriptors.push((family_id, item));
+        }
+    }
+    require(
+        descriptors.len() == 130 && ams_rows.len() == 31 && organization_rows.len() == 5,
+        "dataset surface denominator or official mapping is incomplete",
+    )?;
+
+    let official_units = array(&official, "units", &official_path)?;
+    let command_rows = array(&official_units[0], "rows", &official_path)?;
+    let expected_ams_rows = command_rows
+        .iter()
+        .map(|row| text(row, "id", &official_path).map(str::to_string))
+        .collect::<TaskResult<Vec<_>>>()?;
+    require(
+        ams_rows == expected_ams_rows,
+        "31-command inventory differs from the frozen official command order",
+    )?;
+    let ams_items = families
+        .iter()
+        .find(|family| family["id"] == Value::String("ams-commands".into()))
+        .ok_or("AMS command family is missing")?;
+    for (item, official_row) in array(ams_items, "items", &inventory_path)?
+        .iter()
+        .zip(command_rows)
+    {
+        let official_label = text(official_row, "label", &official_path)?;
+        let command = official_label
+            .split_once(". ")
+            .map(|(_, command)| command)
+            .ok_or_else(|| format!("official AMS label has no chapter prefix: {official_label}"))?;
+        require(
+            text(item, "label", &inventory_path)? == command,
+            &format!("AMS command label differs from official row: {command}"),
+        )?;
+    }
+
+    descriptors.sort_by(|left, right| {
+        (
+            left.0,
+            text(left.1, "id", &inventory_path).unwrap_or_default(),
+        )
+            .cmp(&(
+                right.0,
+                text(right.1, "id", &inventory_path).unwrap_or_default(),
+            ))
+    });
+    let mut source =
+        String::from("// @generated by `cargo xtask dataset-contract`; do not edit.\n\n");
+    source.push_str(&format!(
+        "pub const DATASET_SURFACE_INVENTORY_SHA256: &str = \"sha256:{}\";\n\n",
+        file_digest(&inventory_path)?
+    ));
+    source.push_str("pub const DATASET_SURFACE_DESCRIPTORS: &[DatasetSurfaceDescriptor] = &[\n");
+    for (family, item) in descriptors {
+        source.push_str("    DatasetSurfaceDescriptor {\n");
+        for (field, value) in [
+            ("family", family),
+            ("id", text(item, "id", &inventory_path)?),
+            ("label", text(item, "label", &inventory_path)?),
+            ("authority", text(item, "authority", &inventory_path)?),
+            (
+                "implementation",
+                text(item, "implementation", &inventory_path)?,
+            ),
+            ("effect", text(item, "effect", &inventory_path)?),
+        ] {
+            source.push_str(&format!(
+                "        {field}: {},\n",
+                serde_json::to_string(value).map_err(|error| error.to_string())?
+            ));
+        }
+        for (field, values) in [
+            ("operands", array(item, "operands", &inventory_path)?),
+            (
+                "official_rows",
+                array(item, "official_rows", &inventory_path)?,
+            ),
+        ] {
+            source.push_str(&format!("        {field}: &["));
+            for value in values {
+                source.push_str(
+                    &serde_json::to_string(value.as_str().ok_or_else(|| {
+                        format!("{} {field} value is not text", inventory_path.display())
+                    })?)
+                    .map_err(|error| error.to_string())?,
+                );
+                source.push_str(", ");
+            }
+            source.push_str("],\n");
+        }
+        source.push_str("    },\n");
+    }
+    source.push_str("];\n");
+    Ok(source.into_bytes())
 }
 
 fn generate_semantic_identities(root: &Path) -> TaskResult {

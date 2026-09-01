@@ -1816,15 +1816,21 @@ impl ProductServer {
                         item["dsorg"] = json!(match attributes.organization {
                             DatasetOrganization::Sequential => "PS",
                             DatasetOrganization::Partitioned => "PO",
+                            DatasetOrganization::PartitionedExtended => "PO-E",
                             DatasetOrganization::KeySequenced
                             | DatasetOrganization::EntrySequenced
-                            | DatasetOrganization::Relative => "VS",
+                            | DatasetOrganization::Relative
+                            | DatasetOrganization::VariableRelative => "VS",
+                            DatasetOrganization::Linear => "LDS",
                         });
                         item["recfm"] = json!(match attributes.record_format {
                             RecordFormat::Fixed => "F",
                             RecordFormat::FixedBlocked => "FB",
+                            RecordFormat::FixedBlockedStandard => "FBS",
                             RecordFormat::Variable => "V",
                             RecordFormat::VariableBlocked => "VB",
+                            RecordFormat::VariableSpanned => "VS",
+                            RecordFormat::VariableBlockedSpanned => "VBS",
                             RecordFormat::Undefined => "U",
                             RecordFormat::Line => "LINE",
                         });
@@ -2490,14 +2496,20 @@ impl ProductServer {
             }
         }
         let dataset = match &request {
+            DatasetRequest::Capabilities => None,
             DatasetRequest::List { pattern, .. } => Some(pattern.as_str()),
             DatasetRequest::ReadConcatenation { .. } => None,
             DatasetRequest::Rename { from, .. } => Some(from.as_str()),
             DatasetRequest::Attributes { dataset }
+            | DatasetRequest::Describe { dataset }
+            | DatasetRequest::Diagnose { dataset }
             | DatasetRequest::ListMembers { dataset, .. }
             | DatasetRequest::Read { dataset, .. }
             | DatasetRequest::ReadRelative { dataset, .. }
             | DatasetRequest::Create { dataset, .. }
+            | DatasetRequest::Define { dataset, .. }
+            | DatasetRequest::Alter { dataset, .. }
+            | DatasetRequest::SetLifecycle { dataset, .. }
             | DatasetRequest::Write { dataset, .. }
             | DatasetRequest::Append { dataset, .. }
             | DatasetRequest::Truncate { dataset, .. }
@@ -2523,11 +2535,16 @@ impl ProductServer {
                 if matches!(
                     request,
                     DatasetRequest::Attributes { .. }
+                        | DatasetRequest::Describe { .. }
+                        | DatasetRequest::Diagnose { .. }
                         | DatasetRequest::ListMembers { .. }
                         | DatasetRequest::Read { .. }
                         | DatasetRequest::ReadRelative { .. }
                         | DatasetRequest::ResolveGeneration { .. }
                         | DatasetRequest::List { .. }
+                        | DatasetRequest::StartBrowse { .. }
+                        | DatasetRequest::ReadNext { .. }
+                        | DatasetRequest::EndBrowse { .. }
                 ) {
                     AccessIntent::Read
                 } else {
@@ -3566,7 +3583,20 @@ fn hex_digest(bytes: &[u8]) -> String {
 fn dataset_mutation(request: &DatasetRequest) -> Option<&Mutation> {
     match request {
         DatasetRequest::Create { mutation, .. }
+        | DatasetRequest::Define { mutation, .. }
+        | DatasetRequest::Alter { mutation, .. }
+        | DatasetRequest::SetLifecycle { mutation, .. }
         | DatasetRequest::Write { mutation, .. }
+        | DatasetRequest::Append { mutation, .. }
+        | DatasetRequest::Truncate { mutation, .. }
+        | DatasetRequest::RewriteRecord { mutation, .. }
+        | DatasetRequest::DeleteRecord { mutation, .. }
+        | DatasetRequest::WriteRelative { mutation, .. }
+        | DatasetRequest::DeleteRelative { mutation, .. }
+        | DatasetRequest::DefineAlternateIndex { mutation, .. }
+        | DatasetRequest::DefinePath { mutation, .. }
+        | DatasetRequest::DefineGenerationGroup { mutation, .. }
+        | DatasetRequest::CreateGeneration { mutation, .. }
         | DatasetRequest::Rename { mutation, .. }
         | DatasetRequest::Delete { mutation, .. } => Some(mutation),
         _ => None,
@@ -3591,8 +3621,13 @@ fn dataset_attributes(value: &Value) -> Result<DatasetAttributes, HostProblem> {
         .as_str()
     {
         "PS" => DatasetOrganization::Sequential,
-        "PO" | "PO-E" => DatasetOrganization::Partitioned,
+        "PO" => DatasetOrganization::Partitioned,
+        "PO-E" => DatasetOrganization::PartitionedExtended,
         "VS" | "KSDS" => DatasetOrganization::KeySequenced,
+        "ESDS" => DatasetOrganization::EntrySequenced,
+        "RRDS" => DatasetOrganization::Relative,
+        "VRRDS" => DatasetOrganization::VariableRelative,
+        "LDS" => DatasetOrganization::Linear,
         _ => return Err(HostProblem::Unsupported),
     };
     let record_format = match value
@@ -3604,8 +3639,11 @@ fn dataset_attributes(value: &Value) -> Result<DatasetAttributes, HostProblem> {
     {
         "F" => RecordFormat::Fixed,
         "FB" => RecordFormat::FixedBlocked,
+        "FBS" => RecordFormat::FixedBlockedStandard,
         "V" => RecordFormat::Variable,
         "VB" => RecordFormat::VariableBlocked,
+        "VS" => RecordFormat::VariableSpanned,
+        "VBS" => RecordFormat::VariableBlockedSpanned,
         "U" => RecordFormat::Undefined,
         "LINE" => RecordFormat::Line,
         _ => return Err(HostProblem::Unsupported),
@@ -3785,6 +3823,9 @@ fn gateway_problem(problem: HostProblem) -> GatewayProblem {
     let (status, code) = match problem {
         HostProblem::Malformed => (StatusCode::BAD_REQUEST, "malformed"),
         HostProblem::Unsupported => (StatusCode::NOT_FOUND, "unsupported"),
+        HostProblem::UnsupportedCapability { .. } => {
+            (StatusCode::NOT_IMPLEMENTED, "unsupported_capability")
+        }
         HostProblem::NotFound => (StatusCode::NOT_FOUND, "not_found"),
         HostProblem::Unauthorized => (StatusCode::FORBIDDEN, "not_authorized"),
         HostProblem::Cancelled => (StatusCode::CONFLICT, "cancelled"),

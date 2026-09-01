@@ -2,12 +2,22 @@
 
 #![forbid(unsafe_code)]
 
+mod dataset;
 mod names;
 mod registry;
 mod request;
 mod semantic;
 mod service;
+mod surface;
 
+pub use dataset::{
+    AllocationSpace, BufferingMode, CatalogEntryKind, CatalogMetadata, CompressionMode,
+    DATASET_DEFINITION_CONTRACT, DATASET_PROVIDER_CAPABILITY_CONTRACT, DATASET_REQUEST_CONTRACT,
+    DATASET_RESULT_CONTRACT, DATASET_STATE_SCHEMA_VERSION, DataSecurity, DatasetDefinition,
+    DatasetDescription, DatasetDiagnostic, DatasetLifecycleState, DatasetProviderCapabilities,
+    DatasetShareOptions, DcbOptions, LifecycleMetadata, SmsClasses, SpaceUnit, VolumeKind,
+    VolumeSelection, VsamAttributes,
+};
 pub use names::{
     DatasetName, HostNameProblem, JobName, MemberName, ProgramName, ResourceName, SessionId,
 };
@@ -35,3 +45,7 @@ pub use semantic::{
     official_semantic_identities, official_semantic_identity,
 };
 pub use service::{AuditedEffectResult, ScopedHostService};
+pub use surface::{
+    DATASET_SURFACE_INVENTORY_SHA256, DatasetSurfaceDescriptor, dataset_surface_descriptor,
+    dataset_surface_descriptors,
+};

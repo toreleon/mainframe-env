@@ -445,7 +445,7 @@ impl DatasetService {
             .state
             .lock()
             .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let digest = request_digest(&request);
+        let digest = request_digest(&request)?;
         if let Some(key) = mutation.map(|value| value.idempotency_key.as_str())
             && let Some(replay) = state.replay.get(key)
         {
@@ -537,6 +537,45 @@ impl DatasetService {
         request: &DatasetRequest,
     ) -> Result<DatasetResult, HostProblem> {
         match request {
+            DatasetRequest::Capabilities => Ok(DatasetResult::Capabilities {
+                capabilities:
+                    mainframe_env_host_api::DatasetProviderCapabilities::deterministic_abstract(),
+            }),
+            DatasetRequest::Describe { dataset } => {
+                let entry = entry(state, dataset)?;
+                Ok(DatasetResult::Description(Box::new(
+                    mainframe_env_host_api::DatasetDescription {
+                        definition: entry.definition(),
+                        version: entry.version,
+                        allocated_bytes: allocated_bytes(entry)?,
+                        used_bytes: u64::try_from(bytes(entry))
+                            .map_err(|_| HostProblem::ResourceExhausted)?,
+                    },
+                )))
+            }
+            DatasetRequest::Diagnose { dataset } => {
+                let entry = entry(state, dataset)?;
+                let mut diagnostics = Vec::new();
+                if entry.lifecycle.state
+                    == mainframe_env_host_api::DatasetLifecycleState::RecoveryRequired
+                {
+                    diagnostics.push(mainframe_env_host_api::DatasetDiagnostic {
+                        code: "RECOVERY_REQUIRED".into(),
+                        field: Some("lifecycle.state".into()),
+                        detail: "dataset requires VERIFY or RECOVER before update".into(),
+                    });
+                }
+                if u64::try_from(bytes(entry)).map_err(|_| HostProblem::ResourceExhausted)?
+                    > allocated_bytes(entry)?
+                {
+                    diagnostics.push(mainframe_env_host_api::DatasetDiagnostic {
+                        code: "ALLOCATION_EXCEEDED".into(),
+                        field: Some("allocation".into()),
+                        detail: "used bytes exceed the deterministic allocation".into(),
+                    });
+                }
+                Ok(DatasetResult::Diagnostics { diagnostics })
+            }
             DatasetRequest::List {
                 pattern,
                 start,
@@ -593,9 +632,7 @@ impl DatasetService {
                 max_items,
             } => {
                 let entry = entry(state, dataset)?;
-                if entry.attributes.organization
-                    != mainframe_env_host_api::DatasetOrganization::Partitioned
-                {
+                if !partitioned(entry.attributes.organization) {
                     return Err(HostProblem::Unsupported);
                 }
                 let mut names = Vec::new();
@@ -649,9 +686,7 @@ impl DatasetService {
                     (records, identities, index.version)
                 } else {
                     let entry = entry(state, dataset)?;
-                    if entry.attributes.organization
-                        == mainframe_env_host_api::DatasetOrganization::Relative
-                    {
+                    if relative(entry.attributes.organization) {
                         if member.is_some() || key.is_some() {
                             return Err(HostProblem::Unsupported);
                         }
@@ -714,9 +749,7 @@ impl DatasetService {
                 if let Some(member) = member {
                     for dataset in datasets {
                         let entry = entry(state, dataset)?;
-                        if entry.attributes.organization
-                            != mainframe_env_host_api::DatasetOrganization::Partitioned
-                        {
+                        if !partitioned(entry.attributes.organization) {
                             return Err(HostProblem::Unsupported);
                         }
                         version = version.max(entry.version);
@@ -737,9 +770,7 @@ impl DatasetService {
                 } else {
                     for dataset in datasets {
                         let entry = entry(state, dataset)?;
-                        if entry.attributes.organization
-                            == mainframe_env_host_api::DatasetOrganization::Partitioned
-                        {
+                        if partitioned(entry.attributes.organization) {
                             return Err(HostProblem::Unsupported);
                         }
                         version = version.max(entry.version);
@@ -768,9 +799,7 @@ impl DatasetService {
                 record_number,
             } => {
                 let entry = entry(state, dataset)?;
-                if entry.attributes.organization
-                    != mainframe_env_host_api::DatasetOrganization::Relative
-                {
+                if !relative(entry.attributes.organization) {
                     return Err(HostProblem::Unsupported);
                 }
                 let record = entry
@@ -807,16 +836,169 @@ impl DatasetService {
                 {
                     return Err(condition("DUPREC", 14));
                 }
-                let created = Entry {
-                    attributes: attributes.clone(),
-                    version: 1,
-                    records: Vec::new(),
-                    members: BTreeMap::new(),
-                    relative_records: BTreeMap::new(),
-                };
+                let created = Entry::from_definition(
+                    mainframe_env_host_api::DatasetDefinition::compatibility(attributes.clone()),
+                    1,
+                );
                 self.persist(dataset.as_str(), &created, None)?;
                 state.entries.insert(dataset.as_str().into(), created);
                 Ok(DatasetResult::Created { version: 1 })
+            }
+            DatasetRequest::Define {
+                dataset,
+                definition,
+                mutation,
+            } => {
+                let limits = mainframe_env_host_api::HostLimits {
+                    max_record_bytes: self.limits.max_record_bytes,
+                    max_records: self.limits.max_records,
+                    ..Default::default()
+                };
+                definition.validate(
+                    limits,
+                    mainframe_env_host_api::DatasetProviderCapabilities::deterministic_abstract(),
+                )?;
+                if definition.lifecycle != mainframe_env_host_api::LifecycleMetadata::default() {
+                    return Err(condition("INVREQ", 16));
+                }
+                if state
+                    .entries
+                    .len()
+                    .checked_add(state.alternate_indexes.len())
+                    .and_then(|total| total.checked_add(state.generation_groups.len()))
+                    .is_none_or(|total| total >= self.limits.max_datasets)
+                {
+                    return Err(HostProblem::ResourceExhausted);
+                }
+                if state.entries.contains_key(dataset.as_str())
+                    || state.alternate_indexes.contains_key(dataset.as_str())
+                    || state.generation_groups.contains_key(dataset.as_str())
+                {
+                    return Err(condition("DUPREC", 14));
+                }
+                let created = Entry::from_definition(definition.as_ref().clone(), 1);
+                validate_entry_shape(&created, self.limits)?;
+                let result = DatasetResult::Created { version: 1 };
+                let replay = Replay {
+                    request_digest: request_digest(request)?,
+                    result: Some(result.clone()),
+                };
+                self.commit_catalog_writes(
+                    vec![
+                        ProviderStateWrite {
+                            record: ProviderStateRecord {
+                                namespace: "dataset".into(),
+                                key: dataset.as_str().into(),
+                                version: 1,
+                                payload: encode(&created)
+                                    .map_err(|_| HostProblem::InfrastructureFailure)?,
+                            },
+                            expected_version: None,
+                        },
+                        ProviderStateWrite {
+                            record: ProviderStateRecord {
+                                namespace: "dataset-replay".into(),
+                                key: mutation.idempotency_key.as_str().into(),
+                                version: 2,
+                                payload: encode_replay(&replay)?,
+                            },
+                            expected_version: Some(1),
+                        },
+                    ],
+                    mutation,
+                    &replay,
+                )?;
+                state.entries.insert(dataset.as_str().into(), created);
+                state
+                    .replay
+                    .insert(mutation.idempotency_key.as_str().into(), replay);
+                Ok(result)
+            }
+            DatasetRequest::Alter {
+                dataset,
+                definition,
+                expected_version,
+                mutation,
+            } => {
+                definition.validate(
+                    mainframe_env_host_api::HostLimits {
+                        max_record_bytes: self.limits.max_record_bytes,
+                        max_records: self.limits.max_records,
+                        ..Default::default()
+                    },
+                    mainframe_env_host_api::DatasetProviderCapabilities::deterministic_abstract(),
+                )?;
+                let current = entry(state, dataset)?.clone();
+                if expected_version.is_some_and(|expected| expected != current.version) {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+                if definition.lifecycle != current.lifecycle {
+                    return Err(condition("INVREQ", 16));
+                }
+                let mut next = current.clone();
+                next.replace_definition(definition.as_ref().clone());
+                next.version = next
+                    .version
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?;
+                let result = DatasetResult::Mutated {
+                    version: next.version,
+                };
+                self.persist_with_indexes(
+                    state,
+                    dataset.as_str(),
+                    &current,
+                    &next,
+                    mutation,
+                    request_digest(request)?,
+                    &result,
+                )?;
+                Ok(result)
+            }
+            DatasetRequest::SetLifecycle {
+                dataset,
+                state: next_state,
+                expected_version,
+                mutation,
+            } => {
+                if matches!(
+                    next_state,
+                    mainframe_env_host_api::DatasetLifecycleState::Migrated
+                        | mainframe_env_host_api::DatasetLifecycleState::RecallPending
+                ) {
+                    return Err(HostProblem::UnsupportedCapability {
+                        capability: "migration-recall".into(),
+                        detail:
+                            "lifecycle transition requires provider capability migration-recall"
+                                .into(),
+                    });
+                }
+                let current = entry(state, dataset)?.clone();
+                if expected_version.is_some_and(|expected| expected != current.version) {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+                if !lifecycle_transition_allowed(current.lifecycle.state, *next_state) {
+                    return Err(condition("INVREQ", 16));
+                }
+                let mut next = current.clone();
+                next.lifecycle.state = *next_state;
+                next.version = next
+                    .version
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?;
+                let result = DatasetResult::Mutated {
+                    version: next.version,
+                };
+                self.persist_with_indexes(
+                    state,
+                    dataset.as_str(),
+                    &current,
+                    &next,
+                    mutation,
+                    request_digest(request)?,
+                    &result,
+                )?;
+                Ok(result)
             }
             DatasetRequest::Write {
                 dataset,
@@ -833,9 +1015,7 @@ impl DatasetService {
                 let mut next = current.clone();
                 next.version += 1;
                 if let Some(member) = member {
-                    if next.attributes.organization
-                        != mainframe_env_host_api::DatasetOrganization::Partitioned
-                    {
+                    if !partitioned(next.attributes.organization) {
                         return Err(HostProblem::Unsupported);
                     }
                     next.members.insert(member.as_str().into(), records.clone());
@@ -854,9 +1034,7 @@ impl DatasetService {
                     == mainframe_env_host_api::DatasetOrganization::EntrySequenced
                 {
                     next.records.extend(records.clone());
-                } else if next.attributes.organization
-                    == mainframe_env_host_api::DatasetOrganization::Relative
-                {
+                } else if relative(next.attributes.organization) {
                     return Err(HostProblem::Unsupported);
                 } else {
                     next.records = records.clone();
@@ -873,7 +1051,7 @@ impl DatasetService {
                     &current,
                     &next,
                     mutation,
-                    request_digest(request),
+                    request_digest(request)?,
                     &result,
                 )?;
                 Ok(result)
@@ -896,9 +1074,7 @@ impl DatasetService {
                     .checked_add(1)
                     .ok_or(HostProblem::ResourceExhausted)?;
                 if let Some(member) = member {
-                    if next.attributes.organization
-                        != mainframe_env_host_api::DatasetOrganization::Partitioned
-                    {
+                    if !partitioned(next.attributes.organization) {
                         return Err(HostProblem::Unsupported);
                     }
                     next.members
@@ -923,7 +1099,7 @@ impl DatasetService {
                     &current,
                     &next,
                     mutation,
-                    request_digest(request),
+                    request_digest(request)?,
                     &result,
                 )?;
                 Ok(result)
@@ -954,7 +1130,7 @@ impl DatasetService {
                     &current,
                     &next,
                     mutation,
-                    request_digest(request),
+                    request_digest(request)?,
                     &result,
                 )?;
                 Ok(result)
@@ -1002,7 +1178,7 @@ impl DatasetService {
                     &current,
                     &next,
                     mutation,
-                    request_digest(request),
+                    request_digest(request)?,
                     &result,
                 )?;
                 Ok(result)
@@ -1040,7 +1216,7 @@ impl DatasetService {
                     &current,
                     &next,
                     mutation,
-                    request_digest(request),
+                    request_digest(request)?,
                     &result,
                 )?;
                 Ok(result)
@@ -1053,9 +1229,7 @@ impl DatasetService {
                 mutation,
             } => {
                 let current = entry(state, dataset)?.clone();
-                if current.attributes.organization
-                    != mainframe_env_host_api::DatasetOrganization::Relative
-                {
+                if !relative(current.attributes.organization) {
                     return Err(HostProblem::Unsupported);
                 }
                 validate_records(
@@ -1081,7 +1255,7 @@ impl DatasetService {
                     &current,
                     &next,
                     mutation,
-                    request_digest(request),
+                    request_digest(request)?,
                     &result,
                 )?;
                 Ok(result)
@@ -1093,9 +1267,7 @@ impl DatasetService {
                 mutation,
             } => {
                 let current = entry(state, dataset)?.clone();
-                if current.attributes.organization
-                    != mainframe_env_host_api::DatasetOrganization::Relative
-                {
+                if !relative(current.attributes.organization) {
                     return Err(HostProblem::Unsupported);
                 }
                 if expected_version.is_some_and(|expected| expected != current.version) {
@@ -1118,7 +1290,7 @@ impl DatasetService {
                     &current,
                     &next,
                     mutation,
-                    request_digest(request),
+                    request_digest(request)?,
                     &result,
                 )?;
                 Ok(result)
@@ -1158,7 +1330,7 @@ impl DatasetService {
                 validate_alternate_index(base_entry, &definition)?;
                 let result = DatasetResult::Created { version: 1 };
                 let replay = Replay {
-                    request_digest: request_digest(request),
+                    request_digest: request_digest(request)?,
                     result: Some(result.clone()),
                 };
                 let writes = vec![
@@ -1220,7 +1392,7 @@ impl DatasetService {
                 definition.version = 1;
                 let result = DatasetResult::Created { version: 1 };
                 let replay = Replay {
-                    request_digest: request_digest(request),
+                    request_digest: request_digest(request)?,
                     result: Some(result.clone()),
                 };
                 self.commit_catalog_writes(
@@ -1288,7 +1460,7 @@ impl DatasetService {
                 };
                 let result = DatasetResult::Created { version: 1 };
                 let replay = Replay {
-                    request_digest: request_digest(request),
+                    request_digest: request_digest(request)?,
                     result: Some(result.clone()),
                 };
                 let writes = vec![
@@ -1343,13 +1515,11 @@ impl DatasetService {
                 if state.entries.contains_key(name.as_str()) {
                     return Err(condition("DUPREC", 14));
                 }
-                let entry = Entry {
-                    attributes: attributes.clone(),
-                    version: 1,
-                    records: records.clone(),
-                    members: BTreeMap::new(),
-                    relative_records: BTreeMap::new(),
-                };
+                let mut entry = Entry::from_definition(
+                    mainframe_env_host_api::DatasetDefinition::compatibility(attributes.clone()),
+                    1,
+                );
+                entry.records = records.clone();
                 validate_entry_shape(&entry, self.limits)?;
                 let mut next = current.clone();
                 next.version = next
@@ -1388,7 +1558,7 @@ impl DatasetService {
                     version: next.version,
                 };
                 let replay = Replay {
-                    request_digest: request_digest(request),
+                    request_digest: request_digest(request)?,
                     result: Some(result.clone()),
                 };
                 let writes = vec![
@@ -1777,8 +1947,7 @@ impl DatasetService {
             .lock()
             .map_err(|_| HostProblem::InfrastructureFailure)?;
         let entry = entry(&state, dataset)?;
-        if entry.attributes.organization != mainframe_env_host_api::DatasetOrganization::Partitioned
-        {
+        if !partitioned(entry.attributes.organization) {
             return Err(HostProblem::Unsupported);
         }
         let mut members = Vec::new();
@@ -2233,6 +2402,7 @@ fn build_seed_generation(
                 object.attributes.record_format,
                 mainframe_env_host_api::RecordFormat::Fixed
                     | mainframe_env_host_api::RecordFormat::FixedBlocked
+                    | mainframe_env_host_api::RecordFormat::FixedBlockedStandard
             )
             || object.bytes.is_empty()
             || object.bytes.len() % object.record_length as usize != 0
@@ -2260,13 +2430,11 @@ fn build_seed_generation(
             .chunks_exact(object.record_length as usize)
             .map(<[u8]>::to_vec)
             .collect::<Vec<_>>();
-        let mut entry = Entry {
-            attributes: object.attributes.clone(),
-            version: 1,
-            records,
-            members: BTreeMap::new(),
-            relative_records: BTreeMap::new(),
-        };
+        let mut entry = Entry::from_definition(
+            mainframe_env_host_api::DatasetDefinition::compatibility(object.attributes.clone()),
+            1,
+        );
+        entry.records = records;
         validate_entry_shape(&entry, limits)?;
         if entry.attributes.organization
             == mainframe_env_host_api::DatasetOrganization::KeySequenced
@@ -2337,17 +2505,15 @@ fn encode_seed_generation(generation: &SeedGeneration) -> Result<Vec<u8>, HostPr
         dataset_field(&mut payload, object.source_id.as_bytes())?;
         dataset_field(&mut payload, object.dataset.as_str().as_bytes())?;
         dataset_field(&mut payload, object.sha256.as_bytes())?;
-        let entry = Entry {
-            attributes: object.attributes.clone(),
-            version: 1,
-            records: object
-                .bytes
-                .chunks_exact(object.record_length as usize)
-                .map(<[u8]>::to_vec)
-                .collect(),
-            members: BTreeMap::new(),
-            relative_records: BTreeMap::new(),
-        };
+        let mut entry = Entry::from_definition(
+            mainframe_env_host_api::DatasetDefinition::compatibility(object.attributes.clone()),
+            1,
+        );
+        entry.records = object
+            .bytes
+            .chunks_exact(object.record_length as usize)
+            .map(<[u8]>::to_vec)
+            .collect();
         dataset_field(
             &mut payload,
             &encode(&entry).map_err(|_| HostProblem::InfrastructureFailure)?,
@@ -2486,6 +2652,9 @@ fn dataset_take_field(payload: &[u8], at: &mut usize, max: usize) -> Result<Vec<
 fn mutation(request: &DatasetRequest) -> Option<&mainframe_env_host_api::Mutation> {
     match request {
         DatasetRequest::Create { mutation, .. }
+        | DatasetRequest::Define { mutation, .. }
+        | DatasetRequest::Alter { mutation, .. }
+        | DatasetRequest::SetLifecycle { mutation, .. }
         | DatasetRequest::Write { mutation, .. }
         | DatasetRequest::Append { mutation, .. }
         | DatasetRequest::Truncate { mutation, .. }
@@ -2507,6 +2676,9 @@ fn atomic_dataset_request(request: &DatasetRequest) -> bool {
     matches!(
         request,
         DatasetRequest::Write { .. }
+            | DatasetRequest::Define { .. }
+            | DatasetRequest::Alter { .. }
+            | DatasetRequest::SetLifecycle { .. }
             | DatasetRequest::Append { .. }
             | DatasetRequest::Truncate { .. }
             | DatasetRequest::RewriteRecord { .. }
@@ -2539,11 +2711,13 @@ fn validate_entry_shape(entry: &Entry, limits: DatasetLimits) -> Result<(), Host
     }
     match entry.attributes.organization {
         mainframe_env_host_api::DatasetOrganization::Partitioned
+        | mainframe_env_host_api::DatasetOrganization::PartitionedExtended
             if !entry.records.is_empty() || !entry.relative_records.is_empty() =>
         {
             Err(HostProblem::Malformed)
         }
         mainframe_env_host_api::DatasetOrganization::Relative
+        | mainframe_env_host_api::DatasetOrganization::VariableRelative
             if !entry.records.is_empty() || !entry.members.is_empty() =>
         {
             Err(HostProblem::Malformed)
@@ -2551,12 +2725,27 @@ fn validate_entry_shape(entry: &Entry, limits: DatasetLimits) -> Result<(), Host
         mainframe_env_host_api::DatasetOrganization::Sequential
         | mainframe_env_host_api::DatasetOrganization::KeySequenced
         | mainframe_env_host_api::DatasetOrganization::EntrySequenced
+        | mainframe_env_host_api::DatasetOrganization::Linear
             if !entry.members.is_empty() || !entry.relative_records.is_empty() =>
         {
             Err(HostProblem::Malformed)
         }
         _ => Ok(()),
     }
+}
+fn partitioned(organization: mainframe_env_host_api::DatasetOrganization) -> bool {
+    matches!(
+        organization,
+        mainframe_env_host_api::DatasetOrganization::Partitioned
+            | mainframe_env_host_api::DatasetOrganization::PartitionedExtended
+    )
+}
+fn relative(organization: mainframe_env_host_api::DatasetOrganization) -> bool {
+    matches!(
+        organization,
+        mainframe_env_host_api::DatasetOrganization::Relative
+            | mainframe_env_host_api::DatasetOrganization::VariableRelative
+    )
 }
 fn validate_records(
     records: &[Vec<u8>],
@@ -2574,6 +2763,7 @@ fn validate_records(
         attributes.record_format,
         mainframe_env_host_api::RecordFormat::Fixed
             | mainframe_env_host_api::RecordFormat::FixedBlocked
+            | mainframe_env_host_api::RecordFormat::FixedBlockedStandard
     ) && records
         .iter()
         .any(|record| record.len() != attributes.logical_record_length as usize)
@@ -2584,6 +2774,8 @@ fn validate_records(
         attributes.record_format,
         mainframe_env_host_api::RecordFormat::Variable
             | mainframe_env_host_api::RecordFormat::VariableBlocked
+            | mainframe_env_host_api::RecordFormat::VariableSpanned
+            | mainframe_env_host_api::RecordFormat::VariableBlockedSpanned
             | mainframe_env_host_api::RecordFormat::Line
     ) && records
         .iter()
@@ -2623,6 +2815,47 @@ fn bytes(entry: &Entry) -> usize {
             .sum::<usize>()
         + entry.relative_records.values().map(Vec::len).sum::<usize>()
 }
+fn allocated_bytes(entry: &Entry) -> Result<u64, HostProblem> {
+    let unit = match entry.allocation.unit {
+        mainframe_env_host_api::SpaceUnit::Tracks => 56_664,
+        mainframe_env_host_api::SpaceUnit::Cylinders => 849_960,
+        mainframe_env_host_api::SpaceUnit::Blocks => u64::from(if entry.dcb.block_size == 0 {
+            entry.attributes.logical_record_length
+        } else {
+            entry.dcb.block_size
+        }),
+        mainframe_env_host_api::SpaceUnit::Kilobytes => 1024,
+        mainframe_env_host_api::SpaceUnit::Megabytes => 1024 * 1024,
+        mainframe_env_host_api::SpaceUnit::Records => {
+            u64::from(entry.attributes.logical_record_length)
+        }
+    };
+    entry
+        .allocation
+        .primary
+        .checked_mul(unit)
+        .ok_or(HostProblem::ResourceExhausted)
+}
+
+fn lifecycle_transition_allowed(
+    current: mainframe_env_host_api::DatasetLifecycleState,
+    next: mainframe_env_host_api::DatasetLifecycleState,
+) -> bool {
+    use mainframe_env_host_api::DatasetLifecycleState as State;
+    current == next
+        || matches!(
+            (current, next),
+            (State::Allocated, State::Cataloged)
+                | (State::Cataloged | State::Closed, State::Open)
+                | (State::Open, State::Closed | State::RecoveryRequired)
+                | (State::Cataloged | State::Closed, State::Migrated)
+                | (State::Migrated, State::RecallPending)
+                | (
+                    State::RecallPending | State::RecoveryRequired,
+                    State::Closed
+                )
+        )
+}
 fn condition(name: &str, response: i32) -> HostProblem {
     HostProblem::Condition {
         name: name.into(),
@@ -2640,8 +2873,373 @@ fn store_error(error: StoreError) -> HostProblem {
     }
 }
 
-fn request_digest(request: &DatasetRequest) -> [u8; 32] {
-    Sha256::digest(format!("{request:?}").as_bytes()).into()
+fn request_digest(request: &DatasetRequest) -> Result<[u8; 32], HostProblem> {
+    let mut digest = Sha256::new();
+    digest_field(&mut digest, b"mainframe-env.dataset-request-digest@2");
+    match request {
+        DatasetRequest::Capabilities => digest_field(&mut digest, b"capabilities"),
+        DatasetRequest::List {
+            pattern,
+            start,
+            max_items,
+        } => {
+            digest_field(&mut digest, b"list");
+            digest_field(&mut digest, pattern.as_bytes());
+            digest_optional_name(&mut digest, start.as_ref());
+            digest_field(&mut digest, &max_items.to_be_bytes());
+        }
+        DatasetRequest::Attributes { dataset }
+        | DatasetRequest::Describe { dataset }
+        | DatasetRequest::Diagnose { dataset } => {
+            let tag = match request {
+                DatasetRequest::Attributes { .. } => b"attributes".as_slice(),
+                DatasetRequest::Describe { .. } => b"describe".as_slice(),
+                _ => b"diagnose".as_slice(),
+            };
+            digest_field(&mut digest, tag);
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+        }
+        DatasetRequest::ListMembers {
+            dataset,
+            start,
+            max_items,
+        } => {
+            digest_field(&mut digest, b"list-members");
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_optional_member(&mut digest, start.as_ref());
+            digest_field(&mut digest, &max_items.to_be_bytes());
+        }
+        DatasetRequest::Read {
+            dataset,
+            member,
+            key,
+            max_records,
+        } => {
+            digest_field(&mut digest, b"read");
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_optional_member(&mut digest, member.as_ref());
+            digest_optional_bytes(&mut digest, key.as_deref());
+            digest_field(&mut digest, &max_records.to_be_bytes());
+        }
+        DatasetRequest::ReadConcatenation {
+            datasets,
+            member,
+            max_records,
+        } => {
+            digest_field(&mut digest, b"read-concatenation");
+            digest_field(&mut digest, &(datasets.len() as u64).to_be_bytes());
+            for dataset in datasets {
+                digest_field(&mut digest, dataset.as_str().as_bytes());
+            }
+            digest_optional_member(&mut digest, member.as_ref());
+            digest_field(&mut digest, &max_records.to_be_bytes());
+        }
+        DatasetRequest::ReadRelative {
+            dataset,
+            record_number,
+        } => {
+            digest_field(&mut digest, b"read-relative");
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_field(&mut digest, &record_number.to_be_bytes());
+        }
+        DatasetRequest::Create {
+            dataset,
+            attributes,
+            mutation,
+        } => {
+            digest_field(&mut digest, b"create");
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_definition(
+                &mut digest,
+                &mainframe_env_host_api::DatasetDefinition::compatibility(attributes.clone()),
+            )?;
+            digest_mutation(&mut digest, mutation);
+        }
+        DatasetRequest::Define {
+            dataset,
+            definition,
+            mutation,
+        } => {
+            digest_field(&mut digest, b"define");
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_definition(&mut digest, definition)?;
+            digest_mutation(&mut digest, mutation);
+        }
+        DatasetRequest::Alter {
+            dataset,
+            definition,
+            expected_version,
+            mutation,
+        } => {
+            digest_field(&mut digest, b"alter");
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_definition(&mut digest, definition)?;
+            digest_optional_u64(&mut digest, *expected_version);
+            digest_mutation(&mut digest, mutation);
+        }
+        DatasetRequest::SetLifecycle {
+            dataset,
+            state,
+            expected_version,
+            mutation,
+        } => {
+            digest_field(&mut digest, b"set-lifecycle");
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_field(&mut digest, &[lifecycle_digest_tag(*state)]);
+            digest_optional_u64(&mut digest, *expected_version);
+            digest_mutation(&mut digest, mutation);
+        }
+        DatasetRequest::Write {
+            dataset,
+            member,
+            records,
+            expected_version,
+            mutation,
+        }
+        | DatasetRequest::Append {
+            dataset,
+            member,
+            records,
+            expected_version,
+            mutation,
+        } => {
+            digest_field(
+                &mut digest,
+                if matches!(request, DatasetRequest::Write { .. }) {
+                    b"write"
+                } else {
+                    b"append"
+                },
+            );
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_optional_member(&mut digest, member.as_ref());
+            digest_records(&mut digest, records);
+            digest_optional_u64(&mut digest, *expected_version);
+            digest_mutation(&mut digest, mutation);
+        }
+        DatasetRequest::Truncate {
+            dataset,
+            expected_version,
+            mutation,
+        } => {
+            digest_field(&mut digest, b"truncate");
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_optional_u64(&mut digest, *expected_version);
+            digest_mutation(&mut digest, mutation);
+        }
+        DatasetRequest::RewriteRecord {
+            dataset,
+            key,
+            record,
+            expected_version,
+            mutation,
+        } => {
+            digest_field(&mut digest, b"rewrite-record");
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_field(&mut digest, key);
+            digest_field(&mut digest, record);
+            digest_optional_u64(&mut digest, *expected_version);
+            digest_mutation(&mut digest, mutation);
+        }
+        DatasetRequest::DeleteRecord {
+            dataset,
+            key,
+            expected_version,
+            mutation,
+        } => {
+            digest_field(&mut digest, b"delete-record");
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_field(&mut digest, key);
+            digest_optional_u64(&mut digest, *expected_version);
+            digest_mutation(&mut digest, mutation);
+        }
+        DatasetRequest::WriteRelative {
+            dataset,
+            record_number,
+            record,
+            expected_version,
+            mutation,
+        } => {
+            digest_field(&mut digest, b"write-relative");
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_field(&mut digest, &record_number.to_be_bytes());
+            digest_field(&mut digest, record);
+            digest_optional_u64(&mut digest, *expected_version);
+            digest_mutation(&mut digest, mutation);
+        }
+        DatasetRequest::DeleteRelative {
+            dataset,
+            record_number,
+            expected_version,
+            mutation,
+        } => {
+            digest_field(&mut digest, b"delete-relative");
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_field(&mut digest, &record_number.to_be_bytes());
+            digest_optional_u64(&mut digest, *expected_version);
+            digest_mutation(&mut digest, mutation);
+        }
+        DatasetRequest::DefineAlternateIndex {
+            base,
+            index,
+            key_offset,
+            key_length,
+            allow_duplicates,
+            mutation,
+        } => {
+            digest_field(&mut digest, b"define-alternate-index");
+            digest_field(&mut digest, base.as_str().as_bytes());
+            digest_field(&mut digest, index.as_str().as_bytes());
+            digest_field(&mut digest, &key_offset.to_be_bytes());
+            digest_field(&mut digest, &key_length.to_be_bytes());
+            digest_field(&mut digest, &[u8::from(*allow_duplicates)]);
+            digest_mutation(&mut digest, mutation);
+        }
+        DatasetRequest::DefinePath {
+            path,
+            index,
+            mutation,
+        } => {
+            digest_field(&mut digest, b"define-path");
+            digest_field(&mut digest, path.as_str().as_bytes());
+            digest_field(&mut digest, index.as_str().as_bytes());
+            digest_mutation(&mut digest, mutation);
+        }
+        DatasetRequest::DefineGenerationGroup {
+            base,
+            limit,
+            scratch,
+            empty,
+            mutation,
+        } => {
+            digest_field(&mut digest, b"define-generation-group");
+            digest_field(&mut digest, base.as_str().as_bytes());
+            digest_field(&mut digest, &limit.to_be_bytes());
+            digest_field(&mut digest, &[u8::from(*scratch), u8::from(*empty)]);
+            digest_mutation(&mut digest, mutation);
+        }
+        DatasetRequest::CreateGeneration {
+            base,
+            attributes,
+            records,
+            mutation,
+        } => {
+            digest_field(&mut digest, b"create-generation");
+            digest_field(&mut digest, base.as_str().as_bytes());
+            digest_definition(
+                &mut digest,
+                &mainframe_env_host_api::DatasetDefinition::compatibility(attributes.clone()),
+            )?;
+            digest_records(&mut digest, records);
+            digest_mutation(&mut digest, mutation);
+        }
+        DatasetRequest::ResolveGeneration { base, relative } => {
+            digest_field(&mut digest, b"resolve-generation");
+            digest_field(&mut digest, base.as_str().as_bytes());
+            digest_field(&mut digest, &relative.to_be_bytes());
+        }
+        DatasetRequest::Rename { from, to, mutation } => {
+            digest_field(&mut digest, b"rename");
+            digest_field(&mut digest, from.as_str().as_bytes());
+            digest_field(&mut digest, to.as_str().as_bytes());
+            digest_mutation(&mut digest, mutation);
+        }
+        DatasetRequest::Delete {
+            dataset,
+            member,
+            expected_version,
+            mutation,
+        } => {
+            digest_field(&mut digest, b"delete");
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_optional_member(&mut digest, member.as_ref());
+            digest_optional_u64(&mut digest, *expected_version);
+            digest_mutation(&mut digest, mutation);
+        }
+        DatasetRequest::StartBrowse { dataset, key } => {
+            digest_field(&mut digest, b"start-browse");
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_field(&mut digest, key);
+        }
+        DatasetRequest::ReadNext {
+            dataset,
+            cursor,
+            reverse,
+        } => {
+            digest_field(&mut digest, b"read-next");
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_field(&mut digest, cursor.as_bytes());
+            digest_field(&mut digest, &[u8::from(*reverse)]);
+        }
+        DatasetRequest::EndBrowse { dataset, cursor } => {
+            digest_field(&mut digest, b"end-browse");
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_field(&mut digest, cursor.as_bytes());
+        }
+    }
+    Ok(digest.finalize().into())
+}
+
+fn digest_field(digest: &mut Sha256, value: &[u8]) {
+    digest.update((value.len() as u64).to_be_bytes());
+    digest.update(value);
+}
+
+fn digest_optional_bytes(digest: &mut Sha256, value: Option<&[u8]>) {
+    digest_field(digest, &[u8::from(value.is_some())]);
+    if let Some(value) = value {
+        digest_field(digest, value);
+    }
+}
+
+fn digest_optional_name(digest: &mut Sha256, value: Option<&DatasetName>) {
+    digest_optional_bytes(digest, value.map(|name| name.as_str().as_bytes()));
+}
+
+fn digest_optional_member(digest: &mut Sha256, value: Option<&MemberName>) {
+    digest_optional_bytes(digest, value.map(|name| name.as_str().as_bytes()));
+}
+
+fn digest_optional_u64(digest: &mut Sha256, value: Option<u64>) {
+    digest_field(digest, &[u8::from(value.is_some())]);
+    if let Some(value) = value {
+        digest_field(digest, &value.to_be_bytes());
+    }
+}
+
+fn digest_records(digest: &mut Sha256, records: &[Vec<u8>]) {
+    digest_field(digest, &(records.len() as u64).to_be_bytes());
+    for record in records {
+        digest_field(digest, record);
+    }
+}
+
+fn digest_definition(
+    digest: &mut Sha256,
+    definition: &mainframe_env_host_api::DatasetDefinition,
+) -> Result<(), HostProblem> {
+    let entry = Entry::from_definition(definition.clone(), 0);
+    let bytes = encode(&entry).map_err(|_| HostProblem::ResourceExhausted)?;
+    digest_field(digest, &bytes);
+    Ok(())
+}
+
+fn digest_mutation(digest: &mut Sha256, mutation: &mainframe_env_host_api::Mutation) {
+    digest_field(digest, &mutation.sequence.to_be_bytes());
+    digest_field(digest, mutation.idempotency_key.as_str().as_bytes());
+    digest_optional_bytes(digest, mutation.transaction.as_deref().map(str::as_bytes));
+}
+
+fn lifecycle_digest_tag(state: mainframe_env_host_api::DatasetLifecycleState) -> u8 {
+    match state {
+        mainframe_env_host_api::DatasetLifecycleState::Allocated => 0,
+        mainframe_env_host_api::DatasetLifecycleState::Cataloged => 1,
+        mainframe_env_host_api::DatasetLifecycleState::Open => 2,
+        mainframe_env_host_api::DatasetLifecycleState::Closed => 3,
+        mainframe_env_host_api::DatasetLifecycleState::Migrated => 4,
+        mainframe_env_host_api::DatasetLifecycleState::RecallPending => 5,
+        mainframe_env_host_api::DatasetLifecycleState::RecoveryRequired => 6,
+    }
 }
 
 fn encode_replay(replay: &Replay) -> Result<Vec<u8>, HostProblem> {
@@ -2767,8 +3365,8 @@ pub fn dataset_providers(
                     capability: CapabilityId::new(capability, limits).expect("static capability"),
                     provider_id: "mainframe-env-dataset".into(),
                     generation: "1".into(),
-                    request_schema: "mainframe-env.host.dataset-request@1".into(),
-                    result_schema: "mainframe-env.host.dataset-result@1".into(),
+                    request_schema: mainframe_env_host_api::DATASET_REQUEST_CONTRACT.into(),
+                    result_schema: mainframe_env_host_api::DATASET_RESULT_CONTRACT.into(),
                     max_request_bytes: 1024 * 1024,
                     max_result_bytes: 1024 * 1024,
                     ready: true,
@@ -2843,6 +3441,116 @@ mod tests {
         assert!(
             matches!(service.invoke(DatasetRequest::Read{dataset:name,member:None,key:None,max_records:1}).unwrap(),DatasetResult::Records{records,..}if records==vec![b"ABCD".to_vec()])
         );
+    }
+
+    #[test]
+    fn typed_definition_capabilities_lifecycle_and_restart_are_exact() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let dataset = service(store.clone());
+        assert_eq!(
+            dataset.invoke(DatasetRequest::Capabilities),
+            Ok(DatasetResult::Capabilities {
+                capabilities:
+                    mainframe_env_host_api::DatasetProviderCapabilities::deterministic_abstract(),
+            })
+        );
+
+        let name = DatasetName::new("USER.DEFINED", 44).unwrap();
+        let mut definition = mainframe_env_host_api::DatasetDefinition::compatibility(attrs(
+            DatasetOrganization::Sequential,
+        ));
+        definition.dcb.block_size = 8;
+        definition.allocation.primary = 2;
+        assert_eq!(
+            dataset.invoke(DatasetRequest::Define {
+                dataset: name.clone(),
+                definition: Box::new(definition.clone()),
+                mutation: mutation(70),
+            }),
+            Ok(DatasetResult::Created { version: 1 })
+        );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Describe {
+                dataset: name.clone()
+            }),
+            Ok(DatasetResult::Description(ref description))
+                if description.definition == definition
+                    && description.version == 1
+                    && description.allocated_bytes == 8
+                    && description.used_bytes == 0
+        ));
+        assert_eq!(
+            dataset.invoke(DatasetRequest::SetLifecycle {
+                dataset: name.clone(),
+                state: mainframe_env_host_api::DatasetLifecycleState::Open,
+                expected_version: Some(1),
+                mutation: mutation(71),
+            }),
+            Ok(DatasetResult::Mutated { version: 2 })
+        );
+        let restarted = service(store);
+        assert!(matches!(
+            restarted.invoke(DatasetRequest::Describe {
+                dataset: name.clone()
+            }),
+            Ok(DatasetResult::Description(ref description))
+                if description.definition.lifecycle.state
+                    == mainframe_env_host_api::DatasetLifecycleState::Open
+                    && description.version == 2
+        ));
+
+        let unsupported = DatasetName::new("USER.TAPE", 44).unwrap();
+        let mut tape = definition;
+        tape.volumes.kind = mainframe_env_host_api::VolumeKind::Tape;
+        assert!(matches!(
+            restarted.invoke(DatasetRequest::Define {
+                dataset: unsupported.clone(),
+                definition: Box::new(tape.clone()),
+                mutation: mutation(72),
+            }),
+            Err(HostProblem::UnsupportedCapability { ref capability, .. })
+                if capability == "tape"
+        ));
+        assert_eq!(
+            restarted.invoke(DatasetRequest::Describe {
+                dataset: unsupported.clone()
+            }),
+            Err(HostProblem::NotFound)
+        );
+        tape.volumes.kind = mainframe_env_host_api::VolumeKind::Abstract;
+        assert_eq!(
+            restarted.invoke(DatasetRequest::Define {
+                dataset: unsupported,
+                definition: Box::new(tape),
+                mutation: mutation(72),
+            }),
+            Ok(DatasetResult::Created { version: 1 })
+        );
+    }
+
+    #[test]
+    fn request_digest_is_a_frozen_owned_codec() {
+        let name = DatasetName::new("USER.DIGEST", 44).unwrap();
+        let mut definition = mainframe_env_host_api::DatasetDefinition::compatibility(attrs(
+            DatasetOrganization::KeySequenced,
+        ));
+        definition.dcb.block_size = 8;
+        definition.allocation.primary = 3;
+        let request = DatasetRequest::Define {
+            dataset: name,
+            definition: Box::new(definition),
+            mutation: mutation(90),
+        };
+        let digest = request_digest(&request).unwrap();
+        let actual = digest
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        assert_eq!(
+            actual,
+            "1073af8abde37f8c6c11b5aa253c9d8fe8cda29c21565f9db47f4762d96adb29"
+        );
+        assert_eq!(request_digest(&request).unwrap(), digest);
     }
 
     #[test]
@@ -3467,7 +4175,7 @@ mod tests {
                     key: "id-9".into(),
                     version: 1,
                     payload: encode_replay(&Replay {
-                        request_digest: request_digest(&retry_request),
+                        request_digest: request_digest(&retry_request).unwrap(),
                         result: None,
                     })
                     .unwrap(),
