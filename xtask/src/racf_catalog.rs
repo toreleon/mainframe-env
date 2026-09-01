@@ -6,11 +6,13 @@ const CLASS_CATALOG_PATH: &str = "conformance/0.5/racf/supplied-classes.json";
 const CLASS_SCHEMA_PATH: &str = "conformance/0.5/schemas/racf-class-catalog.schema.json";
 const RACROUTE_PATH: &str = "conformance/0.5/racf/racroute.json";
 const RACROUTE_SCHEMA_PATH: &str = "conformance/0.5/schemas/racroute-catalog.schema.json";
+const ORACLE_SCHEMA_PATH: &str = "conformance/0.5/schemas/racf-oracle-campaign.schema.json";
 const GENERATED_PATH: &str =
     "crates/providers/mainframe-env-racf/src/generated/racf_command_catalog.rs";
 const SPEC_PATH: &str = "conformance/spec/v1/spec.json";
 const RACF_ROW_PREFIX: &str = "ibm-zos-3.2-racf-saf-2026:racf-command-families:";
 const RACROUTE_ROW_PREFIX: &str = "ibm-zos-3.2-racf-saf-2026:racroute-request-types:";
+const RACF_ORACLE_ID: &str = "racf.zos32.licensed-campaign";
 
 pub(super) fn generate(root: &Path) -> TaskResult {
     let generated = render(root)?;
@@ -46,6 +48,16 @@ fn project_spec(root: &Path) -> TaskResult<Vec<u8>> {
     let families = array(&catalog, "families", &catalog_path)?;
     let spec_path = root.join(SPEC_PATH);
     let mut spec = json(&spec_path)?;
+    let oracle_path = root.join(RACF_ORACLE_RELATIVE_PATH);
+    if oracle_path.is_file() {
+        validate_schema_instance(
+            &json(&root.join(ORACLE_SCHEMA_PATH))?,
+            &json(&oracle_path)?,
+            &oracle_path,
+        )?;
+    }
+    let oracle = RacfOracleCampaign::load_optional(root)?;
+    let oracle_id = oracle.as_ref().map(|_| RACF_ORACLE_ID);
     {
         let registries = spec["registries"]
             .as_object_mut()
@@ -66,7 +78,7 @@ fn project_spec(root: &Path) -> TaskResult<Vec<u8>> {
                 "conditions",
                 vec!["racf.command.diagnostic", "racf.racroute.status"],
             ),
-            ("recoveries", Vec::new()),
+            ("recoveries", vec!["racf.restart-recovery"]),
             (
                 "drivers",
                 vec!["racf.command.driver", "racf.racroute.driver"],
@@ -76,7 +88,10 @@ fn project_spec(root: &Path) -> TaskResult<Vec<u8>> {
         ] {
             replace_string_registry(registries, name, &values)?;
         }
-        replace_artifact_registry(registries, "oracles", &[])?;
+        let oracle_entries = oracle.as_ref().map_or_else(Vec::new, |campaign| {
+            vec![(RACF_ORACLE_ID.into(), campaign.digest().into())]
+        });
+        replace_artifact_registry(registries, "oracles", &oracle_entries)?;
     }
 
     let mut rows = spec["rows"]
@@ -115,9 +130,19 @@ fn project_spec(root: &Path) -> TaskResult<Vec<u8>> {
             text(family, "work_package", &catalog_path)?,
             "SEC-502" | "SEC-503" | "SEC-505"
         );
-        let mut obligation_ids = vec!["syntax", "malformed"];
+        let mut obligation_ids = vec![
+            "syntax",
+            "malformed",
+            "bounded-limit",
+            "audit-redaction",
+            "atomic-retry",
+            "restart-recovery",
+        ];
         if executable {
             obligation_ids.extend(["authorized", "unauthorized"]);
+        }
+        if oracle.is_some() {
+            obligation_ids.push("licensed-equivalence");
         }
         rows.push(json!({
             "row_id": row_id,
@@ -127,8 +152,8 @@ fn project_spec(root: &Path) -> TaskResult<Vec<u8>> {
             "transition": "racf.command.transition",
             "postconditions": ["racf.command.passed"],
             "conditions": ["racf.command.diagnostic"],
-            "recovery": Value::Null,
-            "oracle": Value::Null,
+            "recovery": "racf.restart-recovery",
+            "oracle": oracle_id,
             "applicable_gates": ["recognized", "validated", "executed", "conditioned", "recovered", "differential"],
             "obligations": obligation_ids
         }));
@@ -150,6 +175,7 @@ fn project_spec(root: &Path) -> TaskResult<Vec<u8>> {
                     sequence,
                     obligation,
                     gate,
+                    oracle_id,
                 );
             }
         }
@@ -167,6 +193,7 @@ fn project_spec(root: &Path) -> TaskResult<Vec<u8>> {
                 sequence,
                 "authorized",
                 "executed",
+                oracle_id,
             );
             obligations.push(json!({
                 "row_id": row_id,
@@ -182,8 +209,77 @@ fn project_spec(root: &Path) -> TaskResult<Vec<u8>> {
                     sequence,
                     "unauthorized",
                     gate,
+                    oracle_id,
                 );
             }
+        }
+        obligations.push(json!({
+            "row_id": row_id,
+            "obligation_id": "restart-recovery",
+            "applicable_gates": ["recovered"],
+        }));
+        push_case(
+            &mut cases,
+            &mut fixtures,
+            "command",
+            row_id,
+            sequence,
+            "restart-recovery",
+            "recovered",
+            oracle_id,
+        );
+        for (obligation, gate) in [
+            ("bounded-limit", "conditioned"),
+            ("audit-redaction", "conditioned"),
+        ] {
+            obligations.push(json!({
+                "row_id": row_id,
+                "obligation_id": obligation,
+                "applicable_gates": [gate],
+            }));
+            push_case(
+                &mut cases,
+                &mut fixtures,
+                "command",
+                row_id,
+                sequence,
+                obligation,
+                gate,
+                oracle_id,
+            );
+        }
+        obligations.push(json!({
+            "row_id": row_id,
+            "obligation_id": "atomic-retry",
+            "applicable_gates": ["recovered"],
+        }));
+        push_case(
+            &mut cases,
+            &mut fixtures,
+            "command",
+            row_id,
+            sequence,
+            "atomic-retry",
+            "recovered",
+            oracle_id,
+        );
+        if let Some(campaign) = &oracle {
+            require_oracle_fixture(campaign, row_id, "command", sequence)?;
+            obligations.push(json!({
+                "row_id": row_id,
+                "obligation_id": "licensed-equivalence",
+                "applicable_gates": ["differential"],
+            }));
+            push_case(
+                &mut cases,
+                &mut fixtures,
+                "command",
+                row_id,
+                sequence,
+                "licensed-equivalence",
+                "differential",
+                oracle_id,
+            );
         }
     }
     let racroute_path = root.join(RACROUTE_PATH);
@@ -202,10 +298,14 @@ fn project_spec(root: &Path) -> TaskResult<Vec<u8>> {
             "transition": "racf.racroute.transition",
             "postconditions": ["racf.command.passed"],
             "conditions": ["racf.racroute.status"],
-            "recovery": Value::Null,
-            "oracle": Value::Null,
+            "recovery": "racf.restart-recovery",
+            "oracle": oracle_id,
             "applicable_gates": ["recognized", "validated", "executed", "conditioned", "recovered", "differential"],
-            "obligations": ["syntax", "authorized", "unauthorized", "malformed"]
+            "obligations": if oracle.is_some() {
+                json!(["syntax", "authorized", "unauthorized", "malformed", "bounded-limit", "audit-redaction", "atomic-retry", "restart-recovery", "licensed-equivalence"])
+            } else {
+                json!(["syntax", "authorized", "unauthorized", "malformed", "bounded-limit", "audit-redaction", "atomic-retry", "restart-recovery"])
+            }
         }));
         for (obligation, gates) in [
             ("syntax", vec!["recognized", "validated"]),
@@ -227,8 +327,77 @@ fn project_spec(root: &Path) -> TaskResult<Vec<u8>> {
                     sequence,
                     obligation,
                     gate,
+                    oracle_id,
                 );
             }
+        }
+        obligations.push(json!({
+            "row_id": row_id,
+            "obligation_id": "restart-recovery",
+            "applicable_gates": ["recovered"],
+        }));
+        push_case(
+            &mut cases,
+            &mut fixtures,
+            "racroute",
+            row_id,
+            sequence,
+            "restart-recovery",
+            "recovered",
+            oracle_id,
+        );
+        for (obligation, gate) in [
+            ("bounded-limit", "conditioned"),
+            ("audit-redaction", "conditioned"),
+        ] {
+            obligations.push(json!({
+                "row_id": row_id,
+                "obligation_id": obligation,
+                "applicable_gates": [gate],
+            }));
+            push_case(
+                &mut cases,
+                &mut fixtures,
+                "racroute",
+                row_id,
+                sequence,
+                obligation,
+                gate,
+                oracle_id,
+            );
+        }
+        obligations.push(json!({
+            "row_id": row_id,
+            "obligation_id": "atomic-retry",
+            "applicable_gates": ["recovered"],
+        }));
+        push_case(
+            &mut cases,
+            &mut fixtures,
+            "racroute",
+            row_id,
+            sequence,
+            "atomic-retry",
+            "recovered",
+            oracle_id,
+        );
+        if let Some(campaign) = &oracle {
+            require_oracle_fixture(campaign, row_id, "racroute", sequence)?;
+            obligations.push(json!({
+                "row_id": row_id,
+                "obligation_id": "licensed-equivalence",
+                "applicable_gates": ["differential"],
+            }));
+            push_case(
+                &mut cases,
+                &mut fixtures,
+                "racroute",
+                row_id,
+                sequence,
+                "licensed-equivalence",
+                "differential",
+                oracle_id,
+            );
         }
     }
     spec["rows"] = Value::Array(rows);
@@ -251,10 +420,9 @@ fn push_case(
     sequence: usize,
     obligation: &str,
     gate: &str,
+    oracle: Option<&str>,
 ) {
-    let test_id = format!("racf.{surface}.{sequence:04}.{obligation}.{gate}");
-    let fixture = format!("{test_id}.fixture");
-    let digest = format!("sha256:{:x}", Sha256::digest(fixture.as_bytes()));
+    let (test_id, fixture, digest) = case_identity(surface, sequence, obligation, gate);
     fixtures.push((fixture.clone(), digest));
     cases.push(json!({
         "spec_version": "mainframe-env.conformance-ir@1",
@@ -266,9 +434,37 @@ fn push_case(
         "input": fixture,
         "preconditions": ["racf.authority.ready"],
         "expected": ["racf.command.passed"],
-        "recovery": Value::Null,
-        "oracle": Value::Null,
+        "recovery": "racf.restart-recovery",
+        "oracle": oracle,
     }));
+}
+
+fn case_identity(
+    surface: &str,
+    sequence: usize,
+    obligation: &str,
+    gate: &str,
+) -> (String, String, String) {
+    let test_id = format!("racf.{surface}.{sequence:04}.{obligation}.{gate}");
+    let fixture = format!("{test_id}.fixture");
+    let digest = format!("sha256:{:x}", Sha256::digest(fixture.as_bytes()));
+    (test_id, fixture, digest)
+}
+
+fn require_oracle_fixture(
+    campaign: &RacfOracleCampaign,
+    row_id: &str,
+    surface: &str,
+    sequence: usize,
+) -> TaskResult {
+    let oracle_case = campaign
+        .case(row_id)
+        .ok_or_else(|| format!("licensed RACF oracle row is missing: {row_id}"))?;
+    let (_, _, expected) = case_identity(surface, sequence, "licensed-equivalence", "differential");
+    require(
+        oracle_case.fixture_digest == expected,
+        &format!("licensed RACF oracle fixture drifted for {row_id}"),
+    )
 }
 
 fn replace_string_registry(

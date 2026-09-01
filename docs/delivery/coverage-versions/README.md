@@ -79,6 +79,12 @@ All versions inherit these invariants:
 9. A licensed IBM environment is required for a `differential=pass` result.
 10. Remote release actions require separate authorization.
 
+The user-approved 2026-09-01 policy makes one scoped completion exception for
+0.5: RACF/SAF may exit as `pass-with-licensed-differential-pending` with its
+licensed numerator fixed at 0/48. This does not weaken invariant 9 or create a
+differential pass; the real 48-row receipt is a hard gate at 0.17
+`release-certify`.
+
 ## Common evidence package
 
 From 0.3 onward, every claimed coverage gate flows through the shared typed

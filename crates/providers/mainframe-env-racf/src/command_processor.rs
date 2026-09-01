@@ -17,6 +17,7 @@ use argon2::Argon2;
 use argon2::password_hash::{PasswordVerifier, phc::PasswordHash};
 use mainframe_env_execution_api::PrincipalId;
 use mainframe_env_host_api::HostProblem;
+use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -77,7 +78,8 @@ impl CommandContext {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum CommandObjectKind {
     User,
     Group,
@@ -87,7 +89,8 @@ pub enum CommandObjectKind {
     Database,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case", tag = "record_kind")]
 pub enum CommandRecord {
     Name {
         kind: CommandObjectKind,
@@ -2387,7 +2390,7 @@ fn append_audit(
         resource_digest: Some(request_digest.into()),
         decision,
         status,
-        fields: BTreeMap::from([
+        fields: crate::audit::redact_fields(BTreeMap::from([
             (
                 "COMMAND_FAMILY".into(),
                 AuditFieldValue::Text(command.descriptor.keyword().into()),
@@ -2396,7 +2399,7 @@ fn append_audit(
                 "OFFICIAL_ROW".into(),
                 AuditFieldValue::Text(command.descriptor.row_id().into()),
             ),
-        ]),
+        ])),
         tick: context.tick(),
     });
     Ok(())
@@ -3003,8 +3006,89 @@ mod tests {
     use mainframe_env_execution_api::InvocationLimits;
     use mainframe_env_host_api::SecretRef;
     use mainframe_env_store::MemoryStore;
-    use mainframe_env_store_api::ProviderStateStore;
+    use mainframe_env_store_api::{
+        ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
+    };
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    struct UnknownOutcomeStore {
+        inner: Arc<MemoryStore>,
+        fail_after_next_put: AtomicBool,
+    }
+
+    impl UnknownOutcomeStore {
+        fn new(inner: Arc<MemoryStore>) -> Self {
+            Self {
+                inner,
+                fail_after_next_put: AtomicBool::new(false),
+            }
+        }
+
+        fn arm(&self) {
+            self.fail_after_next_put.store(true, Ordering::SeqCst);
+        }
+    }
+
+    impl ProviderStateStore for UnknownOutcomeStore {
+        fn get_provider_state(
+            &self,
+            namespace: &str,
+            key: &str,
+        ) -> Result<Option<ProviderStateRecord>, StoreError> {
+            self.inner.get_provider_state(namespace, key)
+        }
+
+        fn list_provider_state(
+            &self,
+            namespace: &str,
+            max: usize,
+        ) -> Result<Vec<ProviderStateRecord>, StoreError> {
+            self.inner.list_provider_state(namespace, max)
+        }
+
+        fn put_provider_state(
+            &self,
+            record: ProviderStateRecord,
+            expected_version: Option<u64>,
+        ) -> Result<(), StoreError> {
+            self.inner.put_provider_state(record, expected_version)?;
+            if self.fail_after_next_put.swap(false, Ordering::SeqCst) {
+                Err(StoreError::Infrastructure(
+                    "injected unknown outcome".into(),
+                ))
+            } else {
+                Ok(())
+            }
+        }
+
+        fn delete_provider_state(
+            &self,
+            namespace: &str,
+            key: &str,
+            expected_version: u64,
+        ) -> Result<(), StoreError> {
+            self.inner
+                .delete_provider_state(namespace, key, expected_version)
+        }
+
+        fn move_provider_state(
+            &self,
+            record: ProviderStateRecord,
+            old_key: &str,
+            expected_version: u64,
+        ) -> Result<(), StoreError> {
+            self.inner
+                .move_provider_state(record, old_key, expected_version)
+        }
+
+        fn put_provider_states_atomic(
+            &self,
+            writes: Vec<ProviderStateWrite>,
+        ) -> Result<(), StoreError> {
+            self.inner.put_provider_states_atomic(writes)
+        }
+    }
 
     fn setup() -> (Arc<RacfService>, CommandContext) {
         let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
@@ -3322,6 +3406,49 @@ mod tests {
             )
             .unwrap();
         assert_eq!(listed.records.len(), 2);
+    }
+
+    #[test]
+    fn committed_unknown_outcome_replays_after_restart_without_duplicate_mutation() {
+        let backing = Arc::new(MemoryStore::new(Default::default()));
+        let fault_store = Arc::new(UnknownOutcomeStore::new(backing.clone()));
+        let secrets = Arc::new(MemorySecretResolver::default());
+        secrets.insert("secret:admin", b"ADMIN-PASSWORD".to_vec());
+        let provider_store: Arc<dyn ProviderStateStore> = fault_store.clone();
+        let service =
+            RacfService::open(provider_store, secrets.clone(), Default::default()).unwrap();
+        service
+            .bootstrap_administrator(
+                "RACFADM",
+                &SecretRef::new("secret:admin", Default::default()).unwrap(),
+            )
+            .unwrap();
+        let context = CommandContext::new(
+            PrincipalId::new("RACFADM", InvocationLimits::default()).unwrap(),
+            "UNKNOWN-OUTCOME",
+            "UNKNOWN-OUTCOME",
+            1,
+        )
+        .unwrap();
+        fault_store.arm();
+        assert_eq!(
+            service
+                .execute_command(&context, "ADDGROUP GROUP1")
+                .unwrap_err()
+                .code,
+            CommandDiagnosticCode::ProviderFailure
+        );
+        drop(service);
+        let provider_store: Arc<dyn ProviderStateStore> = backing;
+        let reopened = RacfService::open(provider_store, secrets, Default::default()).unwrap();
+        let replay = reopened
+            .execute_command(&context, "ADDGROUP GROUP1")
+            .unwrap();
+        assert!(replay.replayed);
+        let listed = reopened
+            .execute_command(&next(&context, "UNKNOWN-LIST"), "LISTGRP GROUP1")
+            .unwrap();
+        assert_eq!(listed.records.len(), 1);
     }
 
     #[test]

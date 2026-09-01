@@ -10,6 +10,7 @@ use argon2::Argon2;
 use argon2::password_hash::{PasswordVerifier, phc::PasswordHash};
 use mainframe_env_execution_api::PrincipalId;
 use mainframe_env_host_api::{HostProblem, SecretRef};
+use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -216,7 +217,8 @@ impl RacrouteRequest {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum RacrouteState {
     Received,
     Validated,
@@ -226,7 +228,7 @@ pub enum RacrouteState {
     Denied,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct AceeSummary {
     pub id: String,
     pub principal: String,
@@ -238,7 +240,7 @@ pub struct AceeSummary {
     pub version: u64,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct TokenMetadata {
     pub id: String,
     pub kind: TokenKind,
@@ -252,7 +254,8 @@ pub struct TokenMetadata {
     pub version: u64,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case", tag = "record_kind")]
 pub enum ExtractedSecurityRecord {
     User {
         id: String,
@@ -279,7 +282,8 @@ pub enum ExtractedSecurityRecord {
     Token(TokenMetadata),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case", tag = "result_kind", content = "result")]
 pub enum RacrouteResult {
     Audit {
         audit_id: String,
@@ -477,7 +481,7 @@ fn apply_request(
         } => {
             let status = status_for_reason(DecisionReason::Granted);
             let id = next_id("AUDIT", snapshot.generation, snapshot.audits.len());
-            let fields = redact_fields(fields.clone());
+            let fields = crate::audit::redact_fields(fields.clone());
             snapshot.audits.push(SecurityAuditRecord {
                 id: id.clone(),
                 correlation: context.correlation().into(),
@@ -1389,12 +1393,12 @@ fn append_audit(
             DecisionOutcome::Deny
         },
         status,
-        fields: BTreeMap::from([(
+        fields: crate::audit::redact_fields(BTreeMap::from([(
             "ACEE".into(),
             context.acee_id().map_or(AuditFieldValue::Redacted, |id| {
-                AuditFieldValue::Reference(id.into())
+                AuditFieldValue::Reference(format!("acee:{id}"))
             }),
-        )]),
+        )])),
         tick: context.tick(),
     });
     Ok(id)
@@ -1540,29 +1544,6 @@ fn token_metadata(token: &SecurityToken) -> TokenMetadata {
     }
 }
 
-fn redact_fields(
-    mut fields: BTreeMap<String, AuditFieldValue>,
-) -> BTreeMap<String, AuditFieldValue> {
-    for (name, value) in &mut fields {
-        let upper = name.to_ascii_uppercase();
-        if [
-            "PASSWORD",
-            "PHRASE",
-            "CREDENTIAL",
-            "SECRET",
-            "TOKEN",
-            "KEY",
-            "CERTIFICATE",
-        ]
-        .iter()
-        .any(|marker| upper.contains(marker))
-        {
-            *value = AuditFieldValue::Redacted;
-        }
-    }
-    fields
-}
-
 fn request_digest(context: &SafRequestContext, request: &RacrouteRequest) -> String {
     let mut digest = Sha256::new();
     digest.update(b"mainframe-env.racroute-request@1\0");
@@ -1665,7 +1646,7 @@ mod tests {
     use super::*;
     use crate::{CommandContext, MemorySecretResolver};
     use mainframe_env_execution_api::InvocationLimits;
-    use mainframe_env_store::MemoryStore;
+    use mainframe_env_store::{MemoryStore, SqliteStateStore};
     use mainframe_env_store_api::ProviderStateStore;
     use std::sync::Arc;
 
@@ -2039,6 +2020,120 @@ mod tests {
         ] {
             assert!(!audits.contains(reference));
         }
+    }
+
+    #[test]
+    fn sqlite_restart_preserves_sec_505_identity_state_and_sessions() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-racf-sec505-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("racf-sec505.db");
+        let url = format!("sqlite://{}?mode=rwc", path.display());
+        let resolver = Arc::new(MemorySecretResolver::default());
+        for (reference, value) in [
+            ("secret:admin", b"ADMIN-PASSWORD".as_slice()),
+            ("secret:user1", b"USER-PASSWORD".as_slice()),
+            ("secret:user1-new", b"NEW-USER-PASSWORD".as_slice()),
+            ("secret:user2", b"SECOND-PASSWORD".as_slice()),
+            ("secret:mfa", b"123456".as_slice()),
+            ("secret:mfa-proof", b"123456".as_slice()),
+        ] {
+            resolver.insert(reference, value.to_vec());
+        }
+        let admin = PrincipalId::new("RACFADM", InvocationLimits::default()).unwrap();
+        let generation = {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 32 * 1024 * 1024, 65_536).unwrap());
+            let service = RacfService::open(store, resolver.clone(), Default::default()).unwrap();
+            service
+                .bootstrap_administrator(
+                    "RACFADM",
+                    &SecretRef::new("secret:admin", Default::default()).unwrap(),
+                )
+                .unwrap();
+            let fingerprint = format!("sha256:{}", "a".repeat(64));
+            for (index, command) in [
+                "ADDUSER USER1 PASSWORD('USER-PASSWORD') MFA(FACTOR1 REF secret:mfa TYPE TOTP)"
+                    .to_string(),
+                "PASSWORD USER(USER1) PASSWORD('NEW-USER-PASSWORD')".into(),
+                "ADDUSER USER2 PASSWORD('SECOND-PASSWORD')".into(),
+                "TARGET NODE(NODE1) PROTOCOL(TCP)".into(),
+                "RACLINK USER1 DEFINE(NODE1 REMOTE1)".into(),
+                "RACMAP ID(USER1) MAP(MAP1 REGISTRY LDAP NAME user1@example.com)".into(),
+                format!(
+                    "RACDCERT ID(USER1) ADD(CERT1 CERTREF secret:cert1 FINGERPRINT {fingerprint} KEYID KEY1 KEYREF secret:key1)"
+                ),
+                "RACDCERT ID(USER1) CONNECT(CERT1 RING RING1 DEFAULT)".into(),
+            ]
+            .iter()
+            .enumerate()
+            {
+                service
+                    .execute_command(
+                        &command_context(&admin, &format!("RESTART-{index}"), index as u64 + 1),
+                        command,
+                    )
+                    .unwrap();
+            }
+            let user2 = PrincipalId::new("USER2", InvocationLimits::default()).unwrap();
+            service
+                .racroute(
+                    &saf_context(&admin, None, "RESTART-SIGNON", 20),
+                    RacrouteRequest::Signon {
+                        user: user2,
+                        credential_reference: SecretRef::new("secret:user2", Default::default())
+                            .unwrap(),
+                    },
+                )
+                .unwrap();
+            service.database.summary().unwrap().generation
+        };
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 32 * 1024 * 1024, 65_536).unwrap());
+            let service = RacfService::open(store, resolver, Default::default()).unwrap();
+            let summary = service.database.summary().unwrap();
+            assert_eq!(summary.generation, generation);
+            assert_eq!(
+                (
+                    summary.certificates,
+                    summary.keys,
+                    summary.keyrings,
+                    summary.mfa_factors,
+                    summary.identity_mappings,
+                    summary.user_associations,
+                    summary.rrsf_nodes,
+                    summary.signon_sessions,
+                ),
+                (1, 1, 1, 1, 1, 1, 1, 1)
+            );
+            let user1 = PrincipalId::new("USER1", InvocationLimits::default()).unwrap();
+            let verified = service
+                .racroute(
+                    &saf_context(&admin, None, "RESTART-VERIFYX", 21),
+                    RacrouteRequest::Verifyx {
+                        user: user1,
+                        credential_reference: SecretRef::new(
+                            "secret:user1-new",
+                            Default::default(),
+                        )
+                        .unwrap(),
+                        mfa_reference: Some(
+                            SecretRef::new("secret:mfa-proof", Default::default()).unwrap(),
+                        ),
+                        action: SafVerifyAction::AuthenticateOnly,
+                        acee_id: None,
+                        parent_acee: None,
+                    },
+                )
+                .unwrap();
+            assert_eq!(verified.status.reason, DecisionReason::Granted);
+        }
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_dir(directory);
     }
 
     #[test]

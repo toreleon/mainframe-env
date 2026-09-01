@@ -51,3 +51,22 @@ nodes/associations, durable sign-on sessions, MFA proof comparison, password
 history, keyrings, and certificate lifecycle operations are bounded by the v2
 database schema. The shared Conformance IR now executes all 34 command families
 and all 14 RACROUTE request types.
+
+SEC-506 local gates add one centralized fail-closed audit redactor and a bounded
+SMF type-80 projection, automatic migration of retained v1 provider records,
+rollback that leaves the v1 source intact for an older reader, startup
+reconciliation of intent/unknown-outcome transactions, and restart/replay
+coverage for every command and RACROUTE row. Corrupt migration input and
+corrupt v2 snapshots never publish partial authority state. Licensed IBM
+differential remains unclaimed until a pinned z/OS 3.2 oracle actually runs and
+supplies receipts through the shared Conformance IR oracle registry.
+Each official row also has explicit bounded-limit, audit/redaction, and
+concurrent CAS-retry obligations; these results are not inferred from the broad
+workspace regression.
+
+The 0.5 conformance tooling contains a separate pure-state reference simulation
+for development assurance. It does not import this production crate, does not
+define provider contracts or authority state, and cannot supply licensed
+differential credit. Under the user-approved 2026-09-01 scoped policy, 0.5
+retains `differential=0/48 pending`; the real licensed campaign is deferred to
+the 0.17 `release-certify` hard gate.

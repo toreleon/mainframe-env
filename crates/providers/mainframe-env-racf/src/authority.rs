@@ -165,6 +165,8 @@ impl RacfService {
     ) -> Result<Arc<Self>, HostProblem> {
         let database = SecurityDatabase::open(store, limits.into())?;
         install_supplied_class_catalog(&database)?;
+        database.migrate_legacy_records()?;
+        database.reconcile_incomplete_transactions()?;
         Ok(Arc::new(Self {
             database,
             secrets,
@@ -593,6 +595,15 @@ impl RacfService {
             .unwrap_or_default()
     }
 
+    pub fn smf_type80_records(
+        &self,
+        start: usize,
+        max_items: usize,
+    ) -> Result<Vec<crate::SmfType80Record>, HostProblem> {
+        let snapshot = self.database.read()?;
+        crate::audit::project_type80(&snapshot.audits, start, max_items)
+    }
+
     pub fn list_profiles(
         &self,
         class: &str,
@@ -680,18 +691,20 @@ impl RacfService {
                     _ => DecisionOutcome::NoDecision,
                 },
                 status: status(DecisionReason::Granted),
-                fields: event
-                    .fields
-                    .into_iter()
-                    .map(|(name, value)| {
-                        let value = if value == "<redacted>" {
-                            AuditFieldValue::Redacted
-                        } else {
-                            AuditFieldValue::Text(value)
-                        };
-                        (name, value)
-                    })
-                    .collect(),
+                fields: crate::audit::redact_fields(
+                    event
+                        .fields
+                        .into_iter()
+                        .map(|(name, value)| {
+                            let value = if value == "<redacted>" {
+                                AuditFieldValue::Redacted
+                            } else {
+                                AuditFieldValue::Text(value)
+                            };
+                            (name, value)
+                        })
+                        .collect(),
+                ),
                 tick: 0,
             });
             Ok(())
@@ -789,7 +802,7 @@ fn insert_exact<T: Eq>(
     }
 }
 
-fn install_resource_schema(
+pub(crate) fn install_resource_schema(
     snapshot: &mut crate::model::SecurityDatabaseSnapshot,
     class: &str,
     max_name_bytes: usize,
@@ -983,21 +996,7 @@ fn redact_audit(mut event: AuditEvent, limits: RacfLimits) -> Result<AuditEvent,
         if name.is_empty() || name.len() > limits.max_name_bytes {
             return Err(HostProblem::Malformed);
         }
-        let upper = name.to_ascii_uppercase();
-        if [
-            "PASSWORD",
-            "CREDENTIAL",
-            "SECRET",
-            "TOKEN",
-            "PRIVATE_KEY",
-            "CERTIFICATE",
-            "CARD",
-            "QUEUE_PAYLOAD",
-            "PROTECTED",
-        ]
-        .iter()
-        .any(|marker| upper.contains(marker))
-        {
+        if crate::audit::sensitive_name(name) || crate::audit::sensitive_value(value) {
             *value = "<redacted>".into();
         } else if value.len() > limits.max_name_bytes {
             return Err(HostProblem::ResourceExhausted);
@@ -1081,6 +1080,7 @@ mod tests {
                 fields: BTreeMap::from([
                     ("password".into(), "TOP-SECRET".into()),
                     ("token_reference".into(), "secret:token".into()),
+                    ("note".into(), "secret:opaque-reference".into()),
                     ("terminal".into(), "L7001".into()),
                 ]),
             })
@@ -1088,10 +1088,19 @@ mod tests {
         let audits = service.audits();
         assert_eq!(audits[0].fields["password"], "<redacted>");
         assert_eq!(audits[0].fields["token_reference"], "<redacted>");
+        assert_eq!(audits[0].fields["note"], "<redacted>");
         assert_eq!(audits[0].fields["terminal"], "L7001");
         let shown = format!("{audits:?}");
         assert!(!shown.contains("TOP-SECRET"));
         assert!(!shown.contains("secret:token"));
+        assert!(!shown.contains("secret:opaque-reference"));
+        let type80 = service.smf_type80_records(0, 1).unwrap();
+        assert_eq!((type80[0].record_type, type80[0].sequence), (80, 1));
+        assert_eq!(type80[0].fields["note"], AuditFieldValue::Redacted);
+        assert_eq!(
+            service.smf_type80_records(0, 0),
+            Err(HostProblem::ResourceExhausted)
+        );
     }
 
     #[test]

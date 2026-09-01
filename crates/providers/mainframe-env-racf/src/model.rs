@@ -1292,25 +1292,75 @@ impl SecurityDatabaseSnapshot {
                 return Err(SecuritySchemaProblem::MissingReference);
             }
         }
+        let mut audit_ids = BTreeSet::new();
         for audit in &self.audits {
             identifier(&audit.id, limits.max_name_bytes)?;
+            if !audit_ids.insert(audit.id.as_str()) {
+                return Err(SecuritySchemaProblem::Duplicate);
+            }
+            principal_name(&audit.actor)?;
             bounded(&audit.correlation, limits.max_value_bytes)?;
             bounded(&audit.action, limits.max_value_bytes)?;
+            if let Some(class) = &audit.class {
+                class_name(class)?;
+            }
+            if let Some(resource) = &audit.resource_digest {
+                bounded(resource, limits.max_value_bytes)?;
+            }
             if audit.fields.len() > limits.max_fields_per_segment {
                 return Err(SecuritySchemaProblem::LimitExceeded);
+            }
+            if crate::audit::redact_fields(audit.fields.clone()) != audit.fields {
+                return Err(SecuritySchemaProblem::SecretMaterial);
+            }
+            for (name, value) in &audit.fields {
+                bounded(name, limits.max_name_bytes)?;
+                match value {
+                    AuditFieldValue::Text(value) => bounded(value, limits.max_value_bytes)?,
+                    AuditFieldValue::Digest(value) => digest_sha256(value)?,
+                    AuditFieldValue::Reference(value) => {
+                        secret_reference(value, limits.max_value_bytes)?;
+                    }
+                    AuditFieldValue::Redacted => {}
+                }
             }
         }
         for (id, transaction) in &self.transactions {
             identifier(id, limits.max_name_bytes)?;
-            if transaction.id != *id {
+            identifier(&transaction.idempotency_key, limits.max_name_bytes)?;
+            principal_name(&transaction.actor)?;
+            identifier(&transaction.operation, limits.max_name_bytes)?;
+            if transaction.id != *id
+                || transaction.idempotency_key != *id
+                || transaction.base_generation == 0
+                || transaction
+                    .final_generation
+                    .is_some_and(|generation| generation <= transaction.base_generation)
+            {
                 return Err(SecuritySchemaProblem::Malformed);
             }
             digest_sha256(&transaction.request_digest)?;
         }
         for (id, recovery) in &self.recovery {
             identifier(id, limits.max_name_bytes)?;
-            if recovery.id != *id || !self.transactions.contains_key(&recovery.transaction_id) {
+            if recovery.id != *id
+                || recovery.version == 0
+                || !self.transactions.contains_key(&recovery.transaction_id)
+            {
                 return Err(SecuritySchemaProblem::MissingReference);
+            }
+        }
+        let mut migration_ids = BTreeSet::new();
+        for migration in &self.migrations {
+            identifier(&migration.id, limits.max_name_bytes)?;
+            if !migration_ids.insert(migration.id.as_str()) {
+                return Err(SecuritySchemaProblem::Duplicate);
+            }
+            bounded(&migration.from_schema, limits.max_value_bytes)?;
+            bounded(&migration.to_schema, limits.max_value_bytes)?;
+            digest_sha256(&migration.source_digest)?;
+            if let Some(result) = &migration.result_digest {
+                digest_sha256(result)?;
             }
         }
         Ok(())

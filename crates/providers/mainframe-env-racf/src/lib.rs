@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+mod audit;
 mod authority;
 mod command;
 mod command_processor;
@@ -9,6 +10,7 @@ mod database;
 mod model;
 mod saf;
 
+pub use audit::SmfType80Record;
 pub use authority::{
     MemorySecretResolver, RacfInstallReceipt, RacfLimits, RacfManifest, RacfProfileDefinition,
     RacfService, RacfUserDefinition, ResolvedSecret, SecretResolver, racf_providers,
