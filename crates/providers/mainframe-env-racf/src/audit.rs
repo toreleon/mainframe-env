@@ -95,10 +95,10 @@ pub(crate) fn sensitive_name(name: &str) -> bool {
 pub(crate) fn sensitive_value(value: &str) -> bool {
     let trimmed = value.trim();
     let upper = trimmed.to_ascii_uppercase();
-    trimmed.starts_with("secret:")
-        || trimmed.starts_with("vault:")
-        || trimmed.starts_with("keyring:")
-        || trimmed.starts_with("$argon2")
+    upper.starts_with("SECRET:")
+        || upper.starts_with("VAULT:")
+        || upper.starts_with("KEYRING:")
+        || upper.starts_with("$ARGON2")
         || upper.contains("BEGIN PRIVATE KEY")
         || upper.contains("BEGIN CERTIFICATE")
 }
@@ -116,7 +116,19 @@ mod tests {
             ),
             (
                 "NOTE".into(),
-                AuditFieldValue::Reference("secret:opaque-reference".into()),
+                AuditFieldValue::Reference("SeCrEt:opaque-reference".into()),
+            ),
+            (
+                "LOCATION".into(),
+                AuditFieldValue::Text(" VaUlT:credential-reference ".into()),
+            ),
+            (
+                "RING".into(),
+                AuditFieldValue::Reference("KeYrInG:signing-key".into()),
+            ),
+            (
+                "VERIFIER".into(),
+                AuditFieldValue::Text("$ArGoN2id$v=19$unsafe".into()),
             ),
             (
                 "REQUEST_DIGEST".into(),
@@ -125,6 +137,9 @@ mod tests {
         ]));
         assert_eq!(fields["PHRASE"], AuditFieldValue::Redacted);
         assert_eq!(fields["NOTE"], AuditFieldValue::Redacted);
+        assert_eq!(fields["LOCATION"], AuditFieldValue::Redacted);
+        assert_eq!(fields["RING"], AuditFieldValue::Redacted);
+        assert_eq!(fields["VERIFIER"], AuditFieldValue::Redacted);
         assert!(matches!(
             fields["REQUEST_DIGEST"],
             AuditFieldValue::Digest(_)

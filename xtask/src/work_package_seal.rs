@@ -87,7 +87,13 @@ fn validate_allowlist(paths: &[String]) -> TaskResult<BTreeSet<String>> {
 fn staged_changes(root: &Path) -> TaskResult<Vec<ChangedPath>> {
     changes(
         root,
-        &["diff", "--cached", "--name-status", "--diff-filter=AMD"],
+        &[
+            "diff",
+            "--cached",
+            "--name-status",
+            "--no-renames",
+            "--diff-filter=AMD",
+        ],
         |path, status| {
             if status == 'D' {
                 Ok(Vec::new())
@@ -119,6 +125,7 @@ fn committed_changes(root: &Path) -> TaskResult<Vec<ChangedPath>> {
             "--no-commit-id",
             "--name-status",
             "-r",
+            "--no-renames",
             "--diff-filter=AMD",
             "HEAD^",
             "HEAD",
@@ -214,5 +221,95 @@ mod tests {
     fn allowlist_rejects_parent_paths_and_duplicates() {
         assert!(validate_allowlist(&["../outside".into()]).is_err());
         assert!(validate_allowlist(&["one".into(), "one".into()]).is_err());
+    }
+
+    #[test]
+    fn staged_and_committed_renames_are_sealed_as_delete_add_pairs() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-work-package-renames-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        git(&root, &["init", "--quiet"]);
+        git(&root, &["config", "user.email", "tests@mainframe.invalid"]);
+        git(&root, &["config", "user.name", "mainframe-env tests"]);
+        for (path, bytes) in [
+            ("pure old name.txt", b"same bytes".as_slice()),
+            ("edited old name.txt", b"before edit".as_slice()),
+        ] {
+            std::fs::write(root.join(path), bytes).unwrap();
+        }
+        git(&root, &["add", "."]);
+        git(&root, &["commit", "--quiet", "-m", "baseline"]);
+
+        std::fs::rename(
+            root.join("pure old name.txt"),
+            root.join("pure new name.txt"),
+        )
+        .unwrap();
+        std::fs::rename(
+            root.join("edited old name.txt"),
+            root.join("edited new name.txt"),
+        )
+        .unwrap();
+        std::fs::write(root.join("edited new name.txt"), b"after edit").unwrap();
+        git(&root, &["add", "-A"]);
+
+        let staged = staged_changes(&root).unwrap();
+        assert_eq!(
+            staged
+                .iter()
+                .map(|change| (change.status, change.path.as_str()))
+                .collect::<Vec<_>>(),
+            vec![
+                ('A', "edited new name.txt"),
+                ('D', "edited old name.txt"),
+                ('A', "pure new name.txt"),
+                ('D', "pure old name.txt"),
+            ]
+        );
+        assert_eq!(
+            staged
+                .iter()
+                .find(|change| change.path == "edited new name.txt")
+                .unwrap()
+                .bytes,
+            b"after edit"
+        );
+        assert!(
+            staged
+                .iter()
+                .filter(|change| change.status == 'D')
+                .all(|change| change.bytes.is_empty())
+        );
+
+        git(&root, &["commit", "--quiet", "-m", "rename"]);
+        let committed = committed_changes(&root).unwrap();
+        assert_eq!(
+            committed
+                .iter()
+                .map(|change| (change.status, change.path.as_str()))
+                .collect::<Vec<_>>(),
+            staged
+                .iter()
+                .map(|change| (change.status, change.path.as_str()))
+                .collect::<Vec<_>>()
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    fn git(root: &Path, arguments: &[&str]) {
+        let output = Command::new("git")
+            .args(arguments)
+            .current_dir(root)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {:?}: {}",
+            arguments,
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 }

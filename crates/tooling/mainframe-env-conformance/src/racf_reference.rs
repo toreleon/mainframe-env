@@ -5,9 +5,8 @@
 //! precedence and status-code rules. It is not licensed IBM differential
 //! evidence and cannot emit an oracle receipt.
 
-#[cfg(test)]
-use serde::Deserialize;
-use std::collections::BTreeMap;
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, BTreeSet};
 
 #[cfg(test)]
 const COMMAND_CATALOG: &str =
@@ -20,6 +19,42 @@ const UNKNOWN_CASES: [&str; 4] = [
     "rrsf-transport-timing",
     "undocumented-database-internals",
 ];
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub(crate) struct ReferenceObservation {
+    pub surface: String,
+    pub keyword: String,
+    pub obligation: String,
+    pub gate: String,
+    pub outcome: String,
+    pub status: Option<StatusObservation>,
+    pub changed_domains: BTreeSet<String>,
+    pub identity: Option<String>,
+    pub audit: String,
+    pub recovery: String,
+    pub replay: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub(crate) struct StatusObservation {
+    pub saf: u32,
+    pub racf: u32,
+    pub reason_code: u32,
+    pub reason: String,
+}
+
+pub(crate) fn compare_observations(
+    expected: &ReferenceObservation,
+    actual: &ReferenceObservation,
+) -> Result<(), String> {
+    if expected == actual {
+        Ok(())
+    } else {
+        Err(format!(
+            "independent RACF observation mismatch: expected={expected:?} actual={actual:?}"
+        ))
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 enum Access {
@@ -308,7 +343,7 @@ const fn command(
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct RefState {
     generation: u64,
     users: u32,
@@ -701,6 +736,352 @@ pub(crate) fn verify_binding(
     }
 }
 
+pub(crate) fn expected_observation(
+    surface: &str,
+    row_id: &str,
+    keyword: &str,
+    obligation: &str,
+    gate: &str,
+) -> Result<ReferenceObservation, String> {
+    verify_binding(surface, row_id, keyword, obligation, gate)?;
+    match surface {
+        "command" => expected_command_observation(keyword, obligation, gate),
+        "racroute" => expected_request_observation(keyword, obligation, gate),
+        _ => Err("reference observation surface is unknown".into()),
+    }
+}
+
+fn expected_command_observation(
+    keyword: &str,
+    obligation: &str,
+    gate: &str,
+) -> Result<ReferenceObservation, String> {
+    let (outcome, status, audit, recovery, replay, semantic) = match obligation {
+        "syntax" if gate == "recognized" => {
+            ("recognized", None, "none", "none", "not-applicable", false)
+        }
+        "syntax" if gate == "validated" => {
+            ("validated", None, "none", "none", "not-applicable", false)
+        }
+        "authorized" => (
+            "granted",
+            Some(status_observation(status(Reason::Granted))),
+            "allow-redacted",
+            "none",
+            "not-applicable",
+            true,
+        ),
+        "unauthorized" => (
+            "denied",
+            Some(status_observation(status(Reason::DefaultDeny))),
+            "deny-redacted",
+            "none",
+            "not-applicable",
+            false,
+        ),
+        "malformed" => (
+            "diagnostic:MERSEC1012E",
+            None,
+            "none",
+            "none",
+            "not-applicable",
+            false,
+        ),
+        "bounded-limit" => (
+            "diagnostic:MERSEC1002E",
+            None,
+            "none",
+            "none",
+            "not-applicable",
+            false,
+        ),
+        "audit-redaction" => (
+            "granted",
+            Some(status_observation(status(Reason::Granted))),
+            "allow-redacted",
+            "none",
+            "not-applicable",
+            true,
+        ),
+        "atomic-retry" => (
+            "granted",
+            Some(status_observation(status(Reason::Granted))),
+            "allow-redacted",
+            "atomic-retry-stable",
+            "not-applicable",
+            true,
+        ),
+        "restart-recovery" => (
+            "granted",
+            Some(status_observation(status(Reason::Granted))),
+            "allow-redacted",
+            "restart-stable",
+            if command_mutating(keyword) {
+                "state-and-audit-stable"
+            } else {
+                "not-applicable"
+            },
+            true,
+        ),
+        _ => {
+            return Err(format!(
+                "unsupported reference command observation {obligation}/{gate}"
+            ));
+        }
+    };
+    Ok(ReferenceObservation {
+        surface: "command".into(),
+        keyword: keyword.into(),
+        obligation: obligation.into(),
+        gate: gate.into(),
+        outcome: outcome.into(),
+        status,
+        changed_domains: if semantic {
+            command_domains(keyword)
+        } else {
+            BTreeSet::new()
+        },
+        identity: semantic.then(|| command_identity(keyword).to_string()),
+        audit: audit.into(),
+        recovery: recovery.into(),
+        replay: replay.into(),
+    })
+}
+
+fn expected_request_observation(
+    keyword: &str,
+    obligation: &str,
+    gate: &str,
+) -> Result<ReferenceObservation, String> {
+    let credential_negative = matches!(keyword, "SIGNON" | "VERIFY" | "VERIFYX");
+    let (outcome, status, audit, recovery, replay, semantic) = match obligation {
+        "syntax" if gate == "recognized" => {
+            ("recognized", None, "none", "none", "not-applicable", false)
+        }
+        "syntax" if gate == "validated" => {
+            ("validated", None, "none", "none", "not-applicable", false)
+        }
+        "authorized" => (
+            "granted",
+            Some(status_observation(status(Reason::Granted))),
+            "allow-redacted",
+            "none",
+            if request_mutating(keyword) {
+                "exact-terminal-no-duplicate"
+            } else {
+                "not-applicable"
+            },
+            true,
+        ),
+        "unauthorized" => (
+            "denied",
+            Some(status_observation(status(Reason::PrincipalNotFound))),
+            "deny-redacted",
+            "none",
+            if request_mutating(keyword) {
+                "terminal-denial-no-duplicate"
+            } else {
+                "not-applicable"
+            },
+            false,
+        ),
+        "malformed" | "bounded-limit" => (
+            if credential_negative {
+                "credential-invalid"
+            } else {
+                "malformed-request"
+            },
+            Some(status_observation(status(if credential_negative {
+                Reason::CredentialInvalid
+            } else {
+                Reason::MalformedRequest
+            }))),
+            "deny-redacted",
+            "none",
+            if request_mutating(keyword) {
+                "terminal-denial-no-duplicate"
+            } else {
+                "not-applicable"
+            },
+            false,
+        ),
+        "audit-redaction" => (
+            "granted",
+            Some(status_observation(status(Reason::Granted))),
+            "allow-redacted",
+            "none",
+            if request_mutating(keyword) {
+                "exact-terminal-no-duplicate"
+            } else {
+                "not-applicable"
+            },
+            true,
+        ),
+        "atomic-retry" => (
+            "granted",
+            Some(status_observation(status(Reason::Granted))),
+            "allow-redacted",
+            "atomic-retry-stable",
+            if request_mutating(keyword) {
+                "exact-terminal-no-duplicate"
+            } else {
+                "not-applicable"
+            },
+            true,
+        ),
+        "restart-recovery" => (
+            "granted",
+            Some(status_observation(status(Reason::Granted))),
+            "allow-redacted",
+            "restart-stable",
+            if request_mutating(keyword) {
+                "exact-terminal-no-duplicate"
+            } else {
+                "not-applicable"
+            },
+            true,
+        ),
+        _ => {
+            return Err(format!(
+                "unsupported reference request observation {obligation}/{gate}"
+            ));
+        }
+    };
+    Ok(ReferenceObservation {
+        surface: "racroute".into(),
+        keyword: keyword.into(),
+        obligation: obligation.into(),
+        gate: gate.into(),
+        outcome: outcome.into(),
+        status,
+        changed_domains: if semantic {
+            request_domains(keyword)
+        } else {
+            BTreeSet::new()
+        },
+        identity: semantic.then(|| request_identity(keyword).to_string()),
+        audit: audit.into(),
+        recovery: recovery.into(),
+        replay: replay.into(),
+    })
+}
+
+fn status_observation(value: Status) -> StatusObservation {
+    StatusObservation {
+        saf: value.saf,
+        racf: value.racf,
+        reason_code: value.reason_code,
+        reason: reason_slug(value.reason).into(),
+    }
+}
+
+fn reason_slug(reason: Reason) -> &'static str {
+    match reason {
+        Reason::Granted => "granted",
+        Reason::DefaultDeny => "default-deny",
+        Reason::ClassInactive => "class-inactive",
+        Reason::ProfileNotFound => "profile-not-found",
+        Reason::PrincipalNotFound => "principal-not-found",
+        Reason::PrincipalInactive => "principal-inactive",
+        Reason::InsufficientAccess => "insufficient-access",
+        Reason::LabelMismatch => "security-label-mismatch",
+        Reason::ConditionNotSatisfied => "condition-not-satisfied",
+        Reason::TokenInvalid => "token-invalid",
+        Reason::AceeInvalid => "acee-invalid",
+        Reason::CredentialInvalid => "credential-invalid",
+        Reason::MfaInvalid => "mfa-invalid",
+        Reason::PolicyUnavailable => "policy-unavailable",
+        Reason::MalformedRequest => "malformed-request",
+        Reason::ResourceExhausted => "resource-exhausted",
+    }
+}
+
+fn command_domains(keyword: &str) -> BTreeSet<String> {
+    let domains: &[&str] = match keyword {
+        "ADDGROUP" | "DELGROUP" => &["groups"],
+        "ALTGROUP" => &["classes", "groups"],
+        "ADDUSER" | "DELUSER" => &["connections", "principals"],
+        "ALTUSER" => &["classes", "principals"],
+        "CONNECT" | "REMOVE" => &["connections"],
+        "ADDSD" | "ALTDSD" | "DELDSD" | "PERMIT" | "RALTER" | "RDEFINE" | "RDELETE" => {
+            &["profiles"]
+        }
+        "PASSWORD" => &["principals"],
+        "RACDCERT" => &["certificates"],
+        "RACLINK" => &["user-associations"],
+        "RACMAP" => &["identity-mappings"],
+        "RACPRIV" | "RESTART" | "SET" | "SETROPTS" | "STOP" => &["policy"],
+        "TARGET" => &["rrsf-nodes"],
+        _ => &[],
+    };
+    domains.iter().map(|domain| (*domain).into()).collect()
+}
+
+fn command_identity(keyword: &str) -> &'static str {
+    match keyword {
+        "ADDGROUP" | "ALTGROUP" | "DELGROUP" => "group",
+        "ADDSD" | "ALTDSD" | "DELDSD" | "PERMIT" => "dataset-profile",
+        "ADDUSER" | "ALTUSER" | "DELUSER" | "PASSWORD" => "user",
+        "CONNECT" | "REMOVE" => "connection",
+        "DISPLAY" => "summary",
+        "LISTDSD" | "RLIST" | "SEARCH" => "profile",
+        "LISTGRP" => "group-record",
+        "LISTUSER" => "user-record",
+        "RACDCERT" => "certificate",
+        "RACLINK" => "association",
+        "RACMAP" => "identity-mapping",
+        "RACPRIV" | "RESTART" | "RVARY" | "SET" | "SETROPTS" | "STOP" => "policy",
+        "RACPRMCK" => "database",
+        "RALTER" | "RDEFINE" | "RDELETE" => "resource-profile",
+        "SIGNOFF" => "none",
+        "TARGET" => "rrsf-node",
+        _ => "none",
+    }
+}
+
+fn command_mutating(keyword: &str) -> bool {
+    !matches!(
+        keyword,
+        "DISPLAY" | "LISTDSD" | "LISTGRP" | "LISTUSER" | "RACPRMCK" | "RLIST" | "SEARCH"
+    )
+}
+
+fn request_domains(keyword: &str) -> BTreeSet<String> {
+    let domains: &[&str] = match keyword {
+        "DEFINE" => &["profiles"],
+        "LIST" => &["caches", "classes"],
+        "SIGNON" => &["acees", "sessions"],
+        "TOKENBLD" => &["tokens"],
+        "TOKENMAP" | "VERIFYX" => &["acees"],
+        _ => &[],
+    };
+    domains.iter().map(|domain| (*domain).into()).collect()
+}
+
+fn request_identity(keyword: &str) -> &'static str {
+    match keyword {
+        "AUDIT" => "audit",
+        "AUTH" | "DIRAUTH" | "FASTAUTH" => "decision",
+        "DEFINE" => "defined",
+        "VERIFY" | "VERIFYX" => "verified",
+        "EXTRACT" => "extracted-user",
+        "LIST" => "listed",
+        "SIGNON" => "signed-on",
+        "STAT" => "statistics",
+        "TOKENBLD" => "token-built",
+        "TOKENMAP" => "token-mapped",
+        "TOKENXTR" => "token-extracted",
+        _ => "none",
+    }
+}
+
+fn request_mutating(keyword: &str) -> bool {
+    matches!(
+        keyword,
+        "AUDIT" | "DEFINE" | "LIST" | "SIGNON" | "TOKENBLD" | "TOKENMAP" | "VERIFY" | "VERIFYX"
+    )
+}
+
 fn verify_command_obligation(case: CommandCase, obligation: &str) -> Result<(), String> {
     let mut state = RefState::default();
     let before = state.clone();
@@ -753,7 +1134,7 @@ fn verify_command_obligation(case: CommandCase, obligation: &str) -> Result<(), 
                 false,
                 BTreeMap::new(),
             ))?;
-            let restarted = state.clone();
+            let restarted = restart_state(&state)?;
             if restarted == state {
                 Ok(())
             } else {
@@ -799,16 +1180,29 @@ fn verify_request_obligation(case: RequestCase, obligation: &str) -> Result<(), 
             }
         }
         "malformed" | "bounded-limit" => {
+            if matches!(
+                case.transition,
+                RequestTransition::Signon | RequestTransition::Verify | RequestTransition::Verifyx
+            ) {
+                state.credentials = 0;
+            }
+            let credential_negative = state.credentials == 0;
+            let negative_before = protected_shape(&state);
             let outcome = execute_request(
                 &mut state,
                 case,
                 Actor::AUTHORIZED,
                 true,
-                true,
+                !credential_negative,
                 BTreeMap::new(),
             );
-            if outcome.reason == Reason::MalformedRequest
-                && protected_shape(&state) == protected_shape(&before)
+            if outcome.reason
+                == if credential_negative {
+                    Reason::CredentialInvalid
+                } else {
+                    Reason::MalformedRequest
+                }
+                && protected_shape(&state) == negative_before
             {
                 Ok(())
             } else {
@@ -835,7 +1229,7 @@ fn verify_request_obligation(case: RequestCase, obligation: &str) -> Result<(), 
                 false,
                 BTreeMap::new(),
             ))?;
-            let restarted = state.clone();
+            let restarted = restart_state(&state)?;
             if restarted == state {
                 Ok(())
             } else {
@@ -855,6 +1249,13 @@ fn require_granted(outcome: Status) -> Result<(), String> {
     } else {
         Err(format!("reference outcome was not granted: {outcome:?}"))
     }
+}
+
+fn restart_state(state: &RefState) -> Result<RefState, String> {
+    let durable = serde_json::to_vec(state)
+        .map_err(|error| format!("reference restart encode failed: {error}"))?;
+    serde_json::from_slice(&durable)
+        .map_err(|error| format!("reference restart decode failed: {error}"))
 }
 
 fn require_redacted(state: &RefState) -> Result<(), String> {
@@ -1246,6 +1647,56 @@ mod tests {
                 "shared implementation reuse mutant survived: {forbidden}"
             );
         }
+
+        let expected = expected_observation(
+            "command",
+            "ibm-zos-3.2-racf-saf-2026:racf-command-families:0001",
+            "ADDGROUP",
+            "authorized",
+            "executed",
+        )
+        .unwrap();
+        let mut generic_success = expected.clone();
+        generic_success.status = None;
+        assert!(compare_observations(&expected, &generic_success).is_err());
+        let mut no_op = expected.clone();
+        no_op.changed_domains.clear();
+        assert!(compare_observations(&expected, &no_op).is_err());
+        let mut wrong_transition = expected.clone();
+        wrong_transition.changed_domains = BTreeSet::from(["profiles".into()]);
+        assert!(compare_observations(&expected, &wrong_transition).is_err());
+        let mut wrong_status = expected.clone();
+        wrong_status.status.as_mut().unwrap().reason = "default-deny".into();
+        assert!(compare_observations(&expected, &wrong_status).is_err());
+        let mut missing_audit = expected.clone();
+        missing_audit.audit = "none".into();
+        assert!(compare_observations(&expected, &missing_audit).is_err());
+
+        let denied = expected_observation(
+            "command",
+            "ibm-zos-3.2-racf-saf-2026:racf-command-families:0001",
+            "ADDGROUP",
+            "unauthorized",
+            "executed",
+        )
+        .unwrap();
+        let mut authorization_bypass = denied.clone();
+        authorization_bypass.outcome = "granted".into();
+        authorization_bypass.status = Some(status_observation(status(Reason::Granted)));
+        authorization_bypass.changed_domains = BTreeSet::from(["groups".into()]);
+        assert!(compare_observations(&denied, &authorization_bypass).is_err());
+
+        let replay = expected_observation(
+            "racroute",
+            "ibm-zos-3.2-racf-saf-2026:racroute-request-types:0010",
+            "TOKENBLD",
+            "authorized",
+            "executed",
+        )
+        .unwrap();
+        let mut replay_duplication = replay.clone();
+        replay_duplication.replay = "duplicate-effect".into();
+        assert!(compare_observations(&replay, &replay_duplication).is_err());
     }
 
     #[test]

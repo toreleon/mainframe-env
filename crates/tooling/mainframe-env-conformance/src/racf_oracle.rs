@@ -215,10 +215,10 @@ fn contains_sensitive_value(value: &Value, key: Option<&str>) -> bool {
             .any(|value| contains_sensitive_value(value, None)),
         Value::String(value) => {
             let upper = value.to_ascii_uppercase();
-            value.starts_with("secret:")
-                || value.starts_with("vault:")
-                || value.starts_with("keyring:")
-                || value.starts_with("$argon2")
+            upper.starts_with("SECRET:")
+                || upper.starts_with("VAULT:")
+                || upper.starts_with("KEYRING:")
+                || upper.starts_with("$ARGON2")
                 || upper.contains("BEGIN PRIVATE KEY")
                 || upper.contains("BEGIN CERTIFICATE")
         }

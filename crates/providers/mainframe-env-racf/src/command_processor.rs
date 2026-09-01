@@ -4,14 +4,15 @@ use crate::command::{
     ParsedOperand, diagnostic, parse_command,
 };
 use crate::model::{
-    AccessControlEntry, AccessLevel, AssociationState, AuditFieldValue, AuditPolicy,
-    CertificateReference, ClassDescriptor, DatabaseSharingMode, DecisionOutcome, DecisionReason,
-    GroupAuthority, GroupConnection, GroupProfile, IdentityMapping, KeyReference, KeyRing,
-    MfaFactor, MfaFactorKind, PrincipalKind, PrincipalProfile, PrincipalState, ProfileSegment,
-    ProfileTemplate, RaclistCache, ResourceProfile, RrsfNode, RrsfNodeState, SafStatus,
-    SecurityAuditRecord, SecurityDatabaseSnapshot, SecurityTransaction, SegmentFieldKind,
-    SegmentFieldSchema, SegmentTemplate, SegmentValue, SignonSessionState, TransactionState,
-    UserAssociation, connection_key, keyring_key, profile_key,
+    AccessCondition, AccessControlEntry, AccessLevel, AssociationState, AuditFieldValue,
+    AuditPolicy, CertificateReference, ClassDescriptor, CredentialVerifier, DatabaseSharingMode,
+    DecisionOutcome, DecisionReason, GroupAuthority, GroupConnection, GroupProfile,
+    IdentityMapping, KeyReference, KeyRing, MfaFactor, MfaFactorKind, PrincipalKind,
+    PrincipalProfile, PrincipalState, ProfileSegment, ProfileTemplate, RaclistCache,
+    ResourceProfile, RrsfNode, RrsfNodeState, SafStatus, SecurityAuditRecord,
+    SecurityDatabaseSnapshot, SecurityTransaction, SegmentFieldKind, SegmentFieldSchema,
+    SegmentTemplate, SegmentValue, SignonSessionState, TransactionState, UserAssociation,
+    connection_key, keyring_key, profile_key,
 };
 use argon2::Argon2;
 use argon2::password_hash::{PasswordVerifier, phc::PasswordHash};
@@ -338,6 +339,7 @@ fn apply_mutation(
     context: &CommandContext,
     command: &ParsedCommand,
 ) -> Result<Vec<CommandRecord>, SemanticProblem> {
+    reject_unsupported_direction(command)?;
     require_active(snapshot, context)?;
     match command.descriptor.family() {
         CommandFamily::AddGroup => add_group(snapshot, context, command),
@@ -377,6 +379,7 @@ fn apply_query(
     context: &CommandContext,
     command: &ParsedCommand,
 ) -> Result<Vec<CommandRecord>, SemanticProblem> {
+    reject_unsupported_direction(command)?;
     require_active(snapshot, context)?;
     match command.descriptor.family() {
         CommandFamily::Display => display(snapshot, context, command),
@@ -399,6 +402,9 @@ fn password(
     context: &CommandContext,
     command: &ParsedCommand,
 ) -> Result<Vec<CommandRecord>, SemanticProblem> {
+    if command.has_operand("PASSWORD") && command.has_operand("PHRASE") {
+        return Err(SemanticProblem::Invalid(0));
+    }
     let target =
         operand_principal(command, "USER")?.unwrap_or_else(|| context.actor().as_str().to_string());
     if target != context.actor().as_str() && !is_special(snapshot, context) {
@@ -436,45 +442,17 @@ fn password(
         }
     }
     let new_secret = values[values.len() - 1];
-    let minimum = if command.operand("PHRASE").is_some() {
-        snapshot.policy.phrase_minimum
-    } else {
-        snapshot.policy.password_minimum
-    };
-    if new_secret.len() < minimum || new_secret.len() > snapshot.policy.password_maximum {
-        return Err(SemanticProblem::Invalid(operand.offset));
-    }
-    let replacement = service
-        .password_principal_from_bytes(&target, new_secret.as_bytes())
-        .map_err(|_| SemanticProblem::Invalid(operand.offset))?;
     let mut next = current;
-    let new_credential = replacement
-        .credential
-        .ok_or(SemanticProblem::Invalid(operand.offset))?;
-    let new_digest = verifier_digest(&new_credential.encoded_verifier);
-    if next.credential.as_ref().is_some_and(|credential| {
-        credential.encoded_verifier == new_credential.encoded_verifier
-            || credential.history_digests.contains(&new_digest)
-    }) {
-        return Err(SemanticProblem::Conflict);
-    }
-    let mut history = next
-        .credential
-        .as_ref()
-        .map_or_else(Vec::new, |credential| credential.history_digests.clone());
-    if let Some(credential) = &next.credential {
-        history.push(verifier_digest(&credential.encoded_verifier));
-    }
-    let retain = snapshot.policy.password_history;
-    if history.len() > retain {
-        history.drain(..history.len() - retain);
-    }
-    next.credential = Some(crate::model::CredentialVerifier {
-        algorithm: new_credential.algorithm,
-        encoded_verifier: new_credential.encoded_verifier,
-        changed_tick: context.tick(),
-        history_digests: history,
-    });
+    next.credential = Some(replace_credential(
+        service,
+        snapshot,
+        &target,
+        next.credential.as_ref(),
+        new_secret,
+        command.has_operand("PHRASE"),
+        operand.offset,
+        context.tick(),
+    )?);
     next.state = PrincipalState::Active;
     next.version = checked_version(next.version)?;
     snapshot.principals.insert(target.clone(), next);
@@ -482,6 +460,55 @@ fn password(
         kind: CommandObjectKind::User,
         name: target,
     }])
+}
+
+#[allow(clippy::too_many_arguments)]
+fn replace_credential(
+    service: &RacfService,
+    snapshot: &SecurityDatabaseSnapshot,
+    user: &str,
+    current: Option<&CredentialVerifier>,
+    secret: &str,
+    phrase: bool,
+    offset: usize,
+    tick: u64,
+) -> Result<CredentialVerifier, SemanticProblem> {
+    let minimum = if phrase {
+        snapshot.policy.phrase_minimum
+    } else {
+        snapshot.policy.password_minimum
+    };
+    if secret.len() < minimum || secret.len() > snapshot.policy.password_maximum {
+        return Err(SemanticProblem::Invalid(offset));
+    }
+    let replacement = service
+        .password_principal_from_bytes(user, secret.as_bytes())
+        .map_err(|_| SemanticProblem::Invalid(offset))?;
+    let new_credential = replacement
+        .credential
+        .ok_or(SemanticProblem::Invalid(offset))?;
+    let new_digest = verifier_digest(&new_credential.encoded_verifier);
+    if current.is_some_and(|credential| {
+        credential.encoded_verifier == new_credential.encoded_verifier
+            || credential.history_digests.contains(&new_digest)
+    }) {
+        return Err(SemanticProblem::Conflict);
+    }
+    let mut history =
+        current.map_or_else(Vec::new, |credential| credential.history_digests.clone());
+    if let Some(credential) = current {
+        history.push(verifier_digest(&credential.encoded_verifier));
+    }
+    let retain = snapshot.policy.password_history;
+    if history.len() > retain {
+        history.drain(..history.len() - retain);
+    }
+    Ok(CredentialVerifier {
+        algorithm: new_credential.algorithm,
+        encoded_verifier: new_credential.encoded_verifier,
+        changed_tick: tick,
+        history_digests: history,
+    })
 }
 
 fn racdcert(
@@ -1409,26 +1436,39 @@ fn add_user(
     if snapshot.principals.contains_key(&user) {
         return Err(SemanticProblem::Conflict);
     }
-    let mut principal = if let Some(secret) = secret_operand(command)? {
-        service
-            .password_principal_from_bytes(&user, secret.as_bytes())
-            .map_err(|_| SemanticProblem::Invalid(secret_offset(command)))?
-    } else {
-        PrincipalProfile {
-            id: user.clone(),
-            kind: PrincipalKind::User,
-            owner: user.clone(),
-            default_group: None,
-            state: PrincipalState::Active,
-            credential: None,
-            profile_template: None,
-            segments: BTreeMap::new(),
-            security_level: 0,
-            security_label: None,
-            categories: BTreeSet::new(),
-            attributes: BTreeSet::new(),
-            version: 1,
-        }
+    let secret = secret_operand(command)?;
+    if secret.is_some() && command.has_operand("NOPASSWORD")
+        || command.has_operand("PASSWORD") && command.has_operand("PHRASE")
+    {
+        return Err(SemanticProblem::Invalid(secret_offset(command)));
+    }
+    let mut principal = PrincipalProfile {
+        id: user.clone(),
+        kind: PrincipalKind::User,
+        owner: user.clone(),
+        default_group: None,
+        state: PrincipalState::Active,
+        credential: secret
+            .map(|secret| {
+                replace_credential(
+                    service,
+                    snapshot,
+                    &user,
+                    None,
+                    secret,
+                    command.has_operand("PHRASE"),
+                    secret_offset(command),
+                    context.tick(),
+                )
+            })
+            .transpose()?,
+        profile_template: None,
+        segments: BTreeMap::new(),
+        security_level: 0,
+        security_label: None,
+        categories: BTreeSet::new(),
+        attributes: BTreeSet::new(),
+        version: 1,
     };
     principal.owner =
         operand_principal(command, "OWNER")?.unwrap_or_else(|| context.actor().as_str().into());
@@ -1529,10 +1569,15 @@ fn alter_user(
         .get(&user)
         .cloned()
         .ok_or(SemanticProblem::NotFound)?;
-    if !is_special(snapshot, context)
-        && current.owner != context.actor().as_str()
-        && user != context.actor().as_str()
-    {
+    let special = is_special(snapshot, context);
+    let administrative = command
+        .operands
+        .iter()
+        .any(|operand| !matches!(operand.name.as_str(), "NAME" | "LANGUAGE"));
+    if administrative && !special {
+        return Err(SemanticProblem::Unauthorized);
+    }
+    if !special && current.owner != context.actor().as_str() && user != context.actor().as_str() {
         return Err(SemanticProblem::Unauthorized);
     }
     let mut next = current;
@@ -1542,14 +1587,30 @@ fn alter_user(
     }
     if let Some(group) = operand_principal(command, "DFLTGRP")? {
         require_group(snapshot, &group)?;
+        if !snapshot
+            .connections
+            .get(&connection_key(&user, &group))
+            .is_some_and(|connection| !connection.revoked)
+        {
+            return Err(SemanticProblem::Conflict);
+        }
         next.default_group = Some(group);
     }
     if let Some(secret) = secret_operand(command)? {
-        next.credential = service
-            .password_principal_from_bytes(&user, secret.as_bytes())
-            .map_err(|_| SemanticProblem::Invalid(secret_offset(command)))?
-            .credential;
+        next.credential = Some(replace_credential(
+            service,
+            snapshot,
+            &user,
+            next.credential.as_ref(),
+            secret,
+            command.has_operand("PHRASE"),
+            secret_offset(command),
+            context.tick(),
+        )?);
         next.state = PrincipalState::Active;
+    }
+    if command.has_operand("NOPASSWORD") {
+        next.credential = None;
     }
     if command.has_operand("REVOKE") {
         next.state = PrincipalState::Revoked;
@@ -1715,7 +1776,10 @@ fn delete_users(
             .values()
             .any(|profile| profile.owner == user)
             || snapshot.groups.values().any(|group| group.owner == user)
-            || snapshot.acees.values().any(|acee| acee.principal == user)
+            || snapshot
+                .acees
+                .values()
+                .any(|acee| acee.principal == user && acee.state == crate::AceeState::Active)
             || snapshot.tokens.values().any(|token| token.owner == user)
             || snapshot
                 .certificates
@@ -1741,11 +1805,21 @@ fn delete_users(
             || snapshot
                 .signon_sessions
                 .values()
-                .any(|session| session.user == user)
+                .any(|session| session.user == user && session.state == SignonSessionState::Active)
         {
             return Err(SemanticProblem::Conflict);
         }
         snapshot.principals.remove(&user);
+        let closed_acees = snapshot
+            .acees
+            .values()
+            .filter(|acee| acee.principal == user && acee.state != crate::AceeState::Active)
+            .map(|acee| acee.id.clone())
+            .collect::<BTreeSet<_>>();
+        snapshot.acees.retain(|id, _| !closed_acees.contains(id));
+        snapshot.signon_sessions.retain(|_, session| {
+            session.user != user || session.state == SignonSessionState::Active
+        });
         snapshot
             .connections
             .retain(|_, connection| connection.user != user);
@@ -1993,6 +2067,7 @@ fn permit(
     if access.is_none() && !command.has_operand("DELETE") && !command.has_operand("RESET") {
         return Err(SemanticProblem::Invalid(0));
     }
+    let when = parse_access_condition(command)?;
     let mut records = Vec::new();
     for raw_name in &command.positionals {
         let name = upper_profile(raw_name)?;
@@ -2011,18 +2086,19 @@ fn permit(
         }
         for id in &ids {
             next.access_list
-                .retain(|entry| entry.principal != *id || entry.when.is_some());
+                .retain(|entry| entry.principal != *id || entry.when != when);
             if !command.has_operand("DELETE") {
                 next.access_list.push(AccessControlEntry {
                     principal: id.clone(),
                     access: access.expect("validated access"),
-                    when: None,
+                    when: when.clone(),
                     audit: AuditPolicy::None,
                 });
             }
         }
-        next.access_list
-            .sort_by(|left, right| left.principal.cmp(&right.principal));
+        next.access_list.sort_by(|left, right| {
+            (&left.principal, &left.when).cmp(&(&right.principal, &right.when))
+        });
         next.version = checked_version(next.version)?;
         snapshot.profiles.insert(key, next);
         records.push(CommandRecord::Name {
@@ -2360,6 +2436,7 @@ fn append_transaction(
                     .ok_or(HostProblem::ResourceExhausted)?,
             ),
             status,
+            terminal_result: None,
         },
     );
     Ok(())
@@ -2535,6 +2612,106 @@ fn update_principal_flags(principal: &mut PrincipalProfile, command: &ParsedComm
             }
         }
     }
+}
+
+fn reject_unsupported_direction(command: &ParsedCommand) -> Result<(), SemanticProblem> {
+    command
+        .operands
+        .iter()
+        .find(|operand| {
+            matches!(operand.name.as_str(), "AT" | "ONLYAT")
+                && !command
+                    .descriptor
+                    .operands()
+                    .contains(&operand.name.as_str())
+        })
+        .map_or(Ok(()), |operand| {
+            Err(SemanticProblem::Invalid(operand.offset))
+        })
+}
+
+fn parse_access_condition(
+    command: &ParsedCommand,
+) -> Result<Option<AccessCondition>, SemanticProblem> {
+    let Some(operand) = command.operand("WHEN") else {
+        return Ok(None);
+    };
+    let values = operand.values().collect::<Vec<_>>();
+    if values.is_empty() {
+        return Err(SemanticProblem::Invalid(operand.offset));
+    }
+    let mut condition = AccessCondition {
+        terminal: None,
+        console: None,
+        system: None,
+        application: None,
+        start_tick: None,
+        end_tick: None,
+    };
+    let mut index = 0usize;
+    while index < values.len() {
+        let marker = values[index].to_ascii_uppercase();
+        index += 1;
+        match marker.as_str() {
+            "TERMINAL" | "CONSOLE" | "SYSTEM" | "APPLICATION" | "APPL" => {
+                let value = values
+                    .get(index)
+                    .ok_or(SemanticProblem::Invalid(operand.offset))?;
+                index += 1;
+                let value = normalized_text(value, 246)?.to_ascii_uppercase();
+                let target = match marker.as_str() {
+                    "TERMINAL" => &mut condition.terminal,
+                    "CONSOLE" => &mut condition.console,
+                    "SYSTEM" => &mut condition.system,
+                    "APPLICATION" | "APPL" => &mut condition.application,
+                    _ => unreachable!(),
+                };
+                if target.replace(value).is_some() {
+                    return Err(SemanticProblem::Invalid(operand.offset));
+                }
+            }
+            "TIME" => {
+                let start = values
+                    .get(index)
+                    .and_then(|value| value.parse::<u64>().ok())
+                    .ok_or(SemanticProblem::Invalid(operand.offset))?;
+                let end = values
+                    .get(index + 1)
+                    .and_then(|value| value.parse::<u64>().ok())
+                    .ok_or(SemanticProblem::Invalid(operand.offset))?;
+                if condition.start_tick.replace(start).is_some()
+                    || condition.end_tick.replace(end).is_some()
+                {
+                    return Err(SemanticProblem::Invalid(operand.offset));
+                }
+                index += 2;
+            }
+            "START" | "END" => {
+                let value = values
+                    .get(index)
+                    .and_then(|value| value.parse::<u64>().ok())
+                    .ok_or(SemanticProblem::Invalid(operand.offset))?;
+                index += 1;
+                let target = if marker == "START" {
+                    &mut condition.start_tick
+                } else {
+                    &mut condition.end_tick
+                };
+                if target.replace(value).is_some() {
+                    return Err(SemanticProblem::Invalid(operand.offset));
+                }
+            }
+            _ => return Err(SemanticProblem::Invalid(operand.offset)),
+        }
+    }
+    if condition
+        .start_tick
+        .zip(condition.end_tick)
+        .is_some_and(|(start, end)| start > end)
+    {
+        return Err(SemanticProblem::Invalid(operand.offset));
+    }
+    Ok(Some(condition))
 }
 
 fn apply_mfa(
@@ -3002,9 +3179,11 @@ fn host_diagnostic(problem: HostProblem) -> CommandDiagnostic {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{MemorySecretResolver, RacfLimits};
+    use crate::{
+        AccessEnvironment, MemorySecretResolver, RacfLimits, RacrouteRequest, SafRequestContext,
+    };
     use mainframe_env_execution_api::InvocationLimits;
-    use mainframe_env_host_api::SecretRef;
+    use mainframe_env_host_api::{AccessIntent, ResourceName, SecretRef, SecurityDecision};
     use mainframe_env_store::MemoryStore;
     use mainframe_env_store_api::{
         ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
@@ -3203,6 +3382,484 @@ mod tests {
         assert_eq!(
             service.database().summary().unwrap().principals,
             before.principals
+        );
+    }
+
+    #[test]
+    fn ordinary_altuser_self_service_cannot_grant_or_use_privileged_authority() {
+        let (service, admin) = setup();
+        service
+            .execute_command(&admin, "ADDUSER USER1 PASSWORD('USER-PASSWORD')")
+            .unwrap();
+        let user = PrincipalId::new("USER1", InvocationLimits::default()).unwrap();
+        let before = service.database().summary().unwrap();
+        for (index, operand) in [
+            "SPECIAL",
+            "AUDITOR",
+            "OPERATIONS",
+            "OWNER(RACFADM)",
+            "REVOKE",
+            "OMVS(UID(0))",
+            "MFA(FACTOR1 REF secret:mfa TYPE TOTP)",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let context = CommandContext::new(
+                user.clone(),
+                format!("SELF-ESCALATE-{index}"),
+                "SELF-ESCALATE",
+                10 + index as u64,
+            )
+            .unwrap();
+            assert_eq!(
+                service
+                    .execute_command(&context, &format!("ALTUSER USER1 {operand}"))
+                    .unwrap_err()
+                    .code,
+                CommandDiagnosticCode::Unauthorized
+            );
+        }
+        let snapshot = service.database.read().unwrap();
+        assert!(
+            ["SPECIAL", "AUDITOR", "OPERATIONS"]
+                .into_iter()
+                .all(|attribute| !snapshot.principals["USER1"].attributes.contains(attribute))
+        );
+        assert_eq!(snapshot.principals["USER1"].state, PrincipalState::Active);
+        assert!(!snapshot.mfa_factors.contains_key("FACTOR1"));
+        assert_eq!(snapshot.audits.len(), before.audits + 7);
+        drop(snapshot);
+
+        let denied =
+            CommandContext::new(user.clone(), "SELF-USE-PRIVILEGE", "SELF-ESCALATE", 30).unwrap();
+        assert_eq!(
+            service
+                .execute_command(&denied, "ADDGROUP ESCALATED")
+                .unwrap_err()
+                .code,
+            CommandDiagnosticCode::Unauthorized
+        );
+        assert!(
+            !service
+                .database
+                .read()
+                .unwrap()
+                .groups
+                .contains_key("ESCALATED")
+        );
+
+        service
+            .execute_command(
+                &CommandContext::new(user, "SELF-NAME", "SELF-ESCALATE", 31).unwrap(),
+                "ALTUSER USER1 NAME('ORDINARY USER')",
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn permit_when_is_typed_evaluated_and_replaced_independently() {
+        let (service, admin) = setup();
+        for (index, command) in [
+            "ADDUSER USER1 PASSWORD('USER-PASSWORD')",
+            "RDEFINE FACILITY COND.** OWNER(RACFADM) UACC(NONE)",
+            "PERMIT 'COND.**' CLASS(FACILITY) ID(USER1) ACCESS(READ) WHEN(TERMINAL(TERM1) TIME(5 10))",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            service
+                .execute_command(&next(&admin, &format!("WHEN-{index}")), command)
+                .unwrap_or_else(|problem| panic!("{command}: {problem}"));
+        }
+        let user = PrincipalId::new("USER1", InvocationLimits::default()).unwrap();
+        let authorize = |id: &str, terminal: &str, tick: u64| {
+            service
+                .racroute(
+                    &SafRequestContext::new(user.clone(), None, None, id, "PERMIT-WHEN", tick)
+                        .unwrap(),
+                    RacrouteRequest::Auth {
+                        class: "FACILITY".into(),
+                        resource: "COND.ONE".into(),
+                        access: AccessLevel::Read,
+                        environment: AccessEnvironment {
+                            terminal: Some(terminal.into()),
+                            tick,
+                            ..Default::default()
+                        },
+                    },
+                )
+                .unwrap()
+        };
+        assert_eq!(
+            authorize("WHEN-ALLOW", "TERM1", 6).status.reason,
+            DecisionReason::Granted
+        );
+        assert_eq!(
+            authorize("WHEN-DENY-TERM", "OTHER", 6).status.reason,
+            DecisionReason::ConditionNotSatisfied
+        );
+        assert_eq!(
+            authorize("WHEN-DENY-TIME", "TERM1", 11).status.reason,
+            DecisionReason::ConditionNotSatisfied
+        );
+
+        service
+            .execute_command(
+                &next(&admin, "WHEN-UNCONDITIONAL"),
+                "PERMIT 'COND.**' CLASS(FACILITY) ID(USER1) ACCESS(UPDATE)",
+            )
+            .unwrap();
+        assert_eq!(
+            service.database.read().unwrap().profiles["FACILITY:COND.**"]
+                .access_list
+                .iter()
+                .filter(|entry| entry.principal == "USER1")
+                .count(),
+            2
+        );
+        service
+            .execute_command(
+                &next(&admin, "WHEN-DELETE-UNCONDITIONAL"),
+                "PERMIT 'COND.**' CLASS(FACILITY) ID(USER1) DELETE",
+            )
+            .unwrap();
+        let snapshot = service.database.read().unwrap();
+        let entries = snapshot.profiles["FACILITY:COND.**"]
+            .access_list
+            .iter()
+            .filter(|entry| entry.principal == "USER1")
+            .collect::<Vec<_>>();
+        assert_eq!(entries.len(), 1);
+        assert!(entries[0].when.is_some());
+        drop(snapshot);
+
+        service
+            .execute_command(
+                &next(&admin, "WHEN-REPLACE-CONDITIONAL"),
+                "PERMIT 'COND.**' CLASS(FACILITY) ID(USER1) ACCESS(CONTROL) WHEN(TERMINAL(TERM1) TIME(5 10))",
+            )
+            .unwrap();
+        let snapshot = service.database.read().unwrap();
+        let entries = snapshot.profiles["FACILITY:COND.**"]
+            .access_list
+            .iter()
+            .filter(|entry| entry.principal == "USER1")
+            .collect::<Vec<_>>();
+        assert_eq!(
+            (entries.len(), entries[0].access),
+            (1, AccessLevel::Control)
+        );
+        drop(snapshot);
+
+        let before = service.database.read().unwrap();
+        assert_eq!(
+            service
+                .execute_command(
+                    &next(&admin, "WHEN-UNSUPPORTED"),
+                    "PERMIT 'COND.**' CLASS(FACILITY) ID(USER1) ACCESS(READ) WHEN(EXIT(UNKNOWN))",
+                )
+                .unwrap_err()
+                .code,
+            CommandDiagnosticCode::InvalidValue
+        );
+        let after = service.database.read().unwrap();
+        assert_eq!(
+            after.profiles["FACILITY:COND.**"].access_list,
+            before.profiles["FACILITY:COND.**"].access_list
+        );
+        assert_eq!(after.audits.len(), before.audits.len() + 1);
+        drop(after);
+
+        service
+            .execute_command(
+                &next(&admin, "WHEN-DELETE-CONDITIONAL"),
+                "PERMIT 'COND.**' CLASS(FACILITY) ID(USER1) DELETE WHEN(TERMINAL(TERM1) TIME(5 10))",
+            )
+            .unwrap();
+        assert!(
+            service.database.read().unwrap().profiles["FACILITY:COND.**"]
+                .access_list
+                .iter()
+                .all(|entry| entry.principal != "USER1")
+        );
+    }
+
+    #[test]
+    fn remote_only_direction_never_falls_through_to_local_destructive_handlers() {
+        let (service, admin) = setup();
+        for (index, command) in ["ADDGROUP GROUP1", "ADDUSER USER1"].into_iter().enumerate() {
+            service
+                .execute_command(&next(&admin, &format!("DIRECTION-SETUP-{index}")), command)
+                .unwrap();
+        }
+        let before = service.database().summary().unwrap();
+        for (index, command) in ["DELUSER USER1 ONLYAT(REMOTE)", "DELGROUP GROUP1 AT(REMOTE)"]
+            .into_iter()
+            .enumerate()
+        {
+            assert_eq!(
+                service
+                    .execute_command(&next(&admin, &format!("DIRECTION-DENY-{index}")), command,)
+                    .unwrap_err()
+                    .code,
+                CommandDiagnosticCode::InvalidValue
+            );
+        }
+        let after = service.database().summary().unwrap();
+        assert_eq!(
+            (after.principals, after.groups),
+            (before.principals, before.groups)
+        );
+        assert_eq!(after.audits, before.audits + 2);
+        assert!(
+            service
+                .database
+                .read()
+                .unwrap()
+                .principals
+                .contains_key("USER1")
+        );
+        assert!(
+            service
+                .database
+                .read()
+                .unwrap()
+                .groups
+                .contains_key("GROUP1")
+        );
+        service
+            .execute_command(
+                &next(&admin, "DIRECTION-LOCAL-SIGNOFF"),
+                "SIGNOFF AT(REMOTE) LIST",
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn add_alt_and_password_share_policy_history_and_nopassword_across_restart() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let secrets = Arc::new(MemorySecretResolver::default());
+        secrets.insert("secret:admin", b"ADMIN-PASSWORD".to_vec());
+        let service =
+            RacfService::open(store.clone(), secrets.clone(), Default::default()).unwrap();
+        service
+            .bootstrap_administrator(
+                "RACFADM",
+                &SecretRef::new("secret:admin", Default::default()).unwrap(),
+            )
+            .unwrap();
+        let admin = CommandContext::new(
+            PrincipalId::new("RACFADM", InvocationLimits::default()).unwrap(),
+            "POLICY-SET",
+            "PASSWORD-POLICY",
+            1,
+        )
+        .unwrap();
+        service
+            .execute_command(
+                &admin,
+                "SETROPTS PASSWORD(MINIMUM(10) MAXIMUM(20) HISTORY(2)) PHRASE(MINIMUM(15))",
+            )
+            .unwrap();
+        for (id, command) in [
+            ("ADD-SHORT", "ADDUSER SHORT PASSWORD('short')"),
+            ("ADD-PHRASE-SHORT", "ADDUSER PHRASE1 PHRASE('short phrase')"),
+        ] {
+            assert_eq!(
+                service
+                    .execute_command(&next(&admin, id), command)
+                    .unwrap_err()
+                    .code,
+                CommandDiagnosticCode::InvalidValue
+            );
+        }
+        service
+            .execute_command(
+                &next(&admin, "ADD-VALID"),
+                "ADDUSER USER1 PASSWORD('VALID-PASS1')",
+            )
+            .unwrap();
+        service
+            .execute_command(
+                &next(&admin, "ADD-PHRASE-VALID"),
+                "ADDUSER PHRASE1 PHRASE('VALID LONG PHRASE')",
+            )
+            .unwrap();
+        for (id, command) in [
+            ("ALT-SHORT", "ALTUSER USER1 PASSWORD('tiny')"),
+            ("ALT-MAX", "ALTUSER USER1 PASSWORD('123456789012345678901')"),
+        ] {
+            assert_eq!(
+                service
+                    .execute_command(&next(&admin, id), command)
+                    .unwrap_err()
+                    .code,
+                CommandDiagnosticCode::InvalidValue
+            );
+        }
+        service
+            .execute_command(
+                &next(&admin, "ALT-VALID"),
+                "ALTUSER USER1 PASSWORD('VALID-PASS2')",
+            )
+            .unwrap();
+        let credential = service.database.read().unwrap().principals["USER1"]
+            .credential
+            .clone()
+            .unwrap();
+        assert_eq!(credential.history_digests.len(), 1);
+        drop(service);
+
+        let reopened = RacfService::open(store, secrets, Default::default()).unwrap();
+        assert_eq!(
+            reopened
+                .execute_command(
+                    &next(&admin, "ALT-REUSE-AFTER-RESTART"),
+                    "ALTUSER USER1 PASSWORD('VALID-PASS1')",
+                )
+                .unwrap_err()
+                .code,
+            CommandDiagnosticCode::Conflict
+        );
+        assert_eq!(
+            reopened
+                .execute_command(
+                    &next(&admin, "ALT-PHRASE-SHORT"),
+                    "ALTUSER USER1 PHRASE('short phrase')",
+                )
+                .unwrap_err()
+                .code,
+            CommandDiagnosticCode::InvalidValue
+        );
+        reopened
+            .execute_command(
+                &next(&admin, "ALT-PHRASE-VALID"),
+                "ALTUSER USER1 PHRASE('ANOTHER LONG PHRASE')",
+            )
+            .unwrap();
+        reopened
+            .execute_command(&next(&admin, "ALT-NOPASSWORD"), "ALTUSER USER1 NOPASSWORD")
+            .unwrap();
+        assert!(!reopened.database.read().unwrap().principals["USER1"].has_credential());
+
+        reopened
+            .execute_command(
+                &next(&admin, "ADD-SELF-PASSWORD"),
+                "ADDUSER USER2 PASSWORD('VALID-PASS1')",
+            )
+            .unwrap();
+        let user = PrincipalId::new("USER2", InvocationLimits::default()).unwrap();
+        assert_eq!(
+            reopened
+                .execute_command(
+                    &CommandContext::new(
+                        user.clone(),
+                        "SELF-PASSWORD-MISSING-CURRENT",
+                        "PASSWORD-POLICY",
+                        50,
+                    )
+                    .unwrap(),
+                    "PASSWORD PASSWORD('VALID-PASS2')",
+                )
+                .unwrap_err()
+                .code,
+            CommandDiagnosticCode::InvalidValue
+        );
+        reopened
+            .execute_command(
+                &CommandContext::new(user, "SELF-PASSWORD-WITH-CURRENT", "PASSWORD-POLICY", 51)
+                    .unwrap(),
+                "PASSWORD PASSWORD('VALID-PASS1' 'VALID-PASS2')",
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn altuser_default_group_requires_connection_and_survives_restart() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let secrets = Arc::new(MemorySecretResolver::default());
+        secrets.insert("secret:admin", b"ADMIN-PASSWORD".to_vec());
+        let service =
+            RacfService::open(store.clone(), secrets.clone(), Default::default()).unwrap();
+        service
+            .bootstrap_administrator(
+                "RACFADM",
+                &SecretRef::new("secret:admin", Default::default()).unwrap(),
+            )
+            .unwrap();
+        let admin = CommandContext::new(
+            PrincipalId::new("RACFADM", InvocationLimits::default()).unwrap(),
+            "DFLT-1",
+            "DEFAULT-GROUP",
+            1,
+        )
+        .unwrap();
+        for (index, command) in [
+            "ADDGROUP GROUP1",
+            "ADDGROUP GROUP2",
+            "ADDUSER USER1 DFLTGRP(GROUP1)",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            service
+                .execute_command(&next(&admin, &format!("DFLT-{index}")), command)
+                .unwrap();
+        }
+        assert_eq!(
+            service
+                .execute_command(
+                    &next(&admin, "DFLT-NOT-CONNECTED"),
+                    "ALTUSER USER1 DFLTGRP(GROUP2)",
+                )
+                .unwrap_err()
+                .code,
+            CommandDiagnosticCode::Conflict
+        );
+        assert_eq!(
+            service.database.read().unwrap().principals["USER1"].default_group,
+            Some("GROUP1".into())
+        );
+        for (id, command) in [
+            ("DFLT-CONNECT", "CONNECT USER1 GROUP(GROUP2)"),
+            ("DFLT-ALTER", "ALTUSER USER1 DFLTGRP(GROUP2)"),
+            (
+                "DFLT-PROFILE",
+                "ADDSD 'GROUP2.**' OWNER(RACFADM) UACC(NONE)",
+            ),
+            (
+                "DFLT-PERMIT",
+                "PERMIT 'GROUP2.**' CLASS(DATASET) ID(GROUP2) ACCESS(READ)",
+            ),
+        ] {
+            service.execute_command(&next(&admin, id), command).unwrap();
+        }
+        drop(service);
+
+        let reopened = RacfService::open(store, secrets, Default::default()).unwrap();
+        let snapshot = reopened.database.read().unwrap();
+        assert_eq!(
+            snapshot.principals["USER1"].default_group,
+            Some("GROUP2".into())
+        );
+        assert!(
+            snapshot
+                .connections
+                .get(&connection_key("USER1", "GROUP2"))
+                .is_some_and(|connection| !connection.revoked)
+        );
+        drop(snapshot);
+        assert_eq!(
+            reopened
+                .authorize(
+                    &PrincipalId::new("USER1", InvocationLimits::default()).unwrap(),
+                    "DATASET",
+                    &ResourceName::new("GROUP2.DATA", 246).unwrap(),
+                    AccessIntent::Read,
+                )
+                .unwrap(),
+            SecurityDecision::Allow
         );
     }
 

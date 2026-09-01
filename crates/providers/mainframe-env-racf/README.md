@@ -70,3 +70,15 @@ define provider contracts or authority state, and cannot supply licensed
 differential credit. Under the user-approved 2026-09-01 scoped policy, 0.5
 retains `differential=0/48 pending`; the real licensed campaign is deferred to
 the 0.17 `release-certify` hard gate.
+
+Controller review 1 hardens the same authority without adding a parallel
+security engine. ALTUSER administrative operands require SPECIAL, credential
+updates share policy/history enforcement, DFLTGRP remains connection-backed,
+PERMIT WHEN persists typed conditions, and unsupported command direction never
+falls through locally. Mutating RACROUTE requests retain a bounded safe
+terminal result in their existing digest-bound transaction so exact replay and
+unknown-outcome recovery cannot duplicate effects or identities. Caller/shape
+authorization precedes credential resolution, closed ACEEs do not permanently
+block user deletion, and ACEE extraction is owner/auditor/SPECIAL scoped.
+Legacy namespace exhaustion and mixed-case secret-reference redaction fail
+closed before migration or public type-80 projection.

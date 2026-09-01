@@ -443,7 +443,7 @@
     },
     "transaction": {
       "type": "object", "additionalProperties": false,
-      "required": ["id", "idempotency_key", "actor", "operation", "request_digest", "state", "base_generation", "final_generation", "status"],
+      "required": ["id", "idempotency_key", "actor", "operation", "request_digest", "state", "base_generation", "final_generation", "status", "terminal_result"],
       "properties": {
         "id": {"$ref": "#/$defs/name"},
         "idempotency_key": {"$ref": "#/$defs/name"},
@@ -453,7 +453,8 @@
         "state": {"enum": ["intent", "committed", "rolled-back", "unknown-outcome"]},
         "base_generation": {"$ref": "#/$defs/version"},
         "final_generation": {"anyOf": [{"$ref": "#/$defs/version"}, {"type": "null"}]},
-        "status": {"$ref": "#/$defs/saf_status"}
+        "status": {"$ref": "#/$defs/saf_status"},
+        "terminal_result": {"anyOf": [{"type": "string", "maxLength": 65536}, {"type": "null"}]}
       }
     },
     "recovery_record": {

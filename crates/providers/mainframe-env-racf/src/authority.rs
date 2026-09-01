@@ -1080,7 +1080,10 @@ mod tests {
                 fields: BTreeMap::from([
                     ("password".into(), "TOP-SECRET".into()),
                     ("token_reference".into(), "secret:token".into()),
-                    ("note".into(), "secret:opaque-reference".into()),
+                    ("note".into(), "SeCrEt:opaque-reference".into()),
+                    ("location".into(), " VaUlT:credential-reference ".into()),
+                    ("ring".into(), "KeYrInG:signing-key".into()),
+                    ("verifier".into(), "$ArGoN2id$v=19$unsafe".into()),
                     ("terminal".into(), "L7001".into()),
                 ]),
             })
@@ -1089,14 +1092,23 @@ mod tests {
         assert_eq!(audits[0].fields["password"], "<redacted>");
         assert_eq!(audits[0].fields["token_reference"], "<redacted>");
         assert_eq!(audits[0].fields["note"], "<redacted>");
+        assert_eq!(audits[0].fields["location"], "<redacted>");
+        assert_eq!(audits[0].fields["ring"], "<redacted>");
+        assert_eq!(audits[0].fields["verifier"], "<redacted>");
         assert_eq!(audits[0].fields["terminal"], "L7001");
         let shown = format!("{audits:?}");
         assert!(!shown.contains("TOP-SECRET"));
         assert!(!shown.contains("secret:token"));
-        assert!(!shown.contains("secret:opaque-reference"));
+        assert!(!shown.contains("SeCrEt:opaque-reference"));
+        assert!(!shown.contains("VaUlT:credential-reference"));
+        assert!(!shown.contains("KeYrInG:signing-key"));
+        assert!(!shown.contains("$ArGoN2id"));
         let type80 = service.smf_type80_records(0, 1).unwrap();
         assert_eq!((type80[0].record_type, type80[0].sequence), (80, 1));
         assert_eq!(type80[0].fields["note"], AuditFieldValue::Redacted);
+        assert_eq!(type80[0].fields["location"], AuditFieldValue::Redacted);
+        assert_eq!(type80[0].fields["ring"], AuditFieldValue::Redacted);
+        assert_eq!(type80[0].fields["verifier"], AuditFieldValue::Redacted);
         assert_eq!(
             service.smf_type80_records(0, 0),
             Err(HostProblem::ResourceExhausted)

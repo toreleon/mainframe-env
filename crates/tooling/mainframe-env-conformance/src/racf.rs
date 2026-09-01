@@ -7,9 +7,10 @@ use mainframe_env_execution_api::{InvocationLimits, PrincipalId};
 use mainframe_env_host_api::SecretRef;
 use mainframe_env_racf::{
     AccessEnvironment, AccessLevel, CommandContext, CommandDiagnosticCode, CommandFamily,
-    DecisionOutcome, DecisionReason, MemorySecretResolver, RacfService, RacrouteRequest,
-    RacrouteRequestType, RacrouteResult, SafDefineAction, SafExtractKind, SafRequestContext,
-    SafVerifyAction, SecurityDatabaseSummary, TokenKind, command_descriptors, racroute_descriptors,
+    CommandObjectKind, CommandRecord, DecisionOutcome, DecisionReason, MemorySecretResolver,
+    RacfService, RacrouteRequest, RacrouteRequestType, RacrouteResult, SafDefineAction,
+    SafExtractKind, SafRequestContext, SafStatus, SafVerifyAction, SecurityDatabaseSummary,
+    SecuritySemanticProjection, TokenKind, command_descriptors, racroute_descriptors,
     recognize_command, validate_command,
 };
 use mainframe_env_store::MemoryStore;
@@ -18,6 +19,8 @@ use sha2::Digest;
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::sync::Arc;
+
+use crate::racf_reference::{ReferenceObservation, StatusObservation};
 
 struct RacfCommandDriver;
 struct RacrouteDriver;
@@ -86,55 +89,24 @@ impl ConformanceDriver for RacfCommandDriver {
             .ok_or("RACF fixture sequence exceeds catalog")?;
         let obligation = parts[3];
         let gate = parts[4];
-        if gate != "differential" {
-            crate::racf_reference::verify_binding(
-                "command",
+        if gate == "differential" {
+            return compare_licensed_oracle(
                 descriptor.row_id(),
-                descriptor.keyword(),
-                obligation,
-                gate,
-            )?;
+                fixture,
+                command_oracle_observation(descriptor.family())?,
+            );
         }
-        match (obligation, gate) {
-            ("syntax", "recognized") => {
-                let actual = recognize_command(descriptor.keyword(), Default::default())
-                    .map_err(|problem| problem.to_string())?;
-                if actual != descriptor.family() {
-                    return Err("RACF recognition selected the wrong family".into());
-                }
-            }
-            ("syntax", "validated") => {
-                let actual = validate_command(valid_form(descriptor.family()), Default::default())
-                    .map_err(|problem| problem.to_string())?;
-                if actual.family != descriptor.family() {
-                    return Err("RACF validation selected the wrong family".into());
-                }
-            }
-            ("malformed", "conditioned") => {
-                let malformed = format!("{} UNKNOWN(value)", valid_form(descriptor.family()));
-                let problem = validate_command(&malformed, Default::default())
-                    .expect_err("RACF malformed fixture unexpectedly validated");
-                if problem.code != CommandDiagnosticCode::UnknownOperand {
-                    return Err(format!("unexpected redacted RACF diagnostic: {problem}"));
-                }
-            }
-            ("authorized", "executed") => execute_matrix(descriptor.family())?,
-            ("unauthorized", "executed" | "conditioned") => execute_denied(descriptor.family())?,
-            ("bounded-limit", "conditioned") => execute_command_limit(descriptor.family())?,
-            ("audit-redaction", "conditioned") => execute_command_audit(descriptor.family())?,
-            ("atomic-retry", "recovered") => execute_command_atomic_retry(descriptor.family())?,
-            ("restart-recovery", "recovered") => execute_command_recovery(descriptor.family())?,
-            ("licensed-equivalence", "differential") => {
-                return compare_licensed_oracle(
-                    descriptor.row_id(),
-                    fixture,
-                    command_oracle_observation(descriptor.family())?,
-                );
-            }
-            _ => return Err("RACF fixture obligation/gate is unsupported".into()),
-        }
+        let expected = crate::racf_reference::expected_observation(
+            "command",
+            descriptor.row_id(),
+            descriptor.keyword(),
+            obligation,
+            gate,
+        )?;
+        let actual = product_command_observation(descriptor.family(), obligation, gate)?;
+        crate::racf_reference::compare_observations(&expected, &actual)?;
         DriverOutput::new(
-            format!("racf:{}:{obligation}:{gate}:pass", descriptor.keyword()).into_bytes(),
+            serde_json::to_vec(&actual).map_err(|error| error.to_string())?,
             ConformanceLimits::default(),
         )
         .map_err(|problem| problem.to_string())
@@ -160,64 +132,23 @@ impl ConformanceDriver for RacrouteDriver {
             .ok_or("RACROUTE fixture sequence exceeds catalog")?;
         let obligation = parts[3];
         let gate = parts[4];
-        if gate != "differential" {
-            crate::racf_reference::verify_binding(
-                "racroute",
-                descriptor.row_id(),
-                descriptor.keyword(),
-                obligation,
-                gate,
-            )?;
+        if gate == "differential" {
+            let observation =
+                execute_racroute_case(descriptor.request_type(), RacrouteCase::Differential)?
+                    .ok_or("RACROUTE differential observation is missing")?;
+            return compare_licensed_oracle(descriptor.row_id(), fixture, observation);
         }
-        match (obligation, gate) {
-            ("syntax", "recognized") => {
-                if racroute_descriptors()
-                    .iter()
-                    .filter(|candidate| candidate.keyword() == descriptor.keyword())
-                    .count()
-                    != 1
-                {
-                    return Err("RACROUTE generated recognition is ambiguous".into());
-                }
-            }
-            ("syntax", "validated") => {
-                if shape_request(descriptor.request_type()).request_type()
-                    != descriptor.request_type()
-                {
-                    return Err("RACROUTE typed request selected the wrong state machine".into());
-                }
-            }
-            ("authorized", "executed") => {
-                execute_racroute_case(descriptor.request_type(), RacrouteCase::Allowed)?;
-            }
-            ("unauthorized", "executed" | "conditioned") => {
-                execute_racroute_case(descriptor.request_type(), RacrouteCase::Denied)?;
-            }
-            ("malformed", "conditioned") => {
-                execute_racroute_case(descriptor.request_type(), RacrouteCase::Malformed)?;
-            }
-            ("bounded-limit", "conditioned") => {
-                execute_racroute_case(descriptor.request_type(), RacrouteCase::Limit)?;
-            }
-            ("audit-redaction", "conditioned") => {
-                execute_racroute_case(descriptor.request_type(), RacrouteCase::Audit)?;
-            }
-            ("atomic-retry", "recovered") => {
-                execute_racroute_case(descriptor.request_type(), RacrouteCase::Atomic)?;
-            }
-            ("restart-recovery", "recovered") => {
-                execute_racroute_case(descriptor.request_type(), RacrouteCase::Recovery)?;
-            }
-            ("licensed-equivalence", "differential") => {
-                let observation =
-                    execute_racroute_case(descriptor.request_type(), RacrouteCase::Differential)?
-                        .ok_or("RACROUTE differential observation is missing")?;
-                return compare_licensed_oracle(descriptor.row_id(), fixture, observation);
-            }
-            _ => return Err("RACROUTE fixture obligation/gate is unsupported".into()),
-        }
+        let expected = crate::racf_reference::expected_observation(
+            "racroute",
+            descriptor.row_id(),
+            descriptor.keyword(),
+            obligation,
+            gate,
+        )?;
+        let actual = product_racroute_observation(descriptor.request_type(), obligation, gate)?;
+        crate::racf_reference::compare_observations(&expected, &actual)?;
         DriverOutput::new(
-            format!("racf:{}:{obligation}:{gate}:pass", descriptor.keyword()).into_bytes(),
+            serde_json::to_vec(&actual).map_err(|error| error.to_string())?,
             ConformanceLimits::default(),
         )
         .map_err(|problem| problem.to_string())
@@ -235,16 +166,566 @@ impl ConformancePredicate for RacfReady {
 
 impl ConformanceObservation for RacfPassed {
     fn evaluate(&self, output: &DriverOutput) -> Result<ObservationCheck, String> {
-        let actual = std::str::from_utf8(output.bytes())
-            .map_err(|_| "RACF driver output is not UTF-8")?
-            .to_string();
+        let actual: ReferenceObservation = serde_json::from_slice(output.bytes())
+            .map_err(|error| format!("RACF product observation is invalid: {error}"))?;
+        let shown = serde_json::to_string(&actual).map_err(|error| error.to_string())?;
         ObservationCheck::new(
-            actual.starts_with("racf:") && actual.ends_with(":pass"),
-            "bounded RACF selected-route pass observation",
-            actual,
+            matches!(actual.surface.as_str(), "command" | "racroute")
+                && !actual.keyword.is_empty()
+                && !actual.outcome.is_empty(),
+            "exact independently matched RACF product observation",
+            shown,
             ConformanceLimits::default(),
         )
         .map_err(|problem| problem.to_string())
+    }
+}
+
+fn product_command_observation(
+    target: CommandFamily,
+    obligation: &str,
+    gate: &str,
+) -> Result<ReferenceObservation, String> {
+    let descriptor = command_descriptors()
+        .iter()
+        .find(|descriptor| descriptor.family() == target)
+        .ok_or("RACF command observation descriptor is missing")?;
+    let mut observation = empty_observation("command", descriptor.keyword(), obligation, gate);
+    match (obligation, gate) {
+        ("syntax", "recognized") => {
+            let actual = recognize_command(descriptor.keyword(), Default::default())
+                .map_err(|problem| problem.to_string())?;
+            if actual != target {
+                return Err("RACF recognition selected the wrong family".into());
+            }
+            observation.outcome = "recognized".into();
+        }
+        ("syntax", "validated") => {
+            let actual = validate_command(valid_form(target), Default::default())
+                .map_err(|problem| problem.to_string())?;
+            if actual.family != target {
+                return Err("RACF validation selected the wrong family".into());
+            }
+            observation.outcome = "validated".into();
+        }
+        ("malformed", "conditioned") => {
+            let malformed = format!("{} UNKNOWN(value)", valid_form(target));
+            let problem = validate_command(&malformed, Default::default())
+                .expect_err("RACF malformed fixture unexpectedly validated");
+            observation.outcome = format!("diagnostic:{}", problem.code.id());
+        }
+        ("bounded-limit", "conditioned") => {
+            let input = valid_form(target);
+            let limits = mainframe_env_racf::CommandLanguageLimits {
+                max_input_bytes: input.len().saturating_sub(1),
+                ..Default::default()
+            };
+            let problem = validate_command(input, limits)
+                .expect_err("RACF family-specific bounded input unexpectedly validated");
+            observation.outcome = format!("diagnostic:{}", problem.code.id());
+        }
+        ("unauthorized", "executed" | "conditioned") => {
+            let actual = observe_denied_command(target)?;
+            observation.outcome = "denied".into();
+            observation.status = Some(status_observation(actual.status)?);
+            observation.changed_domains = actual.changed_domains;
+            observation.identity = actual.identity;
+            observation.audit = actual.audit;
+        }
+        ("authorized", "executed")
+        | ("audit-redaction", "conditioned")
+        | ("atomic-retry", "recovered")
+        | ("restart-recovery", "recovered") => {
+            if obligation == "atomic-retry" {
+                execute_command_atomic_retry(target)?;
+                observation.recovery = "atomic-retry-stable".into();
+            }
+            if obligation == "restart-recovery" {
+                execute_command_recovery(target)?;
+                observation.recovery = "restart-stable".into();
+            }
+            let replay = obligation == "restart-recovery" && descriptor.mutating();
+            let actual = observe_allowed_command(target, replay)?;
+            observation.outcome = "granted".into();
+            observation.status = Some(status_observation(actual.status)?);
+            observation.changed_domains = actual.changed_domains;
+            observation.identity = actual.identity;
+            observation.audit = actual.audit;
+            if replay {
+                observation.replay = "state-and-audit-stable".into();
+            }
+        }
+        _ => return Err("RACF command observation binding is unsupported".into()),
+    }
+    Ok(observation)
+}
+
+struct ProductRouteObservation {
+    status: SafStatus,
+    changed_domains: BTreeSet<String>,
+    identity: Option<String>,
+    audit: String,
+}
+
+fn observe_allowed_command(
+    target: CommandFamily,
+    require_replay: bool,
+) -> Result<ProductRouteObservation, String> {
+    let (service, base) = setup()?;
+    for (sequence, command) in command_matrix().iter().enumerate() {
+        let invocation = context(&base, sequence + 1)?;
+        let before = service
+            .database()
+            .semantic_projection()
+            .map_err(|problem| format!("RACF semantic projection failed: {problem:?}"))?;
+        let result = service
+            .execute_command(&invocation, command)
+            .map_err(|problem| format!("RACF selected route failed: {problem}"))?;
+        if result.family == target {
+            let after = service
+                .database()
+                .semantic_projection()
+                .map_err(|problem| format!("RACF semantic projection failed: {problem:?}"))?;
+            let summary = service
+                .database()
+                .summary()
+                .map_err(|problem| format!("RACF summary failed: {problem:?}"))?;
+            if require_replay {
+                let replay = service
+                    .execute_command(&invocation, command)
+                    .map_err(|problem| format!("RACF command replay failed: {problem}"))?;
+                if !replay.replayed
+                    || service
+                        .database()
+                        .summary()
+                        .map_err(|problem| format!("RACF replay summary failed: {problem:?}"))?
+                        != summary
+                {
+                    return Err("RACF command replay duplicated state or audit".into());
+                }
+            }
+            return Ok(ProductRouteObservation {
+                status: result.status,
+                changed_domains: changed_domains(&before, &after),
+                identity: Some(command_record_identity(result.records.first())),
+                audit: command_audit_observation(&service, DecisionOutcome::Allow)?,
+            });
+        }
+    }
+    Err("RACF executable family has no selected-route fixture".into())
+}
+
+fn observe_denied_command(target: CommandFamily) -> Result<ProductRouteObservation, String> {
+    let (service, _) = setup()?;
+    let before = service
+        .database()
+        .semantic_projection()
+        .map_err(|problem| format!("RACF semantic projection failed: {problem:?}"))?;
+    let denied = CommandContext::new(
+        PrincipalId::new("MISSING", InvocationLimits::default())
+            .map_err(|problem| problem.to_string())?,
+        format!("DENY-{:?}", target).to_ascii_uppercase(),
+        "RACF-DENY-CONFORMANCE",
+        2,
+    )
+    .map_err(|problem| problem.to_string())?;
+    let problem = service
+        .execute_command(&denied, valid_form(target))
+        .expect_err("unauthorized RACF selected route unexpectedly succeeded");
+    if problem.code != CommandDiagnosticCode::Unauthorized {
+        return Err(format!(
+            "unexpected redacted RACF deny diagnostic: {problem}"
+        ));
+    }
+    let after = service
+        .database()
+        .semantic_projection()
+        .map_err(|problem| format!("RACF semantic projection failed: {problem:?}"))?;
+    let audit = service
+        .smf_type80_records(0, 65_536)
+        .map_err(|problem| format!("RACF audit projection failed: {problem:?}"))?
+        .pop()
+        .ok_or("RACF denied route omitted audit")?;
+    Ok(ProductRouteObservation {
+        status: audit.status,
+        changed_domains: changed_domains(&before, &after),
+        identity: None,
+        audit: command_audit_record(&audit, DecisionOutcome::Deny)?,
+    })
+}
+
+fn command_audit_observation(
+    service: &RacfService,
+    expected: DecisionOutcome,
+) -> Result<String, String> {
+    let audit = service
+        .smf_type80_records(0, 65_536)
+        .map_err(|problem| format!("RACF audit projection failed: {problem:?}"))?
+        .pop()
+        .ok_or("RACF selected route omitted audit")?;
+    command_audit_record(&audit, expected)
+}
+
+fn command_audit_record(
+    audit: &mainframe_env_racf::SmfType80Record,
+    expected: DecisionOutcome,
+) -> Result<String, String> {
+    if audit.record_type != 80
+        || audit.decision != expected
+        || contains_secret_json(&serde_json::to_value(audit).map_err(|error| error.to_string())?)
+    {
+        return Err("RACF audit projection is incomplete or unsafe".into());
+    }
+    Ok(if expected == DecisionOutcome::Allow {
+        "allow-redacted"
+    } else {
+        "deny-redacted"
+    }
+    .into())
+}
+
+fn command_record_identity(record: Option<&CommandRecord>) -> String {
+    match record {
+        Some(CommandRecord::Name { kind, .. }) => match kind {
+            CommandObjectKind::User => "user",
+            CommandObjectKind::Group => "group",
+            CommandObjectKind::Connection => "connection",
+            CommandObjectKind::DatasetProfile => "dataset-profile",
+            CommandObjectKind::ResourceProfile => "resource-profile",
+            CommandObjectKind::Database => "database",
+        },
+        Some(CommandRecord::User { .. }) => "user-record",
+        Some(CommandRecord::Group { .. }) => "group-record",
+        Some(CommandRecord::Profile { .. }) => "profile",
+        Some(CommandRecord::Summary { .. }) => "summary",
+        Some(CommandRecord::Class { .. }) => "class",
+        Some(CommandRecord::Policy { .. }) => "policy",
+        Some(CommandRecord::Certificate { .. }) => "certificate",
+        Some(CommandRecord::Keyring { .. }) => "keyring",
+        Some(CommandRecord::IdentityMapping { .. }) => "identity-mapping",
+        Some(CommandRecord::Association { .. }) => "association",
+        Some(CommandRecord::RrsfNode { .. }) => "rrsf-node",
+        Some(CommandRecord::Session { .. }) => "session",
+        None => "none",
+    }
+    .into()
+}
+
+fn empty_observation(
+    surface: &str,
+    keyword: &str,
+    obligation: &str,
+    gate: &str,
+) -> ReferenceObservation {
+    ReferenceObservation {
+        surface: surface.into(),
+        keyword: keyword.into(),
+        obligation: obligation.into(),
+        gate: gate.into(),
+        outcome: String::new(),
+        status: None,
+        changed_domains: BTreeSet::new(),
+        identity: None,
+        audit: "none".into(),
+        recovery: "none".into(),
+        replay: "not-applicable".into(),
+    }
+}
+
+fn status_observation(status: SafStatus) -> Result<StatusObservation, String> {
+    let reason = serde_json::to_value(status.reason)
+        .map_err(|error| error.to_string())?
+        .as_str()
+        .ok_or("RACF status reason is not a string")?
+        .to_string();
+    Ok(StatusObservation {
+        saf: status.saf_return_code,
+        racf: status.racf_return_code,
+        reason_code: status.racf_reason_code,
+        reason,
+    })
+}
+
+fn changed_domains(
+    before: &SecuritySemanticProjection,
+    after: &SecuritySemanticProjection,
+) -> BTreeSet<String> {
+    before
+        .domain_digests
+        .iter()
+        .filter(|(domain, digest)| after.domain_digests.get(*domain) != Some(*digest))
+        .map(|(domain, _)| domain.clone())
+        .collect()
+}
+
+fn product_racroute_observation(
+    request_type: RacrouteRequestType,
+    obligation: &str,
+    gate: &str,
+) -> Result<ReferenceObservation, String> {
+    let descriptor = racroute_descriptors()
+        .iter()
+        .find(|descriptor| descriptor.request_type() == request_type)
+        .ok_or("RACROUTE observation descriptor is missing")?;
+    let mut observation = empty_observation("racroute", descriptor.keyword(), obligation, gate);
+    match (obligation, gate) {
+        ("syntax", "recognized") => {
+            if racroute_descriptors()
+                .iter()
+                .filter(|candidate| candidate.keyword() == descriptor.keyword())
+                .count()
+                != 1
+            {
+                return Err("RACROUTE generated recognition is ambiguous".into());
+            }
+            observation.outcome = "recognized".into();
+        }
+        ("syntax", "validated") => {
+            if shape_request(request_type).request_type() != request_type {
+                return Err("RACROUTE typed request selected the wrong state machine".into());
+            }
+            observation.outcome = "validated".into();
+        }
+        ("authorized", "executed")
+        | ("unauthorized", "executed" | "conditioned")
+        | ("malformed", "conditioned")
+        | ("bounded-limit", "conditioned")
+        | ("audit-redaction", "conditioned")
+        | ("atomic-retry", "recovered")
+        | ("restart-recovery", "recovered") => {
+            let mode = match obligation {
+                "authorized" => RacrouteCase::Allowed,
+                "unauthorized" => RacrouteCase::Denied,
+                "malformed" => RacrouteCase::Malformed,
+                "bounded-limit" => RacrouteCase::Limit,
+                "audit-redaction" => RacrouteCase::Audit,
+                "atomic-retry" => RacrouteCase::Atomic,
+                "restart-recovery" => RacrouteCase::Recovery,
+                _ => unreachable!(),
+            };
+            if matches!(mode, RacrouteCase::Atomic | RacrouteCase::Recovery) {
+                execute_racroute_case(request_type, mode)?;
+                observation.recovery = if matches!(mode, RacrouteCase::Atomic) {
+                    "atomic-retry-stable"
+                } else {
+                    "restart-stable"
+                }
+                .into();
+            }
+            let actual = observe_racroute_route(request_type, mode)?;
+            observation.outcome = actual.outcome;
+            observation.status = Some(status_observation(actual.status)?);
+            observation.changed_domains = actual.changed_domains;
+            observation.identity = actual.identity;
+            observation.audit = actual.audit;
+            observation.replay = actual.replay;
+        }
+        _ => return Err("RACROUTE observation binding is unsupported".into()),
+    }
+    Ok(observation)
+}
+
+struct ProductRacrouteObservation {
+    outcome: String,
+    status: SafStatus,
+    changed_domains: BTreeSet<String>,
+    identity: Option<String>,
+    audit: String,
+    replay: String,
+}
+
+fn observe_racroute_route(
+    request_type: RacrouteRequestType,
+    mode: RacrouteCase,
+) -> Result<ProductRacrouteObservation, String> {
+    let RecoverableSetup {
+        service,
+        context: base,
+        secrets,
+        ..
+    } = setup_recoverable()?;
+    for (sequence, command) in [
+        "ADDUSER USER1 PASSWORD('USER-PASSWORD')",
+        "RDEFINE FACILITY APP.** OWNER(RACFADM) UACC(ALTER)",
+        "RDEFINE RRSFDATA DIRECT.NODE1 OWNER(RACFADM) UACC(READ)",
+        "SETROPTS CLASSACT(RRSFDATA) RACLIST(FACILITY)",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        service
+            .execute_command(&context(&base, 200 + sequence)?, command)
+            .map_err(|problem| problem.to_string())?;
+    }
+    let admin = base.actor().clone();
+    let verify = service
+        .racroute(
+            &saf_context(&admin, None, "OBS-PREP-VERIFY", 10)?,
+            RacrouteRequest::Verify {
+                user: admin.clone(),
+                credential_reference: SecretRef::new("secret:admin", Default::default())
+                    .map_err(|problem| format!("RACROUTE secret reference: {problem:?}"))?,
+                action: SafVerifyAction::CreateAcee,
+                acee_id: None,
+            },
+        )
+        .map_err(|problem| format!("RACROUTE observation ACEE setup: {problem:?}"))?;
+    let admin_acee = match verify.result {
+        Some(RacrouteResult::Verified {
+            acee: Some(acee), ..
+        }) => acee.id,
+        _ => return Err("RACROUTE observation setup returned no ACEE".into()),
+    };
+    let token_digest = digest('2');
+    let token_id = if matches!(
+        request_type,
+        RacrouteRequestType::Tokenmap | RacrouteRequestType::Tokenxtr
+    ) {
+        let built = service
+            .racroute(
+                &saf_context(&admin, Some(&admin_acee), "OBS-PREP-TOKEN", 11)?,
+                RacrouteRequest::Tokenbld {
+                    owner: admin.clone(),
+                    kind: TokenKind::SafIdentity,
+                    token_reference: "secret:observation-token".into(),
+                    token_digest: token_digest.clone(),
+                    scopes: BTreeSet::from(["FACILITY".into()]),
+                    expires_tick: Some(100),
+                },
+            )
+            .map_err(|problem| format!("RACROUTE observation token setup: {problem:?}"))?;
+        match built.result {
+            Some(RacrouteResult::TokenBuilt(token)) => Some(token.id),
+            _ => return Err("RACROUTE observation setup returned no token".into()),
+        }
+    } else {
+        None
+    };
+    if matches!(mode, RacrouteCase::Limit) {
+        secrets.insert("secret:oversized", vec![b'x'; 4097]);
+    }
+    let caller = if matches!(mode, RacrouteCase::Denied) {
+        PrincipalId::new("MISSING", InvocationLimits::default())
+            .map_err(|problem| problem.to_string())?
+    } else {
+        admin.clone()
+    };
+    let acee = descriptor_acee(request_type, mode, &admin_acee);
+    let request = match mode {
+        RacrouteCase::Malformed => malformed_request(request_type, &admin, &admin_acee),
+        RacrouteCase::Limit => limit_request(request_type, &admin, &admin_acee),
+        _ => allowed_request(
+            request_type,
+            &admin,
+            &admin_acee,
+            token_id.as_deref(),
+            &token_digest,
+        ),
+    };
+    let selected_context = saf_context(&caller, acee, "OBS-CASE", 20)?;
+    let before = service
+        .database()
+        .semantic_projection()
+        .map_err(|problem| format!("RACROUTE semantic projection: {problem:?}"))?;
+    let outcome = service
+        .racroute(&selected_context, request.clone())
+        .map_err(|problem| format!("RACROUTE product observation failed: {problem:?}"))?;
+    let after = service
+        .database()
+        .semantic_projection()
+        .map_err(|problem| format!("RACROUTE semantic projection: {problem:?}"))?;
+    let summary = service
+        .database()
+        .summary()
+        .map_err(|problem| format!("RACROUTE summary: {problem:?}"))?;
+    let descriptor = racroute_descriptors()
+        .iter()
+        .find(|descriptor| descriptor.request_type() == request_type)
+        .ok_or("RACROUTE observation descriptor is missing")?;
+    let replay = if descriptor.mutating() {
+        let replay = service
+            .racroute(&selected_context, request)
+            .map_err(|problem| format!("RACROUTE replay failed: {problem:?}"))?;
+        if replay != outcome
+            || service
+                .database()
+                .summary()
+                .map_err(|problem| format!("RACROUTE replay summary: {problem:?}"))?
+                != summary
+        {
+            return Err("RACROUTE replay duplicated state/audit or changed terminal result".into());
+        }
+        if outcome.status.reason == DecisionReason::Granted {
+            "exact-terminal-no-duplicate"
+        } else {
+            "terminal-denial-no-duplicate"
+        }
+    } else {
+        "not-applicable"
+    };
+    let audit = service
+        .smf_type80_records(0, 65_536)
+        .map_err(|problem| format!("RACROUTE audit projection: {problem:?}"))?
+        .pop()
+        .ok_or("RACROUTE observation omitted audit")?;
+    let expected_decision = if outcome.status.reason == DecisionReason::Granted {
+        DecisionOutcome::Allow
+    } else {
+        DecisionOutcome::Deny
+    };
+    let audit = command_audit_record(&audit, expected_decision)?;
+    let semantic = matches!(
+        mode,
+        RacrouteCase::Allowed | RacrouteCase::Audit | RacrouteCase::Atomic | RacrouteCase::Recovery
+    ) && outcome.status.reason == DecisionReason::Granted;
+    Ok(ProductRacrouteObservation {
+        outcome: match outcome.status.reason {
+            DecisionReason::Granted => "granted",
+            DecisionReason::PrincipalNotFound => "denied",
+            DecisionReason::CredentialInvalid => "credential-invalid",
+            _ => "malformed-request",
+        }
+        .into(),
+        status: outcome.status,
+        changed_domains: if semantic {
+            changed_domains(&before, &after)
+        } else {
+            BTreeSet::new()
+        },
+        identity: semantic.then(|| racroute_result_identity(outcome.result.as_ref()).into()),
+        audit,
+        replay: replay.into(),
+    })
+}
+
+fn descriptor_acee(
+    request_type: RacrouteRequestType,
+    mode: RacrouteCase,
+    admin_acee: &str,
+) -> Option<&str> {
+    let descriptor = racroute_descriptors()
+        .iter()
+        .find(|descriptor| descriptor.request_type() == request_type)?;
+    (!matches!(mode, RacrouteCase::Denied) && descriptor.requires_acee()).then_some(admin_acee)
+}
+
+fn racroute_result_identity(result: Option<&RacrouteResult>) -> &'static str {
+    match result {
+        Some(RacrouteResult::Audit { .. }) => "audit",
+        Some(RacrouteResult::Decision(_)) => "decision",
+        Some(RacrouteResult::Defined { .. }) => "defined",
+        Some(RacrouteResult::Extracted(mainframe_env_racf::ExtractedSecurityRecord::User {
+            ..
+        })) => "extracted-user",
+        Some(RacrouteResult::Extracted(_)) => "extracted-other",
+        Some(RacrouteResult::Listed { .. }) => "listed",
+        Some(RacrouteResult::SignedOn(_)) => "signed-on",
+        Some(RacrouteResult::Statistics { .. }) => "statistics",
+        Some(RacrouteResult::TokenBuilt(_)) => "token-built",
+        Some(RacrouteResult::TokenMapped { .. }) => "token-mapped",
+        Some(RacrouteResult::TokenExtracted(_)) => "token-extracted",
+        Some(RacrouteResult::Verified { .. }) => "verified",
+        None => "none",
     }
 }
 
@@ -855,6 +1336,7 @@ fn context(base: &CommandContext, sequence: usize) -> Result<CommandContext, Str
     .map_err(|problem| problem.to_string())
 }
 
+#[cfg(test)]
 fn execute_matrix(target: CommandFamily) -> Result<(), String> {
     let (service, base) = setup()?;
     for (sequence, command) in command_matrix().iter().enumerate() {
@@ -866,53 +1348,6 @@ fn execute_matrix(target: CommandFamily) -> Result<(), String> {
         }
     }
     Err("RACF executable family has no selected-route fixture".into())
-}
-
-fn execute_command_limit(target: CommandFamily) -> Result<(), String> {
-    let input = valid_form(target);
-    let limits = mainframe_env_racf::CommandLanguageLimits {
-        max_input_bytes: input.len().saturating_sub(1),
-        ..Default::default()
-    };
-    let problem = validate_command(input, limits)
-        .expect_err("RACF family-specific bounded input unexpectedly validated");
-    if problem.code == CommandDiagnosticCode::InputLimit {
-        Ok(())
-    } else {
-        Err(format!(
-            "RACF bounded input returned the wrong diagnostic: {problem}"
-        ))
-    }
-}
-
-fn execute_command_audit(target: CommandFamily) -> Result<(), String> {
-    let (service, base) = setup()?;
-    for (sequence, command) in command_matrix().iter().enumerate() {
-        let result = service
-            .execute_command(&context(&base, sequence + 1)?, command)
-            .map_err(|problem| format!("RACF audit route failed: {problem}"))?;
-        if result.family == target {
-            let descriptor = command_descriptors()
-                .iter()
-                .find(|descriptor| descriptor.family() == target)
-                .ok_or("RACF audit descriptor is missing")?;
-            let audits = service
-                .smf_type80_records(0, 65_536)
-                .map_err(|problem| format!("RACF audit projection failed: {problem:?}"))?;
-            let audit = audits
-                .last()
-                .ok_or("RACF selected route omitted its audit")?;
-            if audit.record_type != 80
-                || audit.action != descriptor.keyword()
-                || audit.decision != DecisionOutcome::Allow
-                || contains_secret_json(&serde_json::to_value(audit).map_err(|e| e.to_string())?)
-            {
-                return Err("RACF selected-route audit is incomplete or unsafe".into());
-            }
-            return Ok(());
-        }
-    }
-    Err("RACF audit family has no selected route".into())
 }
 
 fn execute_command_atomic_retry(target: CommandFamily) -> Result<(), String> {
@@ -1050,10 +1485,10 @@ fn contains_secret_json(value: &serde_json::Value) -> bool {
         serde_json::Value::Array(values) => values.iter().any(contains_secret_json),
         serde_json::Value::String(value) => {
             let upper = value.to_ascii_uppercase();
-            value.starts_with("secret:")
-                || value.starts_with("vault:")
-                || value.starts_with("keyring:")
-                || value.starts_with("$argon2")
+            upper.starts_with("SECRET:")
+                || upper.starts_with("VAULT:")
+                || upper.starts_with("KEYRING:")
+                || upper.starts_with("$ARGON2")
                 || upper.contains("BEGIN PRIVATE KEY")
                 || upper.contains("BEGIN CERTIFICATE")
                 || upper.contains("ADMIN-PASSWORD")
@@ -1111,6 +1546,7 @@ fn execute_command_recovery(target: CommandFamily) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(test)]
 fn execute_denied(target: CommandFamily) -> Result<(), String> {
     let (service, _) = setup()?;
     let before = service

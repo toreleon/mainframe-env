@@ -48,6 +48,11 @@ pub struct SecurityDatabaseSummary {
     pub subsystem_running: bool,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SecuritySemanticProjection {
+    pub domain_digests: BTreeMap<String, String>,
+}
+
 pub struct SecurityDatabase {
     store: Arc<dyn ProviderStateStore>,
     limits: SecurityDatabaseLimits,
@@ -96,6 +101,49 @@ impl SecurityDatabase {
             migrations: snapshot.migrations.len(),
             subsystem_running: snapshot.subsystem.running,
         })
+    }
+
+    pub fn semantic_projection(&self) -> Result<SecuritySemanticProjection, HostProblem> {
+        let snapshot = self.read()?;
+        let mut domain_digests = BTreeMap::new();
+        for (name, bytes) in [
+            ("principals", semantic_bytes(&snapshot.principals)?),
+            ("groups", semantic_bytes(&snapshot.groups)?),
+            ("connections", semantic_bytes(&snapshot.connections)?),
+            ("profiles", semantic_bytes(&snapshot.profiles)?),
+            (
+                "classes",
+                semantic_bytes(&(&snapshot.classes, &snapshot.templates))?,
+            ),
+            ("caches", semantic_bytes(&snapshot.raclist_caches)?),
+            (
+                "policy",
+                semantic_bytes(&(
+                    &snapshot.policy,
+                    &snapshot.database_status,
+                    &snapshot.subsystem,
+                ))?,
+            ),
+            ("acees", semantic_bytes(&snapshot.acees)?),
+            ("tokens", semantic_bytes(&snapshot.tokens)?),
+            ("certificates", semantic_bytes(&snapshot.certificates)?),
+            ("keys", semantic_bytes(&snapshot.keys)?),
+            ("keyrings", semantic_bytes(&snapshot.keyrings)?),
+            ("mfa", semantic_bytes(&snapshot.mfa_factors)?),
+            (
+                "identity-mappings",
+                semantic_bytes(&snapshot.identity_mappings)?,
+            ),
+            (
+                "user-associations",
+                semantic_bytes(&snapshot.user_associations)?,
+            ),
+            ("rrsf-nodes", semantic_bytes(&snapshot.rrsf_nodes)?),
+            ("sessions", semantic_bytes(&snapshot.signon_sessions)?),
+        ] {
+            domain_digests.insert(name.into(), format!("sha256:{:x}", Sha256::digest(bytes)));
+        }
+        Ok(SecuritySemanticProjection { domain_digests })
     }
 
     pub fn install_profile_schemas(
@@ -554,11 +602,24 @@ impl LegacySnapshot {
             (LEGACY_PROFILE_NAMESPACE, limits.max_profiles),
             (LEGACY_AUDIT_NAMESPACE, limits.max_audits),
         ] {
-            rows.extend(
-                store
-                    .list_provider_state(namespace, max)
-                    .map_err(store_problem)?,
-            );
+            let probe = max.checked_add(1).ok_or(HostProblem::ResourceExhausted)?;
+            let namespace_rows = match store.list_provider_state(namespace, probe) {
+                Ok(rows) => rows,
+                Err(StoreError::CapacityExceeded) => {
+                    let rows = store
+                        .list_provider_state(namespace, max)
+                        .map_err(store_problem)?;
+                    if rows.len() == max {
+                        return Err(HostProblem::ResourceExhausted);
+                    }
+                    rows
+                }
+                Err(problem) => return Err(store_problem(problem)),
+            };
+            if namespace_rows.len() > max {
+                return Err(HostProblem::ResourceExhausted);
+            }
+            rows.extend(namespace_rows);
         }
         rows.sort_by(|left, right| {
             (&left.namespace, &left.key).cmp(&(&right.namespace, &right.key))
@@ -834,6 +895,10 @@ fn snapshot_content_digest(snapshot: &SecurityDatabaseSnapshot) -> Result<String
     content.migrations.clear();
     let bytes = serde_json::to_vec(&content).map_err(|_| HostProblem::InfrastructureFailure)?;
     Ok(format!("sha256:{:x}", Sha256::digest(bytes)))
+}
+
+fn semantic_bytes(value: &impl serde::Serialize) -> Result<Vec<u8>, HostProblem> {
+    serde_json::to_vec(value).map_err(|_| HostProblem::InfrastructureFailure)
 }
 
 fn recovery_id(transaction_id: &str) -> String {
@@ -1194,6 +1259,62 @@ mod tests {
     }
 
     #[test]
+    fn every_legacy_namespace_rejects_truncation_and_retries_after_overflow_is_removed() {
+        for namespace in [
+            LEGACY_USER_NAMESPACE,
+            LEGACY_GROUP_NAMESPACE,
+            LEGACY_PROFILE_NAMESPACE,
+            LEGACY_AUDIT_NAMESPACE,
+        ] {
+            let store = Arc::new(MemoryStore::new(StoreLimits {
+                max_blob_bytes: 32 * 1024 * 1024,
+                ..StoreLimits::default()
+            }));
+            let mut limits = SecurityDatabaseLimits::default();
+            match namespace {
+                LEGACY_USER_NAMESPACE => limits.max_principals = 2,
+                LEGACY_GROUP_NAMESPACE => limits.max_groups = 2,
+                LEGACY_PROFILE_NAMESPACE => limits.max_profiles = 2,
+                LEGACY_AUDIT_NAMESPACE => limits.max_audits = 2,
+                _ => unreachable!(),
+            }
+            for index in 1..=2 {
+                store
+                    .put_provider_state(legacy_record(namespace, index), None)
+                    .unwrap();
+            }
+            assert_eq!(LegacySnapshot::read(&*store, limits).unwrap().rows.len(), 2);
+
+            let overflow = legacy_record(namespace, 3);
+            store.put_provider_state(overflow.clone(), None).unwrap();
+            assert_eq!(
+                LegacySnapshot::read(&*store, limits).map(|_| ()),
+                Err(HostProblem::ResourceExhausted),
+                "legacy namespace {namespace} was silently truncated"
+            );
+            let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+            let database = SecurityDatabase::open(provider_store, limits).unwrap();
+            let summary = database.summary().unwrap();
+            assert_eq!(
+                (
+                    summary.principals,
+                    summary.groups,
+                    summary.profiles,
+                    summary.audits,
+                    summary.migrations
+                ),
+                (0, 0, 0, 0, 0),
+                "legacy namespace {namespace} published partial v2 state"
+            );
+
+            store
+                .delete_provider_state(namespace, &overflow.key, overflow.version)
+                .unwrap();
+            assert_eq!(LegacySnapshot::read(&*store, limits).unwrap().rows.len(), 2);
+        }
+    }
+
+    #[test]
     fn restart_reconciles_intent_and_unknown_outcome_once() {
         let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(StoreLimits {
             max_blob_bytes: 32 * 1024 * 1024,
@@ -1219,6 +1340,7 @@ mod tests {
                             base_generation,
                             final_generation: Some(base_generation + 1),
                             status: legacy_status(DecisionReason::RecoveryRequired),
+                            terminal_result: None,
                         },
                     );
                 }
@@ -1260,6 +1382,35 @@ mod tests {
             reopened.database().summary().unwrap().generation,
             generation
         );
+    }
+
+    fn legacy_record(namespace: &str, index: usize) -> ProviderStateRecord {
+        let suffix = format!("{index:07}");
+        let (key, payload) = match namespace {
+            LEGACY_USER_NAMESPACE => (
+                format!("U{suffix}"),
+                legacy_user_payload("$argon2id$v=19$m=19456,t=2,p=1$c2FsdA$dmVyaWZpZXI", &[]),
+            ),
+            LEGACY_GROUP_NAMESPACE => (format!("G{suffix}"), Vec::new()),
+            LEGACY_PROFILE_NAMESPACE => {
+                let name = format!("P{suffix}");
+                (
+                    format!("DATASET:{name}"),
+                    legacy_profile_payload("DATASET", &name, "U0000001", 0, &[]),
+                )
+            }
+            LEGACY_AUDIT_NAMESPACE => (
+                format!("{index:020}"),
+                legacy_audit_payload("SIGNON", "sha256:legacy", "DENY", &[]),
+            ),
+            _ => unreachable!(),
+        };
+        ProviderStateRecord {
+            namespace: namespace.into(),
+            key,
+            version: 1,
+            payload,
+        }
     }
 
     fn legacy_user_payload(hash: &str, groups: &[&str]) -> Vec<u8> {

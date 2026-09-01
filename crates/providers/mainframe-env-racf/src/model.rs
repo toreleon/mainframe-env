@@ -400,7 +400,7 @@ impl Default for RacfSubsystemState {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct AccessCondition {
     pub terminal: Option<String>,
@@ -722,6 +722,8 @@ pub struct SecurityTransaction {
     pub base_generation: u64,
     pub final_generation: Option<u64>,
     pub status: SafStatus,
+    #[serde(default)]
+    pub terminal_result: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -1340,6 +1342,12 @@ impl SecurityDatabaseSnapshot {
                 return Err(SecuritySchemaProblem::Malformed);
             }
             digest_sha256(&transaction.request_digest)?;
+            if let Some(result) = &transaction.terminal_result {
+                bounded(result, 65_536)?;
+                if crate::audit::sensitive_value(result) {
+                    return Err(SecuritySchemaProblem::SecretMaterial);
+                }
+            }
         }
         for (id, recovery) in &self.recovery {
             identifier(id, limits.max_name_bytes)?;
