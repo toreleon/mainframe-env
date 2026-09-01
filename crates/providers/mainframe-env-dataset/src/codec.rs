@@ -21,6 +21,15 @@ pub(crate) struct Entry {
     pub records: Vec<Vec<u8>>,
     pub members: BTreeMap<String, Vec<Vec<u8>>>,
     pub relative_records: BTreeMap<u64, Vec<u8>>,
+    pub member_generations: BTreeMap<String, Vec<MemberGeneration>>,
+    pub member_aliases: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct MemberGeneration {
+    pub generation: u64,
+    pub program_object: bool,
+    pub records: Vec<Vec<u8>>,
 }
 
 impl Entry {
@@ -39,6 +48,8 @@ impl Entry {
             records: Vec::new(),
             members: BTreeMap::new(),
             relative_records: BTreeMap::new(),
+            member_generations: BTreeMap::new(),
+            member_aliases: BTreeMap::new(),
         }
     }
 
@@ -70,7 +81,7 @@ impl Entry {
 }
 
 pub(crate) fn encode(entry: &Entry) -> Result<Vec<u8>, ()> {
-    let mut out = b"MEDS3".to_vec();
+    let mut out = b"MEDS4".to_vec();
     out.push(org(entry.attributes.organization));
     out.push(recfm(entry.attributes.record_format));
     u32v(&mut out, entry.attributes.logical_record_length);
@@ -96,6 +107,44 @@ pub(crate) fn encode(entry: &Entry) -> Result<Vec<u8>, ()> {
         u64v(&mut out, *number);
         bytes(&mut out, value)?;
     }
+    u32v(
+        &mut out,
+        u32::try_from(entry.member_generations.len()).map_err(|_| ())?,
+    );
+    for (member, generations) in &entry.member_generations {
+        bytes(&mut out, member.as_bytes())?;
+        u32v(&mut out, u32::try_from(generations.len()).map_err(|_| ())?);
+        for generation in generations {
+            u64v(&mut out, generation.generation);
+            boolv(&mut out, generation.program_object);
+            records(&mut out, &generation.records)?;
+        }
+    }
+    u32v(
+        &mut out,
+        u32::try_from(entry.member_aliases.len()).map_err(|_| ())?,
+    );
+    for (alias, target) in &entry.member_aliases {
+        bytes(&mut out, alias.as_bytes())?;
+        bytes(&mut out, target.as_bytes())?;
+    }
+    Ok(out)
+}
+
+pub(crate) fn encode_definition_digest_v2(definition: &DatasetDefinition) -> Result<Vec<u8>, ()> {
+    let entry = Entry::from_definition(definition.clone(), 0);
+    let mut out = b"MEDS3".to_vec();
+    out.push(org(entry.attributes.organization));
+    out.push(recfm(entry.attributes.record_format));
+    u32v(&mut out, entry.attributes.logical_record_length);
+    optional_u32(&mut out, entry.attributes.key_offset);
+    optional_u32(&mut out, entry.attributes.key_length);
+    optional_u16(&mut out, entry.attributes.ccsid);
+    u64v(&mut out, 0);
+    encode_metadata(&mut out, &entry)?;
+    records(&mut out, &[])?;
+    u32v(&mut out, 0);
+    u32v(&mut out, 0);
     Ok(out)
 }
 pub(crate) fn decode(
@@ -109,7 +158,7 @@ pub(crate) fn decode(
         at: 0,
     };
     let schema = r.take(5)?;
-    if !matches!(schema, b"MEDS1" | b"MEDS2" | b"MEDS3") {
+    if !matches!(schema, b"MEDS1" | b"MEDS2" | b"MEDS3" | b"MEDS4") {
         return Err(());
     }
     let organization = org_back(r.byte()?)?;
@@ -127,7 +176,7 @@ pub(crate) fn decode(
         key_length,
         ccsid,
     });
-    if schema == b"MEDS3" {
+    if matches!(schema, b"MEDS3" | b"MEDS4") {
         decode_metadata(&mut r, &mut definition, max_records)?;
     }
     let records = r.records(max_records, max_record)?;
@@ -146,7 +195,7 @@ pub(crate) fn decode(
         }
     }
     let mut relative_records = BTreeMap::new();
-    if matches!(schema, b"MEDS2" | b"MEDS3") {
+    if matches!(schema, b"MEDS2" | b"MEDS3" | b"MEDS4") {
         let count = usize::try_from(r.u32()?).map_err(|_| ())?;
         if count > max_records {
             return Err(());
@@ -162,13 +211,61 @@ pub(crate) fn decode(
             }
         }
     }
-    if r.at != bytes_in.len() {
+    if schema != b"MEDS4" && r.at != bytes_in.len() {
         return Err(());
     }
     let mut entry = Entry::from_definition(definition, version);
     entry.records = records;
     entry.members = members;
     entry.relative_records = relative_records;
+    if schema == b"MEDS4" {
+        let member_count = usize::try_from(r.u32()?).map_err(|_| ())?;
+        if member_count > max_members {
+            return Err(());
+        }
+        for _ in 0..member_count {
+            let member = r.string(128)?;
+            let generation_count = usize::try_from(r.u32()?).map_err(|_| ())?;
+            if generation_count == 0 || generation_count > max_records {
+                return Err(());
+            }
+            let mut generations = Vec::with_capacity(generation_count);
+            let mut previous = 0u64;
+            for _ in 0..generation_count {
+                let generation = r.u64()?;
+                if generation == 0 || generation <= previous {
+                    return Err(());
+                }
+                previous = generation;
+                generations.push(MemberGeneration {
+                    generation,
+                    program_object: r.bool()?,
+                    records: r.records(max_records, max_record)?,
+                });
+            }
+            if entry
+                .member_generations
+                .insert(member, generations)
+                .is_some()
+            {
+                return Err(());
+            }
+        }
+        let alias_count = usize::try_from(r.u32()?).map_err(|_| ())?;
+        if alias_count > max_members {
+            return Err(());
+        }
+        for _ in 0..alias_count {
+            let alias = r.string(128)?;
+            let target = r.string(128)?;
+            if entry.member_aliases.insert(alias, target).is_some() {
+                return Err(());
+            }
+        }
+    }
+    if r.at != bytes_in.len() {
+        return Err(());
+    }
     Ok(entry)
 }
 fn org(value: DatasetOrganization) -> u8 {
@@ -635,7 +732,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn meds2_state_upgrades_to_the_typed_meds3_definition() {
+    fn meds2_state_upgrades_to_the_typed_meds4_definition() {
         let mut legacy = b"MEDS2".to_vec();
         legacy.extend_from_slice(&[0, 0]);
         legacy.extend_from_slice(&4u32.to_be_bytes());
@@ -663,7 +760,27 @@ mod tests {
             })
         );
         let upgraded = encode(&decoded).unwrap();
-        assert_eq!(&upgraded[..5], b"MEDS3");
+        assert_eq!(&upgraded[..5], b"MEDS4");
+        assert_eq!(decode(&upgraded, 8, 80, 8).unwrap(), decoded);
+    }
+
+    #[test]
+    fn meds3_definition_upgrades_with_empty_pdse_directory() {
+        let definition = DatasetDefinition::compatibility(DatasetAttributes {
+            organization: DatasetOrganization::PartitionedExtended,
+            record_format: RecordFormat::Fixed,
+            logical_record_length: 80,
+            key_offset: None,
+            key_length: None,
+            ccsid: Some(1047),
+        });
+        let legacy = encode_definition_digest_v2(&definition).unwrap();
+        assert_eq!(&legacy[..5], b"MEDS3");
+        let decoded = decode(&legacy, 8, 80, 8).unwrap();
+        assert!(decoded.member_generations.is_empty());
+        assert!(decoded.member_aliases.is_empty());
+        let upgraded = encode(&decoded).unwrap();
+        assert_eq!(&upgraded[..5], b"MEDS4");
         assert_eq!(decode(&upgraded, 8, 80, 8).unwrap(), decoded);
     }
 }

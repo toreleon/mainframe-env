@@ -2326,6 +2326,14 @@ fn check_schemas(root: &Path) -> TaskResult {
         &json(&migration_path)?,
         &migration_path,
     )?;
+    let migration_v4_path = root.join("conformance/0.6/migrations/dataset-state-v3-to-v4.json");
+    let migration_v4_schema =
+        root.join("conformance/0.6/schemas/dataset-state-v4-migration.schema.json");
+    validate_schema_instance(
+        &json(&migration_v4_schema)?,
+        &json(&migration_v4_path)?,
+        &migration_v4_path,
+    )?;
     let organization_fixture = root.join("conformance/0.6/fixtures/dataset-organizations.json");
     let organization_schema =
         root.join("conformance/0.6/schemas/dataset-organization-fixtures.schema.json");
@@ -2597,7 +2605,7 @@ fn render_dataset_contract(root: &Path) -> TaskResult<Vec<u8>> {
         ("dcb", 12),
         ("lifecycle", 10),
         ("organizations", 12),
-        ("provider-capabilities", 19),
+        ("provider-capabilities", 20),
         ("sms", 9),
         ("volume", 8),
     ]);
@@ -2666,7 +2674,7 @@ fn render_dataset_contract(root: &Path) -> TaskResult<Vec<u8>> {
         }
     }
     require(
-        descriptors.len() == 130 && ams_rows.len() == 31 && organization_rows.len() == 5,
+        descriptors.len() == 131 && ams_rows.len() == 31 && organization_rows.len() == 5,
         "dataset surface denominator or official mapping is incomplete",
     )?;
 

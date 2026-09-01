@@ -8,7 +8,7 @@ pub const DATASET_REQUEST_CONTRACT: &str = "mainframe-env.host.dataset-request@2
 pub const DATASET_RESULT_CONTRACT: &str = "mainframe-env.host.dataset-result@2";
 pub const DATASET_PROVIDER_CAPABILITY_CONTRACT: &str =
     "mainframe-env.dataset-provider-capabilities@1";
-pub const DATASET_STATE_SCHEMA_VERSION: u16 = 3;
+pub const DATASET_STATE_SCHEMA_VERSION: u16 = 4;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SpaceUnit {
@@ -189,6 +189,21 @@ pub enum CatalogEntryKind {
     PageSpace,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CatalogKind {
+    Master,
+    User,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CatalogResolution {
+    pub requested: DatasetName,
+    pub resolved: DatasetName,
+    pub catalog: Option<DatasetName>,
+    pub alias_chain: Vec<DatasetName>,
+    pub version: u64,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CatalogMetadata {
     pub entry_kind: CatalogEntryKind,
@@ -245,6 +260,7 @@ pub struct DatasetProviderCapabilities {
     pub allocation_extents: bool,
     pub buffering: bool,
     pub catalog_metadata: bool,
+    pub catalog_routing: bool,
     pub control_intervals: bool,
     pub extended_format: bool,
     pub physical_volumes: bool,
@@ -270,6 +286,7 @@ impl DatasetProviderCapabilities {
             allocation_extents: false,
             buffering: false,
             catalog_metadata: false,
+            catalog_routing: true,
             control_intervals: false,
             extended_format: false,
             physical_volumes: false,
@@ -295,6 +312,7 @@ impl DatasetProviderCapabilities {
             allocation_extents: true,
             buffering: true,
             catalog_metadata: true,
+            catalog_routing: true,
             control_intervals: true,
             extended_format: true,
             physical_volumes: true,
@@ -474,9 +492,18 @@ impl DatasetDefinition {
             "BUFNO/BUFSIZE/BUFFERING",
         )?;
         require_capability(
-            self.catalog == CatalogMetadata::default() || capabilities.catalog_metadata,
+            self.catalog.catalog.is_none() || capabilities.catalog_routing,
+            "catalog-routing",
+            "CATALOG",
+        )?;
+        require_capability(
+            (self.catalog.entry_kind == CatalogEntryKind::Dataset
+                && self.catalog.owner.is_none()
+                && self.catalog.expiration_date.is_none()
+                && self.catalog.retention_days.is_none())
+                || capabilities.catalog_metadata,
             "catalog-metadata",
-            "CATALOG/OWNER/EXPIRATION/RETPD/ENTRYTYPE",
+            "OWNER/EXPIRATION/RETPD/ENTRYTYPE",
         )?;
         require_capability(
             (self.vsam.control_interval_size.is_none() && self.vsam.control_area_size.is_none())

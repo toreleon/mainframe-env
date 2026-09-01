@@ -36,7 +36,7 @@ mod tests {
     #[test]
     fn generated_surface_is_sorted_unique_and_complete() {
         let descriptors = dataset_surface_descriptors();
-        assert_eq!(descriptors.len(), 130);
+        assert_eq!(descriptors.len(), 131);
         assert!(
             descriptors
                 .windows(2)

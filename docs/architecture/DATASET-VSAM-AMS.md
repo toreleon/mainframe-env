@@ -19,7 +19,7 @@ same selected dataset authority.
 ## Frozen programming surface
 
 The normative detailed inventory is
-`conformance/0.6/inventory/dataset-programming-surface.json`. It contains 130
+`conformance/0.6/inventory/dataset-programming-surface.json`. It contains 131
 typed surface descriptors in ten families, including all 31 frozen AMS command
 rows and exact mappings for the five official VSAM organization rows. It adds
 obligations beneath the immutable 0.2 denominator; it does not invent new IBM
@@ -54,15 +54,16 @@ reported as successful.
 
 ## Durable state and migration
 
-Dataset state writer version 3 (`MEDS3`) is a bounded owned binary codec. The
-reader accepts `MEDS1`, `MEDS2`, and `MEDS3`. Older records materialize reviewed
-compatibility defaults and are fully validated before any version-3 write.
+Dataset state writer version 4 (`MEDS4`) is a bounded owned binary codec. The
+reader accepts `MEDS1` through `MEDS4`. Older records materialize reviewed
+compatibility defaults and are fully validated before any current-version write.
 Corrupt, over-limit, cross-reference-invalid, or capability-invalid state fails
 before publication.
 
 The portable state, diagnostic, capability, and migration schemas live in
 `conformance/0.6/schemas`. The non-destructive migration contract is
-`conformance/0.6/migrations/dataset-state-v2-to-v3.json`. Rollback restores a
+`conformance/0.6/migrations/dataset-state-v2-to-v3.json` and
+`dataset-state-v3-to-v4.json`. Rollback restores a
 digest-verified pre-migration provider snapshot atomically; partial version-3
 state is never selected. Backup/restore and injected-failure evidence belongs
 to DAT-606.
@@ -99,6 +100,37 @@ All mutating RBA/RRN/key paths publish data and idempotency result in the same
 provider-state transaction, and restart reconstructs the same identities.
 Control-interval/control-area placement and spanned-fragment behavior are added
 by DAT-604 without leaking a physical page manager into this interface.
+
+## Catalog, GDG, and partitioned-directory model
+
+One bounded `DependencyGraph` owns every relationship edge. Edges point from a
+dependent to its authority: alternate index to base, path to alternate index,
+catalog alias to target, generation to GDG base, PDSE member alias to member,
+and migrated generation to source. Edge insertion rejects cycles before durable
+publication. Reverse invalidation is deterministic, dependent-first, and is
+used to reject rename/delete while an unsupported dependent cleanup would be
+left behind.
+
+Catalog resolution follows exact aliases first, then the longest qualifier
+alias that names a connected user catalog, then an explicit catalog recorded in
+the dataset definition, and finally the connected master catalog. Resolution
+returns the requested name, resolved name, selected catalog, bounded alias
+chain, and maximum participating version. Disconnected catalogs fail with an
+exact catalog condition; they do not silently fall through to another catalog.
+
+PDS retains one bounded member record stream per directory name. PDSE uses a
+separate ordered generation list per member; normal member reads select the
+latest generation and an explicit non-positive relative generation selects
+history. Each generation records whether it is a program object. Member aliases
+resolve to the same generation authority and cannot shadow members or form
+cycles. `MEDS4` persists generations and aliases without duplicating a selected
+member projection.
+
+GDG roll-in distinguishes `SCRATCH` from `NOSCRATCH`: both remove old
+generations from relative selection, but only `SCRATCH` removes dataset state.
+`EMPTY` retires every prior active generation when the limit is exceeded;
+`NOEMPTY` retires only the overflow. Alias-dependent scratch is rejected before
+mutation until atomic dependent cleanup is available.
 
 ## Evolution rules
 

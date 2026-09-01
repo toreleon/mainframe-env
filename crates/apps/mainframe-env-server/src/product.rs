@@ -2495,11 +2495,18 @@ impl ProductServer {
                 )?;
             }
         }
+        if let DatasetRequest::DefineAlias { target, .. } = &request {
+            self.authorize_resource(principal, "DATASET", target.as_str(), AccessIntent::Read)?;
+        }
         let dataset = match &request {
             DatasetRequest::Capabilities => None,
             DatasetRequest::List { pattern, .. } => Some(pattern.as_str()),
             DatasetRequest::ReadConcatenation { .. } => None,
             DatasetRequest::Rename { from, .. } => Some(from.as_str()),
+            DatasetRequest::ResolveCatalog { name } => Some(name.as_str()),
+            DatasetRequest::DefineCatalog { catalog, .. }
+            | DatasetRequest::SetCatalogConnection { catalog, .. } => Some(catalog.as_str()),
+            DatasetRequest::DefineAlias { alias, .. } => Some(alias.as_str()),
             DatasetRequest::Attributes { dataset }
             | DatasetRequest::Describe { dataset }
             | DatasetRequest::Diagnose { dataset }
@@ -2508,10 +2515,14 @@ impl ProductServer {
             | DatasetRequest::ReadRelative { dataset, .. }
             | DatasetRequest::ReadRba { dataset, .. }
             | DatasetRequest::ReadSequential { dataset, .. }
+            | DatasetRequest::ReadMemberGeneration { dataset, .. }
             | DatasetRequest::Create { dataset, .. }
             | DatasetRequest::Define { dataset, .. }
             | DatasetRequest::Alter { dataset, .. }
             | DatasetRequest::SetLifecycle { dataset, .. }
+            | DatasetRequest::DefineMemberAlias { dataset, .. }
+            | DatasetRequest::WriteMemberGeneration { dataset, .. }
+            | DatasetRequest::DeleteMemberGeneration { dataset, .. }
             | DatasetRequest::Write { dataset, .. }
             | DatasetRequest::Append { dataset, .. }
             | DatasetRequest::Truncate { dataset, .. }
@@ -2545,6 +2556,8 @@ impl ProductServer {
                         | DatasetRequest::ReadRelative { .. }
                         | DatasetRequest::ReadRba { .. }
                         | DatasetRequest::ReadSequential { .. }
+                        | DatasetRequest::ReadMemberGeneration { .. }
+                        | DatasetRequest::ResolveCatalog { .. }
                         | DatasetRequest::ResolveGeneration { .. }
                         | DatasetRequest::List { .. }
                         | DatasetRequest::StartBrowse { .. }
@@ -3591,6 +3604,12 @@ fn dataset_mutation(request: &DatasetRequest) -> Option<&Mutation> {
         | DatasetRequest::Define { mutation, .. }
         | DatasetRequest::Alter { mutation, .. }
         | DatasetRequest::SetLifecycle { mutation, .. }
+        | DatasetRequest::DefineCatalog { mutation, .. }
+        | DatasetRequest::SetCatalogConnection { mutation, .. }
+        | DatasetRequest::DefineAlias { mutation, .. }
+        | DatasetRequest::DefineMemberAlias { mutation, .. }
+        | DatasetRequest::WriteMemberGeneration { mutation, .. }
+        | DatasetRequest::DeleteMemberGeneration { mutation, .. }
         | DatasetRequest::Write { mutation, .. }
         | DatasetRequest::Append { mutation, .. }
         | DatasetRequest::Truncate { mutation, .. }

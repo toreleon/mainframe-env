@@ -11,12 +11,13 @@ mod service;
 mod surface;
 
 pub use dataset::{
-    AllocationSpace, BufferingMode, CatalogEntryKind, CatalogMetadata, CompressionMode,
-    DATASET_DEFINITION_CONTRACT, DATASET_PROVIDER_CAPABILITY_CONTRACT, DATASET_REQUEST_CONTRACT,
-    DATASET_RESULT_CONTRACT, DATASET_STATE_SCHEMA_VERSION, DataSecurity, DatasetDefinition,
-    DatasetDescription, DatasetDiagnostic, DatasetLifecycleState, DatasetProviderCapabilities,
-    DatasetShareOptions, DcbOptions, LifecycleMetadata, SmsClasses, SpaceUnit, VolumeKind,
-    VolumeSelection, VsamAttributes,
+    AllocationSpace, BufferingMode, CatalogEntryKind, CatalogKind, CatalogMetadata,
+    CatalogResolution, CompressionMode, DATASET_DEFINITION_CONTRACT,
+    DATASET_PROVIDER_CAPABILITY_CONTRACT, DATASET_REQUEST_CONTRACT, DATASET_RESULT_CONTRACT,
+    DATASET_STATE_SCHEMA_VERSION, DataSecurity, DatasetDefinition, DatasetDescription,
+    DatasetDiagnostic, DatasetLifecycleState, DatasetProviderCapabilities, DatasetShareOptions,
+    DcbOptions, LifecycleMetadata, SmsClasses, SpaceUnit, VolumeKind, VolumeSelection,
+    VsamAttributes,
 };
 pub use names::{
     DatasetName, HostNameProblem, JobName, MemberName, ProgramName, ResourceName, SessionId,

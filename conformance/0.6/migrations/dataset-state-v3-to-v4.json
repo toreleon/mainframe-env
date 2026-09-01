@@ -1,0 +1,22 @@
+{
+  "schema_version": "mainframe-env.dataset-state-v4-migration@1",
+  "migration_id": "dataset-state-v3-to-v4",
+  "from_version": 3,
+  "to_version": 4,
+  "reader_versions": [1, 2, 3, 4],
+  "writer_version": 4,
+  "destructive": false,
+  "steps": [
+    "Decode MEDS1 through MEDS3 using their original bounds and compatibility defaults.",
+    "Materialize empty PDSE member-generation and member-alias maps.",
+    "Validate member names, generation order, alias targets, and dependency cycles before publication.",
+    "Write MEDS4 through the existing optimistic provider-state transaction path."
+  ],
+  "failure_policy": "reject-before-publication",
+  "rollback": {
+    "supported": true,
+    "method": "restore-verified-pre-migration-provider-snapshot",
+    "requires_backup": true,
+    "partial_state_selected": false
+  }
+}

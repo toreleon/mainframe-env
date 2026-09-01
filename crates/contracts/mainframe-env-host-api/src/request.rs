@@ -1,6 +1,6 @@
 use crate::dataset::{
-    DatasetDefinition, DatasetDescription, DatasetDiagnostic, DatasetLifecycleState,
-    DatasetProviderCapabilities,
+    CatalogKind, CatalogResolution, DatasetDefinition, DatasetDescription, DatasetDiagnostic,
+    DatasetLifecycleState, DatasetProviderCapabilities,
 };
 use crate::{DatasetName, JobName, MemberName, ProgramName, ResourceName, SessionId};
 use mainframe_env_execution_api::{
@@ -156,10 +156,19 @@ pub enum DatasetRequest {
     Diagnose {
         dataset: DatasetName,
     },
+    ResolveCatalog {
+        name: DatasetName,
+    },
     ListMembers {
         dataset: DatasetName,
         start: Option<MemberName>,
         max_items: u32,
+    },
+    ReadMemberGeneration {
+        dataset: DatasetName,
+        member: MemberName,
+        relative: i32,
+        max_records: u32,
     },
     Read {
         dataset: DatasetName,
@@ -207,6 +216,44 @@ pub enum DatasetRequest {
     SetLifecycle {
         dataset: DatasetName,
         state: DatasetLifecycleState,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
+    DefineCatalog {
+        catalog: DatasetName,
+        kind: CatalogKind,
+        mutation: Mutation,
+    },
+    SetCatalogConnection {
+        catalog: DatasetName,
+        connected: bool,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
+    DefineAlias {
+        alias: DatasetName,
+        target: DatasetName,
+        mutation: Mutation,
+    },
+    DefineMemberAlias {
+        dataset: DatasetName,
+        alias: MemberName,
+        target: MemberName,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
+    WriteMemberGeneration {
+        dataset: DatasetName,
+        member: MemberName,
+        records: Vec<Vec<u8>>,
+        program_object: bool,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
+    DeleteMemberGeneration {
+        dataset: DatasetName,
+        member: MemberName,
+        generation: u64,
         expected_version: Option<u64>,
         mutation: Mutation,
     },
@@ -339,9 +386,17 @@ pub enum DatasetResult {
     Diagnostics {
         diagnostics: Vec<DatasetDiagnostic>,
     },
+    Catalog(CatalogResolution),
     Records {
         records: Vec<Vec<u8>>,
         identities: Vec<Vec<u8>>,
+        version: u64,
+    },
+    MemberGeneration {
+        records: Vec<Vec<u8>>,
+        identities: Vec<Vec<u8>>,
+        generation: u64,
+        program_object: bool,
         version: u64,
     },
     Rba {
@@ -854,7 +909,9 @@ impl HostRequest {
                 | DatasetRequest::Attributes { .. }
                 | DatasetRequest::Describe { .. }
                 | DatasetRequest::Diagnose { .. }
+                | DatasetRequest::ResolveCatalog { .. }
                 | DatasetRequest::ListMembers { .. }
+                | DatasetRequest::ReadMemberGeneration { .. }
                 | DatasetRequest::Read { .. }
                 | DatasetRequest::ReadConcatenation { .. }
                 | DatasetRequest::ReadRelative { .. }
@@ -894,6 +951,12 @@ impl HostRequest {
                     | DatasetRequest::Define { .. }
                     | DatasetRequest::Alter { .. }
                     | DatasetRequest::SetLifecycle { .. }
+                    | DatasetRequest::DefineCatalog { .. }
+                    | DatasetRequest::SetCatalogConnection { .. }
+                    | DatasetRequest::DefineAlias { .. }
+                    | DatasetRequest::DefineMemberAlias { .. }
+                    | DatasetRequest::WriteMemberGeneration { .. }
+                    | DatasetRequest::DeleteMemberGeneration { .. }
                     | DatasetRequest::Write { .. }
                     | DatasetRequest::Append { .. }
                     | DatasetRequest::Truncate { .. }
@@ -934,6 +997,12 @@ impl HostRequest {
                 | DatasetRequest::Define { mutation, .. }
                 | DatasetRequest::Alter { mutation, .. }
                 | DatasetRequest::SetLifecycle { mutation, .. }
+                | DatasetRequest::DefineCatalog { mutation, .. }
+                | DatasetRequest::SetCatalogConnection { mutation, .. }
+                | DatasetRequest::DefineAlias { mutation, .. }
+                | DatasetRequest::DefineMemberAlias { mutation, .. }
+                | DatasetRequest::WriteMemberGeneration { mutation, .. }
+                | DatasetRequest::DeleteMemberGeneration { mutation, .. }
                 | DatasetRequest::Write { mutation, .. }
                 | DatasetRequest::Append { mutation, .. }
                 | DatasetRequest::Truncate { mutation, .. }
@@ -1133,6 +1202,14 @@ impl HostResult {
                     DatasetProviderCapabilities::all_contract_capabilities(),
                 )
             }
+            Self::Dataset(DatasetResult::Catalog(resolution))
+                if resolution.alias_chain.len() > limits.max_records || resolution.version == 0 =>
+            {
+                Err(HostProblem::ResourceExhausted)
+            }
+            Self::Dataset(DatasetResult::MemberGeneration { generation: 0, .. }) => {
+                Err(HostProblem::Malformed)
+            }
             Self::Dataset(DatasetResult::Diagnostics { diagnostics })
                 if diagnostics.len() > limits.max_records
                     || diagnostics.iter().any(|diagnostic| {
@@ -1158,6 +1235,11 @@ impl HostResult {
                 Err(HostProblem::ResourceExhausted)
             }
             Self::Dataset(DatasetResult::Records {
+                records,
+                identities,
+                ..
+            })
+            | Self::Dataset(DatasetResult::MemberGeneration {
                 records,
                 identities,
                 ..
@@ -1356,7 +1438,8 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
     match request {
         DatasetRequest::Capabilities
         | DatasetRequest::Describe { .. }
-        | DatasetRequest::Diagnose { .. } => Ok(()),
+        | DatasetRequest::Diagnose { .. }
+        | DatasetRequest::ResolveCatalog { .. } => Ok(()),
         DatasetRequest::List {
             max_items, pattern, ..
         } if *max_items == 0
@@ -1367,6 +1450,14 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
         }
         DatasetRequest::ListMembers { max_items, .. }
             if *max_items == 0 || *max_items as usize > limits.max_records =>
+        {
+            Err(HostProblem::ResourceExhausted)
+        }
+        DatasetRequest::ReadMemberGeneration { relative, .. } if *relative > 0 => {
+            Err(HostProblem::Malformed)
+        }
+        DatasetRequest::ReadMemberGeneration { max_records, .. }
+            if *max_records == 0 || *max_records as usize > limits.max_records =>
         {
             Err(HostProblem::ResourceExhausted)
         }
@@ -1429,6 +1520,27 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
             mutation.validate(limits)
         }
         DatasetRequest::SetLifecycle { mutation, .. } => mutation.validate(limits),
+        DatasetRequest::DefineCatalog { mutation, .. }
+        | DatasetRequest::SetCatalogConnection { mutation, .. }
+        | DatasetRequest::DefineAlias { mutation, .. }
+        | DatasetRequest::DefineMemberAlias { mutation, .. } => mutation.validate(limits),
+        DatasetRequest::WriteMemberGeneration {
+            records, mutation, ..
+        } => {
+            validate_records(records, limits)?;
+            mutation.validate(limits)
+        }
+        DatasetRequest::DeleteMemberGeneration {
+            generation,
+            mutation,
+            ..
+        } => {
+            if *generation == 0 {
+                Err(HostProblem::Malformed)
+            } else {
+                mutation.validate(limits)
+            }
+        }
         DatasetRequest::Write {
             records, mutation, ..
         } => {

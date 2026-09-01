@@ -12,7 +12,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "abstract_volumes", "allocation_extents", "buffering", "catalog_metadata",
+        "abstract_volumes", "allocation_extents", "buffering", "catalog_metadata", "catalog_routing",
         "control_intervals", "extended_format", "physical_volumes", "tape", "sms_acs",
         "encryption", "compression", "striping", "migration_recall", "rls", "sharing",
         "sms_classes", "tvs", "vsam_data_options"
@@ -22,6 +22,7 @@
         "allocation_extents": { "type": "boolean" },
         "buffering": { "type": "boolean" },
         "catalog_metadata": { "type": "boolean" },
+        "catalog_routing": { "type": "boolean" },
         "control_intervals": { "type": "boolean" },
         "extended_format": { "type": "boolean" },
         "physical_volumes": { "type": "boolean" },
