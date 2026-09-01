@@ -1,0 +1,65 @@
+{
+  "schema_version": "mainframe-env.dataset-organization-fixtures@1",
+  "cases": [
+    {
+      "id": "dataset.ksds.valid",
+      "organization": "ksds",
+      "class": "valid",
+      "expected": "organization=ksds;outcome=valid;access=key;identity=AA;bytes=AA11;restart=true"
+    },
+    {
+      "id": "dataset.ksds.invalid",
+      "organization": "ksds",
+      "class": "invalid",
+      "expected": "organization=ksds;outcome=condition;condition=DUPREC;version=2;unchanged=true"
+    },
+    {
+      "id": "dataset.esds.valid",
+      "organization": "esds",
+      "class": "valid",
+      "expected": "organization=esds;outcome=valid;access=rba;rba=2;bytes=BBB;restart=true"
+    },
+    {
+      "id": "dataset.esds.invalid",
+      "organization": "esds",
+      "class": "invalid",
+      "expected": "organization=esds;outcome=condition;condition=NOTFND;version=2;unchanged=true"
+    },
+    {
+      "id": "dataset.lds.valid",
+      "organization": "lds",
+      "class": "valid",
+      "expected": "organization=lds;outcome=valid;access=rba;rba=0;bytes=HELLO;restart=true"
+    },
+    {
+      "id": "dataset.lds.invalid",
+      "organization": "lds",
+      "class": "invalid",
+      "expected": "organization=lds;outcome=condition;condition=NOTFND;version=1;unchanged=true"
+    },
+    {
+      "id": "dataset.rrds.valid",
+      "organization": "rrds",
+      "class": "valid",
+      "expected": "organization=rrds;outcome=valid;access=rrn;rrn=2;bytes=F002;restart=true"
+    },
+    {
+      "id": "dataset.rrds.invalid",
+      "organization": "rrds",
+      "class": "invalid",
+      "expected": "organization=rrds;outcome=condition;condition=MALFORMED;version=1;unchanged=true"
+    },
+    {
+      "id": "dataset.vrrds.valid",
+      "organization": "vrrds",
+      "class": "valid",
+      "expected": "organization=vrrds;outcome=valid;access=rrn;rrn=4;bytes=FOUR;restart=true"
+    },
+    {
+      "id": "dataset.vrrds.invalid",
+      "organization": "vrrds",
+      "class": "invalid",
+      "expected": "organization=vrrds;outcome=condition;condition=LENGERR;version=1;unchanged=true"
+    }
+  ]
+}

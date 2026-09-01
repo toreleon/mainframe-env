@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/dataset-provider-capabilities.schema.json",
+  "title": "Dataset provider capabilities",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "generation", "capabilities"],
+  "properties": {
+    "schema_version": { "const": "mainframe-env.dataset-provider-capabilities@1" },
+    "generation": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "abstract_volumes", "allocation_extents", "buffering", "catalog_metadata", "catalog_routing",
+        "control_intervals", "extended_format", "physical_volumes", "tape", "sms_acs",
+        "encryption", "compression", "striping", "migration_recall", "rls", "sharing",
+        "sms_classes", "tvs", "vsam_data_options"
+      ],
+      "properties": {
+        "abstract_volumes": { "type": "boolean" },
+        "allocation_extents": { "type": "boolean" },
+        "buffering": { "type": "boolean" },
+        "catalog_metadata": { "type": "boolean" },
+        "catalog_routing": { "type": "boolean" },
+        "control_intervals": { "type": "boolean" },
+        "extended_format": { "type": "boolean" },
+        "physical_volumes": { "type": "boolean" },
+        "tape": { "type": "boolean" },
+        "sms_acs": { "type": "boolean" },
+        "encryption": { "type": "boolean" },
+        "compression": { "type": "boolean" },
+        "striping": { "type": "boolean" },
+        "migration_recall": { "type": "boolean" },
+        "rls": { "type": "boolean" },
+        "sharing": { "type": "boolean" },
+        "sms_classes": { "type": "boolean" },
+        "tvs": { "type": "boolean" },
+        "vsam_data_options": { "type": "boolean" }
+      }
+    }
+  }
+}

@@ -1,7 +1,7 @@
 use crate::{
     ArtifactRecord, CheckpointRecord, EffectRecord, ExecutionRecord, ExecutionState,
-    GenerationRecord, OutboxRecord, ProviderStateRecord, ProviderStateWrite, SessionRecord,
-    StoreError, WorkRecord,
+    GenerationRecord, OutboxRecord, ProviderStateMutation, ProviderStateRecord, ProviderStateWrite,
+    SessionRecord, StoreError, WorkRecord,
 };
 use mainframe_env_execution_api::{ArtifactRef, ExecutionId, IdempotencyKey, LifecycleEvent};
 
@@ -148,6 +148,10 @@ pub trait ProviderStateStore: Send + Sync {
     ) -> Result<(), StoreError>;
     fn put_provider_states_atomic(&self, writes: Vec<ProviderStateWrite>)
     -> Result<(), StoreError>;
+    fn mutate_provider_states_atomic(
+        &self,
+        mutations: Vec<ProviderStateMutation>,
+    ) -> Result<(), StoreError>;
 }
 
 pub trait PlatformStore:

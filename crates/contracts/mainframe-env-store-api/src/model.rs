@@ -184,6 +184,21 @@ pub struct ProviderStateWrite {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ProviderStateMutation {
+    Put(ProviderStateWrite),
+    Delete {
+        namespace: String,
+        key: String,
+        expected_version: u64,
+    },
+    Move {
+        record: ProviderStateRecord,
+        old_key: String,
+        expected_version: u64,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StoreError {
     NotFound,
     AlreadyExists,

@@ -27,6 +27,7 @@ mainframe-env-server.workspace = true
 mainframe-env-ims.workspace = true
 mainframe-env-mq.workspace = true
 mainframe-env-store.workspace = true
+mainframe-env-store-api.workspace = true
 axum.workspace = true
 base64.workspace = true
 ring.workspace = true

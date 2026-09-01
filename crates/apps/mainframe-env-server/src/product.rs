@@ -1816,15 +1816,21 @@ impl ProductServer {
                         item["dsorg"] = json!(match attributes.organization {
                             DatasetOrganization::Sequential => "PS",
                             DatasetOrganization::Partitioned => "PO",
+                            DatasetOrganization::PartitionedExtended => "PO-E",
                             DatasetOrganization::KeySequenced
                             | DatasetOrganization::EntrySequenced
-                            | DatasetOrganization::Relative => "VS",
+                            | DatasetOrganization::Relative
+                            | DatasetOrganization::VariableRelative => "VS",
+                            DatasetOrganization::Linear => "LDS",
                         });
                         item["recfm"] = json!(match attributes.record_format {
                             RecordFormat::Fixed => "F",
                             RecordFormat::FixedBlocked => "FB",
+                            RecordFormat::FixedBlockedStandard => "FBS",
                             RecordFormat::Variable => "V",
                             RecordFormat::VariableBlocked => "VB",
+                            RecordFormat::VariableSpanned => "VS",
+                            RecordFormat::VariableBlockedSpanned => "VBS",
                             RecordFormat::Undefined => "U",
                             RecordFormat::Line => "LINE",
                         });
@@ -1940,6 +1946,8 @@ impl ProductServer {
                         dataset: dataset_name(&dataset)?,
                         member: member_name(member)?,
                         expected_version: None,
+                        purge: false,
+                        current_date: None,
                         mutation: self.mutation().map_err(gateway_problem)?,
                     },
                 )?;
@@ -2489,15 +2497,62 @@ impl ProductServer {
                 )?;
             }
         }
+        if let DatasetRequest::DefineAlias { target, .. } = &request {
+            self.authorize_resource(principal, "DATASET", target.as_str(), AccessIntent::Read)?;
+        }
+        if let DatasetRequest::BuildAlternateIndex { base, .. } = &request {
+            self.authorize_resource(principal, "DATASET", base.as_str(), AccessIntent::Read)?;
+        }
+        if let DatasetRequest::TvsStatus { owner, .. }
+        | DatasetRequest::AcquireLock { owner, .. }
+        | DatasetRequest::ReleaseLock { owner, .. }
+        | DatasetRequest::BeginTvs { owner, .. }
+        | DatasetRequest::StageTvs { owner, .. }
+        | DatasetRequest::CompleteTvs { owner, .. }
+        | DatasetRequest::ReconcileTvs { owner, .. } = &request
+            && owner.as_str() != principal
+        {
+            return Err(gateway_problem(HostProblem::Unauthorized));
+        }
         let dataset = match &request {
-            DatasetRequest::List { pattern, .. } => Some(pattern.as_str()),
+            DatasetRequest::Capabilities
+            | DatasetRequest::TvsStatus { .. }
+            | DatasetRequest::BeginTvs { .. }
+            | DatasetRequest::CompleteTvs { .. }
+            | DatasetRequest::ReconcileTvs { .. } => None,
+            DatasetRequest::List { pattern, .. } | DatasetRequest::ListCatalog { pattern, .. } => {
+                Some(pattern.as_str())
+            }
+            DatasetRequest::ListVolumes { .. } => Some("VOLUME.**"),
             DatasetRequest::ReadConcatenation { .. } => None,
             DatasetRequest::Rename { from, .. } => Some(from.as_str()),
+            DatasetRequest::ResolveCatalog { name } => Some(name.as_str()),
+            DatasetRequest::DefineCatalog { catalog, .. }
+            | DatasetRequest::SetCatalogConnection { catalog, .. } => Some(catalog.as_str()),
+            DatasetRequest::DefineAlias { alias, .. } => Some(alias.as_str()),
             DatasetRequest::Attributes { dataset }
+            | DatasetRequest::Describe { dataset }
+            | DatasetRequest::Diagnose { dataset }
+            | DatasetRequest::ListLocks { dataset, .. }
             | DatasetRequest::ListMembers { dataset, .. }
             | DatasetRequest::Read { dataset, .. }
+            | DatasetRequest::ReadGeneric { dataset, .. }
             | DatasetRequest::ReadRelative { dataset, .. }
+            | DatasetRequest::ReadRba { dataset, .. }
+            | DatasetRequest::ReadSequential { dataset, .. }
+            | DatasetRequest::Snapshot { dataset, .. }
+            | DatasetRequest::ReadMemberGeneration { dataset, .. }
             | DatasetRequest::Create { dataset, .. }
+            | DatasetRequest::Define { dataset, .. }
+            | DatasetRequest::Alter { dataset, .. }
+            | DatasetRequest::SetLifecycle { dataset, .. }
+            | DatasetRequest::RecordBackup { dataset, .. }
+            | DatasetRequest::Restore { dataset, .. }
+            | DatasetRequest::DefineMemberAlias { dataset, .. }
+            | DatasetRequest::WriteMemberGeneration { dataset, .. }
+            | DatasetRequest::DeleteMemberGeneration { dataset, .. }
+            | DatasetRequest::AcquireLock { dataset, .. }
+            | DatasetRequest::ReleaseLock { dataset, .. }
             | DatasetRequest::Write { dataset, .. }
             | DatasetRequest::Append { dataset, .. }
             | DatasetRequest::Truncate { dataset, .. }
@@ -2505,11 +2560,20 @@ impl ProductServer {
             | DatasetRequest::DeleteRecord { dataset, .. }
             | DatasetRequest::WriteRelative { dataset, .. }
             | DatasetRequest::DeleteRelative { dataset, .. }
+            | DatasetRequest::WriteRba { dataset, .. }
             | DatasetRequest::Delete { dataset, .. }
             | DatasetRequest::StartBrowse { dataset, .. }
             | DatasetRequest::ReadNext { dataset, .. }
             | DatasetRequest::EndBrowse { dataset, .. } => Some(dataset.as_str()),
             DatasetRequest::DefinePath { path, .. } => Some(path.as_str()),
+            DatasetRequest::BuildAlternateIndex { index, .. } => Some(index.as_str()),
+            DatasetRequest::StageTvs { operation, .. } => Some(match operation {
+                mainframe_env_host_api::TvsRecordOperation::Insert { dataset, .. }
+                | mainframe_env_host_api::TvsRecordOperation::Rewrite { dataset, .. }
+                | mainframe_env_host_api::TvsRecordOperation::Delete { dataset, .. } => {
+                    dataset.as_str()
+                }
+            }),
             DatasetRequest::DefineAlternateIndex { base, .. }
             | DatasetRequest::DefineGenerationGroup { base, .. }
             | DatasetRequest::CreateGeneration { base, .. }
@@ -2523,11 +2587,26 @@ impl ProductServer {
                 if matches!(
                     request,
                     DatasetRequest::Attributes { .. }
+                        | DatasetRequest::Describe { .. }
+                        | DatasetRequest::Diagnose { .. }
+                        | DatasetRequest::ListLocks { .. }
+                        | DatasetRequest::TvsStatus { .. }
                         | DatasetRequest::ListMembers { .. }
                         | DatasetRequest::Read { .. }
+                        | DatasetRequest::ReadGeneric { .. }
                         | DatasetRequest::ReadRelative { .. }
+                        | DatasetRequest::ReadRba { .. }
+                        | DatasetRequest::ReadSequential { .. }
+                        | DatasetRequest::Snapshot { .. }
+                        | DatasetRequest::ReadMemberGeneration { .. }
+                        | DatasetRequest::ResolveCatalog { .. }
                         | DatasetRequest::ResolveGeneration { .. }
                         | DatasetRequest::List { .. }
+                        | DatasetRequest::ListCatalog { .. }
+                        | DatasetRequest::ListVolumes { .. }
+                        | DatasetRequest::StartBrowse { .. }
+                        | DatasetRequest::ReadNext { .. }
+                        | DatasetRequest::EndBrowse { .. }
                 ) {
                     AccessIntent::Read
                 } else {
@@ -2910,6 +2989,8 @@ impl ProductServer {
                         dataset: dataset_name(name)?,
                         member: None,
                         expected_version: None,
+                        purge: false,
+                        current_date: None,
                         mutation: self.mutation().map_err(gateway_problem)?,
                     },
                 )?;
@@ -3566,7 +3647,36 @@ fn hex_digest(bytes: &[u8]) -> String {
 fn dataset_mutation(request: &DatasetRequest) -> Option<&Mutation> {
     match request {
         DatasetRequest::Create { mutation, .. }
+        | DatasetRequest::Define { mutation, .. }
+        | DatasetRequest::Alter { mutation, .. }
+        | DatasetRequest::SetLifecycle { mutation, .. }
+        | DatasetRequest::RecordBackup { mutation, .. }
+        | DatasetRequest::Restore { mutation, .. }
+        | DatasetRequest::DefineCatalog { mutation, .. }
+        | DatasetRequest::SetCatalogConnection { mutation, .. }
+        | DatasetRequest::DefineAlias { mutation, .. }
+        | DatasetRequest::DefineMemberAlias { mutation, .. }
+        | DatasetRequest::WriteMemberGeneration { mutation, .. }
+        | DatasetRequest::DeleteMemberGeneration { mutation, .. }
+        | DatasetRequest::AcquireLock { mutation, .. }
+        | DatasetRequest::ReleaseLock { mutation, .. }
+        | DatasetRequest::BeginTvs { mutation, .. }
+        | DatasetRequest::StageTvs { mutation, .. }
+        | DatasetRequest::CompleteTvs { mutation, .. }
+        | DatasetRequest::ReconcileTvs { mutation, .. }
         | DatasetRequest::Write { mutation, .. }
+        | DatasetRequest::Append { mutation, .. }
+        | DatasetRequest::Truncate { mutation, .. }
+        | DatasetRequest::RewriteRecord { mutation, .. }
+        | DatasetRequest::DeleteRecord { mutation, .. }
+        | DatasetRequest::WriteRelative { mutation, .. }
+        | DatasetRequest::DeleteRelative { mutation, .. }
+        | DatasetRequest::WriteRba { mutation, .. }
+        | DatasetRequest::DefineAlternateIndex { mutation, .. }
+        | DatasetRequest::BuildAlternateIndex { mutation, .. }
+        | DatasetRequest::DefinePath { mutation, .. }
+        | DatasetRequest::DefineGenerationGroup { mutation, .. }
+        | DatasetRequest::CreateGeneration { mutation, .. }
         | DatasetRequest::Rename { mutation, .. }
         | DatasetRequest::Delete { mutation, .. } => Some(mutation),
         _ => None,
@@ -3591,8 +3701,13 @@ fn dataset_attributes(value: &Value) -> Result<DatasetAttributes, HostProblem> {
         .as_str()
     {
         "PS" => DatasetOrganization::Sequential,
-        "PO" | "PO-E" => DatasetOrganization::Partitioned,
+        "PO" => DatasetOrganization::Partitioned,
+        "PO-E" => DatasetOrganization::PartitionedExtended,
         "VS" | "KSDS" => DatasetOrganization::KeySequenced,
+        "ESDS" => DatasetOrganization::EntrySequenced,
+        "RRDS" => DatasetOrganization::Relative,
+        "VRRDS" => DatasetOrganization::VariableRelative,
+        "LDS" => DatasetOrganization::Linear,
         _ => return Err(HostProblem::Unsupported),
     };
     let record_format = match value
@@ -3604,8 +3719,11 @@ fn dataset_attributes(value: &Value) -> Result<DatasetAttributes, HostProblem> {
     {
         "F" => RecordFormat::Fixed,
         "FB" => RecordFormat::FixedBlocked,
+        "FBS" => RecordFormat::FixedBlockedStandard,
         "V" => RecordFormat::Variable,
         "VB" => RecordFormat::VariableBlocked,
+        "VS" => RecordFormat::VariableSpanned,
+        "VBS" => RecordFormat::VariableBlockedSpanned,
         "U" => RecordFormat::Undefined,
         "LINE" => RecordFormat::Line,
         _ => return Err(HostProblem::Unsupported),
@@ -3785,6 +3903,9 @@ fn gateway_problem(problem: HostProblem) -> GatewayProblem {
     let (status, code) = match problem {
         HostProblem::Malformed => (StatusCode::BAD_REQUEST, "malformed"),
         HostProblem::Unsupported => (StatusCode::NOT_FOUND, "unsupported"),
+        HostProblem::UnsupportedCapability { .. } => {
+            (StatusCode::NOT_IMPLEMENTED, "unsupported_capability")
+        }
         HostProblem::NotFound => (StatusCode::NOT_FOUND, "not_found"),
         HostProblem::Unauthorized => (StatusCode::FORBIDDEN, "not_authorized"),
         HostProblem::Cancelled => (StatusCode::CONFLICT, "cancelled"),
