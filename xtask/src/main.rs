@@ -1282,17 +1282,22 @@ fn check_cobol_statement_bindings(
             }
             Some("0023") => {
                 expected_obligations.insert("phrase-count-in");
+                expected_obligations.insert("phrase-count-modes");
                 expected_obligations.insert("phrase-group-hierarchy");
+                expected_obligations.insert("phrase-name-overrides");
                 expected_obligations.insert("phrase-root-name-omitted");
+                expected_obligations.insert("phrase-suppress-item");
             }
             Some("0043") => {
                 expected_obligations.insert("phrase-count-in");
                 expected_obligations.insert("phrase-group-hierarchy");
             }
             Some("0024") => {
-                expected_obligations.insert("phrase-group-atomic-exception");
+                expected_obligations.insert("phrase-group-partial-exception");
                 expected_obligations.insert("phrase-group-hierarchy");
+                expected_obligations.insert("phrase-name-overrides");
                 expected_obligations.insert("phrase-root-name-omitted");
+                expected_obligations.insert("phrase-suppress-item");
                 expected_obligations.insert("phrase-with-detail");
             }
             Some("0029") => {

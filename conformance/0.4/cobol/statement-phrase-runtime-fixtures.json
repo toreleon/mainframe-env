@@ -273,11 +273,11 @@
       "expected_output": "34World\n"
     },
     {
-      "id": "json-parse-group-atomic-exception",
+      "id": "json-parse-group-partial-exception",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
-      "obligation_id": "phrase-group-atomic-exception",
-      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. JSONPARSEATOMIC. DATA DIVISION. WORKING-STORAGE SECTION. 01 JSON-X PIC X(80) VALUE '{\"GREETING\":{\"COUNT-X\":34,\"MSG\":99}}'. 01 GREETING. 05 COUNT-X PIC 99 VALUE 12. 05 MSG PIC X(5) VALUE 'Hello'. PROCEDURE DIVISION. JSON PARSE JSON-X INTO GREETING ON EXCEPTION DISPLAY COUNT-X MSG NOT ON EXCEPTION DISPLAY 'BAD' END-JSON. STOP RUN.",
-      "expected_output": "12Hello\n"
+      "obligation_id": "phrase-group-partial-exception",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. JSONPARSEPARTIAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 JSON-X PIC X(80) VALUE '{\"GREETING\":{\"COUNT-X\":34,\"MSG\":99}}'. 01 GREETING. 05 COUNT-X PIC 99 VALUE 12. 05 MSG PIC X(5) VALUE 'Hello'. PROCEDURE DIVISION. JSON PARSE JSON-X INTO GREETING ON EXCEPTION DISPLAY COUNT-X MSG NOT ON EXCEPTION DISPLAY 'BAD' END-JSON. STOP RUN.",
+      "expected_output": "34Hello\n"
     },
     {
       "id": "xml-generate-group-hierarchy",
@@ -306,6 +306,41 @@
       "obligation_id": "phrase-root-name-omitted",
       "source": "IDENTIFICATION DIVISION. PROGRAM-ID. JSONOMITPARSE. DATA DIVISION. WORKING-STORAGE SECTION. 01 JSON-X PIC X(80) VALUE '{\"COUNT-X\":34,\"MSG\":\"World\"}'. 01 GREETING. 05 COUNT-X PIC 99. 05 MSG PIC X(5). PROCEDURE DIVISION. JSON PARSE JSON-X INTO GREETING NAME GREETING IS OMITTED. DISPLAY COUNT-X MSG. STOP RUN.",
       "expected_output": "34World\n"
+    },
+    {
+      "id": "json-generate-name-overrides",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0023",
+      "obligation_id": "phrase-name-overrides",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. JSONGENNAME. DATA DIVISION. WORKING-STORAGE SECTION. 01 GREETING. 05 COUNT-X PIC 99 VALUE 12. 05 MSG PIC X(5) VALUE 'Hello'. 01 JSON-X PIC X(80). 01 LEN-X PIC 99. PROCEDURE DIVISION. JSON GENERATE JSON-X FROM GREETING COUNT IN LEN-X NAME OF GREETING IS 'greeting' COUNT-X IS 'count' MSG IS 'message'. DISPLAY JSON-X(1:LEN-X). STOP RUN.",
+      "expected_output": "{\"greeting\":{\"count\":12,\"message\":\"Hello\"}}\n"
+    },
+    {
+      "id": "json-parse-name-overrides",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
+      "obligation_id": "phrase-name-overrides",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. JSONPARSENAME. DATA DIVISION. WORKING-STORAGE SECTION. 01 JSON-X PIC X(80) VALUE '{\"greeting\":{\"count\":34,\"message\":\"World\"}}'. 01 GREETING. 05 COUNT-X PIC 99. 05 MSG PIC X(5). PROCEDURE DIVISION. JSON PARSE JSON-X INTO GREETING NAME OF GREETING IS 'greeting' COUNT-X IS 'count' MSG IS 'message'. DISPLAY COUNT-X MSG. STOP RUN.",
+      "expected_output": "34World\n"
+    },
+    {
+      "id": "json-generate-suppress-item",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0023",
+      "obligation_id": "phrase-suppress-item",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. JSONGENSUPPRESS. DATA DIVISION. WORKING-STORAGE SECTION. 01 GREETING. 05 COUNT-X PIC 99 VALUE 12. 05 MSG PIC X(5) VALUE 'Hello'. 01 JSON-X PIC X(80). 01 LEN-X PIC 99. PROCEDURE DIVISION. JSON GENERATE JSON-X FROM GREETING COUNT IN LEN-X SUPPRESS MSG. DISPLAY JSON-X(1:LEN-X). STOP RUN.",
+      "expected_output": "{\"GREETING\":{\"COUNT-X\":12}}\n"
+    },
+    {
+      "id": "json-parse-suppress-item",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
+      "obligation_id": "phrase-suppress-item",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. JSONPARSESUPPRESS. DATA DIVISION. WORKING-STORAGE SECTION. 01 JSON-X PIC X(80) VALUE '{\"GREETING\":{\"COUNT-X\":34,\"MSG\":\"World\"}}'. 01 GREETING. 05 COUNT-X PIC 99 VALUE 12. 05 MSG PIC X(5) VALUE 'Hello'. PROCEDURE DIVISION. JSON PARSE JSON-X INTO GREETING SUPPRESS MSG. DISPLAY COUNT-X MSG. STOP RUN.",
+      "expected_output": "34Hello\n"
+    },
+    {
+      "id": "json-generate-count-modes",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0023",
+      "obligation_id": "phrase-count-modes",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. JSONCOUNTMODES. DATA DIVISION. WORKING-STORAGE SECTION. 01 MSG PIC X(2) VALUE 'é'. 01 JSON-X PIC X(80). 01 BYTE-X PIC 99. 01 CHAR-X PIC 99. PROCEDURE DIVISION. JSON GENERATE JSON-X FROM MSG COUNT BYTES IN BYTE-X. JSON GENERATE JSON-X FROM MSG COUNT CHARACTERS IN CHAR-X. DISPLAY BYTE-X CHAR-X. STOP RUN.",
+      "expected_output": "1211\n"
     }
   ]
 }

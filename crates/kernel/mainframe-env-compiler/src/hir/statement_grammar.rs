@@ -1751,15 +1751,14 @@ fn validate_generate(tokens: &[Token<'_>]) -> Result<(), &'static str> {
     cursor.expect("FROM")?;
     cursor.operand()?;
     if cursor.eat("COUNT") {
+        if !cursor.eat("BYTES") {
+            cursor.eat("CHARACTERS");
+        }
         cursor.expect("IN")?;
         cursor.operand()?;
     }
-    if cursor.eat("NAME") {
-        cursor.eat("OF");
-        cursor.operand()?;
-        cursor.expect("IS")?;
-        cursor.expect("OMITTED")?;
-    }
+    validate_json_names(&mut cursor)?;
+    validate_json_suppress(&mut cursor)?;
     cursor.finish()
 }
 
@@ -1771,13 +1770,35 @@ fn validate_json_parse(tokens: &[Token<'_>]) -> Result<(), &'static str> {
     if cursor.eat("WITH") {
         cursor.expect("DETAIL")?;
     }
-    if cursor.eat("NAME") {
+    validate_json_names(&mut cursor)?;
+    validate_json_suppress(&mut cursor)?;
+    cursor.finish()
+}
+
+fn validate_json_names(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
+    if !cursor.eat("NAME") {
+        return Ok(());
+    }
+    let mut count = 0usize;
+    while !cursor.done() && !cursor.at("SUPPRESS") {
         cursor.eat("OF");
         cursor.operand()?;
         cursor.expect("IS")?;
-        cursor.expect("OMITTED")?;
+        if !cursor.eat("OMITTED") {
+            cursor.literal()?;
+        }
+        count += 1;
     }
-    cursor.finish()
+    (count > 0)
+        .then_some(())
+        .ok_or("NAME requires a data item and replacement")
+}
+
+fn validate_json_suppress(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
+    if !cursor.eat("SUPPRESS") {
+        return Ok(());
+    }
+    cursor.operand_list(1)
 }
 
 fn validate_xml_parse(tokens: &[Token<'_>]) -> Result<(), &'static str> {
@@ -2445,6 +2466,19 @@ impl<'a> Cursor<'a> {
         self.position =
             consume_operand(self.tokens, self.position).ok_or("operand is malformed")?;
         Ok(())
+    }
+
+    fn literal(&mut self) -> Result<(), &'static str> {
+        if self
+            .tokens
+            .get(self.position)
+            .is_some_and(|token| token.kind == TokenKind::Literal)
+        {
+            self.position += 1;
+            Ok(())
+        } else {
+            Err("literal is missing")
+        }
     }
 
     fn operand_list(&mut self, minimum: usize) -> Result<(), &'static str> {

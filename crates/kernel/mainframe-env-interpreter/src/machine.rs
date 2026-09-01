@@ -157,6 +157,12 @@ struct XmlNode {
     children: Vec<XmlNode>,
 }
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct JsonClauses {
+    names: BTreeMap<String, Option<String>>,
+    suppressed: BTreeSet<String>,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SortProcedurePhase {
     Input,
@@ -6000,19 +6006,28 @@ impl ReferenceMachine {
         let from = position(args, "FROM")
             .and_then(|i| args.get(i + 1))
             .ok_or(MachineProblem::InvalidOperation)?;
-        let generated = if let Some(layout) = self.layout(from).cloned()
-            && is_group(layout.category)
-        {
+        let generated = if let Some(layout) = self.layout(from).cloned() {
             if json {
-                let value = self.json_layout_value(&layout)?;
-                if json_name_omitted(args, &layout.simple_name) {
+                let clauses = JsonClauses::parse(args)?;
+                let value = self
+                    .json_layout_value(&layout, &clauses, true)?
+                    .ok_or(MachineProblem::DataException)?;
+                if clauses.omitted(&layout) {
                     serde_json::to_string(&value).map_err(|_| MachineProblem::DataException)?
                 } else {
-                    serde_json::to_string(&BTreeMap::from([(layout.simple_name.clone(), value)]))
-                        .map_err(|_| MachineProblem::DataException)?
+                    serde_json::to_string(&BTreeMap::from([(
+                        clauses.name(&layout).to_string(),
+                        value,
+                    )]))
+                    .map_err(|_| MachineProblem::DataException)?
                 }
-            } else {
+            } else if is_group(layout.category) {
                 self.xml_layout_value(&layout)?
+            } else {
+                let value = String::from_utf8_lossy(&self.resolve(from)?)
+                    .trim()
+                    .to_string();
+                format!("<{from}>{}</{from}>", xml_escape(&value))
             }
         } else {
             let value = String::from_utf8_lossy(&self.resolve(from)?)
@@ -6027,11 +6042,18 @@ impl ReferenceMachine {
         };
         let count_assignment = position(args, "COUNT")
             .map(|count| {
-                if args.get(count + 1).is_none_or(|token| token != "IN") {
+                let mode = args.get(count + 1).map(String::as_str);
+                let target_at = count
+                    + if matches!(mode, Some("BYTES" | "CHARACTERS")) {
+                        3
+                    } else {
+                        2
+                    };
+                if args.get(target_at - 1).is_none_or(|token| token != "IN") {
                     return Err(MachineProblem::InvalidOperation);
                 }
                 let target = args
-                    .get(count + 2)
+                    .get(target_at)
                     .ok_or(MachineProblem::InvalidOperation)?;
                 let reference = self.reference(std::slice::from_ref(target))?;
                 if reference.length != reference.layout.length
@@ -6040,8 +6062,12 @@ impl ReferenceMachine {
                     return Err(MachineProblem::DataException);
                 }
                 let value = Decimal {
-                    coefficient: i128::try_from(generated.len())
-                        .map_err(|_| MachineProblem::ResourceExhausted)?,
+                    coefficient: i128::try_from(if mode == Some("CHARACTERS") {
+                        generated.chars().count()
+                    } else {
+                        generated.len()
+                    })
+                    .map_err(|_| MachineProblem::ResourceExhausted)?,
                     scale: 0,
                 };
                 let bytes = encode_decimal(
@@ -6061,7 +6087,12 @@ impl ReferenceMachine {
     fn json_layout_value(
         &self,
         layout: &LayoutMetadata,
-    ) -> Result<serde_json::Value, MachineProblem> {
+        clauses: &JsonClauses,
+        root: bool,
+    ) -> Result<Option<serde_json::Value>, MachineProblem> {
+        if !root && clauses.suppressed(layout) {
+            return Ok(None);
+        }
         if is_group(layout.category) {
             let mut children = self
                 .layouts
@@ -6086,15 +6117,18 @@ impl ReferenceMachine {
             }
             let mut object = serde_json::Map::new();
             for child in children {
-                object.insert(child.simple_name.clone(), self.json_layout_value(&child)?);
+                if let Some(value) = self.json_layout_value(&child, clauses, false)? {
+                    object.insert(clauses.name(&child).to_string(), value);
+                }
             }
-            return Ok(serde_json::Value::Object(object));
+            return Ok(Some(serde_json::Value::Object(object)));
         }
         if is_numeric(layout.category) {
             let value = decimal_string(decode_decimal(layout, &self.read(&layout.name)?)?);
             return value
                 .parse::<serde_json::Number>()
                 .map(serde_json::Value::Number)
+                .map(Some)
                 .map_err(|_| MachineProblem::DataException);
         }
         let bytes = self.read(&layout.name)?;
@@ -6107,7 +6141,7 @@ impl ReferenceMachine {
         } else {
             String::from_utf8(bytes).map_err(|_| MachineProblem::DataException)?
         };
-        Ok(serde_json::Value::String(text.trim_end().into()))
+        Ok(Some(serde_json::Value::String(text.trim_end().into())))
     }
 
     fn xml_layout_value(&self, layout: &LayoutMetadata) -> Result<String, MachineProblem> {
@@ -6168,24 +6202,21 @@ impl ReferenceMachine {
         let into = position(args, "INTO").ok_or(MachineProblem::UnsupportedForm)?;
         let target = args.get(into + 1).ok_or(MachineProblem::InvalidOperation)?;
         let value = if json {
+            let clauses = JsonClauses::parse(args)?;
             let value: serde_json::Value =
                 serde_json::from_str(source.trim()).map_err(|_| MachineProblem::DataException)?;
             if let Some(layout) = self.layout(target).cloned()
                 && is_group(layout.category)
             {
-                let value = if json_name_omitted(args, &layout.simple_name) {
+                let value = if clauses.omitted(&layout) {
                     &value
                 } else {
                     value
                         .as_object()
-                        .and_then(|object| object.get(&layout.simple_name))
+                        .and_then(|object| object.get(clauses.name(&layout)))
                         .ok_or(MachineProblem::DataException)?
                 };
-                let mut assignments = Vec::new();
-                self.stage_json_group(&layout, value, &mut assignments)?;
-                for (reference, bytes) in assignments {
-                    self.write_reference(&reference, &bytes)?;
-                }
+                self.parse_json_group(&layout, value, &clauses)?;
                 return Ok(());
             }
             let value = value
@@ -6298,11 +6329,11 @@ impl ReferenceMachine {
         Ok(())
     }
 
-    fn stage_json_group(
-        &self,
+    fn parse_json_group(
+        &mut self,
         layout: &LayoutMetadata,
         value: &serde_json::Value,
-        assignments: &mut Vec<(ResolvedReference, Vec<u8>)>,
+        clauses: &JsonClauses,
     ) -> Result<(), MachineProblem> {
         let object = value.as_object().ok_or(MachineProblem::DataException)?;
         let mut children = self
@@ -6324,11 +6355,14 @@ impl ReferenceMachine {
                 .then_with(|| left.name.cmp(&right.name))
         });
         for child in children {
+            if clauses.suppressed(&child) {
+                continue;
+            }
             let value = object
-                .get(&child.simple_name)
+                .get(clauses.name(&child))
                 .ok_or(MachineProblem::DataException)?;
             if is_group(child.category) {
-                self.stage_json_group(&child, value, assignments)?;
+                self.parse_json_group(&child, value, clauses)?;
                 continue;
             }
             let reference = self.reference(std::slice::from_ref(&child.name))?;
@@ -6359,7 +6393,7 @@ impl ReferenceMachine {
                     .bytes()
                     .to_vec()
             };
-            assignments.push((reference, bytes));
+            self.write_reference(&reference, &bytes)?;
         }
         Ok(())
     }
@@ -10906,19 +10940,74 @@ fn xml_escape(value: &str) -> String {
         .replace('\'', "&apos;")
 }
 
-fn json_name_omitted(args: &[String], name: &str) -> bool {
-    args.iter().enumerate().any(|(index, token)| {
-        if token != "NAME" {
-            return false;
+impl JsonClauses {
+    fn parse(args: &[String]) -> Result<Self, MachineProblem> {
+        let mut clauses = Self::default();
+        if let Some(mut at) = position(args, "NAME").map(|position| position + 1) {
+            while at < args.len() && args[at] != "SUPPRESS" {
+                if args[at] == "OF" {
+                    at += 1;
+                }
+                let target = normalize(args.get(at).ok_or(MachineProblem::InvalidOperation)?);
+                at += 1;
+                while args.get(at).is_some_and(|token| token != "IS") {
+                    if matches!(args[at].as_str(), "SUPPRESS" | "CONVERTING") {
+                        return Err(MachineProblem::InvalidOperation);
+                    }
+                    at += 1;
+                }
+                if args.get(at).is_none_or(|token| token != "IS") {
+                    return Err(MachineProblem::InvalidOperation);
+                }
+                at += 1;
+                let replacement = args.get(at).ok_or(MachineProblem::InvalidOperation)?;
+                let replacement = if replacement == "OMITTED" {
+                    None
+                } else if replacement.len() >= 2
+                    && matches!(replacement.as_bytes().first(), Some(b'\'' | b'"'))
+                    && replacement.as_bytes().first() == replacement.as_bytes().last()
+                {
+                    Some(replacement[1..replacement.len() - 1].to_string())
+                } else {
+                    return Err(MachineProblem::InvalidOperation);
+                };
+                clauses.names.insert(target, replacement);
+                at += 1;
+            }
         }
-        let mut at = index + 1;
-        if args.get(at).is_some_and(|token| token == "OF") {
-            at += 1;
+        if let Some(at) = position(args, "SUPPRESS") {
+            for token in &args[at + 1..] {
+                if matches!(token.as_str(), "OF" | "IN") {
+                    continue;
+                }
+                if matches!(token.as_str(), "CONVERTING" | "ON" | "NOT" | "END-JSON") {
+                    break;
+                }
+                clauses.suppressed.insert(normalize(token));
+            }
         }
-        args.get(at).is_some_and(|token| token == name)
-            && args.get(at + 1).is_some_and(|token| token == "IS")
-            && args.get(at + 2).is_some_and(|token| token == "OMITTED")
-    })
+        Ok(clauses)
+    }
+
+    fn entry<'a>(&'a self, layout: &LayoutMetadata) -> Option<&'a Option<String>> {
+        self.names
+            .get(&layout.name)
+            .or_else(|| self.names.get(&layout.simple_name))
+    }
+
+    fn name<'a>(&'a self, layout: &'a LayoutMetadata) -> &'a str {
+        self.entry(layout)
+            .and_then(Option::as_deref)
+            .unwrap_or(&layout.simple_name)
+    }
+
+    fn omitted(&self, layout: &LayoutMetadata) -> bool {
+        self.entry(layout).is_some_and(Option::is_none)
+    }
+
+    fn suppressed(&self, layout: &LayoutMetadata) -> bool {
+        self.suppressed.contains(&layout.name) || self.suppressed.contains(&layout.simple_name)
+    }
 }
 
 fn xml_unescape(value: &str) -> Result<String, MachineProblem> {
