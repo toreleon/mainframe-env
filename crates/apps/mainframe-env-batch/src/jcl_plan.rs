@@ -586,22 +586,71 @@ pub fn convert_jcl(
 
 fn validate_statement_operands(statement: &JclExpandedStatement) -> Result<(), String> {
     let descriptor = statement.statement().identity().descriptor();
+    let identity = statement.statement().identity();
     let value = if statement.statement().identity() == JclStatementId::JclCommand {
         statement.effective_name().unwrap_or_default()
     } else {
         statement.effective_operands()
     };
-    match descriptor.validation {
-        JclValueShape::None => Ok(()),
-        JclValueShape::JclValue if balanced_jcl_value(value) => Ok(()),
-        JclValueShape::Text if !value.trim().is_empty() => Ok(()),
-        JclValueShape::Name if valid_name(value) => Ok(()),
-        shape => Err(format!(
+    let valid = match identity {
+        JclStatementId::JclCommand
+        | JclStatementId::Command
+        | JclStatementId::Schedule
+        | JclStatementId::Xmit => balanced_jcl_value(value),
+        JclStatementId::Comment | JclStatementId::Delimiter | JclStatementId::Null => true,
+        JclStatementId::Cntl | JclStatementId::Endcntl | JclStatementId::Pend => {
+            value.trim().is_empty()
+        }
+        JclStatementId::Dd
+        | JclStatementId::Exec
+        | JclStatementId::Job
+        | JclStatementId::Output
+        | JclStatementId::Conditional => true,
+        JclStatementId::Export => {
+            valid_single_named_operand(value, "SYMLIST", |value| validate_list(value, valid_name))
+        }
+        JclStatementId::Include => valid_single_named_operand(value, "MEMBER", valid_name),
+        JclStatementId::Jcllib => valid_single_named_operand(value, "ORDER", |value| {
+            validate_list(value, |name| valid_name(strip_quotes(name)))
+        }),
+        JclStatementId::Proc => value.trim().is_empty() || valid_named_assignments(value),
+        JclStatementId::Set => valid_named_assignments(value),
+    };
+    valid.then_some(()).ok_or_else(|| {
+        format!(
             "{} statement violates generated {} operand validation",
             descriptor.label,
-            validation_name(shape)
-        )),
+            validation_name(descriptor.validation)
+        )
+    })
+}
+
+fn valid_single_named_operand(
+    value: &str,
+    expected: &str,
+    validator: impl Fn(&str) -> bool,
+) -> bool {
+    if !balanced_jcl_value(value) {
+        return false;
     }
+    let operands = split_top_level(value);
+    operands.len() == 1
+        && operands[0].split_once('=').is_some_and(|(name, value)| {
+            name.trim().eq_ignore_ascii_case(expected) && validator(value.trim())
+        })
+}
+
+fn valid_named_assignments(value: &str) -> bool {
+    if !balanced_jcl_value(value) {
+        return false;
+    }
+    let operands = split_top_level(value);
+    !operands.is_empty()
+        && operands.iter().all(|operand| {
+            operand.split_once('=').is_some_and(|(name, value)| {
+                valid_name(name.trim()) && balanced_jcl_value(value.trim())
+            })
+        })
 }
 
 fn validate_jecl_operands(identity: Jes2StatementId, operands: &str) -> Result<(), String> {
@@ -1188,19 +1237,45 @@ fn validate_condition_statement(
 }
 
 fn valid_if_expression(value: &str) -> bool {
-    let normalized = value
-        .trim()
-        .trim_end_matches(|character: char| character.is_ascii_whitespace())
-        .strip_suffix("THEN")
-        .unwrap_or(value)
-        .replace(['(', ')'], " ");
+    let upper = value.trim().to_ascii_uppercase();
+    let Some(expression) = upper.strip_suffix("THEN").map(str::trim) else {
+        return false;
+    };
+    if !balanced_jcl_value(expression)
+        || !expression.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric()
+                || byte.is_ascii_whitespace()
+                || matches!(
+                    byte,
+                    b'(' | b')'
+                        | b'='
+                        | b'<'
+                        | b'>'
+                        | b'!'
+                        | b'&'
+                        | b'|'
+                        | b'.'
+                        | b'$'
+                        | b'#'
+                        | b'@'
+                        | b'_'
+                        | b'-'
+                )
+        })
+    {
+        return false;
+    }
+    let normalized = expression.replace(['(', ')'], " ");
     let words = normalized.split_whitespace().collect::<Vec<_>>();
-    words.iter().any(|word| {
-        word.eq_ignore_ascii_case("RC")
-            || word.eq_ignore_ascii_case("ABEND")
-            || word.eq_ignore_ascii_case("ABENDCC")
-            || word.eq_ignore_ascii_case("RUN")
-    }) && words.iter().all(|word| word.len() <= 64)
+    let has_rc = words.iter().any(|word| matches!(*word, "RC" | "ABENDCC"));
+    let has_state = words.iter().any(|word| matches!(*word, "ABEND" | "RUN"));
+    let has_relation = words
+        .iter()
+        .any(|word| matches!(*word, "EQ" | "NE" | "GT" | "LT" | "GE" | "LE"))
+        || expression
+            .bytes()
+            .any(|byte| matches!(byte, b'=' | b'<' | b'>'));
+    (has_state || (has_rc && has_relation)) && words.iter().all(|word| word.len() <= 64)
 }
 
 fn statement_capability(identity: JclStatementId) -> Option<&'static str> {
@@ -1846,6 +1921,18 @@ mod tests {
                     .any(|diagnostic| diagnostic.code().as_str() == "MEJCL0745")
             );
         }
+    }
+
+    #[test]
+    fn malformed_if_operator_is_rejected_at_the_if_statement() {
+        let conversion = convert("//J JOB\n// IF (RC ?? 0) THEN\n//S EXEC PGM=IEFBR14\n// ENDIF\n");
+        assert!(conversion.plan().is_none());
+        let diagnostic = conversion
+            .diagnostics()
+            .iter()
+            .find(|diagnostic| diagnostic.code().as_str() == "MEJCL0750")
+            .expect("malformed IF has its target diagnostic");
+        assert_eq!(diagnostic.primary().unwrap().bytes, 8..29);
     }
 
     #[test]

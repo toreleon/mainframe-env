@@ -680,7 +680,11 @@ fn physical_records(text: &str) -> Vec<PhysicalRecord> {
 }
 
 fn statement_area(raw: &str) -> &str {
-    &raw[..raw.len().min(72)]
+    let mut end = raw.len().min(72);
+    while !raw.is_char_boundary(end) {
+        end -= 1;
+    }
+    &raw[..end]
 }
 
 fn absolute(range: &Range<usize>, start: usize) -> Range<usize> {
@@ -986,6 +990,54 @@ mod tests {
             ]
         );
         assert_eq!(analysis.syntax().green().to_string(), source);
+    }
+
+    #[test]
+    fn multibyte_character_crossing_column_72_in_custom_data_is_lossless_and_recovers() {
+        let data = format!("{}éTAIL", "A".repeat(71));
+        let source = format!(
+            "//J JOB\n//S EXEC PGM=IEBGENER\n//IN DD DATA,DLM=@@\n{data}\n@@\n//OUT DD SYSOUT=*\n"
+        );
+        let analysis = analyze(&source);
+        assert!(analysis.is_complete());
+        assert_eq!(analysis.syntax().text(), source);
+        assert_eq!(analysis.syntax().green().to_string(), source);
+        assert_eq!(
+            analysis.syntax().records()[3].kind(),
+            JclRecordKind::InStreamData
+        );
+        assert_eq!(
+            analysis.syntax().records()[4].kind(),
+            JclRecordKind::Delimiter
+        );
+        assert_eq!(
+            analysis.syntax().records()[5].kind(),
+            JclRecordKind::Statement
+        );
+        assert!(analysis.diagnostics().is_empty());
+    }
+
+    #[test]
+    fn multibyte_character_crossing_column_72_in_cntl_data_is_lossless_and_recovers() {
+        let data = format!("{}éTAIL", "C".repeat(71));
+        let source = format!("//C CNTL\n{data}\n//E ENDCNTL\n//J JOB\n//S EXEC PGM=IEFBR14\n");
+        let analysis = analyze(&source);
+        assert!(analysis.is_complete());
+        assert_eq!(analysis.syntax().text(), source);
+        assert_eq!(analysis.syntax().green().to_string(), source);
+        assert_eq!(
+            analysis.syntax().records()[1].kind(),
+            JclRecordKind::InStreamData
+        );
+        assert_eq!(
+            analysis.syntax().records()[2].kind(),
+            JclRecordKind::Statement
+        );
+        assert_eq!(
+            analysis.syntax().records()[3].kind(),
+            JclRecordKind::Statement
+        );
+        assert!(analysis.diagnostics().is_empty());
     }
 
     #[test]

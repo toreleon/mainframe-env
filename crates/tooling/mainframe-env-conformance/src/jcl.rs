@@ -1,6 +1,6 @@
 use mainframe_env_batch::{
-    JclBundle, JclConversionLimits, JclExpansionLimits, JclSyntaxLimits, analyze_jcl_syntax,
-    convert_jcl, parse_jcl_statements, parse_jes2_statements,
+    JclBundle, JclCapabilityState, JclConversionLimits, JclExpansionLimits, JclPlanNode,
+    JclSyntaxLimits, analyze_jcl_syntax, convert_jcl, parse_jcl_statements, parse_jes2_statements,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -22,6 +22,7 @@ struct FixtureCatalog {
 #[serde(deny_unknown_fields)]
 struct JclFixture {
     id: String,
+    target: JclFixtureTarget,
     primary: String,
     #[serde(default)]
     includes: BTreeMap<String, String>,
@@ -33,10 +34,22 @@ struct JclFixture {
     symbols: BTreeMap<String, String>,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct JclFixtureTarget {
+    family: String,
+    row_id: String,
+    keyword: String,
+    support: String,
+    capability: String,
+    source_line: usize,
+    expected_error: Option<String>,
+}
+
 impl JclFixture {
-    fn bundle(&self) -> JclBundle {
+    fn bundle(&self, primary: String) -> JclBundle {
         JclBundle {
-            primary: self.primary.clone(),
+            primary,
             includes: self.includes.clone(),
             cataloged_procedures: self.cataloged_procedures.clone(),
             procedure_libraries: self.procedure_libraries.clone(),
@@ -71,16 +84,77 @@ impl JclFixtureRuntime {
             .fixtures
             .get(fixture_id)
             .ok_or_else(|| format!("unknown JCL fixture {fixture_id}"))?;
-        let bundle = fixture.bundle();
+        self.execute_fixture(fixture, fixture.primary.clone())
+    }
+
+    pub fn execute_with_primary(
+        &self,
+        fixture_id: &str,
+        primary: String,
+    ) -> Result<Vec<u8>, String> {
+        let fixture = self
+            .fixtures
+            .get(fixture_id)
+            .ok_or_else(|| format!("unknown JCL fixture {fixture_id}"))?;
+        self.execute_fixture(fixture, primary)
+    }
+
+    fn execute_fixture(&self, fixture: &JclFixture, primary: String) -> Result<Vec<u8>, String> {
+        let target_range = source_line_range(&primary, fixture.target.source_line)
+            .ok_or_else(|| format!("fixture {} target line is missing", fixture.id))?;
+        let bundle = fixture.bundle(primary);
         let syntax = analyze_jcl_syntax(&bundle, JclConversionLimits::default().syntax)
             .map_err(|problem| problem.to_string())?;
         let jcl = parse_jcl_statements(&syntax);
         let jecl = parse_jes2_statements(&syntax);
+        let target_recognized =
+            match fixture.target.family.as_str() {
+                "jcl-statements" => jcl.statements().iter().any(|statement| {
+                    statement.generated_identity().row_id() == fixture.target.row_id
+                }),
+                "jes2-jecl-statements" => jecl.statements().iter().any(|statement| {
+                    statement.generated_identity().row_id() == fixture.target.row_id
+                }),
+                "dd-parameters" | "exec-parameters" | "job-parameters" | "output-parameters" => jcl
+                    .statements()
+                    .iter()
+                    .flat_map(|statement| statement.parameters())
+                    .any(|parameter| {
+                        parameter.identity().generated().row_id() == fixture.target.row_id
+                    }),
+                family => return Err(format!("unknown JCL target family {family}")),
+            };
         let conversion = convert_jcl(&bundle, JclConversionLimits::default())
             .map_err(|problem| problem.to_string())?;
+        let target_validated = conversion
+            .plan()
+            .is_some_and(|plan| target_retained(plan, &fixture.target));
+        let target_error = fixture
+            .target
+            .expected_error
+            .as_deref()
+            .is_some_and(|expected| {
+                conversion.diagnostics().iter().any(|diagnostic| {
+                    diagnostic.code().as_str() == expected
+                        && diagnostic.primary().is_some_and(|primary| {
+                            primary.bytes.start < target_range.end
+                                && target_range.start < primary.bytes.end
+                        })
+                })
+            });
         serde_json::to_vec(&serde_json::json!({
             "recognized": !jcl.statements().is_empty() || !jecl.statements().is_empty(),
             "plan": conversion.plan().is_some(),
+            "target": {
+                "family": fixture.target.family,
+                "row_id": fixture.target.row_id,
+                "keyword": fixture.target.keyword,
+                "support": fixture.target.support,
+                "capability": fixture.target.capability,
+            },
+            "target_recognized": target_recognized,
+            "target_validated": target_validated,
+            "target_error": target_error,
             "diagnostic_codes": conversion
                 .diagnostics()
                 .iter()
@@ -90,6 +164,104 @@ impl JclFixtureRuntime {
         }))
         .map_err(|error| error.to_string())
     }
+}
+
+fn target_retained(plan: &mainframe_env_batch::JclPlanDocument, target: &JclFixtureTarget) -> bool {
+    let expected_state = match target.support.as_str() {
+        "available" => JclCapabilityState::Available,
+        "deferred" => JclCapabilityState::Deferred,
+        _ => return false,
+    };
+    let statements = plan
+        .statements()
+        .iter()
+        .filter(|statement| statement.identity().row_id() == target.row_id)
+        .collect::<Vec<_>>();
+    match target.family.as_str() {
+        "jcl-statements" => statements.iter().any(|statement| {
+            let node_retained = plan
+                .nodes()
+                .iter()
+                .any(|node| plan_node_statement_id(node) == statement.id());
+            node_retained
+                && (expected_state == JclCapabilityState::Available
+                    || plan.capabilities().iter().any(|requirement| {
+                        requirement.statement_id() == statement.id()
+                            && requirement.parameter().is_none()
+                            && requirement.capability() == target.capability
+                            && requirement.state() == expected_state
+                    }))
+        }),
+        "jes2-jecl-statements" => statements.iter().any(|statement| {
+            plan.nodes().iter().any(|node| {
+                matches!(node, JclPlanNode::Jecl { operation, statement_id }
+                    if *statement_id == statement.id()
+                        && operation.eq_ignore_ascii_case(&target.keyword))
+            }) && plan.capabilities().iter().any(|requirement| {
+                requirement.statement_id() == statement.id()
+                    && requirement.parameter().is_none()
+                    && requirement.capability() == target.capability
+                    && requirement.state() == expected_state
+            })
+        }),
+        "dd-parameters" | "exec-parameters" | "job-parameters" | "output-parameters" => plan
+            .statements()
+            .iter()
+            .flat_map(|statement| {
+                statement
+                    .parameters()
+                    .iter()
+                    .map(move |parameter| (statement.id(), parameter))
+            })
+            .any(|(statement_id, parameter)| {
+                parameter.identity().row_id() == target.row_id
+                    && plan.capabilities().iter().any(|requirement| {
+                        requirement.statement_id() == statement_id
+                            && requirement
+                                .parameter()
+                                .is_some_and(|identity| identity.row_id() == target.row_id)
+                            && requirement.capability() == target.capability
+                            && requirement.state() == expected_state
+                    })
+            }),
+        _ => false,
+    }
+}
+
+const fn plan_node_statement_id(node: &JclPlanNode) -> u32 {
+    match node {
+        JclPlanNode::Job { statement_id, .. }
+        | JclPlanNode::Step { statement_id, .. }
+        | JclPlanNode::Dd { statement_id, .. }
+        | JclPlanNode::Output { statement_id, .. }
+        | JclPlanNode::Jecl { statement_id, .. }
+        | JclPlanNode::Annotation { statement_id, .. } => *statement_id,
+    }
+}
+
+fn source_line_range(source: &str, selected: usize) -> Option<std::ops::Range<usize>> {
+    let bytes = source.as_bytes();
+    let mut line = 1usize;
+    let mut start = 0usize;
+    while start <= bytes.len() {
+        let mut end = start;
+        while end < bytes.len() && !matches!(bytes[end], b'\r' | b'\n') {
+            end += 1;
+        }
+        if line == selected {
+            return Some(start..end);
+        }
+        if end == bytes.len() {
+            break;
+        }
+        start = if bytes[end] == b'\r' && bytes.get(end + 1) == Some(&b'\n') {
+            end + 2
+        } else {
+            end + 1
+        };
+        line += 1;
+    }
+    None
 }
 
 fn fixture_catalog() -> FixtureCatalog {
@@ -133,7 +305,7 @@ pub fn verify_jcl_exit() -> Result<JclExitReceipt, String> {
     let mut forbidden_mutation_cases = 0usize;
     let mut plan_set = Sha256::new();
     for fixture in &catalog.fixtures {
-        let bundle = fixture.bundle();
+        let bundle = fixture.bundle(fixture.primary.clone());
         let unchanged = bundle.clone();
         let first = convert_jcl(&bundle, JclConversionLimits::default())
             .map_err(|problem| problem.to_string())?;
@@ -347,5 +519,20 @@ mod tests {
                 .len(),
             474
         );
+        assert!(catalog.fixtures.iter().all(|fixture| {
+            source_line_range(&fixture.primary, fixture.target.source_line).is_some()
+                && fixture.id.ends_with(".valid") == fixture.target.expected_error.is_none()
+        }));
+        let malformed_statements = catalog
+            .fixtures
+            .iter()
+            .filter(|fixture| {
+                fixture.target.family == "jcl-statements" && fixture.id.ends_with(".invalid")
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(malformed_statements.len(), 20);
+        assert!(malformed_statements.iter().all(|fixture| {
+            fixture.target.expected_error.is_some() && !fixture.primary.starts_with("BROKEN\n")
+        }));
     }
 }

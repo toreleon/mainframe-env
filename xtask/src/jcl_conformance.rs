@@ -47,7 +47,6 @@ fn render(root: &Path) -> TaskResult<Rendered> {
     )?;
     let families = array(&catalog, "families", &catalog_path)?;
     let mut fixtures = Vec::new();
-    let mut expected_errors = BTreeMap::new();
     for family in families {
         let family_id = text(family, "id", &catalog_path)?;
         for row in array(family, "rows", &catalog_path)? {
@@ -57,55 +56,60 @@ fn render(root: &Path) -> TaskResult<Rendered> {
             let keyword = text(row, "keyword", &catalog_path)?;
             let valid_id = fixture_id(family_id, ordinal, "valid");
             let invalid_id = fixture_id(family_id, ordinal, "invalid");
-            let (valid, invalid, expected_error) = if family_id == "jcl-statements" {
-                let valid = statement_seed(&seeds, keyword)?;
-                let mut invalid = valid.clone();
-                invalid["id"] = Value::String(invalid_id.clone());
-                invalid["primary"] =
-                    Value::String(format!("BROKEN\n{}", text(&valid, "primary", &seeds_path)?));
-                (with_id(valid, &valid_id), invalid, "MEJCL0703")
-            } else if family_id == "jes2-jecl-statements" {
-                let (valid_line, invalid_line) = jecl_seed(&seeds, keyword)?;
-                (
-                    fixture(
+            let (valid, invalid, valid_line, invalid_line, expected_error) =
+                if family_id == "jcl-statements" {
+                    statement_seed(&seeds, keyword, &valid_id, &invalid_id)?
+                } else if family_id == "jes2-jecl-statements" {
+                    let (valid_line, invalid_line) = jecl_seed(&seeds, keyword)?;
+                    (
+                        fixture(
+                            &valid_id,
+                            jecl_source(keyword, &valid_line),
+                            BTreeMap::new(),
+                            BTreeMap::new(),
+                        ),
+                        fixture(
+                            &invalid_id,
+                            jecl_source(keyword, &invalid_line),
+                            BTreeMap::new(),
+                            BTreeMap::new(),
+                        ),
+                        jecl_target_line(keyword),
+                        jecl_target_line(keyword),
+                        "MEJCL0763",
+                    )
+                } else {
+                    let validation = text(row, "validation", &catalog_path)?;
+                    let (valid_value, invalid_value) = value_seeds(&seeds, row, validation)?;
+                    let (valid, invalid, valid_line, invalid_line) = parameter_fixtures(
+                        family_id,
+                        keyword,
+                        validation,
+                        &valid_value,
+                        &invalid_value,
                         &valid_id,
-                        jecl_source(keyword, &valid_line),
-                        BTreeMap::new(),
-                        BTreeMap::new(),
-                    ),
-                    fixture(
                         &invalid_id,
-                        jecl_source(keyword, &invalid_line),
-                        BTreeMap::new(),
-                        BTreeMap::new(),
-                    ),
-                    "MEJCL0763",
-                )
-            } else {
-                let validation = text(row, "validation", &catalog_path)?;
-                let (valid_value, invalid_value) = value_seeds(&seeds, row, validation)?;
-                let (valid, invalid) = parameter_fixtures(
-                    family_id,
-                    keyword,
-                    validation,
-                    &valid_value,
-                    &invalid_value,
-                    &valid_id,
-                    &invalid_id,
-                )?;
-                (
-                    valid,
-                    invalid,
-                    if invalid_value == "(" {
-                        "MEJCL0743"
-                    } else {
-                        "MEJCL0745"
-                    },
-                )
-            };
-            fixtures.push(valid);
-            fixtures.push(invalid);
-            expected_errors.insert((family_id.to_string(), ordinal), expected_error.to_string());
+                    )?;
+                    (
+                        valid,
+                        invalid,
+                        valid_line,
+                        invalid_line,
+                        if invalid_value == "(" {
+                            "MEJCL0743"
+                        } else {
+                            "MEJCL0745"
+                        },
+                    )
+                };
+            fixtures.push(with_target(valid, row, family_id, valid_line, None)?);
+            fixtures.push(with_target(
+                invalid,
+                row,
+                family_id,
+                invalid_line,
+                Some(expected_error),
+            )?);
         }
     }
     fixtures.sort_by(|left, right| left["id"].as_str().cmp(&right["id"].as_str()));
@@ -125,7 +129,7 @@ fn render(root: &Path) -> TaskResult<Rendered> {
         &root.join(FIXTURE_SCHEMA),
     )?;
     let fixtures_bytes = pretty_json(&fixture_value)?;
-    let spec = render_spec(root, &catalog, &fixture_value, &expected_errors)?;
+    let spec = render_spec(root, &catalog, &fixture_value)?;
     Ok(Rendered {
         fixtures: fixtures_bytes,
         spec: pretty_json(&spec)?,
@@ -136,7 +140,6 @@ fn render_spec(
     root: &Path,
     generated_catalog: &Value,
     fixture_catalog: &Value,
-    expected_errors: &BTreeMap<(String, u64), String>,
 ) -> TaskResult<Value> {
     let spec_path = root.join(SPEC_PATH);
     let mut spec = json(&spec_path)?;
@@ -192,12 +195,9 @@ fn render_spec(
                 "preconditions": ["jcl.fixture.exists"],
                 "transition": "jcl.transition.convert",
                 "postconditions": [
-                    "jcl.observation.recognized",
-                    "jcl.observation.plan-present",
-                    "jcl.observation.error.MEJCL0703",
-                    "jcl.observation.error.MEJCL0743",
-                    "jcl.observation.error.MEJCL0745",
-                    "jcl.observation.error.MEJCL0763"
+                    "jcl.observation.target-recognized",
+                    "jcl.observation.target-validated",
+                    "jcl.observation.target-error"
                 ],
                 "conditions": ["jcl.condition.diagnostic"],
                 "recovery": "jcl.recovery.record-boundary",
@@ -223,7 +223,7 @@ fn render_spec(
                 "recognized",
                 &format!("jcl.{slug}.recognized"),
                 &valid_fixture,
-                "jcl.observation.recognized",
+                "jcl.observation.target-recognized",
                 true,
             ));
             cases.push(case(
@@ -232,19 +232,16 @@ fn render_spec(
                 "validated",
                 &format!("jcl.{slug}.validated"),
                 &valid_fixture,
-                "jcl.observation.plan-present",
+                "jcl.observation.target-validated",
                 true,
             ));
-            let error = expected_errors
-                .get(&(family.to_string(), ordinal))
-                .ok_or("JCL malformed fixture has no expected error")?;
             cases.push(case(
                 row_id,
                 &malformed_obligation,
                 "validated",
                 &format!("jcl.{slug}.malformed"),
                 &invalid_fixture,
-                &format!("jcl.observation.error.{error}"),
+                "jcl.observation.target-error",
                 true,
             ));
         }
@@ -288,12 +285,9 @@ fn render_spec(
         &mut spec,
         "observations",
         &[
-            "jcl.observation.recognized",
-            "jcl.observation.plan-present",
-            "jcl.observation.error.MEJCL0703",
-            "jcl.observation.error.MEJCL0743",
-            "jcl.observation.error.MEJCL0745",
-            "jcl.observation.error.MEJCL0763",
+            "jcl.observation.target-recognized",
+            "jcl.observation.target-validated",
+            "jcl.observation.target-error",
         ],
     )?;
     merge_registry_strings(&mut spec, "conditions", &["jcl.condition.diagnostic"])?;
@@ -359,14 +353,43 @@ fn merge_registry_strings(spec: &mut Value, name: &str, values: &[&str]) -> Task
     Ok(())
 }
 
-fn statement_seed(seeds: &Value, keyword: &str) -> TaskResult<Value> {
-    let value = seeds["statements"]
+fn statement_seed(
+    seeds: &Value,
+    keyword: &str,
+    valid_id: &str,
+    invalid_id: &str,
+) -> TaskResult<(Value, Value, usize, usize, &'static str)> {
+    let pair = seeds["statements"]
         .get(keyword)
-        .cloned()
         .ok_or_else(|| format!("JCL fixture seeds omit statement {keyword}"))?;
-    let mut fixture = fixture(
-        "placeholder",
-        text(&value, "primary", Path::new(SEEDS_PATH))?.into(),
+    let valid = pair
+        .get("valid")
+        .ok_or_else(|| format!("JCL fixture seeds omit valid statement {keyword}"))?;
+    let invalid = pair
+        .get("invalid")
+        .ok_or_else(|| format!("JCL fixture seeds omit invalid statement {keyword}"))?;
+    let expected_error = text(invalid, "expected_error", Path::new(SEEDS_PATH))?;
+    let expected_error = match expected_error {
+        "MEJCL0702" => "MEJCL0702",
+        "MEJCL0721" => "MEJCL0721",
+        "MEJCL0745" => "MEJCL0745",
+        "MEJCL0750" => "MEJCL0750",
+        "MEJCL0760" => "MEJCL0760",
+        other => return Err(format!("statement {keyword} has unsupported error {other}")),
+    };
+    Ok((
+        fixture_from_statement_seed(valid_id, valid)?,
+        fixture_from_statement_seed(invalid_id, invalid)?,
+        target_line(valid)?,
+        target_line(invalid)?,
+        expected_error,
+    ))
+}
+
+fn fixture_from_statement_seed(id: &str, value: &Value) -> TaskResult<Value> {
+    let mut output = fixture(
+        id,
+        text(value, "primary", Path::new(SEEDS_PATH))?.into(),
         BTreeMap::new(),
         BTreeMap::new(),
     );
@@ -377,10 +400,18 @@ fn statement_seed(seeds: &Value, keyword: &str) -> TaskResult<Value> {
         "symbols",
     ] {
         if let Some(value) = value.get(field) {
-            fixture[field] = value.clone();
+            output[field] = value.clone();
         }
     }
-    Ok(fixture)
+    Ok(output)
+}
+
+fn target_line(value: &Value) -> TaskResult<usize> {
+    value["target_line"]
+        .as_u64()
+        .and_then(|line| usize::try_from(line).ok())
+        .filter(|line| *line > 0)
+        .ok_or_else(|| "JCL fixture seed target_line is invalid".into())
 }
 
 fn jecl_seed(seeds: &Value, keyword: &str) -> TaskResult<(String, String)> {
@@ -425,41 +456,53 @@ fn parameter_fixtures(
     invalid: &str,
     valid_id: &str,
     invalid_id: &str,
-) -> TaskResult<(Value, Value)> {
+) -> TaskResult<(Value, Value, usize, usize)> {
     let procedure = BTreeMap::from([(
         "PROC1".into(),
         "//PROC1 PROC\n//PS EXEC PGM=IEFBR14\n// PEND\n".into(),
     )]);
-    let (valid_source, invalid_source, procedures) = match family {
+    let (valid_source, invalid_source, procedures, valid_line, invalid_line) = match family {
         "job-parameters" if keyword == "POSITIONAL-ACCOUNTING" => (
             "//J JOB (A)\n//S EXEC PGM=IEFBR14\n".into(),
             "//J JOB ''\n//S EXEC PGM=IEFBR14\n".into(),
             BTreeMap::new(),
+            1,
+            1,
         ),
         "job-parameters" if keyword == "POSITIONAL-PROGRAMMER" => (
             "//J JOB (A),'PROGRAMMER'\n//S EXEC PGM=IEFBR14\n".into(),
             "//J JOB (A),''\n//S EXEC PGM=IEFBR14\n".into(),
             BTreeMap::new(),
+            1,
+            1,
         ),
         "job-parameters" => (
             format!("//J JOB {keyword}={valid}\n//S EXEC PGM=IEFBR14\n"),
             format!("//J JOB {keyword}={invalid}\n//S EXEC PGM=IEFBR14\n"),
             BTreeMap::new(),
+            1,
+            1,
         ),
         "exec-parameters" if keyword == "PROC" => (
             "//J JOB\n//S EXEC PROC=PROC1\n".into(),
             format!("//J JOB\n//S EXEC PROC={invalid}\n"),
             procedure,
+            2,
+            2,
         ),
         "exec-parameters" if keyword == "PGM" => (
             format!("//J JOB\n//S EXEC PGM={valid}\n"),
             format!("//J JOB\n//S EXEC PGM={invalid}\n"),
             BTreeMap::new(),
+            2,
+            2,
         ),
         "exec-parameters" => (
             format!("//J JOB\n//S EXEC PGM=IEFBR14,{keyword}={valid}\n"),
             format!("//J JOB\n//S EXEC PGM=IEFBR14,{keyword}={invalid}\n"),
             BTreeMap::new(),
+            2,
+            2,
         ),
         "dd-parameters" if matches!(keyword, "*" | "DATA" | "DUMMY") => {
             let valid_source = if keyword == "*" {
@@ -473,6 +516,8 @@ fn parameter_fixtures(
                 valid_source,
                 format!("//J JOB\n//S EXEC PGM=IEFBR14\n//D DD {keyword}=BAD\n"),
                 BTreeMap::new(),
+                3,
+                3,
             )
         }
         "dd-parameters" if matches!(keyword, "DDNAME" | "REFDD") => (
@@ -481,16 +526,22 @@ fn parameter_fixtures(
             ),
             format!("//J JOB\n//S EXEC PGM=IEFBR14\n//D DD {keyword}={invalid}\n"),
             BTreeMap::new(),
+            4,
+            3,
         ),
         "dd-parameters" => (
             format!("//J JOB\n//S EXEC PGM=IEFBR14\n//D DD {keyword}={valid}\n"),
             format!("//J JOB\n//S EXEC PGM=IEFBR14\n//D DD {keyword}={invalid}\n"),
             BTreeMap::new(),
+            3,
+            3,
         ),
         "output-parameters" => (
             format!("//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT {keyword}={valid}\n"),
             format!("//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT {keyword}={invalid}\n"),
             BTreeMap::new(),
+            3,
+            3,
         ),
         _ => {
             return Err(format!(
@@ -501,6 +552,8 @@ fn parameter_fixtures(
     Ok((
         fixture(valid_id, valid_source, BTreeMap::new(), procedures.clone()),
         fixture(invalid_id, invalid_source, BTreeMap::new(), procedures),
+        valid_line,
+        invalid_line,
     ))
 }
 
@@ -511,6 +564,16 @@ fn jecl_source(keyword: &str, line: &str) -> String {
         format!("//J JOB\n{line}\n//S EXEC PGM=IEFBR14\n")
     } else {
         format!("//J JOB\n//S EXEC PGM=IEFBR14\n{line}\n")
+    }
+}
+
+fn jecl_target_line(keyword: &str) -> usize {
+    if keyword == "SIGNON" {
+        1
+    } else if matches!(keyword, "JOBPARM" | "PRIORITY" | "XEQ") {
+        2
+    } else {
+        3
     }
 }
 
@@ -530,9 +593,23 @@ fn fixture(
     })
 }
 
-fn with_id(mut fixture: Value, id: &str) -> Value {
-    fixture["id"] = Value::String(id.into());
-    fixture
+fn with_target(
+    mut fixture: Value,
+    row: &Value,
+    family: &str,
+    source_line: usize,
+    expected_error: Option<&str>,
+) -> TaskResult<Value> {
+    fixture["target"] = json!({
+        "family": family,
+        "row_id": text(row, "row_id", Path::new(GENERATED_CATALOG))?,
+        "keyword": text(row, "keyword", Path::new(GENERATED_CATALOG))?,
+        "support": text(row, "support", Path::new(GENERATED_CATALOG))?,
+        "capability": text(row, "capability", Path::new(GENERATED_CATALOG))?,
+        "source_line": source_line,
+        "expected_error": expected_error,
+    });
+    Ok(fixture)
 }
 
 fn fixture_id(family: &str, ordinal: u64, disposition: &str) -> String {
@@ -554,23 +631,17 @@ fn official_catalog_digest(root: &Path) -> TaskResult<Value> {
 
 pub(super) struct JclConformanceRuntime {
     fixture: JclRuntimeFixture,
-    recognized: Recognized,
-    plan_present: PlanPresent,
-    lexical_error: ErrorCode,
-    operand_error: ErrorCode,
-    parameter_error: ErrorCode,
-    jecl_error: ErrorCode,
+    target_recognized: TargetRecognized,
+    target_validated: TargetValidated,
+    target_error: TargetError,
 }
 
 pub(super) fn runtime() -> JclConformanceRuntime {
     JclConformanceRuntime {
         fixture: JclRuntimeFixture(mainframe_env_conformance::jcl_fixture_runtime()),
-        recognized: Recognized,
-        plan_present: PlanPresent,
-        lexical_error: ErrorCode("MEJCL0703"),
-        operand_error: ErrorCode("MEJCL0743"),
-        parameter_error: ErrorCode("MEJCL0745"),
-        jecl_error: ErrorCode("MEJCL0763"),
+        target_recognized: TargetRecognized,
+        target_validated: TargetValidated,
+        target_error: TargetError,
     }
 }
 
@@ -592,28 +663,16 @@ impl JclConformanceRuntime {
             )],
             vec![
                 (
-                    ObservationRef::new("jcl.observation.recognized", limits)?,
-                    &self.recognized as &dyn ConformanceObservation,
+                    ObservationRef::new("jcl.observation.target-recognized", limits)?,
+                    &self.target_recognized as &dyn ConformanceObservation,
                 ),
                 (
-                    ObservationRef::new("jcl.observation.plan-present", limits)?,
-                    &self.plan_present,
+                    ObservationRef::new("jcl.observation.target-validated", limits)?,
+                    &self.target_validated,
                 ),
                 (
-                    ObservationRef::new("jcl.observation.error.MEJCL0703", limits)?,
-                    &self.lexical_error,
-                ),
-                (
-                    ObservationRef::new("jcl.observation.error.MEJCL0743", limits)?,
-                    &self.operand_error,
-                ),
-                (
-                    ObservationRef::new("jcl.observation.error.MEJCL0745", limits)?,
-                    &self.parameter_error,
-                ),
-                (
-                    ObservationRef::new("jcl.observation.error.MEJCL0763", limits)?,
-                    &self.jecl_error,
+                    ObservationRef::new("jcl.observation.target-error", limits)?,
+                    &self.target_error,
                 ),
             ],
             limits,
@@ -639,47 +698,49 @@ impl ConformancePredicate for JclRuntimeFixture {
     }
 }
 
-struct Recognized;
+struct TargetRecognized;
 
-impl ConformanceObservation for Recognized {
+impl ConformanceObservation for TargetRecognized {
     fn evaluate(&self, output: &DriverOutput) -> Result<ObservationCheck, String> {
         let value = output_value(output)?;
         observation(
-            value["recognized"].as_bool() == Some(true),
-            "recognized=true",
-            &format!("recognized={}", value["recognized"]),
-        )
-    }
-}
-
-struct PlanPresent;
-
-impl ConformanceObservation for PlanPresent {
-    fn evaluate(&self, output: &DriverOutput) -> Result<ObservationCheck, String> {
-        let value = output_value(output)?;
-        observation(
-            value["plan"].as_bool() == Some(true),
-            "plan=true",
-            &format!("plan={}", value["plan"]),
-        )
-    }
-}
-
-struct ErrorCode(&'static str);
-
-impl ConformanceObservation for ErrorCode {
-    fn evaluate(&self, output: &DriverOutput) -> Result<ObservationCheck, String> {
-        let value = output_value(output)?;
-        let codes = value["diagnostic_codes"]
-            .as_array()
-            .ok_or("driver diagnostic_codes is not an array")?;
-        observation(
-            value["plan"].as_bool() == Some(false)
-                && codes.iter().any(|code| code.as_str() == Some(self.0)),
-            &format!("plan=false,error={}", self.0),
+            value["target_recognized"].as_bool() == Some(true),
+            "target_recognized=true",
             &format!(
-                "plan={},errors={}",
-                value["plan"], value["diagnostic_codes"]
+                "target={},target_recognized={}",
+                value["target"]["row_id"], value["target_recognized"]
+            ),
+        )
+    }
+}
+
+struct TargetValidated;
+
+impl ConformanceObservation for TargetValidated {
+    fn evaluate(&self, output: &DriverOutput) -> Result<ObservationCheck, String> {
+        let value = output_value(output)?;
+        observation(
+            value["target_validated"].as_bool() == Some(true),
+            "target_validated=true",
+            &format!(
+                "target={},target_validated={},plan={}",
+                value["target"]["row_id"], value["target_validated"], value["plan"]
+            ),
+        )
+    }
+}
+
+struct TargetError;
+
+impl ConformanceObservation for TargetError {
+    fn evaluate(&self, output: &DriverOutput) -> Result<ObservationCheck, String> {
+        let value = output_value(output)?;
+        observation(
+            value["target_error"].as_bool() == Some(true),
+            "target_error=true",
+            &format!(
+                "target={},target_error={},errors={}",
+                value["target"]["row_id"], value["target_error"], value["diagnostic_codes"]
             ),
         )
     }
@@ -704,6 +765,10 @@ mod tests {
             serde_json::to_vec(&serde_json::json!({
                 "recognized": true,
                 "plan": true,
+                "target": {"row_id": "target"},
+                "target_recognized": false,
+                "target_validated": false,
+                "target_error": false,
                 "diagnostic_codes": [],
                 "plan_identity": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
             }))
@@ -711,17 +776,17 @@ mod tests {
             ConformanceLimits::default(),
         )
         .unwrap();
-        assert!(
-            !ErrorCode("MEJCL0745")
-                .evaluate(&generic_success)
-                .unwrap()
-                .matched
-        );
+        assert!(!TargetRecognized.evaluate(&generic_success).unwrap().matched);
+        assert!(!TargetValidated.evaluate(&generic_success).unwrap().matched);
 
         let omitted_transition = DriverOutput::new(
             serde_json::to_vec(&serde_json::json!({
                 "recognized": true,
                 "plan": false,
+                "target": {"row_id": "target"},
+                "target_recognized": true,
+                "target_validated": false,
+                "target_error": false,
                 "diagnostic_codes": [],
                 "plan_identity": null
             }))
@@ -729,6 +794,58 @@ mod tests {
             ConformanceLimits::default(),
         )
         .unwrap();
-        assert!(!PlanPresent.evaluate(&omitted_transition).unwrap().matched);
+        assert!(
+            !TargetValidated
+                .evaluate(&omitted_transition)
+                .unwrap()
+                .matched
+        );
+    }
+
+    #[test]
+    fn removing_exact_targets_leaves_scaffolding_but_kills_row_verdicts() {
+        let runtime = mainframe_env_conformance::jcl_fixture_runtime();
+        for (fixture, primary) in [
+            (
+                "jcl.fixture.jcl-statements.0015.valid",
+                "//J JOB\n//S EXEC PGM=IEFBR14\n//* OUTPUT REMOVED\n",
+            ),
+            (
+                "jcl.fixture.dd-parameters.0022.valid",
+                "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DUMMY\n",
+            ),
+            (
+                "jcl.fixture.jes2-jecl-statements.0007.valid",
+                "//J JOB\n//* PRIORITY REMOVED\n//S EXEC PGM=IEFBR14\n",
+            ),
+        ] {
+            let output = DriverOutput::new(
+                runtime
+                    .execute_with_primary(fixture, primary.into())
+                    .unwrap(),
+                ConformanceLimits::default(),
+            )
+            .unwrap();
+            let value = output_value(&output).unwrap();
+            assert_eq!(value["plan"], true);
+            assert!(!TargetRecognized.evaluate(&output).unwrap().matched);
+            assert!(!TargetValidated.evaluate(&output).unwrap().matched);
+        }
+    }
+
+    #[test]
+    fn unrelated_malformed_record_cannot_satisfy_target_error() {
+        let runtime = mainframe_env_conformance::jcl_fixture_runtime();
+        let output = DriverOutput::new(
+            runtime
+                .execute_with_primary(
+                    "jcl.fixture.jcl-statements.0015.invalid",
+                    "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT CLASS=A\nBROKEN\n".into(),
+                )
+                .unwrap(),
+            ConformanceLimits::default(),
+        )
+        .unwrap();
+        assert!(!TargetError.evaluate(&output).unwrap().matched);
     }
 }
