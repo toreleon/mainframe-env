@@ -355,6 +355,20 @@
       "obligation_id": "phrase-occurs-array",
       "source": "IDENTIFICATION DIVISION. PROGRAM-ID. JSONPARSEARRAY. DATA DIVISION. WORKING-STORAGE SECTION. 01 JSON-X PIC X(160) VALUE '{\"INVENTORY\":{\"ITEM-X\":[{\"CODE-X\":\"A1\",\"QTY-X\":2},{\"CODE-X\":\"B2\",\"QTY-X\":3}]}}'. 01 INVENTORY. 05 ITEM-X OCCURS 2 TIMES. 10 CODE-X PIC X(2). 10 QTY-X PIC 9. PROCEDURE DIVISION. JSON PARSE JSON-X INTO INVENTORY. DISPLAY CODE-X(1) QTY-X(1) CODE-X(2) QTY-X(2). STOP RUN.",
       "expected_output": "A12B23\n"
+    },
+    {
+      "id": "xml-generate-occurs-elements",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0043",
+      "obligation_id": "phrase-occurs-elements",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. XMLGENOCCURS. DATA DIVISION. WORKING-STORAGE SECTION. 01 INVENTORY. 05 ITEM-X OCCURS 2 TIMES. 10 CODE-X PIC X(2). 10 QTY-X PIC 9. 01 XML-X PIC X(200). 01 LEN-X PIC 999. PROCEDURE DIVISION. MOVE 'A1' TO CODE-X(1). MOVE 2 TO QTY-X(1). MOVE 'B2' TO CODE-X(2). MOVE 3 TO QTY-X(2). XML GENERATE XML-X FROM INVENTORY COUNT IN LEN-X. DISPLAY XML-X(1:LEN-X). STOP RUN.",
+      "expected_output": "<INVENTORY><ITEM-X><CODE-X>A1</CODE-X><QTY-X>2</QTY-X></ITEM-X><ITEM-X><CODE-X>B2</CODE-X><QTY-X>3</QTY-X></ITEM-X></INVENTORY>\n"
+    },
+    {
+      "id": "xml-parse-occurs-elements",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044",
+      "obligation_id": "phrase-occurs-elements",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. XMLPARSEOCCURS. DATA DIVISION. WORKING-STORAGE SECTION. 01 XML-X PIC X(200) VALUE '<INVENTORY><ITEM-X><CODE-X>A1</CODE-X><QTY-X>2</QTY-X></ITEM-X><ITEM-X><CODE-X>B2</CODE-X><QTY-X>3</QTY-X></ITEM-X></INVENTORY>'. 01 INVENTORY. 05 ITEM-X OCCURS 2 TIMES. 10 CODE-X PIC X(2). 10 QTY-X PIC 9. PROCEDURE DIVISION. XML PARSE XML-X INTO INVENTORY. DISPLAY CODE-X(1) QTY-X(1) CODE-X(2) QTY-X(2). STOP RUN.",
+      "expected_output": "A12B23\n"
     }
   ]
 }

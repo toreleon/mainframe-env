@@ -6022,7 +6022,7 @@ impl ReferenceMachine {
                     .map_err(|_| MachineProblem::DataException)?
                 }
             } else if is_group(layout.category) {
-                self.xml_layout_value(&layout)?
+                self.xml_layout_value(&layout, &[])?
             } else {
                 let value = String::from_utf8_lossy(&self.resolve(from)?)
                     .trim()
@@ -6164,7 +6164,28 @@ impl ReferenceMachine {
         Ok(serde_json::Value::String(text.trim_end().into()))
     }
 
-    fn xml_layout_value(&self, layout: &LayoutMetadata) -> Result<String, MachineProblem> {
+    fn xml_layout_value(
+        &self,
+        layout: &LayoutMetadata,
+        indexes: &[usize],
+    ) -> Result<String, MachineProblem> {
+        if layout.occurs > 1 {
+            let mut values = Vec::new();
+            for occurrence in 1..=self.active_occurs(layout)? {
+                let mut indexes = indexes.to_vec();
+                indexes.push(occurrence);
+                values.push(self.xml_layout_single_value(layout, &indexes)?);
+            }
+            return Ok(values.concat());
+        }
+        self.xml_layout_single_value(layout, indexes)
+    }
+
+    fn xml_layout_single_value(
+        &self,
+        layout: &LayoutMetadata,
+        indexes: &[usize],
+    ) -> Result<String, MachineProblem> {
         let value = if is_group(layout.category) {
             let mut children = self
                 .layouts
@@ -6189,13 +6210,16 @@ impl ReferenceMachine {
             }
             children
                 .iter()
-                .map(|child| self.xml_layout_value(child))
+                .map(|child| self.xml_layout_value(child, indexes))
                 .collect::<Result<Vec<_>, _>>()?
                 .concat()
         } else if is_numeric(layout.category) {
-            decimal_string(decode_decimal(layout, &self.read(&layout.name)?)?)
+            decimal_string(decode_decimal(
+                layout,
+                &self.read_reference(&self.layout_occurrence_reference(layout, indexes)?)?,
+            )?)
         } else {
-            let bytes = self.read(&layout.name)?;
+            let bytes = self.read_reference(&self.layout_occurrence_reference(layout, indexes)?)?;
             let text = if matches!(
                 layout.category,
                 LayoutCategory::National | LayoutCategory::NationalEdited
@@ -6258,7 +6282,7 @@ impl ReferenceMachine {
                     return Err(MachineProblem::DataException);
                 }
                 let mut assignments = Vec::new();
-                self.stage_xml_group(&layout, &document, &mut assignments)?;
+                self.stage_xml_group(&layout, &document, &mut assignments, &[])?;
                 for (reference, bytes) in assignments {
                     self.write_reference(&reference, &bytes)?;
                 }
@@ -6284,6 +6308,7 @@ impl ReferenceMachine {
         layout: &LayoutMetadata,
         node: &XmlNode,
         assignments: &mut Vec<(ResolvedReference, Vec<u8>)>,
+        indexes: &[usize],
     ) -> Result<(), MachineProblem> {
         let mut children = self
             .layouts
@@ -6309,40 +6334,53 @@ impl ReferenceMachine {
                 .iter()
                 .filter(|node| node.name == child.simple_name)
                 .collect::<Vec<_>>();
-            if matches.len() != 1 {
-                return Err(MachineProblem::DataException);
-            }
-            let node = matches[0];
-            if is_group(child.category) {
-                self.stage_xml_group(&child, node, assignments)?;
-                continue;
-            }
-            if !node.children.is_empty() {
-                return Err(MachineProblem::DataException);
-            }
-            let reference = self.reference(std::slice::from_ref(&child.name))?;
-            let bytes = if is_numeric(child.category) {
-                encode_decimal(
-                    &child,
-                    decimal_rescale(
-                        decimal_text(&node.text).ok_or(MachineProblem::DataException)?,
-                        child.scale,
-                    )?,
-                )?
+            let occurs = if child.occurs > 1 {
+                self.active_occurs(&child)?
             } else {
-                let bytes = if matches!(
-                    child.category,
-                    LayoutCategory::National | LayoutCategory::NationalEdited
-                ) {
-                    utf8_to_national(node.text.as_bytes())?
-                } else {
-                    node.text.as_bytes().to_vec()
-                };
-                FixedValue::fit(&bytes, reference.length, child.justified_right)
-                    .bytes()
-                    .to_vec()
+                1
             };
-            assignments.push((reference, bytes));
+            if matches.len() != occurs {
+                return Err(MachineProblem::DataException);
+            }
+            for (index, node) in matches.into_iter().enumerate() {
+                let mut child_indexes = indexes.to_vec();
+                if child.occurs > 1 {
+                    child_indexes.push(index + 1);
+                }
+                if is_group(child.category) {
+                    self.stage_xml_group(&child, node, assignments, &child_indexes)?;
+                } else {
+                    if !node.children.is_empty() {
+                        return Err(MachineProblem::DataException);
+                    }
+                    let reference = self.layout_occurrence_reference(&child, &child_indexes)?;
+                    let bytes = if is_numeric(child.category) {
+                        let mut element = child.clone();
+                        element.length = reference.length;
+                        element.occurs = 1;
+                        encode_decimal(
+                            &element,
+                            decimal_rescale(
+                                decimal_text(&node.text).ok_or(MachineProblem::DataException)?,
+                                element.scale,
+                            )?,
+                        )?
+                    } else {
+                        let bytes = if matches!(
+                            child.category,
+                            LayoutCategory::National | LayoutCategory::NationalEdited
+                        ) {
+                            utf8_to_national(node.text.as_bytes())?
+                        } else {
+                            node.text.as_bytes().to_vec()
+                        };
+                        FixedValue::fit(&bytes, reference.length, child.justified_right)
+                            .bytes()
+                            .to_vec()
+                    };
+                    assignments.push((reference, bytes));
+                }
+            }
         }
         Ok(())
     }

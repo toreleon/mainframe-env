@@ -1292,6 +1292,7 @@ fn check_cobol_statement_bindings(
             Some("0043") => {
                 expected_obligations.insert("phrase-count-in");
                 expected_obligations.insert("phrase-group-hierarchy");
+                expected_obligations.insert("phrase-occurs-elements");
             }
             Some("0024") => {
                 expected_obligations.insert("phrase-group-partial-exception");
@@ -1339,6 +1340,7 @@ fn check_cobol_statement_bindings(
             }
             Some("0044") => {
                 expected_obligations.insert("phrase-group-hierarchy");
+                expected_obligations.insert("phrase-occurs-elements");
                 expected_obligations.insert("phrase-processing-procedure-through");
             }
             _ => {}
