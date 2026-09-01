@@ -232,6 +232,20 @@
       "obligation_id": "boundary-default-currency-position",
       "source": "IDENTIFICATION DIVISION. PROGRAM-ID. TESTNUMVALCDEFAULT. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUT-X PIC 9. PROCEDURE DIVISION. MOVE FUNCTION TEST-NUMVAL-C('$12X') TO OUT-X. DISPLAY OUT-X. STOP RUN.",
       "expected_output": "4\n"
+    },
+    {
+      "id": "range-wide-decimal-exactness",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0054",
+      "obligation_id": "boundary-wide-decimal-exactness",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. RANGEWIDE. DATA DIVISION. WORKING-STORAGE SECTION. 01 A-X PIC 9(30) VALUE 999999999999999999999999999999. 01 B-X PIC 9(30) VALUE 999999999999999999999999999998. 01 OUT-X PIC 9. PROCEDURE DIVISION. MOVE FUNCTION RANGE(A-X, B-X) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "1\n"
+    },
+    {
+      "id": "midrange-wide-decimal-exactness",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0041",
+      "obligation_id": "boundary-wide-decimal-exactness",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. MIDRANGEWIDE. DATA DIVISION. WORKING-STORAGE SECTION. 01 A-X PIC 9(30) VALUE 999999999999999999999999999998. 01 B-X PIC 9(30) VALUE 999999999999999999999999999996. 01 OUT-X PIC 9(30). PROCEDURE DIVISION. MOVE FUNCTION MIDRANGE(A-X, B-X) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "999999999999999999999999999997\n"
     }
   ]
 }

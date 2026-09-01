@@ -6462,7 +6462,7 @@ impl ReferenceMachine {
             "MAX" => extrema(self, &arguments, true),
             "MEAN" => mean(self.arithmetic_mode, &numeric()?).map(CobolValue::Decimal),
             "MEDIAN" => median(self.arithmetic_mode, &numeric()?).map(CobolValue::Decimal),
-            "MIDRANGE" => midrange(&numeric()?).map(CobolValue::Decimal),
+            "MIDRANGE" => midrange(self.arithmetic_mode, &numeric()?).map(CobolValue::Decimal),
             "MIN" => extrema(self, &arguments, false),
             "MOD" => decimal_mod(decimal(0)?, decimal(1)?, true).map(CobolValue::Decimal),
             "NATIONAL-OF" => {
@@ -6519,7 +6519,7 @@ impl ReferenceMachine {
             }
             "PRESENT-VALUE" => present_value(&numeric()?).map(CobolValue::Decimal),
             "RANDOM" => self.random(arguments.first().map(|_| integer(0)).transpose()?),
-            "RANGE" => decimal_range(&numeric()?).map(CobolValue::Decimal),
+            "RANGE" => decimal_range(self.arithmetic_mode, &numeric()?).map(CobolValue::Decimal),
             "REM" => decimal_mod(decimal(0)?, decimal(1)?, false).map(CobolValue::Decimal),
             "REVERSE" => text_reverse(&bytes(0)?, national(0)?).map(CobolValue::Bytes),
             "SECONDS-FROM-FORMATTED-TIME" => seconds_from_formatted_time(
@@ -9316,29 +9316,53 @@ fn median(mode: CobolArithmeticMode, values: &[Decimal]) -> Result<Decimal, Mach
     }
 }
 
-fn decimal_range(values: &[Decimal]) -> Result<Decimal, MachineProblem> {
+fn decimal_extrema(values: &[Decimal]) -> Result<(Decimal, Decimal), MachineProblem> {
     if values.is_empty() {
         return Err(MachineProblem::InvalidOperation);
     }
-    let floats = values
+    values
         .iter()
-        .map(|value| decimal_f64(*value))
-        .collect::<Result<Vec<_>, _>>()?;
-    decimal_from_f64(
-        floats.iter().copied().fold(f64::NEG_INFINITY, f64::max)
-            - floats.iter().copied().fold(f64::INFINITY, f64::min),
-    )
+        .skip(1)
+        .try_fold((values[0], values[0]), |(minimum, maximum), value| {
+            let (value_for_minimum, aligned_minimum) = decimal_aligned(*value, minimum)?;
+            let (value_for_maximum, aligned_maximum) = decimal_aligned(*value, maximum)?;
+            Ok((
+                if value_for_minimum.coefficient < aligned_minimum.coefficient {
+                    *value
+                } else {
+                    minimum
+                },
+                if value_for_maximum.coefficient > aligned_maximum.coefficient {
+                    *value
+                } else {
+                    maximum
+                },
+            ))
+        })
 }
 
-fn midrange(values: &[Decimal]) -> Result<Decimal, MachineProblem> {
-    let range = decimal_range(values)?;
-    let minimum = values
+fn decimal_range(mode: CobolArithmeticMode, values: &[Decimal]) -> Result<Decimal, MachineProblem> {
+    let (minimum, maximum) = decimal_extrema(values)?;
+    decimal_subtract(mode, maximum, minimum)
+}
+
+fn midrange(mode: CobolArithmeticMode, values: &[Decimal]) -> Result<Decimal, MachineProblem> {
+    let (minimum, maximum) = decimal_extrema(values)?;
+    let scale = values
         .iter()
-        .map(|value| decimal_f64(*value))
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .fold(f64::INFINITY, f64::min);
-    decimal_from_f64(minimum + decimal_f64(range)? / 2.0)
+        .map(|value| value.scale)
+        .max()
+        .unwrap_or(0)
+        .saturating_add(1);
+    decimal_divide(
+        mode,
+        decimal_add(mode, minimum, maximum)?,
+        Decimal {
+            coefficient: 2,
+            scale: 0,
+        },
+        scale,
+    )
 }
 
 fn variance(values: &[Decimal], standard_deviation: bool) -> Result<Decimal, MachineProblem> {

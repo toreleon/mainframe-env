@@ -1673,6 +1673,9 @@ fn check_cobol_function_bindings(
             Some("0037" | "0074") => {
                 expected_obligations.insert("boundary-national-case-map");
             }
+            Some("0041" | "0054") => {
+                expected_obligations.insert("boundary-wide-decimal-exactness");
+            }
             Some("0046") => {
                 expected_obligations.insert("boundary-currency-symbol");
                 expected_obligations.insert("boundary-default-currency");
