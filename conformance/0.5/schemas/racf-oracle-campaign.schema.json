@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/racf-oracle-campaign-v1.json",
+  "title": "Licensed z/OS 3.2 RACF/SAF differential campaign",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "baseline_id", "source_sha256", "environment_identity", "product_identity", "adapter_identity", "evidence_origin", "campaign_mode", "licensed", "cases"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.racf-oracle-campaign@1"},
+    "baseline_id": {"const": "ibm-zos-3.2-racf-saf-2026"},
+    "source_sha256": {"const": "sha256:f4c8860aeb4d00b78f9257b28b2d880bd7571d74e2e00b2b1424b203801d5a46"},
+    "environment_identity": {"type": "string", "minLength": 14, "maxLength": 246, "pattern": "^licensed-zos:[A-Za-z0-9._:-]+$"},
+    "product_identity": {"const": "IBM z/OS 3.2 RACF/SAF"},
+    "adapter_identity": {"type": "string", "minLength": 30, "maxLength": 246, "pattern": "^approved-licensed-zos-adapter:[A-Za-z0-9._:-]+$"},
+    "evidence_origin": {"const": "external-licensed-zos-execution"},
+    "campaign_mode": {"const": "fresh-release-certify-campaign"},
+    "licensed": {"const": true},
+    "cases": {
+      "type": "array",
+      "minItems": 48,
+      "maxItems": 48,
+      "items": {"$ref": "#/$defs/case"}
+    }
+  },
+  "$defs": {
+    "identity": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 246,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-fA-F]{64}$"
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["row_id", "surface", "keyword", "fixture_digest", "observation"],
+      "properties": {
+        "row_id": {"type": "string", "minLength": 1, "maxLength": 246},
+        "surface": {"enum": ["command", "racroute"]},
+        "keyword": {"type": "string", "minLength": 1, "maxLength": 32, "pattern": "^[A-Z0-9]+$"},
+        "fixture_digest": {"$ref": "#/$defs/digest"},
+        "observation": {"type": "object", "maxProperties": 64}
+      }
+    }
+  }
+}

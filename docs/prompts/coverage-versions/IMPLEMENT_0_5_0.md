@@ -32,7 +32,8 @@ and evidence contracts before integrating public commands or SAF calls.
 4. Implement **SEC-505** certificate/keyring, password/phrase, MFA, identity
    mapping and RRSF behavior through safe secret references.
 5. Implement **SEC-506** audit/redaction, concurrency, restart, migration,
-   recovery and licensed differential suites.
+   recovery, independent bounded reference simulation, and the fail-closed
+   licensed differential adapter.
 
 ## Reuse and architecture guardrails
 
@@ -65,10 +66,22 @@ and evidence contracts before integrating public commands or SAF calls.
 
 Do not finish until 34/34 RACF command families and 14/14 RACROUTE requests pass
 recognition, validation, execution, condition, authorization, atomicity,
-concurrency, restart/recovery, malformed, limit, audit, and licensed differential
-matrices. ACEE/token/policy/certificate behavior and prior CardDemo security
-journeys must be exact without application-specific branches.
+concurrency, restart/recovery, malformed, limit, and audit matrices. The
+independent bounded reference simulation must pass its catalog, precedence,
+state, status-code, redaction, invariant, metamorphic, and mutant suites without
+reusing production implementation. ACEE/token/policy/certificate behavior and
+prior CardDemo security journeys must be exact without application-specific
+branches.
+
+Scoped completion policy approved by the user on 2026-09-01: 0.5 may exit as
+`pass-with-licensed-differential-pending` because no licensed z/OS 3.2 RACF/SAF
+receipt is available in this development cycle. Keep the licensed differential
+numerator exactly 0/48, never fabricate or infer a pass, and retain the
+fail-closed campaign adapter. The real licensed 48-row campaign is a hard gate
+of 0.17 `release-certify` and remains mandatory before 1.0/release
+certification.
 
 At handoff, include per-family gate counts, deny-path evidence, audit/redaction
-checks, migration/rollback and recovery results, oracle receipts, and the exact
-candidate identity. Do not expose secrets or tag/publish the release.
+checks, migration/rollback and recovery results, reference-simulation results,
+the explicit licensed-differential pending reason, and the exact candidate
+identity. Do not expose secrets or tag/publish the release.

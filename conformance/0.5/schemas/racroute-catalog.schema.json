@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/racroute-catalog-v1.json",
+  "title": "mainframe-env RACROUTE request catalog v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "baseline_id", "supporting_source_sha256", "requests"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.racroute-catalog@1"},
+    "baseline_id": {"const": "ibm-zos-3.2-racf-saf-2026"},
+    "supporting_source_sha256": {"const": "sha256:83e6eed67f5631268e03ad9459c5ac5fde03bd9d78152eb07403b70af3c4cf78"},
+    "requests": {
+      "type": "array", "minItems": 14, "maxItems": 14,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["row_id", "variant", "keyword", "mutating", "requires_acee", "uses_cache"],
+        "properties": {
+          "row_id": {"type": "string", "pattern": "^ibm-zos-3\\.2-racf-saf-2026:racroute-request-types:[0-9]{4}$"},
+          "variant": {"type": "string", "pattern": "^[A-Z][A-Za-z0-9]+$", "maxLength": 64},
+          "keyword": {"type": "string", "pattern": "^[A-Z]+$", "maxLength": 16},
+          "mutating": {"type": "boolean"},
+          "requires_acee": {"type": "boolean"},
+          "uses_cache": {"type": "boolean"}
+        }
+      }
+    }
+  }
+}

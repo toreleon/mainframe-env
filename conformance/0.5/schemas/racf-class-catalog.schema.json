@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/racf-class-catalog-v1.json",
+  "title": "mainframe-env RACF supplied class catalog v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "baseline_id", "source_sha256", "classes"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.racf-class-catalog@1"},
+    "baseline_id": {"const": "ibm-zos-3.2-racf-saf-2026"},
+    "source_sha256": {"const": "sha256:f4c8860aeb4d00b78f9257b28b2d880bd7571d74e2e00b2b1424b203801d5a46"},
+    "classes": {
+      "type": "array", "minItems": 1, "maxItems": 1024,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["name", "active", "generic_allowed", "generic_active", "discrete_allowed", "raclist", "max_profile_name_bytes", "posit"],
+        "properties": {
+          "name": {"type": "string", "pattern": "^[A-Z0-9]+$", "maxLength": 32},
+          "active": {"type": "boolean"},
+          "generic_allowed": {"type": "boolean"},
+          "generic_active": {"type": "boolean"},
+          "discrete_allowed": {"type": "boolean"},
+          "raclist": {"type": "boolean"},
+          "max_profile_name_bytes": {"type": "integer", "minimum": 1, "maximum": 246},
+          "posit": {"anyOf": [{"type": "integer", "minimum": 0, "maximum": 65535}, {"type": "null"}]}
+        }
+      }
+    }
+  }
+}

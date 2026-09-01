@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/racf-decision-v1.json",
+  "title": "mainframe-env SAF decision v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["outcome", "status", "granted_access", "matched_profile", "audit_id", "cache_generation"],
+  "properties": {
+    "outcome": {"enum": ["allow", "deny", "no-decision"]},
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["saf_return_code", "racf_return_code", "racf_reason_code", "reason"],
+      "properties": {
+        "saf_return_code": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+        "racf_return_code": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+        "racf_reason_code": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+        "reason": {"enum": ["granted", "default-deny", "class-inactive", "profile-not-found", "principal-not-found", "principal-inactive", "insufficient-access", "security-label-mismatch", "condition-not-satisfied", "token-invalid", "acee-invalid", "credential-invalid", "mfa-invalid", "policy-unavailable", "store-unavailable", "malformed-request", "unsupported-request", "resource-exhausted", "cancelled", "timed-out", "recovery-required"]}
+      }
+    },
+    "granted_access": {"enum": ["NONE", "EXECUTE", "READ", "UPDATE", "CONTROL", "ALTER"]},
+    "matched_profile": {"anyOf": [{"type": "string", "minLength": 1, "maxLength": 246}, {"type": "null"}]},
+    "audit_id": {"anyOf": [{"type": "string", "minLength": 1, "maxLength": 246}, {"type": "null"}]},
+    "cache_generation": {"anyOf": [{"type": "integer", "minimum": 1}, {"type": "null"}]}
+  }
+}

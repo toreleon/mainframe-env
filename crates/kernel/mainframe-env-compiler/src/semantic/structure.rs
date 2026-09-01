@@ -129,13 +129,10 @@ pub(super) fn analyze(
     let mut hierarchy = Vec::<(u8, String)>::new();
     for range in sentence_ranges(&source[data_start..data_end]) {
         let range = data_start + range.start..data_start + range.end;
-        let sentence = source[range.clone()].trim();
-        let leading = source[range.clone()].len() - source[range.clone()].trim_start().len();
-        let range = range.start + leading..range.start + leading + sentence.len();
-        if sentence.is_empty() || sentence.trim_start().starts_with("*>") {
+        let Some((sentence, range)) = sentence_content(source, range) else {
             continue;
-        }
-        let words = words(sentence);
+        };
+        let words = words(&sentence);
         let upper_sentence = sentence.to_ascii_uppercase();
         if upper_sentence.contains("FILE SECTION") {
             section = StorageSection::File;
@@ -161,7 +158,7 @@ pub(super) fn analyze(
             if file_descriptions.len() + data_descriptions.len() >= max_items {
                 return Err(SemanticProblem::ItemLimitExceeded);
             }
-            file_descriptions.push(parse_file_description(sentence, &words, range, origins)?);
+            file_descriptions.push(parse_file_description(&sentence, &words, range, origins)?);
             hierarchy.clear();
             continue;
         }
@@ -169,7 +166,7 @@ pub(super) fn analyze(
             continue;
         };
         if !matches!(level, 1..=49 | 66 | 77 | 78 | 88) || words.len() < 2 {
-            return Err(SemanticProblem::InvalidDeclaration(sentence.into()));
+            return Err(SemanticProblem::InvalidDeclaration(sentence));
         }
         if file_descriptions.len() + data_descriptions.len() >= max_items {
             return Err(SemanticProblem::ItemLimitExceeded);
@@ -189,7 +186,8 @@ pub(super) fn analyze(
         let qualified_name = hierarchy
             .last()
             .map_or_else(|| name.clone(), |(_, parent)| format!("{parent}.{name}"));
-        let clauses = parse_data_clauses(sentence, &words, level, section, range.clone(), origins)?;
+        let clauses =
+            parse_data_clauses(&sentence, &words, level, section, range.clone(), origins)?;
         if let Some(type_clause) = clauses
             .iter()
             .find(|clause| clause.kind == CobolClauseKind::Data(DataDescriptionClauseKind::Type))
@@ -1096,11 +1094,30 @@ fn sequence(words: &[String], value: &[&str]) -> Option<usize> {
 }
 
 fn words(sentence: &str) -> Vec<String> {
-    sentence
-        .split_whitespace()
-        .map(|word| word.trim_matches([',', ';', '.']).to_ascii_uppercase())
-        .filter(|word| !word.is_empty())
-        .collect()
+    super::declaration_words(sentence)
+}
+
+fn sentence_content(source: &str, range: Range<usize>) -> Option<(String, Range<usize>)> {
+    let mut text = String::new();
+    let mut first = None;
+    let mut last = range.start;
+    let mut offset = 0usize;
+    for part in source[range.clone()].split_inclusive('\n') {
+        let line = part.strip_suffix('\n').unwrap_or(part);
+        let line = line.strip_suffix('\r').unwrap_or(line);
+        let trimmed = line.trim();
+        if !trimmed.is_empty() && !trimmed.starts_with("*>") {
+            if !text.is_empty() {
+                text.push('\n');
+            }
+            text.push_str(line);
+            let leading = line.len() - line.trim_start().len();
+            first.get_or_insert(range.start + offset + leading);
+            last = range.start + offset + line.trim_end().len();
+        }
+        offset += part.len();
+    }
+    Some((text.trim().into(), first?..last))
 }
 
 fn sentence_ranges(source: &str) -> Vec<Range<usize>> {
@@ -1110,6 +1127,23 @@ fn sentence_ranges(source: &str) -> Vec<Range<usize>> {
     let mut quote = None;
     let mut cursor = 0usize;
     while cursor < bytes.len() {
+        if cursor == 0 || bytes[cursor - 1] == b'\n' {
+            let line_end = source[cursor..]
+                .find('\n')
+                .map_or(bytes.len(), |offset| cursor + offset);
+            if source[cursor..line_end].trim_start().starts_with("*>") {
+                cursor = line_end;
+                continue;
+            }
+        }
+        if quote.is_none()
+            && let Some(end) = super::embedded_exec_end(source, cursor)
+        {
+            ranges.push(start..end);
+            start = end;
+            cursor = end;
+            continue;
+        }
         if matches!(bytes[cursor], b'\'' | b'"') {
             if quote == Some(bytes[cursor]) {
                 if bytes.get(cursor + 1) == Some(&bytes[cursor]) {

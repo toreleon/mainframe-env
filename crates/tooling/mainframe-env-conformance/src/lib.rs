@@ -29,6 +29,9 @@ mod cobol_statements;
 mod dataset;
 mod dataset_reference;
 mod jcl;
+mod racf;
+mod racf_oracle;
+mod racf_reference;
 
 pub use abi::{
     HostAbiInventoryReceipt, HostAbiLibraryReceipt, HostAbiMemberReceipt, verify_host_abi_libraries,
@@ -64,6 +67,8 @@ pub use dataset::{
 };
 pub use dataset_reference::{DatasetReferenceSimulationReport, run_dataset_reference_simulation};
 pub use jcl::{JclExitReceipt, JclFixtureRuntime, jcl_fixture_runtime, verify_jcl_exit};
+pub use racf::{racf_runtime, racf_runtime_with};
+pub use racf_oracle::{RACF_ORACLE_RELATIVE_PATH, RacfOracleCampaign, RacfOracleCase};
 
 pub use cobol_clauses::verify_cobol_semantic_fixtures;
 pub use cobol_exit::{CobolExitReceipt, verify_cobol_exit};

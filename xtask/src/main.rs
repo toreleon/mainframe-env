@@ -5,10 +5,13 @@
 mod evidence_seal;
 mod jcl_catalog;
 mod jcl_conformance;
+mod racf_catalog;
+mod work_package_seal;
 
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use mainframe_env_conformance::{
-    DatasetConformanceRuntime, dataset_conformance_runtime, run_dataset_reference_simulation,
+    DatasetConformanceRuntime, RACF_ORACLE_RELATIVE_PATH, RacfOracleCampaign,
+    dataset_conformance_runtime, run_dataset_reference_simulation,
     verify_carddemo_application_package_from_env, verify_carddemo_base_batch_from_env,
     verify_carddemo_base_online_from_env, verify_carddemo_batch_programs_from_env,
     verify_carddemo_cics_abi_from_env, verify_carddemo_cics_runtime_from_env,
@@ -91,6 +94,18 @@ struct ConformanceArgs {
     check: bool,
 }
 
+#[derive(Debug, Args)]
+struct WorkPackageSealArgs {
+    #[arg(long)]
+    id: String,
+    #[arg(long)]
+    target_version: String,
+    #[arg(long = "path", required = true)]
+    paths: Vec<String>,
+    #[arg(long)]
+    check: bool,
+}
+
 #[derive(Debug, Subcommand)]
 enum EvidenceCommand {
     Seal(CheckArgs),
@@ -134,7 +149,9 @@ enum XtaskCommand {
     JclCatalog(CheckArgs),
     JclConformance(CheckArgs),
     JclExit(CheckArgs),
+    RacfCatalog(CheckArgs),
     Spec(CheckArgs),
+    WorkPackageSeal(WorkPackageSealArgs),
     Conformance(ConformanceArgs),
     Certification(CheckArgs),
     CarddemoCorpus(CheckArgs),
@@ -361,6 +378,15 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             }
         ),
         XtaskCommand::JclExit(args) => checked!("jcl-exit", args, check_jcl_exit(root)),
+        XtaskCommand::RacfCatalog(args) => (
+            "racf-catalog",
+            args.check,
+            if args.check {
+                racf_catalog::check(root)
+            } else {
+                racf_catalog::generate(root)
+            },
+        ),
         XtaskCommand::Spec(args) => checked!("spec", args, check_spec(root)),
         XtaskCommand::Conformance(args) => {
             let focused = args.subsystem.is_some()
@@ -492,6 +518,11 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             checked!("carddemo-full", args, check_carddemo_full(root))
         }
         XtaskCommand::Digest(args) => checked!("digest", args, print_digest(root)),
+        XtaskCommand::WorkPackageSeal(args) => (
+            "work-package-seal",
+            args.check,
+            work_package_seal::run(root, &args),
+        ),
         XtaskCommand::Release(args) => (
             "release",
             args.check,
@@ -506,6 +537,7 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
 
 fn check_conformance(root: &Path) -> TaskResult {
     check_spec(root)?;
+    racf_catalog::check(root)?;
     jcl_catalog::check(root)?;
     jcl_conformance::check(root)?;
     check_versions(root)?;
@@ -1997,14 +2029,13 @@ fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> T
         args.replay.is_none() || (args.gate.is_none() && args.shard.is_none()),
         "--replay cannot be combined with --gate or --shard",
     )?;
-    let dataset_or_jcl_selected = matches!(
+    let dataset_racf_or_jcl_selected = matches!(
         args.subsystem.as_deref(),
-        Some("dataset-vsam-ams" | "jcl-jes2")
-    ) || args
-        .replay
-        .as_deref()
-        .is_some_and(|replay| replay.starts_with("dataset.") || replay.starts_with("jcl."));
-    if dataset_or_jcl_selected {
+        Some("dataset-vsam-ams" | "racf-saf" | "jcl-jes2")
+    ) || args.replay.as_deref().is_some_and(|replay| {
+        replay.starts_with("dataset.") || replay.starts_with("racf.") || replay.starts_with("jcl.")
+    });
+    if dataset_racf_or_jcl_selected {
         return check_focused_dataset_or_jcl_conformance_interface(root, args);
     }
     let cobol_selected = args.subsystem.as_deref() == Some("cobol")
@@ -2210,6 +2241,11 @@ fn check_focused_dataset_or_jcl_conformance_interface(
         selected > 0,
         "focused conformance selection has no executable bindings",
     )?;
+    let racf_selected = args.subsystem.as_deref() == Some("racf-saf")
+        || args
+            .replay
+            .as_deref()
+            .is_some_and(|replay| replay.starts_with("racf."));
     let is_dataset = args.subsystem.as_deref() == Some("dataset-vsam-ams")
         || args
             .replay
@@ -2281,9 +2317,77 @@ fn check_focused_dataset_or_jcl_conformance_interface(
             .as_deref()
             .is_some_and(|replay| replay.starts_with("jcl."));
     require(
-        jcl_selected,
+        racf_selected || jcl_selected,
         "selected subsystem product driver registry is not installed",
     )?;
+    if racf_selected {
+        return run_focused_racf(root, args, gate, &spec, selected);
+    }
+    run_focused_jcl(root, args, gate, &spec, selected)
+}
+
+fn run_focused_racf(
+    root: &Path,
+    args: &ConformanceArgs,
+    gate: Option<CoverageGate>,
+    spec: &CompiledSpec,
+    selected: usize,
+) -> TaskResult {
+    let limits = ConformanceLimits::default();
+    let selection = if let Some(replay) = args.replay.as_deref() {
+        RunnerSelection::replay(replay, limits).map_err(|problem| problem.to_string())?
+    } else {
+        RunnerSelection::focused("racf-saf", gate, args.shard, limits)
+            .map_err(|problem| problem.to_string())?
+    };
+    let context = RunnerContext::new(repository_digest(root)?, "local-deterministic", limits)
+        .map_err(|problem| problem.to_string())?;
+    let dataset_handlers = dataset_conformance_runtime();
+    let jcl_handlers = jcl_conformance::runtime();
+    let runtime = combined_conformance_runtime(spec, &dataset_handlers, &jcl_handlers, limits)?;
+    let report = ConformanceRunner::new(spec, runtime, limits)
+        .run(&selection, &context)
+        .map_err(|problem| problem.to_string())?;
+    if let Some(failure) = report
+        .batches
+        .iter()
+        .flat_map(|batch| &batch.events)
+        .find(|event| event.verdict == Verdict::Fail)
+    {
+        return Err(format!(
+            "{} failed: expected={} actual={} replay={}",
+            failure.test_id.as_str(),
+            failure.expected,
+            failure.actual,
+            failure.replay
+        ));
+    }
+    let counts = CoverageGate::ALL
+        .into_iter()
+        .map(|gate| {
+            let count = &report.ledger.counts[&gate];
+            format!(
+                "{}={}/{}/{}/{}",
+                gate.slug(),
+                count.pass,
+                count.fail,
+                count.pending,
+                count.non_applicable
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    println!("bindings={selected} {counts}");
+    Ok(())
+}
+
+fn run_focused_jcl(
+    root: &Path,
+    args: &ConformanceArgs,
+    gate: Option<CoverageGate>,
+    spec: &CompiledSpec,
+    selected: usize,
+) -> TaskResult {
     let limits = ConformanceLimits::default();
     let selection = if let Some(replay) = args.replay.as_deref() {
         RunnerSelection::replay(replay, limits).map_err(|problem| problem.to_string())?
@@ -2300,9 +2404,8 @@ fn check_focused_dataset_or_jcl_conformance_interface(
         .map_err(|problem| problem.to_string())?;
     let dataset_handlers = dataset_conformance_runtime();
     let jcl_handlers = jcl_conformance::runtime();
-    let runtime = combined_conformance_runtime(&spec, &dataset_handlers, &jcl_handlers, limits)
-        .map_err(|problem| problem.to_string())?;
-    let report = ConformanceRunner::new(&spec, runtime, limits)
+    let runtime = combined_conformance_runtime(spec, &dataset_handlers, &jcl_handlers, limits)?;
+    let report = ConformanceRunner::new(spec, runtime, limits)
         .run(&selection, &context)
         .map_err(|problem| problem.to_string())?;
     require(
@@ -2404,7 +2507,7 @@ fn combined_conformance_runtime<'a>(
         jcl.observations(limits)
             .map_err(|problem| problem.to_string())?,
     );
-    RuntimeRegistry::new(spec, drivers, predicates, observations, limits)
+    mainframe_env_conformance::racf_runtime_with(spec, drivers, predicates, observations, limits)
         .map_err(|problem| problem.to_string())
 }
 
@@ -2674,29 +2777,63 @@ fn check_carddemo_security(root: &Path) -> TaskResult {
         &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
     )
     .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
-    let receipt_digest = format!(
-        "sha256:{:x}",
-        Sha256::digest(serde_json::to_vec(&receipt_value).map_err(|error| error.to_string())?)
-    );
     println!(
         "{}",
         serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
     let evidence = json(&root.join("conformance/0.1.1/evidence/issues/CD-017.json"))?;
+    let historical = evidence["security_receipt"]
+        .as_object()
+        .ok_or("CD-017 historical security receipt is malformed")?;
+    let historical_digest = canonical_evidence_digest(historical)?;
     require(
         evidence["issue"] == Value::String("CD-017".into())
             && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
+            && evidence["status"] == Value::String("pass".into())
+            && evidence["evidence_digest"].as_str() == Some(historical_digest.as_str()),
         "CD-017 evidence is not a derived pass",
     )?;
     require(
-        evidence["security_receipt"] == receipt_value,
-        "CD-017 security receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-017 evidence digest differs",
+        receipt.status == "pass"
+            && receipt.schema_version == "mainframe-env.carddemo-security-receipt@1"
+            && receipt.corpus_commit == historical["corpus_commit"]
+            && receipt.transport_users
+                == historical["transport_users"].as_u64().unwrap_or(0) as usize
+            && receipt.application_signon_records
+                == historical["application_signon_records"]
+                    .as_u64()
+                    .unwrap_or(0) as usize
+            && receipt.identities_distinct
+            && receipt.groups == historical["groups"].as_u64().unwrap_or(0) as usize
+            && receipt.profiles == historical["profiles"].as_u64().unwrap_or(0) as usize
+            && receipt.permissions > 0
+            && receipt.permissions <= historical["permissions"].as_u64().unwrap_or(0) as usize
+            && receipt.resource_classes
+                == serde_json::from_value::<Vec<String>>(historical["resource_classes"].clone())
+                    .map_err(|error| error.to_string())?
+            && receipt.transaction_profiles
+                == historical["transaction_profiles"].as_u64().unwrap_or(0) as usize
+            && receipt.program_profiles
+                == historical["program_profiles"].as_u64().unwrap_or(0) as usize
+            && receipt.dataset_profiles
+                == historical["dataset_profiles"].as_u64().unwrap_or(0) as usize
+            && receipt.queue_profiles
+                == historical["queue_profiles"].as_u64().unwrap_or(0) as usize
+            && receipt.regular_allow_checks
+                == historical["regular_allow_checks"].as_u64().unwrap_or(0) as usize
+            && receipt.regular_deny_checks
+                == historical["regular_deny_checks"].as_u64().unwrap_or(0) as usize
+            && receipt.admin_allow_checks
+                == historical["admin_allow_checks"].as_u64().unwrap_or(0) as usize
+            && receipt.redacted_fields
+                == historical["redacted_fields"].as_u64().unwrap_or(0) as usize
+            && receipt.manifest_replay
+            && receipt.security_shape_sha256.len() == 64
+            && receipt
+                .security_shape_sha256
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit()),
+        "current CardDemo security profile is not an exact least-privilege pass",
     )?;
     Ok(())
 }
@@ -3727,6 +3864,7 @@ fn check_declared_dependency_graph(root: &Path) -> TaskResult {
         root.join("conformance/0.1.1/inventory/dependency-graph-additions.json"),
         root.join("conformance/0.2/inventory/dependency-additions.json"),
         root.join("conformance/0.3/inventory/dependency-additions.json"),
+        root.join("conformance/0.5/inventory/dependency-additions.json"),
         root.join("conformance/0.6/inventory/dependency-additions.json"),
         root.join("conformance/0.7/inventory/dependency-additions.json"),
     ] {
@@ -4071,6 +4209,11 @@ fn check_schemas(root: &Path) -> TaskResult {
     )?;
     collect_extension(
         &root.join("conformance/0.2/schemas"),
+        OsStr::new("json"),
+        &mut files,
+    )?;
+    collect_extension(
+        &root.join("conformance/0.5/schemas"),
         OsStr::new("json"),
         &mut files,
     )?;

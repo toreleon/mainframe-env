@@ -1670,6 +1670,126 @@ mod tests {
     }
 
     #[test]
+    fn numeric_leading_hyphenated_perform_targets_remain_single_names() {
+        let parsed = parse_procedure(
+            "MAIN.\nIF END-OF-AUTHDB\n PERFORM 1000-INITIALIZE THRU 1000-EXIT\nEND-IF.\n1000-INITIALIZE.\nCONTINUE.\n1000-EXIT.\nEXIT.",
+            32,
+        )
+        .unwrap();
+        assert!(parsed.edges.iter().any(|edge| {
+            edge.kind == ControlEdgeKind::Call && parsed.nodes[edge.to].text == "1000-INITIALIZE"
+        }));
+        let labels = parsed
+            .nodes
+            .iter()
+            .filter(|node| node.role == ControlRole::Label)
+            .map(|node| node.text.as_str())
+            .collect::<BTreeSet<_>>();
+        assert!(labels.contains("1000-INITIALIZE") && labels.contains("1000-EXIT"));
+    }
+
+    #[test]
+    fn compute_accepts_a_well_formed_intrinsic_function_expression() {
+        let parsed = parse_procedure(
+            "MAIN.\nCOMPUTE TOTAL = FUNCTION NUMVAL(TEXT-VALUE).\nGOBACK.",
+            16,
+        )
+        .unwrap();
+        assert!(parsed.statements.iter().any(|statement| {
+            statement.kind == StatementKind::Compute
+                && statement.arguments
+                    == ["TOTAL", "=", "FUNCTION", "NUMVAL", "(", "TEXT-VALUE", ")"]
+        }));
+    }
+
+    #[test]
+    fn string_accepts_optional_commas_only_between_senders() {
+        let parsed = parse_procedure(
+            "MAIN.\nSTRING 'A', VALUE-X, 'END' DELIMITED BY SIZE INTO OUTPUT-X END-STRING.\nGOBACK.",
+            16,
+        )
+        .unwrap();
+        assert!(
+            parsed
+                .statements
+                .iter()
+                .any(|statement| statement.kind == StatementKind::String)
+        );
+        assert!(
+            parse_procedure(
+                "MAIN.\nSTRING , VALUE-X DELIMITED BY SIZE INTO OUTPUT-X END-STRING.\nGOBACK.",
+                16,
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn move_accepts_receiver_separator_commas_without_accepting_empty_receivers() {
+        let parsed = parse_procedure(
+            "MAIN.\nMOVE VALUE-X TO TARGET-X,\nMOVE VALUE-X TO FIRST-X, SECOND-X.\nGOBACK.",
+            16,
+        )
+        .unwrap();
+        assert_eq!(
+            parsed
+                .statements
+                .iter()
+                .filter(|statement| statement.kind == StatementKind::Move)
+                .count(),
+            2
+        );
+        assert!(parse_procedure("MAIN.\nMOVE VALUE-X TO ,.\nGOBACK.", 16).is_err());
+    }
+
+    #[test]
+    fn call_accepts_optional_commas_only_between_using_arguments() {
+        let parsed = parse_procedure(
+            "MAIN.\nCALL 'PROGRAM' USING FIRST-X, SECOND-X.\nGOBACK.",
+            16,
+        )
+        .unwrap();
+        assert!(
+            parsed
+                .statements
+                .iter()
+                .any(|statement| statement.kind == StatementKind::Call)
+        );
+        assert!(parse_procedure("MAIN.\nCALL 'PROGRAM' USING , FIRST-X.\nGOBACK.", 16).is_err());
+    }
+
+    #[test]
+    fn accept_date_and_day_formats_are_matched_suffixes() {
+        let parsed = parse_procedure(
+            "MAIN.\nACCEPT DATE-X FROM DATE YYYYMMDD\nACCEPT DAY-X FROM DAY YYYYDDD.\nGOBACK.",
+            16,
+        )
+        .unwrap();
+        assert_eq!(
+            parsed
+                .statements
+                .iter()
+                .filter(|statement| statement.kind == StatementKind::Accept)
+                .count(),
+            2
+        );
+        assert!(parse_procedure("MAIN.\nACCEPT TIME-X FROM TIME YYYYMMDD.\nGOBACK.", 16).is_err());
+    }
+
+    #[test]
+    fn empty_inline_varying_retains_loop_control_but_empty_until_is_rejected() {
+        let parsed = parse_procedure(
+            "MAIN.\nPERFORM VARYING I FROM 10 BY -1 UNTIL I = 1\nEND-PERFORM.\nGOBACK.",
+            16,
+        )
+        .unwrap();
+        assert!(parsed.nodes.iter().any(|node| {
+            node.role == ControlRole::BlockStart && node.scope == Some(ControlScope::Perform)
+        }));
+        assert!(parse_procedure("MAIN.\nPERFORM UNTIL DONE END-PERFORM.\nGOBACK.", 16).is_err());
+    }
+
+    #[test]
     fn malformed_or_recovered_control_cannot_build_hir() {
         assert_eq!(
             parse_procedure("END-IF.", 16).unwrap_err(),

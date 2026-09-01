@@ -767,7 +767,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn shared_runtime_closes_cobol_dataset_and_jcl_handlers() {
+    fn shared_runtime_closes_cobol_dataset_racf_and_jcl_handlers() {
         let root = repository_root().unwrap();
         let spec = compile_shared_spec(&root).unwrap();
         let dataset_handlers = dataset_conformance_runtime();

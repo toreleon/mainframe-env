@@ -1,0 +1,31 @@
+{
+  "schema_version": "mainframe-env.racf-class-catalog@1",
+  "baseline_id": "ibm-zos-3.2-racf-saf-2026",
+  "source_sha256": "sha256:f4c8860aeb4d00b78f9257b28b2d880bd7571d74e2e00b2b1424b203801d5a46",
+  "classes": [
+    {"name":"ACCTNUM","active":false,"generic_allowed":true,"generic_active":true,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":246,"posit":null},
+    {"name":"APPL","active":false,"generic_allowed":true,"generic_active":true,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":246,"posit":null},
+    {"name":"CDT","active":false,"generic_allowed":false,"generic_active":false,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":32,"posit":null},
+    {"name":"CONSOLE","active":false,"generic_allowed":true,"generic_active":true,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":246,"posit":null},
+    {"name":"DATASET","active":true,"generic_allowed":true,"generic_active":true,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":44,"posit":null},
+    {"name":"DIGTCERT","active":false,"generic_allowed":false,"generic_active":false,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":246,"posit":null},
+    {"name":"DIGTRING","active":false,"generic_allowed":false,"generic_active":false,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":246,"posit":null},
+    {"name":"FACILITY","active":true,"generic_allowed":true,"generic_active":true,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":246,"posit":null},
+    {"name":"FIELD","active":false,"generic_allowed":true,"generic_active":true,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":246,"posit":null},
+    {"name":"JESINPUT","active":false,"generic_allowed":true,"generic_active":true,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":246,"posit":null},
+    {"name":"JESJOBS","active":true,"generic_allowed":true,"generic_active":true,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":246,"posit":null},
+    {"name":"JESSPOOL","active":false,"generic_allowed":true,"generic_active":true,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":246,"posit":null},
+    {"name":"OPERCMDS","active":true,"generic_allowed":true,"generic_active":true,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":246,"posit":null},
+    {"name":"PROGRAM","active":true,"generic_allowed":true,"generic_active":true,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":246,"posit":null},
+    {"name":"PTKTDATA","active":false,"generic_allowed":true,"generic_active":true,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":246,"posit":null},
+    {"name":"RACFVARS","active":false,"generic_allowed":true,"generic_active":true,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":246,"posit":null},
+    {"name":"RRSFDATA","active":false,"generic_allowed":true,"generic_active":true,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":246,"posit":null},
+    {"name":"STARTED","active":false,"generic_allowed":true,"generic_active":true,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":246,"posit":null},
+    {"name":"SURROGAT","active":false,"generic_allowed":true,"generic_active":true,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":246,"posit":null},
+    {"name":"TCICSTRN","active":true,"generic_allowed":true,"generic_active":true,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":246,"posit":null},
+    {"name":"TERMINAL","active":false,"generic_allowed":true,"generic_active":true,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":246,"posit":null},
+    {"name":"TSOAUTH","active":false,"generic_allowed":true,"generic_active":true,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":246,"posit":null},
+    {"name":"TSOPROC","active":false,"generic_allowed":true,"generic_active":true,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":246,"posit":null},
+    {"name":"UNIXPRIV","active":false,"generic_allowed":true,"generic_active":true,"discrete_allowed":true,"raclist":false,"max_profile_name_bytes":246,"posit":null}
+  ]
+}

@@ -37,8 +37,10 @@ reviewed candidate-bound licensed receipt before release certification can pass.
    APAR/PTF/service state, configuration, locale/CCSID, topology, authority,
    fixtures, tools, redaction and reproducible oracle commands.
 2. Run **CER-1702** independent per-subsystem differential campaigns against the
-   same source identity, including the deferred 0.6 dataset/VSAM/AMS 36-row
-   campaign. Normalize only documented nondeterministic fields.
+   same source identity. Normalize only documented nondeterministic fields. The
+   campaign must include the 34 RACF command-family and 14 RACROUTE rows deferred
+   from 0.5 with their licensed numerator still starting at 0/48, plus the
+   deferred 0.6 dataset/VSAM/AMS 36-row campaign starting at 0/36.
 3. Triage each mismatch to an implementation defect, baseline correction or
    explicit out-of-scope row. Add a focused regression before every code fix and
    invalidate/rerun all affected receipts after a merge.
@@ -74,6 +76,9 @@ reviewed candidate-bound licensed receipt before release certification can pass.
 
 - Every mandatory pinned row is complete at every applicable gate; there is no
   accepted unsupported row and partial rows never round up.
+- Reference simulations, modeled outputs, official documentation, historical
+  receipts, and current-product observations cannot substitute for the deferred
+  licensed RACF/SAF campaign.
 - Inputs, outputs, traces, diagnostics, statuses, environment identities and
   normalization rules are retained with bounded/redacted evidence and digests.
 - A mismatch cannot be waived by changing expected output to match the product.
