@@ -218,6 +218,20 @@
       "obligation_id": "boundary-optional-offset",
       "source": "IDENTIFICATION DIVISION. PROGRAM-ID. FORMATTIME. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUT-X PIC X(8). PROCEDURE DIVISION. MOVE FUNCTION FORMATTED-TIME('hh:mm:ss', 45296) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
       "expected_output": "12:34:56\n"
+    },
+    {
+      "id": "numval-c-default-currency",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0046",
+      "obligation_id": "boundary-default-currency",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. NUMVALCDEFAULT. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUT-X PIC 99V9. PROCEDURE DIVISION. MOVE FUNCTION NUMVAL-C('$12.5') TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "125\n"
+    },
+    {
+      "id": "test-numval-c-default-currency",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0069",
+      "obligation_id": "boundary-default-currency-position",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. TESTNUMVALCDEFAULT. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUT-X PIC 9. PROCEDURE DIVISION. MOVE FUNCTION TEST-NUMVAL-C('$12X') TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "4\n"
     }
   ]
 }

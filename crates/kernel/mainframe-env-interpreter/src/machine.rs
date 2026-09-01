@@ -6485,7 +6485,11 @@ impl ReferenceMachine {
             }
             "NUMVAL" => parse_numval(&bytes(0)?, false, None).map(CobolValue::Decimal),
             "NUMVAL-C" => {
-                let currency = bytes(1)?;
+                let currency = arguments
+                    .get(1)
+                    .map(|_| bytes(1))
+                    .transpose()?
+                    .unwrap_or_else(|| b"$".to_vec());
                 parse_numval(&bytes(0)?, false, Some(&currency)).map(CobolValue::Decimal)
             }
             "NUMVAL-F" => parse_numval(&bytes(0)?, true, None).map(CobolValue::Decimal),
@@ -6543,7 +6547,11 @@ impl ReferenceMachine {
             ) as i128)),
             "TEST-NUMVAL" => Ok(integer_value(test_numval(&bytes(0)?, false, None) as i128)),
             "TEST-NUMVAL-C" => {
-                let currency = bytes(1)?;
+                let currency = arguments
+                    .get(1)
+                    .map(|_| bytes(1))
+                    .transpose()?
+                    .unwrap_or_else(|| b"$".to_vec());
                 Ok(integer_value(
                     test_numval(&bytes(0)?, false, Some(&currency)) as i128,
                 ))

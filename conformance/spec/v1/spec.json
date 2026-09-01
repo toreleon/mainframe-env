@@ -35104,6 +35104,40 @@
       ],
       "oracle": "cobol.enterprise-6.5.licensed",
       "recovery": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0046",
+      "gate": "executed",
+      "obligation_id": "boundary-default-currency",
+      "test_id": "cobol.function-boundary-runtime.numval-c-default-currency",
+      "input": "cobol.function-boundary-runtime.numval-c-default-currency",
+      "driver": "cobol.function-boundary-runtime.driver",
+      "preconditions": [
+        "cobol.function-boundary-runtime.fixture.available"
+      ],
+      "expected": [
+        "cobol.function-boundary-runtime.executed"
+      ],
+      "oracle": "cobol.enterprise-6.5.licensed",
+      "recovery": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0069",
+      "gate": "executed",
+      "obligation_id": "boundary-default-currency-position",
+      "test_id": "cobol.function-boundary-runtime.test-numval-c-default-currency",
+      "input": "cobol.function-boundary-runtime.test-numval-c-default-currency",
+      "driver": "cobol.function-boundary-runtime.driver",
+      "preconditions": [
+        "cobol.function-boundary-runtime.fixture.available"
+      ],
+      "expected": [
+        "cobol.function-boundary-runtime.executed"
+      ],
+      "oracle": "cobol.enterprise-6.5.licensed",
+      "recovery": null
     }
   ],
   "catalog_digest": "sha256:074f7385b1d1e1127f9cf83dbbc4e0bc46903cfa7739a2515c4085f7d2037f01",
@@ -48140,6 +48174,20 @@
       "applicable_gates": [
         "executed"
       ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0046",
+      "obligation_id": "boundary-default-currency",
+      "applicable_gates": [
+        "executed"
+      ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0069",
+      "obligation_id": "boundary-default-currency-position",
+      "applicable_gates": [
+        "executed"
+      ]
     }
   ],
   "registries": {
@@ -48479,15 +48527,15 @@
         "id": "cobol.frontend.use.valid"
       },
       {
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8",
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7",
         "id": "cobol.function-boundary-runtime.numval-c-currency"
       },
       {
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8",
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7",
         "id": "cobol.function-boundary-runtime.test-numval-c-currency-position"
       },
       {
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8",
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7",
         "id": "cobol.function-boundary-runtime.test-numval-error-position"
       },
       {
@@ -52248,27 +52296,27 @@
       },
       {
         "id": "cobol.function-boundary-runtime.byte-length-national-bytes",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.length-national-characters",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.ulength-byte-slice",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.upos-multibyte-position",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.usupplementary-first-index",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.uwidth-multibyte-width",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.condition.acos-domain",
@@ -52296,7 +52344,7 @@
       },
       {
         "id": "cobol.function-boundary-runtime.test-formatted-datetime-error-position",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.statement-phrase-runtime.perform-out-of-line-repetition",
@@ -52328,31 +52376,31 @@
       },
       {
         "id": "cobol.function-boundary-runtime.date-to-yyyymmdd-sliding-window",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.day-to-yyyyddd-sliding-window",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.year-to-yyyy-default-window",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.test-date-yyyymmdd-error-fields",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.test-day-yyyyddd-error-fields",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.test-formatted-datetime-range-position",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.random-sequence-and-reseed",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.recovery.random-sequence",
@@ -52360,59 +52408,59 @@
       },
       {
         "id": "cobol.function-boundary-runtime.display-of-cp037-bytes",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.national-of-cp037-bytes",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.reverse-national-surrogate-pair",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.upper-case-national",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.lower-case-national",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.trim-national-spaces",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.bit-of-packed-storage",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.byte-length-packed-storage",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.content-of-preserves-numeric-type",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.hex-of-packed-storage",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.length-packed-storage",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.formatted-date-integer-epoch",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.formatted-datetime-optional-offset",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.function-boundary-runtime.formatted-time-optional-offset",
-        "digest": "sha256:56f5e1338414e622b1763a8f1936cdee6554243508eb6eb1f8e35146115701b8"
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       },
       {
         "id": "cobol.statement-phrase-runtime.display-internal-numeric-compatible-sign",
@@ -52421,6 +52469,14 @@
       {
         "id": "cobol.statement-phrase-runtime.display-internal-numeric-separate-sign",
         "digest": "sha256:bb4c57322c8afe406766fe6e8629091348a19614c5e3fe18a48bcee33360545e"
+      },
+      {
+        "id": "cobol.function-boundary-runtime.numval-c-default-currency",
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
+      },
+      {
+        "id": "cobol.function-boundary-runtime.test-numval-c-default-currency",
+        "digest": "sha256:663358ffc9d7eeb65e9fa2e6880b162c3c0b4b33453befd489d6d3e57255dbc7"
       }
     ],
     "input_shapes": [
@@ -56432,6 +56488,7 @@
       "input": "cobol.function-runtime.artifact",
       "obligations": [
         "boundary-currency-symbol",
+        "boundary-default-currency",
         "checkpoint-identity",
         "invalid-signature",
         "licensed-equivalence",
@@ -57495,6 +57552,7 @@
       "input": "cobol.function-runtime.artifact",
       "obligations": [
         "boundary-currency-position",
+        "boundary-default-currency-position",
         "checkpoint-identity",
         "invalid-signature",
         "licensed-equivalence",
