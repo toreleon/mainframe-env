@@ -26,6 +26,7 @@ mod cobol_exit;
 mod cobol_frontend;
 mod cobol_functions;
 mod cobol_statements;
+mod jcl;
 
 pub use abi::{
     HostAbiInventoryReceipt, HostAbiLibraryReceipt, HostAbiMemberReceipt, verify_host_abi_libraries,
@@ -56,10 +57,14 @@ pub use carddemo::{
     verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
     verify_carddemo_vsam_from_env,
 };
+pub use jcl::{JclExitReceipt, JclFixtureRuntime, jcl_fixture_runtime, verify_jcl_exit};
 
 pub use cobol_clauses::verify_cobol_semantic_fixtures;
 pub use cobol_exit::{CobolExitReceipt, verify_cobol_exit};
-pub use cobol_frontend::{cobol_frontend_runtime, verify_cobol_frontend_fixtures};
+pub use cobol_frontend::{
+    CobolConformanceHandlers, cobol_conformance_handlers, cobol_frontend_runtime,
+    verify_cobol_frontend_fixtures,
+};
 pub use cobol_functions::verify_cobol_function_fixtures;
 pub use cobol_statements::verify_cobol_statement_fixtures;
 

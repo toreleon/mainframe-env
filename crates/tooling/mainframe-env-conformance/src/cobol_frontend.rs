@@ -96,6 +96,12 @@ static FIXTURE_AVAILABLE: FixtureAvailable = FixtureAvailable;
 static ACCEPTED_OBSERVATION: AcceptedObservation = AcceptedObservation;
 static REJECTED_OBSERVATION: RejectedObservation = RejectedObservation;
 
+pub struct CobolConformanceHandlers {
+    pub drivers: Vec<(DriverRef, &'static dyn ConformanceDriver)>,
+    pub predicates: Vec<(PredicateRef, &'static dyn ConformancePredicate)>,
+    pub observations: Vec<(ObservationRef, &'static dyn ConformanceObservation)>,
+}
+
 pub fn verify_cobol_frontend_fixtures() -> Result<(), String> {
     let catalog = fixture_catalog()?;
     if catalog.schema_version != "mainframe-env.cobol-frontend-fixtures@1"
@@ -125,6 +131,20 @@ pub fn cobol_frontend_runtime(
     spec: &CompiledSpec,
     limits: ConformanceLimits,
 ) -> Result<RuntimeRegistry<'static>, String> {
+    let handlers = cobol_conformance_handlers(limits)?;
+    RuntimeRegistry::new(
+        spec,
+        handlers.drivers,
+        handlers.predicates,
+        handlers.observations,
+        limits,
+    )
+    .map_err(|error| error.to_string())
+}
+
+pub fn cobol_conformance_handlers(
+    limits: ConformanceLimits,
+) -> Result<CobolConformanceHandlers, String> {
     verify_cobol_frontend_fixtures()?;
     crate::cobol_clauses::verify_cobol_semantic_fixtures()?;
     crate::cobol_functions::verify_cobol_function_fixtures()?;
@@ -158,8 +178,11 @@ pub fn cobol_frontend_runtime(
     observations.extend(crate::cobol_clauses::runtime_observations(limits)?);
     observations.extend(crate::cobol_functions::runtime_observations(limits)?);
     observations.extend(crate::cobol_statements::runtime_observations(limits)?);
-    RuntimeRegistry::new(spec, drivers, predicates, observations, limits)
-        .map_err(|error| error.to_string())
+    Ok(CobolConformanceHandlers {
+        drivers,
+        predicates,
+        observations,
+    })
 }
 
 impl ConformancePredicate for FixtureAvailable {
