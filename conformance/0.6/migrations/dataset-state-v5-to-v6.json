@@ -1,0 +1,22 @@
+{
+  "schema_version": "mainframe-env.dataset-state-v6-migration@1",
+  "migration_id": "dataset-state-v5-to-v6",
+  "from_version": 5,
+  "to_version": 6,
+  "reader_versions": [1, 2, 3, 4, 5, 6],
+  "writer_version": 6,
+  "destructive": false,
+  "steps": [
+    "Decode MEDS1 through MEDS5 using their original bounds and compatibility defaults.",
+    "Materialize a null catalog creation date for every pre-MEDS6 dataset.",
+    "Reject retained-day metadata without an explicit creation date before publication.",
+    "Write MEDS6 through the optimistic provider-state transaction path."
+  ],
+  "failure_policy": "reject-before-publication",
+  "rollback": {
+    "supported": true,
+    "method": "restore-verified-pre-migration-provider-snapshot",
+    "requires_backup": true,
+    "partial_state_selected": false
+  }
+}

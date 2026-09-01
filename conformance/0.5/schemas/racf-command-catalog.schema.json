@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/racf-command-catalog-v1.json",
+  "title": "mainframe-env generated RACF command catalog v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "baseline_id", "source_sha256", "families"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.racf-command-catalog@1"},
+    "baseline_id": {"const": "ibm-zos-3.2-racf-saf-2026"},
+    "source_sha256": {"const": "sha256:f4c8860aeb4d00b78f9257b28b2d880bd7571d74e2e00b2b1424b203801d5a46"},
+    "families": {
+      "type": "array",
+      "minItems": 34,
+      "maxItems": 34,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["row_id", "variant", "keyword", "aliases", "domain", "work_package", "mutating", "command_direction", "min_positionals", "max_positionals", "operands"],
+        "properties": {
+          "row_id": {"type": "string", "pattern": "^ibm-zos-3\\.2-racf-saf-2026:racf-command-families:[0-9]{4}$"},
+          "variant": {"type": "string", "pattern": "^[A-Z][A-Za-z0-9]+$", "maxLength": 64},
+          "keyword": {"type": "string", "pattern": "^[A-Z]+$", "maxLength": 16},
+          "aliases": {"type": "array", "maxItems": 4, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Z]+$", "maxLength": 16}},
+          "domain": {"enum": ["group", "dataset", "user", "connection", "resource", "query", "policy", "identity", "operations"]},
+          "work_package": {"enum": ["SEC-502", "SEC-503", "SEC-505"]},
+          "mutating": {"type": "boolean"},
+          "command_direction": {"type": "boolean"},
+          "min_positionals": {"type": "integer", "minimum": 0, "maximum": 3},
+          "max_positionals": {"type": "integer", "minimum": 0, "maximum": 256},
+          "operands": {"type": "array", "maxItems": 128, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9]+$", "maxLength": 32}}
+        }
+      }
+    }
+  }
+}

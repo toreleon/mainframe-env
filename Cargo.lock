@@ -1143,6 +1143,7 @@ name = "mainframe-env-batch"
 version = "0.2.0"
 dependencies = [
  "jsonschema",
+ "mainframe-env-dataset",
  "mainframe-env-diagnostics",
  "mainframe-env-encoding",
  "mainframe-env-execution-api",
@@ -1236,6 +1237,7 @@ dependencies = [
  "mainframe-env-server",
  "mainframe-env-source",
  "mainframe-env-store",
+ "mainframe-env-store-api",
  "proptest",
  "ring",
  "serde",
@@ -1262,6 +1264,7 @@ dependencies = [
  "mainframe-env-host-api",
  "mainframe-env-store",
  "mainframe-env-store-api",
+ "serde_json",
  "sha2 0.10.9",
 ]
 
@@ -1305,6 +1308,7 @@ name = "mainframe-env-host-api"
 version = "0.2.0"
 dependencies = [
  "mainframe-env-execution-api",
+ "serde",
 ]
 
 [[package]]
@@ -1365,11 +1369,16 @@ name = "mainframe-env-racf"
 version = "0.2.0"
 dependencies = [
  "argon2",
+ "jsonschema",
  "mainframe-env-execution-api",
  "mainframe-env-host-api",
  "mainframe-env-store",
  "mainframe-env-store-api",
+ "proptest",
+ "ring",
  "serde",
+ "serde_json",
+ "sha2 0.10.9",
  "static_assertions",
  "zeroize",
 ]

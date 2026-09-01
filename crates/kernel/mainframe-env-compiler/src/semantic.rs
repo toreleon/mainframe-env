@@ -277,8 +277,8 @@ impl SemanticModel {
             })
             .collect::<Result<Vec<_>, _>>()?;
         attach_layout_sources(&specs, &mut layouts, &structure.data_descriptions)?;
-        validate_layout_relationships(&specs, &layouts)?;
-        validate_file_layouts(&files, &structure.file_descriptions, &layouts)?;
+        validate_layout_relationships(&specs, &layouts, upper.contains("EXEC CICS"))?;
+        validate_file_layouts(&files, &structure.file_descriptions, &layouts, &cleaned)?;
         let mut by_qualified = BTreeMap::new();
         let mut by_simple = BTreeMap::<String, Vec<usize>>::new();
         for (index, layout) in layouts.iter().enumerate() {
@@ -451,10 +451,7 @@ fn file_bindings(source: &str) -> Result<Vec<CobolFileBinding>, SemanticProblem>
     let descriptions = file_descriptions(source);
     let mut bindings = Vec::new();
     for sentence in source[start..end].split('.') {
-        let words = words(sentence)
-            .into_iter()
-            .map(str::to_ascii_uppercase)
-            .collect::<Vec<_>>();
+        let words = declaration_words(sentence);
         let Some(select) = words.iter().position(|word| word == "SELECT") else {
             continue;
         };
@@ -552,10 +549,7 @@ fn file_descriptions(source: &str) -> BTreeMap<String, String> {
     source[start..end]
         .split('.')
         .filter_map(|sentence| {
-            let words = words(sentence)
-                .into_iter()
-                .map(str::to_ascii_uppercase)
-                .collect::<Vec<_>>();
+            let words = declaration_words(sentence);
             let index = words
                 .iter()
                 .position(|word| matches!(word.as_str(), "FD" | "SD"))?;
@@ -582,10 +576,7 @@ fn file_record_names(source: &str) -> BTreeMap<String, String> {
     let mut current = None;
     let mut records = BTreeMap::new();
     for sentence in source[start..end].split('.') {
-        let words = words(sentence)
-            .into_iter()
-            .map(str::to_ascii_uppercase)
-            .collect::<Vec<_>>();
+        let words = declaration_words(sentence);
         if let Some(index) = words
             .iter()
             .position(|word| matches!(word.as_str(), "FD" | "SD"))
@@ -667,10 +658,7 @@ fn parse_specs(sentences: &[String], max_items: usize) -> Result<Vec<DataSpec>, 
             stack.clear();
             continue;
         }
-        let words = words(sentence)
-            .into_iter()
-            .map(str::to_ascii_uppercase)
-            .collect::<Vec<_>>();
+        let words = declaration_words(sentence);
         let Some(level) = words.first().and_then(|word| word.parse::<u8>().ok()) else {
             continue;
         };
@@ -1651,7 +1639,8 @@ fn validate_spec_constraints(specs: &[DataSpec]) -> Result<(), SemanticProblem> 
         let has_occurs = spec.occurs_min != 1 || spec.occurs_max != 1 || spec.unbounded;
         if has_occurs {
             if matches!(spec.level, 1 | 66 | 77 | 78 | 88)
-                || spec.redefines.is_some()
+                || (spec.redefines.is_some()
+                    && (spec.occurs_min != spec.occurs_max || spec.unbounded))
                 || (spec.occurs_min != spec.occurs_max && spec.depending_on.is_none())
                 || (spec.unbounded && spec.depending_on.is_none())
             {
@@ -1773,9 +1762,12 @@ fn attach_layout_sources(
 fn validate_layout_relationships(
     specs: &[DataSpec],
     layouts: &[CobolLayout],
+    cics_context: bool,
 ) -> Result<(), SemanticProblem> {
     for (index, spec) in specs.iter().enumerate() {
-        if let Some(name) = &layouts[index].depending_on {
+        if let Some(name) = &layouts[index].depending_on
+            && !(cics_context && name.eq_ignore_ascii_case("EIBCALEN"))
+        {
             let target = resolve_layout_name(name, spec, specs, layouts)?;
             if !matches!(
                 target.category,
@@ -1894,6 +1886,7 @@ fn validate_file_layouts(
     files: &[CobolFileBinding],
     descriptions: &[CobolFileDescription],
     layouts: &[CobolLayout],
+    source: &str,
 ) -> Result<(), SemanticProblem> {
     for file in files {
         let Some(record_name) = &file.record_name else {
@@ -1938,7 +1931,15 @@ fn validate_file_layouts(
                 .iter()
                 .find(|layout| layout.name == *key)
                 .ok_or_else(|| SemanticProblem::InvalidFileLayout(key.clone()))?;
-            if key.offset < record.offset || key.offset.saturating_add(key.length) > record_end {
+            let contained = key.section == StorageSection::File
+                && key.offset >= record.offset
+                && key.offset.saturating_add(key.length) <= record_end;
+            let source_root = key.qualified_name.split('.').next().unwrap_or(&key.name);
+            let compatible_io_source = record.level == 1
+                && record.category == DataCategory::Alphanumeric
+                && key.section != StorageSection::File
+                && every_file_io_uses_source(source, &file.select_name, &record.name, source_root);
+            if !contained && !compatible_io_source {
                 return Err(SemanticProblem::InvalidFileLayout(key.name.clone()));
             }
         }
@@ -1968,6 +1969,37 @@ fn validate_file_layouts(
     Ok(())
 }
 
+fn every_file_io_uses_source(source: &str, file: &str, record: &str, source_root: &str) -> bool {
+    let words = declaration_words(source);
+    let writes = words
+        .windows(2)
+        .filter(|window| window[0] == "WRITE" && window[1] == record)
+        .count();
+    let mapped = words
+        .windows(4)
+        .filter(|window| {
+            window[0] == "WRITE"
+                && window[1] == record
+                && window[2] == "FROM"
+                && window[3] == source_root
+        })
+        .count();
+    let reads = words
+        .windows(2)
+        .filter(|window| window[0] == "READ" && window[1] == file)
+        .count();
+    let mapped_reads = words
+        .windows(4)
+        .filter(|window| {
+            window[0] == "READ"
+                && window[1] == file
+                && window[2] == "INTO"
+                && window[3] == source_root
+        })
+        .count();
+    writes + reads > 0 && writes + reads == mapped + mapped_reads
+}
+
 fn strip_comments(source: &str) -> String {
     source
         .lines()
@@ -1983,6 +2015,17 @@ fn declaration_sentences(source: &str) -> Vec<String> {
     let mut quote = None;
     let mut index = 0usize;
     while index < bytes.len() {
+        if quote.is_none()
+            && let Some(end) = embedded_exec_end(source, index)
+        {
+            let sentence = source[start..end].trim();
+            if !sentence.is_empty() {
+                sentences.push(sentence.to_string());
+            }
+            start = end;
+            index = end;
+            continue;
+        }
         if matches!(bytes[index], b'\'' | b'"') {
             if quote == Some(bytes[index]) {
                 if bytes.get(index + 1) == Some(&bytes[index]) {
@@ -2014,6 +2057,64 @@ fn declaration_sentences(source: &str) -> Vec<String> {
     sentences
 }
 
+fn declaration_words(line: &str) -> Vec<String> {
+    let mut words = Vec::new();
+    let mut word = String::new();
+    let mut quote = None;
+    let mut characters = line.chars().peekable();
+    while let Some(character) = characters.next() {
+        if let Some(delimiter) = quote {
+            word.push(character);
+            if character == delimiter {
+                if characters.peek() == Some(&delimiter) {
+                    word.push(characters.next().expect("peeked quote"));
+                } else {
+                    quote = None;
+                }
+            }
+        } else if matches!(character, '\'' | '"') {
+            word.push(character);
+            quote = Some(character);
+        } else if character.is_whitespace() {
+            if !word.is_empty() {
+                let value = word.trim_matches([',', ';', '.']).to_ascii_uppercase();
+                if !value.is_empty() {
+                    words.push(value);
+                }
+                word.clear();
+            }
+        } else {
+            word.push(character);
+        }
+    }
+    if !word.is_empty() {
+        let value = word.trim_matches([',', ';', '.']).to_ascii_uppercase();
+        if !value.is_empty() {
+            words.push(value);
+        }
+    }
+    words
+}
+
+fn embedded_exec_end(source: &str, index: usize) -> Option<usize> {
+    const MARKER: &str = "END-EXEC";
+    let end = index.checked_add(MARKER.len())?;
+    if !source.get(index..end)?.eq_ignore_ascii_case(MARKER)
+        || index
+            .checked_sub(1)
+            .and_then(|at| source.as_bytes().get(at))
+            .is_some_and(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+        || source
+            .as_bytes()
+            .get(end)
+            .is_some_and(|byte| !byte.is_ascii_whitespace() && *byte != b'.')
+    {
+        None
+    } else {
+        Some(end)
+    }
+}
+
 fn extract_program_id(source: &str) -> Option<String> {
     let marker = source.find("PROGRAM-ID")?;
     let rest = &source[marker + "PROGRAM-ID".len()..];
@@ -2024,12 +2125,6 @@ fn extract_program_id(source: &str) -> Option<String> {
             .trim()
             .to_string(),
     )
-}
-
-fn words(line: &str) -> Vec<&str> {
-    line.split_whitespace()
-        .map(|word| word.trim_matches([',', '.']))
-        .collect()
 }
 
 fn find_after_owned(words: &[String], name: &str) -> Option<String> {
@@ -2859,6 +2954,135 @@ mod tests {
         assert_eq!(model.layout("VALUE-X OF ROOT-A").unwrap().initial, b"AA");
         assert_eq!(model.layout("ROOT-A").unwrap().length, 2);
         assert_eq!(model.layout("ROOT-B").unwrap().offset, 8);
+    }
+
+    #[test]
+    fn comment_sentences_do_not_hide_following_data_declarations() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. T. DATA DIVISION. WORKING-STORAGE SECTION.\n*> banner with a quote ' and period.\n01 ROOT.\n*> another \"comment.\n05 CHILD PIC X. PROCEDURE DIVISION. STOP RUN.";
+        let model = SemanticModel::analyze(source, 1024, 32).unwrap();
+        assert_eq!(model.layout("ROOT").unwrap().length, 1);
+        assert_eq!(model.layout("CHILD OF ROOT").unwrap().length, 1);
+        assert_eq!(model.data_descriptions.len(), 2);
+    }
+
+    #[test]
+    fn declaration_area_exec_sql_without_a_period_does_not_capture_the_next_data_item() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SQLDECL. DATA DIVISION. WORKING-STORAGE SECTION. 01 BEFORE-X PIC X. EXEC SQL DECLARE C1 CURSOR FOR SELECT COL FROM TABLE-X END-EXEC\n01 AFTER-X PIC X. PROCEDURE DIVISION. GOBACK.";
+        let model = SemanticModel::analyze(source, 1024, 32).unwrap();
+        assert!(model.layout("BEFORE-X").is_some());
+        assert!(model.layout("AFTER-X").is_some());
+        assert_eq!(model.data_descriptions.len(), 2);
+    }
+
+    #[test]
+    fn data_clause_keywords_inside_quoted_values_are_not_reinterpreted() {
+        let source = program(
+            "01 MESSAGE-X PIC X(40). 88 MESSAGE-SHOWN VALUE 'Selected transaction type shown above'",
+        );
+        let model = SemanticModel::analyze(&source, 1024, 32).unwrap();
+        assert!(model.layout("MESSAGE-X").is_some());
+        assert!(model.layout("MESSAGE-SHOWN").is_some());
+        assert_eq!(model.data_descriptions.len(), 2);
+    }
+
+    #[test]
+    fn raw_indexed_file_key_can_come_from_every_explicit_write_source_only() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. EXPORT. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT EXPORT-OUTPUT ASSIGN TO EXPFILE ORGANIZATION IS INDEXED RECORD KEY IS EXPORT-KEY. DATA DIVISION. FILE SECTION. FD EXPORT-OUTPUT. 01 EXPORT-OUTPUT-RECORD PIC X(10). WORKING-STORAGE SECTION. 01 EXPORT-RECORD. 05 EXPORT-KEY PIC 9. 05 EXPORT-DATA PIC X(9). PROCEDURE DIVISION. WRITE EXPORT-OUTPUT-RECORD FROM EXPORT-RECORD. GOBACK.";
+        let model = SemanticModel::analyze(source, 1024, 32).unwrap();
+        assert_eq!(model.files[0].record_key.as_deref(), Some("EXPORT-KEY"));
+
+        let unsafe_write = source.replace(
+            "WRITE EXPORT-OUTPUT-RECORD FROM EXPORT-RECORD",
+            "WRITE EXPORT-OUTPUT-RECORD",
+        );
+        assert_eq!(
+            SemanticModel::analyze(&unsafe_write, 1024, 32),
+            Err(SemanticProblem::InvalidFileLayout("EXPORT-KEY".into()))
+        );
+
+        let input = "IDENTIFICATION DIVISION. PROGRAM-ID. IMPORT. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT EXPORT-INPUT ASSIGN TO EXPFILE ORGANIZATION IS INDEXED RECORD KEY IS EXPORT-KEY. DATA DIVISION. FILE SECTION. FD EXPORT-INPUT. 01 EXPORT-INPUT-RECORD PIC X(10). WORKING-STORAGE SECTION. 01 EXPORT-RECORD. 05 EXPORT-KEY PIC 9. 05 EXPORT-DATA PIC X(9). PROCEDURE DIVISION. READ EXPORT-INPUT INTO EXPORT-RECORD. GOBACK.";
+        assert!(SemanticModel::analyze(input, 1024, 32).is_ok());
+        let unsafe_read =
+            input.replace("READ EXPORT-INPUT INTO EXPORT-RECORD", "READ EXPORT-INPUT");
+        assert_eq!(
+            SemanticModel::analyze(&unsafe_read, 1024, 32),
+            Err(SemanticProblem::InvalidFileLayout("EXPORT-KEY".into()))
+        );
+    }
+
+    #[test]
+    fn cics_eibcalen_is_an_exact_implicit_occurs_dependency_only_in_cics_context() {
+        let declarations = "LINKAGE SECTION. 01 DFHCOMMAREA. 05 DATA-BYTE PIC X OCCURS 1 TO 32767 TIMES DEPENDING ON EIBCALEN";
+        let cics = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSAPP. DATA DIVISION. {declarations}. PROCEDURE DIVISION. EXEC CICS RETURN END-EXEC."
+        );
+        let model = SemanticModel::analyze(&cics, 65_536, 32).unwrap();
+        assert_eq!(
+            model.layout("DATA-BYTE").unwrap().depending_on.as_deref(),
+            Some("EIBCALEN")
+        );
+
+        let batch = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BATCHAPP. DATA DIVISION. {declarations}. PROCEDURE DIVISION. GOBACK."
+        );
+        assert_eq!(
+            SemanticModel::analyze(&batch, 65_536, 32),
+            Err(SemanticProblem::InvalidReference("EIBCALEN".into()))
+        );
+    }
+
+    #[test]
+    fn fixed_occurs_can_redefine_an_exact_overlay_but_variable_occurs_cannot() {
+        let fixed = program(
+            "01 ROOT. 05 RAW-DATA PIC X(20). 05 DATA-PART REDEFINES RAW-DATA OCCURS 10 TIMES PIC X(2) INDEXED BY PART-INDEX",
+        );
+        let model = SemanticModel::analyze(&fixed, 1024, 32).unwrap();
+        let raw = model.layout("RAW-DATA").unwrap();
+        let part = model.layout("DATA-PART").unwrap();
+        assert_eq!(
+            (part.offset, part.length, part.occurs),
+            (raw.offset, 20, 10)
+        );
+
+        let variable = program(
+            "01 TABLE-COUNT PIC 99. 01 ROOT. 05 RAW-DATA PIC X(20). 05 DATA-PART REDEFINES RAW-DATA OCCURS 1 TO 10 TIMES DEPENDING ON TABLE-COUNT PIC X(2)",
+        );
+        assert_eq!(
+            SemanticModel::analyze(&variable, 1024, 32),
+            Err(SemanticProblem::InvalidOccurs)
+        );
+    }
+
+    #[test]
+    fn intrinsic_arguments_resolve_subscripted_data_references_and_reject_missing_items() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. INTRINSIC. DATA DIVISION. WORKING-STORAGE SECTION. 01 TABLE-ROOT. 05 TABLE-ITEM PIC X(10) OCCURS 2 TIMES. 01 ITEM-INDEX PIC 9. 01 OUTPUT-X PIC X(10). PROCEDURE DIVISION. MOVE FUNCTION TRIM(TABLE-ITEM(ITEM-INDEX)) TO OUTPUT-X. GOBACK.";
+        let model = SemanticModel::analyze(source, 1024, 32).unwrap();
+        assert_eq!(model.intrinsic_calls.len(), 1);
+        assert_eq!(
+            model.intrinsic_calls[0].arguments[0].text,
+            "TABLE-ITEM(ITEM-INDEX)"
+        );
+
+        let missing = source.replace("TABLE-ITEM(ITEM-INDEX)", "MISSING(ITEM-INDEX)");
+        assert!(matches!(
+            SemanticModel::analyze(&missing, 1024, 32),
+            Err(SemanticProblem::InvalidIntrinsic(problem)) if problem.contains("unresolved intrinsic argument")
+        ));
+    }
+
+    #[test]
+    fn zero_argument_intrinsic_reference_modification_has_selected_length() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DATEREF. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUTPUT-X PIC X(4). PROCEDURE DIVISION. MOVE FUNCTION CURRENT-DATE(1:4) TO OUTPUT-X. GOBACK.";
+        let model = SemanticModel::analyze(source, 1024, 32).unwrap();
+        assert_eq!(model.intrinsic_calls.len(), 1);
+        assert!(model.intrinsic_calls[0].arguments.is_empty());
+        assert_eq!(model.intrinsic_calls[0].fixed_length, Some(4));
+
+        let malformed = source.replace("(1:4)", "(0:4)");
+        assert!(matches!(
+            SemanticModel::analyze(&malformed, 1024, 32),
+            Err(SemanticProblem::InvalidIntrinsic(_))
+        ));
     }
 
     #[test]

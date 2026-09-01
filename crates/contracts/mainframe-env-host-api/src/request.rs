@@ -1,3 +1,9 @@
+use crate::dataset::{
+    CatalogKind, CatalogListEntry, CatalogResolution, DatasetDefinition, DatasetDescription,
+    DatasetDiagnostic, DatasetLifecycleState, DatasetLockMode, DatasetLockReceipt,
+    DatasetLockTarget, DatasetProviderCapabilities, DatasetSnapshot, TvsRecordOperation,
+    TvsUnitOfWorkReceipt,
+};
 use crate::{
     ClassName, DatasetName, JobName, MemberName, MethodName, ProgramName, ResourceName,
     RuntimeServiceName, SessionId,
@@ -5,6 +11,7 @@ use crate::{
 use mainframe_env_execution_api::{
     BoundedPayload, CapabilityId, IdempotencyKey, InvocationLimits, PrincipalId, RunUnitId,
 };
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt;
 
@@ -30,20 +37,28 @@ impl Default for HostLimits {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum DatasetOrganization {
     Sequential,
     Partitioned,
+    PartitionedExtended,
     KeySequenced,
     EntrySequenced,
     Relative,
+    VariableRelative,
+    Linear,
 }
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum RecordFormat {
     Fixed,
     FixedBlocked,
+    FixedBlockedStandard,
     Variable,
     VariableBlocked,
+    VariableSpanned,
+    VariableBlockedSpanned,
     Undefined,
     Line,
 }
@@ -58,7 +73,7 @@ pub enum KeyRelation {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub enum DatasetLockMode {
+pub enum DatasetReadLockMode {
     #[default]
     Default,
     Lock,
@@ -69,7 +84,7 @@ pub enum DatasetLockMode {
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct DatasetReadControl {
-    pub lock: DatasetLockMode,
+    pub lock: DatasetReadLockMode,
     pub wait: Option<bool>,
 }
 
@@ -116,7 +131,7 @@ impl SecretRef {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct DatasetAttributes {
     pub organization: DatasetOrganization,
     pub record_format: RecordFormat,
@@ -141,6 +156,7 @@ impl DatasetAttributes {
                 })
             || self.key_offset.is_some() != self.key_length.is_some()
             || (self.organization == DatasetOrganization::KeySequenced) != self.key_offset.is_some()
+            || self.ccsid == Some(0)
         {
             Err(HostProblem::Malformed)
         } else {
@@ -173,6 +189,7 @@ impl Mutation {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DatasetRequest {
+    Capabilities,
     List {
         pattern: String,
         start: Option<DatasetName>,
@@ -181,10 +198,43 @@ pub enum DatasetRequest {
     Attributes {
         dataset: DatasetName,
     },
+    Describe {
+        dataset: DatasetName,
+    },
+    Diagnose {
+        dataset: DatasetName,
+    },
+    ResolveCatalog {
+        name: DatasetName,
+    },
+    ListCatalog {
+        pattern: String,
+        start: Option<DatasetName>,
+        max_items: u32,
+    },
+    ListVolumes {
+        start: Option<String>,
+        max_items: u32,
+    },
+    ListLocks {
+        dataset: DatasetName,
+        now_tick: u64,
+        max_items: u32,
+    },
+    TvsStatus {
+        transaction: String,
+        owner: PrincipalId,
+    },
     ListMembers {
         dataset: DatasetName,
         start: Option<MemberName>,
         max_items: u32,
+    },
+    ReadMemberGeneration {
+        dataset: DatasetName,
+        member: MemberName,
+        relative: i32,
+        max_records: u32,
     },
     Read {
         dataset: DatasetName,
@@ -192,6 +242,11 @@ pub enum DatasetRequest {
         key: Option<Vec<u8>>,
         max_records: u32,
         control: DatasetReadControl,
+    },
+    ReadGeneric {
+        dataset: DatasetName,
+        key_prefix: Vec<u8>,
+        max_records: u32,
     },
     ReadConcatenation {
         datasets: Vec<DatasetName>,
@@ -202,9 +257,131 @@ pub enum DatasetRequest {
         dataset: DatasetName,
         record_number: u64,
     },
+    ReadRba {
+        dataset: DatasetName,
+        rba: u64,
+        max_bytes: u32,
+    },
+    ReadSequential {
+        dataset: DatasetName,
+        member: Option<MemberName>,
+        start: Option<u64>,
+        reverse: bool,
+        max_records: u32,
+    },
+    Snapshot {
+        dataset: DatasetName,
+        max_records: u32,
+        max_members: u32,
+    },
     Create {
         dataset: DatasetName,
         attributes: DatasetAttributes,
+        mutation: Mutation,
+    },
+    Define {
+        dataset: DatasetName,
+        definition: Box<DatasetDefinition>,
+        mutation: Mutation,
+    },
+    Alter {
+        dataset: DatasetName,
+        definition: Box<DatasetDefinition>,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
+    SetLifecycle {
+        dataset: DatasetName,
+        state: DatasetLifecycleState,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
+    RecordBackup {
+        dataset: DatasetName,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
+    Restore {
+        dataset: DatasetName,
+        snapshot: Box<DatasetSnapshot>,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
+    DefineCatalog {
+        catalog: DatasetName,
+        kind: CatalogKind,
+        mutation: Mutation,
+    },
+    SetCatalogConnection {
+        catalog: DatasetName,
+        connected: bool,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
+    DefineAlias {
+        alias: DatasetName,
+        target: DatasetName,
+        mutation: Mutation,
+    },
+    DefineMemberAlias {
+        dataset: DatasetName,
+        alias: MemberName,
+        target: MemberName,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
+    WriteMemberGeneration {
+        dataset: DatasetName,
+        member: MemberName,
+        records: Vec<Vec<u8>>,
+        program_object: bool,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
+    DeleteMemberGeneration {
+        dataset: DatasetName,
+        member: MemberName,
+        generation: u64,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
+    AcquireLock {
+        dataset: DatasetName,
+        target: DatasetLockTarget,
+        owner: PrincipalId,
+        mode: DatasetLockMode,
+        now_tick: u64,
+        lease_ticks: u64,
+        transaction: Option<String>,
+        mutation: Mutation,
+    },
+    ReleaseLock {
+        dataset: DatasetName,
+        lock_id: String,
+        owner: PrincipalId,
+        mutation: Mutation,
+    },
+    BeginTvs {
+        transaction: String,
+        owner: PrincipalId,
+        mutation: Mutation,
+    },
+    StageTvs {
+        transaction: String,
+        owner: PrincipalId,
+        operation: TvsRecordOperation,
+        mutation: Mutation,
+    },
+    CompleteTvs {
+        transaction: String,
+        owner: PrincipalId,
+        commit: bool,
+        mutation: Mutation,
+    },
+    ReconcileTvs {
+        transaction: String,
+        owner: PrincipalId,
+        committed: bool,
         mutation: Mutation,
     },
     Write {
@@ -252,12 +429,25 @@ pub enum DatasetRequest {
         expected_version: Option<u64>,
         mutation: Mutation,
     },
+    WriteRba {
+        dataset: DatasetName,
+        rba: u64,
+        data: Vec<u8>,
+        expected_version: Option<u64>,
+        mutation: Mutation,
+    },
     DefineAlternateIndex {
         base: DatasetName,
         index: DatasetName,
         key_offset: u32,
         key_length: u32,
         allow_duplicates: bool,
+        upgrade: bool,
+        mutation: Mutation,
+    },
+    BuildAlternateIndex {
+        base: DatasetName,
+        index: DatasetName,
         mutation: Mutation,
     },
     DefinePath {
@@ -291,6 +481,8 @@ pub enum DatasetRequest {
         dataset: DatasetName,
         member: Option<MemberName>,
         expected_version: Option<u64>,
+        purge: bool,
+        current_date: Option<u32>,
         mutation: Mutation,
     },
     StartBrowse {
@@ -317,6 +509,9 @@ pub enum DatasetRequest {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DatasetResult {
+    Capabilities {
+        capabilities: DatasetProviderCapabilities,
+    },
     Listed {
         names: Vec<DatasetName>,
         more: bool,
@@ -329,9 +524,44 @@ pub enum DatasetResult {
         attributes: DatasetAttributes,
         version: u64,
     },
+    Description(Box<DatasetDescription>),
+    Diagnostics {
+        diagnostics: Vec<DatasetDiagnostic>,
+    },
+    Catalog(CatalogResolution),
+    CatalogEntries {
+        entries: Vec<CatalogListEntry>,
+        more: bool,
+    },
+    Volumes {
+        volumes: Vec<crate::DatasetVolumeDescription>,
+        more: bool,
+    },
+    Locks {
+        locks: Vec<DatasetLockReceipt>,
+    },
+    Tvs(TvsUnitOfWorkReceipt),
+    Snapshot {
+        snapshot: Box<DatasetSnapshot>,
+        version: u64,
+    },
     Records {
         records: Vec<Vec<u8>>,
         identities: Vec<Vec<u8>>,
+        version: u64,
+    },
+    MemberGeneration {
+        records: Vec<Vec<u8>>,
+        identities: Vec<Vec<u8>>,
+        generation: u64,
+        program_object: bool,
+        version: u64,
+    },
+    Rba {
+        data: Vec<u8>,
+        record: bool,
+        rba: u64,
+        next_rba: u64,
         version: u64,
     },
     Created {
@@ -852,12 +1082,25 @@ impl HostRequest {
     pub fn required_capability(&self, limits: InvocationLimits) -> CapabilityId {
         let name = match self {
             Self::Dataset(
-                DatasetRequest::List { .. }
+                DatasetRequest::Capabilities
+                | DatasetRequest::List { .. }
                 | DatasetRequest::Attributes { .. }
+                | DatasetRequest::Describe { .. }
+                | DatasetRequest::Diagnose { .. }
+                | DatasetRequest::ResolveCatalog { .. }
+                | DatasetRequest::ListCatalog { .. }
+                | DatasetRequest::ListVolumes { .. }
+                | DatasetRequest::ListLocks { .. }
+                | DatasetRequest::TvsStatus { .. }
                 | DatasetRequest::ListMembers { .. }
+                | DatasetRequest::ReadMemberGeneration { .. }
                 | DatasetRequest::Read { .. }
+                | DatasetRequest::ReadGeneric { .. }
                 | DatasetRequest::ReadConcatenation { .. }
                 | DatasetRequest::ReadRelative { .. }
+                | DatasetRequest::ReadRba { .. }
+                | DatasetRequest::ReadSequential { .. }
+                | DatasetRequest::Snapshot { .. }
                 | DatasetRequest::ResolveGeneration { .. }
                 | DatasetRequest::ReadNext { .. }
                 | DatasetRequest::StartBrowse { .. }
@@ -890,15 +1133,34 @@ impl HostRequest {
             self,
             Self::Dataset(
                 DatasetRequest::Create { .. }
+                    | DatasetRequest::Define { .. }
+                    | DatasetRequest::Alter { .. }
+                    | DatasetRequest::SetLifecycle { .. }
+                    | DatasetRequest::RecordBackup { .. }
+                    | DatasetRequest::Restore { .. }
+                    | DatasetRequest::DefineCatalog { .. }
+                    | DatasetRequest::SetCatalogConnection { .. }
+                    | DatasetRequest::DefineAlias { .. }
+                    | DatasetRequest::DefineMemberAlias { .. }
+                    | DatasetRequest::WriteMemberGeneration { .. }
+                    | DatasetRequest::DeleteMemberGeneration { .. }
+                    | DatasetRequest::AcquireLock { .. }
+                    | DatasetRequest::ReleaseLock { .. }
+                    | DatasetRequest::BeginTvs { .. }
+                    | DatasetRequest::StageTvs { .. }
+                    | DatasetRequest::CompleteTvs { .. }
+                    | DatasetRequest::ReconcileTvs { .. }
                     | DatasetRequest::Write { .. }
                     | DatasetRequest::Append { .. }
                     | DatasetRequest::Truncate { .. }
                     | DatasetRequest::RewriteRecord { .. }
                     | DatasetRequest::DeleteRecord { .. }
                     | DatasetRequest::DefineAlternateIndex { .. }
+                    | DatasetRequest::BuildAlternateIndex { .. }
                     | DatasetRequest::DefinePath { .. }
                     | DatasetRequest::WriteRelative { .. }
                     | DatasetRequest::DeleteRelative { .. }
+                    | DatasetRequest::WriteRba { .. }
                     | DatasetRequest::DefineGenerationGroup { .. }
                     | DatasetRequest::CreateGeneration { .. }
                     | DatasetRequest::Rename { .. }
@@ -927,15 +1189,34 @@ impl HostRequest {
         match self {
             Self::Dataset(
                 DatasetRequest::Create { mutation, .. }
+                | DatasetRequest::Define { mutation, .. }
+                | DatasetRequest::Alter { mutation, .. }
+                | DatasetRequest::SetLifecycle { mutation, .. }
+                | DatasetRequest::RecordBackup { mutation, .. }
+                | DatasetRequest::Restore { mutation, .. }
+                | DatasetRequest::DefineCatalog { mutation, .. }
+                | DatasetRequest::SetCatalogConnection { mutation, .. }
+                | DatasetRequest::DefineAlias { mutation, .. }
+                | DatasetRequest::DefineMemberAlias { mutation, .. }
+                | DatasetRequest::WriteMemberGeneration { mutation, .. }
+                | DatasetRequest::DeleteMemberGeneration { mutation, .. }
+                | DatasetRequest::AcquireLock { mutation, .. }
+                | DatasetRequest::ReleaseLock { mutation, .. }
+                | DatasetRequest::BeginTvs { mutation, .. }
+                | DatasetRequest::StageTvs { mutation, .. }
+                | DatasetRequest::CompleteTvs { mutation, .. }
+                | DatasetRequest::ReconcileTvs { mutation, .. }
                 | DatasetRequest::Write { mutation, .. }
                 | DatasetRequest::Append { mutation, .. }
                 | DatasetRequest::Truncate { mutation, .. }
                 | DatasetRequest::RewriteRecord { mutation, .. }
                 | DatasetRequest::DeleteRecord { mutation, .. }
                 | DatasetRequest::DefineAlternateIndex { mutation, .. }
+                | DatasetRequest::BuildAlternateIndex { mutation, .. }
                 | DatasetRequest::DefinePath { mutation, .. }
                 | DatasetRequest::WriteRelative { mutation, .. }
                 | DatasetRequest::DeleteRelative { mutation, .. }
+                | DatasetRequest::WriteRba { mutation, .. }
                 | DatasetRequest::DefineGenerationGroup { mutation, .. }
                 | DatasetRequest::CreateGeneration { mutation, .. }
                 | DatasetRequest::Rename { mutation, .. }
@@ -1128,6 +1409,135 @@ pub enum HostResult {
 impl HostResult {
     pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
         match self {
+            Self::Dataset(DatasetResult::Description(description)) => {
+                description.definition.validate(
+                    limits,
+                    DatasetProviderCapabilities::all_contract_capabilities(),
+                )?;
+                if description.extents.is_empty()
+                    || description.extents.len() > limits.max_records
+                    || description.buffer_bytes == 0
+                    || description.abstract_placement.is_empty()
+                    || description.abstract_placement.len() > limits.max_name_bytes
+                {
+                    return Err(HostProblem::Malformed);
+                }
+                let mut next_start = 0u64;
+                for (position, extent) in description.extents.iter().enumerate() {
+                    if extent.ordinal != u32::try_from(position).unwrap_or(u32::MAX)
+                        || extent.start != next_start
+                        || extent.length == 0
+                        || extent.volume_id.is_empty()
+                        || extent.volume_id.len() > limits.max_name_bytes
+                    {
+                        return Err(HostProblem::Malformed);
+                    }
+                    next_start = next_start
+                        .checked_add(extent.length)
+                        .ok_or(HostProblem::ResourceExhausted)?;
+                }
+                if next_start != description.allocated_bytes
+                    || description.high_used_rba > description.max_rba
+                {
+                    Err(HostProblem::Malformed)
+                } else {
+                    Ok(())
+                }
+            }
+            Self::Dataset(DatasetResult::Catalog(resolution))
+                if resolution.alias_chain.len() > limits.max_records || resolution.version == 0 =>
+            {
+                Err(HostProblem::ResourceExhausted)
+            }
+            Self::Dataset(DatasetResult::CatalogEntries { entries, .. })
+                if entries.len() > limits.max_records
+                    || entries.iter().any(|entry| entry.version == 0) =>
+            {
+                Err(HostProblem::ResourceExhausted)
+            }
+            Self::Dataset(DatasetResult::Volumes { volumes, .. }) => {
+                if volumes.len() > limits.max_records {
+                    return Err(HostProblem::ResourceExhausted);
+                }
+                let mut previous_volume = None;
+                for volume in volumes {
+                    if volume.volume_id.is_empty()
+                        || volume.volume_id.len() > limits.max_name_bytes
+                        || previous_volume
+                            .is_some_and(|previous: &str| previous >= volume.volume_id.as_str())
+                        || volume.extents.is_empty()
+                        || volume.extents.len() > limits.max_records
+                        || volume.used_bytes > volume.allocated_bytes
+                    {
+                        return Err(HostProblem::Malformed);
+                    }
+                    previous_volume = Some(&volume.volume_id);
+                    let mut next_start = 0u64;
+                    for extent in &volume.extents {
+                        if extent.volume_start != next_start || extent.length == 0 {
+                            return Err(HostProblem::Malformed);
+                        }
+                        next_start = next_start
+                            .checked_add(extent.length)
+                            .ok_or(HostProblem::ResourceExhausted)?;
+                    }
+                    if next_start != volume.allocated_bytes {
+                        return Err(HostProblem::Malformed);
+                    }
+                }
+                Ok(())
+            }
+            Self::Dataset(DatasetResult::Locks { locks })
+                if locks.len() > limits.max_records
+                    || locks.iter().any(|lock| {
+                        lock.lock_id.is_empty()
+                            || lock.lock_id.len() > limits.max_name_bytes
+                            || lock.expires_at == 0
+                            || lock.version == 0
+                            || matches!(
+                                &lock.target,
+                                DatasetLockTarget::Record(identity)
+                                    if identity.is_empty()
+                                        || identity.len() > limits.max_record_bytes
+                            )
+                            || lock.transaction.as_ref().is_some_and(|transaction| {
+                                transaction.is_empty() || transaction.len() > limits.max_name_bytes
+                            })
+                    }) =>
+            {
+                Err(HostProblem::ResourceExhausted)
+            }
+            Self::Dataset(DatasetResult::Tvs(receipt))
+                if receipt.transaction.is_empty()
+                    || receipt.transaction.len() > limits.max_name_bytes
+                    || receipt.version == 0 =>
+            {
+                Err(HostProblem::Malformed)
+            }
+            Self::Dataset(DatasetResult::Snapshot { snapshot, version }) => {
+                if *version == 0 {
+                    Err(HostProblem::Malformed)
+                } else {
+                    validate_dataset_snapshot(snapshot, limits)
+                }
+            }
+            Self::Dataset(DatasetResult::MemberGeneration { generation: 0, .. }) => {
+                Err(HostProblem::Malformed)
+            }
+            Self::Dataset(DatasetResult::Diagnostics { diagnostics })
+                if diagnostics.len() > limits.max_records
+                    || diagnostics.iter().any(|diagnostic| {
+                        diagnostic.code.is_empty()
+                            || diagnostic.code.len() > limits.max_name_bytes
+                            || diagnostic
+                                .field
+                                .as_ref()
+                                .is_some_and(|field| field.len() > limits.max_name_bytes)
+                            || diagnostic.detail.len() > limits.max_state_bytes
+                    }) =>
+            {
+                Err(HostProblem::ResourceExhausted)
+            }
             Self::Dataset(DatasetResult::Listed { names, .. })
                 if names.len() > limits.max_records =>
             {
@@ -1142,6 +1552,11 @@ impl HostResult {
                 records,
                 identities,
                 ..
+            })
+            | Self::Dataset(DatasetResult::MemberGeneration {
+                records,
+                identities,
+                ..
             }) => {
                 validate_records(records, limits)?;
                 if identities.len() != records.len()
@@ -1153,6 +1568,18 @@ impl HostResult {
                 } else {
                     Ok(())
                 }
+            }
+            Self::Dataset(DatasetResult::Rba {
+                data,
+                rba,
+                next_rba,
+                ..
+            }) if data.len() > limits.max_record_bytes
+                || *next_rba < *rba
+                || next_rba.saturating_sub(*rba)
+                    != u64::try_from(data.len()).unwrap_or(u64::MAX) =>
+            {
+                Err(HostProblem::Malformed)
             }
             Self::Dataset(DatasetResult::Browse {
                 record,
@@ -1313,8 +1740,9 @@ impl EffectResult {
         if self.sequence == 0 || self.sequence != expected_sequence {
             return Err(HostProblem::Malformed);
         }
-        if let Ok(result) = &self.outcome {
-            result.validate(limits)?;
+        match &self.outcome {
+            Ok(result) => result.validate(limits)?,
+            Err(problem) => problem.validate(limits)?,
         }
         Ok(())
     }
@@ -1322,6 +1750,41 @@ impl EffectResult {
 
 fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), HostProblem> {
     match request {
+        DatasetRequest::Capabilities
+        | DatasetRequest::Describe { .. }
+        | DatasetRequest::Diagnose { .. }
+        | DatasetRequest::ResolveCatalog { .. } => Ok(()),
+        DatasetRequest::ListCatalog {
+            pattern, max_items, ..
+        } if pattern.len() > limits.max_name_bytes
+            || *max_items == 0
+            || *max_items as usize > limits.max_records =>
+        {
+            Err(HostProblem::ResourceExhausted)
+        }
+        DatasetRequest::ListVolumes { start, max_items }
+            if *max_items == 0
+                || *max_items as usize > limits.max_records
+                || start.as_ref().is_some_and(|start| {
+                    start.is_empty() || start.len() > limits.max_name_bytes
+                }) =>
+        {
+            Err(HostProblem::ResourceExhausted)
+        }
+        DatasetRequest::ListLocks {
+            now_tick,
+            max_items,
+            ..
+        } => {
+            if *now_tick == 0 {
+                Err(HostProblem::Malformed)
+            } else if *max_items == 0 || *max_items as usize > limits.max_records {
+                Err(HostProblem::ResourceExhausted)
+            } else {
+                Ok(())
+            }
+        }
+        DatasetRequest::TvsStatus { transaction, .. } => validate_transaction(transaction, limits),
         DatasetRequest::List {
             max_items, pattern, ..
         } if *max_items == 0
@@ -1335,6 +1798,14 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
         {
             Err(HostProblem::ResourceExhausted)
         }
+        DatasetRequest::ReadMemberGeneration { relative, .. } if *relative > 0 => {
+            Err(HostProblem::Malformed)
+        }
+        DatasetRequest::ReadMemberGeneration { max_records, .. }
+            if *max_records == 0 || *max_records as usize > limits.max_records =>
+        {
+            Err(HostProblem::ResourceExhausted)
+        }
         DatasetRequest::Read {
             key, max_records, ..
         } if *max_records == 0
@@ -1342,6 +1813,17 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
             || key
                 .as_ref()
                 .is_some_and(|value| value.len() > limits.max_record_bytes) =>
+        {
+            Err(HostProblem::ResourceExhausted)
+        }
+        DatasetRequest::ReadGeneric {
+            key_prefix,
+            max_records,
+            ..
+        } if key_prefix.is_empty()
+            || key_prefix.len() > limits.max_record_bytes
+            || *max_records == 0
+            || *max_records as usize > limits.max_records =>
         {
             Err(HostProblem::ResourceExhausted)
         }
@@ -1359,12 +1841,138 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
         DatasetRequest::ReadRelative { record_number, .. } if *record_number == 0 => {
             Err(HostProblem::Malformed)
         }
+        DatasetRequest::ReadRba { max_bytes, .. }
+            if *max_bytes == 0 || *max_bytes as usize > limits.max_record_bytes =>
+        {
+            Err(HostProblem::ResourceExhausted)
+        }
+        DatasetRequest::ReadSequential { max_records, .. }
+            if *max_records == 0 || *max_records as usize > limits.max_records =>
+        {
+            Err(HostProblem::ResourceExhausted)
+        }
+        DatasetRequest::Snapshot {
+            max_records,
+            max_members,
+            ..
+        } if *max_records == 0
+            || *max_members == 0
+            || *max_records as usize > limits.max_records
+            || *max_members as usize > limits.max_records =>
+        {
+            Err(HostProblem::ResourceExhausted)
+        }
         DatasetRequest::Create {
             attributes,
             mutation,
             ..
         } => {
             attributes.validate(limits)?;
+            mutation.validate(limits)
+        }
+        DatasetRequest::Define {
+            definition,
+            mutation,
+            ..
+        }
+        | DatasetRequest::Alter {
+            definition,
+            mutation,
+            ..
+        } => {
+            definition.validate(
+                limits,
+                DatasetProviderCapabilities::all_contract_capabilities(),
+            )?;
+            mutation.validate(limits)
+        }
+        DatasetRequest::SetLifecycle { mutation, .. }
+        | DatasetRequest::RecordBackup { mutation, .. } => mutation.validate(limits),
+        DatasetRequest::Restore {
+            snapshot, mutation, ..
+        } => {
+            validate_dataset_snapshot(snapshot, limits)?;
+            mutation.validate(limits)
+        }
+        DatasetRequest::DefineCatalog { mutation, .. }
+        | DatasetRequest::SetCatalogConnection { mutation, .. }
+        | DatasetRequest::DefineAlias { mutation, .. }
+        | DatasetRequest::DefineMemberAlias { mutation, .. } => mutation.validate(limits),
+        DatasetRequest::WriteMemberGeneration {
+            records, mutation, ..
+        } => {
+            validate_records(records, limits)?;
+            mutation.validate(limits)
+        }
+        DatasetRequest::DeleteMemberGeneration {
+            generation,
+            mutation,
+            ..
+        } => {
+            if *generation == 0 {
+                Err(HostProblem::Malformed)
+            } else {
+                mutation.validate(limits)
+            }
+        }
+        DatasetRequest::AcquireLock {
+            target,
+            now_tick,
+            lease_ticks,
+            transaction,
+            mutation,
+            ..
+        } => {
+            if *now_tick == 0
+                || *lease_ticks == 0
+                || matches!(target, DatasetLockTarget::Record(identity) if identity.is_empty())
+            {
+                return Err(HostProblem::Malformed);
+            }
+            if matches!(target, DatasetLockTarget::Record(identity) if identity.len() > limits.max_record_bytes)
+            {
+                return Err(HostProblem::ResourceExhausted);
+            }
+            if let Some(transaction) = transaction {
+                validate_transaction(transaction, limits)?;
+            }
+            mutation.validate(limits)
+        }
+        DatasetRequest::ReleaseLock {
+            lock_id, mutation, ..
+        } => {
+            if lock_id.is_empty() || lock_id.len() > limits.max_name_bytes {
+                Err(HostProblem::Malformed)
+            } else {
+                mutation.validate(limits)
+            }
+        }
+        DatasetRequest::BeginTvs {
+            transaction,
+            mutation,
+            ..
+        }
+        | DatasetRequest::CompleteTvs {
+            transaction,
+            mutation,
+            ..
+        }
+        | DatasetRequest::ReconcileTvs {
+            transaction,
+            mutation,
+            ..
+        } => {
+            validate_transaction(transaction, limits)?;
+            mutation.validate(limits)
+        }
+        DatasetRequest::StageTvs {
+            transaction,
+            operation,
+            mutation,
+            ..
+        } => {
+            validate_transaction(transaction, limits)?;
+            validate_tvs_operation(operation, limits)?;
             mutation.validate(limits)
         }
         DatasetRequest::Write {
@@ -1412,6 +2020,7 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
                 mutation.validate(limits)
             }
         }
+        DatasetRequest::BuildAlternateIndex { mutation, .. } => mutation.validate(limits),
         DatasetRequest::DefinePath { mutation, .. } => mutation.validate(limits),
         DatasetRequest::WriteRelative {
             record_number,
@@ -1438,6 +2047,15 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
                 mutation.validate(limits)
             }
         }
+        DatasetRequest::WriteRba { data, mutation, .. } => {
+            if data.is_empty() {
+                Err(HostProblem::Malformed)
+            } else if data.len() > limits.max_record_bytes {
+                Err(HostProblem::ResourceExhausted)
+            } else {
+                mutation.validate(limits)
+            }
+        }
         DatasetRequest::DefineGenerationGroup {
             limit, mutation, ..
         } => {
@@ -1460,8 +2078,17 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
         DatasetRequest::ResolveGeneration { relative, .. } if *relative > 0 => {
             Err(HostProblem::Malformed)
         }
-        DatasetRequest::Rename { mutation, .. } | DatasetRequest::Delete { mutation, .. } => {
-            mutation.validate(limits)
+        DatasetRequest::Rename { mutation, .. } => mutation.validate(limits),
+        DatasetRequest::Delete {
+            current_date,
+            mutation,
+            ..
+        } => {
+            if current_date.is_some_and(|date| !valid_julian_date(date)) {
+                Err(HostProblem::Malformed)
+            } else {
+                mutation.validate(limits)
+            }
         }
         DatasetRequest::StartBrowse { key, .. } if key.len() > limits.max_record_bytes => {
             Err(HostProblem::ResourceExhausted)
@@ -1497,6 +2124,196 @@ fn validate_records(records: &[Vec<u8>], limits: HostLimits) -> Result<(), HostP
         Ok(())
     }
 }
+fn validate_dataset_snapshot(
+    snapshot: &DatasetSnapshot,
+    limits: HostLimits,
+) -> Result<(), HostProblem> {
+    snapshot.definition.validate(
+        limits,
+        DatasetProviderCapabilities::all_contract_capabilities(),
+    )?;
+    validate_records(&snapshot.records, limits)?;
+    if snapshot.relative_records.len() > limits.max_records
+        || snapshot.members.len() > limits.max_records
+        || snapshot.linear_data.len() > limits.max_state_bytes
+    {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let mut previous_rrn = 0u64;
+    for relative in &snapshot.relative_records {
+        if relative.record_number == 0 || relative.record_number <= previous_rrn {
+            return Err(HostProblem::Malformed);
+        }
+        previous_rrn = relative.record_number;
+        validate_records(std::slice::from_ref(&relative.record), limits)?;
+    }
+    let mut total = snapshot
+        .records
+        .len()
+        .checked_add(snapshot.relative_records.len())
+        .ok_or(HostProblem::ResourceExhausted)?;
+    let mut total_bytes = snapshot
+        .records
+        .iter()
+        .chain(
+            snapshot
+                .relative_records
+                .iter()
+                .map(|relative| &relative.record),
+        )
+        .try_fold(snapshot.linear_data.len(), |total, record| {
+            total
+                .checked_add(record.len())
+                .ok_or(HostProblem::ResourceExhausted)
+        })?;
+    let mut previous_member = None;
+    for member in &snapshot.members {
+        if previous_member.is_some_and(|previous: &str| previous >= member.name.as_str()) {
+            return Err(HostProblem::Malformed);
+        }
+        previous_member = Some(member.name.as_str());
+        validate_records(&member.records, limits)?;
+        if member.generations.len() > limits.max_records
+            || member.alias_of.is_some()
+                && (!member.records.is_empty() || !member.generations.is_empty())
+        {
+            return Err(HostProblem::Malformed);
+        }
+        total = total
+            .checked_add(member.records.len())
+            .ok_or(HostProblem::ResourceExhausted)?;
+        total_bytes = member
+            .records
+            .iter()
+            .try_fold(total_bytes, |total, record| {
+                total
+                    .checked_add(record.len())
+                    .ok_or(HostProblem::ResourceExhausted)
+            })?;
+        let mut previous = 0u64;
+        for generation in &member.generations {
+            if generation.generation == 0 || generation.generation <= previous {
+                return Err(HostProblem::Malformed);
+            }
+            previous = generation.generation;
+            validate_records(&generation.records, limits)?;
+            total = total
+                .checked_add(generation.records.len())
+                .ok_or(HostProblem::ResourceExhausted)?;
+            total_bytes = generation
+                .records
+                .iter()
+                .try_fold(total_bytes, |total, record| {
+                    total
+                        .checked_add(record.len())
+                        .ok_or(HostProblem::ResourceExhausted)
+                })?;
+        }
+    }
+    let shape_valid = match snapshot.definition.attributes.organization {
+        DatasetOrganization::Sequential
+        | DatasetOrganization::KeySequenced
+        | DatasetOrganization::EntrySequenced => {
+            snapshot.relative_records.is_empty()
+                && snapshot.members.is_empty()
+                && snapshot.linear_data.is_empty()
+        }
+        DatasetOrganization::Relative | DatasetOrganization::VariableRelative => {
+            snapshot.records.is_empty()
+                && snapshot.members.is_empty()
+                && snapshot.linear_data.is_empty()
+        }
+        DatasetOrganization::Partitioned => {
+            snapshot.records.is_empty()
+                && snapshot.relative_records.is_empty()
+                && snapshot.linear_data.is_empty()
+                && snapshot
+                    .members
+                    .iter()
+                    .all(|member| member.alias_of.is_none() && member.generations.is_empty())
+        }
+        DatasetOrganization::PartitionedExtended => {
+            snapshot.records.is_empty()
+                && snapshot.relative_records.is_empty()
+                && snapshot.linear_data.is_empty()
+                && snapshot.members.iter().all(|member| {
+                    member.records.is_empty()
+                        && member.alias_of.as_ref().map_or(
+                            !member.generations.is_empty(),
+                            |target| {
+                                target != &member.name
+                                    && snapshot.members.iter().any(|candidate| {
+                                        candidate.name == *target && candidate.alias_of.is_none()
+                                    })
+                            },
+                        )
+                })
+        }
+        DatasetOrganization::Linear => {
+            snapshot.records.is_empty()
+                && snapshot.relative_records.is_empty()
+                && snapshot.members.is_empty()
+        }
+    };
+    if !shape_valid {
+        Err(HostProblem::Malformed)
+    } else if total > limits.max_records || total_bytes > limits.max_state_bytes {
+        Err(HostProblem::ResourceExhausted)
+    } else {
+        Ok(())
+    }
+}
+fn validate_transaction(transaction: &str, limits: HostLimits) -> Result<(), HostProblem> {
+    if transaction.is_empty()
+        || transaction.len() > limits.max_name_bytes
+        || transaction.chars().any(char::is_control)
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
+}
+fn valid_julian_date(date: u32) -> bool {
+    let year = date / 1000;
+    let day = date % 1000;
+    let leap = year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400));
+    (1900..=9999).contains(&year) && day != 0 && day <= if leap { 366 } else { 365 }
+}
+fn validate_tvs_operation(
+    operation: &TvsRecordOperation,
+    limits: HostLimits,
+) -> Result<(), HostProblem> {
+    match operation {
+        TvsRecordOperation::Insert { record, .. } => {
+            if record.is_empty() {
+                Err(HostProblem::Malformed)
+            } else if record.len() > limits.max_record_bytes {
+                Err(HostProblem::ResourceExhausted)
+            } else {
+                Ok(())
+            }
+        }
+        TvsRecordOperation::Rewrite { key, record, .. } => {
+            if key.is_empty() || record.is_empty() {
+                Err(HostProblem::Malformed)
+            } else if key.len() > limits.max_record_bytes || record.len() > limits.max_record_bytes
+            {
+                Err(HostProblem::ResourceExhausted)
+            } else {
+                Ok(())
+            }
+        }
+        TvsRecordOperation::Delete { key, .. } => {
+            if key.is_empty() {
+                Err(HostProblem::Malformed)
+            } else if key.len() > limits.max_record_bytes {
+                Err(HostProblem::ResourceExhausted)
+            } else {
+                Ok(())
+            }
+        }
+    }
+}
 fn validate_fields(fields: &[TerminalField], limits: HostLimits) -> Result<(), HostProblem> {
     if fields.len() > limits.max_fields
         || fields.iter().any(|field| {
@@ -1516,6 +2333,10 @@ fn validate_fields(fields: &[TerminalField], limits: HostLimits) -> Result<(), H
 pub enum HostProblem {
     Malformed,
     Unsupported,
+    UnsupportedCapability {
+        capability: String,
+        detail: String,
+    },
     NotFound,
     Condition {
         name: String,
@@ -1538,6 +2359,27 @@ impl fmt::Display for HostProblem {
     }
 }
 impl std::error::Error for HostProblem {}
+
+impl HostProblem {
+    fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
+        match self {
+            Self::UnsupportedCapability { capability, detail }
+                if capability.is_empty()
+                    || capability.len() > limits.max_name_bytes
+                    || detail.is_empty()
+                    || detail.len() > limits.max_state_bytes =>
+            {
+                Err(HostProblem::Malformed)
+            }
+            Self::Condition { name, .. }
+                if name.is_empty() || name.len() > limits.max_name_bytes =>
+            {
+                Err(HostProblem::Malformed)
+            }
+            _ => Ok(()),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

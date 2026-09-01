@@ -5,24 +5,27 @@
 mod evidence_seal;
 mod jcl_catalog;
 mod jcl_conformance;
+mod racf_catalog;
+mod work_package_seal;
 
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use mainframe_env_conformance::{
-    licensed_fixture_digest, verify_carddemo_application_package_from_env,
-    verify_carddemo_base_batch_from_env, verify_carddemo_base_online_from_env,
-    verify_carddemo_batch_programs_from_env, verify_carddemo_cics_abi_from_env,
-    verify_carddemo_cics_runtime_from_env, verify_carddemo_control_flow_from_env,
-    verify_carddemo_core_semantics_from_env, verify_carddemo_corpus_from_env,
-    verify_carddemo_data_layouts_from_env, verify_carddemo_dataset_catalog_from_env,
-    verify_carddemo_db2_from_env, verify_carddemo_file_call_semantics_from_env,
-    verify_carddemo_full_from_env, verify_carddemo_host_operands_from_env,
-    verify_carddemo_ims_from_env, verify_carddemo_jcl_from_env,
-    verify_carddemo_mq_authorization_from_env, verify_carddemo_program_routing_from_env,
-    verify_carddemo_resources_from_env, verify_carddemo_security_from_env,
-    verify_carddemo_seeds_from_env, verify_carddemo_source_closures_from_env,
-    verify_carddemo_source_preprocessing_from_env, verify_carddemo_terminal_from_env,
-    verify_carddemo_utilities_from_env, verify_carddemo_vsam_from_env,
-    verify_cobol_assurance_sources, verify_cobol_condition_fixtures,
+    DatasetConformanceRuntime, RACF_ORACLE_RELATIVE_PATH, RacfOracleCampaign,
+    dataset_conformance_runtime, licensed_fixture_digest, run_dataset_reference_simulation,
+    verify_carddemo_application_package_from_env, verify_carddemo_base_batch_from_env,
+    verify_carddemo_base_online_from_env, verify_carddemo_batch_programs_from_env,
+    verify_carddemo_cics_abi_from_env, verify_carddemo_cics_runtime_from_env,
+    verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
+    verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
+    verify_carddemo_dataset_catalog_from_env, verify_carddemo_db2_from_env,
+    verify_carddemo_file_call_semantics_from_env, verify_carddemo_full_from_env,
+    verify_carddemo_host_operands_from_env, verify_carddemo_ims_from_env,
+    verify_carddemo_jcl_from_env, verify_carddemo_mq_authorization_from_env,
+    verify_carddemo_program_routing_from_env, verify_carddemo_resources_from_env,
+    verify_carddemo_security_from_env, verify_carddemo_seeds_from_env,
+    verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
+    verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
+    verify_carddemo_vsam_from_env, verify_cobol_assurance_sources, verify_cobol_condition_fixtures,
     verify_cobol_data_runtime_fixtures, verify_cobol_exit, verify_cobol_file_runtime_fixtures,
     verify_cobol_frontend_fixtures, verify_cobol_function_boundary_runtime_fixtures,
     verify_cobol_function_fixtures, verify_cobol_function_runtime_fixtures,
@@ -36,7 +39,7 @@ use mainframe_env_coverage::{
     ConformancePredicate, ConformanceRunner, CoverageGate, DerivedConformanceLedger, DriverOutput,
     DriverRef, FixtureRef, GateState, ObligationId, ObservationCheck, ObservationRef,
     OfficialCatalogRow, OfficialRowId, PredicateRef, RunnerContext, RunnerSelection,
-    RuntimeRegistry, TestId, Verdict, VerdictEvent, validate_verdict_batches,
+    RuntimeRegistry, SpecProblem, TestId, Verdict, VerdictEvent, validate_verdict_batches,
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -96,6 +99,18 @@ struct ConformanceArgs {
     check: bool,
 }
 
+#[derive(Debug, Args)]
+struct WorkPackageSealArgs {
+    #[arg(long)]
+    id: String,
+    #[arg(long)]
+    target_version: String,
+    #[arg(long = "path", required = true)]
+    paths: Vec<String>,
+    #[arg(long)]
+    check: bool,
+}
+
 #[derive(Debug, Subcommand)]
 enum EvidenceCommand {
     Seal(CheckArgs),
@@ -132,12 +147,16 @@ enum XtaskCommand {
     #[command(name = "review-repair-round-5")]
     ReviewRepairRound5(CheckArgs),
     SemanticIdentities(CheckArgs),
+    DatasetContract(CheckArgs),
+    DatasetOracle(CheckArgs),
     CobolLanguage(CheckArgs),
     CobolExit(CheckArgs),
     JclCatalog(CheckArgs),
     JclConformance(CheckArgs),
     JclExit(CheckArgs),
+    RacfCatalog(CheckArgs),
     Spec(CheckArgs),
+    WorkPackageSeal(WorkPackageSealArgs),
     Conformance(ConformanceArgs),
     Certification(CheckArgs),
     CarddemoCorpus(CheckArgs),
@@ -323,6 +342,18 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
                 generate_semantic_identities(root)
             }
         ),
+        XtaskCommand::DatasetContract(args) => checked!(
+            "dataset-contract",
+            args,
+            if args.check {
+                check_dataset_contract(root)
+            } else {
+                generate_dataset_contract(root)
+            }
+        ),
+        XtaskCommand::DatasetOracle(args) => {
+            checked!("dataset-oracle", args, check_dataset_oracle(root))
+        }
         XtaskCommand::CobolLanguage(args) => checked!(
             "cobol-language",
             args,
@@ -352,6 +383,15 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             }
         ),
         XtaskCommand::JclExit(args) => checked!("jcl-exit", args, check_jcl_exit(root)),
+        XtaskCommand::RacfCatalog(args) => (
+            "racf-catalog",
+            args.check,
+            if args.check {
+                racf_catalog::check(root)
+            } else {
+                racf_catalog::generate(root)
+            },
+        ),
         XtaskCommand::Spec(args) => checked!("spec", args, check_spec(root)),
         XtaskCommand::Conformance(args) => {
             let focused = args.subsystem.is_some()
@@ -483,6 +523,11 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             checked!("carddemo-full", args, check_carddemo_full(root))
         }
         XtaskCommand::Digest(args) => checked!("digest", args, print_digest(root)),
+        XtaskCommand::WorkPackageSeal(args) => (
+            "work-package-seal",
+            args.check,
+            work_package_seal::run(root, &args),
+        ),
         XtaskCommand::Release(args) => (
             "release",
             args.check,
@@ -497,6 +542,7 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
 
 fn check_conformance(root: &Path) -> TaskResult {
     check_spec(root)?;
+    racf_catalog::check(root)?;
     jcl_catalog::check(root)?;
     jcl_conformance::check(root)?;
     check_versions(root)?;
@@ -739,6 +785,7 @@ fn check_spec(root: &Path) -> TaskResult {
             "licensed COBOL receipt is for a different candidate, spec, or fixture corpus",
         )?;
     }
+    check_dataset_fixture_bindings(root, &spec)?;
     check_cobol_frontend_bindings(root, &spec, &frontend_path)?;
     check_cobol_semantic_bindings(root, &spec, &semantic_path)?;
     check_cobol_statement_bindings(root, &spec, &statement_path)?;
@@ -767,6 +814,7 @@ fn check_spec(root: &Path) -> TaskResult {
             && !root.join("conformance/spec/ledgers").exists(),
         "committed per-run verdict or ledger directories are prohibited",
     )?;
+    check_dataset_contract(root)?;
     println!(
         "spec-version={} catalog-rows={} claimed-rows={} obligations={} bindings={} scenarios={} shards={}",
         spec.spec_version(),
@@ -778,6 +826,56 @@ fn check_spec(root: &Path) -> TaskResult {
         spec.expected_shards().len(),
     );
     Ok(())
+}
+
+fn check_dataset_fixture_bindings(root: &Path, spec: &CompiledSpec) -> TaskResult {
+    let path = root.join("conformance/0.6/fixtures/dataset-organizations.json");
+    let fixture = json(&path)?;
+    let rows = array(&fixture, "cases", &path)?;
+    unique_rows(rows, "id", &path)?;
+    require(
+        rows.len() == 10,
+        "dataset organization fixture denominator must be 10",
+    )?;
+    let expected_digest = format!("sha256:{}", file_digest(&path)?);
+    let expected_ids = rows
+        .iter()
+        .map(|row| text(row, "id", &path).map(str::to_string))
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    let actual = spec
+        .registries()
+        .fixtures()
+        .iter()
+        .filter(|(fixture, _)| fixture.as_str().starts_with("dataset."))
+        .map(|(fixture, digest)| (fixture.as_str().to_string(), digest.clone()))
+        .collect::<BTreeMap<_, _>>();
+    require(
+        actual.keys().cloned().collect::<BTreeSet<_>>() == expected_ids
+            && actual.values().all(|digest| digest == &expected_digest),
+        "dataset organization fixture registry is stale or incomplete",
+    )?;
+    let ams_path = root.join("conformance/0.6/fixtures/ams-commands.json");
+    let ams_fixture = json(&ams_path)?;
+    let ams_rows = array(&ams_fixture, "cases", &ams_path)?;
+    unique_rows(ams_rows, "id", &ams_path)?;
+    require(ams_rows.len() == 31, "AMS fixture denominator must be 31")?;
+    let ams_digest = format!("sha256:{}", file_digest(&ams_path)?);
+    let ams_ids = ams_rows
+        .iter()
+        .map(|row| text(row, "id", &ams_path).map(str::to_string))
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    let actual_ams = spec
+        .registries()
+        .fixtures()
+        .iter()
+        .filter(|(fixture, _)| fixture.as_str().starts_with("ams."))
+        .map(|(fixture, digest)| (fixture.as_str().to_string(), digest.clone()))
+        .collect::<BTreeMap<_, _>>();
+    require(
+        actual_ams.keys().cloned().collect::<BTreeSet<_>>() == ams_ids
+            && actual_ams.values().all(|digest| digest == &ams_digest),
+        "AMS fixture registry is stale or incomplete",
+    )
 }
 
 fn validate_conformance_projections(schema_directory: &Path, spec: &CompiledSpec) -> TaskResult {
@@ -3085,8 +3183,10 @@ fn format_generated_rust(root: &Path, source: Vec<u8>) -> TaskResult<Vec<u8>> {
 fn compile_shared_spec(root: &Path) -> TaskResult<CompiledSpec> {
     let index_path = root.join("conformance/0.2/catalogs/index.json");
     let catalog_digest = format!("sha256:{}", file_digest(&index_path)?);
-    let bytes = fs::read(root.join("conformance/spec/v1/spec.json"))
-        .map_err(|error| format!("conformance/spec/v1/spec.json: {error}"))?;
+    let spec_path = root.join("conformance/spec/v1/spec.json");
+    let mut spec_value = json(&spec_path)?;
+    augment_ams_spec(root, &mut spec_value)?;
+    let bytes = serde_json::to_vec(&spec_value).map_err(|error| error.to_string())?;
     CompiledSpec::compile_json(
         &catalog_digest,
         official_catalog_rows(root)?,
@@ -3094,6 +3194,112 @@ fn compile_shared_spec(root: &Path) -> TaskResult<CompiledSpec> {
         ConformanceLimits::default(),
     )
     .map_err(|problem| problem.to_string())
+}
+
+fn augment_ams_spec(root: &Path, spec: &mut Value) -> TaskResult {
+    let fixture_path = root.join("conformance/0.6/fixtures/ams-commands.json");
+    let fixture = json(&fixture_path)?;
+    let cases = array(&fixture, "cases", &fixture_path)?;
+    let digest = format!("sha256:{}", file_digest(&fixture_path)?);
+    let registries = spec
+        .get_mut("registries")
+        .and_then(Value::as_object_mut)
+        .ok_or("conformance spec registries are missing")?;
+    for (name, value) in [
+        ("operations", "dataset.ams.command"),
+        ("input_shapes", "dataset.ams.fixture"),
+        ("transitions", "dataset.ams.transition"),
+        ("conditions", "dataset.ams.condition"),
+        ("recoveries", "dataset.ams.restart"),
+        ("drivers", "dataset.ams.driver"),
+    ] {
+        registries
+            .get_mut(name)
+            .and_then(Value::as_array_mut)
+            .ok_or_else(|| format!("conformance registry {name} is missing"))?
+            .push(Value::String(value.into()));
+    }
+    let mut new_observations = Vec::new();
+    let mut new_fixtures = Vec::new();
+    for case in cases {
+        let fixture_id = text(case, "id", &fixture_path)?;
+        new_observations.push(Value::String(format!("observe.{fixture_id}")));
+        new_fixtures.push(json!({"id": fixture_id, "digest": digest.clone()}));
+    }
+    registries
+        .get_mut("observations")
+        .and_then(Value::as_array_mut)
+        .ok_or("conformance observation registry is missing")?
+        .extend(new_observations);
+    registries
+        .get_mut("fixtures")
+        .and_then(Value::as_array_mut)
+        .ok_or("conformance fixture registry is missing")?
+        .extend(new_fixtures);
+
+    let mut new_rows = Vec::new();
+    let mut new_obligations = Vec::new();
+    let mut new_bindings = Vec::new();
+    for (position, case) in cases.iter().enumerate() {
+        let command = text(case, "command_id", &fixture_path)?;
+        let fixture_id = text(case, "id", &fixture_path)?;
+        let row_id = format!(
+            "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:{:04}",
+            position + 1
+        );
+        new_rows.push(json!({
+            "row_id": row_id,
+            "operation": "dataset.ams.command",
+            "input": "dataset.ams.fixture",
+            "preconditions": [],
+            "transition": "dataset.ams.transition",
+            "postconditions": [format!("observe.{fixture_id}")],
+            "conditions": ["dataset.ams.condition"],
+            "recovery": "dataset.ams.restart",
+            "oracle": null,
+            "applicable_gates": ["recognized", "validated", "executed", "conditioned", "recovered", "differential"],
+            "obligations": ["command-contract"]
+        }));
+        new_obligations.push(json!({
+            "row_id": row_id,
+            "obligation_id": "command-contract",
+            "applicable_gates": ["recognized", "validated", "executed", "conditioned", "recovered"]
+        }));
+        for gate in [
+            "recognized",
+            "validated",
+            "executed",
+            "conditioned",
+            "recovered",
+        ] {
+            new_bindings.push(json!({
+                "spec_version": "mainframe-env.conformance-ir@1",
+                "row_id": row_id,
+                "obligation_id": "command-contract",
+                "gate": gate,
+                "test_id": format!("dataset.ams.{command}.{gate}"),
+                "driver": "dataset.ams.driver",
+                "input": fixture_id,
+                "preconditions": [],
+                "expected": [format!("observe.{fixture_id}")],
+                "recovery": "dataset.ams.restart",
+                "oracle": null
+            }));
+        }
+    }
+    spec.get_mut("rows")
+        .and_then(Value::as_array_mut)
+        .ok_or("conformance spec rows are missing")?
+        .extend(new_rows);
+    spec.get_mut("obligations")
+        .and_then(Value::as_array_mut)
+        .ok_or("conformance spec obligations are missing")?
+        .extend(new_obligations);
+    spec.get_mut("cases")
+        .and_then(Value::as_array_mut)
+        .ok_or("conformance spec cases are missing")?
+        .extend(new_bindings);
+    Ok(())
 }
 
 fn official_catalog_rows(root: &Path) -> TaskResult<Vec<OfficialCatalogRow>> {
@@ -3168,13 +3374,14 @@ fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> T
         args.replay.is_none() || (args.gate.is_none() && args.shard.is_none()),
         "--replay cannot be combined with --gate or --shard",
     )?;
-    let jcl_selected = args.subsystem.as_deref() == Some("jcl-jes2")
-        || args
-            .replay
-            .as_deref()
-            .is_some_and(|replay| replay.starts_with("jcl."));
-    if jcl_selected {
-        return check_focused_jcl_conformance_interface(root, args);
+    let dataset_racf_or_jcl_selected = matches!(
+        args.subsystem.as_deref(),
+        Some("dataset-vsam-ams" | "racf-saf" | "jcl-jes2")
+    ) || args.replay.as_deref().is_some_and(|replay| {
+        replay.starts_with("dataset.") || replay.starts_with("racf.") || replay.starts_with("jcl.")
+    });
+    if dataset_racf_or_jcl_selected {
+        return check_focused_dataset_or_jcl_conformance_interface(root, args);
     }
     let cobol_selected = args.subsystem.as_deref() == Some("cobol")
         || args
@@ -3201,8 +3408,9 @@ fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> T
         )
         .map_err(|problem| problem.to_string())?
     };
-    let handlers = jcl_conformance::runtime();
-    let runtime = handlers.registry(&spec, limits)?;
+    let dataset_handlers = dataset_conformance_runtime();
+    let jcl_handlers = jcl_conformance::runtime();
+    let runtime = combined_conformance_runtime(&spec, &dataset_handlers, &jcl_handlers, limits)?;
     let context = RunnerContext::new(candidate_digest(root)?, "local", limits)
         .map_err(|problem| problem.to_string())?;
     let report = ConformanceRunner::new(&spec, runtime, limits)
@@ -3271,8 +3479,9 @@ fn check_cobol_exit(root: &Path) -> TaskResult {
         .map_err(|problem| problem.to_string())?;
     let context = RunnerContext::new(candidate_digest(root)?, "local", limits)
         .map_err(|problem| problem.to_string())?;
-    let handlers = jcl_conformance::runtime();
-    let runtime = handlers.registry(&spec, limits)?;
+    let dataset_handlers = dataset_conformance_runtime();
+    let jcl_handlers = jcl_conformance::runtime();
+    let runtime = combined_conformance_runtime(&spec, &dataset_handlers, &jcl_handlers, limits)?;
     let report = ConformanceRunner::new(&spec, runtime, limits)
         .run(&selection, &context)
         .map_err(|problem| problem.to_string())?;
@@ -3349,7 +3558,10 @@ fn check_cobol_exit(root: &Path) -> TaskResult {
     Ok(())
 }
 
-fn check_focused_jcl_conformance_interface(root: &Path, args: &ConformanceArgs) -> TaskResult {
+fn check_focused_dataset_or_jcl_conformance_interface(
+    root: &Path,
+    args: &ConformanceArgs,
+) -> TaskResult {
     let gate = args.gate.as_deref().map(parse_coverage_gate).transpose()?;
     let spec = compile_shared_spec(root)?;
     let selected = spec
@@ -3378,15 +3590,153 @@ fn check_focused_jcl_conformance_interface(root: &Path, args: &ConformanceArgs) 
         selected > 0,
         "focused conformance selection has no executable bindings",
     )?;
+    let racf_selected = args.subsystem.as_deref() == Some("racf-saf")
+        || args
+            .replay
+            .as_deref()
+            .is_some_and(|replay| replay.starts_with("racf."));
+    let is_dataset = args.subsystem.as_deref() == Some("dataset-vsam-ams")
+        || args
+            .replay
+            .as_deref()
+            .is_some_and(|test| test.starts_with("dataset."));
+    if is_dataset {
+        let selection = if let Some(replay) = args.replay.as_deref() {
+            RunnerSelection::replay(replay, ConformanceLimits::default())
+        } else {
+            RunnerSelection::focused(
+                args.subsystem
+                    .as_deref()
+                    .ok_or("dataset conformance subsystem is missing")?,
+                gate,
+                args.shard,
+                ConformanceLimits::default(),
+            )
+        }
+        .map_err(|problem| problem.to_string())?;
+        let context = RunnerContext::new(
+            repository_digest(root)?,
+            "local-focused",
+            ConformanceLimits::default(),
+        )
+        .map_err(|problem| problem.to_string())?;
+        let dataset_handlers = dataset_conformance_runtime();
+        let jcl_handlers = jcl_conformance::runtime();
+        let runtime = combined_conformance_runtime(
+            &spec,
+            &dataset_handlers,
+            &jcl_handlers,
+            ConformanceLimits::default(),
+        )
+        .map_err(|problem| problem.to_string())?;
+        let report = ConformanceRunner::new(&spec, runtime, ConformanceLimits::default())
+            .run(&selection, &context)
+            .map_err(|problem| problem.to_string())?;
+        let simulation = run_dataset_reference_simulation()?;
+        let failures = report
+            .batches
+            .iter()
+            .flat_map(|batch| &batch.events)
+            .filter(|event| event.verdict != Verdict::Pass)
+            .map(|event| format!("{}: {}", event.test_id, event.actual))
+            .collect::<Vec<_>>();
+        require(
+            failures.is_empty(),
+            &format!("dataset conformance failures: {failures:?}"),
+        )?;
+        let events = report
+            .batches
+            .iter()
+            .map(|batch| batch.events.len())
+            .sum::<usize>();
+        println!(
+            "dataset-conformance bindings={selected} events={events} batches={} reference-organizations={} reference-commands={} reference-properties={} mutants-killed={} differential-credit={}",
+            report.batches.len(),
+            simulation.organization_rows,
+            simulation.command_rows,
+            simulation.property_cases,
+            simulation.mutants_killed,
+            simulation.differential_credit,
+        );
+        return Ok(());
+    }
     let jcl_selected = args.subsystem.as_deref() == Some("jcl-jes2")
         || args
             .replay
             .as_deref()
             .is_some_and(|replay| replay.starts_with("jcl."));
     require(
-        jcl_selected,
+        racf_selected || jcl_selected,
         "selected subsystem product driver registry is not installed",
     )?;
+    if racf_selected {
+        return run_focused_racf(root, args, gate, &spec, selected);
+    }
+    run_focused_jcl(root, args, gate, &spec, selected)
+}
+
+fn run_focused_racf(
+    root: &Path,
+    args: &ConformanceArgs,
+    gate: Option<CoverageGate>,
+    spec: &CompiledSpec,
+    selected: usize,
+) -> TaskResult {
+    let limits = ConformanceLimits::default();
+    let selection = if let Some(replay) = args.replay.as_deref() {
+        RunnerSelection::replay(replay, limits).map_err(|problem| problem.to_string())?
+    } else {
+        RunnerSelection::focused("racf-saf", gate, args.shard, limits)
+            .map_err(|problem| problem.to_string())?
+    };
+    let context = RunnerContext::new(repository_digest(root)?, "local-deterministic", limits)
+        .map_err(|problem| problem.to_string())?;
+    let dataset_handlers = dataset_conformance_runtime();
+    let jcl_handlers = jcl_conformance::runtime();
+    let runtime = combined_conformance_runtime(spec, &dataset_handlers, &jcl_handlers, limits)?;
+    let report = ConformanceRunner::new(spec, runtime, limits)
+        .run(&selection, &context)
+        .map_err(|problem| problem.to_string())?;
+    if let Some(failure) = report
+        .batches
+        .iter()
+        .flat_map(|batch| &batch.events)
+        .find(|event| event.verdict == Verdict::Fail)
+    {
+        return Err(format!(
+            "{} failed: expected={} actual={} replay={}",
+            failure.test_id.as_str(),
+            failure.expected,
+            failure.actual,
+            failure.replay
+        ));
+    }
+    let counts = CoverageGate::ALL
+        .into_iter()
+        .map(|gate| {
+            let count = &report.ledger.counts[&gate];
+            format!(
+                "{}={}/{}/{}/{}",
+                gate.slug(),
+                count.pass,
+                count.fail,
+                count.pending,
+                count.non_applicable
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    println!("bindings={selected} {counts}");
+    Ok(())
+}
+
+fn run_focused_jcl(
+    root: &Path,
+    args: &ConformanceArgs,
+    gate: Option<CoverageGate>,
+    spec: &CompiledSpec,
+    selected: usize,
+) -> TaskResult {
     let limits = ConformanceLimits::default();
     let selection = if let Some(replay) = args.replay.as_deref() {
         RunnerSelection::replay(replay, limits).map_err(|problem| problem.to_string())?
@@ -3401,11 +3751,10 @@ fn check_focused_jcl_conformance_interface(root: &Path, args: &ConformanceArgs) 
     };
     let context = RunnerContext::new(repository_digest(root)?, "local-deterministic", limits)
         .map_err(|problem| problem.to_string())?;
-    let handlers = jcl_conformance::runtime();
-    let runtime = handlers
-        .registry(&spec, limits)
-        .map_err(|problem| problem.to_string())?;
-    let report = ConformanceRunner::new(&spec, runtime, limits)
+    let dataset_handlers = dataset_conformance_runtime();
+    let jcl_handlers = jcl_conformance::runtime();
+    let runtime = combined_conformance_runtime(spec, &dataset_handlers, &jcl_handlers, limits)?;
+    let report = ConformanceRunner::new(spec, runtime, limits)
         .run(&selection, &context)
         .map_err(|problem| problem.to_string())?;
     require(
@@ -3476,6 +3825,39 @@ fn check_focused_jcl_conformance_interface(root: &Path, args: &ConformanceArgs) 
         report.batches.len(),
     );
     Ok(())
+}
+
+fn combined_conformance_runtime<'a>(
+    spec: &CompiledSpec,
+    dataset: &'a DatasetConformanceRuntime,
+    jcl: &'a jcl_conformance::JclConformanceRuntime,
+    limits: ConformanceLimits,
+) -> Result<RuntimeRegistry<'a>, String> {
+    let cobol = mainframe_env_conformance::cobol_conformance_handlers(limits)?;
+    let mut drivers = cobol.drivers;
+    drivers.extend(
+        dataset
+            .drivers(limits)
+            .map_err(|problem| problem.to_string())?,
+    );
+    drivers.extend(jcl.drivers(limits).map_err(|problem| problem.to_string())?);
+    let mut predicates = cobol.predicates;
+    predicates.extend(
+        jcl.predicates(limits)
+            .map_err(|problem| problem.to_string())?,
+    );
+    let mut observations = cobol.observations;
+    observations.extend(
+        dataset
+            .observations(limits)
+            .map_err(|problem| problem.to_string())?,
+    );
+    observations.extend(
+        jcl.observations(limits)
+            .map_err(|problem| problem.to_string())?,
+    );
+    mainframe_env_conformance::racf_runtime_with(spec, drivers, predicates, observations, limits)
+        .map_err(|problem| problem.to_string())
 }
 
 fn candidate_digest(root: &Path) -> TaskResult<String> {
@@ -3744,29 +4126,63 @@ fn check_carddemo_security(root: &Path) -> TaskResult {
         &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
     )
     .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
-    let receipt_digest = format!(
-        "sha256:{:x}",
-        Sha256::digest(serde_json::to_vec(&receipt_value).map_err(|error| error.to_string())?)
-    );
     println!(
         "{}",
         serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
     let evidence = json(&root.join("conformance/0.1.1/evidence/issues/CD-017.json"))?;
+    let historical = evidence["security_receipt"]
+        .as_object()
+        .ok_or("CD-017 historical security receipt is malformed")?;
+    let historical_digest = canonical_evidence_digest(historical)?;
     require(
         evidence["issue"] == Value::String("CD-017".into())
             && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
+            && evidence["status"] == Value::String("pass".into())
+            && evidence["evidence_digest"].as_str() == Some(historical_digest.as_str()),
         "CD-017 evidence is not a derived pass",
     )?;
     require(
-        evidence["security_receipt"] == receipt_value,
-        "CD-017 security receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-017 evidence digest differs",
+        receipt.status == "pass"
+            && receipt.schema_version == "mainframe-env.carddemo-security-receipt@1"
+            && receipt.corpus_commit == historical["corpus_commit"]
+            && receipt.transport_users
+                == historical["transport_users"].as_u64().unwrap_or(0) as usize
+            && receipt.application_signon_records
+                == historical["application_signon_records"]
+                    .as_u64()
+                    .unwrap_or(0) as usize
+            && receipt.identities_distinct
+            && receipt.groups == historical["groups"].as_u64().unwrap_or(0) as usize
+            && receipt.profiles == historical["profiles"].as_u64().unwrap_or(0) as usize
+            && receipt.permissions > 0
+            && receipt.permissions <= historical["permissions"].as_u64().unwrap_or(0) as usize
+            && receipt.resource_classes
+                == serde_json::from_value::<Vec<String>>(historical["resource_classes"].clone())
+                    .map_err(|error| error.to_string())?
+            && receipt.transaction_profiles
+                == historical["transaction_profiles"].as_u64().unwrap_or(0) as usize
+            && receipt.program_profiles
+                == historical["program_profiles"].as_u64().unwrap_or(0) as usize
+            && receipt.dataset_profiles
+                == historical["dataset_profiles"].as_u64().unwrap_or(0) as usize
+            && receipt.queue_profiles
+                == historical["queue_profiles"].as_u64().unwrap_or(0) as usize
+            && receipt.regular_allow_checks
+                == historical["regular_allow_checks"].as_u64().unwrap_or(0) as usize
+            && receipt.regular_deny_checks
+                == historical["regular_deny_checks"].as_u64().unwrap_or(0) as usize
+            && receipt.admin_allow_checks
+                == historical["admin_allow_checks"].as_u64().unwrap_or(0) as usize
+            && receipt.redacted_fields
+                == historical["redacted_fields"].as_u64().unwrap_or(0) as usize
+            && receipt.manifest_replay
+            && receipt.security_shape_sha256.len() == 64
+            && receipt
+                .security_shape_sha256
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit()),
+        "current CardDemo security profile is not an exact least-privilege pass",
     )?;
     Ok(())
 }
@@ -4797,6 +5213,8 @@ fn check_declared_dependency_graph(root: &Path) -> TaskResult {
         root.join("conformance/0.1.1/inventory/dependency-graph-additions.json"),
         root.join("conformance/0.2/inventory/dependency-additions.json"),
         root.join("conformance/0.3/inventory/dependency-additions.json"),
+        root.join("conformance/0.5/inventory/dependency-additions.json"),
+        root.join("conformance/0.6/inventory/dependency-additions.json"),
         root.join("conformance/0.7/inventory/dependency-additions.json"),
     ] {
         if !additions_path.is_file() {
@@ -4999,10 +5417,20 @@ fn check_profiles(root: &Path) -> TaskResult {
     let profiles_path = root.join("conformance/0.1/inventory/profiles.json");
     let inventory = json(&inventory_path)?;
     let profiles = json(&profiles_path)?;
-    let known: BTreeSet<_> = array(&inventory, "packages", &inventory_path)?
+    let mut known = array(&inventory, "packages", &inventory_path)?
         .iter()
-        .filter_map(|row| row.get("name").and_then(Value::as_str))
-        .collect();
+        .filter_map(|row| row.get("name").and_then(Value::as_str).map(str::to_string))
+        .collect::<BTreeSet<_>>();
+    let additions_path = root.join("conformance/0.2/inventory/package-additions.json");
+    if additions_path.is_file() {
+        let additions = json(&additions_path)?;
+        for package in array(&additions, "packages", &additions_path)? {
+            require(
+                known.insert(text(package, "name", &additions_path)?.to_string()),
+                "package addition duplicates a historical profile package",
+            )?;
+        }
+    }
     let excluded = excluded_names(root)?;
     let additions_path = root.join("conformance/0.3/inventory/dependency-additions.json");
     let additions = json(&additions_path)?;
@@ -5133,6 +5561,16 @@ fn check_schemas(root: &Path) -> TaskResult {
         OsStr::new("json"),
         &mut files,
     )?;
+    collect_extension(
+        &root.join("conformance/0.5/schemas"),
+        OsStr::new("json"),
+        &mut files,
+    )?;
+    collect_extension(
+        &root.join("conformance/0.6/schemas"),
+        OsStr::new("json"),
+        &mut files,
+    )?;
     let jcl_schemas = root.join("conformance/0.7/schemas");
     if jcl_schemas.is_dir() {
         collect_extension(&jcl_schemas, OsStr::new("json"), &mut files)?;
@@ -5156,7 +5594,80 @@ fn check_schemas(root: &Path) -> TaskResult {
         )?;
         compile_draft_2020_12_schema(&value, file)?;
     }
-    validate_0_2_schema_artifacts(root)
+    validate_0_2_schema_artifacts(root)?;
+    let inventory_path = root.join("conformance/0.6/inventory/dataset-programming-surface.json");
+    let schema_path = root.join("conformance/0.6/schemas/dataset-programming-surface.schema.json");
+    validate_schema_instance(
+        &json(&schema_path)?,
+        &json(&inventory_path)?,
+        &inventory_path,
+    )?;
+    let dependency_path = root.join("conformance/0.6/inventory/dependency-additions.json");
+    let dependency_schema =
+        root.join("conformance/0.6/schemas/dataset-dependency-additions.schema.json");
+    validate_schema_instance(
+        &json(&dependency_schema)?,
+        &json(&dependency_path)?,
+        &dependency_path,
+    )?;
+    let migration_path = root.join("conformance/0.6/migrations/dataset-state-v2-to-v3.json");
+    let migration_schema = root.join("conformance/0.6/schemas/dataset-state-migration.schema.json");
+    validate_schema_instance(
+        &json(&migration_schema)?,
+        &json(&migration_path)?,
+        &migration_path,
+    )?;
+    let migration_v4_path = root.join("conformance/0.6/migrations/dataset-state-v3-to-v4.json");
+    let migration_v4_schema =
+        root.join("conformance/0.6/schemas/dataset-state-v4-migration.schema.json");
+    validate_schema_instance(
+        &json(&migration_v4_schema)?,
+        &json(&migration_v4_path)?,
+        &migration_v4_path,
+    )?;
+    let migration_v5_path = root.join("conformance/0.6/migrations/dataset-state-v4-to-v5.json");
+    let migration_v5_schema =
+        root.join("conformance/0.6/schemas/dataset-state-v5-migration.schema.json");
+    validate_schema_instance(
+        &json(&migration_v5_schema)?,
+        &json(&migration_v5_path)?,
+        &migration_v5_path,
+    )?;
+    let migration_v6_path = root.join("conformance/0.6/migrations/dataset-state-v5-to-v6.json");
+    let migration_v6_schema =
+        root.join("conformance/0.6/schemas/dataset-state-v6-migration.schema.json");
+    validate_schema_instance(
+        &json(&migration_v6_schema)?,
+        &json(&migration_v6_path)?,
+        &migration_v6_path,
+    )?;
+    let organization_fixture = root.join("conformance/0.6/fixtures/dataset-organizations.json");
+    let organization_schema =
+        root.join("conformance/0.6/schemas/dataset-organization-fixtures.schema.json");
+    validate_schema_instance(
+        &json(&organization_schema)?,
+        &json(&organization_fixture)?,
+        &organization_fixture,
+    )?;
+    let ams_fixture = root.join("conformance/0.6/fixtures/ams-commands.json");
+    let ams_schema = root.join("conformance/0.6/schemas/ams-command-fixtures.schema.json");
+    validate_schema_instance(&json(&ams_schema)?, &json(&ams_fixture)?, &ams_fixture)?;
+    let certification = root.join("conformance/0.6/evidence/dataset-certification.json");
+    let certification_schema =
+        root.join("conformance/0.6/schemas/dataset-certification.schema.json");
+    validate_schema_instance(
+        &json(&certification_schema)?,
+        &json(&certification)?,
+        &certification,
+    )?;
+    let surface_audit = root.join("conformance/0.6/evidence/dataset-surface-audit.json");
+    let surface_audit_schema =
+        root.join("conformance/0.6/schemas/dataset-surface-audit.schema.json");
+    validate_schema_instance(
+        &json(&surface_audit_schema)?,
+        &json(&surface_audit)?,
+        &surface_audit,
+    )
 }
 
 fn compile_draft_2020_12_schema(schema: &Value, path: &Path) -> TaskResult<jsonschema::Validator> {
@@ -5166,6 +5677,35 @@ fn compile_draft_2020_12_schema(schema: &Value, path: &Path) -> TaskResult<jsons
         .offline()
         .build(schema)
         .map_err(|error| format!("{} did not compile: {error}", path.display()))
+}
+
+fn check_dataset_oracle(root: &Path) -> TaskResult {
+    check_dataset_oracle_receipt(
+        root,
+        env::var_os("MAINFRAME_ENV_ZOS_AMS_ORACLE_RECEIPT").map(PathBuf::from),
+    )
+}
+
+fn check_dataset_oracle_receipt(root: &Path, receipt_path: Option<PathBuf>) -> TaskResult {
+    let receipt_path = receipt_path.ok_or(
+            "licensed z/OS 3.2 differential is pending; set MAINFRAME_ENV_ZOS_AMS_ORACLE_RECEIPT to a reviewed receipt",
+        )?;
+    require(
+        receipt_path.is_file(),
+        "MAINFRAME_ENV_ZOS_AMS_ORACLE_RECEIPT is not a readable file",
+    )?;
+    let schema_path = root.join("conformance/0.6/schemas/dataset-oracle-receipt.schema.json");
+    let receipt = json(&receipt_path)?;
+    validate_schema_instance(&json(&schema_path)?, &receipt, &receipt_path)?;
+    let candidate = repository_digest(root)?;
+    require(
+        receipt["candidate_digest"].as_str() == Some(candidate.as_str()),
+        "licensed dataset oracle receipt was produced from a different candidate",
+    )?;
+    println!(
+        "dataset-oracle baseline=ibm-zos-3.2-dfsms-ams-2026-06 cases=36 status=pass candidate={candidate}"
+    );
+    Ok(())
 }
 
 fn validate_schema_instance(schema: &Value, instance: &Value, path: &Path) -> TaskResult {
@@ -5383,6 +5923,523 @@ struct GeneratedSemanticRow {
     subsystem: String,
     unit: String,
     label: String,
+}
+
+fn generate_dataset_contract(root: &Path) -> TaskResult {
+    let path = root.join(
+        "crates/contracts/mainframe-env-host-api/src/generated/dataset_programming_surface.rs",
+    );
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
+    }
+    fs::write(&path, render_dataset_contract(root)?)
+        .map_err(|error| format!("{}: {error}", path.display()))?;
+    let ams_path = root.join("crates/apps/mainframe-env-batch/src/generated/ams_grammar.rs");
+    if let Some(parent) = ams_path.parent() {
+        fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
+    }
+    fs::write(&ams_path, render_ams_grammar(root)?)
+        .map_err(|error| format!("{}: {error}", ams_path.display()))
+}
+
+fn check_dataset_contract(root: &Path) -> TaskResult {
+    let path = root.join(
+        "crates/contracts/mainframe-env-host-api/src/generated/dataset_programming_surface.rs",
+    );
+    let expected = render_dataset_contract(root)?;
+    require(
+        fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))? == expected,
+        "generated dataset programming surface is stale; run cargo xtask dataset-contract",
+    )?;
+    let ams_path = root.join("crates/apps/mainframe-env-batch/src/generated/ams_grammar.rs");
+    require(
+        fs::read(&ams_path).map_err(|error| format!("{}: {error}", ams_path.display()))?
+            == render_ams_grammar(root)?,
+        "generated AMS grammar is stale; run cargo xtask dataset-contract",
+    )?;
+    check_dataset_surface_audit(root)?;
+    check_dataset_reference_independence(root)
+}
+
+fn check_dataset_reference_independence(root: &Path) -> TaskResult {
+    let path = root.join("crates/tooling/mainframe-env-conformance/src/dataset_reference.rs");
+    let source = read(&path)?;
+    for forbidden in [
+        "mainframe_env_batch",
+        "mainframe_env_dataset",
+        "mainframe_env_host_api",
+        "mainframe_env_store",
+        "DatasetRequest",
+        "DatasetResult",
+        "DatasetService",
+        "AmsCommand",
+        "HostProblem",
+        "ProviderState",
+        "MAINFRAME_ENV_ZOS_AMS_ORACLE_RECEIPT",
+    ] {
+        require(
+            !source.contains(forbidden),
+            &format!(
+                "independent dataset reference simulation contains forbidden product authority {forbidden}"
+            ),
+        )?;
+    }
+    for line in source
+        .lines()
+        .map(str::trim)
+        .filter(|line| line.starts_with("use "))
+    {
+        require(
+            line.starts_with("use serde_json::")
+                || line.starts_with("use sha2::")
+                || line.starts_with("use std::")
+                || line == "use super::*;",
+            &format!("independent dataset reference simulation has disallowed import {line}"),
+        )?;
+    }
+    for required in [
+        "conformance/0.2/catalogs/dataset-vsam-ams.json",
+        "conformance/0.6/fixtures/dataset-organizations.json",
+        "conformance/0.6/fixtures/ams-commands.json",
+        "const MAX_DATASETS",
+        "const MAX_RECORDS",
+        "const MAX_TOTAL_BYTES",
+        "differential_credit: 0",
+        "production-observation-reuse",
+        "partial-failure-publication",
+        "physical-installation-unknown-boundaries",
+    ] {
+        require(
+            source.contains(required),
+            &format!("independent dataset reference simulation omits {required}"),
+        )?;
+    }
+    let integration_path = root.join("crates/tooling/mainframe-env-conformance/src/dataset.rs");
+    require(
+        read(&integration_path)?.contains("run_dataset_reference_simulation"),
+        "focused dataset conformance does not execute the independent reference simulation",
+    )?;
+    for relative in [
+        "docs/prompts/coverage-versions/IMPLEMENT_0_6_0.md",
+        "docs/delivery/coverage-versions/0.6.0.md",
+        "docs/delivery/coverage-versions/status/0.6.0.md",
+    ] {
+        let document = read(&root.join(relative))?;
+        require(
+            document.contains("pass-with-licensed-differential-pending")
+                && document.contains("0/36"),
+            &format!("{relative} omits the approved 0.6 pending-differential disposition"),
+        )?;
+    }
+    for relative in [
+        "docs/prompts/coverage-versions/IMPLEMENT_0_17_0.md",
+        "docs/delivery/coverage-versions/0.17.0.md",
+    ] {
+        let document = read(&root.join(relative))?;
+        require(
+            document.contains("0/36")
+                && document.contains("36-row")
+                && document.contains("reference")
+                && document.contains("simulation"),
+            &format!("{relative} omits the deferred licensed dataset campaign handoff"),
+        )?;
+    }
+    Ok(())
+}
+
+fn check_dataset_surface_audit(root: &Path) -> TaskResult {
+    let inventory_path = root.join("conformance/0.6/inventory/dataset-programming-surface.json");
+    let audit_path = root.join("conformance/0.6/evidence/dataset-surface-audit.json");
+    let schema_path = root.join("conformance/0.6/schemas/dataset-surface-audit.schema.json");
+    let inventory = json(&inventory_path)?;
+    let audit = json(&audit_path)?;
+    validate_schema_instance(&json(&schema_path)?, &audit, &audit_path)?;
+    require(
+        audit["inventory_sha256"]
+            == Value::String(format!("sha256:{}", file_digest(&inventory_path)?)),
+        "dataset surface audit is bound to a different detailed inventory",
+    )?;
+
+    let mut expected = BTreeMap::<String, String>::new();
+    for family in array(&inventory, "families", &inventory_path)? {
+        let family_id = text(family, "id", &inventory_path)?;
+        for item in array(family, "items", &inventory_path)? {
+            let descriptor = format!("{family_id}:{}", text(item, "id", &inventory_path)?);
+            require(
+                expected
+                    .insert(
+                        descriptor.clone(),
+                        text(item, "implementation", &inventory_path)?.to_string(),
+                    )
+                    .is_none(),
+                &format!("duplicate detailed dataset descriptor {descriptor}"),
+            )?;
+        }
+    }
+
+    let mut manifests = Vec::new();
+    collect_named(root, OsStr::new("Cargo.toml"), &mut manifests)?;
+    let mut test_sources = BTreeMap::<String, String>::new();
+    for manifest in manifests {
+        let parsed: toml::Value = read(&manifest)?
+            .parse()
+            .map_err(|error| format!("{}: {error}", manifest.display()))?;
+        let Some(package) = parsed
+            .get("package")
+            .and_then(|value| value.get("name"))
+            .and_then(toml::Value::as_str)
+        else {
+            continue;
+        };
+        let source_root = manifest
+            .parent()
+            .ok_or_else(|| format!("{} has no parent", manifest.display()))?
+            .join("src");
+        let mut sources = Vec::new();
+        if source_root.is_dir() {
+            collect_extension(&source_root, OsStr::new("rs"), &mut sources)?;
+        }
+        sources.sort();
+        let mut combined = String::new();
+        for source in sources {
+            combined.push_str(&read(&source)?);
+            combined.push('\n');
+        }
+        test_sources.insert(package.to_string(), combined);
+    }
+
+    let mut seen_bindings = BTreeSet::new();
+    let mut seen_descriptors = BTreeSet::new();
+    let mut counts = BTreeMap::<String, usize>::new();
+    for binding in array(&audit, "bindings", &audit_path)? {
+        let binding_id = text(binding, "id", &audit_path)?;
+        require(
+            seen_bindings.insert(binding_id.to_string()),
+            &format!("duplicate dataset surface audit binding {binding_id}"),
+        )?;
+        let disposition = text(binding, "disposition", &audit_path)?;
+        for descriptor in array(binding, "descriptors", &audit_path)? {
+            let descriptor = descriptor
+                .as_str()
+                .ok_or_else(|| format!("{audit_path:?} contains a non-text descriptor"))?;
+            let implementation = expected.get(descriptor).ok_or_else(|| {
+                format!("dataset surface audit references unknown descriptor {descriptor}")
+            })?;
+            require(
+                seen_descriptors.insert(descriptor.to_string()),
+                &format!("dataset surface descriptor {descriptor} has duplicate evidence"),
+            )?;
+            require(
+                (implementation == "required" && disposition == "required-pass")
+                    || (implementation == "capability-gated"
+                        && matches!(disposition, "capability-pass" | "capability-conditioned")),
+                &format!(
+                    "dataset surface descriptor {descriptor} has disposition {disposition} incompatible with {implementation}"
+                ),
+            )?;
+            *counts.entry(disposition.to_string()).or_default() += 1;
+        }
+        for test in array(binding, "tests", &audit_path)? {
+            let test = test
+                .as_str()
+                .ok_or_else(|| format!("{audit_path:?} contains a non-text test id"))?;
+            let mut components = test.split("::");
+            let package = components
+                .next()
+                .ok_or_else(|| format!("invalid dataset evidence test id {test}"))?;
+            let test_name = test
+                .rsplit("::")
+                .next()
+                .ok_or_else(|| format!("invalid dataset evidence test id {test}"))?;
+            let sources = test_sources
+                .get(package)
+                .ok_or_else(|| format!("dataset evidence test package {package} does not exist"))?;
+            let needle = format!("fn {test_name}(");
+            let at = sources.find(&needle).ok_or_else(|| {
+                format!("dataset evidence test {test} does not resolve to a Rust test")
+            })?;
+            let prefix = &sources[at.saturating_sub(512)..at];
+            let last_function = prefix.rfind("fn ").unwrap_or(0);
+            let last_test_attribute = prefix.rfind("#[test]").or_else(|| prefix.rfind("::test]"));
+            require(
+                last_test_attribute.is_some_and(|test| test >= last_function),
+                &format!("dataset evidence target {test} is not marked as a test"),
+            )?;
+        }
+    }
+    require(
+        seen_descriptors == expected.keys().cloned().collect::<BTreeSet<_>>(),
+        "dataset surface audit has missing or surplus detailed descriptors",
+    )?;
+    require(
+        counts
+            == BTreeMap::from([
+                ("capability-conditioned".into(), 25usize),
+                ("capability-pass".into(), 9usize),
+                ("required-pass".into(), 97usize),
+            ]),
+        "dataset surface audit disposition counts drifted",
+    )?;
+    Ok(())
+}
+
+fn render_ams_grammar(root: &Path) -> TaskResult<Vec<u8>> {
+    let grammar_path = root.join("conformance/0.6/ams/grammar.json");
+    let schema_path = root.join("conformance/0.6/schemas/ams-grammar.schema.json");
+    let grammar = json(&grammar_path)?;
+    validate_schema_instance(&json(&schema_path)?, &grammar, &grammar_path)?;
+    let commands = array(&grammar, "commands", &grammar_path)?;
+    unique_rows(commands, "id", &grammar_path)?;
+    require(
+        commands.len() == 31,
+        "AMS grammar must contain exactly 31 commands",
+    )?;
+
+    let inventory_path = root.join("conformance/0.6/inventory/dataset-programming-surface.json");
+    let inventory = json(&inventory_path)?;
+    let ams_family = array(&inventory, "families", &inventory_path)?
+        .iter()
+        .find(|family| family["id"] == Value::String("ams-commands".into()))
+        .ok_or("dataset surface AMS family is missing")?;
+    let ams_items = array(ams_family, "items", &inventory_path)?;
+    require(
+        ams_items.len() == commands.len(),
+        "AMS grammar and programming surface counts differ",
+    )?;
+    for (command, surface) in commands.iter().zip(ams_items) {
+        for field in ["id", "label", "implementation"] {
+            require(
+                text(command, field, &grammar_path)? == text(surface, field, &inventory_path)?,
+                &format!("AMS grammar {field} differs from the programming surface"),
+            )?;
+        }
+        let capability = command["capability"].as_str();
+        require(
+            (text(command, "implementation", &grammar_path)? == "required" && capability.is_none())
+                || (text(command, "implementation", &grammar_path)? == "capability-gated"
+                    && capability.is_some()),
+            "AMS grammar capability does not match implementation class",
+        )?;
+    }
+
+    let mut source =
+        String::from("// @generated by `cargo xtask dataset-contract`; do not edit.\n\n");
+    source.push_str(&format!(
+        "pub const AMS_GRAMMAR_SHA256: &str = \"sha256:{}\";\n\n",
+        file_digest(&grammar_path)?
+    ));
+    source.push_str("pub(crate) static AMS_GRAMMAR: &[super::AmsGrammarEntry] = &[\n");
+    for command in commands {
+        source.push_str("    super::AmsGrammarEntry {\n");
+        for field in ["id", "label"] {
+            source.push_str(&format!(
+                "        {field}: {},\n",
+                serde_json::to_string(text(command, field, &grammar_path)?)
+                    .map_err(|error| error.to_string())?
+            ));
+        }
+        source.push_str("        keywords: &[");
+        for keyword in array(command, "keywords", &grammar_path)? {
+            source.push_str(
+                &serde_json::to_string(
+                    keyword
+                        .as_str()
+                        .ok_or_else(|| "AMS grammar keyword is not text".to_string())?,
+                )
+                .map_err(|error| error.to_string())?,
+            );
+            source.push_str(", ");
+        }
+        source.push_str("],\n");
+        source.push_str(&format!(
+            "        capability: {},\n",
+            command["capability"].as_str().map_or_else(
+                || "None".to_string(),
+                |value| format!(
+                    "Some({})",
+                    serde_json::to_string(value).unwrap_or_else(|_| "\"invalid\"".into())
+                )
+            )
+        ));
+        source.push_str("    },\n");
+    }
+    source.push_str("];\n");
+    Ok(source.into_bytes())
+}
+
+fn render_dataset_contract(root: &Path) -> TaskResult<Vec<u8>> {
+    let inventory_path = root.join("conformance/0.6/inventory/dataset-programming-surface.json");
+    let schema_path = root.join("conformance/0.6/schemas/dataset-programming-surface.schema.json");
+    let inventory = json(&inventory_path)?;
+    validate_schema_instance(&json(&schema_path)?, &inventory, &inventory_path)?;
+    let expected_counts = BTreeMap::from([
+        ("access-modes", 5usize),
+        ("allocation", 12),
+        ("ams-commands", 31),
+        ("catalog", 12),
+        ("dcb", 12),
+        ("lifecycle", 10),
+        ("organizations", 12),
+        ("provider-capabilities", 20),
+        ("sms", 9),
+        ("volume", 8),
+    ]);
+    let families = array(&inventory, "families", &inventory_path)?;
+    let actual_counts = families
+        .iter()
+        .map(|family| {
+            Ok((
+                text(family, "id", &inventory_path)?,
+                array(family, "items", &inventory_path)?.len(),
+            ))
+        })
+        .collect::<TaskResult<BTreeMap<_, _>>>()?;
+    require(
+        actual_counts == expected_counts,
+        "dataset programming family inventory count drifted",
+    )?;
+
+    let official_path = root.join("conformance/0.2/catalogs/dataset-vsam-ams.json");
+    let official = json(&official_path)?;
+    let official_rows = array(&official, "units", &official_path)?
+        .iter()
+        .flat_map(|unit| array(unit, "rows", &official_path).into_iter().flatten())
+        .map(|row| text(row, "id", &official_path).map(str::to_string))
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        official_rows.len() == 36,
+        "dataset contract did not load the frozen 36-row official denominator",
+    )?;
+
+    let mut descriptors = Vec::new();
+    let mut identities = BTreeSet::new();
+    let mut ams_rows = Vec::new();
+    let mut organization_rows = BTreeSet::new();
+    for family in families {
+        let family_id = text(family, "id", &inventory_path)?;
+        for item in array(family, "items", &inventory_path)? {
+            let item_id = text(item, "id", &inventory_path)?;
+            require(
+                identities.insert(format!("{family_id}:{item_id}")),
+                &format!("duplicate dataset surface identity {family_id}:{item_id}"),
+            )?;
+            let rows = array(item, "official_rows", &inventory_path)?;
+            for row in rows {
+                let row_id = row.as_str().ok_or_else(|| {
+                    format!("{} official row is not text", inventory_path.display())
+                })?;
+                require(
+                    official_rows.contains(row_id),
+                    &format!("dataset surface references unknown official row {row_id}"),
+                )?;
+                if family_id == "ams-commands" {
+                    ams_rows.push(row_id.to_string());
+                } else if family_id == "organizations" {
+                    organization_rows.insert(row_id.to_string());
+                }
+            }
+            require(
+                text(item, "implementation", &inventory_path)? != "capability-gated"
+                    || text(item, "effect", &inventory_path)?
+                        .to_ascii_lowercase()
+                        .contains("capability"),
+                &format!("{family_id}:{item_id} does not state its capability behavior"),
+            )?;
+            descriptors.push((family_id, item));
+        }
+    }
+    require(
+        descriptors.len() == 131 && ams_rows.len() == 31 && organization_rows.len() == 5,
+        "dataset surface denominator or official mapping is incomplete",
+    )?;
+
+    let official_units = array(&official, "units", &official_path)?;
+    let command_rows = array(&official_units[0], "rows", &official_path)?;
+    let expected_ams_rows = command_rows
+        .iter()
+        .map(|row| text(row, "id", &official_path).map(str::to_string))
+        .collect::<TaskResult<Vec<_>>>()?;
+    require(
+        ams_rows == expected_ams_rows,
+        "31-command inventory differs from the frozen official command order",
+    )?;
+    let ams_items = families
+        .iter()
+        .find(|family| family["id"] == Value::String("ams-commands".into()))
+        .ok_or("AMS command family is missing")?;
+    for (item, official_row) in array(ams_items, "items", &inventory_path)?
+        .iter()
+        .zip(command_rows)
+    {
+        let official_label = text(official_row, "label", &official_path)?;
+        let command = official_label
+            .split_once(". ")
+            .map(|(_, command)| command)
+            .ok_or_else(|| format!("official AMS label has no chapter prefix: {official_label}"))?;
+        require(
+            text(item, "label", &inventory_path)? == command,
+            &format!("AMS command label differs from official row: {command}"),
+        )?;
+    }
+
+    descriptors.sort_by(|left, right| {
+        (
+            left.0,
+            text(left.1, "id", &inventory_path).unwrap_or_default(),
+        )
+            .cmp(&(
+                right.0,
+                text(right.1, "id", &inventory_path).unwrap_or_default(),
+            ))
+    });
+    let mut source =
+        String::from("// @generated by `cargo xtask dataset-contract`; do not edit.\n\n");
+    source.push_str(&format!(
+        "pub const DATASET_SURFACE_INVENTORY_SHA256: &str = \"sha256:{}\";\n\n",
+        file_digest(&inventory_path)?
+    ));
+    source.push_str("pub const DATASET_SURFACE_DESCRIPTORS: &[DatasetSurfaceDescriptor] = &[\n");
+    for (family, item) in descriptors {
+        source.push_str("    DatasetSurfaceDescriptor {\n");
+        for (field, value) in [
+            ("family", family),
+            ("id", text(item, "id", &inventory_path)?),
+            ("label", text(item, "label", &inventory_path)?),
+            ("authority", text(item, "authority", &inventory_path)?),
+            (
+                "implementation",
+                text(item, "implementation", &inventory_path)?,
+            ),
+            ("effect", text(item, "effect", &inventory_path)?),
+        ] {
+            source.push_str(&format!(
+                "        {field}: {},\n",
+                serde_json::to_string(value).map_err(|error| error.to_string())?
+            ));
+        }
+        for (field, values) in [
+            ("operands", array(item, "operands", &inventory_path)?),
+            (
+                "official_rows",
+                array(item, "official_rows", &inventory_path)?,
+            ),
+        ] {
+            source.push_str(&format!("        {field}: &["));
+            for value in values {
+                source.push_str(
+                    &serde_json::to_string(value.as_str().ok_or_else(|| {
+                        format!("{} {field} value is not text", inventory_path.display())
+                    })?)
+                    .map_err(|error| error.to_string())?,
+                );
+                source.push_str(", ");
+            }
+            source.push_str("],\n");
+        }
+        source.push_str("    },\n");
+    }
+    source.push_str("];\n");
+    Ok(source.into_bytes())
 }
 
 fn generate_semantic_identities(root: &Path) -> TaskResult {
@@ -8830,6 +9887,8 @@ fn repository_digest_excluded(relative: &Path) -> bool {
         || relative == Path::new("conformance/0.2/evidence/review-repair-round-5.json")
         || relative == Path::new("conformance/0.2/evidence/work-packages/CV-209.json")
         || relative == Path::new("docs/delivery/coverage-versions/status/0.2.0.md")
+        || relative == Path::new("conformance/0.6/evidence/dataset-certification.json")
+        || relative == Path::new("docs/delivery/coverage-versions/status/0.6.0.md")
         || (relative_text.starts_with("conformance/0.1/evidence/phase-v")
             && relative.extension() == Some(OsStr::new("json")))
 }
@@ -9669,6 +10728,19 @@ fn require(condition: bool, message: &str) -> TaskResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dataset_reference_simulation_cannot_satisfy_the_licensed_receipt_gate() {
+        let root = repository_root().expect("repository root");
+        let pending = check_dataset_oracle_receipt(&root, None)
+            .expect_err("missing licensed receipt must remain pending");
+        assert!(pending.contains("licensed z/OS 3.2 differential is pending"));
+        let simulation =
+            root.join("crates/tooling/mainframe-env-conformance/src/dataset_reference.rs");
+        assert!(check_dataset_oracle_receipt(&root, Some(simulation)).is_err());
+        let local_certification = root.join("conformance/0.6/evidence/dataset-certification.json");
+        assert!(check_dataset_oracle_receipt(&root, Some(local_certification)).is_err());
+    }
 
     #[test]
     fn strict_cli_rejects_unknown_duplicate_and_surplus_arguments() {

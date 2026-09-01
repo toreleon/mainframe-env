@@ -7,8 +7,8 @@ mod traits;
 
 pub use model::{
     ArtifactRecord, CheckpointRecord, EffectRecord, EffectState, ExecutionRecord, ExecutionState,
-    GenerationRecord, OutboxRecord, ProviderStateRecord, ProviderStateWrite, SessionRecord,
-    StoreError, WorkRecord, WorkState,
+    GenerationRecord, OutboxRecord, ProviderStateMutation, ProviderStateRecord, ProviderStateWrite,
+    SessionRecord, StoreError, WorkRecord, WorkState,
 };
 pub use traits::{
     ArtifactStore, CheckpointStore, EventStore, ExecutionStore, GenerationStore, IdempotencyStore,
@@ -16,3 +16,4 @@ pub use traits::{
 };
 
 pub const STORE_CONTRACT: &str = "mainframe-env.store@1";
+pub const PROVIDER_STATE_STORE_CONTRACT: &str = "mainframe-env.provider-state-store@2";

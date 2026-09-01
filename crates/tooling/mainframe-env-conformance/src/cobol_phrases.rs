@@ -7,7 +7,7 @@ use mainframe_env_execution_api::{
     BoundedPayload, InvocationLimits, Machine, MachineDrive, MachineResume, Quantum,
 };
 use mainframe_env_host_api::{
-    DatasetLockMode, DatasetReadControl, DatasetReelUnit, DatasetRequest, EffectResult,
+    DatasetReadControl, DatasetReadLockMode, DatasetReelUnit, DatasetRequest, EffectResult,
     HostProblem, HostRequest,
 };
 use mainframe_env_interpreter::ReferenceMachine;
@@ -255,11 +255,11 @@ fn phrase_effect(request: &HostRequest) -> String {
         format!(
             "lock={},wait={}",
             match control.lock {
-                DatasetLockMode::Default => "default",
-                DatasetLockMode::Lock => "lock",
-                DatasetLockMode::KeptLock => "kept-lock",
-                DatasetLockMode::NoLock => "no-lock",
-                DatasetLockMode::IgnoreLock => "ignore-lock",
+                DatasetReadLockMode::Default => "default",
+                DatasetReadLockMode::Lock => "lock",
+                DatasetReadLockMode::KeptLock => "kept-lock",
+                DatasetReadLockMode::NoLock => "no-lock",
+                DatasetReadLockMode::IgnoreLock => "ignore-lock",
             },
             match control.wait {
                 None => "default",

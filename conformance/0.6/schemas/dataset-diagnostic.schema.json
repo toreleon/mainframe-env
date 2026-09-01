@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/dataset-diagnostic.schema.json",
+  "title": "Dataset diagnostic result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "dataset", "diagnostics"],
+  "properties": {
+    "schema_version": { "const": "mainframe-env.dataset-diagnostic@1" },
+    "dataset": { "type": "string", "pattern": "^[A-Z$#@][A-Z0-9$#@.-]{0,127}$" },
+    "diagnostics": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "field", "detail"],
+        "properties": {
+          "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,63}$" },
+          "field": { "type": ["string", "null"], "maxLength": 128 },
+          "detail": { "type": "string", "minLength": 1, "maxLength": 4096 }
+        }
+      }
+    }
+  }
+}

@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 mod codec;
+mod dependency;
 mod service;
 
 pub use service::{

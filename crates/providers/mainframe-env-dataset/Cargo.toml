@@ -13,3 +13,4 @@ sha2.workspace = true
 
 [dev-dependencies]
 mainframe-env-store = { path = "../../stores/mainframe-env-store" }
+serde_json.workspace = true

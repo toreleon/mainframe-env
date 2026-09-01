@@ -90,14 +90,29 @@ fn intrinsic_calls(
             )));
         };
         let after_name = skip_space(source, name_end);
-        let (argument_ranges, end) = if source.as_bytes().get(after_name) == Some(&b'(') {
-            let close = matching_close(source, after_name).ok_or_else(|| {
-                SemanticProblem::InvalidIntrinsic(format!("unterminated FUNCTION {name}"))
-            })?;
-            (split_arguments(source, after_name + 1..close), close + 1)
-        } else {
-            (Vec::new(), name_end)
-        };
+        let (argument_ranges, end, selected_length) =
+            if source.as_bytes().get(after_name) == Some(&b'(') {
+                let close = matching_close(source, after_name).ok_or_else(|| {
+                    SemanticProblem::InvalidIntrinsic(format!("unterminated FUNCTION {name}"))
+                })?;
+                let selector = numeric_reference_modification(&source[after_name + 1..close]);
+                if descriptor
+                    .signatures
+                    .iter()
+                    .any(|signature| signature.arguments.is_empty())
+                    && selector.is_some()
+                {
+                    (Vec::new(), close + 1, selector)
+                } else {
+                    (
+                        split_arguments(source, after_name + 1..close),
+                        close + 1,
+                        None,
+                    )
+                }
+            } else {
+                (Vec::new(), name_end, None)
+            };
         let arguments = argument_ranges
             .into_iter()
             .map(|range| {
@@ -120,13 +135,23 @@ fn intrinsic_calls(
         calls.push(CobolIntrinsicCall {
             kind: descriptor.kind,
             result_type: result_type(signature.result, &arguments)?,
-            fixed_length: descriptor.fixed_length,
+            fixed_length: selected_length.or(descriptor.fixed_length),
             runtime_supported: descriptor.runtime_supported,
             arguments,
             source: source_spans(origins, start..end),
         });
     }
     Ok(calls)
+}
+
+fn numeric_reference_modification(text: &str) -> Option<usize> {
+    let (start, length) = text.split_once(':')?;
+    if length.contains(':') {
+        return None;
+    }
+    let start = start.trim().parse::<usize>().ok()?;
+    let length = length.trim().parse::<usize>().ok()?;
+    (start > 0 && length > 0).then_some(length)
 }
 
 fn argument_type(
@@ -160,15 +185,22 @@ fn argument_type(
     if text.parse::<f64>().is_ok() {
         return Ok(IntrinsicValueType::Numeric);
     }
-    if let Some(register) = special_register_named(&upper) {
+    let reference = if upper.contains('(') {
+        data_reference_identity(&upper).ok_or_else(|| {
+            SemanticProblem::InvalidIntrinsic(format!("malformed intrinsic argument {text}"))
+        })?
+    } else {
+        upper
+    };
+    if let Some(register) = special_register_named(&reference) {
         return Ok(register_value_type(register.value_type));
     }
     let candidates = layouts
         .iter()
         .filter(|layout| {
-            layout.name == upper
-                || layout.qualified_name == upper
-                || qualified_reference_matches(&upper, &layout.qualified_name)
+            layout.name == reference
+                || layout.qualified_name == reference
+                || qualified_reference_matches(&reference, &layout.qualified_name)
         })
         .collect::<Vec<_>>();
     match candidates.as_slice() {
@@ -180,6 +212,47 @@ fn argument_type(
             "ambiguous intrinsic argument {text}"
         ))),
     }
+}
+
+fn data_reference_identity(text: &str) -> Option<String> {
+    let mut identity = String::with_capacity(text.len());
+    let mut depth = 0usize;
+    let mut selector_has_content = false;
+    for character in text.chars() {
+        match character {
+            '(' => {
+                if depth == 0 {
+                    selector_has_content = false;
+                }
+                depth = depth.checked_add(1)?;
+            }
+            ')' => {
+                depth = depth.checked_sub(1)?;
+                if depth == 0 && !selector_has_content {
+                    return None;
+                }
+            }
+            _ if depth > 0 => {
+                selector_has_content |= !character.is_whitespace();
+            }
+            _ => identity.push(character),
+        }
+    }
+    if depth != 0 {
+        return None;
+    }
+    let words = identity.split_whitespace().collect::<Vec<_>>();
+    if words.is_empty()
+        || words.len().is_multiple_of(2)
+        || !words
+            .iter()
+            .skip(1)
+            .step_by(2)
+            .all(|word| matches!(*word, "OF" | "IN"))
+    {
+        return None;
+    }
+    Some(words.join(" "))
 }
 
 fn infer_nested_function(

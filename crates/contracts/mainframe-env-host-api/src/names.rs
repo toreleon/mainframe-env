@@ -1,9 +1,27 @@
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
 macro_rules! host_name {
-    ($name:ident, $validate:expr) => {
+    ($name:ident, $validate:expr, $deserialize_max:expr) => {
         #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
         pub struct $name(String);
+        impl Serialize for $name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: Serializer,
+            {
+                serializer.serialize_str(&self.0)
+            }
+        }
+        impl<'de> Deserialize<'de> for $name {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                let value = String::deserialize(deserializer)?;
+                Self::new(value, $deserialize_max).map_err(serde::de::Error::custom)
+            }
+        }
         impl $name {
             pub fn new(
                 value: impl Into<String>,
@@ -52,15 +70,15 @@ fn resource(value: &str) -> bool {
     })
 }
 
-host_name!(DatasetName, qualified);
-host_name!(MemberName, simple);
-host_name!(ProgramName, simple);
-host_name!(ClassName, simple);
-host_name!(MethodName, simple);
-host_name!(RuntimeServiceName, simple);
-host_name!(JobName, simple);
-host_name!(SessionId, simple);
-host_name!(ResourceName, resource);
+host_name!(DatasetName, qualified, 246);
+host_name!(MemberName, simple, 8);
+host_name!(ProgramName, simple, 246);
+host_name!(ClassName, simple, 246);
+host_name!(MethodName, simple, 246);
+host_name!(RuntimeServiceName, simple, 246);
+host_name!(JobName, simple, 246);
+host_name!(SessionId, simple, 246);
+host_name!(ResourceName, resource, 246);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HostNameProblem {

@@ -276,12 +276,7 @@ impl Program for Builtin {
                     .split_whitespace()
                     .next()
                     .ok_or(HostProblem::Malformed)?;
-                if !matches!(
-                    command,
-                    "LISTCAT" | "DEFINE" | "DELETE" | "REPRO" | "BLDINDEX"
-                ) {
-                    return Err(HostProblem::Unsupported);
-                }
+                crate::ams::validate_idcams_control(control.as_bytes())?;
                 output(0, vec![format!("IDCAMS {command}").into_bytes()])
             }
             BuiltinProgram::Sort => {

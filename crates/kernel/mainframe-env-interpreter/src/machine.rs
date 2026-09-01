@@ -12,7 +12,7 @@ use mainframe_env_execution_api::{
 };
 use mainframe_env_host_api::{
     CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, ClassName,
-    ClockRequest, DatasetCloseControl, DatasetLockMode, DatasetName, DatasetReadControl,
+    ClockRequest, DatasetCloseControl, DatasetName, DatasetReadControl, DatasetReadLockMode,
     DatasetReelUnit, DatasetRequest, Db2HostVariable, Db2Operation, Db2Request, EffectRequest,
     EffectResult, HostLimits, HostProblem, HostRequest, HostResult, ImsOperation, ImsQualifier,
     ImsRequest, KeyRelation, MethodName, MqOperation, MqRequest, Mutation, ProgramName,
@@ -3730,15 +3730,15 @@ impl ReferenceMachine {
         let current_cursor = self.dataset_cursors.get(&dataset_name).cloned();
         let read_control = DatasetReadControl {
             lock: if args.windows(2).any(|window| window == ["WITH", "KEPT"]) {
-                DatasetLockMode::KeptLock
+                DatasetReadLockMode::KeptLock
             } else if args.windows(2).any(|window| window == ["WITH", "NO"]) {
-                DatasetLockMode::NoLock
+                DatasetReadLockMode::NoLock
             } else if args.iter().any(|token| token == "IGNORE") {
-                DatasetLockMode::IgnoreLock
+                DatasetReadLockMode::IgnoreLock
             } else if args.windows(2).any(|window| window == ["WITH", "LOCK"]) {
-                DatasetLockMode::Lock
+                DatasetReadLockMode::Lock
             } else {
-                DatasetLockMode::Default
+                DatasetReadLockMode::Default
             },
             wait: if args.windows(2).any(|window| window == ["NO", "WAIT"]) {
                 Some(false)

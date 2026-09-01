@@ -37,7 +37,12 @@ mod cobol_recovery;
 mod cobol_registers;
 mod cobol_runtime;
 mod cobol_statements;
+mod dataset;
+mod dataset_reference;
 mod jcl;
+mod racf;
+mod racf_oracle;
+mod racf_reference;
 
 pub use abi::{
     HostAbiInventoryReceipt, HostAbiLibraryReceipt, HostAbiMemberReceipt, verify_host_abi_libraries,
@@ -68,7 +73,13 @@ pub use carddemo::{
     verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
     verify_carddemo_vsam_from_env,
 };
+pub use dataset::{
+    DatasetConformanceRuntime, dataset_conformance_runtime, run_dataset_conformance,
+};
+pub use dataset_reference::{DatasetReferenceSimulationReport, run_dataset_reference_simulation};
 pub use jcl::{JclExitReceipt, JclFixtureRuntime, jcl_fixture_runtime, verify_jcl_exit};
+pub use racf::{racf_runtime, racf_runtime_with};
+pub use racf_oracle::{RACF_ORACLE_RELATIVE_PATH, RacfOracleCampaign, RacfOracleCase};
 
 pub use cobol_assurance::verify_cobol_assurance_sources;
 pub use cobol_clauses::verify_cobol_semantic_fixtures;
@@ -1798,7 +1809,7 @@ mod tests {
     #[test]
     fn read_lock_and_wait_phrases_survive_in_the_typed_dataset_effect() {
         use mainframe_env_host_api::{
-            DatasetLockMode, DatasetReadControl, DatasetRequest, HostRequest,
+            DatasetReadControl, DatasetReadLockMode, DatasetRequest, HostRequest,
         };
 
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. READCONTROL. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT TEST-FILE ASSIGN TO TESTDD ORGANIZATION IS INDEXED ACCESS MODE IS RANDOM RECORD KEY IS REC-KEY. DATA DIVISION. FILE SECTION. FD TEST-FILE. 01 TEST-REC. 05 REC-KEY PIC X(2) VALUE 'AA'. 05 DATA-X PIC X(2). PROCEDURE DIVISION. READ TEST-FILE RECORD KEY IS REC-KEY WITH KEPT LOCK NO WAIT. STOP RUN.";
@@ -1818,7 +1829,7 @@ mod tests {
             effect.request,
             HostRequest::Dataset(DatasetRequest::Read {
                 control: DatasetReadControl {
-                    lock: DatasetLockMode::KeptLock,
+                    lock: DatasetReadLockMode::KeptLock,
                     wait: Some(false),
                 },
                 ..

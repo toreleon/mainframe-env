@@ -15,6 +15,7 @@ mainframe-env-ir.workspace = true
 mainframe-env-compiler-api.workspace = true
 mainframe-env-execution-api.workspace = true
 mainframe-env-host-api.workspace = true
+mainframe-env-store-api.workspace = true
 mainframe-env-compiler.workspace = true
 mainframe-env-interpreter.workspace = true
 mainframe-env-application.workspace = true

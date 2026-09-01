@@ -480,7 +480,11 @@ impl<'a> GrammarParser<'a> {
         let mut depth = 0usize;
         while index < self.tokens.len() {
             if depth == 0 {
-                if self.tokens[index].is("END-PERFORM") || self.is_period_at(index) {
+                if self.at_any_terminator_at(index)
+                    || self.tokens[index].is("ELSE")
+                    || self.tokens[index].is("WHEN")
+                    || self.is_period_at(index)
+                {
                     break;
                 }
                 if self.classify_at(index).is_some() {
@@ -504,6 +508,15 @@ impl<'a> GrammarParser<'a> {
             PerformMode::OutOfLine => {
                 self.push_complete_simple(StatementKind::Perform, start, index, None)
             }
+            PerformMode::Inline
+                if perform_header_allows_empty(&self.tokens[start..index])
+                    && self
+                        .tokens
+                        .get(index)
+                        .is_some_and(|token| token.is("END-PERFORM")) =>
+            {
+                self.parse_inline_perform(start, index)
+            }
             PerformMode::Inline => Err(self.invalid(
                 StatementKind::Perform,
                 line,
@@ -522,7 +535,8 @@ impl<'a> GrammarParser<'a> {
         self.position = body;
         let before = self.statement_count;
         self.parse_sequence(SequenceStop::Perform, Some(StatementKind::Perform))?;
-        if self.statement_count == before {
+        if self.statement_count == before && !perform_header_allows_empty(&self.tokens[start..body])
+        {
             return Err(self.invalid(StatementKind::Perform, line, "inline PERFORM body is empty"));
         }
         let mut options = Vec::new();
@@ -897,9 +911,7 @@ impl<'a> GrammarParser<'a> {
     }
 
     fn at_any_terminator_at(&self, index: usize) -> bool {
-        self.tokens
-            .get(index)
-            .is_some_and(|token| token.kind == TokenKind::Word && token.text.starts_with("END-"))
+        self.tokens.get(index).is_some_and(explicit_terminator)
     }
 
     fn at_word(&self, word: &str) -> bool {
@@ -1036,20 +1048,37 @@ fn lex(source: &str) -> Result<Vec<Token<'_>>, HirProblem> {
             )
         } else if first.is_ascii_digit() {
             let integer = rest.bytes().take_while(u8::is_ascii_digit).count();
-            let fraction = if rest.as_bytes().get(integer) == Some(&b'.')
+            let word = rest
+                .bytes()
+                .take_while(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+                .count();
+            if word > integer
+                && rest
+                    .as_bytes()
+                    .get(integer)
+                    .is_some_and(|byte| matches!(byte, b'-' | b'_'))
                 && rest
                     .as_bytes()
                     .get(integer + 1)
-                    .is_some_and(u8::is_ascii_digit)
+                    .is_some_and(u8::is_ascii_alphanumeric)
             {
-                1 + rest.as_bytes()[integer + 1..]
-                    .iter()
-                    .take_while(|byte| byte.is_ascii_digit())
-                    .count()
+                (TokenKind::Word, word)
             } else {
-                0
-            };
-            (TokenKind::Number, integer + fraction)
+                let fraction = if rest.as_bytes().get(integer) == Some(&b'.')
+                    && rest
+                        .as_bytes()
+                        .get(integer + 1)
+                        .is_some_and(u8::is_ascii_digit)
+                {
+                    1 + rest.as_bytes()[integer + 1..]
+                        .iter()
+                        .take_while(|byte| byte.is_ascii_digit())
+                        .count()
+                } else {
+                    0
+                };
+                (TokenKind::Number, integer + fraction)
+            }
         } else {
             let two = rest.get(..2).unwrap_or(rest);
             let length = if matches!(two, ">=" | "<=" | "<>" | "**") {
@@ -1274,6 +1303,36 @@ fn terminator(kind: StatementKind) -> Option<&'static str> {
     })
 }
 
+fn explicit_terminator(token: &Token<'_>) -> bool {
+    [
+        "END-ACCEPT",
+        "END-ADD",
+        "END-CALL",
+        "END-COMPUTE",
+        "END-DELETE",
+        "END-DIVIDE",
+        "END-EVALUATE",
+        "END-EXEC",
+        "END-IF",
+        "END-INVOKE",
+        "END-JSON",
+        "END-MULTIPLY",
+        "END-PERFORM",
+        "END-READ",
+        "END-RETURN",
+        "END-REWRITE",
+        "END-SEARCH",
+        "END-START",
+        "END-STRING",
+        "END-SUBTRACT",
+        "END-UNSTRING",
+        "END-WRITE",
+        "END-XML",
+    ]
+    .iter()
+    .any(|word| token.is(word))
+}
+
 fn validate_simple_header(kind: StatementKind, tokens: &[Token<'_>]) -> Result<(), &'static str> {
     match kind {
         StatementKind::Accept => validate_accept(tokens),
@@ -1347,17 +1406,22 @@ fn validate_accept(tokens: &[Token<'_>]) -> Result<(), &'static str> {
     let mut cursor = Cursor::new(tokens, 1);
     cursor.operand()?;
     if cursor.eat("FROM") {
-        let source = cursor.position;
+        let source = cursor
+            .tokens
+            .get(cursor.position)
+            .map(|token| token.text.to_ascii_uppercase());
         cursor.operand()?;
-        if tokens.get(source).is_some_and(|token| token.is("DATE")) {
-            cursor.eat("YYYYMMDD");
-        } else if tokens.get(source).is_some_and(|token| token.is("DAY")) {
-            cursor.eat("YYYYDDD");
-        } else if tokens
-            .get(source)
-            .is_some_and(|token| token.is("ENVIRONMENT"))
-        {
-            cursor.operand()?;
+        match source.as_deref() {
+            Some("DATE") => {
+                cursor.eat("YYYYMMDD");
+            }
+            Some("DAY") => {
+                cursor.eat("YYYYDDD");
+            }
+            Some("ENVIRONMENT") => {
+                cursor.operand()?;
+            }
+            _ => {}
         }
     }
     cursor.finish()
@@ -1460,6 +1524,17 @@ fn validate_call_like(tokens: &[Token<'_>], invoke: bool) -> Result<(), &'static
     if cursor.eat("USING") {
         let mut count = 0usize;
         while !cursor.done() && !cursor.at("RETURNING") {
+            if cursor.tokens[cursor.position].text == "," {
+                if count == 0
+                    || cursor.position + 1 == cursor.tokens.len()
+                    || cursor.tokens[cursor.position + 1].text == ","
+                    || cursor.tokens[cursor.position + 1].is("RETURNING")
+                {
+                    return Err("CALL argument separator is misplaced");
+                }
+                cursor.position += 1;
+                continue;
+            }
             if cursor.eat("BY")
                 && !(cursor.eat("REFERENCE") || cursor.eat("CONTENT") || cursor.eat("VALUE"))
             {
@@ -1991,18 +2066,20 @@ fn validate_move(tokens: &[Token<'_>]) -> Result<(), &'static str> {
     cursor.eat("CORRESPONDING");
     cursor.operand()?;
     cursor.expect("TO")?;
-    let mut receivers = 0usize;
-    while !cursor.done() {
-        if cursor.at("TO") {
-            return Err("TO is duplicated");
+    let mut receivers = &tokens[cursor.position..];
+    if receivers.iter().any(|token| token.is("TO")) {
+        return Err("TO is duplicated");
+    }
+    if receivers.last().is_some_and(|token| token.text == ",") {
+        receivers = &receivers[..receivers.len() - 1];
+    }
+    validate_operand_list(receivers, 1).map_err(|problem| {
+        if receivers.is_empty() {
+            "MOVE receiver is missing"
+        } else {
+            problem
         }
-        cursor.operand()?;
-        receivers += 1;
-    }
-    if receivers == 0 {
-        return Err("MOVE receiver is missing");
-    }
-    cursor.finish()
+    })
 }
 
 fn validate_multiply(tokens: &[Token<'_>]) -> Result<(), &'static str> {
@@ -2183,6 +2260,13 @@ fn validate_string(tokens: &[Token<'_>]) -> Result<(), &'static str> {
     let mut position = 0usize;
     let mut count = 0usize;
     while position < senders.len() {
+        if senders[position].text == "," {
+            if count == 0 || position + 1 == senders.len() || senders[position + 1].text == "," {
+                return Err("STRING sender separator is misplaced");
+            }
+            position += 1;
+            continue;
+        }
         position = consume_operand(senders, position).ok_or("invalid STRING sender")?;
         if senders
             .get(position)
@@ -2317,6 +2401,10 @@ fn validate_perform_header(tokens: &[Token<'_>]) -> Result<PerformMode, &'static
     }
 }
 
+fn perform_header_allows_empty(tokens: &[Token<'_>]) -> bool {
+    tokens.iter().any(|token| token.is("VARYING"))
+}
+
 fn validate_expression(tokens: &[Token<'_>]) -> bool {
     if tokens.is_empty()
         || adjust_balanced(tokens).is_err()
@@ -2358,12 +2446,13 @@ fn validate_expression(tokens: &[Token<'_>]) -> bool {
 fn validate_arithmetic_expression(tokens: &[Token<'_>]) -> bool {
     validate_expression(tokens)
         && !tokens.iter().any(|token| {
-            PROCEDURE_STATEMENTS.iter().any(|descriptor| {
-                descriptor
-                    .grammar_keywords
-                    .iter()
-                    .any(|keyword| token.is(keyword))
-            })
+            !token.is("FUNCTION")
+                && PROCEDURE_STATEMENTS.iter().any(|descriptor| {
+                    descriptor
+                        .grammar_keywords
+                        .iter()
+                        .any(|keyword| token.is(keyword))
+                })
         })
 }
 

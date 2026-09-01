@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/ams-command-fixtures.schema.json",
+  "title": "AMS command conformance fixtures",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "cases"],
+  "properties": {
+    "schema_version": { "const": "mainframe-env.ams-command-fixtures@1" },
+    "cases": {
+      "type": "array",
+      "minItems": 31,
+      "maxItems": 31,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "command_id", "control", "expected"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^ams\\.[a-z0-9-]+$" },
+          "command_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "control": { "type": "string", "minLength": 1, "maxLength": 1024 },
+          "expected": { "type": "string", "minLength": 1, "maxLength": 256 }
+        }
+      }
+    }
+  }
+}

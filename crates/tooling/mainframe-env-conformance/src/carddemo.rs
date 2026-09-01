@@ -3212,6 +3212,7 @@ pub fn verify_carddemo_seeds_from_env(
                 key_offset: offset,
                 key_length: length,
                 allow_duplicates: true,
+                upgrade: true,
                 mutation: mutation(sequence as u64 + 1),
             })
             .map_err(|problem| {
@@ -6895,6 +6896,8 @@ async fn exercise_full_certification() -> Result<FullCertificationExercise, Corp
             dataset: DatasetName::new(&dataset, 128).expect("bounded test dataset"),
             member: None,
             expected_version: None,
+            purge: true,
+            current_date: None,
             mutation: Mutation {
                 sequence: postgres_sequence,
                 idempotency_key: IdempotencyKey::new(
@@ -12640,6 +12643,7 @@ fn install_base_online_authorities(
                 key_offset: offset,
                 key_length: length,
                 allow_duplicates: true,
+                upgrade: true,
                 mutation: mutation(sequence as u64 + 1),
             })
             .map_err(terminal_problem)?;
