@@ -1,50 +1,626 @@
 {
-  "schema_version": "mainframe-env.cobol-statement-fixtures@1",
+  "schema_version": "mainframe-env.cobol-statement-fixtures@2",
   "target_version": "0.3.0",
   "fixtures": [
-    {"id":"accept","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0001","target_id":"accept","valid":["ACCEPT A"],"invalid":["ACCEPT"]},
-    {"id":"add","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0002","target_id":"add","valid":["ADD 1 TO A ON SIZE ERROR CONTINUE END-ADD"],"invalid":["ADD 1"]},
-    {"id":"allocate","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0003","target_id":"allocate","valid":["ALLOCATE 10 CHARACTERS RETURNING PTR"],"invalid":["ALLOCATE"]},
-    {"id":"alter","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0004","target_id":"alter","valid":["ALTER TARGET TO PROCEED TO TARGET-EXIT"],"invalid":["ALTER TARGET"]},
-    {"id":"call","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0005","target_id":"call","valid":["CALL 'SUB' USING A ON EXCEPTION CONTINUE END-CALL"],"invalid":["CALL"]},
-    {"id":"cancel","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0006","target_id":"cancel","valid":["CANCEL 'SUB'"],"invalid":["CANCEL"]},
-    {"id":"close","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0007","target_id":"close","valid":["CLOSE TEST-FILE"],"invalid":["CLOSE"]},
-    {"id":"compute","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0008","target_id":"compute","valid":["COMPUTE A ROUNDED = 1 ON SIZE ERROR CONTINUE END-COMPUTE"],"invalid":["COMPUTE A 1"]},
-    {"id":"continue","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0009","target_id":"continue","valid":["CONTINUE"],"invalid":["CONTINUE EXTRA"]},
-    {"id":"delete","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0010","target_id":"delete","valid":["DELETE TEST-FILE RECORD INVALID KEY CONTINUE END-DELETE"],"invalid":["DELETE TEST-FILE"]},
-    {"id":"display","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0011","target_id":"display","valid":["DISPLAY A"],"invalid":["DISPLAY"]},
-    {"id":"divide","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0012","target_id":"divide","valid":["DIVIDE A INTO B GIVING C REMAINDER A ROUNDED"],"invalid":["DIVIDE A B"]},
-    {"id":"entry","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0013","target_id":"entry","valid":["ENTRY 'ALT' USING A"],"invalid":["ENTRY"]},
-    {"id":"evaluate","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0014","target_id":"evaluate","valid":["EVALUATE A\nWHEN 1\nCONTINUE\nWHEN OTHER\nCONTINUE\nEND-EVALUATE"],"invalid":["EVALUATE"]},
-    {"id":"exit","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0015","target_id":"exit","valid":["EXIT PROGRAM"],"invalid":["EXIT BOGUS"]},
-    {"id":"free","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0016","target_id":"free","valid":["FREE PTR"],"invalid":["FREE"]},
-    {"id":"goback","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0017","target_id":"goback","valid":["GOBACK"],"invalid":["GOBACK EXTRA"]},
-    {"id":"go-to","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0018","target_id":"go-to","valid":["GO TO TARGET"],"invalid":["GO TO"]},
-    {"id":"if","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0019","target_id":"if","valid":["IF A = 1\nCONTINUE\nELSE\nCONTINUE\nEND-IF"],"invalid":["IF"]},
-    {"id":"initialize","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0020","target_id":"initialize","valid":["INITIALIZE A"],"invalid":["INITIALIZE"]},
-    {"id":"inspect","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0021","target_id":"inspect","valid":["INSPECT A TALLYING B FOR ALL 'A'"],"invalid":["INSPECT A"]},
-    {"id":"invoke","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0022","target_id":"invoke","valid":["INVOKE A 'METHOD' USING B RETURNING C"],"invalid":["INVOKE A"]},
-    {"id":"json-generate","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0023","target_id":"json-generate","valid":["JSON GENERATE C FROM A ON EXCEPTION CONTINUE END-JSON"],"invalid":["JSON GENERATE C A"]},
-    {"id":"json-parse","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024","target_id":"json-parse","valid":["JSON PARSE C INTO A ON EXCEPTION CONTINUE END-JSON"],"invalid":["JSON PARSE C A"]},
-    {"id":"merge","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0025","target_id":"merge","valid":["MERGE SORT-FILE USING TEST-FILE GIVING OUT-FILE"],"invalid":["MERGE SORT-FILE"]},
-    {"id":"move","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0026","target_id":"move","valid":["MOVE A TO B"],"invalid":["MOVE A B"]},
-    {"id":"multiply","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0027","target_id":"multiply","valid":["MULTIPLY A BY B GIVING C"],"invalid":["MULTIPLY A B"]},
-    {"id":"open","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0028","target_id":"open","valid":["OPEN INPUT TEST-FILE"],"invalid":["OPEN TEST-FILE"]},
-    {"id":"perform","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0029","target_id":"perform","valid":["PERFORM TARGET"],"invalid":["PERFORM"]},
-    {"id":"read","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0030","target_id":"read","valid":["READ TEST-FILE INTO TEST-RECORD AT END CONTINUE END-READ"],"invalid":["READ"]},
-    {"id":"release","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0031","target_id":"release","valid":["RELEASE SORT-RECORD FROM TEST-RECORD"],"invalid":["RELEASE"]},
-    {"id":"return","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0032","target_id":"return","valid":["RETURN SORT-FILE RECORD INTO SORT-RECORD AT END CONTINUE END-RETURN"],"invalid":["RETURN"]},
-    {"id":"rewrite","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0033","target_id":"rewrite","valid":["REWRITE TEST-RECORD FROM C INVALID KEY CONTINUE END-REWRITE"],"invalid":["REWRITE"]},
-    {"id":"search","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0034","target_id":"search","valid":["SEARCH TABLE-ITEM\nWHEN TABLE-ITEM = 'A'\nCONTINUE\nEND-SEARCH"],"invalid":["SEARCH"]},
-    {"id":"set","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0035","target_id":"set","valid":["SET A TO 1"],"invalid":["SET A"]},
-    {"id":"sort","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0036","target_id":"sort","valid":["SORT SORT-FILE USING TEST-FILE GIVING OUT-FILE"],"invalid":["SORT SORT-FILE"]},
-    {"id":"start","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0037","target_id":"start","valid":["START TEST-FILE KEY IS NOT LESS THAN A INVALID KEY CONTINUE END-START"],"invalid":["START"]},
-    {"id":"stop","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0038","target_id":"stop","valid":["STOP RUN"],"invalid":["STOP RUN EXTRA"]},
-    {"id":"string","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0039","target_id":"string","valid":["STRING A DELIMITED BY SIZE INTO C ON OVERFLOW CONTINUE END-STRING"],"invalid":["STRING A"]},
-    {"id":"subtract","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0040","target_id":"subtract","valid":["SUBTRACT A FROM B GIVING C"],"invalid":["SUBTRACT A B"]},
-    {"id":"unstring","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0041","target_id":"unstring","valid":["UNSTRING C DELIMITED BY SPACE INTO A B ON OVERFLOW CONTINUE END-UNSTRING"],"invalid":["UNSTRING C"]},
-    {"id":"write","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0042","target_id":"write","valid":["WRITE TEST-RECORD FROM C INVALID KEY CONTINUE END-WRITE"],"invalid":["WRITE"]},
-    {"id":"xml-generate","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0043","target_id":"xml-generate","valid":["XML GENERATE C FROM A ON EXCEPTION CONTINUE END-XML"],"invalid":["XML GENERATE C A"]},
-    {"id":"xml-parse","row_id":"ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044","target_id":"xml-parse","valid":["XML PARSE C PROCESSING PROCEDURE TARGET ON EXCEPTION CONTINUE END-XML"],"invalid":["XML PARSE C TARGET"]}
+    {
+      "id": "accept", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0001", "target_id": "accept",
+      "valid": [
+        {"source":"ACCEPT A","class":"base","format":"fixed"},
+        {"source":"ACCEPT A FROM B","class":"alternative"},
+        {"source":"ACCEPT A DISPLAY B","class":"same-line-sequence","expected_targets":["accept","display"]}
+      ],
+      "invalid": [
+        {"source":"ACCEPT","class":"missing-required"},
+        {"source":"ACCEPT A @","class":"unknown-suffix"},
+        {"source":"ACCEPT A FROM B FROM C","class":"duplicate-or-exclusive"},
+        {"source":"ACCEPT A B FROM C","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "add", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0002", "target_id": "add",
+      "valid": [
+        {"source":"ADD 1 TO A ON SIZE ERROR CONTINUE END-ADD","class":"base","expected_targets":["add","continue"]},
+        {"source":"ADD A GIVING B","class":"alternative"},
+        {"source":"ADD 1 TO A DISPLAY B","class":"same-line-sequence","expected_targets":["add","display"]}
+      ],
+      "invalid": [
+        {"source":"ADD 1","class":"missing-required"},
+        {"source":"ADD 1 TO A @","class":"unknown-suffix"},
+        {"source":"ADD 1 TO A GIVING B GIVING C","class":"duplicate-or-exclusive"},
+        {"source":"ADD TO A","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "allocate", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0003", "target_id": "allocate",
+      "valid": [
+        {"source":"ALLOCATE 10 CHARACTERS RETURNING PTR","class":"base"},
+        {"source":"ALLOCATE 10 INITIALIZED RETURNING PTR","class":"alternative"},
+        {"source":"ALLOCATE 10 DISPLAY B","class":"same-line-sequence","expected_targets":["allocate","display"]}
+      ],
+      "invalid": [
+        {"source":"ALLOCATE","class":"missing-required"},
+        {"source":"ALLOCATE 10 @","class":"unknown-suffix"},
+        {"source":"ALLOCATE 10 RETURNING PTR RETURNING PTR","class":"duplicate-or-exclusive"},
+        {"source":"ALLOCATE 10 RETURNING PTR INITIALIZED","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "alter", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0004", "target_id": "alter",
+      "valid": [
+        {"source":"ALTER TARGET TO PROCEED TO TARGET-EXIT","class":"base"},
+        {"source":"ALTER TARGET TO TARGET-EXIT","class":"alternative"},
+        {"source":"ALTER TARGET TO TARGET-EXIT DISPLAY B","class":"same-line-sequence","expected_targets":["alter","display"]}
+      ],
+      "invalid": [
+        {"source":"ALTER TARGET","class":"missing-required"},
+        {"source":"ALTER TARGET TO TARGET-EXIT @","class":"unknown-suffix"},
+        {"source":"ALTER TARGET TO PROCEED TO TARGET-EXIT TO TARGET","class":"duplicate-or-exclusive"},
+        {"source":"ALTER TO TARGET","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "call", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0005", "target_id": "call",
+      "valid": [
+        {"source":"CALL 'SUB' USING A ON EXCEPTION CONTINUE END-CALL","class":"base","expected_targets":["call","continue"]},
+        {"source":"CALL 'SUB' RETURNING C","class":"alternative"},
+        {"source":"CALL 'SUB' DISPLAY B","class":"same-line-sequence","expected_targets":["call","display"]}
+      ],
+      "invalid": [
+        {"source":"CALL","class":"missing-required"},
+        {"source":"CALL 'SUB' @","class":"unknown-suffix"},
+        {"source":"CALL 'SUB' RETURNING C RETURNING B","class":"duplicate-or-exclusive"},
+        {"source":"CALL 'SUB' RETURNING C USING A","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "cancel", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0006", "target_id": "cancel",
+      "valid": [
+        {"source":"CANCEL 'SUB'","class":"base"},
+        {"source":"CANCEL 'SUB' 'OTHER'","class":"alternative"},
+        {"source":"CANCEL 'SUB' DISPLAY B","class":"same-line-sequence","expected_targets":["cancel","display"]}
+      ],
+      "invalid": [
+        {"source":"CANCEL","class":"missing-required"},
+        {"source":"CANCEL 'SUB' @","class":"unknown-suffix"},
+        {"source":"CANCEL 'SUB' ()","class":"reordered-or-cardinality"},
+        {"source":"CANCEL , 'SUB'","class":"duplicate-or-exclusive"}
+      ]
+    },
+    {
+      "id": "close", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0007", "target_id": "close",
+      "valid": [
+        {"source":"CLOSE TEST-FILE","class":"base"},
+        {"source":"CLOSE TEST-FILE OUT-FILE","class":"alternative"},
+        {"source":"CLOSE TEST-FILE DISPLAY B","class":"same-line-sequence","expected_targets":["close","display"]}
+      ],
+      "invalid": [
+        {"source":"CLOSE","class":"missing-required"},
+        {"source":"CLOSE TEST-FILE @","class":"unknown-suffix"},
+        {"source":"CLOSE TEST-FILE ()","class":"reordered-or-cardinality"},
+        {"source":"CLOSE , TEST-FILE","class":"duplicate-or-exclusive"}
+      ]
+    },
+    {
+      "id": "compute", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0008", "target_id": "compute",
+      "valid": [
+        {"source":"COMPUTE A ROUNDED = 1 ON SIZE ERROR CONTINUE END-COMPUTE","class":"base","expected_targets":["compute","continue"]},
+        {"source":"COMPUTE A = B + 1","class":"alternative"},
+        {"source":"COMPUTE A = 1 DISPLAY B","class":"same-line-sequence","expected_targets":["compute","display"]}
+      ],
+      "invalid": [
+        {"source":"COMPUTE A 1","class":"missing-required"},
+        {"source":"COMPUTE A = 1 @","class":"unknown-suffix"},
+        {"source":"COMPUTE A = 1 = 2","class":"duplicate-or-exclusive"},
+        {"source":"COMPUTE = 1","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "continue", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0009", "target_id": "continue",
+      "valid": [
+        {"source":"CONTINUE","class":"base"},
+        {"source":"CONTINUE\n","class":"continuation"},
+        {"source":"CONTINUE DISPLAY B","class":"same-line-sequence","expected_targets":["continue","display"]}
+      ],
+      "invalid": [
+        {"source":"CONTINUE EXTRA","class":"arity-boundary"},
+        {"source":"CONTINUE @","class":"unknown-suffix"},
+        {"source":"CONTINUE ()","class":"reordered-or-cardinality"},
+        {"source":"CONTINUE ,","class":"duplicate-or-exclusive"}
+      ]
+    },
+    {
+      "id": "delete", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0010", "target_id": "delete",
+      "valid": [
+        {"source":"DELETE TEST-FILE RECORD INVALID KEY CONTINUE END-DELETE","class":"base","expected_targets":["delete","continue"]},
+        {"source":"DELETE TEST-FILE RECORD","class":"alternative"},
+        {"source":"DELETE TEST-FILE RECORD DISPLAY B","class":"same-line-sequence","expected_targets":["delete","display"]}
+      ],
+      "invalid": [
+        {"source":"DELETE TEST-FILE","class":"missing-required"},
+        {"source":"DELETE TEST-FILE RECORD @","class":"unknown-suffix"},
+        {"source":"DELETE TEST-FILE RECORD RECORD","class":"duplicate-or-exclusive"},
+        {"source":"DELETE RECORD TEST-FILE","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "display", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0011", "target_id": "display",
+      "valid": [
+        {"source":"DISPLAY A","class":"base"},
+        {"source":"DISPLAY A UPON C WITH NO ADVANCING","class":"alternative"},
+        {"source":"DISPLAY A DISPLAY B","class":"same-line-sequence","expected_targets":["display","display"]}
+      ],
+      "invalid": [
+        {"source":"DISPLAY","class":"missing-required"},
+        {"source":"DISPLAY A @","class":"unknown-suffix"},
+        {"source":"DISPLAY A UPON C UPON C","class":"duplicate-or-exclusive"},
+        {"source":"DISPLAY A WITH NO ADVANCING UPON C","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "divide", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0012", "target_id": "divide",
+      "valid": [
+        {"source":"DIVIDE A INTO B GIVING C REMAINDER A ROUNDED","class":"base"},
+        {"source":"DIVIDE A BY B GIVING C","class":"alternative"},
+        {"source":"DIVIDE A INTO B DISPLAY B","class":"same-line-sequence","expected_targets":["divide","display"]}
+      ],
+      "invalid": [
+        {"source":"DIVIDE A B","class":"missing-required"},
+        {"source":"DIVIDE A INTO B @","class":"unknown-suffix"},
+        {"source":"DIVIDE A INTO B GIVING C GIVING A","class":"duplicate-or-exclusive"},
+        {"source":"DIVIDE INTO B","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "entry", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0013", "target_id": "entry",
+      "valid": [
+        {"source":"ENTRY 'ALT' USING A","class":"base"},
+        {"source":"ENTRY 'ALT'","class":"alternative"},
+        {"source":"ENTRY 'ALT' DISPLAY B","class":"same-line-sequence","expected_targets":["entry","display"]}
+      ],
+      "invalid": [
+        {"source":"ENTRY","class":"missing-required"},
+        {"source":"ENTRY 'ALT' @","class":"unknown-suffix"},
+        {"source":"ENTRY 'ALT' USING A USING B","class":"duplicate-or-exclusive"},
+        {"source":"ENTRY A USING B","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "evaluate", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0014", "target_id": "evaluate",
+      "valid": [
+        {"source":"EVALUATE A\nWHEN 1\nCONTINUE\nWHEN OTHER\nCONTINUE\nEND-EVALUATE","class":"base","expected_targets":["evaluate","continue","continue"]},
+        {"source":"EVALUATE A WHEN 1 WHEN 2 DISPLAY B WHEN OTHER CONTINUE END-EVALUATE","class":"alternative","expected_targets":["evaluate","display","continue"]},
+        {"source":"EVALUATE A WHEN 1 CONTINUE END-EVALUATE DISPLAY B","class":"same-line-sequence","expected_targets":["evaluate","continue","display"]}
+      ],
+      "invalid": [
+        {"source":"EVALUATE","class":"missing-required"},
+        {"source":"EVALUATE A WHEN 1 CONTINUE @ END-EVALUATE","class":"unknown-suffix"},
+        {"source":"EVALUATE A WHEN OTHER CONTINUE WHEN 2 CONTINUE END-EVALUATE","class":"duplicate-or-exclusive"},
+        {"source":"EVALUATE A CONTINUE WHEN 1 CONTINUE END-EVALUATE","class":"reordered-or-cardinality"},
+        {"source":"EVALUATE A WHEN 1 CONTINUE END-IF","class":"malformed-nesting"}
+      ]
+    },
+    {
+      "id": "exit", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0015", "target_id": "exit",
+      "valid": [
+        {"source":"EXIT PROGRAM","class":"base"},
+        {"source":"EXIT","class":"alternative"},
+        {"source":"EXIT PROGRAM DISPLAY B","class":"same-line-sequence","expected_targets":["exit","display"]}
+      ],
+      "invalid": [
+        {"source":"EXIT BOGUS","class":"arity-boundary"},
+        {"source":"EXIT PROGRAM @","class":"unknown-suffix"},
+        {"source":"EXIT PROGRAM PROGRAM","class":"duplicate-or-exclusive"},
+        {"source":"EXIT PROGRAM METHOD","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "free", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0016", "target_id": "free",
+      "valid": [
+        {"source":"FREE PTR","class":"base"},
+        {"source":"FREE PTR A","class":"alternative"},
+        {"source":"FREE PTR DISPLAY B","class":"same-line-sequence","expected_targets":["free","display"]}
+      ],
+      "invalid": [
+        {"source":"FREE","class":"missing-required"},
+        {"source":"FREE PTR @","class":"unknown-suffix"},
+        {"source":"FREE PTR ()","class":"reordered-or-cardinality"},
+        {"source":"FREE , PTR","class":"duplicate-or-exclusive"}
+      ]
+    },
+    {
+      "id": "goback", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0017", "target_id": "goback",
+      "valid": [
+        {"source":"GOBACK","class":"base"},
+        {"source":"GO BACK","class":"alternative"},
+        {"source":"GOBACK DISPLAY B","class":"same-line-sequence","expected_targets":["goback","display"]}
+      ],
+      "invalid": [
+        {"source":"GOBACK EXTRA","class":"arity-boundary"},
+        {"source":"GOBACK @","class":"unknown-suffix"},
+        {"source":"GO BACK BACK","class":"duplicate-or-exclusive"},
+        {"source":"GO BACK EXTRA EXTRA","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "go-to", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0018", "target_id": "go-to",
+      "valid": [
+        {"source":"GO TO TARGET","class":"base"},
+        {"source":"GO TO TARGET DEPENDING ON A","class":"alternative"},
+        {"source":"GO TO TARGET DISPLAY B","class":"same-line-sequence","expected_targets":["go-to","display"]}
+      ],
+      "invalid": [
+        {"source":"GO TO","class":"missing-required"},
+        {"source":"GO TO TARGET @","class":"unknown-suffix"},
+        {"source":"GO TO TARGET DEPENDING ON A DEPENDING ON B","class":"duplicate-or-exclusive"},
+        {"source":"GO TO DEPENDING ON A","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "if", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0019", "target_id": "if",
+      "valid": [
+        {"source":"IF A = 1\nCONTINUE\nELSE\nCONTINUE\nEND-IF","class":"base","expected_targets":["if","continue","continue"]},
+        {"source":"IF A = 1 THEN DISPLAY B ELSE CONTINUE END-IF","class":"alternative","expected_targets":["if","display","continue"]},
+        {"source":"IF A = 1 CONTINUE END-IF DISPLAY B","class":"same-line-sequence","expected_targets":["if","continue","display"]}
+      ],
+      "invalid": [
+        {"source":"IF","class":"missing-required"},
+        {"source":"IF A = 1 CONTINUE @ END-IF","class":"unknown-suffix"},
+        {"source":"IF A = 1 CONTINUE ELSE CONTINUE ELSE CONTINUE END-IF","class":"duplicate-or-exclusive"},
+        {"source":"IF A = 1 ELSE CONTINUE END-IF","class":"reordered-or-cardinality"},
+        {"source":"IF A = 1 CONTINUE END-EVALUATE","class":"malformed-nesting"}
+      ]
+    },
+    {
+      "id": "initialize", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0020", "target_id": "initialize",
+      "valid": [
+        {"source":"INITIALIZE A","class":"base"},
+        {"source":"INITIALIZE A WITH FILLER","class":"alternative"},
+        {"source":"INITIALIZE A DISPLAY B","class":"same-line-sequence","expected_targets":["initialize","display"]}
+      ],
+      "invalid": [
+        {"source":"INITIALIZE","class":"missing-required"},
+        {"source":"INITIALIZE A @","class":"unknown-suffix"},
+        {"source":"INITIALIZE A WITH FILLER WITH FILLER","class":"duplicate-or-exclusive"},
+        {"source":"INITIALIZE A REPLACING BY B","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "inspect", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0021", "target_id": "inspect",
+      "valid": [
+        {"source":"INSPECT A TALLYING B FOR ALL 'A'","class":"base"},
+        {"source":"INSPECT A REPLACING ALL 'A' BY 'B'","class":"alternative"},
+        {"source":"INSPECT A CONVERTING 'A' TO 'B' DISPLAY B","class":"same-line-sequence","expected_targets":["inspect","display"]}
+      ],
+      "invalid": [
+        {"source":"INSPECT A","class":"missing-required"},
+        {"source":"INSPECT A TALLYING B @","class":"unknown-suffix"},
+        {"source":"INSPECT A TALLYING B REPLACING A","class":"duplicate-or-exclusive"},
+        {"source":"INSPECT TALLYING A","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "invoke", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0022", "target_id": "invoke",
+      "valid": [
+        {"source":"INVOKE A 'METHOD' USING B RETURNING C","class":"base"},
+        {"source":"INVOKE A 'METHOD' RETURNING C","class":"alternative"},
+        {"source":"INVOKE A 'METHOD' DISPLAY B","class":"same-line-sequence","expected_targets":["invoke","display"]}
+      ],
+      "invalid": [
+        {"source":"INVOKE A","class":"missing-required"},
+        {"source":"INVOKE A 'METHOD' @","class":"unknown-suffix"},
+        {"source":"INVOKE A 'METHOD' RETURNING C RETURNING B","class":"duplicate-or-exclusive"},
+        {"source":"INVOKE A 'METHOD' RETURNING C USING B","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "json-generate", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0023", "target_id": "json-generate",
+      "valid": [
+        {"source":"JSON GENERATE C FROM A ON EXCEPTION CONTINUE END-JSON","class":"base","expected_targets":["json-generate","continue"]},
+        {"source":"JSON GENERATE C FROM A COUNT IN B","class":"alternative"},
+        {"source":"JSON GENERATE C FROM A DISPLAY B","class":"same-line-sequence","expected_targets":["json-generate","display"]}
+      ],
+      "invalid": [
+        {"source":"JSON GENERATE C A","class":"missing-required"},
+        {"source":"JSON GENERATE C FROM A @","class":"unknown-suffix"},
+        {"source":"JSON GENERATE C FROM A COUNT IN B COUNT IN A","class":"duplicate-or-exclusive"},
+        {"source":"JSON GENERATE FROM A","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "json-parse", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024", "target_id": "json-parse",
+      "valid": [
+        {"source":"JSON PARSE C INTO A ON EXCEPTION CONTINUE END-JSON","class":"base","expected_targets":["json-parse","continue"]},
+        {"source":"JSON PARSE C INTO A WITH DETAIL","class":"alternative"},
+        {"source":"JSON PARSE C INTO A DISPLAY B","class":"same-line-sequence","expected_targets":["json-parse","display"]}
+      ],
+      "invalid": [
+        {"source":"JSON PARSE C A","class":"missing-required"},
+        {"source":"JSON PARSE C INTO A @","class":"unknown-suffix"},
+        {"source":"JSON PARSE C INTO A INTO B","class":"duplicate-or-exclusive"},
+        {"source":"JSON PARSE INTO A","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "merge", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0025", "target_id": "merge",
+      "valid": [
+        {"source":"MERGE SORT-FILE USING TEST-FILE GIVING OUT-FILE","class":"base"},
+        {"source":"MERGE SORT-FILE ON DESCENDING KEY A USING TEST-FILE GIVING OUT-FILE","class":"alternative"},
+        {"source":"MERGE SORT-FILE USING TEST-FILE GIVING OUT-FILE DISPLAY B","class":"same-line-sequence","expected_targets":["merge","display"]}
+      ],
+      "invalid": [
+        {"source":"MERGE SORT-FILE","class":"missing-required"},
+        {"source":"MERGE SORT-FILE USING TEST-FILE GIVING OUT-FILE @","class":"unknown-suffix"},
+        {"source":"MERGE SORT-FILE USING TEST-FILE USING OUT-FILE GIVING OUT-FILE","class":"duplicate-or-exclusive"},
+        {"source":"MERGE SORT-FILE GIVING OUT-FILE USING TEST-FILE","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "move", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0026", "target_id": "move",
+      "valid": [
+        {"source":"MOVE A\n TO B","class":"base","format":"variable"},
+        {"source":"MOVE CORRESPONDING A TO B","class":"alternative"},
+        {"source":"MOVE A TO B DISPLAY B","class":"same-line-sequence","expected_targets":["move","display"]}
+      ],
+      "invalid": [
+        {"source":"MOVE A B","class":"missing-required"},
+        {"source":"MOVE A TO B @","class":"unknown-suffix"},
+        {"source":"MOVE A TO B TO C","class":"duplicate-or-exclusive"},
+        {"source":"MOVE TO B","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "multiply", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0027", "target_id": "multiply",
+      "valid": [
+        {"source":"MULTIPLY A BY B GIVING C","class":"base"},
+        {"source":"MULTIPLY A BY B ROUNDED","class":"alternative"},
+        {"source":"MULTIPLY A BY B DISPLAY B","class":"same-line-sequence","expected_targets":["multiply","display"]}
+      ],
+      "invalid": [
+        {"source":"MULTIPLY A B","class":"missing-required"},
+        {"source":"MULTIPLY A BY B @","class":"unknown-suffix"},
+        {"source":"MULTIPLY A BY B GIVING C GIVING A","class":"duplicate-or-exclusive"},
+        {"source":"MULTIPLY BY B","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "open", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0028", "target_id": "open",
+      "valid": [
+        {"source":"OPEN INPUT TEST-FILE","class":"base"},
+        {"source":"OPEN INPUT TEST-FILE OUTPUT OUT-FILE","class":"alternative"},
+        {"source":"OPEN INPUT TEST-FILE DISPLAY B","class":"same-line-sequence","expected_targets":["open","display"]}
+      ],
+      "invalid": [
+        {"source":"OPEN TEST-FILE","class":"missing-required"},
+        {"source":"OPEN INPUT TEST-FILE @","class":"unknown-suffix"},
+        {"source":"OPEN INPUT TEST-FILE INPUT","class":"duplicate-or-exclusive"},
+        {"source":"OPEN INPUT OUTPUT OUT-FILE","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "perform", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0029", "target_id": "perform",
+      "valid": [
+        {"source":"PERFORM TARGET","class":"base"},
+        {"source":"PERFORM UNTIL A = B\nDISPLAY A\nEND-PERFORM","class":"alternative","expected_targets":["perform","display"]},
+        {"source":"PERFORM TARGET DISPLAY B","class":"same-line-sequence","expected_targets":["perform","display"]}
+      ],
+      "invalid": [
+        {"source":"PERFORM","class":"missing-required"},
+        {"source":"PERFORM TARGET @","class":"unknown-suffix"},
+        {"source":"PERFORM TARGET THROUGH TARGET-EXIT THROUGH TARGET","class":"duplicate-or-exclusive"},
+        {"source":"PERFORM UNTIL A = B END-PERFORM","class":"reordered-or-cardinality"},
+        {"source":"PERFORM UNTIL A = B CONTINUE END-IF","class":"malformed-nesting"}
+      ]
+    },
+    {
+      "id": "read", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0030", "target_id": "read",
+      "valid": [
+        {"source":"READ TEST-FILE INTO TEST-RECORD AT END CONTINUE END-READ","class":"base","expected_targets":["read","continue"]},
+        {"source":"READ TEST-FILE KEY IS A","class":"alternative"},
+        {"source":"READ TEST-FILE DISPLAY B","class":"same-line-sequence","expected_targets":["read","display"]}
+      ],
+      "invalid": [
+        {"source":"READ","class":"missing-required"},
+        {"source":"READ TEST-FILE @","class":"unknown-suffix"},
+        {"source":"READ TEST-FILE INTO A INTO B","class":"duplicate-or-exclusive"},
+        {"source":"READ TEST-FILE KEY INTO A","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "release", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0031", "target_id": "release",
+      "valid": [
+        {"source":"RELEASE SORT-RECORD FROM TEST-RECORD","class":"base"},
+        {"source":"RELEASE SORT-RECORD","class":"alternative"},
+        {"source":"RELEASE SORT-RECORD DISPLAY B","class":"same-line-sequence","expected_targets":["release","display"]}
+      ],
+      "invalid": [
+        {"source":"RELEASE","class":"missing-required"},
+        {"source":"RELEASE SORT-RECORD @","class":"unknown-suffix"},
+        {"source":"RELEASE SORT-RECORD FROM A FROM B","class":"duplicate-or-exclusive"},
+        {"source":"RELEASE FROM A","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "return", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0032", "target_id": "return",
+      "valid": [
+        {"source":"RETURN SORT-FILE RECORD INTO SORT-RECORD AT END CONTINUE END-RETURN","class":"base","expected_targets":["return","continue"]},
+        {"source":"RETURN SORT-FILE RECORD","class":"alternative"},
+        {"source":"RETURN SORT-FILE RECORD DISPLAY B","class":"same-line-sequence","expected_targets":["return","display"]}
+      ],
+      "invalid": [
+        {"source":"RETURN","class":"missing-required"},
+        {"source":"RETURN SORT-FILE RECORD @","class":"unknown-suffix"},
+        {"source":"RETURN SORT-FILE RECORD INTO A INTO B","class":"duplicate-or-exclusive"},
+        {"source":"RETURN RECORD SORT-FILE","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "rewrite", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0033", "target_id": "rewrite",
+      "valid": [
+        {"source":"REWRITE TEST-RECORD FROM C INVALID KEY CONTINUE END-REWRITE","class":"base","expected_targets":["rewrite","continue"]},
+        {"source":"REWRITE TEST-RECORD","class":"alternative"},
+        {"source":"REWRITE TEST-RECORD DISPLAY B","class":"same-line-sequence","expected_targets":["rewrite","display"]}
+      ],
+      "invalid": [
+        {"source":"REWRITE","class":"missing-required"},
+        {"source":"REWRITE TEST-RECORD @","class":"unknown-suffix"},
+        {"source":"REWRITE TEST-RECORD FROM A FROM B","class":"duplicate-or-exclusive"},
+        {"source":"REWRITE FROM A","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "search", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0034", "target_id": "search",
+      "valid": [
+        {"source":"SEARCH TABLE-ITEM\nWHEN TABLE-ITEM = 'A'\nCONTINUE\nEND-SEARCH","class":"base","expected_targets":["search","continue"]},
+        {"source":"SEARCH ALL TABLE-ITEM AT END CONTINUE WHEN TABLE-ITEM = 'A' DISPLAY B END-SEARCH","class":"alternative","expected_targets":["search","continue","display"]},
+        {"source":"SEARCH TABLE-ITEM WHEN TABLE-ITEM = 'A' CONTINUE END-SEARCH DISPLAY B","class":"same-line-sequence","expected_targets":["search","continue","display"]}
+      ],
+      "invalid": [
+        {"source":"SEARCH","class":"missing-required"},
+        {"source":"SEARCH TABLE-ITEM WHEN A = 1 CONTINUE @ END-SEARCH","class":"unknown-suffix"},
+        {"source":"SEARCH TABLE-ITEM AT END CONTINUE AT END CONTINUE WHEN A = 1 CONTINUE END-SEARCH","class":"duplicate-or-exclusive"},
+        {"source":"SEARCH TABLE-ITEM CONTINUE WHEN A = 1 CONTINUE END-SEARCH","class":"reordered-or-cardinality"},
+        {"source":"SEARCH TABLE-ITEM WHEN A = 1 CONTINUE END-IF","class":"malformed-nesting"}
+      ]
+    },
+    {
+      "id": "set", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0035", "target_id": "set",
+      "valid": [
+        {"source":"SET A TO 1","class":"base"},
+        {"source":"SET A UP BY 1","class":"alternative"},
+        {"source":"SET A TO 1 DISPLAY B","class":"same-line-sequence","expected_targets":["set","display"]}
+      ],
+      "invalid": [
+        {"source":"SET A","class":"missing-required"},
+        {"source":"SET A TO 1 @","class":"unknown-suffix"},
+        {"source":"SET A TO 1 TO 2","class":"duplicate-or-exclusive"},
+        {"source":"SET A UP 1","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "sort", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0036", "target_id": "sort",
+      "valid": [
+        {"source":"SORT SORT-FILE USING TEST-FILE GIVING OUT-FILE","class":"base"},
+        {"source":"SORT SORT-FILE INPUT PROCEDURE TARGET OUTPUT PROCEDURE TARGET-EXIT","class":"alternative"},
+        {"source":"SORT SORT-FILE USING TEST-FILE GIVING OUT-FILE DISPLAY B","class":"same-line-sequence","expected_targets":["sort","display"]}
+      ],
+      "invalid": [
+        {"source":"SORT SORT-FILE","class":"missing-required"},
+        {"source":"SORT SORT-FILE USING TEST-FILE GIVING OUT-FILE @","class":"unknown-suffix"},
+        {"source":"SORT SORT-FILE USING TEST-FILE USING OUT-FILE GIVING OUT-FILE","class":"duplicate-or-exclusive"},
+        {"source":"SORT SORT-FILE GIVING OUT-FILE USING TEST-FILE","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "start", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0037", "target_id": "start",
+      "valid": [
+        {"source":"START TEST-FILE KEY IS NOT LESS THAN A INVALID KEY CONTINUE END-START","class":"base","expected_targets":["start","continue"]},
+        {"source":"START TEST-FILE KEY IS = A","class":"alternative"},
+        {"source":"START TEST-FILE DISPLAY B","class":"same-line-sequence","expected_targets":["start","display"]}
+      ],
+      "invalid": [
+        {"source":"START","class":"missing-required"},
+        {"source":"START TEST-FILE BOGUS","class":"unknown-suffix"},
+        {"source":"START TEST-FILE KEY IS = A KEY IS = B","class":"duplicate-or-exclusive"},
+        {"source":"START TEST-FILE KEY A","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "stop", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0038", "target_id": "stop",
+      "valid": [
+        {"source":"STOP RUN","class":"base"},
+        {"source":"STOP RUN RETURNING A","class":"alternative"},
+        {"source":"STOP RUN DISPLAY B","class":"same-line-sequence","expected_targets":["stop","display"]}
+      ],
+      "invalid": [
+        {"source":"STOP RUN EXTRA","class":"arity-boundary"},
+        {"source":"STOP RUN @","class":"unknown-suffix"},
+        {"source":"STOP RUN RETURNING A RETURNING B","class":"duplicate-or-exclusive"},
+        {"source":"STOP RUN A RETURNING B","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "string", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0039", "target_id": "string",
+      "valid": [
+        {"source":"STRING A DELIMITED BY SIZE INTO C ON OVERFLOW CONTINUE END-STRING","class":"base","expected_targets":["string","continue"]},
+        {"source":"STRING A DELIMITED BY SPACE INTO C WITH POINTER PTR","class":"alternative"},
+        {"source":"STRING A DELIMITED BY SIZE INTO C DISPLAY B","class":"same-line-sequence","expected_targets":["string","display"]}
+      ],
+      "invalid": [
+        {"source":"STRING A","class":"missing-required"},
+        {"source":"STRING A DELIMITED BY SIZE INTO C @","class":"unknown-suffix"},
+        {"source":"STRING A DELIMITED BY SIZE INTO C INTO B","class":"duplicate-or-exclusive"},
+        {"source":"STRING A INTO C DELIMITED BY SIZE","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "subtract", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0040", "target_id": "subtract",
+      "valid": [
+        {"source":"SUBTRACT A FROM B GIVING C","class":"base"},
+        {"source":"SUBTRACT A FROM B ROUNDED","class":"alternative"},
+        {"source":"SUBTRACT A FROM B DISPLAY B","class":"same-line-sequence","expected_targets":["subtract","display"]}
+      ],
+      "invalid": [
+        {"source":"SUBTRACT A B","class":"missing-required"},
+        {"source":"SUBTRACT A FROM B @","class":"unknown-suffix"},
+        {"source":"SUBTRACT A FROM B GIVING C GIVING A","class":"duplicate-or-exclusive"},
+        {"source":"SUBTRACT FROM B","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "unstring", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0041", "target_id": "unstring",
+      "valid": [
+        {"source":"UNSTRING C DELIMITED BY SPACE INTO A B ON OVERFLOW CONTINUE END-UNSTRING","class":"base","expected_targets":["unstring","continue"]},
+        {"source":"UNSTRING C DELIMITED BY SPACE INTO A WITH POINTER PTR TALLYING IN B","class":"alternative"},
+        {"source":"UNSTRING C DELIMITED BY SPACE INTO A DISPLAY B","class":"same-line-sequence","expected_targets":["unstring","display"]}
+      ],
+      "invalid": [
+        {"source":"UNSTRING C","class":"missing-required"},
+        {"source":"UNSTRING C DELIMITED BY SPACE INTO A @","class":"unknown-suffix"},
+        {"source":"UNSTRING C DELIMITED BY SPACE INTO A INTO B","class":"duplicate-or-exclusive"},
+        {"source":"UNSTRING C INTO A DELIMITED BY SPACE","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "write", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0042", "target_id": "write",
+      "valid": [
+        {"source":"WRITE TEST-RECORD FROM C INVALID KEY CONTINUE END-WRITE","class":"base","expected_targets":["write","continue"]},
+        {"source":"WRITE TEST-RECORD AFTER ADVANCING 1 LINES","class":"alternative"},
+        {"source":"WRITE TEST-RECORD DISPLAY B","class":"same-line-sequence","expected_targets":["write","display"]}
+      ],
+      "invalid": [
+        {"source":"WRITE","class":"missing-required"},
+        {"source":"WRITE TEST-RECORD @","class":"unknown-suffix"},
+        {"source":"WRITE TEST-RECORD FROM A FROM B","class":"duplicate-or-exclusive"},
+        {"source":"WRITE TEST-RECORD LINES 1","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "xml-generate", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0043", "target_id": "xml-generate",
+      "valid": [
+        {"source":"XML GENERATE C FROM A ON EXCEPTION CONTINUE END-XML","class":"base","expected_targets":["xml-generate","continue"]},
+        {"source":"XML GENERATE C FROM A COUNT IN B","class":"alternative"},
+        {"source":"XML GENERATE C FROM A DISPLAY B","class":"same-line-sequence","expected_targets":["xml-generate","display"]}
+      ],
+      "invalid": [
+        {"source":"XML GENERATE C A","class":"missing-required"},
+        {"source":"XML GENERATE C FROM A @","class":"unknown-suffix"},
+        {"source":"XML GENERATE C FROM A COUNT IN B COUNT IN A","class":"duplicate-or-exclusive"},
+        {"source":"XML GENERATE FROM A","class":"reordered-or-cardinality"}
+      ]
+    },
+    {
+      "id": "xml-parse", "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044", "target_id": "xml-parse",
+      "valid": [
+        {"source":"XML PARSE C PROCESSING PROCEDURE TARGET ON EXCEPTION CONTINUE END-XML","class":"base","expected_targets":["xml-parse","continue"]},
+        {"source":"XML PARSE C INTO A","class":"alternative"},
+        {"source":"XML PARSE C INTO A DISPLAY B","class":"same-line-sequence","expected_targets":["xml-parse","display"]}
+      ],
+      "invalid": [
+        {"source":"XML PARSE C TARGET","class":"missing-required"},
+        {"source":"XML PARSE C INTO A @","class":"unknown-suffix"},
+        {"source":"XML PARSE C INTO A INTO B","class":"duplicate-or-exclusive"},
+        {"source":"XML PARSE INTO A","class":"reordered-or-cardinality"}
+      ]
+    }
   ]
 }

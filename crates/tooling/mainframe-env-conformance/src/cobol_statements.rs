@@ -3,6 +3,7 @@ use mainframe_env_coverage::{
     ConformanceDriver, ConformanceLimits, ConformanceObservation, ConformancePredicate,
     DriverOutput, DriverRef, FixtureRef, ObservationCheck, ObservationRef, PredicateRef,
 };
+use mainframe_env_diagnostics::{FailureCategory, Phase};
 use mainframe_env_source::{
     LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
 };
@@ -27,16 +28,46 @@ struct StatementFixture {
     id: String,
     row_id: String,
     target_id: String,
-    valid: Vec<String>,
-    invalid: Vec<String>,
+    valid: Vec<StatementCase>,
+    invalid: Vec<StatementCase>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
+#[serde(untagged)]
+enum StatementCase {
+    Source(String),
+    Detailed(DetailedStatementCase),
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DetailedStatementCase {
+    source: String,
+    class: String,
+    #[serde(default)]
+    format: CaseFormat,
+    #[serde(default)]
+    expected_targets: Vec<String>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum CaseFormat {
+    Fixed,
+    #[default]
+    Free,
+    Variable,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 struct StatementOutput {
     total: usize,
     accepted: usize,
     target_hits: usize,
-    provenance_hits: usize,
+    sequence_hits: usize,
+    statement_provenance_hits: usize,
+    control_provenance_hits: usize,
+    target_diagnostic_hits: usize,
     details: Vec<String>,
 }
 
@@ -52,7 +83,7 @@ static REJECTED_OBSERVATION: RejectedObservation = RejectedObservation;
 
 pub fn verify_cobol_statement_fixtures() -> Result<(), String> {
     let catalog = fixture_catalog()?;
-    if catalog.schema_version != "mainframe-env.cobol-statement-fixtures@1"
+    if catalog.schema_version != "mainframe-env.cobol-statement-fixtures@2"
         || catalog.target_version != "0.3.0"
         || catalog.fixtures.len() != 44
     {
@@ -61,15 +92,47 @@ pub fn verify_cobol_statement_fixtures() -> Result<(), String> {
     let mut ids = BTreeSet::new();
     let mut rows = BTreeSet::new();
     for fixture in catalog.fixtures {
+        let valid_classes = fixture
+            .valid
+            .iter()
+            .map(StatementCase::class)
+            .collect::<BTreeSet<_>>();
+        let invalid_classes = fixture
+            .invalid
+            .iter()
+            .map(StatementCase::class)
+            .collect::<BTreeSet<_>>();
         if !ids.insert(fixture.id.clone())
             || !rows.insert(fixture.row_id.clone())
-            || fixture.valid.is_empty()
-            || fixture.invalid.is_empty()
+            || fixture.valid.len() < 2
+            || fixture.invalid.len() < 4
+            || fixture.valid.iter().chain(&fixture.invalid).any(|case| {
+                case.source().is_empty()
+                    || case.source().len() > 8192
+                    || case.class().is_empty()
+                    || case.class().len() > 64
+            })
             || fixture
                 .valid
                 .iter()
-                .chain(&fixture.invalid)
-                .any(|source| source.is_empty() || source.len() > 8192)
+                .any(|case| case.expected_targets(&fixture.target_id).is_empty())
+            || !valid_classes.contains("base")
+            || !valid_classes.iter().any(|class| {
+                matches!(
+                    *class,
+                    "alternative" | "continuation" | "same-line-sequence"
+                )
+            })
+            || !invalid_classes
+                .iter()
+                .any(|class| matches!(*class, "missing-required" | "arity-boundary"))
+            || !invalid_classes.contains("unknown-suffix")
+            || !invalid_classes.iter().any(|class| {
+                matches!(
+                    *class,
+                    "duplicate-or-exclusive" | "reordered-or-cardinality" | "malformed-nesting"
+                )
+            })
         {
             return Err(format!("invalid COBOL statement fixture {}", fixture.id));
         }
@@ -137,46 +200,93 @@ impl ConformanceDriver for StatementDriver {
         } else {
             &fixture.invalid
         };
-        let mut output = StatementOutput {
-            total: cases.len(),
-            accepted: 0,
-            target_hits: 0,
-            provenance_hits: 0,
-            details: Vec::new(),
-        };
-        for (index, statement_source) in cases.iter().enumerate() {
-            let analysis = CobolCompiler::default().analyze(&bundle(statement_source)?);
-            let Some(hir) = analysis.hir else {
-                output.details.push(format!(
-                    "case-{index}:{}",
-                    analysis
-                        .diagnostics
-                        .first()
-                        .map_or_else(|| "rejected".into(), |diagnostic| format!("{diagnostic:?}"))
-                ));
-                continue;
-            };
-            output.accepted += 1;
-            let matching = hir.statements.iter().find(|statement| {
-                statement.official.is_some_and(|kind| {
-                    procedure_statement_descriptor(kind).id == fixture.target_id
-                })
-            });
-            output.target_hits += usize::from(matching.is_some());
-            output.provenance_hits +=
-                usize::from(matching.is_some_and(|statement| !statement.source.is_empty()));
-            output.details.push(format!(
-                "case-{index}:accepted=true;target={};provenance={}",
-                matching.is_some(),
-                matching.is_some_and(|statement| !statement.source.is_empty())
-            ));
-        }
+        let output = execute_cases(fixture, cases)?;
         DriverOutput::new(
             serde_json::to_vec(&output).map_err(|error| error.to_string())?,
             ConformanceLimits::default(),
         )
         .map_err(|error| error.to_string())
     }
+}
+
+fn execute_cases(
+    fixture: &StatementFixture,
+    cases: &[StatementCase],
+) -> Result<StatementOutput, String> {
+    let mut output = StatementOutput {
+        total: cases.len(),
+        accepted: 0,
+        target_hits: 0,
+        sequence_hits: 0,
+        statement_provenance_hits: 0,
+        control_provenance_hits: 0,
+        target_diagnostic_hits: 0,
+        details: Vec::new(),
+    };
+    for (index, case) in cases.iter().enumerate() {
+        let analysis = CobolCompiler::default().analyze(&bundle(case)?);
+        let Some(hir) = analysis.hir else {
+            let targeted = analysis.diagnostics.iter().any(|diagnostic| {
+                diagnostic.code().as_str() == "MECOB0102"
+                    && diagnostic.phase() == Phase::Parse
+                    && diagnostic.category() == FailureCategory::MalformedInput
+                    && diagnostic.public_message().contains(&fixture.target_id)
+            });
+            output.target_diagnostic_hits += usize::from(targeted);
+            output.details.push(format!(
+                "case-{index}:class={};target-diagnostic={targeted};{}",
+                case.class(),
+                analysis
+                    .diagnostics
+                    .first()
+                    .map_or_else(|| "rejected".into(), |diagnostic| format!("{diagnostic:?}"))
+            ));
+            continue;
+        };
+        output.accepted += 1;
+        let boundary = hir
+            .statements
+            .iter()
+            .position(|statement| {
+                statement.kind == mainframe_env_compiler::StatementKind::Label
+                    && statement.arguments == ["SCAFFOLD-BOUNDARY"]
+            })
+            .ok_or("statement fixture scaffold boundary is absent from HIR")?;
+        let actual_targets = hir.statements[..boundary]
+            .iter()
+            .filter_map(|statement| {
+                statement
+                    .official
+                    .map(|kind| procedure_statement_descriptor(kind).id.to_string())
+            })
+            .collect::<Vec<_>>();
+        let expected_targets = case.expected_targets(&fixture.target_id);
+        let target_hit = actual_targets
+            .iter()
+            .any(|target| target == &fixture.target_id);
+        let sequence_hit = actual_targets == expected_targets;
+        let statement_provenance = hir.statements[..boundary]
+            .iter()
+            .filter(|statement| statement.official.is_some())
+            .all(|statement| !statement.source.is_empty());
+        let boundary_node = hir
+            .control_nodes
+            .iter()
+            .position(|node| node.statement == Some(boundary))
+            .ok_or("statement fixture scaffold boundary has no control node")?;
+        let control_provenance = hir.control_nodes[..boundary_node]
+            .iter()
+            .all(|node| !node.source.is_empty());
+        output.target_hits += usize::from(target_hit);
+        output.sequence_hits += usize::from(sequence_hit);
+        output.statement_provenance_hits += usize::from(statement_provenance);
+        output.control_provenance_hits += usize::from(control_provenance);
+        output.details.push(format!(
+                "case-{index}:class={};accepted=true;target={target_hit};sequence={sequence_hit};statement-provenance={statement_provenance};control-provenance={control_provenance};actual={actual_targets:?};expected={expected_targets:?}",
+                case.class(),
+            ));
+    }
+    Ok(output)
 }
 
 impl ConformanceObservation for AcceptedObservation {
@@ -186,14 +296,18 @@ impl ConformanceObservation for AcceptedObservation {
             output.total > 0
                 && output.accepted == output.total
                 && output.target_hits == output.total
-                && output.provenance_hits == output.total,
-            "all valid statement forms accepted with typed identity and provenance",
+                && output.sequence_hits == output.total
+                && output.statement_provenance_hits == output.total
+                && output.control_provenance_hits == output.total,
+            "all valid statement forms accepted with exact typed sequence and bounded provenance",
             format!(
-                "total={};accepted={};target_hits={};provenance_hits={};details={:?}",
+                "total={};accepted={};target_hits={};sequence_hits={};statement_provenance_hits={};control_provenance_hits={};details={:?}",
                 output.total,
                 output.accepted,
                 output.target_hits,
-                output.provenance_hits,
+                output.sequence_hits,
+                output.statement_provenance_hits,
+                output.control_provenance_hits,
                 output.details
             ),
             ConformanceLimits::default(),
@@ -206,11 +320,13 @@ impl ConformanceObservation for RejectedObservation {
     fn evaluate(&self, output: &DriverOutput) -> Result<ObservationCheck, String> {
         let output = parse_output(output)?;
         ObservationCheck::new(
-            output.total > 0 && output.accepted == 0,
-            "all invalid statement operand or option forms rejected",
+            output.total > 0
+                && output.accepted == 0
+                && output.target_diagnostic_hits == output.total,
+            "all invalid statement forms rejected by their target grammar diagnostic",
             format!(
-                "total={};accepted={};details={:?}",
-                output.total, output.accepted, output.details
+                "total={};accepted={};target_diagnostic_hits={};details={:?}",
+                output.total, output.accepted, output.target_diagnostic_hits, output.details
             ),
             ConformanceLimits::default(),
         )
@@ -237,18 +353,66 @@ fn parse_fixture_ref(fixture: &FixtureRef) -> Result<(&str, bool), String> {
     }
 }
 
-fn bundle(statement: &str) -> Result<SourceBundle, String> {
-    let source = format!(
-        "IDENTIFICATION DIVISION. PROGRAM-ID. STMT. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT TEST-FILE ASSIGN TO TESTDD ORGANIZATION IS INDEXED RECORD KEY IS A. SELECT OUT-FILE ASSIGN TO OUTDD. DATA DIVISION. FILE SECTION. FD TEST-FILE. 01 TEST-RECORD. 05 A PIC 9 VALUE 1. 05 FILLER PIC X(79). FD OUT-FILE. 01 OUT-RECORD PIC X(80). SD SORT-FILE. 01 SORT-RECORD PIC X(80). WORKING-STORAGE SECTION. 01 B PIC 9 VALUE 2. 01 C PIC X(256). 01 PTR POINTER. 01 TABLE-GROUP. 05 TABLE-ITEM OCCURS 2 TIMES PIC X. PROCEDURE DIVISION. {}. TARGET. EXIT. TARGET-EXIT. EXIT. STOP RUN.",
-        statement
+impl StatementCase {
+    fn source(&self) -> &str {
+        match self {
+            Self::Source(source) => source,
+            Self::Detailed(case) => &case.source,
+        }
+    }
+
+    fn class(&self) -> &str {
+        match self {
+            Self::Source(_) => "legacy",
+            Self::Detailed(case) => &case.class,
+        }
+    }
+
+    fn format(&self) -> CaseFormat {
+        match self {
+            Self::Source(_) => CaseFormat::Free,
+            Self::Detailed(case) => case.format,
+        }
+    }
+
+    fn expected_targets(&self, target: &str) -> Vec<String> {
+        match self {
+            Self::Detailed(case) if !case.expected_targets.is_empty() => {
+                case.expected_targets.clone()
+            }
+            _ => vec![target.to_string()],
+        }
+    }
+}
+
+fn bundle(case: &StatementCase) -> Result<SourceBundle, String> {
+    let free_source = format!(
+        "IDENTIFICATION DIVISION.\nPROGRAM-ID. STMT.\nENVIRONMENT DIVISION.\nINPUT-OUTPUT SECTION.\nFILE-CONTROL.\nSELECT TEST-FILE ASSIGN TO TESTDD\n ORGANIZATION IS INDEXED RECORD KEY IS A.\nSELECT OUT-FILE ASSIGN TO OUTDD.\nDATA DIVISION.\nFILE SECTION.\nFD TEST-FILE.\n01 TEST-RECORD.\n 05 A PIC 9 VALUE 1.\n 05 FILLER PIC X(79).\nFD OUT-FILE.\n01 OUT-RECORD PIC X(80).\nSD SORT-FILE.\n01 SORT-RECORD PIC X(80).\nWORKING-STORAGE SECTION.\n01 B PIC 9 VALUE 2.\n01 C PIC X(256).\n01 PTR POINTER.\n01 TABLE-GROUP.\n 05 TABLE-ITEM OCCURS 2 TIMES PIC X.\nPROCEDURE DIVISION.\n{}.\nSCAFFOLD-BOUNDARY. EXIT.\nTARGET. EXIT.\nTARGET-EXIT. EXIT.\nSTOP RUN.\n",
+        case.source()
     );
+    let (source, format) = match case.format() {
+        CaseFormat::Free => (free_source, SourceFormat::Free),
+        CaseFormat::Fixed | CaseFormat::Variable => {
+            let format = match case.format() {
+                CaseFormat::Fixed => SourceFormat::Fixed,
+                CaseFormat::Variable => SourceFormat::Variable,
+                CaseFormat::Free => unreachable!(),
+            };
+            let source = free_source
+                .lines()
+                .enumerate()
+                .map(|(index, line)| format!("{:06} {line}\n", index + 1))
+                .collect();
+            (source, format)
+        }
+    };
     let limits = SourceLimits::default();
     let path = LogicalPath::new("statement.cbl", limits.max_path_bytes)
         .map_err(|error| error.to_string())?;
     let file = SourceFile::input(
         path.as_str(),
         source.into_bytes(),
-        SourceFormat::Free,
+        format,
         SourceEncoding::Utf8,
         limits,
     )
@@ -288,6 +452,77 @@ mod tests {
                 "{}: {}",
                 fixture.id, invalid_check.actual
             );
+        }
+    }
+
+    fn detailed_case(source: &str, class: &str, expected_targets: &[&str]) -> StatementCase {
+        StatementCase::Detailed(DetailedStatementCase {
+            source: source.to_string(),
+            class: class.to_string(),
+            format: CaseFormat::Free,
+            expected_targets: expected_targets
+                .iter()
+                .map(|target| (*target).to_string())
+                .collect(),
+        })
+    }
+
+    fn fixture(target: &str) -> StatementFixture {
+        StatementFixture {
+            id: target.to_string(),
+            row_id: "mutation:statement:0001".to_string(),
+            target_id: target.to_string(),
+            valid: Vec::new(),
+            invalid: Vec::new(),
+        }
+    }
+
+    fn check(
+        output: &StatementOutput,
+        observation: &dyn ConformanceObservation,
+    ) -> ObservationCheck {
+        let driver_output = DriverOutput::new(
+            serde_json::to_vec(output).unwrap(),
+            ConformanceLimits::default(),
+        )
+        .unwrap();
+        observation.evaluate(&driver_output).unwrap()
+    }
+
+    #[test]
+    fn generic_success_and_statement_collapse_mutants_are_killed() {
+        let cases = [detailed_case(
+            "MOVE A TO B DISPLAY B",
+            "same-line-sequence",
+            &["move", "display"],
+        )];
+        let output = execute_cases(&fixture("move"), &cases).unwrap();
+        assert!(check(&output, &ACCEPTED_OBSERVATION).matched);
+
+        let mut generic_success = output.clone();
+        generic_success.target_hits = 0;
+        generic_success.sequence_hits = 0;
+        assert!(!check(&generic_success, &ACCEPTED_OBSERVATION).matched);
+
+        let mut collapsed_second_statement = output;
+        collapsed_second_statement.sequence_hits = 0;
+        assert!(!check(&collapsed_second_statement, &ACCEPTED_OBSERVATION).matched);
+    }
+
+    #[test]
+    fn permissive_suffix_and_option_bypass_mutants_are_killed() {
+        for (target, source) in [
+            ("start", "START TEST-FILE BOGUS"),
+            ("read", "READ TEST-FILE INTO A INTO B"),
+        ] {
+            let cases = [detailed_case(source, "option-bypass", &[])];
+            let output = execute_cases(&fixture(target), &cases).unwrap();
+            assert!(check(&output, &REJECTED_OBSERVATION).matched);
+
+            let mut permissive_mutant = output;
+            permissive_mutant.accepted = 1;
+            permissive_mutant.target_diagnostic_hits = 0;
+            assert!(!check(&permissive_mutant, &REJECTED_OBSERVATION).matched);
         }
     }
 }
