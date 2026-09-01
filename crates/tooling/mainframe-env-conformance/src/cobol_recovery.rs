@@ -3,6 +3,7 @@ use mainframe_env_coverage::{
     DriverOutput, DriverRef, FixtureRef, ObservationCheck, ObservationRef, PredicateRef,
 };
 use mainframe_env_execution_api::{Machine, MachineDrive, MachineResume, Quantum};
+use mainframe_env_host_api::{EffectResult, HostProblem};
 use mainframe_env_interpreter::ReferenceMachine;
 use mainframe_env_ir::CodecLimits;
 use serde::{Deserialize, Serialize};
@@ -35,6 +36,7 @@ enum Marker {
     SearchBranch,
     PerformRepetition,
     XmlEvent,
+    DeclarativeHandler,
 }
 #[derive(Debug, Deserialize, Serialize)]
 struct Output {
@@ -144,6 +146,7 @@ fn execute(fixture: &Fixture) -> Result<Output, String> {
         CodecLimits::default(),
     )
     .map_err(|e| format!("{e:?}"))?;
+    let mut resume = MachineResume::Start;
     for _ in 0..4096 {
         let reached = match fixture.marker {
             Marker::DynamicValue => first
@@ -163,15 +166,27 @@ fn execute(fixture: &Fixture) -> Result<Output, String> {
             Marker::XmlEvent => first
                 .variable("XML-EVENT")
                 .is_some_and(|value| value.bytes() == b"CONTENT-CHARACTERS"),
+            Marker::DeclarativeHandler => first
+                .variable("DECL-MARKER")
+                .is_some_and(|value| value.bytes() == b"Y"),
         };
         if reached {
             break;
         }
-        match first.drive(
-            MachineResume::Start,
-            Quantum::new(1, 8192).ok_or("quantum")?,
-        ) {
-            MachineDrive::Continue => {}
+        match first.drive(resume, Quantum::new(1, 8192).ok_or("quantum")?) {
+            MachineDrive::Continue => resume = MachineResume::Start,
+            MachineDrive::HostCall(effect)
+                if matches!(fixture.marker, Marker::DeclarativeHandler) =>
+            {
+                resume = MachineResume::HostResult(EffectResult {
+                    sequence: effect.sequence,
+                    outcome: Err(HostProblem::Condition {
+                        name: "NOTFND".into(),
+                        response: 13,
+                        response2: 0,
+                    }),
+                });
+            }
             other => return Err(format!("pre-checkpoint terminal={other:?}")),
         }
     }
