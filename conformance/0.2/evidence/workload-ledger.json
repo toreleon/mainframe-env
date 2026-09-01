@@ -57,6 +57,11 @@
       "evidence": "conformance/0.2/evidence/review-repair-round-4.json",
       "id": "evidence-sealing",
       "state": "pass"
+    },
+    {
+      "evidence": "conformance/0.2/evidence/review-repair-round-5.json",
+      "id": "content-evidence-sealing",
+      "state": "pass"
     }
   ],
   "implementation_status": "complete",

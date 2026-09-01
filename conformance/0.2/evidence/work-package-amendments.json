@@ -111,7 +111,7 @@
       "repair_artifacts": [
         {
           "path": "xtask/src/main.rs",
-          "sha256": "sha256:9eaa8be9ab9676e67025a12015023f7739c05079819d7e909a7a1b78326a0d72"
+          "sha256": "sha256:d0276f984dfdd1bd2487fa60f68afa02dc4743167f82f991d8f8540a8f83df5e"
         },
         {
           "path": ".github/workflows/ci.yml",
@@ -127,7 +127,7 @@
         },
         {
           "path": "docs/releases/0.2.md",
-          "sha256": "sha256:1bbb182d832491f9040affb6305d401423a6b46e7d9ea8780b68aa242f284b00"
+          "sha256": "sha256:17e7a4079d43815136360fcac191b2c6deb1b0377c20d9cbff2bd09e4f1a3863"
         }
       ],
       "work_package": "CV-209"

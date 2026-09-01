@@ -4,7 +4,7 @@
     "accepted_carddemo_tree": "7e1fa73f4c808a89ddb4f98c0e3f7d0207f861ea",
     "accepted_release_commit": "44f3081eb2fdf22d09e1a97725f5a4163431ca70",
     "accepted_release_tree": "3d504ece02f1c09e124606ded695b00ba984d104",
-    "source_digest": "sha256:7d7906d3f808e8e26e041475c3ad0ec25d2a43a42f14ce55150f6d3a86854a59",
+    "source_digest": "sha256:0d173ca9f840eaa6d1ffa4d72cd04bf861ed75e65617d47e00e10c1f483d087d",
     "work_package_base_commit": "edb4558c987a56ee9f0c96438f756d663199942f"
   },
   "candidate_unchanged": true,

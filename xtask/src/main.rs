@@ -68,13 +68,7 @@ struct EvidenceArgs {
 #[derive(Debug, Subcommand)]
 enum EvidenceCommand {
     Seal(CheckArgs),
-    Callback(CallbackArgs),
-}
-
-#[derive(Debug, Args)]
-struct CallbackArgs {
-    #[arg(long)]
-    output: PathBuf,
+    Callback,
 }
 
 #[derive(Debug, Subcommand)]
@@ -104,6 +98,8 @@ enum XtaskCommand {
     ReviewRepairRound3(CheckArgs),
     #[command(name = "review-repair-round-4")]
     ReviewRepairRound4(CheckArgs),
+    #[command(name = "review-repair-round-5")]
+    ReviewRepairRound5(CheckArgs),
     SemanticIdentities(CheckArgs),
     Conformance(CheckArgs),
     Certification(CheckArgs),
@@ -196,11 +192,9 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
                     generate_evidence_seal(root)
                 },
             ),
-            (false, Some(EvidenceCommand::Callback(args))) => (
-                "evidence callback",
-                false,
-                write_evidence_callback(root, &args.output),
-            ),
+            (false, Some(EvidenceCommand::Callback)) => {
+                ("evidence callback", false, write_evidence_callback(root))
+            }
             (true, Some(_)) => (
                 "evidence",
                 true,
@@ -277,6 +271,11 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             "review-repair-round-4",
             args,
             check_review_repair_round_4(root)
+        ),
+        XtaskCommand::ReviewRepairRound5(args) => checked!(
+            "review-repair-round-5",
+            args,
+            check_review_repair_round_5(root)
         ),
         XtaskCommand::SemanticIdentities(args) => checked!(
             "semantic-identities",
@@ -435,7 +434,8 @@ fn check_conformance(root: &Path) -> TaskResult {
     check_review_repair(root)?;
     check_review_repair_round_2(root)?;
     check_review_repair_round_3(root)?;
-    check_review_repair_round_4(root)
+    check_review_repair_round_4(root)?;
+    check_review_repair_round_5(root)
 }
 
 fn generate_evidence_seal(root: &Path) -> TaskResult {
@@ -446,8 +446,8 @@ fn check_evidence_seal(root: &Path) -> TaskResult {
     evidence_seal::check(root)
 }
 
-fn write_evidence_callback(root: &Path, output: &Path) -> TaskResult {
-    evidence_seal::callback(root, output)
+fn write_evidence_callback(root: &Path) -> TaskResult {
+    evidence_seal::callback(root)
 }
 
 fn check_carddemo_cics(root: &Path) -> TaskResult {
@@ -2052,6 +2052,8 @@ fn schema_for_0_2_artifact(version: &str) -> Option<&'static str> {
         "mainframe-env.review-repair-round-4-inputs@1" => {
             Some("review-repair-round-4-inputs.schema.json")
         }
+        "mainframe-env.seal-profile@1" => Some("review-repair-round-5-profile.schema.json"),
+        "mainframe-env.review-repair-round-5@1" => Some("review-repair-round-5.schema.json"),
         "mainframe-env.github-actions-receipt@1" => Some("github-actions-receipt.schema.json"),
         "mainframe-env.work-package-amendments@1" => Some("work-package-amendments.schema.json"),
         "mainframe-env.common-program-catalog@1" => Some("common-program-catalog.schema.json"),
@@ -4019,6 +4021,7 @@ fn check_workload_ledger_consistency(root: &Path) -> TaskResult {
         "live-zowe-route",
         "release-checks",
         "evidence-sealing",
+        "content-evidence-sealing",
     ]);
     let actual_exit_gates = exit_gates
         .iter()
@@ -4991,6 +4994,136 @@ fn check_review_repair_round_4(root: &Path) -> TaskResult {
     Ok(())
 }
 
+fn check_review_repair_round_5(root: &Path) -> TaskResult {
+    check_review_repair_round_4(root)?;
+    let path = root.join("conformance/0.2/evidence/review-repair-round-5.json");
+    let evidence = json(&path)?;
+    require(
+        evidence["schema_version"] == Value::String("mainframe-env.review-repair-round-5@1".into())
+            && evidence["derived"] == Value::Bool(true)
+            && evidence["status"] == Value::String("pass".into()),
+        "round-five review repair evidence header is invalid",
+    )?;
+    let receipt = evidence
+        .get("receipt")
+        .and_then(Value::as_object)
+        .ok_or("round-five review repair receipt is missing")?;
+    let digest = canonical_evidence_digest(receipt)?;
+    require(
+        evidence["evidence_digest"].as_str() == Some(digest.as_str()),
+        "round-five review repair evidence digest is stale",
+    )?;
+    let receipt = Value::Object(receipt.clone());
+    require(
+        receipt["target_version"] == Value::String("0.2.0".into())
+            && receipt["accepted_parent"]
+                == Value::String("36344c542e82a4174f5be7da6038f7095ce6cba8".into())
+            && receipt["branch"] == Value::String("impl/0.2.0".into())
+            && receipt["historical_round_four"]["completion_commit"]
+                == Value::String("36344c542e82a4174f5be7da6038f7095ce6cba8".into())
+            && receipt["historical_round_four"]["remote_evidence_credit"]
+                == Value::String("none".into()),
+        "round-five source or historical-evidence boundary is invalid",
+    )?;
+    fn contains_forbidden_key(value: &Value) -> bool {
+        const FORBIDDEN: [&str; 13] = [
+            "commands",
+            "command",
+            "exit_code",
+            "result",
+            "workspace",
+            "tests_passed",
+            "toolchains",
+            "github_jobs",
+            "run_id",
+            "job_id",
+            "conclusion",
+            "future_ci_success_claimed",
+            "check_identities",
+        ];
+        match value {
+            Value::Array(values) => values.iter().any(contains_forbidden_key),
+            Value::Object(values) => {
+                values.keys().any(|key| FORBIDDEN.contains(&key.as_str()))
+                    || values.values().any(contains_forbidden_key)
+            }
+            _ => false,
+        }
+    }
+    require(
+        !contains_forbidden_key(&receipt),
+        "round-five content receipt contains execution or remote-attestation claims",
+    )?;
+    let findings = array(&receipt, "findings", &path)?;
+    require(
+        findings.len() == 4
+            && findings.iter().enumerate().all(|(index, finding)| {
+                finding["id"].as_u64() == Some((index + 1) as u64)
+                    && finding["state"] == Value::String("closed".into())
+                    && finding["content_rule"]
+                        .as_str()
+                        .is_some_and(|value| !value.is_empty())
+            }),
+        "round-five repair must close exactly findings 1 through 4",
+    )?;
+    let profile_path = receipt["profile"]["path"]
+        .as_str()
+        .ok_or("round-five profile path is missing")?;
+    let profile = json(&root.join(profile_path))?;
+    evidence_seal::validate_profile(&profile)?;
+    require(
+        receipt["profile"]["sha256"].as_str()
+            == Some(format!("sha256:{}", file_digest(&root.join(profile_path))?).as_str()),
+        "round-five profile digest drifted",
+    )?;
+    let inventory = receipt["release_inventory"]
+        .as_array()
+        .ok_or("round-five release inventory is missing")?;
+    require(
+        inventory.len() == 2
+            && inventory[0]["target"] == Value::String("aarch64-apple-darwin".into())
+            && inventory[1]["target"] == Value::String("x86_64-unknown-linux-gnu".into())
+            && inventory.iter().all(|target| {
+                target["documents"].as_array().is_some_and(|documents| {
+                    documents.as_slice()
+                        == [
+                            Value::String("LICENSES.md".into()),
+                            Value::String("build-inputs.json".into()),
+                            Value::String("checksums.sha256".into()),
+                            Value::String("manifest.json".into()),
+                            Value::String("provenance.intoto.json".into()),
+                            Value::String("sbom.cdx.json".into()),
+                        ]
+                })
+            }),
+        "round-five release inventory is not the exact two-target six-document set",
+    )?;
+    let completions = evidence_seal::round_five_completion_commits(root, Some(&digest))?;
+    require(
+        completions.len() <= 1,
+        "round-five completion identity is duplicated",
+    )?;
+    if let Some(completion) = completions.first() {
+        require(
+            command_text(root, "git", &["rev-parse", &format!("{completion}^")])?
+                == "36344c542e82a4174f5be7da6038f7095ce6cba8",
+            "round-five completion parent is not the accepted round-four tip",
+        )?;
+        let mut artifact_paths = BTreeSet::new();
+        for artifact in array(&receipt, "artifacts", &path)? {
+            let relative = text(artifact, "path", &path)?;
+            let expected = text(artifact, "sha256", &path)?;
+            require(
+                artifact_paths.insert(relative)
+                    && expected
+                        == format!("sha256:{}", git_file_digest(root, completion, relative)?),
+                &format!("round-five content artifact drifted or duplicated: {relative}"),
+            )?;
+        }
+    }
+    Ok(())
+}
+
 fn validate_official_source(source: &Value, path: &Path, baseline: &str) -> TaskResult {
     let source = source.as_object().ok_or_else(|| {
         format!(
@@ -5199,6 +5332,7 @@ fn check_certification(root: &Path) -> TaskResult {
     check_application_packages(root)?;
     check_db2_catalog(root)?;
     check_review_repair_round_4(root)?;
+    check_review_repair_round_5(root)?;
     check_evidence_seal(root)?;
     check_runtime_architecture(root)?;
 
@@ -5456,6 +5590,7 @@ fn repository_digest_excluded(relative: &Path) -> bool {
         || relative == Path::new("conformance/0.2/evidence/review-repair-round-2.json")
         || relative == Path::new("conformance/0.2/evidence/review-repair-round-3.json")
         || relative == Path::new("conformance/0.2/evidence/review-repair-round-4.json")
+        || relative == Path::new("conformance/0.2/evidence/review-repair-round-5.json")
         || relative == Path::new("conformance/0.2/evidence/work-packages/CV-209.json")
         || relative == Path::new("docs/delivery/coverage-versions/status/0.2.0.md")
         || (relative_text.starts_with("conformance/0.1/evidence/phase-v")
@@ -5481,13 +5616,32 @@ fn release_source_digest(root: &Path) -> TaskResult<String> {
             || relative == Path::new("conformance/0.2/evidence/review-repair-round-3.json")
             || relative == Path::new("conformance/0.2/evidence/review-repair-round-4.json")
             || relative == Path::new("conformance/0.2/evidence/review-repair-round-4-inputs.json")
+            || relative == Path::new("conformance/0.2/evidence/review-repair-round-5.json")
+            || relative == Path::new("conformance/0.2/evidence/review-repair-round-5-profile.json")
+            || relative
+                == Path::new("conformance/0.2/schemas/review-repair-round-5-profile.schema.json")
+            || relative == Path::new("conformance/0.2/schemas/review-repair-round-5.schema.json")
             || relative == Path::new("conformance/0.2/evidence/sources/round-3-ci-runs.json")
             || relative == Path::new("conformance/0.2/evidence/work-packages/CV-209.json")
             || relative == Path::new("docs/delivery/coverage-versions/status/0.2.0.md")
         {
             continue;
         }
-        let bytes = fs::read(&file).map_err(|error| format!("{}: {error}", file.display()))?;
+        let bytes = if matches!(
+            relative,
+            path if path == Path::new("xtask/src/main.rs")
+                || path == Path::new("xtask/src/evidence_seal.rs")
+                || path == Path::new("docs/releases/0.2.md")
+                || path == Path::new("conformance/0.2/evidence/work-package-amendments.json")
+        ) {
+            git_file_bytes(
+                root,
+                "36344c542e82a4174f5be7da6038f7095ce6cba8",
+                &relative.to_string_lossy(),
+            )?
+        } else {
+            fs::read(&file).map_err(|error| format!("{}: {error}", file.display()))?
+        };
         let path = relative.to_string_lossy();
         digest.update((path.len() as u64).to_be_bytes());
         digest.update(path.as_bytes());
@@ -6244,6 +6398,13 @@ mod tests {
                 "evidence",
                 "callback",
                 "--output",
+                "/tmp/ROUND_5_DONE.json",
+            ],
+            vec![
+                "xtask",
+                "evidence",
+                "callback",
+                "--output",
                 "/tmp/ROUND_4_DONE.json",
                 "--tip",
                 "forged",
@@ -6252,6 +6413,7 @@ mod tests {
             assert!(Cli::try_parse_from(arguments).is_err());
         }
         assert!(Cli::try_parse_from(["xtask", "evidence", "seal", "--check"]).is_ok());
+        assert!(Cli::try_parse_from(["xtask", "evidence", "callback"]).is_ok());
         assert!(
             Cli::try_parse_from([
                 "xtask",
@@ -6359,6 +6521,18 @@ mod tests {
             ])
             .unwrap(),
             "x86_64-unknown-linux-gnu"
+        );
+    }
+
+    #[test]
+    fn round_five_tooling_preserves_retained_release_source_digest() {
+        let root = repository_root().unwrap();
+        let inputs =
+            json(&root.join("release/0.2.0/targets/aarch64-apple-darwin/build-inputs.json"))
+                .unwrap();
+        assert_eq!(
+            release_source_digest(&root).unwrap(),
+            inputs["source_digest"].as_str().unwrap()
         );
     }
 

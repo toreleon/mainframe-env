@@ -1,17 +1,70 @@
 use super::*;
 
-const INPUT_PATH: &str = "conformance/0.2/evidence/review-repair-round-4-inputs.json";
-const RECEIPT_PATH: &str = "conformance/0.2/evidence/review-repair-round-4.json";
+const PROFILE_PATH: &str = "conformance/0.2/evidence/review-repair-round-5-profile.json";
+const RECEIPT_PATH: &str = "conformance/0.2/evidence/review-repair-round-5.json";
 const PROGRAM_STATUS_PATH: &str = "conformance/0.2/evidence/program-status.json";
 const WORKLOAD_LEDGER_PATH: &str = "conformance/0.2/evidence/workload-ledger.json";
-const FULL_REGRESSION_PATH: &str = "conformance/0.2/evidence/full-regression.json";
 const AMENDMENTS_PATH: &str = "conformance/0.2/evidence/work-package-amendments.json";
-const HARD_CODE_PATH: &str = "conformance/0.2/evidence/hardcode/no-application-hardcode.json";
-const ROUND_THREE_PATH: &str = "conformance/0.2/evidence/review-repair-round-3.json";
-const COMMIT_SUBJECT: &str = "Repair 0.2.0 fourth review findings";
+const FULL_REGRESSION_PATH: &str = "conformance/0.2/evidence/full-regression.json";
+const ROUND_FOUR_INPUT_PATH: &str = "conformance/0.2/evidence/review-repair-round-4-inputs.json";
+const ROUND_FOUR_RECEIPT_PATH: &str = "conformance/0.2/evidence/review-repair-round-4.json";
+const COMMIT_SUBJECT: &str = "Repair 0.2.0 fifth review findings";
 const EXPECTED_BRANCH: &str = "impl/0.2.0";
-const EXPECTED_PARENT: &str = "b61d604fbdf4867154f235d45fd4453ef7e3b79d";
-const COMMIT_MESSAGE_NAME: &str = "mainframe-env-round-4-commit-message.txt";
+const EXPECTED_PARENT: &str = "36344c542e82a4174f5be7da6038f7095ce6cba8";
+const ROUND_FOUR_PARENT: &str = "b61d604fbdf4867154f235d45fd4453ef7e3b79d";
+const ROUND_FOUR_INPUT_SHA256: &str =
+    "48ff647b06f276a9e5e733de2bdfccbb9b4c6c634fd5ff3912f3794a673ed693";
+const ROUND_FOUR_RECEIPT_SHA256: &str =
+    "7f9fe7538d9653dfb83e9a65d1ad0c20c50951f991d633a9b090cb8599ef9cc9";
+const ROUND_FOUR_EVIDENCE_DIGEST: &str =
+    "sha256:fa5ea3ce742892135f2811f559b913bc44bb1fdf6ca0a6e5acba803db4cb3fa3";
+const COMMIT_MESSAGE_NAME: &str = "mainframe-env-round-5-commit-message.txt";
+
+const SOURCE_PATHS: [&str; 6] = [
+    "conformance/0.2/evidence/review-repair-round-5-profile.json",
+    "conformance/0.2/schemas/review-repair-round-5-profile.schema.json",
+    "conformance/0.2/schemas/review-repair-round-5.schema.json",
+    "docs/releases/0.2.md",
+    "xtask/src/evidence_seal.rs",
+    "xtask/src/main.rs",
+];
+const PROJECTION_PATHS: [&str; 5] = [
+    RECEIPT_PATH,
+    PROGRAM_STATUS_PATH,
+    WORKLOAD_LEDGER_PATH,
+    AMENDMENTS_PATH,
+    FULL_REGRESSION_PATH,
+];
+const RELEASE_TARGETS: [&str; 2] = ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu"];
+const RELEASE_DOCUMENTS: [&str; 6] = [
+    "LICENSES.md",
+    "build-inputs.json",
+    "checksums.sha256",
+    "manifest.json",
+    "provenance.intoto.json",
+    "sbom.cdx.json",
+];
+
+#[derive(Clone, Copy)]
+struct SealProfile {
+    schema_version: &'static str,
+    profile_id: &'static str,
+    accepted_parent: &'static str,
+    subject: &'static str,
+    finding_trailer: &'static str,
+    source_paths: &'static [&'static str],
+    projection_paths: &'static [&'static str],
+}
+
+const ROUND_FIVE_PROFILE: SealProfile = SealProfile {
+    schema_version: "mainframe-env.seal-profile@1",
+    profile_id: "review-repair-round-5",
+    accepted_parent: EXPECTED_PARENT,
+    subject: COMMIT_SUBJECT,
+    finding_trailer: "Fifth-Review-Findings: 4=closed",
+    source_paths: &SOURCE_PATHS,
+    projection_paths: &PROJECTION_PATHS,
+};
 
 #[derive(Clone)]
 struct Snapshot {
@@ -80,16 +133,18 @@ struct SealOutput {
 
 pub(super) fn generate(root: &Path) -> TaskResult {
     validate_precommit_context(root)?;
+    validate_historical_round_four(root)?;
     require(
-        round_four_completion_commits(root, None)?.is_empty(),
-        "round-four completion already exists; seal generation is pre-commit only",
+        round_five_completion_commits(root, None)?.is_empty(),
+        "round-five completion already exists; seal generation is pre-commit only",
     )?;
     let output = render(root, &Snapshot::from_index(root)?)?;
     for (relative, bytes) in &output.files {
         let path = root.join(relative);
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
-        }
+        require(
+            path.parent().is_some_and(Path::is_dir),
+            "sealed projection parent must already exist",
+        )?;
         fs::write(&path, bytes).map_err(|error| format!("{}: {error}", path.display()))?;
     }
     let commit_message = commit_message_path(root)?;
@@ -105,13 +160,14 @@ pub(super) fn check(root: &Path) -> TaskResult {
     let live_receipt = root.join(RECEIPT_PATH);
     require(
         live_receipt.is_file(),
-        "round-four sealed receipt is missing",
+        "round-five sealed receipt is missing",
     )?;
+    validate_historical_round_four(root)?;
     let evidence = json(&live_receipt)?;
     let evidence_digest = evidence["evidence_digest"]
         .as_str()
-        .ok_or("round-four sealed evidence digest is missing")?;
-    let completions = round_four_completion_commits(root, Some(evidence_digest))?;
+        .ok_or("round-five sealed evidence digest is missing")?;
+    let completions = round_five_completion_commits(root, Some(evidence_digest))?;
     let (snapshot, committed) = match completions.as_slice() {
         [] => {
             validate_precommit_context(root)?;
@@ -124,7 +180,7 @@ pub(super) fn check(root: &Path) -> TaskResult {
                 Some(completion.as_str()),
             )
         }
-        _ => return Err("round-four completion identity is duplicated".into()),
+        _ => return Err("round-five completion identity is duplicated".into()),
     };
     let output = render(root, &snapshot)?;
     compare_outputs(&snapshot, &output)?;
@@ -132,7 +188,7 @@ pub(super) fn check(root: &Path) -> TaskResult {
         let actual = command_text(root, "git", &["show", "-s", "--format=%B", completion])?;
         require(
             actual.as_bytes() == trim_final_newline(&output.commit_message),
-            "round-four completion trailers differ from the sealed commit message",
+            "round-five completion trailers differ from the sealed commit message",
         )?;
         let receipt = snapshot.value(RECEIPT_PATH)?;
         reject_self_reference(&receipt, completion)?;
@@ -141,29 +197,23 @@ pub(super) fn check(root: &Path) -> TaskResult {
         let actual = fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?;
         require(
             actual == output.commit_message,
-            "generated round-four commit-message file is stale",
+            "generated round-five commit-message file is stale",
         )?;
     }
     Ok(())
 }
 
-pub(super) fn callback(root: &Path, output_path: &Path) -> TaskResult {
-    require(
-        output_path.is_absolute()
-            && output_path.file_name() == Some(OsStr::new("ROUND_4_DONE.json"))
-            && !output_path.starts_with(root),
-        "callback output must be an absolute ROUND_4_DONE.json outside the repository",
-    )?;
+pub(super) fn callback(root: &Path) -> TaskResult {
     require_clean_worktree(root)?;
     let head = callback_tip(root)?;
     let evidence = json(&root.join(RECEIPT_PATH))?;
     let evidence_digest = evidence["evidence_digest"]
         .as_str()
-        .ok_or("round-four evidence digest is missing")?;
-    let completions = round_four_completion_commits(root, Some(evidence_digest))?;
+        .ok_or("round-five evidence digest is missing")?;
+    let completions = round_five_completion_commits(root, Some(evidence_digest))?;
     require(
         completions.as_slice() == [head.as_str()],
-        "callback HEAD is not the unique sealed round-four completion",
+        "callback HEAD is not the unique sealed round-five completion",
     )?;
     let remote = command_text(
         root,
@@ -241,26 +291,12 @@ pub(super) fn callback(root: &Path, output_path: &Path) -> TaskResult {
                 &format!("repos/toreleon/mainframe-env/actions/runs/{run_id}/jobs"),
             ],
         )?;
-        let mut job_rows = jobs["jobs"]
-            .as_array()
-            .ok_or("callback jobs are missing")?
-            .iter()
-            .map(|job| {
-                require(
-                    job["status"] == Value::String("completed".into())
-                        && job["conclusion"] == Value::String("success".into()),
-                    "callback job is not terminal success",
-                )?;
-                Ok(json!({
-                    "id": job["id"],
-                    "name": job["name"],
-                    "status": job["status"],
-                    "conclusion": job["conclusion"],
-                    "html_url": job["html_url"]
-                }))
-            })
-            .collect::<TaskResult<Vec<_>>>()?;
-        job_rows.sort_by(|left, right| left["name"].as_str().cmp(&right["name"].as_str()));
+        let job_rows = validate_callback_jobs(
+            &head,
+            event,
+            run_id,
+            jobs["jobs"].as_array().ok_or("callback jobs are missing")?,
+        )?;
         checks.push(json!({
             "event": event,
             "run_id": run_id,
@@ -272,7 +308,7 @@ pub(super) fn callback(root: &Path, output_path: &Path) -> TaskResult {
         }));
     }
     let value = json!({
-        "schema_version": "mainframe-env.round-4-completion@1",
+        "schema_version": "mainframe-env.round-5-completion@1",
         "target_version": "0.2.0",
         "pr_number": pr["number"],
         "pr_url": pr["url"],
@@ -286,37 +322,24 @@ pub(super) fn callback(root: &Path, output_path: &Path) -> TaskResult {
         "remote_actions": {"merged": false, "tagged": false, "published": false, "deployed": false}
     });
     let bytes = pretty_json(&value)?;
-    let parent = output_path
-        .parent()
-        .ok_or("callback output has no parent directory")?;
-    fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
-    let temporary = parent.join(format!(".ROUND_4_DONE.json.tmp.{}", std::process::id()));
-    fs::write(&temporary, bytes).map_err(|error| format!("{}: {error}", temporary.display()))?;
-    fs::rename(&temporary, output_path).map_err(|error| {
-        format!(
-            "atomic callback rename {} -> {}: {error}",
-            temporary.display(),
-            output_path.display()
-        )
-    })?;
+    std::io::stdout()
+        .write_all(&bytes)
+        .map_err(|error| format!("write callback JSON to stdout: {error}"))?;
     Ok(())
 }
 
 fn render(root: &Path, snapshot: &Snapshot) -> TaskResult<SealOutput> {
-    let input = snapshot.value(INPUT_PATH)?;
-    validate_input(&input)?;
+    let profile = snapshot.value(PROFILE_PATH)?;
+    validate_profile(&profile)?;
+    validate_release_inventory(snapshot)?;
     let amendments = project_amendments(snapshot)?;
-    let hardcode = project_hardcode(snapshot)?;
-    let candidate_snapshot = snapshot
-        .with_file(AMENDMENTS_PATH, pretty_json(&amendments)?)
-        .with_file(HARD_CODE_PATH, pretty_json(&hardcode)?);
+    let candidate_snapshot = snapshot.with_file(AMENDMENTS_PATH, pretty_json(&amendments)?);
     let candidate_digest = snapshot_digest(&candidate_snapshot);
     let full_regression = project_full_regression(snapshot, &candidate_digest)?;
     let program_status = project_program_status(snapshot, &candidate_digest)?;
     let workload_ledger = project_workload_ledger(snapshot)?;
     let mut projected = BTreeMap::from([
         (PathBuf::from(AMENDMENTS_PATH), pretty_json(&amendments)?),
-        (PathBuf::from(HARD_CODE_PATH), pretty_json(&hardcode)?),
         (
             PathBuf::from(FULL_REGRESSION_PATH),
             pretty_json(&full_regression)?,
@@ -330,14 +353,14 @@ fn render(root: &Path, snapshot: &Snapshot) -> TaskResult<SealOutput> {
             pretty_json(&workload_ledger)?,
         ),
     ]);
-    let receipt = build_receipt(root, snapshot, &projected, &input, &candidate_digest)?;
+    let receipt = build_receipt(root, snapshot, &projected, &profile, &candidate_digest)?;
     let evidence_digest = canonical_evidence_digest(
         receipt
             .as_object()
-            .ok_or("generated round-four receipt is not an object")?,
+            .ok_or("generated round-five receipt is not an object")?,
     )?;
     let evidence = json!({
-        "schema_version": "mainframe-env.review-repair-round-4@1",
+        "schema_version": "mainframe-env.review-repair-round-5@1",
         "derived": true,
         "status": "pass",
         "evidence_digest": evidence_digest,
@@ -356,91 +379,20 @@ fn build_receipt(
     root: &Path,
     snapshot: &Snapshot,
     projected: &BTreeMap<PathBuf, Vec<u8>>,
-    input: &Value,
+    profile: &Value,
     candidate_digest: &str,
 ) -> TaskResult<Value> {
-    let round_three = snapshot.value(ROUND_THREE_PATH)?;
-    let original_digest = round_three["evidence_digest"]
-        .as_str()
-        .ok_or("round-three evidence digest is missing")?;
-    let original_completion = find_completion_commit(
-        root,
-        "Repair 0.2.0 third review findings",
-        &[
-            ("Third-Review-Findings", "11=closed"),
-            ("Target-Version", "0.2.0"),
-            ("Evidence-Digest", original_digest),
-        ],
-    )?;
-    let source_path = input["github_actions_source"]
-        .as_str()
-        .ok_or("GitHub Actions source path is missing")?;
-    let source = snapshot.value(source_path)?;
-    validate_actions_source(root, &source)?;
-    let runs = source["runs"]
-        .as_array()
-        .ok_or("GitHub Actions source runs are missing")?;
-    let failed_candidates = runs
+    let mut artifact_paths = ROUND_FIVE_PROFILE
+        .source_paths
         .iter()
-        .filter(|run| {
-            run["role"]
-                .as_str()
-                .is_some_and(|role| role.starts_with("failed-"))
-        })
-        .map(supersession_run)
-        .collect::<TaskResult<Vec<_>>>()?;
-    let accepted_checks = runs
-        .iter()
-        .filter(|run| {
-            run["role"]
-                .as_str()
-                .is_some_and(|role| role.starts_with("accepted-"))
-        })
-        .map(supersession_run)
-        .collect::<TaskResult<Vec<_>>>()?;
-    let accepted_digest = repository_digest_at_commit(root, EXPECTED_PARENT)?;
-    let linux_manifest: Value = serde_json::from_slice(&git_file_bytes(
-        root,
-        EXPECTED_PARENT,
-        "release/0.2.0/targets/x86_64-unknown-linux-gnu/manifest.json",
-    )?)
-    .map_err(|error| error.to_string())?;
-    let linux_inputs: Value = serde_json::from_slice(&git_file_bytes(
-        root,
-        EXPECTED_PARENT,
-        "release/0.2.0/targets/x86_64-unknown-linux-gnu/build-inputs.json",
-    )?)
-    .map_err(|error| error.to_string())?;
-    let release_binaries = linux_manifest["artifacts"]
-        .as_array()
-        .ok_or("accepted Linux manifest artifacts are missing")?
-        .iter()
-        .filter(|artifact| {
-            artifact["path"]
-                .as_str()
-                .is_some_and(|path| path.starts_with("bin/"))
-        })
-        .cloned()
+        .chain(ROUND_FIVE_PROFILE.projection_paths.iter())
+        .copied()
+        .filter(|path| *path != RECEIPT_PATH)
+        .map(str::to_string)
         .collect::<Vec<_>>();
-    require(
-        release_binaries.len() == 2
-            && linux_inputs["target"] == Value::String("x86_64-unknown-linux-gnu".into())
-            && linux_inputs["rustc_verbose"]
-                .as_str()
-                .is_some_and(|value| value.starts_with("rustc 1.98.0 ")),
-        "accepted Linux release identities are incomplete",
-    )?;
-    let mut artifact_paths = input["artifact_paths"]
-        .as_array()
-        .ok_or("round-four artifact paths are missing")?
-        .iter()
-        .map(|path| {
-            path.as_str()
-                .map(str::to_string)
-                .ok_or_else(|| "round-four artifact path is not text".to_string())
-        })
-        .collect::<TaskResult<Vec<_>>>()?;
+    artifact_paths.extend(retained_paths());
     artifact_paths.sort();
+    artifact_paths.dedup();
     let artifacts = artifact_paths
         .iter()
         .map(|relative| {
@@ -453,82 +405,40 @@ fn build_receipt(
         })
         .collect::<TaskResult<Vec<_>>>()?;
     Ok(json!({
-        "target_version": input["target_version"],
-        "accepted_parent": input["accepted_parent"],
+        "target_version": "0.2.0",
+        "accepted_parent": ROUND_FIVE_PROFILE.accepted_parent,
         "candidate_source_digest": candidate_digest,
-        "branch": input["branch"],
-        "base": input["base"],
-        "pull_request": input["pull_request"],
-        "round_three_supersession": {
-            "status": "superseded",
-            "original": {
-                "completion_commit": original_completion,
-                "evidence_path": ROUND_THREE_PATH,
-                "evidence_digest": original_digest,
-                "candidate_source_digest": round_three["receipt"]["candidate_source_digest"],
-                "invalid_terminal_run_ids": round_three["receipt"]["pull_request"]["check_identities"]
-                    .as_array()
-                    .unwrap_or(&Vec::new())
-                    .iter()
-                    .filter_map(|row| row["source_run_id"].as_u64())
-                    .collect::<BTreeSet<_>>()
-            },
-            "reason": "The original receipt cited a pre-repair successful run; its completion and two intermediate follow-ups failed before native Linux evidence was retained.",
-            "failed_candidates": failed_candidates,
-            "accepted_follow_up": {
-                "tip": EXPECTED_PARENT,
-                "candidate_source_digest": accepted_digest,
-                "checks": accepted_checks,
-                "release": {
-                    "target": linux_inputs["target"],
-                    "rustc_verbose": linux_inputs["rustc_verbose"],
-                    "build_inputs_sha256": format!("sha256:{}", digest_bytes(&git_file_bytes(root, EXPECTED_PARENT, "release/0.2.0/targets/x86_64-unknown-linux-gnu/build-inputs.json")?)),
-                    "binary_artifacts": release_binaries
-                }
-            },
-            "source_provenance": {
-                "path": source_path,
-                "repository": source["repository"],
-                "workflow": source["workflow"],
-                "provenance": source["provenance"]
-            }
+        "branch": EXPECTED_BRANCH,
+        "profile": {
+            "path": PROFILE_PATH,
+            "schema_version": profile["schema_version"],
+            "profile_id": profile["profile_id"],
+            "sha256": format!("sha256:{}", digest_bytes(snapshot.bytes(PROFILE_PATH)?))
         },
-        "findings": input["findings"],
-        "commands": input["commands"],
-        "toolchains": input["toolchains"],
+        "historical_round_four": {
+            "completion_commit": EXPECTED_PARENT,
+            "accepted_parent": ROUND_FOUR_PARENT,
+            "input": {"path": ROUND_FOUR_INPUT_PATH, "sha256": format!("sha256:{ROUND_FOUR_INPUT_SHA256}")},
+            "receipt": {"path": ROUND_FOUR_RECEIPT_PATH, "sha256": format!("sha256:{ROUND_FOUR_RECEIPT_SHA256}"), "evidence_digest": ROUND_FOUR_EVIDENCE_DIGEST},
+            "validation": "exact Git object bytes and completion trailers",
+            "remote_evidence_credit": "none"
+        },
+        "findings": [
+            {"id": 1, "state": "closed", "content_rule": "current receipt schema has no command, count, toolchain, GitHub identity, conclusion, or future-CI fields"},
+            {"id": 2, "state": "closed", "content_rule": "exact candidate/projection path sets and exactly six retained documents for each of two targets"},
+            {"id": 3, "state": "closed", "content_rule": "live callback requires the exact v0-foundation and contract-msrv job set for both current-tip events"},
+            {"id": 4, "state": "closed", "content_rule": "callback emits canonical JSON to stdout and accepts no filesystem path"}
+        ],
         "artifacts": artifacts,
+        "release_inventory": release_inventory_value(),
         "sealing": {
-            "command": "cargo xtask evidence seal",
-            "check_command": "cargo xtask evidence seal --check",
             "canonicalization": "schema-versioned serde_json::to_vec(receipt)",
-            "candidate": "canonical sorted length-delimited Git/index path and bytes with versioned derived exclusions",
+            "candidate": "canonical sorted length-delimited Git/index path and repository bytes with exact profile paths",
             "commit_message": COMMIT_MESSAGE_NAME,
             "completion_identity": "discovered after commit by unique subject and generated trailers",
-            "callback": "post-commit only; excluded from commit evidence"
+            "callback": "canonical Git/GitHub-derived JSON on stdout only"
         },
-        "future_ci_success_claimed": false,
-        "remote_actions": input["remote_actions"]
-    }))
-}
-
-fn supersession_run(run: &Value) -> TaskResult<Value> {
-    let jobs = run["jobs"]
-        .as_array()
-        .ok_or("sourced run jobs are missing")?;
-    let v0 = jobs
-        .iter()
-        .find(|job| job["name"] == Value::String("v0-foundation".into()))
-        .ok_or("sourced run v0-foundation job is missing")?;
-    Ok(json!({
-        "role": run["role"],
-        "head_sha": run["head_sha"],
-        "event": run["event"],
-        "workflow": "mainframe-env",
-        "run_id": run["id"],
-        "run_status": run["status"],
-        "run_conclusion": run["conclusion"],
-        "run_url": run["html_url"],
-        "job": {"id": v0["id"], "name": v0["name"], "status": v0["status"], "conclusion": v0["conclusion"], "html_url": v0["html_url"]}
+        "parent_repository_digest": repository_digest_at_commit(root, EXPECTED_PARENT)?
     }))
 }
 
@@ -556,59 +466,7 @@ fn project_amendments(snapshot: &Snapshot) -> TaskResult<Value> {
 
 fn project_full_regression(snapshot: &Snapshot, candidate_digest: &str) -> TaskResult<Value> {
     let mut value = snapshot.value(FULL_REGRESSION_PATH)?;
-    let input = snapshot.value(INPUT_PATH)?;
     value["candidate"]["source_digest"] = Value::String(candidate_digest.into());
-    value["workspace"]["tests_passed"] = input["workspace"]["tests_passed"].clone();
-    value["workspace"]["tests_ignored_in_workspace_command"] =
-        input["workspace"]["tests_ignored"].clone();
-    value["workspace"]["failures"] = input["workspace"]["failures"].clone();
-    if let Some(result) = value["results"].as_array_mut().and_then(|results| {
-        results.iter_mut().find(|result| {
-            result["command"]
-                .as_str()
-                .is_some_and(|command| command.contains("cargo test --workspace"))
-        })
-    }) {
-        result["result"] = Value::String(format!(
-            "{} passed, {} explicitly ignored",
-            input["workspace"]["tests_passed"]
-                .as_u64()
-                .unwrap_or_default(),
-            input["workspace"]["tests_ignored"]
-                .as_u64()
-                .unwrap_or_default()
-        ));
-    }
-    for target in ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu"] {
-        let row = &mut value["release"]["targets"][target];
-        for (file, field) in [
-            ("manifest.json", "manifest_sha256"),
-            ("sbom.cdx.json", "sbom_sha256"),
-            ("provenance.intoto.json", "provenance_sha256"),
-            ("checksums.sha256", "checksums_sha256"),
-            ("LICENSES.md", "licenses_sha256"),
-            ("build-inputs.json", "build_inputs_sha256"),
-        ] {
-            row[field] = Value::String(digest_bytes(
-                snapshot.bytes(&format!("release/0.2.0/targets/{target}/{file}"))?,
-            ));
-        }
-    }
-    Ok(value)
-}
-
-fn project_hardcode(snapshot: &Snapshot) -> TaskResult<Value> {
-    let mut value = snapshot.value(HARD_CODE_PATH)?;
-    let scanned = snapshot
-        .files
-        .keys()
-        .filter(|path| {
-            path.starts_with("crates")
-                && path.extension() == Some(OsStr::new("rs"))
-                && !path.starts_with("crates/tooling/mainframe-env-conformance")
-        })
-        .count();
-    value["after"]["scanned_rust_files"] = json!(scanned);
     Ok(value)
 }
 
@@ -624,14 +482,8 @@ fn project_program_status(snapshot: &Snapshot, candidate_digest: &str) -> TaskRe
     {
         evidence_paths.push(Value::String(RECEIPT_PATH.into()));
     }
-    value["evidence_corrections"] = json!([{
-        "claim": "round-three exact-one-repair-commit terminal success",
-        "status": "superseded",
-        "reason": "The round-three completion and two intermediate follow-ups failed CI; b61d604 is the accepted tested follow-up tip.",
-        "evidence": RECEIPT_PATH
-    }]);
     value["next_smallest_executable_step"] = Value::String(
-        "Commit the generated round-four repair message, push impl/0.2.0, await terminal checks, then generate the post-commit callback without changing repository evidence."
+        "Commit the generated round-five repair message, push impl/0.2.0, await the exact terminal CI job set, then capture callback JSON stdout without changing repository evidence."
             .into(),
     );
     Ok(value)
@@ -644,49 +496,130 @@ fn project_workload_ledger(snapshot: &Snapshot) -> TaskResult<Value> {
         .ok_or("workload ledger exit gates are missing")?;
     if !exit_gates
         .iter()
-        .any(|gate| gate["id"] == Value::String("evidence-sealing".into()))
+        .any(|gate| gate["id"] == Value::String("content-evidence-sealing".into()))
     {
-        exit_gates
-            .push(json!({"id": "evidence-sealing", "state": "pass", "evidence": RECEIPT_PATH}));
+        exit_gates.push(
+            json!({"id": "content-evidence-sealing", "state": "pass", "evidence": RECEIPT_PATH}),
+        );
     }
     Ok(value)
 }
 
-fn validate_input(input: &Value) -> TaskResult {
+pub(super) fn validate_profile(profile: &Value) -> TaskResult {
+    let keys = profile
+        .as_object()
+        .ok_or("seal profile is not an object")?
+        .keys()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
     require(
-        input["schema_version"]
-            == Value::String("mainframe-env.review-repair-round-4-inputs@1".into())
-            && input["target_version"] == Value::String("0.2.0".into())
-            && input["accepted_parent"] == Value::String(EXPECTED_PARENT.into())
-            && input["branch"] == Value::String(EXPECTED_BRANCH.into())
-            && input["base"] == Value::String("main".into())
-            && input["pull_request"].as_u64() == Some(1),
-        "round-four seal input identity is invalid",
+        keys == BTreeSet::from([
+            "schema_version",
+            "profile_id",
+            "source_paths",
+            "projection_paths",
+            "retained_paths",
+        ]) && profile["schema_version"] == Value::String(ROUND_FIVE_PROFILE.schema_version.into())
+            && profile["profile_id"] == Value::String(ROUND_FIVE_PROFILE.profile_id.into())
+            && string_array(&profile["source_paths"])? == ROUND_FIVE_PROFILE.source_paths
+            && string_array(&profile["projection_paths"])? == ROUND_FIVE_PROFILE.projection_paths
+            && string_array(&profile["retained_paths"])? == retained_paths(),
+        "seal profile differs from the exact compiled content profile",
     )?;
-    let findings = input["findings"]
+    Ok(())
+}
+
+fn string_array(value: &Value) -> TaskResult<Vec<&str>> {
+    value
         .as_array()
-        .ok_or("round-four findings are missing")?;
-    require(
-        findings.len() == 3
-            && findings.iter().enumerate().all(|(index, finding)| {
-                finding["id"].as_u64() == Some((index + 1) as u64)
-                    && finding["state"] == Value::String("closed".into())
-            })
-            && input["commands"].as_array().is_some_and(|commands| {
-                !commands.is_empty()
-                    && commands
-                        .iter()
-                        .all(|command| command["exit_code"].as_i64() == Some(0))
-            })
-            && input["workspace"]["tests_passed"]
-                .as_u64()
-                .is_some_and(|count| count >= 260)
-            && input["workspace"]["tests_ignored"].as_u64().is_some()
-            && input["workspace"]["failures"].as_u64() == Some(0)
-            && input["remote_actions"]
-                == json!({"tagged": false, "published": false, "deployed": false, "merged": false}),
-        "round-four seal inputs do not close exactly three findings with passing commands",
+        .ok_or("profile path field is not an array")?
+        .iter()
+        .map(|value| {
+            value
+                .as_str()
+                .ok_or_else(|| "profile path is not text".into())
+        })
+        .collect()
+}
+
+fn retained_paths() -> Vec<String> {
+    let mut paths = vec![
+        ".github/workflows/ci.yml".to_string(),
+        ROUND_FOUR_INPUT_PATH.to_string(),
+        ROUND_FOUR_RECEIPT_PATH.to_string(),
+    ];
+    for target in RELEASE_TARGETS {
+        for document in RELEASE_DOCUMENTS {
+            paths.push(format!("release/0.2.0/targets/{target}/{document}"));
+        }
+    }
+    paths
+}
+
+fn release_inventory_value() -> Value {
+    Value::Array(
+        RELEASE_TARGETS
+            .iter()
+            .map(|target| json!({"target": target, "documents": RELEASE_DOCUMENTS}))
+            .collect(),
     )
+}
+
+fn validate_release_inventory(snapshot: &Snapshot) -> TaskResult {
+    let prefix = Path::new("release/0.2.0/targets");
+    let actual = snapshot
+        .files
+        .keys()
+        .filter(|path| path.starts_with(prefix))
+        .map(|path| path.to_string_lossy().to_string())
+        .collect::<BTreeSet<_>>();
+    let expected = retained_paths()
+        .into_iter()
+        .filter(|path| path.starts_with("release/0.2.0/targets/"))
+        .collect::<BTreeSet<_>>();
+    require(
+        actual == expected,
+        "release inventory has missing, surplus, nested, alternate, or unsupported target paths",
+    )
+}
+
+fn validate_callback_jobs(
+    head: &str,
+    event: &str,
+    run_id: u64,
+    jobs: &[Value],
+) -> TaskResult<Vec<Value>> {
+    require(
+        jobs.len() == 2,
+        "callback run must contain exactly two jobs",
+    )?;
+    let mut rows = Vec::new();
+    for name in ["contract-msrv", "v0-foundation"] {
+        let matching = jobs
+            .iter()
+            .filter(|job| job["name"].as_str() == Some(name))
+            .collect::<Vec<_>>();
+        require(
+            matching.len() == 1,
+            &format!("callback {event} run requires exactly one {name} job"),
+        )?;
+        let job = matching[0];
+        require(
+            job["status"] == Value::String("completed".into())
+                && job["conclusion"] == Value::String("success".into())
+                && job["run_id"].as_u64().is_none_or(|value| value == run_id)
+                && job["head_sha"].as_str().is_none_or(|value| value == head),
+            &format!("callback {event}/{name} job is stale or not terminal success"),
+        )?;
+        rows.push(json!({
+            "id": job["id"],
+            "name": name,
+            "status": "completed",
+            "conclusion": "success",
+            "html_url": job["html_url"]
+        }));
+    }
+    Ok(rows)
 }
 
 pub(super) fn validate_actions_source(root: &Path, source: &Value) -> TaskResult {
@@ -720,10 +653,10 @@ pub(super) fn validate_actions_source(root: &Path, source: &Value) -> TaskResult
             "pull_request",
             "failure",
         ),
-        ("accepted-push", EXPECTED_PARENT, "push", "success"),
+        ("accepted-push", ROUND_FOUR_PARENT, "push", "success"),
         (
             "accepted-pull-request",
-            EXPECTED_PARENT,
+            ROUND_FOUR_PARENT,
             "pull_request",
             "success",
         ),
@@ -779,6 +712,56 @@ pub(super) fn validate_actions_source(root: &Path, source: &Value) -> TaskResult
     Ok(())
 }
 
+fn validate_historical_round_four(root: &Path) -> TaskResult {
+    require(
+        command_text(root, "git", &["rev-parse", &format!("{EXPECTED_PARENT}^")])?
+            == ROUND_FOUR_PARENT,
+        "historical round-four completion parent drifted",
+    )?;
+    for (relative, expected_digest) in [
+        (ROUND_FOUR_INPUT_PATH, ROUND_FOUR_INPUT_SHA256),
+        (ROUND_FOUR_RECEIPT_PATH, ROUND_FOUR_RECEIPT_SHA256),
+    ] {
+        let object_bytes = git_file_bytes(root, EXPECTED_PARENT, relative)?;
+        require(
+            digest_bytes(&object_bytes) == expected_digest,
+            &format!("historical round-four Git object drifted: {relative}"),
+        )?;
+        require(
+            fs::read(root.join(relative)).map_err(|error| error.to_string())? == object_bytes,
+            &format!("historical round-four path was rewritten: {relative}"),
+        )?;
+    }
+    let receipt: Value = serde_json::from_slice(&git_file_bytes(
+        root,
+        EXPECTED_PARENT,
+        ROUND_FOUR_RECEIPT_PATH,
+    )?)
+    .map_err(|error| error.to_string())?;
+    let canonical = canonical_evidence_digest(
+        receipt["receipt"]
+            .as_object()
+            .ok_or("historical round-four receipt object is missing")?,
+    )?;
+    require(
+        canonical == ROUND_FOUR_EVIDENCE_DIGEST
+            && receipt["evidence_digest"] == Value::String(canonical),
+        "historical round-four evidence canonicalization drifted",
+    )?;
+    let message = command_text(root, "git", &["show", "-s", "--format=%B", EXPECTED_PARENT])?;
+    require(
+        message.lines().next() == Some("Repair 0.2.0 fourth review findings")
+            && message
+                .lines()
+                .any(|line| line == "Fourth-Review-Findings: 3=closed")
+            && message.lines().any(|line| line == "Target-Version: 0.2.0")
+            && message
+                .lines()
+                .any(|line| line == format!("Evidence-Digest: {ROUND_FOUR_EVIDENCE_DIGEST}")),
+        "historical round-four completion trailers drifted",
+    )
+}
+
 fn compare_outputs(snapshot: &Snapshot, output: &SealOutput) -> TaskResult {
     compare_named_bytes(&output.files, &snapshot.files)
 }
@@ -786,60 +769,79 @@ fn compare_outputs(snapshot: &Snapshot, output: &SealOutput) -> TaskResult {
 fn validate_precommit_context(root: &Path) -> TaskResult {
     require_clean_unstaged_and_untracked(root)?;
     validate_branch_parent(root, EXPECTED_BRANCH, EXPECTED_PARENT)?;
-    validate_changed_scope(root, &["diff", "--cached", "--name-only", EXPECTED_PARENT])
+    validate_changed_scope(
+        root,
+        &["diff", "--cached", "--name-only", EXPECTED_PARENT],
+        false,
+    )
 }
 
 fn validate_committed_context(root: &Path, completion: &str) -> TaskResult {
     require_clean_worktree(root)?;
     require(
         command_text(root, "git", &["rev-parse", &format!("{completion}^")])? == EXPECTED_PARENT,
-        "sealed round-four completion has the wrong parent",
+        "sealed round-five completion has the wrong parent",
     )?;
-    validate_changed_scope(root, &["diff", "--name-only", EXPECTED_PARENT, completion])
+    validate_changed_scope(
+        root,
+        &["diff", "--name-only", EXPECTED_PARENT, completion],
+        true,
+    )
 }
 
-fn validate_changed_scope(root: &Path, arguments: &[&str]) -> TaskResult {
+fn validate_changed_scope(
+    root: &Path,
+    arguments: &[&str],
+    require_projections: bool,
+) -> TaskResult {
     let paths = command_text(root, "git", arguments)?;
-    require(!paths.is_empty(), "evidence seal has no candidate changes")?;
-    for relative in paths.lines() {
-        require(
-            allowed_round_four_path(relative),
-            &format!("evidence seal candidate contains out-of-scope path {relative}"),
-        )?;
+    let actual = paths.lines().map(str::to_string).collect::<BTreeSet<_>>();
+    validate_candidate_path_set(&actual, require_projections)?;
+    let retained = retained_paths();
+    for relative in actual.iter().chain(retained.iter()) {
+        let stage = command_text(root, "git", &["ls-files", "--stage", "--", relative])?;
+        let mode = stage.split_whitespace().next().unwrap_or_default();
+        validate_regular_git_mode(mode, relative)?;
     }
     Ok(())
 }
 
-fn allowed_round_four_path(relative: &str) -> bool {
-    matches!(
-        relative,
-        ".github/workflows/ci.yml"
-            | "Cargo.lock"
-            | "Cargo.toml"
-            | "xtask/Cargo.toml"
-            | "xtask/src/main.rs"
-            | "xtask/src/evidence_seal.rs"
-            | "crates/providers/mainframe-env-racf/Cargo.toml"
-            | "crates/providers/mainframe-env-racf/src/service.rs"
-            | "crates/apps/mainframe-env-server/Cargo.toml"
-            | "crates/apps/mainframe-env-server/src/lib.rs"
-            | "crates/apps/mainframe-env-server/src/main.rs"
-            | "crates/apps/mainframe-env-server/src/environment_secrets.rs"
-            | "conformance/0.2/inventory/contracts.json"
-            | "conformance/0.2/evidence/review-repair-round-4-inputs.json"
-            | "conformance/0.2/evidence/review-repair-round-4.json"
-            | "conformance/0.2/evidence/sources/round-3-ci-runs.json"
-            | "conformance/0.2/evidence/work-package-amendments.json"
-            | "conformance/0.2/evidence/hardcode/no-application-hardcode.json"
-            | "conformance/0.2/evidence/full-regression.json"
-            | "conformance/0.2/evidence/program-status.json"
-            | "conformance/0.2/evidence/workload-ledger.json"
-            | "conformance/0.2/schemas/github-actions-receipt.schema.json"
-            | "conformance/0.2/schemas/review-repair-round-4-inputs.schema.json"
-            | "conformance/0.2/schemas/review-repair-round-4.schema.json"
-            | "conformance/0.2/schemas/program-status.schema.json"
-            | "docs/releases/0.2.md"
-    ) || relative.starts_with("release/0.2.0/targets/")
+fn validate_regular_git_mode(mode: &str, relative: &str) -> TaskResult {
+    require(
+        mode == "100644" || mode == "100755",
+        &format!("sealed content path is missing, a symlink, or non-regular: {relative}"),
+    )
+}
+
+fn validate_candidate_path_set(actual: &BTreeSet<String>, require_projections: bool) -> TaskResult {
+    let source = ROUND_FIVE_PROFILE
+        .source_paths
+        .iter()
+        .map(|path| (*path).to_string())
+        .collect::<BTreeSet<_>>();
+    let complete = source
+        .iter()
+        .cloned()
+        .chain(
+            ROUND_FIVE_PROFILE
+                .projection_paths
+                .iter()
+                .map(|path| (*path).to_string()),
+        )
+        .collect::<BTreeSet<_>>();
+    let expected = if require_projections {
+        &complete
+    } else {
+        &source
+    };
+    require(
+        actual == expected || (!require_projections && actual == &complete),
+        &format!(
+            "sealed candidate differs from the exact profile; missing={:?}; surplus={:?}",
+            expected.difference(actual).collect::<Vec<_>>(),
+            actual.difference(expected).collect::<Vec<_>>()
+        ),
+    )
 }
 
 fn require_clean_unstaged_and_untracked(root: &Path) -> TaskResult {
@@ -864,6 +866,32 @@ pub(super) fn round_four_completion_commits(
     root: &Path,
     digest: Option<&str>,
 ) -> TaskResult<Vec<String>> {
+    completion_commits(
+        root,
+        "Repair 0.2.0 fourth review findings",
+        "Fourth-Review-Findings: 3=closed",
+        digest,
+    )
+}
+
+pub(super) fn round_five_completion_commits(
+    root: &Path,
+    digest: Option<&str>,
+) -> TaskResult<Vec<String>> {
+    completion_commits(
+        root,
+        ROUND_FIVE_PROFILE.subject,
+        ROUND_FIVE_PROFILE.finding_trailer,
+        digest,
+    )
+}
+
+fn completion_commits(
+    root: &Path,
+    subject: &str,
+    finding_trailer: &str,
+    digest: Option<&str>,
+) -> TaskResult<Vec<String>> {
     let output = Command::new("git")
         .args(["log", "--format=%H%x1f%B%x1e", "HEAD"])
         .current_dir(root)
@@ -875,11 +903,14 @@ pub(super) fn round_four_completion_commits(
         .split('\u{1e}')
         .filter_map(|record| record.trim().split_once('\u{1f}'))
         .filter(|(_, message)| {
-            message.lines().next() == Some(COMMIT_SUBJECT)
+            message.lines().next() == Some(subject)
                 && message
                     .lines()
-                    .filter(|line| line.starts_with("Fourth-Review-Findings:"))
-                    .eq(["Fourth-Review-Findings: 3=closed"])
+                    .filter(|line| {
+                        line.starts_with("Fourth-Review-Findings:")
+                            || line.starts_with("Fifth-Review-Findings:")
+                    })
+                    .eq([finding_trailer])
                 && message
                     .lines()
                     .filter(|line| line.starts_with("Target-Version:"))
@@ -913,7 +944,13 @@ fn reject_self_reference(value: &Value, completion: &str) -> TaskResult {
 fn snapshot_digest(snapshot: &Snapshot) -> String {
     let mut digest = Sha256::new();
     for (relative, bytes) in &snapshot.files {
-        if repository_digest_excluded(relative) {
+        if repository_digest_excluded(relative)
+            || ROUND_FIVE_PROFILE
+                .projection_paths
+                .iter()
+                .filter(|path| **path != AMENDMENTS_PATH)
+                .any(|path| relative == Path::new(path))
+        {
             continue;
         }
         let path = relative.to_string_lossy();
@@ -927,7 +964,7 @@ fn snapshot_digest(snapshot: &Snapshot) -> String {
 
 fn commit_message(evidence_digest: &str) -> Vec<u8> {
     format!(
-        "{COMMIT_SUBJECT}\n\nFourth-Review-Findings: 3=closed\nTarget-Version: 0.2.0\nEvidence-Digest: {evidence_digest}\n"
+        "{COMMIT_SUBJECT}\n\nFifth-Review-Findings: 4=closed\nTarget-Version: 0.2.0\nEvidence-Digest: {evidence_digest}\n"
     )
     .into_bytes()
 }
@@ -956,9 +993,15 @@ fn git_index_bytes(root: &Path, relative: &str) -> TaskResult<Vec<u8>> {
 }
 
 fn validate_relative(relative: &str) -> TaskResult {
+    let path = Path::new(relative);
     require(
-        !relative.contains("..") && !Path::new(relative).is_absolute(),
-        "sealed path is unsafe",
+        !path.is_absolute()
+            && !relative.contains("//")
+            && !relative.starts_with("./")
+            && path
+                .components()
+                .all(|component| matches!(component, std::path::Component::Normal(_))),
+        "sealed path is unsafe or non-canonical",
     )
 }
 
@@ -1016,201 +1059,249 @@ mod tests {
     use super::*;
     use serde_json::Map;
 
-    fn temporary_repository(name: &str) -> PathBuf {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock")
-            .as_nanos();
-        let root = env::temp_dir().join(format!(
-            "mainframe-env-seal-{name}-{}-{nonce}",
-            std::process::id()
-        ));
-        fs::create_dir_all(&root).expect("temporary repository");
-        for args in [
-            vec!["init", "--quiet"],
-            vec!["config", "user.name", "sealer-test"],
-            vec!["config", "user.email", "sealer@example.invalid"],
-            vec!["checkout", "-b", EXPECTED_BRANCH],
+    fn exact_profile() -> Value {
+        json!({
+            "schema_version": ROUND_FIVE_PROFILE.schema_version,
+            "profile_id": ROUND_FIVE_PROFILE.profile_id,
+            "source_paths": ROUND_FIVE_PROFILE.source_paths,
+            "projection_paths": ROUND_FIVE_PROFILE.projection_paths,
+            "retained_paths": retained_paths()
+        })
+    }
+
+    fn exact_source_paths() -> BTreeSet<String> {
+        ROUND_FIVE_PROFILE
+            .source_paths
+            .iter()
+            .map(|path| (*path).to_string())
+            .collect()
+    }
+
+    fn release_snapshot() -> Snapshot {
+        Snapshot {
+            files: retained_paths()
+                .into_iter()
+                .filter(|path| path.starts_with("release/0.2.0/targets/"))
+                .map(|path| (PathBuf::from(path), Vec::new()))
+                .collect(),
+        }
+    }
+
+    fn callback_jobs(head: &str, run_id: u64) -> Vec<Value> {
+        ["contract-msrv", "v0-foundation"]
+            .iter()
+            .enumerate()
+            .map(|(index, name)| {
+                json!({
+                    "id": run_id * 10 + index as u64,
+                    "run_id": run_id,
+                    "head_sha": head,
+                    "name": name,
+                    "status": "completed",
+                    "conclusion": "success",
+                    "html_url": format!("https://github.example/jobs/{run_id}/{index}")
+                })
+            })
+            .collect()
+    }
+
+    #[test]
+    fn profile_excludes_fabricated_commands_counts_toolchains_and_remote_identities() {
+        let profile = exact_profile();
+        assert!(validate_profile(&profile).is_ok());
+        for (field, fabricated) in [
+            ("commands", json!([{"command": "false", "exit_code": 0}])),
+            ("workspace", json!({"tests_passed": 999999})),
+            ("toolchains", json!({"rust": "forged"})),
+            ("github_jobs", json!([{"id": 12345678901_u64}])),
+            ("conclusion", json!("success")),
+            ("future_ci_success", json!(true)),
         ] {
+            let mut changed = profile.clone();
+            changed[field] = fabricated;
             assert!(
-                Command::new("git")
-                    .args(args)
-                    .current_dir(&root)
-                    .status()
-                    .unwrap()
-                    .success()
+                validate_profile(&changed).is_err(),
+                "profile accepted forbidden field {field}"
             );
         }
-        for (name, bytes) in [
-            ("artifact", b"artifact".as_slice()),
-            ("receipt", b"receipt".as_slice()),
-            ("ledger", b"ledger".as_slice()),
-            ("status", b"status".as_slice()),
-        ] {
-            fs::write(root.join(name), bytes).unwrap();
-        }
-        assert!(
-            Command::new("git")
-                .args(["add", "."])
-                .current_dir(&root)
-                .status()
-                .unwrap()
-                .success()
-        );
-        assert!(
-            Command::new("git")
-                .args(["commit", "--quiet", "-m", "fixture"])
-                .current_dir(&root)
-                .status()
-                .unwrap()
-                .success()
-        );
-        root
-    }
-
-    #[test]
-    fn unchanged_seal_runs_are_byte_identical() {
-        let root = temporary_repository("idempotence");
         let receipt = Map::from_iter([
             ("candidate".into(), Value::String("sha256:fixture".into())),
-            ("result".into(), Value::String("pass".into())),
+            ("artifacts".into(), json!([])),
         ]);
-        let first = canonical_evidence_digest(&receipt).unwrap();
-        let second = canonical_evidence_digest(&receipt).unwrap();
-        assert_eq!(first, second);
-        assert_eq!(commit_message(&first), commit_message(&second));
         assert_eq!(
-            snapshot_digest(&Snapshot::from_index(&root).unwrap()),
-            snapshot_digest(&Snapshot::from_index(&root).unwrap())
+            canonical_evidence_digest(&receipt).unwrap(),
+            canonical_evidence_digest(&receipt).unwrap()
         );
-        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
-    fn seal_check_rejects_changed_artifact_receipt_ledger_status_and_trailer() {
-        let root = temporary_repository("mutations");
+    fn candidate_scope_rejects_extra_files_in_both_targets_missing_files_and_new_targets() {
+        let exact = exact_source_paths();
+        assert!(validate_candidate_path_set(&exact, false).is_ok());
+        for extra in [
+            "release/0.2.0/targets/aarch64-apple-darwin/unexpected.projection",
+            "release/0.2.0/targets/x86_64-unknown-linux-gnu/unexpected.projection",
+            "release/0.2.0/targets/powerpc64-unknown-linux-gnu/manifest.json",
+            "release/0.2.0/targets/aarch64-apple-darwin/nested/manifest.json",
+            "README.md",
+        ] {
+            let mut changed = exact.clone();
+            changed.insert(extra.into());
+            assert!(validate_candidate_path_set(&changed, false).is_err());
+        }
+        let mut missing = exact.clone();
+        missing.remove("xtask/src/main.rs");
+        assert!(validate_candidate_path_set(&missing, false).is_err());
+    }
+
+    #[test]
+    fn release_inventory_is_exact_for_two_targets_and_six_documents() {
+        let exact = release_snapshot();
+        assert!(validate_release_inventory(&exact).is_ok());
+        for extra in [
+            "release/0.2.0/targets/aarch64-apple-darwin/unexpected.projection",
+            "release/0.2.0/targets/x86_64-unknown-linux-gnu/unexpected.projection",
+            "release/0.2.0/targets/powerpc64-unknown-linux-gnu/manifest.json",
+            "release/0.2.0/targets/aarch64-apple-darwin/nested/manifest.json",
+        ] {
+            let mut changed = exact.clone();
+            changed.files.insert(PathBuf::from(extra), Vec::new());
+            assert!(validate_release_inventory(&changed).is_err());
+        }
+        let mut missing = exact.clone();
+        missing.files.remove(Path::new(
+            "release/0.2.0/targets/x86_64-unknown-linux-gnu/LICENSES.md",
+        ));
+        assert!(validate_release_inventory(&missing).is_err());
+    }
+
+    #[test]
+    fn candidate_scope_rejects_symlink_and_non_regular_git_modes() {
+        assert!(validate_regular_git_mode("100644", "regular").is_ok());
+        assert!(validate_regular_git_mode("100755", "executable").is_ok());
+        for mode in ["120000", "160000", "040000", ""] {
+            assert!(validate_regular_git_mode(mode, "not-regular").is_err());
+        }
+    }
+
+    #[test]
+    fn callback_requires_exact_successful_current_tip_job_set() {
+        let head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        let jobs = callback_jobs(head, 42);
+        let rows = validate_callback_jobs(head, "push", 42, &jobs).unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0]["name"], "contract-msrv");
+        assert_eq!(rows[1]["name"], "v0-foundation");
+
+        for (pointer, replacement) in [
+            ("/0/name", json!("renamed")),
+            ("/0/status", json!("queued")),
+            ("/0/conclusion", json!("skipped")),
+            ("/0/head_sha", json!("stale")),
+            ("/0/run_id", json!(99_u64)),
+            ("/1/conclusion", json!("failure")),
+        ] {
+            let mut changed = Value::Array(jobs.clone());
+            *changed.pointer_mut(pointer).unwrap() = replacement;
+            assert!(
+                validate_callback_jobs(head, "pull_request", 42, changed.as_array().unwrap())
+                    .is_err()
+            );
+        }
+
+        let mut missing = jobs.clone();
+        missing.pop();
+        assert!(validate_callback_jobs(head, "push", 42, &missing).is_err());
+        let mut duplicate = jobs.clone();
+        duplicate[1] = duplicate[0].clone();
+        assert!(validate_callback_jobs(head, "push", 42, &duplicate).is_err());
+        let mut extra = jobs;
+        extra.push(json!({
+            "id": 999,
+            "run_id": 42,
+            "head_sha": head,
+            "name": "unrelated-green",
+            "status": "completed",
+            "conclusion": "success"
+        }));
+        assert!(validate_callback_jobs(head, "push", 42, &extra).is_err());
+    }
+
+    #[test]
+    fn callback_implementation_is_stdout_only_and_has_no_filesystem_mutation() {
+        let source = include_str!("evidence_seal.rs");
+        let callback = source
+            .split_once("pub(super) fn callback(root: &Path) -> TaskResult {")
+            .unwrap()
+            .1
+            .split_once("\nfn render(")
+            .unwrap()
+            .0;
+        assert!(callback.contains("std::io::stdout()"));
+        for forbidden in [
+            "output_path",
+            "fs::write",
+            "fs::rename",
+            "fs::create_dir",
+            "OpenOptions",
+        ] {
+            assert!(
+                !callback.contains(forbidden),
+                "callback contains filesystem operation {forbidden}"
+            );
+        }
+    }
+
+    #[test]
+    fn projections_and_commit_message_are_byte_deterministic() {
+        let snapshot = Snapshot {
+            files: BTreeMap::from([
+                (PathBuf::from("source"), b"source".to_vec()),
+                (PathBuf::from(RECEIPT_PATH), b"excluded".to_vec()),
+            ]),
+        };
+        assert_eq!(snapshot_digest(&snapshot), snapshot_digest(&snapshot));
+        let digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        assert_eq!(commit_message(digest), commit_message(digest));
+        assert!(
+            String::from_utf8(commit_message(digest))
+                .unwrap()
+                .contains("Fifth-Review-Findings: 4=closed")
+        );
+    }
+
+    #[test]
+    fn changed_projection_bytes_and_self_reference_are_rejected() {
         let expected = BTreeMap::from([
-            (PathBuf::from("artifact"), b"a".to_vec()),
-            (PathBuf::from("receipt"), b"b".to_vec()),
-            (PathBuf::from("ledger"), b"c".to_vec()),
-            (PathBuf::from("status"), b"d".to_vec()),
+            (PathBuf::from("receipt"), b"a".to_vec()),
+            (PathBuf::from("ledger"), b"b".to_vec()),
+            (PathBuf::from("status"), b"c".to_vec()),
         ]);
         for changed in expected.keys() {
             let mut actual = expected.clone();
             actual.get_mut(changed).unwrap().push(b'!');
             assert!(compare_named_bytes(&expected, &actual).is_err());
         }
-        let digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-        let mut changed = commit_message(digest);
-        changed.push(b'!');
-        assert_ne!(changed, commit_message(digest));
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn branch_parent_dirty_and_out_of_scope_inputs_are_rejected() {
-        let root = temporary_repository("context");
-        let parent = callback_tip(&root).unwrap();
-        assert!(validate_branch_parent(&root, EXPECTED_BRANCH, &parent).is_ok());
-        assert!(validate_branch_parent(&root, "wrong", &parent).is_err());
-        assert!(validate_branch_parent(&root, EXPECTED_BRANCH, "bad-parent").is_err());
-        fs::write(root.join("untracked"), b"dirty").unwrap();
-        assert!(require_clean_unstaged_and_untracked(&root).is_err());
-        fs::remove_file(root.join("untracked")).unwrap();
-        fs::write(root.join("README.md"), b"out of scope").unwrap();
-        assert!(
-            Command::new("git")
-                .args(["add", "README.md"])
-                .current_dir(&root)
-                .status()
-                .unwrap()
-                .success()
-        );
-        assert!(
-            validate_changed_scope(&root, &["diff", "--cached", "--name-only", "HEAD"]).is_err()
-        );
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn duplicate_completion_and_caller_supplied_callback_tip_are_rejected() {
-        let root = temporary_repository("completion");
-        let digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-        for index in 0..2 {
-            fs::write(root.join("artifact"), format!("artifact-{index}")).unwrap();
-            assert!(
-                Command::new("git")
-                    .args(["add", "artifact"])
-                    .current_dir(&root)
-                    .status()
-                    .unwrap()
-                    .success()
-            );
-            let message = String::from_utf8(commit_message(digest)).unwrap();
-            assert!(
-                Command::new("git")
-                    .args(["commit", "--quiet", "-m", &message])
-                    .current_dir(&root)
-                    .status()
-                    .unwrap()
-                    .success()
-            );
-        }
-        assert_eq!(
-            round_four_completion_commits(&root, Some(digest))
-                .unwrap()
-                .len(),
-            2
-        );
-        let actual = callback_tip(&root).unwrap();
-        assert_ne!(actual, "caller-supplied-tip");
-        assert_eq!(
-            actual,
-            command_text(&root, "git", &["rev-parse", "HEAD"]).unwrap()
-        );
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn self_referential_completion_is_rejected() {
         let completion = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
         assert!(reject_self_reference(&json!({"tip": completion}), completion).is_err());
         assert!(reject_self_reference(&json!({"parent": EXPECTED_PARENT}), completion).is_ok());
     }
 
     #[test]
-    fn round_three_supersession_rejects_wrong_head_event_conclusion_duplicates_and_live_substitution()
-     {
+    fn historical_round_three_source_remains_informational_and_immutable() {
         let root = repository_root().unwrap();
         let source_path = root.join("conformance/0.2/evidence/sources/round-3-ci-runs.json");
         let source = json(&source_path).unwrap();
         assert!(validate_actions_source(&root, &source).is_ok());
-        for (pointer, replacement) in [
-            (
-                "/runs/0/head_sha",
-                json!("0000000000000000000000000000000000000000"),
-            ),
-            ("/runs/3/event", json!("pull_request")),
-            ("/runs/4/conclusion", json!("failure")),
-            ("/runs/4/jobs/1/conclusion", json!("failure")),
-        ] {
-            let mut changed = source.clone();
-            *changed.pointer_mut(pointer).unwrap() = replacement;
-            assert!(validate_actions_source(&root, &changed).is_err());
-        }
-        let mut duplicate = source.clone();
-        duplicate["runs"][1]["id"] = duplicate["runs"][0]["id"].clone();
-        assert!(validate_actions_source(&root, &duplicate).is_err());
         let historical = git_file_bytes(
             &root,
             "ab4894d6111910b08f37579134520a1de93a1e8a",
-            ROUND_THREE_PATH,
+            "conformance/0.2/evidence/review-repair-round-3.json",
         )
         .unwrap();
-        let mut substituted: Value = serde_json::from_slice(&historical).unwrap();
-        substituted["receipt"]["candidate_source_digest"] = Value::String(
-            "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".into(),
+        assert_eq!(
+            historical,
+            fs::read(root.join("conformance/0.2/evidence/review-repair-round-3.json")).unwrap()
         );
-        assert_ne!(pretty_json(&substituted).unwrap(), historical);
     }
 }
