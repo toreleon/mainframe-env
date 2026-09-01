@@ -12,11 +12,12 @@ use mainframe_env_execution_api::{
 };
 use mainframe_env_host_api::{
     CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, ClassName,
-    ClockRequest, DatasetLockMode, DatasetName, DatasetReadControl, DatasetRequest,
-    Db2HostVariable, Db2Operation, Db2Request, EffectRequest, EffectResult, HostLimits,
-    HostProblem, HostRequest, HostResult, ImsOperation, ImsQualifier, ImsRequest, KeyRelation,
-    MethodName, MqOperation, MqRequest, Mutation, ProgramName, ProgramRequest, RuntimeServiceKind,
-    RuntimeServiceName, RuntimeServiceSelector, TerminalRequest,
+    ClockRequest, DatasetCloseControl, DatasetLockMode, DatasetName, DatasetReadControl,
+    DatasetReelUnit, DatasetRequest, Db2HostVariable, Db2Operation, Db2Request, EffectRequest,
+    EffectResult, HostLimits, HostProblem, HostRequest, HostResult, ImsOperation, ImsQualifier,
+    ImsRequest, KeyRelation, MethodName, MqOperation, MqRequest, Mutation, ProgramName,
+    ProgramRequest, RuntimeServiceKind, RuntimeServiceName, RuntimeServiceSelector,
+    TerminalRequest,
 };
 use mainframe_env_ir::{
     Attribute, CodecLimits, Module, Operation, OperationIdentity, StorageId, decode_binary,
@@ -3709,12 +3710,26 @@ impl ReferenceMachine {
                     Some(DatasetCursorAction::Start(dataset_name.clone())),
                 )
             }
-            "close" if current_cursor.is_some() => (
-                DatasetRequest::EndBrowse {
+            "close" => (
+                DatasetRequest::Close {
                     dataset,
-                    cursor: current_cursor.ok_or(MachineProblem::InvalidOperation)?,
+                    cursor: current_cursor.clone(),
+                    control: DatasetCloseControl {
+                        reel_or_unit: if args.iter().any(|token| token == "REEL") {
+                            Some(DatasetReelUnit::Reel)
+                        } else if args.iter().any(|token| token == "UNIT") {
+                            Some(DatasetReelUnit::Unit)
+                        } else {
+                            None
+                        },
+                        no_rewind: args.windows(2).any(|window| window == ["NO", "REWIND"]),
+                        removal: args.windows(2).any(|window| window == ["FOR", "REMOVAL"]),
+                        lock: args.windows(2).any(|window| window == ["WITH", "LOCK"]),
+                    },
                 },
-                Some(DatasetCursorAction::End(dataset_name.clone())),
+                current_cursor
+                    .is_some()
+                    .then(|| DatasetCursorAction::End(dataset_name.clone())),
             ),
             _ => (DatasetRequest::Attributes { dataset }, None),
         };

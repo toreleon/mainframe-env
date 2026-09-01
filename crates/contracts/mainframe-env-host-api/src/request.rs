@@ -72,6 +72,20 @@ pub struct DatasetReadControl {
     pub lock: DatasetLockMode,
     pub wait: Option<bool>,
 }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DatasetReelUnit {
+    Reel,
+    Unit,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct DatasetCloseControl {
+    pub reel_or_unit: Option<DatasetReelUnit>,
+    pub no_rewind: bool,
+    pub removal: bool,
+    pub lock: bool,
+}
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AccessIntent {
     Read,
@@ -293,6 +307,11 @@ pub enum DatasetRequest {
     EndBrowse {
         dataset: DatasetName,
         cursor: String,
+    },
+    Close {
+        dataset: DatasetName,
+        cursor: Option<String>,
+        control: DatasetCloseControl,
     },
 }
 
@@ -842,7 +861,8 @@ impl HostRequest {
                 | DatasetRequest::ResolveGeneration { .. }
                 | DatasetRequest::ReadNext { .. }
                 | DatasetRequest::StartBrowse { .. }
-                | DatasetRequest::EndBrowse { .. },
+                | DatasetRequest::EndBrowse { .. }
+                | DatasetRequest::Close { .. },
             ) => "host.dataset.read",
             Self::Dataset(_) => "host.dataset.write",
             Self::Program(_) => "host.program.invoke",
@@ -1451,6 +1471,17 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
         {
             Err(HostProblem::Malformed)
         }
+        DatasetRequest::Close {
+            cursor, control, ..
+        } if cursor
+            .as_ref()
+            .is_some_and(|cursor| cursor.is_empty() || cursor.len() > limits.max_name_bytes)
+            || (control.lock
+                && (control.reel_or_unit.is_some() || control.no_rewind || control.removal))
+            || (control.removal && control.reel_or_unit.is_none()) =>
+        {
+            Err(HostProblem::Malformed)
+        }
         _ => Ok(()),
     }
 }
@@ -1556,6 +1587,35 @@ mod tests {
         assert_eq!(
             request.validate(limits),
             Err(HostProblem::ResourceExhausted)
+        );
+    }
+
+    #[test]
+    fn close_control_rejects_conflicting_lock_and_reel_dispositions() {
+        let dataset = DatasetName::new("USER.DATA", 44).unwrap();
+        let valid = HostRequest::Dataset(DatasetRequest::Close {
+            dataset: dataset.clone(),
+            cursor: None,
+            control: DatasetCloseControl {
+                reel_or_unit: Some(DatasetReelUnit::Reel),
+                no_rewind: true,
+                ..DatasetCloseControl::default()
+            },
+        });
+        assert_eq!(valid.validate(HostLimits::default()), Ok(()));
+
+        let invalid = HostRequest::Dataset(DatasetRequest::Close {
+            dataset,
+            cursor: None,
+            control: DatasetCloseControl {
+                reel_or_unit: Some(DatasetReelUnit::Unit),
+                lock: true,
+                ..DatasetCloseControl::default()
+            },
+        });
+        assert_eq!(
+            invalid.validate(HostLimits::default()),
+            Err(HostProblem::Malformed)
         );
     }
 

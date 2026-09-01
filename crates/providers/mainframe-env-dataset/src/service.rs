@@ -1665,6 +1665,32 @@ impl DatasetService {
                     key: None,
                 })
             }
+            DatasetRequest::Close {
+                dataset,
+                cursor,
+                control: _,
+            } => {
+                if let Some(cursor) = cursor {
+                    let removed = state
+                        .cursors
+                        .remove(cursor)
+                        .ok_or_else(|| condition("INVREQ", 16))?;
+                    if removed.dataset != dataset.as_str() {
+                        return Err(condition("INVREQ", 16));
+                    }
+                    return Ok(DatasetResult::Browse {
+                        cursor: cursor.clone(),
+                        record: None,
+                        identity: None,
+                        key: None,
+                    });
+                }
+                let entry = entry(state, dataset)?;
+                Ok(DatasetResult::Attributes {
+                    attributes: entry.attributes.clone(),
+                    version: entry.version,
+                })
+            }
         }
     }
     fn persist_with_indexes(

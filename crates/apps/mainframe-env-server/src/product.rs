@@ -2512,7 +2512,8 @@ impl ProductServer {
             | DatasetRequest::Delete { dataset, .. }
             | DatasetRequest::StartBrowse { dataset, .. }
             | DatasetRequest::ReadNext { dataset, .. }
-            | DatasetRequest::EndBrowse { dataset, .. } => Some(dataset.as_str()),
+            | DatasetRequest::EndBrowse { dataset, .. }
+            | DatasetRequest::Close { dataset, .. } => Some(dataset.as_str()),
             DatasetRequest::DefinePath { path, .. } => Some(path.as_str()),
             DatasetRequest::DefineAlternateIndex { base, .. }
             | DatasetRequest::DefineGenerationGroup { base, .. }

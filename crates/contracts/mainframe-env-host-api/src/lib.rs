@@ -20,13 +20,13 @@ pub use registry::{
 };
 pub use request::{
     AccessIntent, AuditEvent, CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest,
-    CicsResponse, CicsUnitOfWorkOutcome, ClockRequest, DatasetAttributes, DatasetLockMode,
-    DatasetOrganization, DatasetReadControl, DatasetRequest, DatasetResult, Db2HostVariable,
-    Db2Operation, Db2Request, Db2Result, Db2Row, EffectRequest, EffectResult, HostLimits,
-    HostProblem, HostRequest, HostResult, ImsOperation, ImsQualifier, ImsRequest, ImsResult,
-    ImsSegment, KeyRelation, MqOperation, MqRequest, MqResult, Mutation, ProgramRequest,
-    RecordFormat, RuntimeServiceKind, RuntimeServiceSelector, SecretRef, SecurityDecision,
-    SecurityRequest, SpoolRequest, StateRequest, TerminalField, TerminalRequest,
+    CicsResponse, CicsUnitOfWorkOutcome, ClockRequest, DatasetAttributes, DatasetCloseControl,
+    DatasetLockMode, DatasetOrganization, DatasetReadControl, DatasetReelUnit, DatasetRequest,
+    DatasetResult, Db2HostVariable, Db2Operation, Db2Request, Db2Result, Db2Row, EffectRequest,
+    EffectResult, HostLimits, HostProblem, HostRequest, HostResult, ImsOperation, ImsQualifier,
+    ImsRequest, ImsResult, ImsSegment, KeyRelation, MqOperation, MqRequest, MqResult, Mutation,
+    ProgramRequest, RecordFormat, RuntimeServiceKind, RuntimeServiceSelector, SecretRef,
+    SecurityDecision, SecurityRequest, SpoolRequest, StateRequest, TerminalField, TerminalRequest,
 };
 pub use runtime_service::{
     RUNTIME_SERVICE_REGISTRY_CONTRACT, RuntimeServiceDescriptor, RuntimeServiceRegistry,
