@@ -1,7 +1,11 @@
 {
   "schema_version": "mainframe-env.conformance-dependency-additions@1",
   "target_version": "0.3.0",
+  "profile_additions": [
+    ["conformance", "mainframe-env-coverage"]
+  ],
   "edges": [
+    ["mainframe-env-conformance", "mainframe-env-coverage"],
     ["xtask", "mainframe-env-coverage"]
   ]
 }

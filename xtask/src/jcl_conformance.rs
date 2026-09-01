@@ -767,6 +767,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn shared_runtime_closes_cobol_dataset_and_jcl_handlers() {
+        let root = repository_root().unwrap();
+        let spec = compile_shared_spec(&root).unwrap();
+        let dataset_handlers = dataset_conformance_runtime();
+        let jcl_handlers = runtime();
+        combined_conformance_runtime(
+            &spec,
+            &dataset_handlers,
+            &jcl_handlers,
+            ConformanceLimits::default(),
+        )
+        .unwrap();
+    }
+
+    #[test]
     fn generic_success_and_validation_bypass_mutants_are_rejected() {
         let generic_success = DriverOutput::new(
             serde_json::to_vec(&serde_json::json!({

@@ -21,6 +21,7 @@ jobs:
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - run: cargo fmt --all -- --check
       - run: cargo xtask spec --check
+      - run: cargo xtask cobol-exit --check
       - run: cargo check --workspace --all-targets --all-features --locked
       - run: cargo test --workspace --all-features --locked --no-fail-fast
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings

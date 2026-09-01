@@ -4940,16 +4940,16 @@ mod tests {
             limits,
         )
         .unwrap();
-        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+        let compile_result = CobolCompiler::default()
             .compile(CompilerRequest {
                 source: bundle,
                 mode: CompilationMode::Executable,
                 target: CompileTarget::new("reference").unwrap(),
                 options: CompileOptions::new(BTreeMap::new()).unwrap(),
             })
-            .unwrap()
-        else {
-            panic!("COBSWAIT fixture did not publish");
+            .unwrap();
+        let CompilerResult::Published { artifact, .. } = compile_result else {
+            panic!("COBSWAIT fixture did not publish: {compile_result:?}");
         };
         let server = ProductServer::memory(config()).unwrap();
         server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
