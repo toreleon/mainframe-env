@@ -37,6 +37,7 @@ enum Marker {
     PerformRepetition,
     XmlEvent,
     DeclarativeHandler,
+    RandomSequence,
 }
 #[derive(Debug, Deserialize, Serialize)]
 struct Output {
@@ -168,6 +169,9 @@ fn execute(fixture: &Fixture) -> Result<Output, String> {
                 .is_some_and(|value| value.bytes() == b"CONTENT-CHARACTERS"),
             Marker::DeclarativeHandler => first
                 .variable("DECL-MARKER")
+                .is_some_and(|value| value.bytes() == b"Y"),
+            Marker::RandomSequence => first
+                .variable("RANDOM-MARKER")
                 .is_some_and(|value| value.bytes() == b"Y"),
         };
         if reached {

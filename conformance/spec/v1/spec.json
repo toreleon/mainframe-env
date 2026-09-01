@@ -34815,6 +34815,23 @@
       ],
       "oracle": "cobol.enterprise-6.5.licensed",
       "recovery": null
+    },
+    {
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0053",
+      "gate": "recovered",
+      "obligation_id": "checkpoint-restart",
+      "test_id": "cobol.recovery.random-sequence",
+      "input": "cobol.recovery.random-sequence",
+      "driver": "cobol.recovery.driver",
+      "preconditions": [
+        "cobol.recovery.fixture.available"
+      ],
+      "expected": [
+        "cobol.recovery.exact"
+      ],
+      "oracle": "cobol.enterprise-6.5.licensed",
+      "recovery": null
     }
   ],
   "catalog_digest": "sha256:074f7385b1d1e1127f9cf83dbbc4e0bc46903cfa7739a2515c4085f7d2037f01",
@@ -47732,6 +47749,13 @@
       "applicable_gates": [
         "executed"
       ]
+    },
+    {
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0053",
+      "obligation_id": "checkpoint-restart",
+      "applicable_gates": [
+        "recovered"
+      ]
     }
   ],
   "registries": {
@@ -49067,23 +49091,23 @@
         "id": "cobol.function.year-to-yyyy.valid"
       },
       {
-        "digest": "sha256:653ac2c5f6cec5dfff594cb9ab93672009da3b481215e79210a84089adf65b45",
+        "digest": "sha256:a2397331b24cd1a217a726e8ca22743e073e15f5df4413b887bea547dd571c83",
         "id": "cobol.recovery.dynamic-length"
       },
       {
-        "digest": "sha256:653ac2c5f6cec5dfff594cb9ab93672009da3b481215e79210a84089adf65b45",
+        "digest": "sha256:a2397331b24cd1a217a726e8ca22743e073e15f5df4413b887bea547dd571c83",
         "id": "cobol.recovery.release"
       },
       {
-        "digest": "sha256:653ac2c5f6cec5dfff594cb9ab93672009da3b481215e79210a84089adf65b45",
+        "digest": "sha256:a2397331b24cd1a217a726e8ca22743e073e15f5df4413b887bea547dd571c83",
         "id": "cobol.recovery.return"
       },
       {
-        "digest": "sha256:653ac2c5f6cec5dfff594cb9ab93672009da3b481215e79210a84089adf65b45",
+        "digest": "sha256:a2397331b24cd1a217a726e8ca22743e073e15f5df4413b887bea547dd571c83",
         "id": "cobol.recovery.search"
       },
       {
-        "digest": "sha256:653ac2c5f6cec5dfff594cb9ab93672009da3b481215e79210a84089adf65b45",
+        "digest": "sha256:a2397331b24cd1a217a726e8ca22743e073e15f5df4413b887bea547dd571c83",
         "id": "cobol.recovery.sort"
       },
       {
@@ -51896,7 +51920,7 @@
       },
       {
         "id": "cobol.recovery.perform-repetition",
-        "digest": "sha256:653ac2c5f6cec5dfff594cb9ab93672009da3b481215e79210a84089adf65b45"
+        "digest": "sha256:a2397331b24cd1a217a726e8ca22743e073e15f5df4413b887bea547dd571c83"
       },
       {
         "id": "cobol.statement-phrase-runtime.entry-alternate-selection",
@@ -51908,7 +51932,7 @@
       },
       {
         "id": "cobol.recovery.xml-events",
-        "digest": "sha256:653ac2c5f6cec5dfff594cb9ab93672009da3b481215e79210a84089adf65b45"
+        "digest": "sha256:a2397331b24cd1a217a726e8ca22743e073e15f5df4413b887bea547dd571c83"
       },
       {
         "id": "cobol.statement-phrase-runtime.read-declarative-error",
@@ -51916,7 +51940,7 @@
       },
       {
         "id": "cobol.recovery.declarative-handler",
-        "digest": "sha256:653ac2c5f6cec5dfff594cb9ab93672009da3b481215e79210a84089adf65b45"
+        "digest": "sha256:a2397331b24cd1a217a726e8ca22743e073e15f5df4413b887bea547dd571c83"
       },
       {
         "id": "cobol.function-boundary-runtime.date-to-yyyymmdd-sliding-window",
@@ -51945,6 +51969,10 @@
       {
         "id": "cobol.function-boundary-runtime.random-sequence-and-reseed",
         "digest": "sha256:e5cc3e7c40f496733945955ea2a596a60557b55d33790ed2d2f51541338f4e86"
+      },
+      {
+        "id": "cobol.recovery.random-sequence",
+        "digest": "sha256:a2397331b24cd1a217a726e8ca22743e073e15f5df4413b887bea547dd571c83"
       }
     ],
     "input_shapes": [
@@ -56246,6 +56274,7 @@
       "obligations": [
         "boundary-sequence-and-reseed",
         "checkpoint-identity",
+        "checkpoint-restart",
         "invalid-signature",
         "licensed-equivalence",
         "quantum-identity",
@@ -56265,14 +56294,16 @@
         "cobol.function-runtime.executed",
         "cobol.function.accepted",
         "cobol.function.rejected",
-        "cobol.licensed.row-equivalent"
+        "cobol.licensed.row-equivalent",
+        "cobol.recovery.exact"
       ],
       "preconditions": [
         "cobol.assurance.fixture.available",
         "cobol.function-boundary-runtime.fixture.available",
         "cobol.function-runtime.fixture.available",
         "cobol.function.fixture.available",
-        "cobol.licensed.receipt.available"
+        "cobol.licensed.receipt.available",
+        "cobol.recovery.fixture.available"
       ],
       "recovery": null,
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0053",

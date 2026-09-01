@@ -1626,6 +1626,9 @@ fn check_cobol_function_bindings(
             "runtime-normal",
             "valid-signature",
         ]);
+        if row.row_id().as_str().ends_with(":0053") {
+            expected_obligations.insert("checkpoint-restart");
+        }
         if matches!(
             row.row_id().as_str().rsplit(':').next(),
             Some("0002" | "0009" | "0022" | "0035" | "0061" | "0075")

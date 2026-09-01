@@ -345,6 +345,7 @@ pub struct MachineSnapshot {
     )>,
     pub linkage_addresses: BTreeMap<String, Option<(usize, usize, usize)>>,
     pub freed_allocations: BTreeSet<usize>,
+    pub random_state: Option<u64>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -785,7 +786,7 @@ impl ReferenceMachine {
     #[must_use]
     pub fn snapshot(&self) -> MachineSnapshot {
         MachineSnapshot {
-            schema_version: 9,
+            schema_version: 10,
             program_counter: self.pc,
             effect_sequence: self.effect_sequence,
             executed_steps: self.executed_steps,
@@ -858,11 +859,12 @@ impl ReferenceMachine {
                 })
                 .collect(),
             freed_allocations: self.freed_allocations.clone(),
+            random_state: self.random_state.get(),
         }
     }
 
     pub fn restore(&mut self, snapshot: MachineSnapshot) -> Result<(), MachineProblem> {
-        if !matches!(snapshot.schema_version, 1..=9)
+        if !matches!(snapshot.schema_version, 1..=10)
             || snapshot.program_counter > self.operations.len()
             || snapshot.base_storage.iter().map(Vec::len).sum::<usize>()
                 > self.invocation.limits.max_storage_bytes as usize
@@ -1048,6 +1050,11 @@ impl ReferenceMachine {
             self.linkage_addresses.clear();
             self.freed_allocations.clear();
         }
+        self.random_state.set(if snapshot.schema_version >= 10 {
+            snapshot.random_state
+        } else {
+            None
+        });
         self.pending = None;
         self.deferred_drive = None;
         Ok(())
@@ -1065,6 +1072,7 @@ impl ReferenceMachine {
                 | "mainframe-env.reference-machine-checkpoint@7"
                 | "mainframe-env.reference-machine-checkpoint@8"
                 | "mainframe-env.reference-machine-checkpoint@9"
+                | "mainframe-env.reference-machine-checkpoint@10"
         ) {
             return Err(MachineProblem::IncompatibleSnapshot);
         }
@@ -7566,7 +7574,7 @@ impl Machine for ReferenceMachine {
         }
         let bytes = encode_snapshot(&self.snapshot())?;
         BoundedPayload::new(
-            "mainframe-env.reference-machine-checkpoint@9",
+            "mainframe-env.reference-machine-checkpoint@10",
             bytes,
             InvocationLimits {
                 max_payload_bytes: usize::try_from(
@@ -7589,7 +7597,7 @@ impl Machine for ReferenceMachine {
 }
 
 fn encode_snapshot(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
-    let mut bytes = b"MECP0009".to_vec();
+    let mut bytes = b"MECP0010".to_vec();
     bytes.extend_from_slice(&snapshot.schema_version.to_be_bytes());
     bytes.extend_from_slice(&u64::try_from(snapshot.program_counter).ok()?.to_be_bytes());
     bytes.extend_from_slice(&snapshot.effect_sequence.to_be_bytes());
@@ -7755,6 +7763,13 @@ fn encode_snapshot(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
     for base in &snapshot.freed_allocations {
         bytes.extend_from_slice(&u64::try_from(*base).ok()?.to_be_bytes());
     }
+    match snapshot.random_state {
+        Some(state) => {
+            bytes.push(1);
+            bytes.extend_from_slice(&state.to_be_bytes());
+        }
+        None => bytes.push(0),
+    }
     Some(bytes)
 }
 
@@ -7790,6 +7805,7 @@ fn decode_snapshot(
         b"MECP0007" => 7,
         b"MECP0008" => 8,
         b"MECP0009" => 9,
+        b"MECP0010" => 10,
         _ => return Err(MachineProblem::IncompatibleSnapshot),
     };
     let schema_version = input.u32()?;
@@ -7919,6 +7935,7 @@ fn decode_snapshot(
     let mut sort_io = None;
     let mut linkage_addresses = BTreeMap::new();
     let mut freed_allocations = BTreeSet::new();
+    let mut random_state = None;
     if header_version >= 8 {
         let dynamic_count =
             usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
@@ -8106,6 +8123,13 @@ fn decode_snapshot(
             }
         }
     }
+    if header_version >= 10 {
+        random_state = match input.take(1)?.first() {
+            Some(0) => None,
+            Some(1) => Some(input.u64()?),
+            _ => return Err(MachineProblem::IncompatibleSnapshot),
+        };
+    }
     if !input.finished() {
         return Err(MachineProblem::IncompatibleSnapshot);
     }
@@ -8132,6 +8156,7 @@ fn decode_snapshot(
         sort_io,
         linkage_addresses,
         freed_allocations,
+        random_state,
     })
 }
 
@@ -11265,10 +11290,11 @@ mod tests {
         first
             .dataset_cursors
             .insert("IBMUSER.INPUT".into(), "CURSOR-1".into());
+        first.random_state.set(Some(42));
         let checkpoint = first.checkpoint().unwrap();
         assert_eq!(
             checkpoint.schema(),
-            "mainframe-env.reference-machine-checkpoint@9"
+            "mainframe-env.reference-machine-checkpoint@10"
         );
         let mut restored =
             ReferenceMachine::from_binary(&binary(), test_invocation, CodecLimits::default())
@@ -11278,11 +11304,26 @@ mod tests {
         assert_eq!(restored.condition_status, first.condition_status);
         assert_eq!(restored.dataset_cursors, first.dataset_cursors);
         assert_eq!(restored.executed_steps, first.executed_steps);
+        assert_eq!(restored.random_state.get(), Some(42));
         let first_done = first.drive(MachineResume::Start, Quantum::new(100, 1024).unwrap());
         let restored_done = restored.drive(MachineResume::Start, Quantum::new(100, 1024).unwrap());
         assert_eq!(first_done, restored_done);
 
-        let mut version_eight = checkpoint.bytes()[..checkpoint.bytes().len() - 8].to_vec();
+        let mut version_nine = checkpoint.bytes()[..checkpoint.bytes().len() - 9].to_vec();
+        version_nine[..8].copy_from_slice(b"MECP0009");
+        version_nine[8..12].copy_from_slice(&9u32.to_be_bytes());
+        let version_nine = BoundedPayload::new(
+            "mainframe-env.reference-machine-checkpoint@9",
+            version_nine,
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let mut migrated_nine =
+            ReferenceMachine::from_binary(&binary(), invocation(), CodecLimits::default()).unwrap();
+        migrated_nine.restore_checkpoint(&version_nine).unwrap();
+        assert_eq!(migrated_nine.random_state.get(), None);
+
+        let mut version_eight = version_nine.bytes()[..version_nine.bytes().len() - 8].to_vec();
         version_eight[..8].copy_from_slice(b"MECP0008");
         version_eight[8..12].copy_from_slice(&8u32.to_be_bytes());
         let version_eight = BoundedPayload::new(

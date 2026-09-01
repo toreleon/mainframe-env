@@ -1556,7 +1556,7 @@ mod tests {
         let checkpoint = first.checkpoint().unwrap();
         assert_eq!(
             checkpoint.schema(),
-            "mainframe-env.reference-machine-checkpoint@9"
+            "mainframe-env.reference-machine-checkpoint@10"
         );
         let mut restored = ReferenceMachine::from_binary(
             artifact.payload(),
@@ -1572,7 +1572,7 @@ mod tests {
     }
 
     #[test]
-    fn checkpoint_v9_preserves_dynamic_sort_and_allocated_linkage_state() {
+    fn checkpoint_v10_preserves_dynamic_sort_and_allocated_linkage_state() {
         let dynamic_source = "IDENTIFICATION DIVISION. PROGRAM-ID. DYNCP. DATA DIVISION. WORKING-STORAGE SECTION. 01 DYN-X PIC X DYNAMIC LENGTH LIMIT IS 8. PROCEDURE DIVISION. MOVE 'HELLO' TO DYN-X. DISPLAY DYN-X. STOP RUN.";
         let artifact = compile(dynamic_source).unwrap();
         let dynamic_invocation = invocation(&artifact, 1024);
@@ -1655,7 +1655,7 @@ mod tests {
         let checkpoint = first.checkpoint().unwrap();
         assert_eq!(
             checkpoint.schema(),
-            "mainframe-env.reference-machine-checkpoint@9"
+            "mainframe-env.reference-machine-checkpoint@10"
         );
         let mut restored =
             ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
