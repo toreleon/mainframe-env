@@ -1328,15 +1328,43 @@ fn validate_add_subtract(
         })
         .ok_or("required arithmetic separator is missing")?;
     validate_operand_list(&tokens[1..split], 1)?;
-    let mut cursor = Cursor::new(tokens, split + 1);
-    cursor.operand()?;
-    if separator != "GIVING" && cursor.eat("GIVING") {
-        cursor.operand()?;
+    if tokens[split].is("GIVING") {
+        return validate_arithmetic_receivers(&tokens[split + 1..]);
     }
-    if cursor.eat("ROUNDED") && cursor.at("ROUNDED") {
-        return Err("ROUNDED is duplicated");
+    let giving = find_word(tokens, split + 1, "GIVING");
+    let receivers_end = giving.unwrap_or(tokens.len());
+    validate_arithmetic_receivers(&tokens[split + 1..receivers_end])?;
+    if let Some(giving) = giving {
+        validate_arithmetic_receivers(&tokens[giving + 1..])?;
     }
-    cursor.finish()
+    Ok(())
+}
+
+fn validate_arithmetic_receivers(tokens: &[Token<'_>]) -> Result<(), &'static str> {
+    let mut position = 0usize;
+    let mut count = 0usize;
+    while position < tokens.len() {
+        if tokens[position].text == "," {
+            if count == 0 || position + 1 == tokens.len() {
+                return Err("receiver separator is misplaced");
+            }
+            position += 1;
+            continue;
+        }
+        position = consume_operand(tokens, position).ok_or("receiver is malformed")?;
+        if tokens
+            .get(position)
+            .is_some_and(|token| token.is("ROUNDED"))
+        {
+            position += 1;
+        }
+        count += 1;
+    }
+    if count == 0 {
+        Err("required receiver is missing")
+    } else {
+        Ok(())
+    }
 }
 
 fn validate_allocate(tokens: &[Token<'_>]) -> Result<(), &'static str> {

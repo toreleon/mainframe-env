@@ -738,6 +738,10 @@ fn check_cobol_language_catalog(root: &Path, path: &Path) -> TaskResult {
                 && register_names.insert(text(register, "name", path)?),
             "COBOL special-register identities are duplicated",
         )?;
+        require(
+            register["runtime_supported"].is_boolean(),
+            "COBOL special-register runtime support flag is not boolean",
+        )?;
     }
     Ok(())
 }
@@ -1402,7 +1406,7 @@ fn render_cobol_language(root: &Path) -> TaskResult<Vec<u8>> {
     source.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
     source.push_str("pub struct IntrinsicFunctionDescriptor {\n    pub kind: IntrinsicFunctionKind,\n    pub id: &'static str,\n    pub row_id: &'static str,\n    pub name: &'static str,\n    pub source_locator: &'static str,\n    pub signatures: &'static [IntrinsicSignature],\n    pub literal_arguments: &'static [usize],\n    pub fixed_length: Option<usize>,\n    pub runtime_supported: bool,\n}\n\n");
     source.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
-    source.push_str("pub struct SpecialRegisterDescriptor {\n    pub kind: SpecialRegisterKind,\n    pub id: &'static str,\n    pub name: &'static str,\n    pub source_locator: &'static str,\n    pub value_type: SpecialRegisterValueType,\n    pub usage: SpecialRegisterUsage,\n    pub length_kind: SpecialRegisterLengthKind,\n    pub fixed_length: Option<usize>,\n    pub writable: bool,\n    pub operand: SpecialRegisterOperand,\n}\n\n");
+    source.push_str("pub struct SpecialRegisterDescriptor {\n    pub kind: SpecialRegisterKind,\n    pub id: &'static str,\n    pub name: &'static str,\n    pub source_locator: &'static str,\n    pub value_type: SpecialRegisterValueType,\n    pub usage: SpecialRegisterUsage,\n    pub length_kind: SpecialRegisterLengthKind,\n    pub fixed_length: Option<usize>,\n    pub writable: bool,\n    pub operand: SpecialRegisterOperand,\n    pub runtime_supported: bool,\n}\n\n");
     source.push_str(
         "pub static COMPILER_DIRECTING_STATEMENTS: &[CompilerDirectingDescriptor] = &[\n",
     );
@@ -1568,6 +1572,12 @@ fn render_cobol_language(root: &Path) -> TaskResult<Vec<u8>> {
             entry["writable"]
                 .as_bool()
                 .ok_or("special-register writable flag is not boolean")?
+        ));
+        source.push_str(&format!(
+            "        runtime_supported: {},\n",
+            entry["runtime_supported"]
+                .as_bool()
+                .ok_or("special-register runtime support flag is not boolean")?
         ));
         source.push_str("    },\n");
     }

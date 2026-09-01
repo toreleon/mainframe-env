@@ -600,6 +600,7 @@ pub struct SpecialRegisterDescriptor {
     pub fixed_length: Option<usize>,
     pub writable: bool,
     pub operand: SpecialRegisterOperand,
+    pub runtime_supported: bool,
 }
 
 pub static COMPILER_DIRECTING_STATEMENTS: &[CompilerDirectingDescriptor] = &[
@@ -3096,6 +3097,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::DataItem,
         fixed_length: None,
         writable: true,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::DebugItem,
@@ -3108,6 +3110,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::DebugContext,
         fixed_length: None,
         writable: false,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::IgyJavaiopCallException,
@@ -3120,6 +3123,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: None,
         writable: false,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::Jnienvptr,
@@ -3132,6 +3136,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: None,
         writable: false,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::JsonCode,
@@ -3144,6 +3149,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(4usize),
         writable: true,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::JsonStatus,
@@ -3156,6 +3162,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(4usize),
         writable: false,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::LengthOf,
@@ -3168,6 +3175,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::DataItem,
         fixed_length: None,
         writable: false,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::LinageCounter,
@@ -3180,6 +3188,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::File,
         fixed_length: None,
         writable: false,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::ReturnCode,
@@ -3192,6 +3201,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(2usize),
         writable: true,
+        runtime_supported: true,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::ShiftOut,
@@ -3204,6 +3214,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(1usize),
         writable: false,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::ShiftIn,
@@ -3216,6 +3227,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(1usize),
         writable: false,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::SortControl,
@@ -3228,6 +3240,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(8usize),
         writable: true,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::SortCoreSize,
@@ -3240,6 +3253,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(4usize),
         writable: true,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::SortFileSize,
@@ -3252,6 +3266,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(4usize),
         writable: true,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::SortMessage,
@@ -3264,6 +3279,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(8usize),
         writable: true,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::SortModeSize,
@@ -3276,6 +3292,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(4usize),
         writable: true,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::SortReturn,
@@ -3288,6 +3305,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(2usize),
         writable: true,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::Tally,
@@ -3300,6 +3318,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(4usize),
         writable: true,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::WhenCompiled,
@@ -3312,6 +3331,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(16usize),
         writable: false,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::XmlCode,
@@ -3324,6 +3344,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(4usize),
         writable: true,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::XmlEvent,
@@ -3336,6 +3357,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(30usize),
         writable: false,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::XmlInformation,
@@ -3348,6 +3370,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: Some(4usize),
         writable: false,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::XmlNamespace,
@@ -3360,6 +3383,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: None,
         writable: false,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::XmlNnamespace,
@@ -3372,6 +3396,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: None,
         writable: false,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::XmlNamespacePrefix,
@@ -3384,6 +3409,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: None,
         writable: false,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::XmlNnamespacePrefix,
@@ -3396,6 +3422,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: None,
         writable: false,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::XmlNtext,
@@ -3408,6 +3435,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: None,
         writable: false,
+        runtime_supported: false,
     },
     SpecialRegisterDescriptor {
         kind: SpecialRegisterKind::XmlText,
@@ -3420,6 +3448,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         operand: SpecialRegisterOperand::None,
         fixed_length: None,
         writable: false,
+        runtime_supported: false,
     },
 ];
 

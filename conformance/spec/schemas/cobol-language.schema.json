@@ -97,7 +97,7 @@
     },
     "special-register": {
       "type": "object", "additionalProperties": false,
-      "required": ["id", "name", "source_locator", "value_type", "usage", "length_kind", "writable", "operand"],
+      "required": ["id", "name", "source_locator", "value_type", "usage", "length_kind", "writable", "operand", "runtime_supported"],
       "properties": {
         "id": {"$ref": "#/$defs/id"},
         "name": {"type": "string", "pattern": "^[A-Z][A-Z0-9 -]*$", "maxLength": 64},
@@ -107,7 +107,8 @@
         "length_kind": {"enum": ["fixed", "lp", "dynamic", "dependent"]},
         "fixed_length": {"type": "integer", "minimum": 1, "maximum": 1024},
         "writable": {"type": "boolean"},
-        "operand": {"enum": ["none", "data-item", "file", "debug-context"]}
+        "operand": {"enum": ["none", "data-item", "file", "debug-context"]},
+        "runtime_supported": {"type": "boolean"}
       },
       "allOf": [
         {"if": {"properties": {"length_kind": {"const": "fixed"}}}, "then": {"required": ["fixed_length"]}},

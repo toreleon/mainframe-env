@@ -44,6 +44,7 @@ pub struct CobolSpecialRegisterReference {
     pub value_type: IntrinsicValueType,
     pub length: Option<usize>,
     pub writable: bool,
+    pub runtime_supported: bool,
     pub source: Vec<SourceSpan>,
 }
 
@@ -441,6 +442,7 @@ fn special_registers(
                     }
                 },
                 writable: descriptor.writable,
+                runtime_supported: descriptor.runtime_supported,
                 source: source_spans(origins, start..end),
             });
         }
@@ -600,10 +602,7 @@ fn next_phrase(source: &str, from: usize, phrase: &str) -> Option<usize> {
     while let Some(found) = upper[relative..].find(phrase) {
         let start = from + relative + found;
         let end = start + phrase.len();
-        if boundary(source, start, end)
-            && !inside_quote(source, start)
-            && !inside_line_comment(source, start)
-        {
+        if boundary(source, start, end) && is_code_position(source, start) {
             return Some(start);
         }
         relative += found + 1;
@@ -623,23 +622,42 @@ fn boundary(source: &str, start: usize, end: usize) -> bool {
             .is_none_or(|byte| !is_word(*byte))
 }
 
-fn inside_quote(source: &str, position: usize) -> bool {
+fn is_code_position(source: &str, position: usize) -> bool {
+    let bytes = source.as_bytes();
     let mut quote = None;
-    for byte in source.as_bytes()[..position].iter().copied() {
-        if matches!(byte, b'\'' | b'"') {
-            if quote == Some(byte) {
-                quote = None;
-            } else if quote.is_none() {
-                quote = Some(byte);
+    let mut in_comment = false;
+    let mut index = 0usize;
+    while index < position {
+        let byte = bytes[index];
+        if in_comment {
+            if byte == b'\n' {
+                in_comment = false;
             }
+            index += 1;
+            continue;
         }
+        if let Some(delimiter) = quote {
+            if byte == delimiter {
+                if bytes.get(index + 1) == Some(&delimiter) {
+                    index += 2;
+                    continue;
+                }
+                quote = None;
+            }
+            index += 1;
+            continue;
+        }
+        if byte == b'*' && bytes.get(index + 1) == Some(&b'>') {
+            in_comment = true;
+            index += 2;
+            continue;
+        }
+        if matches!(byte, b'\'' | b'"') {
+            quote = Some(byte);
+        }
+        index += 1;
     }
-    quote.is_some()
-}
-
-fn inside_line_comment(source: &str, position: usize) -> bool {
-    let start = source[..position].rfind('\n').map_or(0, |index| index + 1);
-    source[start..position].contains("*>")
+    quote.is_none() && !in_comment
 }
 
 fn skip_space(source: &str, mut index: usize) -> usize {
@@ -755,6 +773,18 @@ mod tests {
 
     #[test]
     fn special_register_operands_types_and_receiving_rules_are_explicit() {
+        assert_eq!(
+            SPECIAL_REGISTERS
+                .iter()
+                .filter(|descriptor| descriptor.runtime_supported)
+                .map(|descriptor| descriptor.kind)
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                SpecialRegisterKind::AddressOf,
+                SpecialRegisterKind::LengthOf,
+                SpecialRegisterKind::ReturnCode,
+            ])
+        );
         let source = program(
             "MOVE LENGTH OF TEXT TO INT. SET ADDRESS OF LINK-X TO PTR. MOVE 4 TO RETURN-CODE. DISPLAY WHEN-COMPILED",
         );
@@ -765,15 +795,37 @@ mod tests {
                 && reference.operand.as_deref() == Some("LINK-X")
                 && reference.value_type == IntrinsicValueType::Other
                 && reference.length == Some(4)
+                && reference.runtime_supported
         }));
         assert!(model.special_registers.iter().any(|reference| {
             reference.kind == SpecialRegisterKind::LengthOf
                 && reference.value_type == IntrinsicValueType::Integer
+                && reference.runtime_supported
+        }));
+        assert!(model.special_registers.iter().any(|reference| {
+            reference.kind == SpecialRegisterKind::ReturnCode && reference.runtime_supported
+        }));
+        assert!(model.special_registers.iter().any(|reference| {
+            reference.kind == SpecialRegisterKind::WhenCompiled && !reference.runtime_supported
         }));
         assert!(
             SemanticModel::analyze(&program("MOVE TEXT TO TEXT(LENGTH OF TEXT:1)"), 4096, 128,)
                 .is_ok()
         );
         assert!(SemanticModel::analyze(&program("MOVE 'X' TO WHEN-COMPILED"), 4096, 128).is_err());
+    }
+
+    #[test]
+    fn function_scan_ignores_comments_and_escaped_quotes_without_poisoning_later_calls() {
+        let invalid_after_comment = program(
+            "DISPLAY 'DON''T'. *> comment's unmatched apostrophe FUNCTION ABS(NUM)\nMOVE FUNCTION ABS(TEXT) TO NUM",
+        );
+        assert!(SemanticModel::analyze(&invalid_after_comment, 4096, 128).is_err());
+
+        let escaped_literal =
+            program("DISPLAY 'FUNCTION ABS(TEXT) ISN''T A CALL'. MOVE FUNCTION ABS(NUM) TO NUM");
+        let model = SemanticModel::analyze(&escaped_literal, 4096, 128).unwrap();
+        assert_eq!(model.intrinsic_calls.len(), 1);
+        assert_eq!(model.intrinsic_calls[0].kind, IntrinsicFunctionKind::Abs);
     }
 }

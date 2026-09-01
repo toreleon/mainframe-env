@@ -402,6 +402,86 @@ impl CobolHir {
             .map(|statement| statement.kind)
             .collect()
     }
+
+    #[must_use]
+    pub fn execution_incomplete_arithmetic_receivers(&self) -> BTreeSet<(StatementKind, usize)> {
+        self.statements
+            .iter()
+            .filter(|statement| {
+                matches!(statement.kind, StatementKind::Add | StatementKind::Subtract)
+                    && has_multiple_arithmetic_receivers(statement)
+            })
+            .map(|statement| (statement.kind, statement.line))
+            .collect()
+    }
+}
+
+fn has_multiple_arithmetic_receivers(statement: &HirStatement) -> bool {
+    let separator = match statement.kind {
+        StatementKind::Add => statement
+            .arguments
+            .iter()
+            .position(|argument| argument == "TO")
+            .or_else(|| {
+                statement
+                    .arguments
+                    .iter()
+                    .position(|argument| argument == "GIVING")
+            }),
+        StatementKind::Subtract => statement
+            .arguments
+            .iter()
+            .position(|argument| argument == "FROM"),
+        _ => None,
+    };
+    let Some(separator) = separator else {
+        return false;
+    };
+    let giving = statement
+        .arguments
+        .iter()
+        .enumerate()
+        .skip(separator + 1)
+        .find_map(|(index, argument)| (argument == "GIVING").then_some(index));
+    let primary_start = separator + 1;
+    let primary_end = giving.unwrap_or(statement.arguments.len());
+    arithmetic_receiver_count(&statement.arguments[primary_start..primary_end]) > 1
+        || giving
+            .is_some_and(|giving| arithmetic_receiver_count(&statement.arguments[giving + 1..]) > 1)
+}
+
+fn arithmetic_receiver_count(tokens: &[String]) -> usize {
+    let mut count = 0usize;
+    let mut position = 0usize;
+    while position < tokens.len() {
+        if matches!(tokens[position].as_str(), "," | "ROUNDED") {
+            position += 1;
+            continue;
+        }
+        count += 1;
+        position += 1;
+        while position < tokens.len() {
+            if tokens[position] == "(" {
+                let mut depth = 1usize;
+                position += 1;
+                while position < tokens.len() && depth > 0 {
+                    match tokens[position].as_str() {
+                        "(" => depth += 1,
+                        ")" => depth = depth.saturating_sub(1),
+                        _ => {}
+                    }
+                    position += 1;
+                }
+            } else if matches!(tokens[position].as_str(), "OF" | "IN")
+                && position + 1 < tokens.len()
+            {
+                position += 2;
+            } else {
+                break;
+            }
+        }
+    }
+    count
 }
 
 fn source_spans_for_range(

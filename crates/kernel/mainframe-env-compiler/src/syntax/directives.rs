@@ -200,22 +200,28 @@ impl EffectiveCompilerOptions {
         bundle: &SourceBundle,
         options: &CompilerOptionSet,
     ) -> Result<Self, SyntaxProblem> {
-        let source_lp = options.value("LP").flatten().and_then(option_integer_value);
+        let source_lp = options
+            .value("LP")
+            .map(|value| {
+                value
+                    .and_then(lp_value)
+                    .ok_or(SyntaxProblem::InvalidCompilerOption)
+            })
+            .transpose()?;
         let bundle_lp = bundle
             .options()
             .get("cobol.lp")
-            .and_then(|value| option_integer_value(value));
+            .map(|value| lp_value(value).ok_or(SyntaxProblem::InvalidCompilerOption))
+            .transpose()?;
         if source_lp
             .zip(bundle_lp)
             .is_some_and(|(source, bundle)| source != bundle)
         {
             return Err(SyntaxProblem::ConflictingCompilerOption("LP".into()));
         }
-        let lp = source_lp.or(bundle_lp).unwrap_or(32);
-        if !matches!(lp, 32 | 64) {
-            return Err(SyntaxProblem::InvalidCompilerOption);
-        }
-        Ok(Self { lp: lp as u8 })
+        Ok(Self {
+            lp: source_lp.or(bundle_lp).unwrap_or(32),
+        })
     }
 
     #[must_use]
@@ -836,6 +842,20 @@ fn option_integer_value(value: &str) -> Option<i128> {
         .split(',')
         .next()
         .and_then(|value| value.parse().ok())
+}
+
+fn lp_value(value: &str) -> Option<u8> {
+    let trimmed = value.trim();
+    let value = if trimmed.starts_with('(') && trimmed.ends_with(')') {
+        trimmed.get(1..trimmed.len().checked_sub(1)?)?.trim()
+    } else {
+        trimmed
+    };
+    match value {
+        "32" => Some(32),
+        "64" => Some(64),
+        _ => None,
+    }
 }
 
 fn option_enabled(bundle: &SourceBundle, options: &CompilerOptionSet, name: &str) -> bool {

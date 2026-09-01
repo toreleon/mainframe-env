@@ -10,8 +10,8 @@ pub use structure::{
     CobolSectionNode,
 };
 
-use crate::IntrinsicFunctionKind;
 use crate::syntax::{SourceOrigin, SourceSpan};
+use crate::{IntrinsicFunctionKind, SpecialRegisterKind};
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -384,7 +384,14 @@ impl SemanticModel {
     pub fn execution_incomplete_layouts(&self) -> BTreeSet<String> {
         self.layouts
             .iter()
-            .filter(|layout| layout.dynamic || layout.unbounded)
+            .filter(|layout| {
+                layout.dynamic
+                    || layout.unbounded
+                    || matches!(
+                        layout.category,
+                        DataCategory::FloatShort | DataCategory::FloatLong
+                    )
+            })
             .map(|layout| layout.qualified_name.clone())
             .collect()
     }
@@ -395,6 +402,15 @@ impl SemanticModel {
             .iter()
             .filter(|call| !call.runtime_supported)
             .map(|call| call.kind)
+            .collect()
+    }
+
+    #[must_use]
+    pub fn execution_incomplete_special_registers(&self) -> BTreeSet<SpecialRegisterKind> {
+        self.special_registers
+            .iter()
+            .filter(|register| !register.runtime_supported)
+            .map(|register| register.kind)
             .collect()
     }
 }
@@ -693,7 +709,7 @@ fn parse_specs(sentences: &[String], max_items: usize) -> Result<Vec<DataSpec>, 
             children: Vec::new(),
             section,
             redefines: find_after_owned(&words, "REDEFINES"),
-            depending_on: find_sequence_after(&words, &["DEPENDING", "ON"]),
+            depending_on: qualified_reference_after(&words, &["DEPENDING", "ON"]),
             indexes,
             keys,
             typedef: words.iter().any(|word| word == "TYPEDEF"),
@@ -767,11 +783,43 @@ fn table_keys(words: &[String]) -> Result<Vec<CobolTableKey>, SemanticProblem> {
             {
                 break;
             }
+            if matches!(name.as_str(), "OF" | "IN") {
+                return Err(SemanticProblem::InvalidOccurs);
+            }
+            let mut reference = name.clone();
+            cursor += 1;
+            while words
+                .get(cursor)
+                .is_some_and(|word| matches!(word.as_str(), "OF" | "IN"))
+            {
+                let qualifier = words
+                    .get(cursor + 1)
+                    .filter(|qualifier| {
+                        !matches!(
+                            qualifier.as_str(),
+                            "ASCENDING"
+                                | "DESCENDING"
+                                | "INDEXED"
+                                | "DEPENDING"
+                                | "PIC"
+                                | "PICTURE"
+                                | "VALUE"
+                                | "VALUES"
+                                | "REDEFINES"
+                                | "TYPE"
+                                | "TYPEDEF"
+                                | "USAGE"
+                        )
+                    })
+                    .ok_or(SemanticProblem::InvalidOccurs)?;
+                reference.push_str(" OF ");
+                reference.push_str(qualifier);
+                cursor += 2;
+            }
             keys.push(CobolTableKey {
-                name: name.clone(),
+                name: reference,
                 descending,
             });
-            cursor += 1;
         }
         if keys.len() == start {
             return Err(SemanticProblem::InvalidOccurs);
@@ -1710,24 +1758,78 @@ fn validate_layout_relationships(
 
 fn resolve_layout_name<'a>(
     name: &str,
-    _spec: &DataSpec,
+    spec: &DataSpec,
     specs: &[DataSpec],
     layouts: &'a [CobolLayout],
 ) -> Result<&'a CobolLayout, SemanticProblem> {
-    let normalized = name.to_ascii_uppercase();
+    let (normalized, explicitly_qualified) = normalize_data_reference(name)?;
+    if explicitly_qualified {
+        return specs
+            .iter()
+            .position(|candidate| candidate.qualified == normalized)
+            .and_then(|index| layouts.get(index))
+            .ok_or(SemanticProblem::InvalidReference(normalized));
+    }
     let candidates = specs
         .iter()
         .enumerate()
-        .filter(|(_, candidate)| candidate.name == normalized || candidate.qualified == normalized)
-        .filter_map(|(index, _)| layouts.get(index))
+        .filter(|(_, candidate)| candidate.name == normalized)
+        .filter_map(|(index, candidate)| layouts.get(index).map(|layout| (candidate, layout)))
         .collect::<Vec<_>>();
     match candidates.as_slice() {
-        [layout] => Ok(*layout),
+        [(_, layout)] => Ok(*layout),
         [] => Err(SemanticProblem::InvalidReference(normalized)),
-        _ => Err(SemanticProblem::InvalidReference(format!(
-            "ambiguous {normalized}"
-        ))),
+        _ => {
+            let owner = spec.qualified.split('.').collect::<Vec<_>>();
+            let mut ranked = candidates
+                .into_iter()
+                .map(|(candidate, layout)| {
+                    let proximity = owner
+                        .iter()
+                        .zip(candidate.qualified.split('.'))
+                        .take_while(|(left, right)| **left == *right)
+                        .count();
+                    (proximity, layout)
+                })
+                .collect::<Vec<_>>();
+            ranked.sort_by_key(|(proximity, _)| std::cmp::Reverse(*proximity));
+            match ranked.as_slice() {
+                [(best, layout), rest @ ..] if rest.first().is_none_or(|(next, _)| next < best) => {
+                    Ok(*layout)
+                }
+                _ => Err(SemanticProblem::InvalidReference(format!(
+                    "ambiguous {normalized}"
+                ))),
+            }
+        }
     }
+}
+
+fn normalize_data_reference(name: &str) -> Result<(String, bool), SemanticProblem> {
+    let upper = name.trim().to_ascii_uppercase();
+    if upper.contains('.') {
+        return Ok((upper, true));
+    }
+    let words = upper.split_whitespace().collect::<Vec<_>>();
+    let Some(simple) = words.first() else {
+        return Err(SemanticProblem::InvalidReference(upper));
+    };
+    if words.len() == 1 {
+        return Ok(((*simple).to_string(), false));
+    }
+    if words.len().is_multiple_of(2)
+        || !words
+            .iter()
+            .skip(1)
+            .step_by(2)
+            .all(|word| matches!(*word, "OF" | "IN"))
+    {
+        return Err(SemanticProblem::InvalidReference(upper));
+    }
+    let mut components = words.iter().skip(2).step_by(2).copied().collect::<Vec<_>>();
+    components.reverse();
+    components.push(simple);
+    Ok((components.join("."), true))
 }
 
 fn validate_file_layouts(
@@ -1879,16 +1981,24 @@ fn find_after_owned(words: &[String], name: &str) -> Option<String> {
         .and_then(|index| words.get(index + 1).cloned())
 }
 
-fn find_sequence_after(words: &[String], sequence: &[&str]) -> Option<String> {
-    words
-        .windows(sequence.len())
-        .position(|window| {
-            window
-                .iter()
-                .zip(sequence)
-                .all(|(word, expected)| word.eq_ignore_ascii_case(expected))
-        })
-        .and_then(|index| words.get(index + sequence.len()).cloned())
+fn qualified_reference_after(words: &[String], sequence: &[&str]) -> Option<String> {
+    let start = words.windows(sequence.len()).position(|window| {
+        window
+            .iter()
+            .zip(sequence)
+            .all(|(word, expected)| word.eq_ignore_ascii_case(expected))
+    })? + sequence.len();
+    let mut reference = words.get(start)?.clone();
+    let mut cursor = start + 1;
+    while words
+        .get(cursor)
+        .is_some_and(|word| matches!(word.as_str(), "OF" | "IN"))
+    {
+        reference.push_str(" OF ");
+        reference.push_str(words.get(cursor + 1)?);
+        cursor += 2;
+    }
+    Some(reference)
 }
 
 fn values_after(words: &[String], first: &str, second: &str) -> Vec<String> {
@@ -2810,8 +2920,25 @@ mod tests {
         assert_eq!((dynamic.length, dynamic.dynamic_limit), (0, Some(100)));
         assert_eq!(
             model.execution_incomplete_layouts(),
-            BTreeSet::from(["DYNAMIC-ITEM".into()])
+            BTreeSet::from([
+                "DYNAMIC-ITEM".into(),
+                "LONG-FLOAT".into(),
+                "SHORT-FLOAT".into(),
+            ])
         );
+    }
+
+    #[test]
+    fn occurs_dependencies_and_keys_resolve_in_the_owning_hierarchy() {
+        let source = program(
+            "01 GROUP-A. 05 N PIC 9. 05 TABLE-A OCCURS 1 TO 3 TIMES DEPENDING ON N ASCENDING KEY IS KEY-X. 10 KEY-X PIC X. 01 GROUP-B. 05 N PIC 9. 05 KEY-X PIC X. 05 TABLE-B OCCURS 1 TO 3 TIMES DEPENDING ON N OF GROUP-B. 10 ITEM-B PIC X",
+        );
+        let model = SemanticModel::analyze(&source, 4096, 128).unwrap();
+        let table_a = model.layout("GROUP-A.TABLE-A").unwrap();
+        assert_eq!(table_a.depending_on.as_deref(), Some("N"));
+        assert_eq!(table_a.keys[0].name, "KEY-X");
+        let table_b = model.layout("GROUP-B.TABLE-B").unwrap();
+        assert_eq!(table_b.depending_on.as_deref(), Some("N OF GROUP-B"));
     }
 
     #[test]

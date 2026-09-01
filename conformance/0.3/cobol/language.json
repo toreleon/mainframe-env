@@ -3000,7 +3000,8 @@
       "usage": "pointer",
       "length_kind": "lp",
       "writable": true,
-      "operand": "data-item"
+      "operand": "data-item",
+      "runtime_supported": true
     },
     {
       "id": "debug-item",
@@ -3010,7 +3011,8 @@
       "usage": "group",
       "length_kind": "dependent",
       "writable": false,
-      "operand": "debug-context"
+      "operand": "debug-context",
+      "runtime_supported": false
     },
     {
       "id": "igy-javaiop-call-exception",
@@ -3020,7 +3022,8 @@
       "usage": "native-binary",
       "length_kind": "lp",
       "writable": false,
-      "operand": "none"
+      "operand": "none",
+      "runtime_supported": false
     },
     {
       "id": "jnienvptr",
@@ -3030,7 +3033,8 @@
       "usage": "pointer",
       "length_kind": "lp",
       "writable": false,
-      "operand": "none"
+      "operand": "none",
+      "runtime_supported": false
     },
     {
       "id": "json-code",
@@ -3041,6 +3045,7 @@
       "length_kind": "fixed",
       "writable": true,
       "operand": "none",
+      "runtime_supported": false,
       "fixed_length": 4
     },
     {
@@ -3052,6 +3057,7 @@
       "length_kind": "fixed",
       "writable": false,
       "operand": "none",
+      "runtime_supported": false,
       "fixed_length": 4
     },
     {
@@ -3062,7 +3068,8 @@
       "usage": "binary",
       "length_kind": "lp",
       "writable": false,
-      "operand": "data-item"
+      "operand": "data-item",
+      "runtime_supported": true
     },
     {
       "id": "linage-counter",
@@ -3072,7 +3079,8 @@
       "usage": "binary",
       "length_kind": "dependent",
       "writable": false,
-      "operand": "file"
+      "operand": "file",
+      "runtime_supported": false
     },
     {
       "id": "return-code",
@@ -3083,6 +3091,7 @@
       "length_kind": "fixed",
       "writable": true,
       "operand": "none",
+      "runtime_supported": true,
       "fixed_length": 2
     },
     {
@@ -3094,6 +3103,7 @@
       "length_kind": "fixed",
       "writable": false,
       "operand": "none",
+      "runtime_supported": false,
       "fixed_length": 1
     },
     {
@@ -3105,6 +3115,7 @@
       "length_kind": "fixed",
       "writable": false,
       "operand": "none",
+      "runtime_supported": false,
       "fixed_length": 1
     },
     {
@@ -3116,6 +3127,7 @@
       "length_kind": "fixed",
       "writable": true,
       "operand": "none",
+      "runtime_supported": false,
       "fixed_length": 8
     },
     {
@@ -3127,6 +3139,7 @@
       "length_kind": "fixed",
       "writable": true,
       "operand": "none",
+      "runtime_supported": false,
       "fixed_length": 4
     },
     {
@@ -3138,6 +3151,7 @@
       "length_kind": "fixed",
       "writable": true,
       "operand": "none",
+      "runtime_supported": false,
       "fixed_length": 4
     },
     {
@@ -3149,6 +3163,7 @@
       "length_kind": "fixed",
       "writable": true,
       "operand": "none",
+      "runtime_supported": false,
       "fixed_length": 8
     },
     {
@@ -3160,6 +3175,7 @@
       "length_kind": "fixed",
       "writable": true,
       "operand": "none",
+      "runtime_supported": false,
       "fixed_length": 4
     },
     {
@@ -3171,6 +3187,7 @@
       "length_kind": "fixed",
       "writable": true,
       "operand": "none",
+      "runtime_supported": false,
       "fixed_length": 2
     },
     {
@@ -3182,6 +3199,7 @@
       "length_kind": "fixed",
       "writable": true,
       "operand": "none",
+      "runtime_supported": false,
       "fixed_length": 4
     },
     {
@@ -3193,6 +3211,7 @@
       "length_kind": "fixed",
       "writable": false,
       "operand": "none",
+      "runtime_supported": false,
       "fixed_length": 16
     },
     {
@@ -3204,6 +3223,7 @@
       "length_kind": "fixed",
       "writable": true,
       "operand": "none",
+      "runtime_supported": false,
       "fixed_length": 4
     },
     {
@@ -3215,6 +3235,7 @@
       "length_kind": "fixed",
       "writable": false,
       "operand": "none",
+      "runtime_supported": false,
       "fixed_length": 30
     },
     {
@@ -3226,6 +3247,7 @@
       "length_kind": "fixed",
       "writable": false,
       "operand": "none",
+      "runtime_supported": false,
       "fixed_length": 4
     },
     {
@@ -3236,7 +3258,8 @@
       "usage": "display",
       "length_kind": "dynamic",
       "writable": false,
-      "operand": "none"
+      "operand": "none",
+      "runtime_supported": false
     },
     {
       "id": "xml-nnamespace",
@@ -3246,7 +3269,8 @@
       "usage": "national",
       "length_kind": "dynamic",
       "writable": false,
-      "operand": "none"
+      "operand": "none",
+      "runtime_supported": false
     },
     {
       "id": "xml-namespace-prefix",
@@ -3256,7 +3280,8 @@
       "usage": "display",
       "length_kind": "dynamic",
       "writable": false,
-      "operand": "none"
+      "operand": "none",
+      "runtime_supported": false
     },
     {
       "id": "xml-nnamespace-prefix",
@@ -3266,7 +3291,8 @@
       "usage": "national",
       "length_kind": "dynamic",
       "writable": false,
-      "operand": "none"
+      "operand": "none",
+      "runtime_supported": false
     },
     {
       "id": "xml-ntext",
@@ -3276,7 +3302,8 @@
       "usage": "national",
       "length_kind": "dynamic",
       "writable": false,
-      "operand": "none"
+      "operand": "none",
+      "runtime_supported": false
     },
     {
       "id": "xml-text",
@@ -3286,7 +3313,8 @@
       "usage": "display",
       "length_kind": "dynamic",
       "writable": false,
-      "operand": "none"
+      "operand": "none",
+      "runtime_supported": false
     }
   ]
 }

@@ -27,8 +27,6 @@ pub const SUPPORTED_LAYOUT_CATEGORIES: &[&str] = &[
     "binary",
     "condition",
     "dbcs",
-    "float_long",
-    "float_short",
     "function_pointer",
     "group",
     "index",
