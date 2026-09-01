@@ -1856,6 +1856,7 @@ impl ProductServer {
                         member: member_name(member)?,
                         key: None,
                         max_records: 4096,
+                        control: Default::default(),
                     },
                 )?;
                 let DatasetResult::Records { records, .. } = result else {
@@ -1984,6 +1985,7 @@ impl ProductServer {
                         member: None,
                         key: None,
                         max_records: u32::try_from(max).unwrap_or(u32::MAX),
+                        control: Default::default(),
                     },
                 )?;
                 let DatasetResult::Records { records, .. } = result else {
@@ -2607,6 +2609,7 @@ impl ProductServer {
                         member: Some(member.clone()),
                         key: None,
                         max_records: 4_096,
+                        control: Default::default(),
                     })
                     .map_err(gateway_problem)?
                 {
@@ -2932,6 +2935,7 @@ impl ProductServer {
                         member: None,
                         key: None,
                         max_records: 4096,
+                        control: Default::default(),
                     },
                 )?
                 else {

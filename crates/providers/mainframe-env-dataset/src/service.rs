@@ -620,6 +620,7 @@ impl DatasetService {
                 member,
                 key,
                 max_records,
+                ..
             } => {
                 if member.is_some() && state.alternate_indexes.contains_key(dataset.as_str()) {
                     return Err(HostProblem::Unsupported);
@@ -1613,6 +1614,7 @@ impl DatasetService {
                 dataset,
                 cursor,
                 reverse,
+                ..
             } => {
                 let identity = {
                     let state_cursor = state
@@ -2862,7 +2864,7 @@ mod tests {
         let first = service.invoke(request.clone()).unwrap();
         assert_eq!(service.invoke(request).unwrap(), first);
         assert!(
-            matches!(service.invoke(DatasetRequest::Read{dataset:name,member:None,key:None,max_records:1}).unwrap(),DatasetResult::Records{records,..}if records==vec![b"ABCD".to_vec()])
+            matches!(service.invoke(DatasetRequest::Read{dataset:name,member:None,key:None,max_records:1,control:Default::default()}).unwrap(),DatasetResult::Records{records,..}if records==vec![b"ABCD".to_vec()])
         );
     }
 
@@ -2894,6 +2896,7 @@ mod tests {
                 member: None,
                 key: None,
                 max_records: 10,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, .. })
                 if records == [b"AA11".to_vec(), b"BB22".to_vec()]
@@ -2928,6 +2931,7 @@ mod tests {
                 member: None,
                 key: None,
                 max_records: 10,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, .. })
                 if records == [b"AA11".to_vec(), b"BB22".to_vec()]
@@ -2970,6 +2974,7 @@ mod tests {
                 member: None,
                 key: None,
                 max_records: 10,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, identities, .. })
                 if records == [b"AA11".to_vec(), b"BB22".to_vec()]
@@ -3195,6 +3200,7 @@ mod tests {
                 member: None,
                 key: None,
                 max_records: 10,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, .. })
                 if records == [b"ZZ11".to_vec(), b"YY22".to_vec()]
@@ -3206,6 +3212,7 @@ mod tests {
                 member: None,
                 key: None,
                 max_records: 10,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, .. })
                 if records == [b"AA11".to_vec(), b"BB22".to_vec()]
@@ -3302,6 +3309,7 @@ mod tests {
                 member: None,
                 key: None,
                 max_records: 10,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, identities, .. })
                 if records == [b"AAX1".to_vec(), b"BBY2".to_vec(), b"CCX3".to_vec()]
@@ -3323,6 +3331,7 @@ mod tests {
                 dataset: base.clone(),
                 cursor: reverse_cursor.clone(),
                 reverse: true,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Browse {
                 record: Some(ref record),
@@ -3363,6 +3372,7 @@ mod tests {
                 member: None,
                 key: Some(b"X".to_vec()),
                 max_records: 10,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, identities, .. })
                 if records == [b"AAX1".to_vec(), b"CCX3".to_vec()]
@@ -3386,6 +3396,7 @@ mod tests {
                     dataset: duplicate_aix.clone(),
                     cursor: cursor.clone(),
                     reverse: false,
+                    control: Default::default(),
                 }),
                 Ok(DatasetResult::Browse {
                     record: Some(ref actual),
@@ -3425,6 +3436,7 @@ mod tests {
                 member: None,
                 key: Some(b"X".to_vec()),
                 max_records: 10,
+                control: Default::default(),
             }),
             Err(HostProblem::Condition { ref name, response: 13, .. }) if name == "NOTFND"
         ));
@@ -3454,6 +3466,7 @@ mod tests {
                 member: None,
                 key: Some(b"BB".to_vec()),
                 max_records: 1,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, .. }) if records == [b"BBY2".to_vec()]
         ));
@@ -3509,6 +3522,7 @@ mod tests {
                 member: None,
                 key: Some(b"Z".to_vec()),
                 max_records: 1,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, identities, .. })
                 if records == [b"AAZ9".to_vec()] && identities == [b"AA".to_vec()]
@@ -3599,7 +3613,8 @@ mod tests {
                 dataset: name.clone(),
                 member: None,
                 key: None,
-                max_records: 1
+                max_records: 1,
+                control: Default::default(),
             }),
             Err(HostProblem::NotFound)
         );
@@ -3677,6 +3692,7 @@ mod tests {
                     dataset: dataset.clone(),
                     cursor,
                     reverse: false,
+                    control: Default::default(),
                 }),
                 Ok(DatasetResult::Browse { record: Some(record), .. }) if record == expected
             ));

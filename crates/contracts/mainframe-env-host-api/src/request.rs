@@ -56,6 +56,22 @@ pub enum KeyRelation {
     Less,
     LessOrEqual,
 }
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum DatasetLockMode {
+    #[default]
+    Default,
+    Lock,
+    KeptLock,
+    NoLock,
+    IgnoreLock,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct DatasetReadControl {
+    pub lock: DatasetLockMode,
+    pub wait: Option<bool>,
+}
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AccessIntent {
     Read,
@@ -161,6 +177,7 @@ pub enum DatasetRequest {
         member: Option<MemberName>,
         key: Option<Vec<u8>>,
         max_records: u32,
+        control: DatasetReadControl,
     },
     ReadConcatenation {
         datasets: Vec<DatasetName>,
@@ -271,6 +288,7 @@ pub enum DatasetRequest {
         dataset: DatasetName,
         cursor: String,
         reverse: bool,
+        control: DatasetReadControl,
     },
     EndBrowse {
         dataset: DatasetName,

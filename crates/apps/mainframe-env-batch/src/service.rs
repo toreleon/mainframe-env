@@ -1731,6 +1731,7 @@ impl BatchService {
                             .transpose()?,
                         key: None,
                         max_records: 4_096,
+                        control: Default::default(),
                     }),
                 },
             );
