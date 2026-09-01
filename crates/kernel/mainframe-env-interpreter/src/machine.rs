@@ -6685,6 +6685,11 @@ impl ReferenceMachine {
         actual: &[u8],
         expected: &str,
     ) -> Result<bool, MachineProblem> {
+        if let Some(condition) = self.layout(expected)
+            && condition.category == LayoutCategory::Condition
+        {
+            return condition_matches(actual, &condition.condition_values, layout);
+        }
         if matches!(expected, "ZERO" | "ZEROES" | "ZEROS") && is_numeric(layout.category) {
             return decode_decimal(layout, actual).map(|value| value.coefficient == 0);
         }
@@ -6735,6 +6740,16 @@ impl ReferenceMachine {
         reference: &ResolvedReference,
         value: &str,
     ) -> Result<Vec<u8>, MachineProblem> {
+        if let Some(condition) = self.layout(value)
+            && condition.category == LayoutCategory::Condition
+        {
+            let literal = condition
+                .condition_values
+                .first()
+                .cloned()
+                .ok_or(MachineProblem::DataException)?;
+            return self.json_conversion_bytes(layout, reference, &literal);
+        }
         if matches!(value, "ZERO" | "ZEROES" | "ZEROS") && is_numeric(layout.category) {
             let mut element = layout.clone();
             element.length = reference.length;
