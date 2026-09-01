@@ -1260,10 +1260,16 @@ fn check_cobol_statement_bindings(
                 expected_obligations.insert("phrase-multiple-with-lock");
                 expected_obligations.insert("phrase-reel-removal-no-rewind");
             }
+            Some("0008") => {
+                expected_obligations.insert("phrase-rounded-result");
+            }
             Some("0011") => {
                 expected_obligations.insert("phrase-internal-numeric-compatible-sign");
                 expected_obligations.insert("phrase-internal-numeric-separate-sign");
                 expected_obligations.insert("phrase-upon-no-advancing");
+            }
+            Some("0012") => {
+                expected_obligations.insert("phrase-giving-remainder");
             }
             Some("0013") => {
                 expected_obligations.insert("phrase-alternate-entry");
