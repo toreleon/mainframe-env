@@ -161,6 +161,15 @@ struct XmlNode {
 struct JsonClauses {
     names: BTreeMap<String, Option<String>>,
     suppressed: BTreeSet<String>,
+    conversions: BTreeMap<String, JsonConversion>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum JsonConversion {
+    GenerateBoolean(String),
+    GenerateNull(String),
+    ParseBoolean(String, String),
+    ParseNull(String),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -6008,7 +6017,7 @@ impl ReferenceMachine {
             .ok_or(MachineProblem::InvalidOperation)?;
         let generated = if let Some(layout) = self.layout(from).cloned() {
             if json {
-                let clauses = JsonClauses::parse(args)?;
+                let clauses = JsonClauses::parse(args, false)?;
                 let value = self
                     .json_layout_value(&layout, &clauses, &[], true)?
                     .ok_or(MachineProblem::DataException)?;
@@ -6145,6 +6154,24 @@ impl ReferenceMachine {
         }
         let reference = self.layout_occurrence_reference(layout, indexes)?;
         let bytes = self.read_reference(&reference)?;
+        if let Some(conversion) = clauses.conversion(layout) {
+            match conversion {
+                JsonConversion::GenerateBoolean(true_value) => {
+                    return Ok(serde_json::Value::Bool(
+                        self.json_value_matches(layout, &bytes, true_value)?,
+                    ));
+                }
+                JsonConversion::GenerateNull(null_value)
+                    if self.json_value_matches(layout, &bytes, null_value)? =>
+                {
+                    return Ok(serde_json::Value::Null);
+                }
+                JsonConversion::GenerateNull(_) => {}
+                JsonConversion::ParseBoolean(_, _) | JsonConversion::ParseNull(_) => {
+                    return Err(MachineProblem::InvalidOperation);
+                }
+            }
+        }
         if is_numeric(layout.category) {
             let value = decimal_string(decode_decimal(layout, &bytes)?);
             return value
@@ -6246,7 +6273,7 @@ impl ReferenceMachine {
         let into = position(args, "INTO").ok_or(MachineProblem::UnsupportedForm)?;
         let target = args.get(into + 1).ok_or(MachineProblem::InvalidOperation)?;
         let value = if json {
-            let clauses = JsonClauses::parse(args)?;
+            let clauses = JsonClauses::parse(args, true)?;
             let value: serde_json::Value =
                 serde_json::from_str(source.trim()).map_err(|_| MachineProblem::DataException)?;
             if let Some(layout) = self.layout(target).cloned() {
@@ -6421,6 +6448,27 @@ impl ReferenceMachine {
     ) -> Result<(), MachineProblem> {
         if !is_group(layout.category) {
             let reference = self.layout_occurrence_reference(layout, indexes)?;
+            if let Some(conversion) = clauses.conversion(layout) {
+                match conversion {
+                    JsonConversion::ParseBoolean(true_value, false_value) => {
+                        let value = value.as_bool().ok_or(MachineProblem::DataException)?;
+                        let bytes = self.json_conversion_bytes(
+                            layout,
+                            &reference,
+                            if value { true_value } else { false_value },
+                        )?;
+                        return self.write_reference(&reference, &bytes);
+                    }
+                    JsonConversion::ParseNull(null_value) if value.is_null() => {
+                        let bytes = self.json_conversion_bytes(layout, &reference, null_value)?;
+                        return self.write_reference(&reference, &bytes);
+                    }
+                    JsonConversion::ParseNull(_) => {}
+                    JsonConversion::GenerateBoolean(_) | JsonConversion::GenerateNull(_) => {
+                        return Err(MachineProblem::InvalidOperation);
+                    }
+                }
+            }
             let bytes = if is_numeric(layout.category) {
                 let text = value
                     .as_number()
@@ -6498,6 +6546,50 @@ impl ReferenceMachine {
         tokens.extend(indexes.iter().map(ToString::to_string));
         tokens.push(")".into());
         self.reference(&tokens)
+    }
+
+    fn json_value_matches(
+        &self,
+        layout: &LayoutMetadata,
+        actual: &[u8],
+        expected: &str,
+    ) -> Result<bool, MachineProblem> {
+        if matches!(expected, "ZERO" | "ZEROES" | "ZEROS") && is_numeric(layout.category) {
+            return decode_decimal(layout, actual).map(|value| value.coefficient == 0);
+        }
+        if let Some(expected) = json_figurative_bytes(layout, expected, actual.len()) {
+            return Ok(actual == expected);
+        }
+        Ok(actual == self.resolve(expected)?)
+    }
+
+    fn json_conversion_bytes(
+        &self,
+        layout: &LayoutMetadata,
+        reference: &ResolvedReference,
+        value: &str,
+    ) -> Result<Vec<u8>, MachineProblem> {
+        if matches!(value, "ZERO" | "ZEROES" | "ZEROS") && is_numeric(layout.category) {
+            let mut element = layout.clone();
+            element.length = reference.length;
+            element.occurs = 1;
+            return encode_decimal(
+                &element,
+                Decimal {
+                    coefficient: 0,
+                    scale: element.scale,
+                },
+            );
+        }
+        if let Some(bytes) = json_figurative_bytes(layout, value, reference.length) {
+            return Ok(bytes);
+        }
+        let bytes = self.resolve(value)?;
+        Ok(
+            FixedValue::fit(&bytes, reference.length, layout.justified_right)
+                .bytes()
+                .to_vec(),
+        )
     }
 
     fn xml_processing_step(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
@@ -11043,10 +11135,10 @@ fn xml_escape(value: &str) -> String {
 }
 
 impl JsonClauses {
-    fn parse(args: &[String]) -> Result<Self, MachineProblem> {
+    fn parse(args: &[String], parsing: bool) -> Result<Self, MachineProblem> {
         let mut clauses = Self::default();
         if let Some(mut at) = position(args, "NAME").map(|position| position + 1) {
-            while at < args.len() && args[at] != "SUPPRESS" {
+            while at < args.len() && !matches!(args[at].as_str(), "SUPPRESS" | "CONVERTING") {
                 if args[at] == "OF" {
                     at += 1;
                 }
@@ -11088,6 +11180,63 @@ impl JsonClauses {
                 clauses.suppressed.insert(normalize(token));
             }
         }
+        if let Some(mut at) = position(args, "CONVERTING").map(|position| position + 1) {
+            loop {
+                if args.get(at).is_some_and(|token| token == "OF") {
+                    at += 1;
+                }
+                let target = normalize(args.get(at).ok_or(MachineProblem::InvalidOperation)?);
+                at += 1;
+                let direction = if parsing { "FROM" } else { "TO" };
+                while args.get(at).is_some_and(|token| token != direction) {
+                    at += 1;
+                }
+                if args.get(at).is_none_or(|token| token != direction)
+                    || args.get(at + 1).is_none_or(|token| token != "JSON")
+                {
+                    return Err(MachineProblem::InvalidOperation);
+                }
+                at += 2;
+                let boolean = matches!(args.get(at).map(String::as_str), Some("BOOLEAN" | "BOOL"));
+                if !boolean && args.get(at).is_none_or(|token| token != "NULL") {
+                    return Err(MachineProblem::InvalidOperation);
+                }
+                at += 1;
+                if args.get(at).is_none_or(|token| token != "USING") {
+                    return Err(MachineProblem::InvalidOperation);
+                }
+                let first = args
+                    .get(at + 1)
+                    .cloned()
+                    .ok_or(MachineProblem::InvalidOperation)?;
+                at += 2;
+                let conversion = if parsing && boolean {
+                    if args.get(at).is_none_or(|token| token != "AND") {
+                        return Err(MachineProblem::InvalidOperation);
+                    }
+                    let second = args
+                        .get(at + 1)
+                        .cloned()
+                        .ok_or(MachineProblem::InvalidOperation)?;
+                    at += 2;
+                    JsonConversion::ParseBoolean(first, second)
+                } else if parsing {
+                    JsonConversion::ParseNull(first)
+                } else if boolean {
+                    JsonConversion::GenerateBoolean(first)
+                } else {
+                    JsonConversion::GenerateNull(first)
+                };
+                clauses.conversions.insert(target, conversion);
+                if args.get(at).is_none_or(|token| token != "ALSO") {
+                    if at != args.len() {
+                        return Err(MachineProblem::InvalidOperation);
+                    }
+                    break;
+                }
+                at += 1;
+            }
+        }
         Ok(clauses)
     }
 
@@ -11110,6 +11259,50 @@ impl JsonClauses {
     fn suppressed(&self, layout: &LayoutMetadata) -> bool {
         self.suppressed.contains(&layout.name) || self.suppressed.contains(&layout.simple_name)
     }
+
+    fn conversion(&self, layout: &LayoutMetadata) -> Option<&JsonConversion> {
+        self.conversions
+            .get(&layout.name)
+            .or_else(|| self.conversions.get(&layout.simple_name))
+    }
+}
+
+fn is_json_figurative(value: &str) -> bool {
+    matches!(
+        value,
+        "SPACE"
+            | "SPACES"
+            | "ZERO"
+            | "ZEROES"
+            | "ZEROS"
+            | "LOW-VALUE"
+            | "LOW-VALUES"
+            | "HIGH-VALUE"
+            | "HIGH-VALUES"
+    )
+}
+
+fn json_figurative_bytes(layout: &LayoutMetadata, value: &str, length: usize) -> Option<Vec<u8>> {
+    if !is_json_figurative(value) {
+        return None;
+    }
+    let national = matches!(
+        layout.category,
+        LayoutCategory::National | LayoutCategory::NationalEdited | LayoutCategory::NationalGroup
+    );
+    let unit = match value {
+        "SPACE" | "SPACES" if national => &[0x00, 0x20][..],
+        "LOW-VALUE" | "LOW-VALUES" if national => &[0x00, 0x00][..],
+        "HIGH-VALUE" | "HIGH-VALUES" if national => &[0xff, 0xff][..],
+        "SPACE" | "SPACES" => &[b' '][..],
+        "ZERO" | "ZEROES" | "ZEROS" => &[b'0'][..],
+        "LOW-VALUE" | "LOW-VALUES" => &[0x00][..],
+        "HIGH-VALUE" | "HIGH-VALUES" => &[0xff][..],
+        _ => return None,
+    };
+    let mut bytes = unit.repeat(length.saturating_add(unit.len() - 1) / unit.len());
+    bytes.truncate(length);
+    Some(bytes)
 }
 
 fn xml_unescape(value: &str) -> Result<String, MachineProblem> {

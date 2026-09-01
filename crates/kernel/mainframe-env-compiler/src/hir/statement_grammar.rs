@@ -1759,6 +1759,7 @@ fn validate_generate(tokens: &[Token<'_>]) -> Result<(), &'static str> {
     }
     validate_json_names(&mut cursor)?;
     validate_json_suppress(&mut cursor)?;
+    validate_json_converting(&mut cursor, false)?;
     cursor.finish()
 }
 
@@ -1772,6 +1773,7 @@ fn validate_json_parse(tokens: &[Token<'_>]) -> Result<(), &'static str> {
     }
     validate_json_names(&mut cursor)?;
     validate_json_suppress(&mut cursor)?;
+    validate_json_converting(&mut cursor, true)?;
     cursor.finish()
 }
 
@@ -1780,7 +1782,7 @@ fn validate_json_names(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
         return Ok(());
     }
     let mut count = 0usize;
-    while !cursor.done() && !cursor.at("SUPPRESS") {
+    while !cursor.done() && !cursor.at("SUPPRESS") && !cursor.at("CONVERTING") {
         cursor.eat("OF");
         cursor.operand()?;
         cursor.expect("IS")?;
@@ -1798,7 +1800,39 @@ fn validate_json_suppress(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
     if !cursor.eat("SUPPRESS") {
         return Ok(());
     }
-    cursor.operand_list(1)
+    let mut count = 0usize;
+    while !cursor.done() && !cursor.at("CONVERTING") {
+        cursor.operand()?;
+        count += 1;
+    }
+    (count > 0)
+        .then_some(())
+        .ok_or("SUPPRESS requires a data item")
+}
+
+fn validate_json_converting(cursor: &mut Cursor<'_>, parsing: bool) -> Result<(), &'static str> {
+    if !cursor.eat("CONVERTING") {
+        return Ok(());
+    }
+    loop {
+        cursor.operand()?;
+        cursor.expect(if parsing { "FROM" } else { "TO" })?;
+        cursor.expect("JSON")?;
+        let boolean = cursor.eat("BOOLEAN") || cursor.eat("BOOL");
+        if !boolean {
+            cursor.expect("NULL")?;
+        }
+        cursor.expect("USING")?;
+        cursor.json_conversion_value()?;
+        if parsing && boolean {
+            cursor.expect("AND")?;
+            cursor.json_conversion_value()?;
+        }
+        if !cursor.eat("ALSO") {
+            break;
+        }
+    }
+    Ok(())
 }
 
 fn validate_xml_parse(tokens: &[Token<'_>]) -> Result<(), &'static str> {
@@ -2478,6 +2512,36 @@ impl<'a> Cursor<'a> {
             Ok(())
         } else {
             Err("literal is missing")
+        }
+    }
+
+    fn json_conversion_value(&mut self) -> Result<(), &'static str> {
+        if [
+            "SPACE",
+            "SPACES",
+            "ZERO",
+            "ZEROES",
+            "ZEROS",
+            "LOW-VALUE",
+            "LOW-VALUES",
+            "HIGH-VALUE",
+            "HIGH-VALUES",
+        ]
+        .iter()
+        .any(|value| self.eat(value))
+        {
+            Ok(())
+        } else {
+            self.atom()
+        }
+    }
+
+    fn atom(&mut self) -> Result<(), &'static str> {
+        if self.tokens.get(self.position).is_some_and(is_operand_atom) {
+            self.position += 1;
+            Ok(())
+        } else {
+            Err("operand is malformed")
         }
     }
 
