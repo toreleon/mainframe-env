@@ -1236,6 +1236,7 @@ dependencies = [
  "mainframe-env-host-api",
  "mainframe-env-store",
  "mainframe-env-store-api",
+ "serde_json",
  "sha2 0.10.9",
 ]
 

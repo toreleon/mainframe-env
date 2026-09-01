@@ -2,7 +2,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
 macro_rules! host_name {
-    ($name:ident, $validate:expr) => {
+    ($name:ident, $validate:expr, $deserialize_max:expr) => {
         #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
         pub struct $name(String);
         impl Serialize for $name {
@@ -19,7 +19,7 @@ macro_rules! host_name {
                 D: Deserializer<'de>,
             {
                 let value = String::deserialize(deserializer)?;
-                Self::new(value, 246).map_err(serde::de::Error::custom)
+                Self::new(value, $deserialize_max).map_err(serde::de::Error::custom)
             }
         }
         impl $name {
@@ -70,12 +70,12 @@ fn resource(value: &str) -> bool {
     })
 }
 
-host_name!(DatasetName, qualified);
-host_name!(MemberName, simple);
-host_name!(ProgramName, simple);
-host_name!(JobName, simple);
-host_name!(SessionId, simple);
-host_name!(ResourceName, resource);
+host_name!(DatasetName, qualified, 246);
+host_name!(MemberName, simple, 8);
+host_name!(ProgramName, simple, 246);
+host_name!(JobName, simple, 246);
+host_name!(SessionId, simple, 246);
+host_name!(ResourceName, resource, 246);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HostNameProblem {

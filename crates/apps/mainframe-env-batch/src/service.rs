@@ -2177,14 +2177,6 @@ impl BatchService {
         let records = if disconnect {
             let core = format!("MEAMSCAT1|{}", target.as_str());
             let header = format!("{core}|{}", ams_snapshot_digest(&core, &[])).into_bytes();
-            self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
-                DatasetRequest::SetCatalogConnection {
-                    catalog: target.clone(),
-                    connected: false,
-                    expected_version: None,
-                    mutation,
-                }
-            })?;
             vec![header]
         } else {
             let DatasetResult::Snapshot { snapshot, version } = self.ams_dataset_read(
@@ -2210,7 +2202,16 @@ impl BatchService {
             &BTreeMap::from([(dd, records)]),
             effect_sequence,
         )?;
-        if let Some(version) = backup_version {
+        if disconnect {
+            self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
+                DatasetRequest::SetCatalogConnection {
+                    catalog: target,
+                    connected: false,
+                    expected_version: None,
+                    mutation,
+                }
+            })?;
+        } else if let Some(version) = backup_version {
             self.ams_dataset_mutation(invocation, job, step, effect_sequence, |mutation| {
                 DatasetRequest::RecordBackup {
                     dataset: target,
@@ -6069,6 +6070,59 @@ mod tests {
             }),
             Ok(DatasetResult::Mutated { version: 4 })
         );
+    }
+
+    #[test]
+    fn idcams_export_disconnect_output_failure_leaves_catalog_connected() {
+        let (service, dataset) = service_with_real_datasets();
+        let catalog = DatasetName::new("USER.SAFECAT", 128).unwrap();
+        dataset
+            .invoke(DatasetRequest::DefineCatalog {
+                catalog: catalog.clone(),
+                kind: mainframe_env_host_api::CatalogKind::User,
+                mutation: dataset_test_mutation(544),
+            })
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::Create {
+                dataset: DatasetName::new("USER.TINYOUT", 128).unwrap(),
+                attributes: DatasetAttributes {
+                    organization: DatasetOrganization::Sequential,
+                    record_format: RecordFormat::Fixed,
+                    logical_record_length: 4,
+                    key_offset: None,
+                    key_length: None,
+                    ccsid: Some(37),
+                },
+                mutation: dataset_test_mutation(545),
+            })
+            .unwrap();
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//BADDISC JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//OUT DD DSN=USER.TINYOUT,DISP=OLD\n//SYSIN DD *\n EXPORT DISCONNECT ENTRIES(USER.SAFECAT) OUTFILE(OUT)\n/*\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("ams-disconnect-output-failure", InvocationLimits::default())
+                    .unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service
+                .run_next(&invocation, false)
+                .unwrap()
+                .unwrap()
+                .return_code,
+            Some(16)
+        );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::ResolveCatalog { name: catalog }),
+            Ok(DatasetResult::Catalog(resolution)) if resolution.catalog.is_some()
+        ));
     }
 
     #[test]

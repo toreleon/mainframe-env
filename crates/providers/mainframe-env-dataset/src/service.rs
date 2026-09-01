@@ -96,18 +96,20 @@ impl DatasetService {
                 if state
                     .locks
                     .values()
-                    .filter(|lock| lock.owner == *owner && lock.expires_at > *now_tick)
+                    .filter(|lock| {
+                        lock.expires_at > *now_tick
+                            && same_lock_isolation_owner(lock, owner, transaction.as_deref())
+                    })
                     .map(|lock| lock_resource(&lock.dataset, &lock.target))
                     .max()
                     .is_some_and(|held| resource < held)
                 {
                     return Err(condition("LOCKORDER", 16));
                 }
-                for lock in state
-                    .locks
-                    .values()
-                    .filter(|lock| lock.expires_at > *now_tick && lock.owner != *owner)
-                {
+                for lock in state.locks.values().filter(|lock| {
+                    lock.expires_at > *now_tick
+                        && !same_lock_isolation_owner(lock, owner, transaction.as_deref())
+                }) {
                     if lock_conflicts(dataset, entry, target, *mode, lock) {
                         return Err(condition("LOCKED", 16));
                     }
@@ -369,10 +371,14 @@ impl DatasetService {
                     return Err(condition("INVREQ", 16));
                 }
                 if *committed {
-                    let mut retry = current.clone();
-                    retry.state = mainframe_env_host_api::TvsUnitOfWorkState::Active;
-                    state.tvs_units.insert(transaction.clone(), retry);
-                    return self.complete_tvs(state, request, transaction, owner, true, mutation);
+                    return self.complete_tvs_from_current(
+                        state,
+                        request,
+                        transaction,
+                        mutation,
+                        current,
+                        true,
+                    );
                 }
                 let mut next = current.clone();
                 next.state = mainframe_env_host_api::TvsUnitOfWorkState::RolledBack;
@@ -396,6 +402,18 @@ impl DatasetService {
         mutation: &mainframe_env_host_api::Mutation,
     ) -> Result<DatasetResult, HostProblem> {
         let current = require_active_tvs(state, transaction, owner.as_str())?.clone();
+        self.complete_tvs_from_current(state, request, transaction, mutation, current, commit)
+    }
+
+    fn complete_tvs_from_current(
+        &self,
+        state: &mut State,
+        request: &DatasetRequest,
+        transaction: &str,
+        mutation: &mainframe_env_host_api::Mutation,
+        current: TvsUnitOfWork,
+        commit: bool,
+    ) -> Result<DatasetResult, HostProblem> {
         let mut next = current.clone();
         next.state = if commit {
             mainframe_env_host_api::TvsUnitOfWorkState::Committed
@@ -908,10 +926,7 @@ impl DatasetService {
         }
         for (dataset, entry) in &entries {
             if let Some(catalog) = &entry.catalog.catalog {
-                if !catalogs
-                    .get(catalog.as_str())
-                    .is_some_and(|catalog| catalog.connected)
-                {
+                if !catalogs.contains_key(catalog.as_str()) {
                     return Err(HostProblem::InfrastructureFailure);
                 }
                 dependencies.add_dependency(dataset, catalog.as_str(), graph_limits)?;
@@ -2187,6 +2202,7 @@ impl DatasetService {
                 if definition.lifecycle != current.lifecycle {
                     return Err(condition("INVREQ", 16));
                 }
+                ensure_alter_preserves_concurrency(state, dataset, &current, definition)?;
                 let mut dependencies = state.dependencies.clone();
                 dependencies.set_direct_dependencies(
                     dataset.as_str(),
@@ -2402,6 +2418,9 @@ impl DatasetService {
                 }
                 validate_entry_shape(&next, self.limits)?;
                 validate_guaranteed_volume_capacity(state, dataset.as_str(), &next, self.limits)?;
+                if let Some(current) = &current {
+                    ensure_restore_preserves_concurrency(state, dataset, current, &next)?;
+                }
                 let mut dependencies = state.dependencies.clone();
                 if let Some(current) = &current
                     && current.attributes.organization
@@ -4712,9 +4731,10 @@ fn resolve_catalog(
             version = version.max(next.version);
             target = &next.target;
         }
-        if let Some(catalog) = state.catalogs.get(target)
-            && catalog.connected
-        {
+        if let Some(catalog) = state.catalogs.get(target) {
+            if !catalog.connected {
+                return Err(condition("CATLGERR", 16));
+            }
             alias_chain.push(
                 DatasetName::new(alias_name, 128)
                     .map_err(|_| HostProblem::InfrastructureFailure)?,
@@ -4840,6 +4860,57 @@ fn active_tvs_references(state: &State, dataset: &DatasetName) -> bool {
             .iter()
             .any(|operation| tvs_operation_dataset(operation) == dataset)
     })
+}
+
+fn concurrency_definition_changed(
+    current: &Entry,
+    next: &mainframe_env_host_api::DatasetDefinition,
+) -> bool {
+    current.attributes != next.attributes
+        || current.vsam != next.vsam
+        || current.catalog.owner != next.catalog.owner
+}
+
+fn ensure_alter_preserves_concurrency(
+    state: &State,
+    dataset: &DatasetName,
+    current: &Entry,
+    next: &mainframe_env_host_api::DatasetDefinition,
+) -> Result<(), HostProblem> {
+    if concurrency_definition_changed(current, next)
+        && (state.locks.values().any(|lock| lock.dataset == *dataset)
+            || active_tvs_references(state, dataset))
+    {
+        Err(condition("LOCKED", 16))
+    } else {
+        Ok(())
+    }
+}
+
+fn ensure_restore_preserves_concurrency(
+    state: &State,
+    dataset: &DatasetName,
+    current: &Entry,
+    next: &Entry,
+) -> Result<(), HostProblem> {
+    if active_tvs_references(state, dataset) {
+        return Err(condition("LOCKED", 16));
+    }
+    let locks = state
+        .locks
+        .values()
+        .filter(|lock| lock.dataset == *dataset)
+        .collect::<Vec<_>>();
+    if locks.iter().any(|lock| lock.transaction.is_some())
+        || (!locks.is_empty() && concurrency_definition_changed(current, &next.definition()))
+        || locks
+            .iter()
+            .any(|lock| validate_lock_target(next, &lock.target).is_err())
+    {
+        Err(condition("LOCKED", 16))
+    } else {
+        Ok(())
+    }
 }
 
 fn tvs_operation_identity(
@@ -5076,6 +5147,18 @@ fn lock_conflicts(
             mainframe_env_host_api::DatasetLockMode::Shared
         )
     )
+}
+
+fn same_lock_isolation_owner(
+    existing: &mainframe_env_host_api::DatasetLockReceipt,
+    requested_owner: &mainframe_env_execution_api::PrincipalId,
+    requested_transaction: Option<&str>,
+) -> bool {
+    match (existing.transaction.as_deref(), requested_transaction) {
+        (Some(existing), Some(requested)) => existing == requested,
+        (None, None) => existing.owner == *requested_owner,
+        _ => false,
+    }
 }
 
 fn authorize_data_mutation(
@@ -6434,6 +6517,33 @@ fn authorize_principal(
     {
         return Err(HostProblem::Unauthorized);
     }
+    let derived_base = match request {
+        DatasetRequest::DefineAlternateIndex { base, .. } => Some(base.as_str()),
+        DatasetRequest::DefinePath { index, .. } => Some(
+            state
+                .alternate_indexes
+                .get(index.as_str())
+                .ok_or(HostProblem::NotFound)?
+                .base
+                .as_str(),
+        ),
+        DatasetRequest::Delete {
+            dataset,
+            member: None,
+            ..
+        } => state
+            .alternate_indexes
+            .get(dataset.as_str())
+            .map(|index| index.base.as_str()),
+        _ => None,
+    };
+    if derived_base
+        .and_then(|base| state.entries.get(base))
+        .and_then(|entry| entry.catalog.owner.as_deref())
+        .is_some_and(|owner| owner != principal.as_str())
+    {
+        return Err(HostProblem::Unauthorized);
+    }
     if let Some(dataset) = owned_mutation_dataset(request)
         && state
             .entries
@@ -6716,7 +6826,8 @@ fn restore_snapshot_content(
 
 fn validate_entry_shape(entry: &Entry, limits: DatasetLimits) -> Result<(), HostProblem> {
     validate_records(&entry.records, &entry.attributes, limits)?;
-    for records in entry.members.values() {
+    for (member, records) in &entry.members {
+        MemberName::new(member, 8).map_err(|_| HostProblem::Malformed)?;
         validate_records(records, &entry.attributes, limits)?;
     }
     for record in entry.relative_records.values() {
@@ -8592,6 +8703,7 @@ mod tests {
     struct FailAtomicOnceStore {
         inner: MemoryStore,
         fail_next: AtomicBool,
+        fail_next_tvs_put: AtomicBool,
     }
 
     impl FailAtomicOnceStore {
@@ -8599,11 +8711,17 @@ mod tests {
             Self {
                 inner: MemoryStore::new(Default::default()),
                 fail_next: AtomicBool::new(false),
+                fail_next_tvs_put: AtomicBool::new(false),
             }
         }
 
         fn arm(&self) {
             self.fail_next.store(true, Ordering::SeqCst);
+        }
+
+        fn arm_reconciliation_failure(&self) {
+            self.fail_next.store(true, Ordering::SeqCst);
+            self.fail_next_tvs_put.store(true, Ordering::SeqCst);
         }
 
         fn fail_now(&self) -> bool {
@@ -8633,7 +8751,15 @@ mod tests {
             record: ProviderStateRecord,
             expected_version: Option<u64>,
         ) -> Result<(), StoreError> {
-            self.inner.put_provider_state(record, expected_version)
+            if record.namespace == "dataset-tvs"
+                && self.fail_next_tvs_put.swap(false, Ordering::SeqCst)
+            {
+                Err(StoreError::Infrastructure(
+                    "injected-reconciliation-state-failure".into(),
+                ))
+            } else {
+                self.inner.put_provider_state(record, expected_version)
+            }
         }
 
         fn delete_provider_state(
@@ -12270,6 +12396,30 @@ mod tests {
             result => panic!("unexpected lock result: {result:?}"),
         };
         rls_definition.catalog.owner = None;
+        assert!(matches!(
+            public_invoke(
+                dataset.clone(),
+                "OWNER2",
+                DatasetRequest::Alter {
+                    dataset: rls.clone(),
+                    definition: Box::new(rls_definition.clone()),
+                    expected_version: Some(1),
+                    mutation: mutation(21_002),
+                },
+            ),
+            Err(HostProblem::Condition { ref name, response: 16, .. }) if name == "LOCKED"
+        ));
+        public_invoke(
+            dataset.clone(),
+            "OWNER2",
+            DatasetRequest::ReleaseLock {
+                dataset: rls.clone(),
+                lock_id: lock_id.clone(),
+                owner: principal("OWNER2"),
+                mutation: mutation(21_006),
+            },
+        )
+        .unwrap();
         public_invoke(
             dataset.clone(),
             "OWNER2",
@@ -12355,6 +12505,30 @@ mod tests {
         )
         .unwrap();
         tvs_definition.catalog.owner = None;
+        assert!(matches!(
+            public_invoke(
+                dataset.clone(),
+                "OWNER2",
+                DatasetRequest::Alter {
+                    dataset: tvs.clone(),
+                    definition: Box::new(tvs_definition.clone()),
+                    expected_version: Some(1),
+                    mutation: mutation(21_013),
+                },
+            ),
+            Err(HostProblem::Condition { ref name, response: 16, .. }) if name == "LOCKED"
+        ));
+        public_invoke(
+            dataset.clone(),
+            "OWNER2",
+            DatasetRequest::CompleteTvs {
+                transaction: "TVS-AUTH".into(),
+                owner: principal("OWNER2"),
+                commit: false,
+                mutation: mutation(21_016),
+            },
+        )
+        .unwrap();
         public_invoke(
             dataset.clone(),
             "OWNER2",
@@ -12418,9 +12592,670 @@ mod tests {
                 },
             ),
             Ok(DatasetResult::Tvs(receipt))
-                if receipt.state == mainframe_env_host_api::TvsUnitOfWorkState::Active
+                if receipt.state == mainframe_env_host_api::TvsUnitOfWorkState::RolledBack
                     && receipt.staged_operations == 1
         ));
+    }
+
+    #[test]
+    fn disconnected_user_catalog_restarts_and_longest_alias_fails_closed() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let dataset = service(store.clone());
+        let master = DatasetName::new("CAT.MASTER", 44).unwrap();
+        let short = DatasetName::new("CAT.SHORT", 44).unwrap();
+        let long = DatasetName::new("CAT.LONG", 44).unwrap();
+        for (sequence, catalog, kind) in [
+            (30_000, master, mainframe_env_host_api::CatalogKind::Master),
+            (
+                30_001,
+                short.clone(),
+                mainframe_env_host_api::CatalogKind::User,
+            ),
+            (
+                30_002,
+                long.clone(),
+                mainframe_env_host_api::CatalogKind::User,
+            ),
+        ] {
+            public_invoke(
+                dataset.clone(),
+                "OWNER1",
+                DatasetRequest::DefineCatalog {
+                    catalog,
+                    kind,
+                    mutation: mutation(sequence),
+                },
+            )
+            .unwrap();
+        }
+        public_invoke(
+            dataset.clone(),
+            "OWNER1",
+            DatasetRequest::DefineAlias {
+                alias: DatasetName::new("APP", 44).unwrap(),
+                target: short.clone(),
+                mutation: mutation(30_003),
+            },
+        )
+        .unwrap();
+        public_invoke(
+            dataset.clone(),
+            "OWNER1",
+            DatasetRequest::DefineAlias {
+                alias: DatasetName::new("APP.PAY", 44).unwrap(),
+                target: long.clone(),
+                mutation: mutation(30_004),
+            },
+        )
+        .unwrap();
+        let data = DatasetName::new("APP.PAY.DATA", 44).unwrap();
+        let mut definition = mainframe_env_host_api::DatasetDefinition::compatibility(attrs(
+            DatasetOrganization::Sequential,
+        ));
+        definition.catalog.catalog = Some(long.clone());
+        public_invoke(
+            dataset.clone(),
+            "OWNER1",
+            DatasetRequest::Define {
+                dataset: data.clone(),
+                definition: Box::new(definition),
+                mutation: mutation(30_005),
+            },
+        )
+        .unwrap();
+        public_invoke(
+            dataset.clone(),
+            "OWNER1",
+            DatasetRequest::SetCatalogConnection {
+                catalog: long.clone(),
+                connected: false,
+                expected_version: Some(1),
+                mutation: mutation(30_006),
+            },
+        )
+        .unwrap();
+        drop(dataset);
+
+        let reopened = service(store);
+        for name in [
+            data.clone(),
+            DatasetName::new("APP.PAY.MISSING", 44).unwrap(),
+        ] {
+            assert!(matches!(
+                public_invoke(
+                    reopened.clone(),
+                    "OWNER1",
+                    DatasetRequest::ResolveCatalog { name },
+                ),
+                Err(HostProblem::Condition { ref name, response: 16, .. }) if name == "CATLGERR"
+            ));
+        }
+        assert!(matches!(
+            public_invoke(
+                reopened.clone(),
+                "OWNER1",
+                DatasetRequest::ResolveCatalog {
+                    name: DatasetName::new("APP.OTHER", 44).unwrap(),
+                },
+            ),
+            Ok(DatasetResult::Catalog(resolution)) if resolution.catalog == Some(short)
+        ));
+        public_invoke(
+            reopened.clone(),
+            "OWNER1",
+            DatasetRequest::SetCatalogConnection {
+                catalog: long.clone(),
+                connected: true,
+                expected_version: Some(2),
+                mutation: mutation(30_007),
+            },
+        )
+        .unwrap();
+        assert!(matches!(
+            public_invoke(
+                reopened,
+                "OWNER1",
+                DatasetRequest::ResolveCatalog { name: data },
+            ),
+            Ok(DatasetResult::Catalog(resolution)) if resolution.catalog == Some(long)
+        ));
+    }
+
+    #[test]
+    fn alter_and_restore_preserve_live_locks_and_tvs_authority_across_restart() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let dataset = service(store.clone());
+        let rls = DatasetName::new("USER.CRIT.RLS", 44).unwrap();
+        let mut definition = mainframe_env_host_api::DatasetDefinition::compatibility(attrs(
+            DatasetOrganization::KeySequenced,
+        ));
+        definition.catalog.owner = Some("OWNER1".into());
+        public_invoke(
+            dataset.clone(),
+            "OWNER1",
+            DatasetRequest::Define {
+                dataset: rls.clone(),
+                definition: Box::new(definition.clone()),
+                mutation: mutation(30_100),
+            },
+        )
+        .unwrap();
+        public_invoke(
+            dataset.clone(),
+            "OWNER1",
+            DatasetRequest::Write {
+                dataset: rls.clone(),
+                member: None,
+                records: vec![b"AA11".to_vec()],
+                expected_version: Some(1),
+                mutation: mutation(30_101),
+            },
+        )
+        .unwrap();
+        definition.vsam.access_mode = mainframe_env_host_api::VsamAccessMode::Rls;
+        public_invoke(
+            dataset.clone(),
+            "OWNER1",
+            DatasetRequest::Alter {
+                dataset: rls.clone(),
+                definition: Box::new(definition.clone()),
+                expected_version: Some(2),
+                mutation: mutation(30_102),
+            },
+        )
+        .unwrap();
+        public_invoke(
+            dataset.clone(),
+            "OWNER1",
+            DatasetRequest::AcquireLock {
+                dataset: rls.clone(),
+                target: mainframe_env_host_api::DatasetLockTarget::Record(b"AA".to_vec()),
+                owner: principal("OWNER1"),
+                mode: mainframe_env_host_api::DatasetLockMode::Exclusive,
+                now_tick: 30_103,
+                lease_ticks: 1_000,
+                transaction: None,
+                mutation: mutation(30_103),
+            },
+        )
+        .unwrap();
+        let mut non_rls = definition.clone();
+        non_rls.vsam.access_mode = mainframe_env_host_api::VsamAccessMode::NonRls;
+        let mut unowned = definition.clone();
+        unowned.catalog.owner = None;
+        for (sequence, changed) in [(30_104, non_rls), (30_105, unowned)] {
+            assert!(matches!(
+                public_invoke(
+                    dataset.clone(),
+                    "OWNER1",
+                    DatasetRequest::Alter {
+                        dataset: rls.clone(),
+                        definition: Box::new(changed),
+                        expected_version: Some(3),
+                        mutation: mutation(sequence),
+                    },
+                ),
+                Err(HostProblem::Condition { ref name, response: 16, .. }) if name == "LOCKED"
+            ));
+        }
+        let DatasetResult::Snapshot { mut snapshot, .. } = dataset
+            .invoke(DatasetRequest::Snapshot {
+                dataset: rls.clone(),
+                max_records: 8,
+                max_members: 8,
+            })
+            .unwrap()
+        else {
+            panic!("expected RLS snapshot");
+        };
+        snapshot.records = vec![b"BB22".to_vec()];
+        assert!(matches!(
+            public_invoke(
+                dataset.clone(),
+                "OWNER1",
+                DatasetRequest::Restore {
+                    dataset: rls.clone(),
+                    snapshot,
+                    expected_version: Some(3),
+                    mutation: mutation(30_106),
+                },
+            ),
+            Err(HostProblem::Condition { ref name, response: 16, .. }) if name == "LOCKED"
+        ));
+
+        let tvs = DatasetName::new("USER.CRIT.TVS", 44).unwrap();
+        let mut tvs_definition = definition.clone();
+        tvs_definition.vsam.access_mode = mainframe_env_host_api::VsamAccessMode::Tvs;
+        public_invoke(
+            dataset.clone(),
+            "OWNER1",
+            DatasetRequest::Define {
+                dataset: tvs.clone(),
+                definition: Box::new(tvs_definition.clone()),
+                mutation: mutation(30_110),
+            },
+        )
+        .unwrap();
+        public_invoke(
+            dataset.clone(),
+            "OWNER1",
+            DatasetRequest::BeginTvs {
+                transaction: "CRIT-ACTIVE".into(),
+                owner: principal("OWNER1"),
+                mutation: mutation(30_111),
+            },
+        )
+        .unwrap();
+        public_invoke(
+            dataset.clone(),
+            "OWNER1",
+            DatasetRequest::StageTvs {
+                transaction: "CRIT-ACTIVE".into(),
+                owner: principal("OWNER1"),
+                operation: mainframe_env_host_api::TvsRecordOperation::Insert {
+                    dataset: tvs.clone(),
+                    record: b"AA11".to_vec(),
+                },
+                mutation: mutation(30_112),
+            },
+        )
+        .unwrap();
+        tvs_definition.vsam.access_mode = mainframe_env_host_api::VsamAccessMode::Rls;
+        assert!(matches!(
+            public_invoke(
+                dataset.clone(),
+                "OWNER1",
+                DatasetRequest::Alter {
+                    dataset: tvs.clone(),
+                    definition: Box::new(tvs_definition),
+                    expected_version: Some(1),
+                    mutation: mutation(30_113),
+                },
+            ),
+            Err(HostProblem::Condition { ref name, response: 16, .. }) if name == "LOCKED"
+        ));
+        drop(dataset);
+        let reopened = service(store);
+        assert!(matches!(
+            reopened.invoke(DatasetRequest::Read {
+                dataset: rls.clone(),
+                member: None,
+                key: Some(b"AA".to_vec()),
+                max_records: 1,
+            }),
+            Ok(DatasetResult::Records { records, version: 3, .. })
+                if records == [b"AA11".to_vec()]
+        ));
+        assert!(matches!(
+            reopened.invoke(DatasetRequest::ListLocks {
+                dataset: rls,
+                now_tick: 30_104,
+                max_items: 8,
+            }),
+            Ok(DatasetResult::Locks { locks }) if locks.len() == 1
+        ));
+        assert!(matches!(
+            reopened.invoke(DatasetRequest::TvsStatus {
+                transaction: "CRIT-ACTIVE".into(),
+                owner: principal("OWNER1"),
+            }),
+            Ok(DatasetResult::Tvs(receipt))
+                if receipt.state == mainframe_env_host_api::TvsUnitOfWorkState::Active
+        ));
+    }
+
+    #[test]
+    fn derived_aix_and_path_mutations_require_the_base_owner() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let dataset = service(store.clone());
+        let base = DatasetName::new("USER.OWN.BASE", 44).unwrap();
+        let index = DatasetName::new("USER.OWN.AIX", 44).unwrap();
+        let path = DatasetName::new("USER.OWN.PATH", 44).unwrap();
+        let mut definition = mainframe_env_host_api::DatasetDefinition::compatibility(attrs(
+            DatasetOrganization::KeySequenced,
+        ));
+        definition.catalog.owner = Some("OWNER1".into());
+        public_invoke(
+            dataset.clone(),
+            "OWNER1",
+            DatasetRequest::Define {
+                dataset: base.clone(),
+                definition: Box::new(definition),
+                mutation: mutation(30_200),
+            },
+        )
+        .unwrap();
+        let define_index = |sequence| DatasetRequest::DefineAlternateIndex {
+            base: base.clone(),
+            index: index.clone(),
+            key_offset: 2,
+            key_length: 2,
+            allow_duplicates: false,
+            upgrade: true,
+            mutation: mutation(sequence),
+        };
+        assert_eq!(
+            public_invoke(dataset.clone(), "OWNER2", define_index(30_201)),
+            Err(HostProblem::Unauthorized)
+        );
+        public_invoke(dataset.clone(), "OWNER1", define_index(30_202)).unwrap();
+        assert_eq!(
+            public_invoke(
+                dataset.clone(),
+                "OWNER2",
+                DatasetRequest::DefinePath {
+                    path: path.clone(),
+                    index: index.clone(),
+                    mutation: mutation(30_203),
+                },
+            ),
+            Err(HostProblem::Unauthorized)
+        );
+        public_invoke(
+            dataset.clone(),
+            "OWNER1",
+            DatasetRequest::DefinePath {
+                path: path.clone(),
+                index: index.clone(),
+                mutation: mutation(30_204),
+            },
+        )
+        .unwrap();
+        for (sequence, derived) in [(30_205, path.clone()), (30_206, index.clone())] {
+            assert_eq!(
+                public_invoke(
+                    dataset.clone(),
+                    "OWNER2",
+                    DatasetRequest::Delete {
+                        dataset: derived,
+                        member: None,
+                        expected_version: Some(1),
+                        purge: true,
+                        current_date: None,
+                        mutation: mutation(sequence),
+                    },
+                ),
+                Err(HostProblem::Unauthorized)
+            );
+        }
+        public_invoke(
+            dataset.clone(),
+            "OWNER1",
+            DatasetRequest::Delete {
+                dataset: path,
+                member: None,
+                expected_version: Some(1),
+                purge: true,
+                current_date: None,
+                mutation: mutation(30_207),
+            },
+        )
+        .unwrap();
+        public_invoke(
+            dataset.clone(),
+            "OWNER1",
+            DatasetRequest::Delete {
+                dataset: index,
+                member: None,
+                expected_version: Some(1),
+                purge: true,
+                current_date: None,
+                mutation: mutation(30_208),
+            },
+        )
+        .unwrap();
+        drop(dataset);
+        let reopened = service(store);
+        assert!(matches!(
+            reopened.invoke(DatasetRequest::Attributes { dataset: base }),
+            Ok(DatasetResult::Attributes { version: 1, .. })
+        ));
+    }
+
+    #[test]
+    fn tvs_lock_reentrancy_is_scoped_to_transaction_not_principal() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let dataset = service(store.clone());
+        let name = DatasetName::new("USER.TX.ISOLATE", 44).unwrap();
+        let mut definition = mainframe_env_host_api::DatasetDefinition::compatibility(attrs(
+            DatasetOrganization::KeySequenced,
+        ));
+        definition.catalog.owner = Some("OWNER1".into());
+        definition.vsam.access_mode = mainframe_env_host_api::VsamAccessMode::Tvs;
+        public_invoke(
+            dataset.clone(),
+            "OWNER1",
+            DatasetRequest::Define {
+                dataset: name.clone(),
+                definition: Box::new(definition),
+                mutation: mutation(30_300),
+            },
+        )
+        .unwrap();
+        for (sequence, transaction) in [(30_301, "TX-A"), (30_302, "TX-B")] {
+            public_invoke(
+                dataset.clone(),
+                "OWNER1",
+                DatasetRequest::BeginTvs {
+                    transaction: transaction.into(),
+                    owner: principal("OWNER1"),
+                    mutation: mutation(sequence),
+                },
+            )
+            .unwrap();
+        }
+        let acquire = |sequence, transaction: &str| DatasetRequest::AcquireLock {
+            dataset: name.clone(),
+            target: mainframe_env_host_api::DatasetLockTarget::Dataset,
+            owner: principal("OWNER1"),
+            mode: mainframe_env_host_api::DatasetLockMode::Exclusive,
+            now_tick: sequence,
+            lease_ticks: 1_000,
+            transaction: Some(transaction.into()),
+            mutation: mutation(sequence),
+        };
+        public_invoke(dataset.clone(), "OWNER1", acquire(30_303, "TX-A")).unwrap();
+        public_invoke(dataset.clone(), "OWNER1", acquire(30_304, "TX-A")).unwrap();
+        assert!(matches!(
+            public_invoke(dataset.clone(), "OWNER1", acquire(30_305, "TX-B")),
+            Err(HostProblem::Condition { ref name, response: 16, .. }) if name == "LOCKED"
+        ));
+        public_invoke(
+            dataset.clone(),
+            "OWNER1",
+            DatasetRequest::CompleteTvs {
+                transaction: "TX-A".into(),
+                owner: principal("OWNER1"),
+                commit: false,
+                mutation: mutation(30_306),
+            },
+        )
+        .unwrap();
+        public_invoke(dataset.clone(), "OWNER1", acquire(30_307, "TX-B")).unwrap();
+        drop(dataset);
+        let reopened = service(store);
+        assert!(matches!(
+            reopened.invoke(DatasetRequest::ListLocks {
+                dataset: name,
+                now_tick: 30_308,
+                max_items: 8,
+            }),
+            Ok(DatasetResult::Locks { locks })
+                if locks.len() == 1 && locks[0].transaction.as_deref() == Some("TX-B")
+        ));
+    }
+
+    #[test]
+    fn failed_committed_reconciliation_remains_unknown_in_memory_and_restart() {
+        let store = Arc::new(FailAtomicOnceStore::new());
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let dataset = service(provider_store);
+        let name = DatasetName::new("USER.RECON.FAIL", 44).unwrap();
+        let mut definition = mainframe_env_host_api::DatasetDefinition::compatibility(attrs(
+            DatasetOrganization::KeySequenced,
+        ));
+        definition.catalog.owner = Some("OWNER1".into());
+        definition.vsam.access_mode = mainframe_env_host_api::VsamAccessMode::Tvs;
+        public_invoke(
+            dataset.clone(),
+            "OWNER1",
+            DatasetRequest::Define {
+                dataset: name.clone(),
+                definition: Box::new(definition),
+                mutation: mutation(30_400),
+            },
+        )
+        .unwrap();
+        public_invoke(
+            dataset.clone(),
+            "OWNER1",
+            DatasetRequest::BeginTvs {
+                transaction: "TX-UNKNOWN".into(),
+                owner: principal("OWNER1"),
+                mutation: mutation(30_401),
+            },
+        )
+        .unwrap();
+        public_invoke(
+            dataset.clone(),
+            "OWNER1",
+            DatasetRequest::StageTvs {
+                transaction: "TX-UNKNOWN".into(),
+                owner: principal("OWNER1"),
+                operation: mainframe_env_host_api::TvsRecordOperation::Insert {
+                    dataset: name.clone(),
+                    record: b"AA11".to_vec(),
+                },
+                mutation: mutation(30_402),
+            },
+        )
+        .unwrap();
+        store.arm();
+        assert_eq!(
+            public_invoke(
+                dataset.clone(),
+                "OWNER1",
+                DatasetRequest::CompleteTvs {
+                    transaction: "TX-UNKNOWN".into(),
+                    owner: principal("OWNER1"),
+                    commit: true,
+                    mutation: mutation(30_403),
+                },
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        store.arm_reconciliation_failure();
+        assert_eq!(
+            public_invoke(
+                dataset.clone(),
+                "OWNER1",
+                DatasetRequest::ReconcileTvs {
+                    transaction: "TX-UNKNOWN".into(),
+                    owner: principal("OWNER1"),
+                    committed: true,
+                    mutation: mutation(30_404),
+                },
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::TvsStatus {
+                transaction: "TX-UNKNOWN".into(),
+                owner: principal("OWNER1"),
+            }),
+            Ok(DatasetResult::Tvs(receipt))
+                if receipt.state == mainframe_env_host_api::TvsUnitOfWorkState::Unknown
+        ));
+        drop(dataset);
+        let reopened_store: Arc<dyn ProviderStateStore> = store;
+        let reopened = service(reopened_store);
+        assert!(matches!(
+            reopened.invoke(DatasetRequest::TvsStatus {
+                transaction: "TX-UNKNOWN".into(),
+                owner: principal("OWNER1"),
+            }),
+            Ok(DatasetResult::Tvs(receipt))
+                if receipt.state == mainframe_env_host_api::TvsUnitOfWorkState::Unknown
+        ));
+        assert!(matches!(
+            reopened.invoke(DatasetRequest::Read {
+                dataset: name,
+                member: None,
+                key: None,
+                max_records: 8,
+            }),
+            Ok(DatasetResult::Records { records, version: 1, .. }) if records.is_empty()
+        ));
+    }
+
+    #[test]
+    fn crafted_pds_snapshot_member_names_fail_before_persistence_and_restart() {
+        let mut definition = mainframe_env_host_api::DatasetDefinition::compatibility(attrs(
+            DatasetOrganization::Partitioned,
+        ));
+        definition.attributes.logical_record_length = 4;
+        let valid = DatasetSnapshot {
+            definition: definition.clone(),
+            records: Vec::new(),
+            relative_records: Vec::new(),
+            members: vec![DatasetMemberSnapshot {
+                name: MemberName::new("MEMBER", 8).unwrap(),
+                records: vec![b"DATA".to_vec()],
+                generations: Vec::new(),
+                alias_of: None,
+            }],
+            linear_data: Vec::new(),
+        };
+        let mut serialized = serde_json::to_value(&valid).unwrap();
+        serialized["members"][0]["name"] = serde_json::Value::String("TOOLONG99".into());
+        assert!(serde_json::from_value::<DatasetSnapshot>(serialized).is_err());
+
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let dataset = service(store.clone());
+        let target = DatasetName::new("USER.BAD.PDS", 44).unwrap();
+        let crafted = DatasetSnapshot {
+            definition,
+            records: Vec::new(),
+            relative_records: Vec::new(),
+            members: vec![DatasetMemberSnapshot {
+                name: MemberName::new("TOOLONG99", 246).unwrap(),
+                records: vec![b"DATA".to_vec()],
+                generations: Vec::new(),
+                alias_of: None,
+            }],
+            linear_data: Vec::new(),
+        };
+        assert_eq!(
+            public_invoke(
+                dataset.clone(),
+                "OWNER1",
+                DatasetRequest::Restore {
+                    dataset: target.clone(),
+                    snapshot: Box::new(crafted),
+                    expected_version: None,
+                    mutation: mutation(30_500),
+                },
+            ),
+            Err(HostProblem::Malformed)
+        );
+        assert!(
+            store
+                .get_provider_state("dataset", target.as_str())
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            store
+                .get_provider_state("dataset-replay", "id-30500")
+                .unwrap()
+                .is_none()
+        );
+        drop(dataset);
+        let reopened = service(store);
+        assert_eq!(
+            reopened.invoke(DatasetRequest::Attributes { dataset: target }),
+            Err(HostProblem::NotFound)
+        );
     }
 
     #[test]
