@@ -38,6 +38,7 @@ pub const PUBLISHABLE_LAYOUT_CATEGORIES: &[&str] = &[
 pub(crate) fn lower_to_core(
     hir: &CobolHir,
     arithmetic_mode: &str,
+    declaratives: &[(String, Vec<String>)],
     limits: IrLimits,
 ) -> Result<Module, LowerProblem> {
     let mut unsupported = hir.unsupported();
@@ -120,10 +121,27 @@ pub(crate) fn lower_to_core(
             core_identity("config")?,
             Vec::new(),
             0,
-            BTreeMap::from([(
-                "arithmetic_mode".into(),
-                Attribute::Text(arithmetic_mode.into()),
-            )]),
+            BTreeMap::from([
+                (
+                    "arithmetic_mode".into(),
+                    Attribute::Text(arithmetic_mode.into()),
+                ),
+                (
+                    "declaratives".into(),
+                    Attribute::Text(
+                        declaratives
+                            .iter()
+                            .map(|(section, operands)| {
+                                std::iter::once(section.as_str())
+                                    .chain(operands.iter().map(String::as_str))
+                                    .collect::<Vec<_>>()
+                                    .join("\u{1f}")
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\u{1e}"),
+                    ),
+                ),
+            ]),
             Vec::new(),
             Vec::new(),
             None,

@@ -895,6 +895,42 @@ mod tests {
             b"ADD-ERR\nSTR-ERR\nUNSTR-ERR\nJSON-ERR\nXML-ERR\n"
         );
     }
+    #[test]
+    fn use_after_standard_error_runs_its_declarative_section_and_returns() {
+        use mainframe_env_host_api::{EffectResult, HostProblem};
+
+        let source = "IDENTIFICATION DIVISION.\nPROGRAM-ID. DECLERR.\nENVIRONMENT DIVISION.\nINPUT-OUTPUT SECTION.\nFILE-CONTROL.\nSELECT TEST-FILE ASSIGN TO TESTDD ORGANIZATION IS INDEXED ACCESS MODE IS RANDOM RECORD KEY IS REC-KEY.\nDATA DIVISION.\nFILE SECTION.\nFD TEST-FILE.\n01 TEST-REC.\n05 REC-KEY PIC X VALUE 'A'.\n05 DATA-X PIC X.\nPROCEDURE DIVISION.\nDECLARATIVES.\nERROR-HANDLER SECTION.\nUSE AFTER STANDARD ERROR PROCEDURE ON TEST-FILE.\nHANDLE-P.\nDISPLAY 'DECL'.\nEXIT.\nEND DECLARATIVES.\nMAIN-P.\nREAD TEST-FILE RECORD KEY IS REC-KEY.\nDISPLAY 'DONE'.\nSTOP RUN.\n";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(128, 4096).unwrap())
+        else {
+            panic!("declarative READ did not emit a host effect");
+        };
+        let mut resume = MachineResume::HostResult(EffectResult {
+            sequence: effect.sequence,
+            outcome: Err(HostProblem::Condition {
+                name: "NOTFND".into(),
+                response: 13,
+                response2: 0,
+            }),
+        });
+        loop {
+            match machine.drive(resume, Quantum::new(128, 4096).unwrap()) {
+                MachineDrive::Continue => resume = MachineResume::Start,
+                MachineDrive::Completed(done) => {
+                    assert_eq!(done.output.bytes(), b"DECL\nDONE\n");
+                    break;
+                }
+                other => panic!("{other:?}"),
+            }
+        }
+    }
 
     #[test]
     fn json_and_xml_generate_count_the_exact_emitted_bytes() {

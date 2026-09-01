@@ -16,6 +16,7 @@ pub struct CompilerDirectingNode {
     pub operands: Vec<String>,
     pub source: Vec<SourceSpan>,
     pub active: bool,
+    pub declarative_section: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -862,6 +863,7 @@ fn record_raw_directing(
             source_end: decoded.input_offset(range.end)?,
         }],
         true,
+        None,
         limits,
     )
 }
@@ -937,6 +939,7 @@ pub(super) fn prepare_source(
     let mut control_prefix = primary;
     let mut context = SourceContext::BeforeIdentification;
     let mut in_declaratives = false;
+    let mut declarative_section = None;
     for line in physical_lines(&source.text) {
         let whole = line.content.start..line.terminator.end;
         let text = &source.text[line.content.clone()];
@@ -948,6 +951,28 @@ pub(super) fn prepare_source(
         }
         if primary && head == "BASIS" {
             return Err(SyntaxProblem::InvalidDirectiveContext);
+        }
+        if matches!(upper.as_str(), "DECLARATIVES" | "END DECLARATIVES") {
+            observe_source_context(
+                &source.text[line.content.clone()],
+                &mut context,
+                Some(&mut in_declaratives),
+            );
+            if upper == "END DECLARATIVES" {
+                declarative_section = None;
+                let at = upper
+                    .find("DECLARATIVES")
+                    .ok_or(SyntaxProblem::InvalidDirectiveContext)?;
+                let leading = text.len().saturating_sub(text.trim_start().len());
+                append_slice(
+                    &mut output,
+                    source,
+                    line.content.start + leading + at..whole.end,
+                );
+            } else {
+                append_newline(&mut output, source, &line);
+            }
+            continue;
         }
         let kind = if primary && control_prefix && starts_control_option(&upper) {
             Some(CompilerDirectingKind::Process)
@@ -981,7 +1006,17 @@ pub(super) fn prepare_source(
             } else {
                 control_prefix = false;
             }
-            push_directing(artifacts, kind, operands, spans, true, limits)?;
+            push_directing(
+                artifacts,
+                kind,
+                operands,
+                spans,
+                true,
+                (kind == CompilerDirectingKind::Use)
+                    .then(|| declarative_section.clone())
+                    .flatten(),
+                limits,
+            )?;
             if matches!(
                 kind,
                 CompilerDirectingKind::Process
@@ -989,6 +1024,7 @@ pub(super) fn prepare_source(
                     | CompilerDirectingKind::Eject
                     | CompilerDirectingKind::Skip
                     | CompilerDirectingKind::Title
+                    | CompilerDirectingKind::Use
             ) {
                 append_newline(&mut output, source, &line);
             } else {
@@ -1004,6 +1040,12 @@ pub(super) fn prepare_source(
             &mut context,
             Some(&mut in_declaratives),
         );
+        let words = upper.split_whitespace().collect::<Vec<_>>();
+        if words.as_slice() == ["END", "DECLARATIVES"] {
+            declarative_section = None;
+        } else if in_declaratives && words.len() == 2 && words[1] == "SECTION" {
+            declarative_section = Some(words[0].to_string());
+        }
         append_slice(&mut output, source, whole);
     }
     Ok(output)
@@ -2222,7 +2264,7 @@ pub(super) fn record_directing(
     active: bool,
     limits: SyntaxLimits,
 ) -> Result<(), SyntaxProblem> {
-    push_directing(artifacts, kind, operands, source, active, limits)
+    push_directing(artifacts, kind, operands, source, active, None, limits)
 }
 
 fn push_directing(
@@ -2231,6 +2273,7 @@ fn push_directing(
     operands: Vec<String>,
     source: Vec<SourceSpan>,
     active: bool,
+    declarative_section: Option<String>,
     limits: SyntaxLimits,
 ) -> Result<(), SyntaxProblem> {
     if artifacts.directing.len() >= limits.max_directives {
@@ -2241,6 +2284,7 @@ fn push_directing(
         operands,
         source,
         active,
+        declarative_section,
     });
     Ok(())
 }

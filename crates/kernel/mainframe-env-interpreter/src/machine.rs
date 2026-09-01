@@ -239,6 +239,7 @@ enum PendingKind {
         target: Option<String>,
         status: Option<String>,
         ccsid: Option<u16>,
+        declarative: Option<String>,
     },
     DatasetStatus {
         status: Option<String>,
@@ -246,6 +247,7 @@ enum PendingKind {
         linage_advance: usize,
         linage_limit: Option<usize>,
         page_advance: bool,
+        declarative: Option<String>,
     },
     ProgramCall {
         targets: Vec<String>,
@@ -294,6 +296,14 @@ enum AcceptClockFormat {
 enum DatasetCursorAction {
     Start(String),
     End(String),
+}
+
+fn pending_declarative(kind: &PendingKind) -> Option<&str> {
+    match kind {
+        PendingKind::DatasetRead { declarative, .. }
+        | PendingKind::DatasetStatus { declarative, .. } => declarative.as_deref(),
+        _ => None,
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -355,6 +365,7 @@ pub struct ReferenceMachine {
     layouts: BTreeMap<String, LayoutMetadata>,
     simple_layouts: BTreeMap<String, Vec<String>>,
     files: BTreeMap<String, FileMetadata>,
+    declaratives: BTreeMap<String, String>,
     labels: BTreeMap<String, usize>,
     control_nodes: BTreeMap<usize, usize>,
     loop_reentry: BTreeSet<usize>,
@@ -597,6 +608,13 @@ impl ReferenceMachine {
                 ));
             }
         };
+        let declaratives = operations
+            .iter()
+            .find(|operation| operation.identity.name() == "config")
+            .and_then(|operation| optional_text_attribute(operation, "declaratives"))
+            .map(declarative_handlers)
+            .transpose()?
+            .unwrap_or_default();
         let (layouts, simple_layouts) = layout_metadata(&operations)?;
         let dynamic_lengths = layouts
             .values()
@@ -677,6 +695,7 @@ impl ReferenceMachine {
             layouts,
             simple_layouts,
             files,
+            declaratives,
             labels,
             control_nodes,
             loop_reentry: BTreeSet::new(),
@@ -1140,6 +1159,9 @@ impl ReferenceMachine {
             if let Some(target) = status_target {
                 self.write(&target, status.as_bytes())?;
             }
+            if let Some(handler) = pending_declarative(&pending.kind) {
+                self.enter_declarative(handler)?;
+            }
             return Ok(());
         }
         if result.outcome.is_err() {
@@ -1163,6 +1185,11 @@ impl ReferenceMachine {
                     return Ok(());
                 }
                 _ => {}
+            }
+            if let Some(handler) = pending_declarative(&pending.kind) {
+                self.last_file_status = "30".into();
+                self.enter_declarative(handler)?;
+                return Ok(());
             }
         }
         let outcome = result
@@ -1195,6 +1222,7 @@ impl ReferenceMachine {
                     target: Some(target),
                     status,
                     ccsid,
+                    ..
                 },
                 HostResult::Dataset(mainframe_env_host_api::DatasetResult::Records {
                     records, ..
@@ -1217,6 +1245,7 @@ impl ReferenceMachine {
                     target,
                     status,
                     ccsid,
+                    ..
                 },
                 HostResult::Dataset(mainframe_env_host_api::DatasetResult::Browse {
                     record, ..
@@ -1289,6 +1318,7 @@ impl ReferenceMachine {
                     linage_advance,
                     linage_limit,
                     page_advance,
+                    ..
                 },
                 HostResult::Dataset(_),
             ) => {
@@ -1645,6 +1675,18 @@ impl ReferenceMachine {
         Ok(())
     }
 
+    fn enter_declarative(&mut self, handler: &str) -> Result<(), MachineProblem> {
+        let call_pc = self
+            .pc
+            .checked_sub(1)
+            .ok_or(MachineProblem::InvalidOperation)?;
+        self.altered
+            .insert(declarative_state_key(call_pc), normalize(handler));
+        self.perform_stack.push(call_pc);
+        self.pc = self.label(handler)?;
+        Ok(())
+    }
+
     fn execute(&mut self, operation: &Operation) -> Result<Step, MachineProblem> {
         let name = operation.identity.name();
         let args = arguments(operation);
@@ -1837,6 +1879,15 @@ impl ReferenceMachine {
                 return self.exit_paragraph_step();
             }
             "exit" => {}
+            "label"
+                if args.first().is_some_and(|name| {
+                    self.declaratives
+                        .values()
+                        .any(|handler| handler == &normalize(name))
+                }) && !self.active_declarative() =>
+            {
+                return self.skip_declarative_section(&args);
+            }
             "entry" | "label" | "continue" => {}
             "accept" => return self.accept_effect(operation, &args),
             "call" | "cancel" | "invoke" => {
@@ -2414,6 +2465,37 @@ impl ReferenceMachine {
         Ok(Step::Jump(next))
     }
 
+    fn active_declarative(&self) -> bool {
+        self.perform_stack
+            .last()
+            .is_some_and(|call_pc| self.altered.contains_key(&declarative_state_key(*call_pc)))
+    }
+
+    fn declarative_section_boundary(&self, handler: &str) -> Option<usize> {
+        let start = self.labels.get(&normalize(handler)).copied()?;
+        self.operations
+            .iter()
+            .enumerate()
+            .skip(start + 1)
+            .find(|(_, operation)| {
+                if operation.identity.name() != "label" {
+                    return false;
+                }
+                let arguments = arguments(operation);
+                arguments.first().is_some_and(|name| name == "DECLARATIVES")
+                    || arguments.get(1).is_some_and(|marker| marker == "SECTION")
+            })
+            .map(|(pc, _)| pc)
+    }
+
+    fn skip_declarative_section(&self, args: &[String]) -> Result<Step, MachineProblem> {
+        let handler = args.first().ok_or(MachineProblem::InvalidOperation)?;
+        Ok(Step::Jump(
+            self.declarative_section_boundary(handler)
+                .unwrap_or_else(|| self.operations.len().saturating_sub(1)),
+        ))
+    }
+
     fn at_perform_endpoint(&self) -> bool {
         let Some(call_pc) = self.perform_stack.last().copied() else {
             return false;
@@ -2424,6 +2506,11 @@ impl ReferenceMachine {
     fn perform_endpoint(&self, call_pc: usize) -> Option<usize> {
         let call = self.operations.get(call_pc)?;
         let args = arguments(call);
+        if let Some(handler) = self.altered.get(&declarative_state_key(call_pc)) {
+            return self
+                .declarative_section_boundary(handler)
+                .map(|boundary| boundary.saturating_sub(1));
+        }
         if matches!(call.identity.name(), "sort" | "merge") {
             let active = self
                 .active_sort_procedure
@@ -2481,6 +2568,13 @@ impl ReferenceMachine {
             .get(call_pc)
             .cloned()
             .ok_or(MachineProblem::InvalidOperation)?;
+        if self
+            .altered
+            .remove(&declarative_state_key(call_pc))
+            .is_some()
+        {
+            return Ok(call_pc.saturating_add(1));
+        }
         if matches!(operation.identity.name(), "sort" | "merge") {
             let active = self
                 .active_sort_procedure
@@ -3736,11 +3830,27 @@ impl ReferenceMachine {
         let target = (name == "read")
             .then(|| position(args, "INTO").and_then(|index| args.get(index + 1).cloned()))
             .flatten();
+        let declarative = self
+            .declaratives
+            .get(&logical_name)
+            .or_else(|| {
+                let mode = match name {
+                    "read" | "start" => "INPUT",
+                    "write" => "OUTPUT",
+                    "rewrite" | "delete" => "I-O",
+                    "open" => open_mode.unwrap_or("INPUT"),
+                    "close" => "INPUT",
+                    _ => "INPUT",
+                };
+                self.declaratives.get(mode)
+            })
+            .cloned();
         let pending = if name == "read" {
             PendingKind::DatasetRead {
                 target,
                 status,
                 ccsid,
+                declarative,
             }
         } else {
             let (linage_advance, page_advance) =
@@ -3755,6 +3865,7 @@ impl ReferenceMachine {
                 linage_advance,
                 linage_limit: file.as_ref().and_then(|file| file.linage),
                 page_advance,
+                declarative,
             }
         };
         self.effect(HostRequest::Dataset(request), pending)
@@ -8493,6 +8604,34 @@ fn file_contract_words(description: &str) -> Vec<&str> {
     description.split_whitespace().collect()
 }
 
+fn declarative_handlers(value: &str) -> Result<BTreeMap<String, String>, MachineProblem> {
+    let mut handlers = BTreeMap::new();
+    for entry in value.split('\u{1e}').filter(|entry| !entry.is_empty()) {
+        let fields = entry.split('\u{1f}').collect::<Vec<_>>();
+        let section = fields
+            .first()
+            .map(|field| normalize(field))
+            .filter(|field| !field.is_empty())
+            .ok_or_else(|| MachineProblem::InvalidArtifact("invalid declarative section".into()))?;
+        if fields.get(1).is_some_and(|field| *field == "FOR") {
+            continue;
+        }
+        let on = fields
+            .iter()
+            .position(|field| *field == "ON")
+            .ok_or_else(|| MachineProblem::InvalidArtifact("invalid declarative target".into()))?;
+        for target in &fields[on + 1..] {
+            let target = normalize(target);
+            if target.is_empty() || handlers.insert(target, section.clone()).is_some() {
+                return Err(MachineProblem::InvalidArtifact(
+                    "duplicate declarative target".into(),
+                ));
+            }
+        }
+    }
+    Ok(handlers)
+}
+
 fn file_record_bounds(description: &str) -> (Option<usize>, Option<usize>) {
     let words = file_contract_words(description);
     let Some(record) = words.iter().position(|word| *word == "RECORD") else {
@@ -10224,6 +10363,10 @@ const fn xml_state_key(pc: usize) -> usize {
 
 const fn out_of_line_perform_key(pc: usize) -> usize {
     pc | (1usize << (usize::BITS - 2))
+}
+
+fn declarative_state_key(pc: usize) -> String {
+    format!("__COBOL_DECLARATIVE_RETURN_{pc}")
 }
 
 fn xml_document_events(source: &str) -> Result<Vec<(String, Vec<u8>)>, MachineProblem> {

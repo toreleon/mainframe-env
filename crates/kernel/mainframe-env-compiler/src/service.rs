@@ -1,3 +1,4 @@
+use crate::CompilerDirectingKind;
 use crate::hir::{CobolHir, HirProblem};
 use crate::lower::{LowerProblem, core_mir_catalog, core_mir_profile, lower_to_core};
 use crate::semantic::{SemanticModel, SemanticProblem};
@@ -235,14 +236,29 @@ impl CompilerService for CobolCompiler {
             .hir
             .as_ref()
             .ok_or(CompilerProblem::IncompleteStage)?;
-        let effective_options = analysis
+        let syntax = analysis
             .syntax
             .as_ref()
-            .ok_or(CompilerProblem::IncompleteStage)?
-            .effective_compiler_options();
+            .ok_or(CompilerProblem::IncompleteStage)?;
+        let effective_options = syntax.effective_compiler_options();
+        let declaratives = syntax
+            .compiler_directing_statements()
+            .iter()
+            .filter(|statement| statement.kind == CompilerDirectingKind::Use && statement.active)
+            .map(|statement| {
+                Ok((
+                    statement
+                        .declarative_section
+                        .clone()
+                        .ok_or(CompilerProblem::IncompleteStage)?,
+                    statement.operands.clone(),
+                ))
+            })
+            .collect::<Result<Vec<_>, CompilerProblem>>()?;
         let mir = lower_to_core(
             hir,
             effective_options.arithmetic_mode().as_str(),
+            &declaratives,
             self.limits.ir,
         )
         .map_err(lower_problem)?;
