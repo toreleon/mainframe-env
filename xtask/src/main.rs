@@ -837,9 +837,9 @@ fn run_focused_jcl(
         .map_err(|problem| problem.to_string())?;
     let handlers = jcl_conformance::runtime();
     let runtime = handlers
-        .registry(&spec, limits)
+        .registry(spec, limits)
         .map_err(|problem| problem.to_string())?;
-    let report = ConformanceRunner::new(&spec, runtime, limits)
+    let report = ConformanceRunner::new(spec, runtime, limits)
         .run(&selection, &context)
         .map_err(|problem| problem.to_string())?;
     require(
