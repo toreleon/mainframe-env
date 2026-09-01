@@ -13,3 +13,6 @@ mainframe-env-encoding.workspace = true
 mainframe-env-host-api.workspace = true
 mainframe-env-store-api.workspace = true
 sha2.workspace = true
+serde_json.workspace = true
+dec.workspace = true
+libm.workspace = true

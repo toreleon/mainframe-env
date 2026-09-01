@@ -1,0 +1,27 @@
+{
+  "schema_version": "mainframe-env.cobol-function-boundary-runtime-fixtures@1",
+  "target_version": "0.4.0",
+  "fixtures": [
+    {
+      "id": "numval-c-currency",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0046",
+      "obligation_id": "boundary-currency-symbol",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. NUMVALC. DATA DIVISION. WORKING-STORAGE SECTION. 01 SYMBOL-X PIC X(3) VALUE '€'. 01 VALUE-X PIC 99V9. PROCEDURE DIVISION. MOVE FUNCTION NUMVAL-C('€12.5', SYMBOL-X) TO VALUE-X. DISPLAY VALUE-X. STOP RUN.",
+      "expected_output": "125\n"
+    },
+    {
+      "id": "test-numval-error-position",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0068",
+      "obligation_id": "boundary-error-position",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. TESTNUM. DATA DIVISION. WORKING-STORAGE SECTION. 01 BAD-X PIC X(4) VALUE '12A3'. 01 POS-X PIC 9. PROCEDURE DIVISION. MOVE FUNCTION TEST-NUMVAL(BAD-X) TO POS-X. DISPLAY POS-X. STOP RUN.",
+      "expected_output": "3\n"
+    },
+    {
+      "id": "test-numval-c-currency-position",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0069",
+      "obligation_id": "boundary-currency-position",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. TESTNUMC. DATA DIVISION. WORKING-STORAGE SECTION. 01 CUR-X PIC X(6) VALUE '€12X'. 01 SYMBOL-X PIC X(3) VALUE '€'. 01 POS-X PIC 9. PROCEDURE DIVISION. MOVE FUNCTION TEST-NUMVAL-C(CUR-X, SYMBOL-X) TO POS-X. DISPLAY POS-X. STOP RUN.",
+      "expected_output": "4\n"
+    }
+  ]
+}

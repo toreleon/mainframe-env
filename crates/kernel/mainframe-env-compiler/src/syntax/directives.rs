@@ -191,10 +191,30 @@ impl DirectiveCursor {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct EffectiveCompilerOptions {
     lp: u8,
+    arithmetic_mode: EffectiveArithmeticMode,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EffectiveArithmeticMode {
+    Compatible,
+    Extended,
+}
+
+impl EffectiveArithmeticMode {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Compatible => "compatible",
+            Self::Extended => "extended",
+        }
+    }
 }
 
 impl EffectiveCompilerOptions {
-    pub(super) const DEFAULT: Self = Self { lp: 32 };
+    pub(super) const DEFAULT: Self = Self {
+        lp: 32,
+        arithmetic_mode: EffectiveArithmeticMode::Extended,
+    };
 
     pub(super) fn resolve(
         bundle: &SourceBundle,
@@ -219,8 +239,30 @@ impl EffectiveCompilerOptions {
         {
             return Err(SyntaxProblem::ConflictingCompilerOption("LP".into()));
         }
+        let source_arithmetic = options
+            .value("ARITH")
+            .map(|value| {
+                value
+                    .and_then(arithmetic_mode_value)
+                    .ok_or(SyntaxProblem::InvalidCompilerOption)
+            })
+            .transpose()?;
+        let bundle_arithmetic = bundle
+            .options()
+            .get("cobol.arith")
+            .map(|value| arithmetic_mode_value(value).ok_or(SyntaxProblem::InvalidCompilerOption))
+            .transpose()?;
+        if source_arithmetic
+            .zip(bundle_arithmetic)
+            .is_some_and(|(source, bundle)| source != bundle)
+        {
+            return Err(SyntaxProblem::ConflictingCompilerOption("ARITH".into()));
+        }
         Ok(Self {
             lp: source_lp.or(bundle_lp).unwrap_or(32),
+            arithmetic_mode: source_arithmetic
+                .or(bundle_arithmetic)
+                .unwrap_or(EffectiveArithmeticMode::Extended),
         })
     }
 
@@ -232,6 +274,11 @@ impl EffectiveCompilerOptions {
     #[must_use]
     pub const fn pointer_bytes(self) -> usize {
         if self.lp == 64 { 8 } else { 4 }
+    }
+
+    #[must_use]
+    pub const fn arithmetic_mode(self) -> EffectiveArithmeticMode {
+        self.arithmetic_mode
     }
 }
 
@@ -854,6 +901,20 @@ fn lp_value(value: &str) -> Option<u8> {
     match value {
         "32" => Some(32),
         "64" => Some(64),
+        _ => None,
+    }
+}
+
+fn arithmetic_mode_value(value: &str) -> Option<EffectiveArithmeticMode> {
+    let trimmed = value.trim();
+    let value = if trimmed.starts_with('(') && trimmed.ends_with(')') {
+        trimmed.get(1..trimmed.len().checked_sub(1)?)?.trim()
+    } else {
+        trimmed
+    };
+    match value.to_ascii_uppercase().as_str() {
+        "COMPAT" | "COMPATIBLE" => Some(EffectiveArithmeticMode::Compatible),
+        "EXTEND" | "EXTENDED" => Some(EffectiveArithmeticMode::Extended),
         _ => None,
     }
 }

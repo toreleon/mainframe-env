@@ -2,7 +2,7 @@ mod directives;
 
 pub use directives::{
     CompilerDirectingNode, CompilerDirectiveNode, CompilerOption, CompilerOptionSet,
-    EffectiveCompilerOptions,
+    EffectiveArithmeticMode, EffectiveCompilerOptions,
 };
 
 use crate::generated::cobol_language::CompilerDirectingKind;
@@ -2773,6 +2773,57 @@ STOP RUN.\n";
                 .compiler_directives()
                 .iter()
                 .all(|directive| !directive.source.is_empty())
+        );
+    }
+
+    #[test]
+    fn arithmetic_mode_is_resolved_once_from_source_or_compile_binding() {
+        let body = "IDENTIFICATION DIVISION. PROGRAM-ID. ARITHOPT. PROCEDURE DIVISION. STOP RUN.";
+        let default =
+            decode_and_lex(&bundle(body, SourceFormat::Free), SyntaxLimits::default()).unwrap();
+        assert_eq!(
+            default.effective_compiler_options().arithmetic_mode(),
+            EffectiveArithmeticMode::Extended
+        );
+
+        let source = decode_and_lex(
+            &bundle(
+                &format!("PROCESS ARITH(COMPAT)\n{body}"),
+                SourceFormat::Free,
+            ),
+            SyntaxLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            source.effective_compiler_options().arithmetic_mode(),
+            EffectiveArithmeticMode::Compatible
+        );
+
+        let binding = decode_and_lex(
+            &bundle_with_options(
+                body,
+                SourceFormat::Free,
+                BTreeMap::from([("cobol.arith".into(), "COMPAT".into())]),
+            ),
+            SyntaxLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            binding.effective_compiler_options().arithmetic_mode(),
+            EffectiveArithmeticMode::Compatible
+        );
+
+        assert_eq!(
+            decode_and_lex(
+                &bundle_with_options(
+                    &format!("PROCESS ARITH(EXTEND)\n{body}"),
+                    SourceFormat::Free,
+                    BTreeMap::from([("cobol.arith".into(), "COMPAT".into())]),
+                ),
+                SyntaxLimits::default(),
+            )
+            .unwrap_err(),
+            SyntaxProblem::ConflictingCompilerOption("ARITH".into())
         );
     }
 

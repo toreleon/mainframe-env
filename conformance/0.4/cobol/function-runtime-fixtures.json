@@ -1,0 +1,580 @@
+{
+  "fixtures": [
+    {
+      "expression": "FUNCTION ABS(NUM)",
+      "id": "abs",
+      "name": "ABS",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0001",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION ACOS(0.5)",
+      "id": "acos",
+      "name": "ACOS",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0002",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION ANNUITY(0.05, 10)",
+      "id": "annuity",
+      "name": "ANNUITY",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0003",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION ASIN(0.5)",
+      "id": "asin",
+      "name": "ASIN",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0004",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION ATAN(0.5)",
+      "id": "atan",
+      "name": "ATAN",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0005",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION BIT-OF(PTR)",
+      "id": "bit-of",
+      "name": "BIT-OF",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0006",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION BIT-TO-CHAR(BITS)",
+      "id": "bit-to-char",
+      "name": "BIT-TO-CHAR",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0007",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION BYTE-LENGTH(PTR)",
+      "id": "byte-length",
+      "name": "BYTE-LENGTH",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0008",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION CHAR(66)",
+      "id": "char",
+      "name": "CHAR",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0009",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION COMBINED-DATETIME(1, 3600)",
+      "id": "combined-datetime",
+      "name": "COMBINED-DATETIME",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0010",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION CONTENT-OF(NAT)",
+      "id": "content-of",
+      "name": "CONTENT-OF",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0011",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION COS(0.5)",
+      "id": "cos",
+      "name": "COS",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0012",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION CURRENT-DATE",
+      "id": "current-date",
+      "name": "CURRENT-DATE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0013",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION DATE-OF-INTEGER(154557)",
+      "id": "date-of-integer",
+      "name": "DATE-OF-INTEGER",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0014",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION DATE-TO-YYYYMMDD(240229, 1950)",
+      "id": "date-to-yyyymmdd",
+      "name": "DATE-TO-YYYYMMDD",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0015",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION DAY-OF-INTEGER(154557)",
+      "id": "day-of-integer",
+      "name": "DAY-OF-INTEGER",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0016",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION DAY-TO-YYYYDDD(24060, 1950)",
+      "id": "day-to-yyyyddd",
+      "name": "DAY-TO-YYYYDDD",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0017",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION DISPLAY-OF(NAT, INT)",
+      "id": "display-of",
+      "name": "DISPLAY-OF",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0018",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION E",
+      "id": "e",
+      "name": "E",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0019",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION EXP(1)",
+      "id": "exp",
+      "name": "EXP",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0020",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION EXP10(2)",
+      "id": "exp10",
+      "name": "EXP10",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0021",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION FACTORIAL(10)",
+      "id": "factorial",
+      "name": "FACTORIAL",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0022",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION FORMATTED-CURRENT-DATE('YYYYMMDDThhmmss')",
+      "id": "formatted-current-date",
+      "name": "FORMATTED-CURRENT-DATE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0023",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION FORMATTED-DATE('YYYY-MM-DD', 20240229)",
+      "id": "formatted-date",
+      "name": "FORMATTED-DATE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0024",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION FORMATTED-DATETIME('YYYYMMDDThhmmss', 20240229, 45296, 0)",
+      "id": "formatted-datetime",
+      "name": "FORMATTED-DATETIME",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0025",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION FORMATTED-TIME('hh:mm:ss', 45296, 0)",
+      "id": "formatted-time",
+      "name": "FORMATTED-TIME",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0026",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION HEX-OF(TEXT)",
+      "id": "hex-of",
+      "name": "HEX-OF",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0027",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION HEX-TO-CHAR(HEX-TEXT)",
+      "id": "hex-to-char",
+      "name": "HEX-TO-CHAR",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0028",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION INTEGER(NUM)",
+      "id": "integer",
+      "name": "INTEGER",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0029",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION INTEGER-OF-DATE(20240229)",
+      "id": "integer-of-date",
+      "name": "INTEGER-OF-DATE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0030",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION INTEGER-OF-DAY(2024060)",
+      "id": "integer-of-day",
+      "name": "INTEGER-OF-DAY",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0031",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION INTEGER-OF-FORMATTED-DATE('YYYY-MM-DD', DATE-TEXT)",
+      "id": "integer-of-formatted-date",
+      "name": "INTEGER-OF-FORMATTED-DATE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0032",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION INTEGER-PART(NUM)",
+      "id": "integer-part",
+      "name": "INTEGER-PART",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0033",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION LENGTH(NAT)",
+      "id": "length",
+      "name": "LENGTH",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0034",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION LOG(2)",
+      "id": "log",
+      "name": "LOG",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0035",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION LOG10(100)",
+      "id": "log10",
+      "name": "LOG10",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0036",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION LOWER-CASE(TEXT)",
+      "id": "lower-case",
+      "name": "LOWER-CASE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0037",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION MAX(INT, INT2)",
+      "id": "max",
+      "name": "MAX",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0038",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION MEAN(NUM, NUM2)",
+      "id": "mean",
+      "name": "MEAN",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0039",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION MEDIAN(NUM, NUM2)",
+      "id": "median",
+      "name": "MEDIAN",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0040",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION MIDRANGE(NUM, NUM2)",
+      "id": "midrange",
+      "name": "MIDRANGE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0041",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION MIN(NAT, NAT2)",
+      "id": "min",
+      "name": "MIN",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0042",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION MOD(INT, INT2)",
+      "id": "mod",
+      "name": "MOD",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0043",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION NATIONAL-OF(TEXT, 1208)",
+      "id": "national-of",
+      "name": "NATIONAL-OF",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0044",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION NUMVAL(TEXT)",
+      "id": "numval",
+      "name": "NUMVAL",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0045",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION NUMVAL-C(CURRENCY-TEXT, CURRENCY-SYMBOL)",
+      "id": "numval-c",
+      "name": "NUMVAL-C",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0046",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION NUMVAL-F(FLOAT-TEXT)",
+      "id": "numval-f",
+      "name": "NUMVAL-F",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0047",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION ORD(ALPHA)",
+      "id": "ord",
+      "name": "ORD",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0048",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION ORD-MAX(TEXT, TEXT2)",
+      "id": "ord-max",
+      "name": "ORD-MAX",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0049",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION ORD-MIN(TEXT, TEXT2)",
+      "id": "ord-min",
+      "name": "ORD-MIN",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0050",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION PI",
+      "id": "pi",
+      "name": "PI",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0051",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION PRESENT-VALUE(0.1, 100, 100)",
+      "id": "present-value",
+      "name": "PRESENT-VALUE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0052",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION RANDOM(2)",
+      "id": "random",
+      "name": "RANDOM",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0053",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION RANGE(INT, INT2)",
+      "id": "range",
+      "name": "RANGE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0054",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION REM(-7, 3)",
+      "id": "rem",
+      "name": "REM",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0055",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION REVERSE(NAT)",
+      "id": "reverse",
+      "name": "REVERSE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0056",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION SECONDS-FROM-FORMATTED-TIME('hh:mm:ss', TIME-TEXT)",
+      "id": "seconds-from-formatted-time",
+      "name": "SECONDS-FROM-FORMATTED-TIME",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0057",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION SECONDS-PAST-MIDNIGHT",
+      "id": "seconds-past-midnight",
+      "name": "SECONDS-PAST-MIDNIGHT",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0058",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION SIGN(-2)",
+      "id": "sign",
+      "name": "SIGN",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0059",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION SIN(0.5)",
+      "id": "sin",
+      "name": "SIN",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0060",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION SQRT(4)",
+      "id": "sqrt",
+      "name": "SQRT",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0061",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION STANDARD-DEVIATION(NUM, NUM2)",
+      "id": "standard-deviation",
+      "name": "STANDARD-DEVIATION",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0062",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION SUM(INT, INT2)",
+      "id": "sum",
+      "name": "SUM",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0063",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION TAN(0.5)",
+      "id": "tan",
+      "name": "TAN",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0064",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION TEST-DATE-YYYYMMDD(20240229)",
+      "id": "test-date-yyyymmdd",
+      "name": "TEST-DATE-YYYYMMDD",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0065",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION TEST-DAY-YYYYDDD(2024060)",
+      "id": "test-day-yyyyddd",
+      "name": "TEST-DAY-YYYYDDD",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0066",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION TEST-FORMATTED-DATETIME('hh:mm:ss', TIME-TEXT)",
+      "id": "test-formatted-datetime",
+      "name": "TEST-FORMATTED-DATETIME",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0067",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION TEST-NUMVAL(TEXT)",
+      "id": "test-numval",
+      "name": "TEST-NUMVAL",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0068",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION TEST-NUMVAL-C(TEXT, TEXT2)",
+      "id": "test-numval-c",
+      "name": "TEST-NUMVAL-C",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0069",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION TEST-NUMVAL-F(FLOAT-TEXT)",
+      "id": "test-numval-f",
+      "name": "TEST-NUMVAL-F",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0070",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION TRIM(UTF, LEADING)",
+      "id": "trim",
+      "name": "TRIM",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0071",
+      "setup": "MOVE 'Aé🙂' TO UTF."
+    },
+    {
+      "expression": "FUNCTION ULENGTH(UTF, 1, 2)",
+      "id": "ulength",
+      "name": "ULENGTH",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0072",
+      "setup": "MOVE 'Aé🙂' TO UTF."
+    },
+    {
+      "expression": "FUNCTION UPOS(UTF, 1)",
+      "id": "upos",
+      "name": "UPOS",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0073",
+      "setup": "MOVE 'Aé🙂' TO UTF."
+    },
+    {
+      "expression": "FUNCTION UPPER-CASE(TEXT)",
+      "id": "upper-case",
+      "name": "UPPER-CASE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0074",
+      "setup": "MOVE 'Aé🙂' TO UTF."
+    },
+    {
+      "expression": "FUNCTION USUBSTR(UTF, 1, 2)",
+      "id": "usubstr",
+      "name": "USUBSTR",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0075",
+      "setup": "MOVE 'Aé🙂' TO UTF."
+    },
+    {
+      "expression": "FUNCTION USUPPLEMENTARY(UTF)",
+      "id": "usupplementary",
+      "name": "USUPPLEMENTARY",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0076",
+      "setup": "MOVE 'Aé🙂' TO UTF."
+    },
+    {
+      "expression": "FUNCTION UUID4",
+      "id": "uuid4",
+      "name": "UUID4",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0077",
+      "setup": "MOVE 'Aé🙂' TO UTF."
+    },
+    {
+      "expression": "FUNCTION UVALID(UTF)",
+      "id": "uvalid",
+      "name": "UVALID",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0078",
+      "setup": "MOVE 'Aé🙂' TO UTF."
+    },
+    {
+      "expression": "FUNCTION UWIDTH(UTF, 1)",
+      "id": "uwidth",
+      "name": "UWIDTH",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0079",
+      "setup": "MOVE 'Aé🙂' TO UTF."
+    },
+    {
+      "expression": "FUNCTION VARIANCE(NUM, NUM2)",
+      "id": "variance",
+      "name": "VARIANCE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0080",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION WHEN-COMPILED",
+      "id": "when-compiled",
+      "name": "WHEN-COMPILED",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0081",
+      "setup": ""
+    },
+    {
+      "expression": "FUNCTION YEAR-TO-YYYY(24, 1950)",
+      "id": "year-to-yyyy",
+      "name": "YEAR-TO-YYYY",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0082",
+      "setup": ""
+    }
+  ],
+  "schema_version": "mainframe-env.cobol-function-runtime-fixtures@1",
+  "target_version": "0.4.0"
+}

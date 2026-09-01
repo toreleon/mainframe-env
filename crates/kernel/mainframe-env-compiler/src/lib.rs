@@ -42,8 +42,8 @@ pub use semantic::{
 pub use service::{CobolAnalysis, CobolCompiler, CobolCompilerLimits};
 pub use syntax::{
     CobolLanguage, CobolSyntaxKind, CompilerDirectingNode, CompilerDirectiveNode, CompilerOption,
-    CompilerOptionSet, EffectiveCompilerOptions, Expansion, LosslessSyntax, SourceOrigin,
-    SourceSpan, SyntaxLimits, SyntaxToken, SyntaxTokenId,
+    CompilerOptionSet, EffectiveArithmeticMode, EffectiveCompilerOptions, Expansion,
+    LosslessSyntax, SourceOrigin, SourceSpan, SyntaxLimits, SyntaxToken, SyntaxTokenId,
 };
 
 pub const COBOL_HIR_DIALECT: &str = "cobol.hir@1";

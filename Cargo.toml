@@ -58,6 +58,8 @@ ring = "0.17"
 jsonschema = { version = "0.52.1", default-features = false }
 zeroize = { version = "1", default-features = false, features = ["alloc"] }
 static_assertions = "1"
+dec = "=0.4.11"
+libm = { version = "=0.2.16", default-features = false, features = ["force-soft-floats"] }
 
 mainframe-env-source = { path = "crates/foundation/mainframe-env-source" }
 mainframe-env-diagnostics = { path = "crates/foundation/mainframe-env-diagnostics" }
