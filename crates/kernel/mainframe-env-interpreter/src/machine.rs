@@ -166,6 +166,8 @@ struct JsonClauses {
     ignored_nulls: BTreeSet<String>,
     encoding: Option<String>,
     encoding_from_codepage: bool,
+    indicators: BTreeMap<String, JsonIndicator>,
+    indicator_items: BTreeSet<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -174,6 +176,13 @@ enum JsonConversion {
     GenerateNull(String),
     ParseBoolean(String, String),
     ParseNull(String),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct JsonIndicator {
+    null_value: String,
+    nonnull_value: Option<String>,
+    item: String,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -6173,6 +6182,9 @@ impl ReferenceMachine {
             }
             let mut object = serde_json::Map::new();
             for child in children {
+                if clauses.is_indicator_item(&child) {
+                    continue;
+                }
                 if let Some(value) = self.json_layout_value(&child, clauses, indexes, false)? {
                     object.insert(clauses.name(&child).to_string(), value);
                 }
@@ -6181,6 +6193,22 @@ impl ReferenceMachine {
         }
         let reference = self.layout_occurrence_reference(layout, indexes)?;
         let bytes = self.read_reference(&reference)?;
+        if let Some(indicator) = clauses.indicator(layout) {
+            let indicator_layout = self
+                .layout(&indicator.item)
+                .cloned()
+                .ok_or(MachineProblem::InvalidOperation)?;
+            let indicator_reference =
+                self.layout_occurrence_reference(&indicator_layout, indexes)?;
+            let indicator_bytes = self.read_reference(&indicator_reference)?;
+            if self.json_value_matches(
+                &indicator_layout,
+                &indicator_bytes,
+                &indicator.null_value,
+            )? {
+                return Ok(serde_json::Value::Null);
+            }
+        }
         if let Some(conversion) = clauses.conversion(layout) {
             match conversion {
                 JsonConversion::GenerateBoolean(true_value) => {
@@ -6482,6 +6510,31 @@ impl ReferenceMachine {
     ) -> Result<(), MachineProblem> {
         if !is_group(layout.category) {
             let reference = self.layout_occurrence_reference(layout, indexes)?;
+            if let Some(indicator) = clauses.indicator(layout) {
+                let indicator_layout = self
+                    .layout(&indicator.item)
+                    .cloned()
+                    .ok_or(MachineProblem::InvalidOperation)?;
+                let indicator_reference =
+                    self.layout_occurrence_reference(&indicator_layout, indexes)?;
+                let indicator_value = if value.is_null() {
+                    &indicator.null_value
+                } else {
+                    indicator
+                        .nonnull_value
+                        .as_ref()
+                        .ok_or(MachineProblem::InvalidOperation)?
+                };
+                let bytes = self.json_conversion_bytes(
+                    &indicator_layout,
+                    &indicator_reference,
+                    indicator_value,
+                )?;
+                self.write_reference(&indicator_reference, &bytes)?;
+                if value.is_null() {
+                    return Ok(());
+                }
+            }
             if let Some(conversion) = clauses.conversion(layout) {
                 match conversion {
                     JsonConversion::ParseBoolean(true_value, false_value) => {
@@ -6567,6 +6620,9 @@ impl ReferenceMachine {
                 .then_with(|| left.name.cmp(&right.name))
         });
         for child in children {
+            if clauses.is_indicator_item(&child) {
+                continue;
+            }
             if clauses.suppressed(&child) {
                 continue;
             }
@@ -11278,6 +11334,58 @@ impl JsonClauses {
                 at += 1;
             }
         }
+        if let Some(mut at) = position(args, "INDICATING").map(|position| position + 1) {
+            loop {
+                let target = normalize(args.get(at).ok_or(MachineProblem::InvalidOperation)?);
+                at += 1;
+                while args.get(at).is_some_and(|token| token != "IS") {
+                    at += 1;
+                }
+                if args.get(at).is_none_or(|token| token != "IS")
+                    || args.get(at + 1).is_none_or(|token| token != "JSON")
+                    || args.get(at + 2).is_none_or(|token| token != "NULL")
+                    || args.get(at + 3).is_none_or(|token| token != "USING")
+                {
+                    return Err(MachineProblem::InvalidOperation);
+                }
+                let null_value = args
+                    .get(at + 4)
+                    .cloned()
+                    .ok_or(MachineProblem::InvalidOperation)?;
+                at += 5;
+                let nonnull_value = if parsing {
+                    if args.get(at).is_none_or(|token| token != "AND") {
+                        return Err(MachineProblem::InvalidOperation);
+                    }
+                    let value = args
+                        .get(at + 1)
+                        .cloned()
+                        .ok_or(MachineProblem::InvalidOperation)?;
+                    at += 2;
+                    Some(value)
+                } else {
+                    None
+                };
+                if args.get(at).is_none_or(|token| token != "IN") {
+                    return Err(MachineProblem::InvalidOperation);
+                }
+                let item = normalize(args.get(at + 1).ok_or(MachineProblem::InvalidOperation)?);
+                at += 2;
+                clauses.indicator_items.insert(item.clone());
+                clauses.indicators.insert(
+                    target,
+                    JsonIndicator {
+                        null_value,
+                        nonnull_value,
+                        item,
+                    },
+                );
+                if args.get(at).is_none_or(|token| token != "ALSO") {
+                    break;
+                }
+                at += 1;
+            }
+        }
         if let Some(at) = position(args, "ENCODING").map(|position| position + 1) {
             if args.get(at).is_some_and(|token| token == "FROM") {
                 if args.get(at + 1).is_none_or(|token| token != "CODEPAGE") {
@@ -11425,6 +11533,17 @@ impl JsonClauses {
         self.ignore_null_all
             || self.ignored_nulls.contains(&layout.name)
             || self.ignored_nulls.contains(&layout.simple_name)
+    }
+
+    fn indicator(&self, layout: &LayoutMetadata) -> Option<&JsonIndicator> {
+        self.indicators
+            .get(&layout.name)
+            .or_else(|| self.indicators.get(&layout.simple_name))
+    }
+
+    fn is_indicator_item(&self, layout: &LayoutMetadata) -> bool {
+        self.indicator_items.contains(&layout.name)
+            || self.indicator_items.contains(&layout.simple_name)
     }
 }
 

@@ -1287,6 +1287,7 @@ fn check_cobol_statement_bindings(
                 expected_obligations.insert("phrase-ebcdic-encoding");
                 expected_obligations.insert("phrase-group-hierarchy");
                 expected_obligations.insert("phrase-name-overrides");
+                expected_obligations.insert("phrase-null-indicator");
                 expected_obligations.insert("phrase-occurs-array");
                 expected_obligations.insert("phrase-root-name-omitted");
                 expected_obligations.insert("phrase-suppress-item");
@@ -1303,6 +1304,7 @@ fn check_cobol_statement_bindings(
                 expected_obligations.insert("phrase-group-hierarchy");
                 expected_obligations.insert("phrase-ignoring-null");
                 expected_obligations.insert("phrase-name-overrides");
+                expected_obligations.insert("phrase-null-indicator");
                 expected_obligations.insert("phrase-null-status");
                 expected_obligations.insert("phrase-occurs-array");
                 expected_obligations.insert("phrase-root-name-omitted");

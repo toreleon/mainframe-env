@@ -1757,6 +1757,7 @@ fn validate_generate(tokens: &[Token<'_>]) -> Result<(), &'static str> {
         cursor.expect("IN")?;
         cursor.operand()?;
     }
+    validate_json_indicating(&mut cursor, false)?;
     validate_json_encoding(&mut cursor)?;
     validate_json_names(&mut cursor)?;
     validate_json_suppress(&mut cursor)?;
@@ -1773,11 +1774,36 @@ fn validate_json_parse(tokens: &[Token<'_>]) -> Result<(), &'static str> {
         cursor.expect("DETAIL")?;
     }
     validate_json_ignoring(&mut cursor)?;
+    validate_json_indicating(&mut cursor, true)?;
     validate_json_encoding(&mut cursor)?;
     validate_json_names(&mut cursor)?;
     validate_json_suppress(&mut cursor)?;
     validate_json_converting(&mut cursor, true)?;
     cursor.finish()
+}
+
+fn validate_json_indicating(cursor: &mut Cursor<'_>, parsing: bool) -> Result<(), &'static str> {
+    if !cursor.eat("INDICATING") {
+        return Ok(());
+    }
+    loop {
+        cursor.operand()?;
+        cursor.expect("IS")?;
+        cursor.expect("JSON")?;
+        cursor.expect("NULL")?;
+        cursor.expect("USING")?;
+        cursor.atom()?;
+        if parsing {
+            cursor.expect("AND")?;
+            cursor.atom()?;
+        }
+        cursor.expect("IN")?;
+        cursor.operand()?;
+        if !cursor.eat("ALSO") {
+            break;
+        }
+    }
+    Ok(())
 }
 
 fn validate_json_encoding(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
