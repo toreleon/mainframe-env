@@ -64,8 +64,9 @@ must rerun the affected 0.3 gate.
 - Resource exhaustion, cancellation, provider failure, invalid data, and runtime
   limits produce exact typed conditions without forbidden mutation.
 - Extend the accepted 0.3 row specifications with execution, condition,
-  recovery, and oracle bindings. Generate row-level verdicts and the ledger;
-  never infer execution coverage from a broad interpreter/CardDemo pass.
+  recovery, and oracle obligations. Generate obligation-level verdicts and the
+  ledger; never infer execution coverage from a broad interpreter/CardDemo
+  pass.
 
 ## Completion gate
 
@@ -77,4 +78,4 @@ remain green.
 
 At handoff, report coverage by all six gates, oracle environment receipts and
 normalization rules, interpreter resource bounds, recovery results, and exact
-row/test verdict bindings. Never mark unavailable oracle work passed.
+row/obligation/test verdict bindings. Never mark unavailable oracle work passed.

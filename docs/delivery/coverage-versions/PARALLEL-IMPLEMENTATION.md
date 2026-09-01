@@ -52,7 +52,7 @@ the 0.11 `core-server` profile.
 | Wave | Parallel workstreams | What remains serialized |
 |---|---|---|
 | Foundation | 0.2 only | Official catalog schema, generated identity model, handler registry, application-package schema, coverage store, and architecture gates |
-| Structural foundation | 0.3 Conformance IR and COBOL structure; 0.5 RACF; 0.6 dataset; 0.7 JCL converter; private Db2/IMS/MQ catalog preparation | The shared Conformance IR/verdict/ledger contract freezes in 0.3 before other lanes merge behavioral coverage claims; host/store/source changes go through existing owners |
+| Structural foundation | 0.3 CI-300 thin Conformance IR/obligation model followed by COBOL structure; 0.5 RACF; 0.6 dataset; 0.7 JCL converter; private Db2/IMS/MQ catalog preparation | CI-300 freezes the shared IR v1, typed registries, obligation/verdict/ledger contract, and shard identity before other lanes merge behavioral coverage claims; host/store/source changes go through existing owners |
 | COBOL bridge | 0.4 after 0.3; unfinished 0.5–0.7 lanes and private provider preparation continue | COBOL host-extension ABI and effect contract |
 | Main semantic engines | After 0.4–0.7 dependencies pass: 0.8 JES; 0.9 CICS API; 0.12 Db2 core; 0.14 IMS; 0.15 MQ | Interpreter host-extension ABI, mutation/UOW contract, and capability vocabulary |
 | Subsystem completion | 0.10 after 0.9 and 0.13 after 0.12 can overlap; 0.11 adapters prepare and complete after 0.8 plus 0.10 | Public route advertisement and cross-provider transaction contract |
@@ -63,7 +63,7 @@ the 0.11 `core-server` profile.
 
 | Lane | Primary ownership | Earliest start | Can run alongside |
 |---|---|---|---|
-| Catalog/codegen | Official receipts, schemas, generated identities, Conformance IR compiler, test bindings, verdict runner, and derived ledger | 0.2 catalogs; executable IR from 0.3 | All later lanes after the relevant contract freeze |
+| Catalog/codegen | Official receipts, schemas, generated identities, thin Conformance IR compiler, obligation bindings, verdict runner, and derived ledger | 0.2 catalogs; executable IR from 0.3 | All later lanes after the relevant contract freeze |
 | COBOL | Source, syntax, semantic types, HIR/MIR, interpreter, LE extensions | 0.3 | RACF, dataset, JCL; later Db2/IMS/MQ provider internals |
 | Security | RACF commands, profile schemas, ACEE/tokens, SAF | 0.5 | COBOL, dataset, JCL |
 | Data | Catalog, allocation, VSAM, locking, AMS | 0.6 | COBOL, RACF, JCL |
@@ -94,6 +94,8 @@ the 0.11 `core-server` profile.
   transaction/UOW, security principal, or recovery semantics.
 - Any route advertised by `core-server` and any change to profile closure.
 - Any generator output consumed by two or more subsystem packages.
+- Cross-subsystem `ScenarioSpec` driver, ordering, failure-point, or explicit
+  row/obligation credit vocabulary.
 
 ### Merge discipline
 

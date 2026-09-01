@@ -73,22 +73,52 @@ Conformance IR defines behavior and binds claimed gates to executable tests.
 
 - Each claimed official row has a typed specification with `row_id`, operation,
   input, preconditions, transition, postconditions, conditions, recovery,
-  oracle, and applicable gates.
-- Every behavioral conformance test binds at least one `(row_id, gate)` and
-  emits a bounded canonical verdict event. Internal unit tests without a row
-  binding remain useful but contribute no official coverage.
+  oracle, applicable gates, and mandatory obligation IDs. Split a coarse row
+  into the smallest independently testable valid, boundary, condition, or
+  forbidden-mutation obligations; partial obligations never pass the row.
+- Every behavioral conformance test binds at least one
+  `(row_id, obligation_id, gate)` and emits a bounded canonical verdict event.
+  Internal unit tests without an official binding remain useful but contribute
+  no official coverage.
+- Keep the IR a thin typed binding layer. Drivers invoke product-owned routes
+  and expectations use bounded registry references; do not duplicate product
+  algorithms in a general predicate, expression, transition, or workflow DSL.
+- Keep source/catalog, product behavior, test expectation, and licensed/golden
+  oracle authorities distinct. Never generate expected results from the same
+  product handler being tested, and never let product behavior dispatch on row
+  or obligation IDs.
 - Generate the coverage ledger from the official catalog and verdict events.
   Never edit pass counts or infer row completion from a broad workload result.
 - CardDemo and other applications are integration profiles. They may exercise
-  registered row bindings but are not the primary IBM conformance model.
+  registered row/obligation bindings but are not the primary IBM conformance
+  model.
 - Provide fast `spec --check`, focused subsystem/gate conformance, and
   release-only certification entry points. Keep the agent inner loop on the
   first two tiers.
+- Design cases with equivalence classes, mandatory boundaries, properties,
+  pairwise combinations, and bounded fuzzing instead of a Cartesian-product
+  test explosion. Deterministically shard and exactly cache by candidate,
+  spec/runner, fixture/oracle, environment, subsystem, family, gate, and
+  obligation identity; fail if any expected shard or obligation is absent.
+- Add representative harness mutation checks for omitted transitions, generic
+  success, bypassed validation/authorization, forbidden mutation, and byte or
+  encoding errors. Mutation scores are diagnostic, not coverage evidence.
+- Use a separate bounded `ScenarioSpec` for cross-subsystem workflows. It may
+  credit only explicitly mapped `(row_id, obligation_id, gate)` bindings.
+- Every failure reports source locator, row/obligation/gate, driver/test, seed or
+  fixture, bounded expected/actual observations, and a deterministic replay
+  command.
 - Use model checking only for bounded concurrency, transaction, restart,
   retry, rollback, or unknown-outcome transitions.
 - Retain only candidate SHA, spec/catalog identity, verdict/ledger artifact,
   CI verdict/reference, and shipped artifact digest, plus recovery/oracle
   receipts when those gates apply.
+
+Freeze the minimal IR v1 before dependent lanes merge claims. Prefer additive
+typed-registry extensions, explicitly version incompatible semantic changes,
+and keep accepted historical ledgers on the spec version that produced them.
+Do not add per-row/obligation committed verdict files, subsystem-local IRs,
+shell-in-spec, general formal languages, or generated tests for internal details.
 
 ### Implementation discipline
 

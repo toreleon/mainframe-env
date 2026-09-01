@@ -26,10 +26,14 @@ allowed. Do not merge a new public compiler artifact format or claim coverage.
 
 ## Implement in this order
 
-1. Freeze the shared minimal typed Conformance IR, bounded operation/predicate/
-   observation registries, executable test binding, verdict event, derived
-   coverage ledger, and `spec --check`/focused runner interfaces. This is the
-   common foundation reused by every later subsystem minor.
+1. Complete **CI-300** as a small standalone foundation commit. Freeze the
+   shared minimal typed Conformance IR v1: row specifications,
+   mandatory obligation IDs, bounded driver/predicate/observation registries,
+   executable `(row, obligation, gate)` bindings, replayable verdict events,
+   derived coverage ledger, deterministic shard/cache identity, and
+   `spec --check`/focused runner interfaces. This is the common foundation
+   reused by every later subsystem minor. Do not bundle COBOL grammar or product
+   semantics into CI-300.
 2. Freeze lossless syntax-node, source-span, diagnostic, name, type, layout, and
    executable-blocking contracts.
 3. Run **CB-301/CB-303** for lexer, preprocessing/directives, complete statement
@@ -59,9 +63,24 @@ allowed. Do not merge a new public compiler artifact format or claim coverage.
 - Keep one generic Conformance IR. It contains typed bounded references to owned
   product drivers and observations, not Rust/shell snippets, arbitrary
   expressions, COBOL-specific duplicated algorithms, or process evidence.
+- Keep IBM catalog authority, COBOL product behavior, independently reviewed
+  expectations, and oracle/golden authority separate. Generated bindings must
+  not compute expected behavior through the compiler implementation under test,
+  and compiler code must not dispatch on conformance row/obligation IDs.
 - Generate or register executable cases from the formal rows. A broad compiler
-  or CardDemo test contributes coverage only through explicit row/gate verdicts.
+  or CardDemo test contributes coverage only through explicit
+  row/obligation/gate verdicts.
   Do not add per-review schemas or manually edited coverage pass counts.
+- Split coarse COBOL rows into stable mandatory obligations and cover them with
+  equivalence classes, boundaries, properties, pairwise cases, and bounded fuzz
+  seeds rather than enumerating every operand combination. A gate passes only
+  when all mandatory obligations pass.
+- Add harness mutants proving that omitted recognition/validation, generic
+  success, bypassed context/operand checks, forbidden AST/HIR mutation, and
+  byte/encoding defects are detected. Keep mutation results diagnostic.
+- Make every generated failure directly replayable and include row,
+  obligation, gate, source locator, fixture/seed, and bounded expected/actual
+  observations.
 
 ## Version-specific invariants
 
@@ -76,7 +95,8 @@ allowed. Do not merge a new public compiler artifact format or claim coverage.
 - One semantic owner integrates qualification, scopes, name resolution, types,
   PICTURE/USAGE, alignment, aliasing, and layouts.
 - Every recognition or validation claim is traceable as official row -> typed
-  Conformance IR case -> executable test -> verdict event -> derived ledger.
+  row specification -> mandatory obligation -> executable binding -> verdict
+  event -> derived ledger.
   Execution, recovery, and IBM differential gates owned by later versions remain
   explicitly pending rather than being rounded up or marked non-applicable.
 
@@ -92,8 +112,9 @@ Require `cargo xtask spec --check` to compile the complete COBOL specification,
 registries, schemas, and test bindings quickly without product environments.
 Run focused COBOL recognition/validation conformance during implementation, then
 tier-3 complete compiler/source/IR diagnostics, malformed/boundary/property/fuzz,
-artifact round-trip, and affected-scope repository validation once on the
-unchanged minor candidate. Generate the ledger exclusively from verdict events.
+representative harness mutation, cache/shard completeness, artifact round-trip,
+and affected-scope repository validation once on the unchanged minor candidate.
+Generate the ledger exclusively from obligation verdict events.
 At handoff, report denominators and recognition/validation numerators with exact
-row/test bindings; leave execution/recovery/differential pending where 0.4 or
-0.17 owns them.
+row/obligation/test bindings; leave execution/recovery/differential pending
+where 0.4 or 0.17 owns them.

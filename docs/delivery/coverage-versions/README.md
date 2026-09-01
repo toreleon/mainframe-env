@@ -85,14 +85,15 @@ From 0.3 onward, every claimed coverage gate flows through the shared typed
 [Conformance IR](../../architecture/CONFORMANCE-IR.md):
 
 ```text
-official row -> formal case -> executable test -> row/gate verdict -> ledger
+official row -> typed row spec -> mandatory obligation -> executable binding
+             -> obligation/gate verdict -> ledger
 ```
 
 The retained package is intentionally small:
 
 - candidate commit SHA;
 - official catalog and Conformance IR version/digest;
-- canonical row-level verdict stream or its artifact digest;
+- canonical obligation-level verdict stream or its artifact digest;
 - generated numerator/denominator ledger for affected gates;
 - CI verdict/reference and shipped artifact digest;
 - migration/restart/rollback receipt only when durable behavior changes; and

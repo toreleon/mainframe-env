@@ -101,8 +101,10 @@ validator and ignoring its result.
 
 From 0.3 onward, official catalog rows are connected to executable behavior
 through the shared typed [Conformance IR](CONFORMANCE-IR.md). Behavioral tests
-emit explicit `(row_id, gate, verdict)` events, and coverage ledgers are derived
-from those events rather than edited or inferred from broad workload success.
+emit explicit `(row_id, obligation_id, gate, verdict)` events, and coverage
+ledgers are derived from the complete mandatory-obligation set rather than
+edited or inferred from broad workload success. The IR is a typed binding layer
+over product-owned behavior, not a second semantic implementation.
 Application profiles such as CardDemo remain integration consumers, not the
 primary IBM conformance model.
 

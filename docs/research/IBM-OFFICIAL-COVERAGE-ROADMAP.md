@@ -84,14 +84,17 @@ typed [Conformance IR](../architecture/CONFORMANCE-IR.md):
 
 ```text
 official row
-  -> typed operation/input/precondition/transition/postcondition specification
-  -> generated or registered executable test
-  -> canonical (row_id, gate, verdict) event
+  -> typed row specification and mandatory obligations
+  -> generated or registered executable bindings
+  -> canonical (row_id, obligation_id, gate, verdict) events
   -> generated coverage ledger
 ```
 
 CardDemo and other workloads remain valuable integration profiles, but a
-workload pass does not replace row-level mappings. Process receipts, command
+workload pass does not replace obligation-level mappings. The IR stays a thin
+typed binding layer over product-owned routes; independently reviewed
+expectations must not be derived from the product handler being tested. Process
+receipts, command
 transcripts, review-round schemas, and manually maintained pass counts do not
 contribute coverage. Evidence remains minimal, while formal specification and
 executable behavior receive the implementation investment.

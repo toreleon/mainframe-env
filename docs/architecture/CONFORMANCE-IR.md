@@ -12,9 +12,10 @@ Conformance IR connects each claimed row and gate to executable observations.
 ```text
 pinned IBM source
   -> normalized official row
-  -> typed Conformance IR case
-  -> generated/registered executable test
-  -> row-level verdict event
+  -> typed row specification
+  -> mandatory executable obligations
+  -> generated/registered test bindings
+  -> obligation-level verdict events
   -> derived coverage ledger
 ```
 
@@ -22,26 +23,41 @@ This pipeline is the primary conformance authority. CardDemo and other
 applications consume it as integration profiles; they are not substitutes for
 IBM row-level specifications.
 
-## Minimal typed model
+## Thin typed model
 
-The first version remains deliberately small:
+The first version remains deliberately small and has two layers. `RowSpec`
+records the IBM-observable contract while `ConformanceCase` records one
+executable obligation for one gate:
 
 ```rust
-pub struct ConformanceCase {
+pub struct RowSpec {
     pub row_id: OfficialRowId,
     pub operation: OperationRef,
     pub input: InputShapeRef,
-    pub preconditions: Vec<Predicate>,
+    pub preconditions: Vec<PredicateRef>,
     pub transition: TransitionRef,
-    pub postconditions: Vec<Predicate>,
-    pub conditions: Vec<ExpectedCondition>,
-    pub recovery: Option<RecoveryInvariant>,
+    pub postconditions: Vec<ObservationRef>,
+    pub conditions: Vec<ConditionRef>,
+    pub recovery: Option<RecoveryRef>,
     pub oracle: Option<OracleRef>,
     pub applicable_gates: GateSet,
+    pub obligations: Vec<ObligationId>,
+}
+
+pub struct ConformanceCase {
+    pub row_id: OfficialRowId,
+    pub obligation_id: ObligationId,
+    pub gate: CoverageGate,
+    pub driver: DriverRef,
+    pub input: FixtureRef,
+    pub preconditions: Vec<PredicateRef>,
+    pub expected: Vec<ObservationRef>,
+    pub recovery: Option<RecoveryRef>,
+    pub oracle: Option<OracleRef>,
 }
 ```
 
-The serialized contract carries the equivalent fields:
+The serialized row contract therefore retains the required semantic fields:
 
 ```text
 row_id
@@ -54,12 +70,44 @@ conditions
 recovery
 oracle
 applicable_gates
+obligations
 ```
 
 References resolve through bounded typed registries owned by the relevant
 compiler or subsystem. The IR does not embed Rust source, shell commands,
 application names, arbitrary expressions, or duplicated product algorithms.
 Add predicate or observation forms only when a real official row requires them.
+
+An obligation is the smallest independently testable requirement needed to
+credit one row/gate pair: for example a valid form, a boundary, a documented
+condition, or a forbidden mutation. Large IBM rows split into stable mandatory
+obligations instead of hiding partial coverage inside one coarse pass. A row's
+gate passes only when every mandatory obligation for that gate passes. The
+ledger may show obligation progress, but partial obligations never count as a
+row pass.
+
+The model is intentionally a typed binding layer, not a second semantic engine.
+`DriverRef` invokes the product's selected public or owned subsystem route;
+predicate and observation references inspect bounded inputs and results. The IR
+must not contain a general predicate language, an arbitrary state-machine DSL,
+shell snippets, or a copy of the product transition algorithm.
+
+## Authority separation
+
+Keep four authorities distinct so a generated test cannot prove itself:
+
+- pinned IBM sources and the normalized catalog own the denominator and source
+  locator;
+- product code owns routing, validation, transitions, conditions, and recovery;
+- independently reviewed row specifications, obligations, fixtures, and
+  expected observations own what is tested; and
+- licensed IBM adapters, reviewed golden data, or explicitly justified
+  metamorphic/property relations own oracle results.
+
+Code generation may compile these authorities into registrations and typed
+identities, but it may not derive an expected result from the same handler or
+transition implementation being tested. Product crates must not inspect
+`row_id` or `obligation_id` to select behavior.
 
 ## Gate semantics
 
@@ -79,10 +127,11 @@ recovery, and IBM differential remain pending for 0.4 or 0.17.
 
 ## Executable binding
 
-Every behavioral conformance test must register at least one `(row_id, gate)`
-binding. One test may cover multiple rows or gates, but every emitted verdict is
+Every behavioral conformance test must register at least one
+`(row_id, obligation_id, gate)` binding. One reusable driver may execute many
+cases and one scenario may observe multiple rows, but every emitted verdict is
 explicit. Tests that are purely internal implementation checks need no official
-row binding and do not contribute coverage.
+binding and do not contribute coverage.
 
 The runner emits bounded canonical events:
 
@@ -90,18 +139,25 @@ The runner emits bounded canonical events:
 pub struct VerdictEvent {
     pub spec_version: SpecVersion,
     pub row_id: OfficialRowId,
+    pub obligation_id: ObligationId,
     pub gate: CoverageGate,
     pub test_id: TestId,
     pub verdict: Verdict,
     pub observation_digest: ArtifactDigest,
+    pub replay: ReplayRef,
     pub oracle: Option<OracleReceiptRef>,
 }
 ```
 
-`pass` is valid only when the registered test executed successfully on the
-candidate. Missing, duplicate, stale-spec, unknown-row, unexecuted, skipped, or
-conflicting events fail ledger generation. An oracle reference is mandatory for
-`differential=pass`.
+`pass` is valid only when the registered obligation executed successfully on
+the candidate. Missing, duplicate, stale-spec, unknown-row, unknown-obligation,
+unexecuted, skipped, or conflicting events fail ledger generation. An oracle
+reference is mandatory for `differential=pass`.
+
+Failures identify the row, obligation, gate, IBM source locator, driver/test,
+seed or fixture, bounded expected and actual observations, and one deterministic
+replay command. Large payloads remain artifacts referenced by digest. Generated
+test code must not make failures harder to reproduce than handwritten tests.
 
 ## Derived ledger
 
@@ -110,12 +166,35 @@ events. They are never edited to mark a row complete. The generator reports:
 
 - denominator per subsystem and gate;
 - pass, fail, pending, and non-applicable counts;
-- exact test IDs and observation digests behind each claimed gate; and
+- mandatory-obligation progress plus exact test IDs and observation digests
+  behind each claimed gate; and
 - conflicts, stale bindings, and rows without executable mappings.
 
 A product or application workload pass may emit row verdicts only through its
 registered Conformance IR bindings. A broad workload result alone grants no
 official coverage.
+
+## Case design and adequacy
+
+Do not enumerate the Cartesian product of every operand and environment. Split
+official behavior into equivalence classes and mandatory obligations, then use
+reviewed golden examples, boundary cases, properties, pairwise combinations,
+and bounded fuzzing as appropriate. Store the seed and minimized failing input
+for every generated/property failure.
+
+The conformance harness itself needs mutation adequacy checks. Representative
+mutants must prove that cases fail when the product transition is omitted,
+generic success replaces a documented condition, an authorization or operand
+check is bypassed, a forbidden mutation occurs, or byte/encoding behavior is
+wrong. Run the small harness mutation suite when a registry, predicate,
+observation, verdict, or ledger contract changes; run broader product mutation
+sampling in scheduled integration. Mutation scores are diagnostics, not a new
+coverage denominator or release evidence family.
+
+Cross-subsystem workflows use a separate bounded `ScenarioSpec`. A scenario
+declares its participating drivers, ordering/failure points, and exact
+`(row_id, obligation_id, gate)` credits. Scenario success cannot infer coverage
+for rows it did not map, and it does not replace subsystem cases.
 
 ## Commands and feedback tiers
 
@@ -134,13 +213,25 @@ cargo xtask release-certify
 - `release-certify` runs global integration, recovery, release, and licensed
   oracle gates according to the risk-tiered validation policy.
 
+Cases are deterministically sharded by subsystem, operation family, gate, and
+obligation. Exact results may be cached by candidate SHA, catalog/spec digest,
+runner version, selected shard, fixture/oracle identity, and environment class.
+The runner must reject incomplete shard sets and never reuse a cached verdict
+after any key changes. A ledger declares the complete expected obligation set so
+parallel execution cannot silently omit a shard.
+
+Freeze IR v1 before later subsystem lanes merge claims. Prefer additive registry
+extensions; an incompatible field or gate semantic requires an explicit spec
+version bump. Previously accepted ledgers remain bound to their original spec
+and are not mass-migrated merely to match the newest schema.
+
 ## Evidence boundary
 
 From 0.3 onward, retained conformance evidence is minimal:
 
 - candidate commit SHA;
 - catalog and Conformance IR version/digest;
-- canonical row-level verdict stream or its artifact digest;
+- canonical obligation-level verdict stream or its artifact digest;
 - derived coverage ledger;
 - CI verdict/reference; and
 - shipped artifact digest.
@@ -167,3 +258,18 @@ shared Conformance IR and begins emitting executable bindings for COBOL rows.
 Rows outside the active minor remain pending. Later subsystem minors reuse this
 same IR, runner, verdict event, and ledger generator rather than creating local
 evidence frameworks.
+
+## Explicit non-goals
+
+Do not build any of the following as part of Conformance IR:
+
+- a general predicate or expression language;
+- an arbitrary state-machine/workflow DSL;
+- shell execution embedded in specifications;
+- a generated test for every unit or internal implementation detail;
+- one schema, receipt, or committed verdict file per subsystem, work package,
+  review round, row, or obligation;
+- TLA+/model checking for catalogs, parsers, or straight-line validation;
+- cryptographic notarization of the developer process; or
+- a second product router, transaction engine, recovery engine, or semantic
+  implementation hidden inside the conformance harness.
