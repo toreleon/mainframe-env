@@ -59,7 +59,7 @@ pub fn verify_cobol_condition_fixtures() -> Result<(), String> {
     let catalog = catalog()?;
     if catalog.schema_version != "mainframe-env.cobol-condition-fixtures@1"
         || catalog.target_version != "0.4.0"
-        || catalog.fixtures.len() != 10
+        || !(10..=512).contains(&catalog.fixtures.len())
     {
         return Err("COBOL condition fixture denominator drifted".into());
     }

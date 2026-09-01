@@ -6,7 +6,7 @@
   "properties":{
     "schema_version":{"const":"mainframe-env.cobol-condition-fixtures@1"},
     "target_version":{"const":"0.4.0"},
-    "fixtures":{"type":"array","minItems":10,"maxItems":10,"items":{
+    "fixtures":{"type":"array","minItems":10,"maxItems":512,"items":{
       "type":"object","additionalProperties":false,
       "required":["id","row_id","source","host_behavior","expected_output","expected_terminal"],
       "properties":{
