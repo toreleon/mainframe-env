@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.example/schemas/cobol-data-runtime-fixtures.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_version", "fixtures"],
+  "properties": {
+    "schema_version": { "const": "mainframe-env.cobol-data-runtime-fixtures@1" },
+    "target_version": { "const": "0.4.0" },
+    "fixtures": {
+      "type": "array",
+      "minItems": 17,
+      "maxItems": 17,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "row_id", "declarations", "procedure", "expected_output", "expected_variables"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$", "maxLength": 64 },
+          "row_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "declarations": { "type": "string", "minLength": 1, "maxLength": 8192 },
+          "procedure": { "type": "string", "minLength": 1, "maxLength": 8192 },
+          "expected_output": { "type": "string", "maxLength": 8192 },
+          "expected_variables": {
+            "type": "object",
+            "maxProperties": 32,
+            "additionalProperties": { "type": "string", "maxLength": 8192 }
+          }
+        }
+      }
+    }
+  }
+}
