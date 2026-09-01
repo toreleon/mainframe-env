@@ -402,6 +402,18 @@ pub(crate) fn execute(
     let request_digest = request_digest(context, &request);
     let initial = service.database.read()?;
     let mut preflight = validate_request_shape(&request).err();
+    if preflight.is_none()
+        && is_authentication_request(&request)
+        && (!initial.subsystem.running || !initial.database_status.active)
+    {
+        return reject_unavailable_authentication(
+            service,
+            context,
+            descriptor.keyword(),
+            &request,
+            &request_digest,
+        );
+    }
     if preflight.is_none() && !initial.principals.contains_key(context.caller().as_str()) {
         preflight = Some(DecisionReason::PrincipalNotFound);
     }
@@ -637,6 +649,44 @@ pub(crate) fn execute(
     }
 }
 
+fn is_authentication_request(request: &RacrouteRequest) -> bool {
+    matches!(
+        request,
+        RacrouteRequest::Signon { .. }
+            | RacrouteRequest::Verify { .. }
+            | RacrouteRequest::Verifyx { .. }
+    )
+}
+
+fn reject_unavailable_authentication(
+    service: &RacfService,
+    context: &SafRequestContext,
+    keyword: &str,
+    request: &RacrouteRequest,
+    request_digest: &str,
+) -> Result<RacrouteOutcome, HostProblem> {
+    let status = status_for_reason(DecisionReason::PolicyUnavailable);
+    let (result, generation) = service.database.mutate_retry(|snapshot| {
+        let audit_id = append_audit(snapshot, context, keyword, status, request_digest)?;
+        let mut result = normalized_preflight_result(request, DecisionReason::PolicyUnavailable);
+        if let Some(result) = &mut result {
+            attach_audit(result, audit_id);
+        }
+        Ok((result, true))
+    })?;
+    Ok(RacrouteOutcome {
+        request_type: request.request_type(),
+        status,
+        states: vec![
+            RacrouteState::Received,
+            RacrouteState::Validated,
+            RacrouteState::Denied,
+        ],
+        result,
+        generation,
+    })
+}
+
 fn execute_existing_transaction(
     service: &RacfService,
     context: &SafRequestContext,
@@ -849,14 +899,15 @@ fn normalized_preflight_result(
     request: &RacrouteRequest,
     reason: DecisionReason,
 ) -> Option<RacrouteResult> {
-    if reason != DecisionReason::CredentialInvalid
-        || !matches!(
-            request,
-            RacrouteRequest::Signon { .. }
-                | RacrouteRequest::Verify { .. }
-                | RacrouteRequest::Verifyx { .. }
-        )
-    {
+    if !matches!(
+        reason,
+        DecisionReason::CredentialInvalid | DecisionReason::PolicyUnavailable
+    ) || !matches!(
+        request,
+        RacrouteRequest::Signon { .. }
+            | RacrouteRequest::Verify { .. }
+            | RacrouteRequest::Verifyx { .. }
+    ) {
         return None;
     }
     Some(RacrouteResult::Verified {
@@ -2309,6 +2360,178 @@ mod tests {
             | RacrouteResult::SignedOn(acee) => acee.id.clone(),
             other => panic!("expected ACEE result, got {other:?}"),
         }
+    }
+
+    fn assert_policy_unavailable(outcome: &RacrouteOutcome) {
+        assert_eq!(outcome.status.reason, DecisionReason::PolicyUnavailable);
+        assert_eq!(
+            outcome.states,
+            [
+                RacrouteState::Received,
+                RacrouteState::Validated,
+                RacrouteState::Denied,
+            ]
+        );
+        assert!(matches!(
+            outcome.result.as_ref(),
+            Some(RacrouteResult::Verified {
+                decision: SafDecision {
+                    outcome: DecisionOutcome::Deny,
+                    status: SafStatus {
+                        reason: DecisionReason::PolicyUnavailable,
+                        ..
+                    },
+                    ..
+                },
+                acee: None,
+            })
+        ));
+    }
+
+    #[test]
+    fn stopped_or_inactive_racf_rejects_authentication_until_reactivated_across_restart() {
+        use mainframe_env_host_api::SecurityDecision;
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let resolver = Arc::new(CountingResolver::new());
+        resolver.insert("secret:admin", b"ADMIN-PASSWORD");
+        let credential = SecretRef::new("secret:admin", Default::default()).unwrap();
+        let admin = PrincipalId::new("RACFADM", InvocationLimits::default()).unwrap();
+        let service =
+            RacfService::open(store.clone(), resolver.clone(), Default::default()).unwrap();
+        service
+            .bootstrap_administrator("RACFADM", &credential)
+            .unwrap();
+
+        service
+            .execute_command(&command_context(&admin, "STOP-AUTH", 1), "STOP")
+            .unwrap();
+        let calls_before_stop_checks = resolver.calls();
+        assert_eq!(
+            service.authenticate(&admin, &credential).unwrap(),
+            SecurityDecision::Deny
+        );
+        let stopped_signon = service
+            .racroute(
+                &saf_context(&admin, None, "STOPPED-SIGNON", 2),
+                RacrouteRequest::Signon {
+                    user: admin.clone(),
+                    credential_reference: credential.clone(),
+                },
+            )
+            .unwrap();
+        assert_policy_unavailable(&stopped_signon);
+        let stopped_verify = service
+            .racroute(
+                &saf_context(&admin, None, "STOPPED-VERIFY", 3),
+                RacrouteRequest::Verify {
+                    user: admin.clone(),
+                    credential_reference: credential.clone(),
+                    action: SafVerifyAction::AuthenticateOnly,
+                    acee_id: None,
+                },
+            )
+            .unwrap();
+        assert_policy_unavailable(&stopped_verify);
+        assert_eq!(resolver.calls(), calls_before_stop_checks);
+        {
+            let snapshot = service.database.read().unwrap();
+            assert!(!snapshot.subsystem.running);
+            assert!(snapshot.acees.is_empty() && snapshot.signon_sessions.is_empty());
+            assert!(!snapshot.transactions.contains_key("STOPPED-SIGNON"));
+            assert!(!snapshot.transactions.contains_key("STOPPED-VERIFY"));
+            assert_eq!(
+                snapshot.audits.last().unwrap().status.reason,
+                DecisionReason::PolicyUnavailable
+            );
+        }
+
+        drop(service);
+        let service =
+            RacfService::open(store.clone(), resolver.clone(), Default::default()).unwrap();
+        let calls_before_restart_check = resolver.calls();
+        assert_eq!(
+            service.authenticate(&admin, &credential).unwrap(),
+            SecurityDecision::Deny
+        );
+        assert_eq!(resolver.calls(), calls_before_restart_check);
+        service
+            .execute_command(&command_context(&admin, "RESTART-AUTH", 4), "RESTART")
+            .unwrap();
+        assert_eq!(
+            service.authenticate(&admin, &credential).unwrap(),
+            SecurityDecision::Allow
+        );
+        let active_signon = service
+            .racroute(
+                &saf_context(&admin, None, "ACTIVE-SIGNON", 5),
+                RacrouteRequest::Signon {
+                    user: admin.clone(),
+                    credential_reference: credential.clone(),
+                },
+            )
+            .unwrap();
+        assert_eq!(active_signon.status.reason, DecisionReason::Granted);
+
+        service
+            .execute_command(
+                &command_context(&admin, "INACTIVE-AUTH", 6),
+                "RVARY INACTIVE",
+            )
+            .unwrap();
+        let calls_before_inactive_checks = resolver.calls();
+        assert_eq!(
+            service.authenticate(&admin, &credential).unwrap(),
+            SecurityDecision::Deny
+        );
+        let inactive_signon = service
+            .racroute(
+                &saf_context(&admin, None, "INACTIVE-SIGNON", 7),
+                RacrouteRequest::Signon {
+                    user: admin.clone(),
+                    credential_reference: credential.clone(),
+                },
+            )
+            .unwrap();
+        assert_policy_unavailable(&inactive_signon);
+        let inactive_verify = service
+            .racroute(
+                &saf_context(&admin, None, "INACTIVE-VERIFY", 8),
+                RacrouteRequest::Verify {
+                    user: admin.clone(),
+                    credential_reference: credential.clone(),
+                    action: SafVerifyAction::AuthenticateOnly,
+                    acee_id: None,
+                },
+            )
+            .unwrap();
+        assert_policy_unavailable(&inactive_verify);
+        assert_eq!(resolver.calls(), calls_before_inactive_checks);
+
+        drop(service);
+        let service = RacfService::open(store, resolver.clone(), Default::default()).unwrap();
+        let calls_before_active = resolver.calls();
+        assert_eq!(
+            service.authenticate(&admin, &credential).unwrap(),
+            SecurityDecision::Deny
+        );
+        assert_eq!(resolver.calls(), calls_before_active);
+        service
+            .execute_command(&command_context(&admin, "ACTIVE-AUTH", 9), "RVARY ACTIVE")
+            .unwrap();
+        let active_verify = service
+            .racroute(
+                &saf_context(&admin, None, "REACTIVATED-VERIFY", 10),
+                RacrouteRequest::Verify {
+                    user: admin,
+                    credential_reference: credential,
+                    action: SafVerifyAction::AuthenticateOnly,
+                    acee_id: None,
+                },
+            )
+            .unwrap();
+        assert_eq!(active_verify.status.reason, DecisionReason::Granted);
+        assert!(resolver.calls() > calls_before_active);
     }
 
     #[test]

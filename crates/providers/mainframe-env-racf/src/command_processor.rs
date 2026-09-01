@@ -240,6 +240,27 @@ pub(crate) fn execute(
             if parsed.descriptor.mutating()
                 && let Some(existing) = snapshot.transactions.get(context.idempotency_key())
             {
+                if existing.actor != context.actor().as_str()
+                    || require_active(snapshot, context).is_err()
+                {
+                    let status = crate::saf::status_for_reason(DecisionReason::InsufficientAccess);
+                    append_audit(
+                        snapshot,
+                        context,
+                        &parsed,
+                        DecisionOutcome::Deny,
+                        status,
+                        &request_digest,
+                    )?;
+                    return Ok((
+                        (
+                            ExecutionOutcome::Failure(SemanticProblem::Unauthorized),
+                            false,
+                            status,
+                        ),
+                        true,
+                    ));
+                }
                 if existing.request_digest != request_digest {
                     append_audit(
                         snapshot,
@@ -3880,6 +3901,82 @@ mod tests {
             .execute_command(&next(&context, "QUERY-GROUP"), "LISTGRP OPER")
             .unwrap();
         assert_eq!(listed.records.len(), 1);
+    }
+
+    #[test]
+    fn command_replay_is_bound_to_the_active_actor_across_restart() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let secrets = Arc::new(MemorySecretResolver::default());
+        secrets.insert("secret:admin", b"ADMIN-PASSWORD".to_vec());
+        let service =
+            RacfService::open(store.clone(), secrets.clone(), Default::default()).unwrap();
+        service
+            .bootstrap_administrator(
+                "RACFADM",
+                &SecretRef::new("secret:admin", Default::default()).unwrap(),
+            )
+            .unwrap();
+        let admin = PrincipalId::new("RACFADM", InvocationLimits::default()).unwrap();
+        let user = PrincipalId::new("USER1", InvocationLimits::default()).unwrap();
+        let missing = PrincipalId::new("MISSING", InvocationLimits::default()).unwrap();
+        service
+            .execute_command(
+                &CommandContext::new(admin.clone(), "ACTOR-SETUP", "ACTOR-REPLAY", 1).unwrap(),
+                "ADDUSER USER1",
+            )
+            .unwrap();
+        let original =
+            CommandContext::new(admin.clone(), "ACTOR-BOUND", "ACTOR-REPLAY", 2).unwrap();
+        service.execute_command(&original, "ADDGROUP OPER").unwrap();
+        let before = service.database.read().unwrap();
+        let transaction = before.transactions["ACTOR-BOUND"].clone();
+        let audit_count = before.audits.len();
+        let group_count = before.groups.len();
+        drop(before);
+
+        for (actor, command, tick) in [
+            (user.clone(), "ADDGROUP OPER", 3),
+            (missing, "DELGROUP OPER", 4),
+        ] {
+            let denied = service
+                .execute_command(
+                    &CommandContext::new(actor, "ACTOR-BOUND", "ACTOR-REPLAY", tick).unwrap(),
+                    command,
+                )
+                .unwrap_err();
+            assert_eq!(denied.code, CommandDiagnosticCode::Unauthorized);
+        }
+        let after_denials = service.database.read().unwrap();
+        assert_eq!(after_denials.groups.len(), group_count);
+        assert_eq!(after_denials.transactions["ACTOR-BOUND"], transaction);
+        assert_eq!(after_denials.audits.len(), audit_count + 2);
+        assert!(after_denials.audits[audit_count..].iter().all(|audit| {
+            audit.decision == DecisionOutcome::Deny
+                && audit.status.reason == DecisionReason::InsufficientAccess
+        }));
+        assert_eq!(after_denials.audits[audit_count].actor, "USER1");
+        assert_eq!(after_denials.audits[audit_count + 1].actor, "MISSING");
+        drop(after_denials);
+
+        drop(service);
+        let service = RacfService::open(store, secrets, Default::default()).unwrap();
+        assert_eq!(
+            service
+                .execute_command(
+                    &CommandContext::new(user, "ACTOR-BOUND", "ACTOR-REPLAY-RESTART", 5,).unwrap(),
+                    "ADDGROUP OPER",
+                )
+                .unwrap_err()
+                .code,
+            CommandDiagnosticCode::Unauthorized
+        );
+        let audit_count_before_owner_replay = service.database.read().unwrap().audits.len();
+        let replay = service.execute_command(&original, "ADDGROUP OPER").unwrap();
+        assert!(replay.replayed);
+        let after_restart = service.database.read().unwrap();
+        assert_eq!(after_restart.groups.len(), group_count);
+        assert_eq!(after_restart.transactions["ACTOR-BOUND"], transaction);
+        assert_eq!(after_restart.audits.len(), audit_count_before_owner_replay);
     }
 
     #[test]

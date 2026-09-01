@@ -530,6 +530,9 @@ impl RacfService {
         reference: &SecretRef,
     ) -> Result<SecurityDecision, HostProblem> {
         let snapshot = self.database.read()?;
+        if !snapshot.subsystem.running || !snapshot.database_status.active {
+            return Ok(SecurityDecision::Deny);
+        }
         let Some(principal) = snapshot.principals.get(user.as_str()) else {
             return Ok(SecurityDecision::InvalidCredentials);
         };
