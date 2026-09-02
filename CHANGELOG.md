@@ -4,6 +4,20 @@ All notable changes to mainframe-env are documented here.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-02
+
+### Added
+
+- Added typed dataset, VSAM organization, catalog, GDG, allocation, locking,
+  RLS/TVS, migration, backup/restore, and recovery semantics.
+- Added generated execution for the 31-command AMS surface and local
+  independent reference-model assurance across all 36 official rows.
+
+### Known limitations
+
+- The licensed z/OS 3.2 dataset/VSAM/AMS differential remains exactly 0/36 and
+  is deferred to release certification.
+
 ## [0.5.0] - 2026-09-02
 
 ### Added

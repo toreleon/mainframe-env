@@ -1,7 +1,7 @@
 {
   "schema_version": "mainframe-env.version-inventory@1",
-  "product": "0.5.0",
-  "release_line": "0.5",
+  "product": "0.6.0",
+  "release_line": "0.6",
   "channel": "stable",
   "release_state": "release-prepared-not-published",
   "rust": {"pinned": "1.98.0", "msrv": "1.95.0", "edition": "2024"},
