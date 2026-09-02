@@ -4,6 +4,20 @@ All notable changes to mainframe-env are documented here.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-02
+
+### Added
+
+- Added deterministic execution for the pinned COBOL statement, intrinsic,
+  data, file, JSON/XML, condition, and recovery surfaces.
+- Added checkpoint schema 10 and the bounded 16-case GnuCOBOL reference
+  campaign as local assurance with zero licensed credit.
+
+### Known limitations
+
+- The licensed Enterprise COBOL 6.5 differential remains exactly 0/153 and is
+  deferred to release certification.
+
 ## [0.3.0] - 2026-09-02
 
 ### Added
