@@ -4,6 +4,33 @@ All notable changes to mainframe-env are documented here.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-02
+
+### Added
+
+- Added the shared typed Conformance IR, deterministic shard/cache identities,
+  replayable verdicts, and derived ledgers.
+- Added complete recognition and validation coverage for the pinned 173-row
+  COBOL structure and type-system inventory.
+
+### Changed
+
+- Generalized stable `0.x.y` release preparation and bound post-0.2 receipts to
+  the clean live source tree while retaining immutable 0.2 evidence.
+
+## [0.2.0] - 2026-09-02
+
+### Added
+
+- Added reviewed official coverage catalogs, generated registries, application
+  packages, subsystem ABI libraries, and six independent evidence gates.
+
+### Changed
+
+- Authorized external promotion of the immutable accepted 0.2 candidate and
+  its two retained target receipts; this branch does not create the tag or
+  publish artifacts.
+
 ## [0.1.1] - 2026-08-31
 
 ### Added

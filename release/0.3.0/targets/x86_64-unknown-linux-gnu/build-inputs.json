@@ -1,0 +1,30 @@
+{
+  "cargo_lock_sha256": "2a03a5eb50040875e0a722d2efe0e51c0431223639ca41abd6079236f9d133b6",
+  "cargo_version": "cargo 1.98.0 (797e8a9bc 2026-08-05)",
+  "deterministic_environment": {
+    "CARGO_INCREMENTAL": "0",
+    "LC_ALL": "C",
+    "SOURCE_DATE_EPOCH": "0",
+    "TZ": "UTC",
+    "ZERO_AR_DATE": "1"
+  },
+  "features": "all",
+  "linker_determinism": "-Wl,--build-id=sha1",
+  "locked": true,
+  "path_remapping": {
+    "cargo_home": "/cargo",
+    "repository": "/workspace/mainframe-env",
+    "rustup_home": "/rustup"
+  },
+  "profile": "release",
+  "profile_settings": {
+    "codegen_units": 1,
+    "debug": 0,
+    "incremental": false,
+    "strip": "symbols"
+  },
+  "rustc_verbose": "rustc 1.98.0 (88d9e12ae 2026-08-18)\nbinary: rustc\ncommit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea\ncommit-date: 2026-08-18\nrelease: 1.98.0\nLLVM version: 22.1.8",
+  "schema_version": "mainframe-env.release-build-inputs@1",
+  "source_digest": "sha256:d57dc772395cdab703c2dc8a09d363898ea2ab229ad3cb37ed3923254c29ea77",
+  "target": "x86_64-unknown-linux-gnu"
+}

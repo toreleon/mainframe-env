@@ -31,14 +31,24 @@ jobs:
       - run: cargo xtask conformance --check
       - run: cargo xtask evidence seal --check
       - run: cargo xtask runtime-architecture --check
-      - run: cargo xtask release --target x86_64-unknown-linux-gnu
-      - run: git diff --exit-code -- release/0.2.0/targets/x86_64-unknown-linux-gnu
-      - run: cargo xtask release --check --target x86_64-unknown-linux-gnu
+      - id: linux-release
+        shell: bash
+        run: |
+          version="$(<VERSION)"
+          if [[ ! "$version" =~ ^0\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "unsafe product VERSION: $version" >&2
+            exit 1
+          fi
+          release_dir="release/$version/targets/x86_64-unknown-linux-gnu"
+          cargo xtask release --target x86_64-unknown-linux-gnu
+          git diff --exit-code -- "$release_dir"
+          cargo xtask release --check --target x86_64-unknown-linux-gnu
+          printf 'path=%s\n' "$release_dir" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: linux-release-evidence
-          path: release/0.2.0/targets/x86_64-unknown-linux-gnu
+          path: ${{ steps.linux-release.outputs.path }}
           if-no-files-found: error
 
   contract-msrv:

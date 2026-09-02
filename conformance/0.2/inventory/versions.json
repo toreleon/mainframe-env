@@ -1,9 +1,9 @@
 {
   "schema_version": "mainframe-env.version-inventory@1",
-  "product": "0.2.0",
-  "release_line": "0.2",
+  "product": "0.3.0",
+  "release_line": "0.3",
   "channel": "stable",
-  "release_state": "implementation-candidate-not-released",
+  "release_state": "release-prepared-not-published",
   "rust": {"pinned": "1.98.0", "msrv": "1.95.0", "edition": "2024"},
   "profiles": {"core-server": 1, "conformance": 1},
   "contracts": {

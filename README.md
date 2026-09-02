@@ -10,7 +10,10 @@ The design goal is a stable, robust platform built around a deterministic
 compiler and execution kernel, with asynchronous infrastructure and external
 frameworks isolated behind owned ports.
 
-The current locally released product is **0.1.1** on the 0.1 release line.
+The current product version prepared for official release is **0.3.0** on the
+0.3 release line. The [0.3 release notes](docs/releases/0.3.md) define its
+claims and limitations. No tag, package publication, or deployment is
+performed by this release-preparation branch.
 
 Start with [the documentation index](docs/README.md).
 
@@ -21,6 +24,12 @@ Version, phase-commit, and promotion rules are defined in
 
 ## Current status
 
+- The 0.3 product identity is internally consistent and retains reproducible,
+  unpublished release receipts for the advertised macOS ARM64 and Linux x86-64
+  targets.
+- The 0.3 through 0.7 subsystem work was integrated in parallel before product
+  promotion. The 0.3 source baseline therefore contains later accepted work;
+  that does not promote later minor claims into the 0.3 release.
 - The generic platform passes CardDemo corpus certification: 27/27 issues and
   20/20 journeys with memory, SQLite, PostgreSQL 18, and live Zowe CLI evidence.
   CardDemo remains a non-production corpus/workload, not a product feature.

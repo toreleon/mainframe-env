@@ -1,0 +1,57 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "predicate": {
+    "buildDefinition": {
+      "buildType": "mainframe-env.cargo-release@1",
+      "externalParameters": {
+        "all_features": true,
+        "locked": true,
+        "profile": "release",
+        "target": "x86_64-unknown-linux-gnu"
+      },
+      "resolvedDependencies": [
+        {
+          "digest": {
+            "sha256": "2a03a5eb50040875e0a722d2efe0e51c0431223639ca41abd6079236f9d133b6"
+          },
+          "uri": "Cargo.lock"
+        },
+        {
+          "digest": {
+            "sha256": "050acd69b083868e062bca28f2179542e775e3529e2d8583b7b5cd8582cf6deb"
+          },
+          "uri": "build-inputs.json"
+        },
+        {
+          "digest": {
+            "sha256": "d57dc772395cdab703c2dc8a09d363898ea2ab229ad3cb37ed3923254c29ea77"
+          },
+          "uri": "source-tree"
+        }
+      ]
+    },
+    "runDetails": {
+      "builder": {
+        "id": "mainframe-env-cargo/x86_64-unknown-linux-gnu"
+      },
+      "metadata": {
+        "invocationId": "mainframe-env-v0.3.0-x86_64-unknown-linux-gnu-local"
+      }
+    }
+  },
+  "predicateType": "https://slsa.dev/provenance/v1",
+  "subject": [
+    {
+      "digest": {
+        "sha256": "5c1fbf89a8f934d63dc3de85ec8846edf36dc21fc5007af9429e2783d4a914e3"
+      },
+      "name": "mainframe-env-server"
+    },
+    {
+      "digest": {
+        "sha256": "2d5425444ed3769863a2715d761b014238b4450d12f0b2ab167b6397d03ed568"
+      },
+      "name": "mainframe-env"
+    }
+  ]
+}
