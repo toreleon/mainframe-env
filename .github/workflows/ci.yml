@@ -62,13 +62,19 @@ jobs:
         if: ${{ github.event_name != 'pull_request' }}
         run: RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --locked
       - name: Check complete conformance
-        if: ${{ github.event_name != 'pull_request' }}
+        if: >-
+          github.event_name == 'workflow_dispatch' ||
+          startsWith(github.ref, 'refs/tags/mainframe-env-v')
         run: cargo xtask conformance --check
       - name: Check evidence seal
-        if: ${{ github.event_name != 'pull_request' }}
+        if: >-
+          github.event_name == 'workflow_dispatch' ||
+          startsWith(github.ref, 'refs/tags/mainframe-env-v')
         run: cargo xtask evidence seal --check
       - name: Check runtime architecture
-        if: ${{ github.event_name != 'pull_request' }}
+        if: >-
+          github.event_name == 'workflow_dispatch' ||
+          startsWith(github.ref, 'refs/tags/mainframe-env-v')
         run: cargo xtask runtime-architecture --check
       - name: Save trusted Rust build cache
         if: >-

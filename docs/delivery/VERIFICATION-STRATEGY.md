@@ -120,13 +120,13 @@ every event:
 - documentation-only changes do not start the Rust workflow;
 - pull requests run formatting, specification and COBOL exit checks, workspace
   tests, Clippy, and the contract MSRV gate;
-- the integrated `main` commit runs the full workspace, documentation,
-  conformance, evidence, and runtime-architecture gates; the MSRV result is not
-  repeated for a standard GitHub merge commit;
-- manual dispatch runs the full integrated gate; and
+- the integrated `main` commit runs the complete workspace and documentation
+  gates; the MSRV result is not repeated for a standard GitHub merge commit;
+- manual dispatch adds complete conformance, evidence, and runtime-architecture
+  checks for a minor exit or an explicit integrated audit; and
 - release generation, artifact upload, and reproduction run only on a
-  `mainframe-env-v*` tag and use a clean build rather than the normal debug
-  cache.
+  `mainframe-env-v*` tag, after the complete manual-tier checks, and use a clean
+  build rather than the normal debug cache.
 
 The non-release job caches `target/debug` by runner, Rust version, lockfile, and
 workspace manifests. Pull requests are restore-only: they may consume the
