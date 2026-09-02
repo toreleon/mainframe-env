@@ -1,0 +1,21 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://mainframe-env.example/schemas/cobol-recovery-fixtures.schema.json",
+  "type":"object","additionalProperties":false,
+  "required":["schema_version","target_version","fixtures"],
+  "properties":{
+    "schema_version":{"const":"mainframe-env.cobol-recovery-fixtures@1"},
+    "target_version":{"const":"0.4.0"},
+    "fixtures":{"type":"array","minItems":5,"maxItems":512,"items":{
+      "type":"object","additionalProperties":false,
+      "required":["id","row_id","source","marker","expected_output"],
+      "properties":{
+        "id":{"type":"string","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","maxLength":64},
+        "row_id":{"type":"string","minLength":1,"maxLength":256},
+        "source":{"type":"string","minLength":1,"maxLength":16384},
+        "marker":{"enum":["dynamic-value","sort-second-record","search-branch","perform-repetition","xml-event","declarative-handler","random-sequence"]},
+        "expected_output":{"type":"string","maxLength":8192}
+      }
+    }}
+  }
+}

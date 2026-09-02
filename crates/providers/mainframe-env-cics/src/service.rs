@@ -2198,6 +2198,7 @@ impl CicsService {
                     .map(|value| encode_dataset_bytes(ccsid, &value))
                     .transpose()?,
                 max_records: 1,
+                control: Default::default(),
             },
             CicsOperation::Write => {
                 let sequence = run
@@ -2276,6 +2277,7 @@ impl CicsService {
                     ccsid,
                     &argument_bytes(request, "RIDFLD").unwrap_or_default(),
                 )?,
+                relation: mainframe_env_host_api::KeyRelation::GreaterOrEqual,
             },
             CicsOperation::ReadNext | CicsOperation::ReadPrev => DatasetRequest::ReadNext {
                 dataset: dataset.clone(),
@@ -2287,6 +2289,7 @@ impl CicsService {
                         response2: 0,
                     })?,
                 reverse: request.operation == CicsOperation::ReadPrev,
+                control: Default::default(),
             },
             CicsOperation::EndBrowse => DatasetRequest::EndBrowse {
                 dataset: dataset.clone(),

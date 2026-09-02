@@ -829,10 +829,7 @@ mod tests {
             IntrinsicValueType::Alphanumeric
         );
         assert_eq!(model.intrinsic_calls[2].fixed_length, Some(36));
-        assert_eq!(
-            model.execution_incomplete_intrinsics(),
-            BTreeSet::from([IntrinsicFunctionKind::Abs, IntrinsicFunctionKind::Uuid4])
-        );
+        assert_eq!(model.execution_incomplete_intrinsics(), BTreeSet::new());
 
         for invalid in [
             "MOVE FUNCTION ABS(TEXT) TO NUM",
@@ -852,11 +849,10 @@ mod tests {
                 .filter(|descriptor| descriptor.runtime_supported)
                 .map(|descriptor| descriptor.kind)
                 .collect::<BTreeSet<_>>(),
-            BTreeSet::from([
-                SpecialRegisterKind::AddressOf,
-                SpecialRegisterKind::LengthOf,
-                SpecialRegisterKind::ReturnCode,
-            ])
+            SPECIAL_REGISTERS
+                .iter()
+                .map(|descriptor| descriptor.kind)
+                .collect::<BTreeSet<_>>()
         );
         let source = program(
             "MOVE LENGTH OF TEXT TO INT. SET ADDRESS OF LINK-X TO PTR. MOVE 4 TO RETURN-CODE. DISPLAY WHEN-COMPILED",
@@ -879,7 +875,7 @@ mod tests {
             reference.kind == SpecialRegisterKind::ReturnCode && reference.runtime_supported
         }));
         assert!(model.special_registers.iter().any(|reference| {
-            reference.kind == SpecialRegisterKind::WhenCompiled && !reference.runtime_supported
+            reference.kind == SpecialRegisterKind::WhenCompiled && reference.runtime_supported
         }));
         assert!(
             SemanticModel::analyze(&program("MOVE TEXT TO TEXT(LENGTH OF TEXT:1)"), 4096, 128,)

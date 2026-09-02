@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/cobol-statement-runtime-fixtures-v1.json",
+  "title": "mainframe-env COBOL statement runtime fixtures",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_version", "fixtures"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.cobol-statement-runtime-fixtures@1"},
+    "target_version": {"const": "0.4.0"},
+    "fixtures": {
+      "type": "array",
+      "minItems": 44,
+      "maxItems": 44,
+      "items": {"$ref": "#/$defs/fixture"}
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9_.:+@/-]+$"},
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "row_id", "procedure", "expected_output", "expected_return_code", "expected_effects", "expected_variables"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "row_id": {"$ref": "#/$defs/id"},
+        "procedure": {"type": "string", "minLength": 1, "maxLength": 8192},
+        "expected_output": {"type": "string", "maxLength": 8192},
+        "expected_return_code": {"type": "integer", "minimum": -2147483648, "maximum": 2147483647},
+        "expected_effects": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/id"}},
+        "expected_variables": {
+          "type": "object",
+          "maxProperties": 64,
+          "additionalProperties": {"type": "string", "maxLength": 8192}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.example/schemas/cobol-gnucobol-reference-allowlist.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_version",
+    "reference",
+    "reference_version",
+    "dialect",
+    "source_format",
+    "source_encoding",
+    "normalization_rules",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": { "const": "mainframe-env.cobol-gnucobol-reference-allowlist@1" },
+    "target_version": { "const": "0.4.0" },
+    "reference": { "const": "gnucobol" },
+    "reference_version": { "const": "3.2.0" },
+    "dialect": { "const": "ibm-strict" },
+    "source_format": { "const": "free" },
+    "source_encoding": { "const": "UTF-8" },
+    "normalization_rules": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 16,
+      "maxItems": 16,
+      "items": { "$ref": "#/$defs/case" }
+    }
+  },
+  "$defs": {
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "cohort",
+        "row_id",
+        "source_locator",
+        "program_id",
+        "portable_rationale",
+        "source",
+        "expected_stdout"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$", "maxLength": 128 },
+        "cohort": { "enum": ["statement-control", "decimal-arithmetic", "move-string", "intrinsic"] },
+        "row_id": {
+          "type": "string",
+          "pattern": "^ibm-enterprise-cobol-6\\.5-2026-05-31:(procedure-statements|intrinsic-functions):[0-9]{4}$"
+        },
+        "source_locator": { "type": "string", "pattern": "^pdf-page:[0-9]+;outline:.+$", "maxLength": 246 },
+        "program_id": { "type": "string", "pattern": "^[A-Z][A-Z0-9]{0,7}$" },
+        "portable_rationale": { "type": "string", "minLength": 32, "maxLength": 512 },
+        "source": { "type": "string", "minLength": 64, "maxLength": 16384 },
+        "expected_stdout": { "type": "string", "minLength": 1, "maxLength": 4096 }
+      }
+    }
+  }
+}

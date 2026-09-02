@@ -1,0 +1,22 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://mainframe-env.example/schemas/cobol-file-runtime-fixtures.schema.json",
+  "type":"object","additionalProperties":false,
+  "required":["schema_version","target_version","fixtures"],
+  "properties":{
+    "schema_version":{"const":"mainframe-env.cobol-file-runtime-fixtures@1"},
+    "target_version":{"const":"0.4.0"},
+    "fixtures":{"type":"array","minItems":10,"maxItems":10,"items":{
+      "type":"object","additionalProperties":false,
+      "required":["id","row_id","declaration","contract_fragment","expected_record_hex","expected_linage"],
+      "properties":{
+        "id":{"type":"string","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","maxLength":64},
+        "row_id":{"type":"string","minLength":1,"maxLength":256},
+        "declaration":{"type":"string","minLength":1,"maxLength":4096},
+        "contract_fragment":{"type":"string","minLength":1,"maxLength":1024},
+        "expected_record_hex":{"type":"string","pattern":"^[0-9a-f]+$","maxLength":16384},
+        "expected_linage":{"type":"integer","minimum":1,"maximum":1000000}
+      }
+    }}
+  }
+}

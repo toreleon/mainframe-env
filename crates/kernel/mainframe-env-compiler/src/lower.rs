@@ -6,6 +6,8 @@ use mainframe_env_ir::{
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const CORE_NAMESPACE: &str = "mainframe.core.cobol";
+pub const MAX_UNBOUNDED_OCCURRENCES: usize = 4096;
+pub const MAX_UNBOUNDED_STORAGE_BYTES: usize = 16 * 1024 * 1024;
 pub const PUBLISHABLE_LAYOUT_CATEGORIES: &[&str] = &[
     "alphabetic",
     "alphanumeric",
@@ -13,6 +15,8 @@ pub const PUBLISHABLE_LAYOUT_CATEGORIES: &[&str] = &[
     "binary",
     "condition",
     "dbcs",
+    "float_long",
+    "float_short",
     "function_pointer",
     "group",
     "index",
@@ -31,7 +35,13 @@ pub const PUBLISHABLE_LAYOUT_CATEGORIES: &[&str] = &[
     "utf8_group",
 ];
 
-pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, LowerProblem> {
+pub(crate) fn lower_to_core(
+    hir: &CobolHir,
+    arithmetic_mode: &str,
+    display_sign: &str,
+    declaratives: &[(String, Vec<String>)],
+    limits: IrLimits,
+) -> Result<Module, LowerProblem> {
     let mut unsupported = hir.unsupported();
     let structured = hir.control_nodes.iter().any(|node| {
         matches!(
@@ -53,6 +63,7 @@ pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, 
     let storage_bytes = hir
         .layouts
         .iter()
+        .filter(|layout| !layout.dynamic && unbounded_ancestor(layout, &hir.layouts).is_none())
         .map(|layout| layout.offset.saturating_add(layout.length))
         .max()
         .unwrap_or(0);
@@ -60,16 +71,40 @@ pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, 
         .then(|| builder.add_storage("__program_storage", storage_bytes as u64, None))
         .transpose()
         .map_err(|_| LowerProblem::InvalidLayout)?;
-    for layout in hir.layouts.iter().filter(|layout| layout.length > 0) {
-        let alias = program_storage.map(|id| StorageReference {
-            storage: id,
-            offset: layout.offset as u64,
-            length: layout.length as u64,
-        });
+    for layout in hir
+        .layouts
+        .iter()
+        .filter(|layout| layout.length > 0 || layout.dynamic || layout.unbounded)
+    {
+        let unbounded_parent = unbounded_ancestor(layout, &hir.layouts);
+        let storage_length = if layout.dynamic {
+            layout.dynamic_limit.ok_or(LowerProblem::InvalidLayout)?
+        } else if layout.unbounded {
+            unbounded_storage_length(layout)?
+        } else {
+            layout.length
+        };
+        let alias = if let Some(parent) = unbounded_parent {
+            Some(StorageReference {
+                storage: *storage
+                    .get(&parent.qualified_name)
+                    .ok_or(LowerProblem::InvalidLayout)?,
+                offset: layout.offset.saturating_sub(parent.offset) as u64,
+                length: layout.length as u64,
+            })
+        } else if !layout.dynamic && !layout.unbounded {
+            program_storage.map(|id| StorageReference {
+                storage: id,
+                offset: layout.offset as u64,
+                length: layout.length as u64,
+            })
+        } else {
+            None
+        };
         let id = builder
             .add_storage(
                 layout.qualified_name.to_ascii_lowercase(),
-                layout.length as u64,
+                storage_length as u64,
                 alias,
             )
             .map_err(|_| LowerProblem::InvalidLayout)?;
@@ -80,6 +115,39 @@ pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, 
         .map_err(|_| LowerProblem::LimitExceeded)?;
     let block = builder
         .add_block(region)
+        .map_err(|_| LowerProblem::LimitExceeded)?;
+    builder
+        .add_operation(
+            block,
+            core_identity("config")?,
+            Vec::new(),
+            0,
+            BTreeMap::from([
+                (
+                    "arithmetic_mode".into(),
+                    Attribute::Text(arithmetic_mode.into()),
+                ),
+                ("display_sign".into(), Attribute::Text(display_sign.into())),
+                (
+                    "declaratives".into(),
+                    Attribute::Text(
+                        declaratives
+                            .iter()
+                            .map(|(section, operands)| {
+                                std::iter::once(section.as_str())
+                                    .chain(operands.iter().map(String::as_str))
+                                    .collect::<Vec<_>>()
+                                    .join("\u{1f}")
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\u{1e}"),
+                    ),
+                ),
+            ]),
+            Vec::new(),
+            Vec::new(),
+            None,
+        )
         .map_err(|_| LowerProblem::LimitExceeded)?;
     for layout in &hir.layouts {
         let attributes = BTreeMap::from([
@@ -111,6 +179,10 @@ pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, 
                 Attribute::Integer(i64::from(layout.justified_right)),
             ),
             (
+                "blank_when_zero".into(),
+                Attribute::Integer(i64::from(layout.blank_when_zero)),
+            ),
+            (
                 "section".into(),
                 Attribute::Text(
                     match layout.section {
@@ -123,12 +195,63 @@ pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, 
                 ),
             ),
             ("offset".into(), Attribute::Integer(layout.offset as i64)),
-            ("length".into(), Attribute::Integer(layout.length as i64)),
+            (
+                "length".into(),
+                Attribute::Integer(if layout.unbounded {
+                    unbounded_storage_length(layout)? as i64
+                } else {
+                    layout.length as i64
+                }),
+            ),
             (
                 "element_length".into(),
                 Attribute::Integer(layout.element_length as i64),
             ),
-            ("occurs".into(), Attribute::Integer(layout.occurs as i64)),
+            (
+                "occurs".into(),
+                Attribute::Integer(if layout.unbounded {
+                    unbounded_occurrences(layout)? as i64
+                } else {
+                    layout.occurs as i64
+                }),
+            ),
+            (
+                "occurs_min".into(),
+                Attribute::Integer(layout.occurs_min as i64),
+            ),
+            (
+                "unbounded".into(),
+                Attribute::Integer(i64::from(layout.unbounded)),
+            ),
+            (
+                "depending_on".into(),
+                Attribute::Text(layout.depending_on.clone().unwrap_or_default()),
+            ),
+            (
+                "indexes".into(),
+                Attribute::Text(layout.indexes.join("\u{1f}")),
+            ),
+            (
+                "keys".into(),
+                Attribute::Text(
+                    layout
+                        .keys
+                        .iter()
+                        .map(|key| {
+                            format!("{}:{}", if key.descending { "D" } else { "A" }, key.name)
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\u{1f}"),
+                ),
+            ),
+            (
+                "dynamic".into(),
+                Attribute::Integer(i64::from(layout.dynamic)),
+            ),
+            (
+                "dynamic_limit".into(),
+                Attribute::Integer(layout.dynamic_limit.unwrap_or_default() as i64),
+            ),
             (
                 "parent".into(),
                 Attribute::Text(layout.parent.clone().unwrap_or_default()),
@@ -136,6 +259,10 @@ pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, 
             (
                 "condition_values".into(),
                 Attribute::Text(layout.condition_values.join("\u{1f}")),
+            ),
+            (
+                "object_class".into(),
+                Attribute::Text(layout.object_class.clone().unwrap_or_default()),
             ),
         ]);
         builder
@@ -186,6 +313,14 @@ pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, 
                 "file_status".into(),
                 Attribute::Text(file.file_status.clone().unwrap_or_default()),
             ),
+            (
+                "sort_merge".into(),
+                Attribute::Integer(i64::from(file.sort_merge)),
+            ),
+            (
+                "description".into(),
+                Attribute::Text(file.description.clone()),
+            ),
         ]);
         builder
             .add_operation(
@@ -202,13 +337,20 @@ pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, 
     }
     for layout in hir.layouts.iter().filter(|layout| {
         layout.allocated
-            && layout.length > 0
-            && layout.parent.is_none()
+            && (layout.length > 0 || layout.dynamic || layout.unbounded)
+            && (layout.parent.is_none() || layout.unbounded)
             && layout.alias_of.is_none()
     }) {
         let id = *storage
             .get(&layout.qualified_name)
             .ok_or(LowerProblem::InvalidLayout)?;
+        let storage_length = if layout.dynamic {
+            layout.dynamic_limit.ok_or(LowerProblem::InvalidLayout)?
+        } else if layout.unbounded {
+            unbounded_storage_length(layout)?
+        } else {
+            layout.length
+        };
         let attributes = BTreeMap::from([
             (
                 "name".into(),
@@ -216,10 +358,18 @@ pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, 
             ),
             (
                 "initial".into(),
-                Attribute::Bytes(runtime_root_initial(layout, &hir.layouts)),
+                Attribute::Bytes(runtime_root_initial(
+                    layout,
+                    &hir.layouts,
+                    if layout.unbounded {
+                        unbounded_occurrences(layout)?
+                    } else {
+                        layout.occurs
+                    },
+                )),
             ),
             ("offset".into(), Attribute::Integer(layout.offset as i64)),
-            ("length".into(), Attribute::Integer(layout.length as i64)),
+            ("length".into(), Attribute::Integer(storage_length as i64)),
         ]);
         builder
             .add_operation(
@@ -232,7 +382,7 @@ pub(crate) fn lower_to_core(hir: &CobolHir, limits: IrLimits) -> Result<Module, 
                 vec![StorageReference {
                     storage: id,
                     offset: 0,
-                    length: layout.length as u64,
+                    length: storage_length as u64,
                 }],
                 None,
             )
@@ -360,7 +510,11 @@ fn lower_structured(
     Ok(())
 }
 
-fn runtime_root_initial(root: &crate::CobolLayout, layouts: &[crate::CobolLayout]) -> Vec<u8> {
+fn runtime_root_initial(
+    root: &crate::CobolLayout,
+    layouts: &[crate::CobolLayout],
+    occurrences: usize,
+) -> Vec<u8> {
     if !matches!(
         root.category,
         DataCategory::Group | DataCategory::NationalGroup | DataCategory::Utf8Group
@@ -383,7 +537,44 @@ fn runtime_root_initial(root: &crate::CobolLayout, layouts: &[crate::CobolLayout
         let copy = child.initial.len().min(element.len() - relative);
         element[relative..relative + copy].copy_from_slice(&child.initial[..copy]);
     }
-    element.repeat(root.occurs)
+    element.repeat(occurrences)
+}
+
+fn unbounded_occurrences(layout: &crate::CobolLayout) -> Result<usize, LowerProblem> {
+    if !layout.unbounded || layout.element_length == 0 {
+        return Err(LowerProblem::InvalidLayout);
+    }
+    MAX_UNBOUNDED_OCCURRENCES
+        .min(
+            MAX_UNBOUNDED_STORAGE_BYTES
+                .checked_div(layout.element_length)
+                .ok_or(LowerProblem::InvalidLayout)?,
+        )
+        .checked_sub(layout.occurs_min)
+        .map(|remaining| remaining + layout.occurs_min)
+        .ok_or(LowerProblem::InvalidLayout)
+}
+
+fn unbounded_storage_length(layout: &crate::CobolLayout) -> Result<usize, LowerProblem> {
+    layout
+        .element_length
+        .checked_mul(unbounded_occurrences(layout)?)
+        .ok_or(LowerProblem::InvalidLayout)
+}
+
+fn unbounded_ancestor<'a>(
+    layout: &crate::CobolLayout,
+    layouts: &'a [crate::CobolLayout],
+) -> Option<&'a crate::CobolLayout> {
+    let mut parent = layout.parent.as_deref();
+    while let Some(name) = parent {
+        let candidate = layouts.iter().find(|item| item.qualified_name == name)?;
+        if candidate.unbounded {
+            return Some(candidate);
+        }
+        parent = candidate.parent.as_deref();
+    }
+    None
 }
 
 fn lower_statement(
@@ -392,50 +583,153 @@ fn lower_statement(
     builder: &mut ModuleBuilder,
     block: mainframe_env_ir::BlockId,
     storage: &BTreeMap<String, mainframe_env_ir::StorageId>,
-    mut attributes: BTreeMap<String, Attribute>,
+    attributes: BTreeMap<String, Attribute>,
 ) -> Result<(), LowerProblem> {
     let name = match statement.kind {
         StatementKind::ProgramEnd => "halt",
         other => other.slug(),
     };
-    attributes.insert("line".into(), Attribute::Integer(statement.line as i64));
-    attributes.insert(
-        "arguments".into(),
-        Attribute::Bytes(encode_arguments(&statement.arguments)),
-    );
-    let mut references = Vec::new();
-    let mut seen = BTreeSet::new();
-    for argument in &statement.arguments {
-        let normalized = argument.trim_matches(['\'', '"']).to_ascii_uppercase();
-        if seen.insert(normalized.clone())
-            && let Some(layout) = hir
-                .layouts
-                .iter()
-                .find(|layout| layout.name == normalized && layout.length > 0)
-        {
-            let id = *storage
-                .get(&layout.qualified_name)
-                .ok_or(LowerProblem::InvalidLayout)?;
-            references.push(StorageReference {
-                storage: id,
-                offset: 0,
-                length: layout.length as u64,
-            });
+    let groups = statement_argument_groups(statement)?;
+    let last = groups.len().saturating_sub(1);
+    for (index, arguments) in groups.into_iter().enumerate() {
+        let mut operation_attributes = attributes.clone();
+        operation_attributes.insert("line".into(), Attribute::Integer(statement.line as i64));
+        operation_attributes.insert(
+            "arguments".into(),
+            Attribute::Bytes(encode_arguments(&arguments)),
+        );
+        if index > 0 {
+            for key in [
+                "control_node",
+                "control_role",
+                "control_scope",
+                "control_parent",
+            ] {
+                operation_attributes.remove(key);
+            }
         }
+        if index < last {
+            operation_attributes.retain(|key, _| !key.starts_with("edge_"));
+        }
+        let mut references = Vec::new();
+        let mut seen = BTreeSet::new();
+        for argument in &arguments {
+            let normalized = argument.trim_matches(['\'', '"']).to_ascii_uppercase();
+            if seen.insert(normalized.clone())
+                && let Some(layout) = hir
+                    .layouts
+                    .iter()
+                    .find(|layout| layout.name == normalized && layout.length > 0)
+            {
+                let id = *storage
+                    .get(&layout.qualified_name)
+                    .ok_or(LowerProblem::InvalidLayout)?;
+                references.push(StorageReference {
+                    storage: id,
+                    offset: 0,
+                    length: layout.length as u64,
+                });
+            }
+        }
+        builder
+            .add_operation(
+                block,
+                core_identity(name)?,
+                Vec::new(),
+                0,
+                operation_attributes,
+                crate::hir::effects(statement.kind),
+                references,
+                None,
+            )
+            .map_err(|_| LowerProblem::LimitExceeded)?;
     }
-    builder
-        .add_operation(
-            block,
-            core_identity(name)?,
-            Vec::new(),
-            0,
-            attributes,
-            crate::hir::effects(statement.kind),
-            references,
-            None,
-        )
-        .map_err(|_| LowerProblem::LimitExceeded)?;
     Ok(())
+}
+
+fn statement_argument_groups(
+    statement: &crate::HirStatement,
+) -> Result<Vec<Vec<String>>, LowerProblem> {
+    if statement.kind == StatementKind::Open {
+        let mut groups = Vec::new();
+        let mut at = 0usize;
+        while at < statement.arguments.len() {
+            let mode = statement.arguments[at].clone();
+            if !matches!(mode.as_str(), "INPUT" | "OUTPUT" | "I-O" | "EXTEND") {
+                return Err(LowerProblem::InvalidOperation);
+            }
+            at += 1;
+            let start = at;
+            while at < statement.arguments.len()
+                && !matches!(
+                    statement.arguments[at].as_str(),
+                    "INPUT" | "OUTPUT" | "I-O" | "EXTEND"
+                )
+            {
+                groups.push(vec![mode.clone(), statement.arguments[at].clone()]);
+                at += 1;
+            }
+            if at == start {
+                return Err(LowerProblem::InvalidOperation);
+            }
+        }
+        return Ok(groups);
+    }
+    if statement.kind == StatementKind::Close {
+        let mut groups = Vec::new();
+        let mut at = 0usize;
+        while at < statement.arguments.len() {
+            let mut group = vec![statement.arguments[at].clone()];
+            at += 1;
+            if statement
+                .arguments
+                .get(at)
+                .is_some_and(|token| matches!(token.as_str(), "REEL" | "UNIT"))
+            {
+                group.push(statement.arguments[at].clone());
+                at += 1;
+            }
+            if statement
+                .arguments
+                .get(at)
+                .is_some_and(|token| token == "WITH")
+            {
+                group.push(statement.arguments[at].clone());
+                at += 1;
+                if statement
+                    .arguments
+                    .get(at)
+                    .is_some_and(|token| token == "NO")
+                {
+                    group.push(statement.arguments[at].clone());
+                    at += 1;
+                }
+                group.push(
+                    statement
+                        .arguments
+                        .get(at)
+                        .cloned()
+                        .ok_or(LowerProblem::InvalidOperation)?,
+                );
+                at += 1;
+            } else if statement
+                .arguments
+                .get(at)
+                .is_some_and(|token| token == "FOR")
+            {
+                group.extend_from_slice(
+                    statement
+                        .arguments
+                        .get(at..at + 2)
+                        .ok_or(LowerProblem::InvalidOperation)?,
+                );
+                at += 2;
+            }
+            groups.push(group);
+        }
+        return Ok(groups);
+    }
+    Ok(vec![statement.arguments.clone()])
 }
 
 fn encode_arguments(arguments: &[String]) -> Vec<u8> {
@@ -449,6 +743,13 @@ fn encode_arguments(arguments: &[String]) -> Vec<u8> {
 
 pub fn core_mir_catalog() -> OperationCatalog {
     let mut catalog = OperationCatalog::default();
+    catalog
+        .register(OperationSchema::pure(
+            core_identity("config").expect("static identity"),
+            0,
+            0,
+        ))
+        .expect("unique config");
     catalog
         .register(OperationSchema::pure(
             core_identity("define").expect("static identity"),

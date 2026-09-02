@@ -9656,6 +9656,7 @@ fn base_batch_dataset_digests(
                         member: Some(member),
                         key: None,
                         max_records: 4_096,
+                        control: Default::default(),
                     })
                     .map_err(terminal_problem)?
                 else {
@@ -9684,6 +9685,7 @@ fn base_batch_dataset_digests(
                     member: None,
                     key: None,
                     max_records: 4_096,
+                    control: Default::default(),
                 })
                 .map_err(terminal_problem)?
             else {
@@ -10778,6 +10780,7 @@ fn utility_records(
                 .transpose()?,
             key: None,
             max_records: 4_096,
+            control: Default::default(),
         })
         .map_err(terminal_problem)?
     {
@@ -12567,6 +12570,7 @@ fn carddemo_dataset_text_records(
             member: None,
             key: None,
             max_records: 4096,
+            control: Default::default(),
         })
         .map_err(terminal_problem)?;
     let DatasetResult::Records { records, .. } = result else {

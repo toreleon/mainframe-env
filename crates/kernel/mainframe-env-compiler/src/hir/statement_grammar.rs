@@ -45,6 +45,7 @@ pub(super) enum ProcedureEvent {
     },
     Label {
         name: String,
+        section: bool,
         range: Range<usize>,
         line: usize,
     },
@@ -152,7 +153,8 @@ impl<'a> GrammarParser<'a> {
         let line = self.tokens[start].line;
         let name = self.tokens[start].text.to_ascii_uppercase();
         self.position += 1;
-        if self.at_word("SECTION") {
+        let section = self.at_word("SECTION");
+        if section {
             self.position += 1;
         }
         if !self.at_period() {
@@ -160,6 +162,7 @@ impl<'a> GrammarParser<'a> {
         }
         self.push_event(ProcedureEvent::Label {
             name,
+            section,
             range: self.token_range(start, self.position),
             line,
         });
@@ -619,7 +622,21 @@ impl<'a> GrammarParser<'a> {
         let mut index = start + keyword_length;
         let mut depth = 0usize;
         while index < self.tokens.len() {
-            if depth == 0 && (self.at_simple_stop(kind, index) || self.classify_at(index).is_some())
+            let exit_qualifier = kind == StatementKind::Exit
+                && index == start + 1
+                && [
+                    "PROGRAM",
+                    "METHOD",
+                    "FUNCTION",
+                    "PERFORM",
+                    "PARAGRAPH",
+                    "SECTION",
+                ]
+                .iter()
+                .any(|word| self.tokens[index].is(word));
+            if depth == 0
+                && (self.at_simple_stop(kind, start, index)
+                    || (!exit_qualifier && self.classify_at(index).is_some()))
             {
                 return validate_simple_header(kind, &self.tokens[start..index])
                     .map(|()| index)
@@ -828,13 +845,33 @@ impl<'a> GrammarParser<'a> {
         }
     }
 
-    fn at_simple_stop(&self, kind: StatementKind, index: usize) -> bool {
+    fn at_simple_stop(&self, kind: StatementKind, start: usize, index: usize) -> bool {
+        let json_suppression_when = kind == StatementKind::JsonGenerate
+            && self.tokens[index].is("WHEN")
+            && self.tokens[start..index]
+                .iter()
+                .any(|token| token.is("SUPPRESS"))
+            && self.tokens.get(index + 1).is_some_and(|token| {
+                [
+                    "SPACE",
+                    "SPACES",
+                    "ZERO",
+                    "ZEROES",
+                    "ZEROS",
+                    "LOW-VALUE",
+                    "LOW-VALUES",
+                    "HIGH-VALUE",
+                    "HIGH-VALUES",
+                ]
+                .iter()
+                .any(|value| token.is(value))
+            });
         self.is_period_at(index)
             || self.branch_at(kind, index).is_some()
             || self.at_terminator_at(kind, index)
             || self.at_any_terminator_at(index)
             || self.tokens[index].is("ELSE")
-            || self.tokens[index].is("WHEN")
+            || (self.tokens[index].is("WHEN") && !json_suppression_when)
     }
 
     fn is_label(&self) -> bool {
@@ -1381,6 +1418,9 @@ fn validate_accept(tokens: &[Token<'_>]) -> Result<(), &'static str> {
             Some("DAY") => {
                 cursor.eat("YYYYDDD");
             }
+            Some("ENVIRONMENT") => {
+                cursor.operand()?;
+            }
             _ => {}
         }
     }
@@ -1392,6 +1432,20 @@ fn validate_add_subtract(
     separator: &str,
     allow_direct_giving: bool,
 ) -> Result<(), &'static str> {
+    if tokens
+        .get(1)
+        .is_some_and(|token| token.is("CORRESPONDING") || token.is("CORR"))
+    {
+        if !allow_direct_giving {
+            return Err("CORRESPONDING is not valid for this arithmetic statement");
+        }
+        let mut cursor = Cursor::new(tokens, 2);
+        cursor.operand()?;
+        cursor.expect(separator)?;
+        cursor.operand()?;
+        cursor.eat("ROUNDED");
+        return cursor.finish();
+    }
     let split = find_word(tokens, 1, separator)
         .or_else(|| {
             allow_direct_giving
@@ -1680,13 +1734,18 @@ fn validate_exit(tokens: &[Token<'_>]) -> Result<(), &'static str> {
 }
 
 fn validate_go_to(tokens: &[Token<'_>]) -> Result<(), &'static str> {
-    let mut cursor = Cursor::new(tokens, 2);
-    cursor.operand()?;
-    if cursor.eat("DEPENDING") {
+    if let Some(depending) = find_word(tokens, 2, "DEPENDING") {
+        validate_operand_list(&tokens[2..depending], 1)?;
+        let mut cursor = Cursor::new(tokens, depending);
+        cursor.expect("DEPENDING")?;
         cursor.expect("ON")?;
         cursor.operand()?;
+        cursor.finish()
+    } else {
+        let mut cursor = Cursor::new(tokens, 2);
+        cursor.operand()?;
+        cursor.finish()
     }
-    cursor.finish()
 }
 
 fn validate_initialize(tokens: &[Token<'_>]) -> Result<(), &'static str> {
@@ -1697,12 +1756,35 @@ fn validate_initialize(tokens: &[Token<'_>]) -> Result<(), &'static str> {
         cursor.expect("FILLER")?;
     }
     if cursor.eat("REPLACING") {
-        let by = cursor.find("BY").ok_or("REPLACING requires BY")?;
-        if by == cursor.position || by + 1 >= tokens.len() {
+        let categories = [
+            "ALPHABETIC",
+            "ALPHANUMERIC",
+            "ALPHANUMERIC-EDITED",
+            "DBCS",
+            "EGCS",
+            "NATIONAL",
+            "NATIONAL-EDITED",
+            "NUMERIC",
+            "NUMERIC-EDITED",
+            "UTF-8",
+        ];
+        let mut seen = BTreeSet::new();
+        while !cursor.done() && !tokens[cursor.position].is("THEN") {
+            let category = categories
+                .iter()
+                .find(|category| cursor.eat(category))
+                .copied()
+                .ok_or("REPLACING category is missing or invalid")?;
+            if !seen.insert(category) {
+                return Err("REPLACING category is duplicated");
+            }
+            cursor.eat("DATA");
+            cursor.expect("BY")?;
+            cursor.operand()?;
+        }
+        if seen.is_empty() {
             return Err("REPLACING category or value is missing");
         }
-        cursor.position = by + 1;
-        cursor.operand()?;
     }
     if cursor.eat("THEN") {
         cursor.expect("TO")?;
@@ -1764,9 +1846,17 @@ fn validate_generate(tokens: &[Token<'_>]) -> Result<(), &'static str> {
     cursor.expect("FROM")?;
     cursor.operand()?;
     if cursor.eat("COUNT") {
+        if !cursor.eat("BYTES") {
+            cursor.eat("CHARACTERS");
+        }
         cursor.expect("IN")?;
         cursor.operand()?;
     }
+    validate_json_indicating(&mut cursor, false)?;
+    validate_json_encoding(&mut cursor)?;
+    validate_json_names(&mut cursor)?;
+    validate_json_suppress(&mut cursor, false)?;
+    validate_json_converting(&mut cursor, false)?;
     cursor.finish()
 }
 
@@ -1778,7 +1868,145 @@ fn validate_json_parse(tokens: &[Token<'_>]) -> Result<(), &'static str> {
     if cursor.eat("WITH") {
         cursor.expect("DETAIL")?;
     }
+    validate_json_ignoring(&mut cursor)?;
+    validate_json_indicating(&mut cursor, true)?;
+    validate_json_encoding(&mut cursor)?;
+    validate_json_names(&mut cursor)?;
+    validate_json_suppress(&mut cursor, true)?;
+    validate_json_converting(&mut cursor, true)?;
     cursor.finish()
+}
+
+fn validate_json_indicating(cursor: &mut Cursor<'_>, parsing: bool) -> Result<(), &'static str> {
+    if !cursor.eat("INDICATING") {
+        return Ok(());
+    }
+    loop {
+        cursor.operand()?;
+        cursor.expect("IS")?;
+        cursor.expect("JSON")?;
+        cursor.expect("NULL")?;
+        cursor.expect("USING")?;
+        cursor.atom()?;
+        if parsing {
+            cursor.expect("AND")?;
+            cursor.atom()?;
+        }
+        cursor.expect("IN")?;
+        cursor.operand()?;
+        if !cursor.eat("ALSO") {
+            break;
+        }
+    }
+    Ok(())
+}
+
+fn validate_json_encoding(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
+    if !cursor.eat("ENCODING") {
+        return Ok(());
+    }
+    if cursor.eat("FROM") {
+        cursor.expect("CODEPAGE")
+    } else {
+        cursor.atom()
+    }
+}
+
+fn validate_json_ignoring(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
+    if !cursor.eat("IGNORING") {
+        return Ok(());
+    }
+    loop {
+        cursor.expect("JSON")?;
+        cursor.expect("NULL")?;
+        cursor.expect("FOR")?;
+        if !cursor.eat("ALL") {
+            cursor.operand()?;
+        }
+        if !cursor.eat("ALSO") {
+            break;
+        }
+    }
+    Ok(())
+}
+
+fn validate_json_names(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
+    if !cursor.eat("NAME") {
+        return Ok(());
+    }
+    let mut count = 0usize;
+    while !cursor.done() && !cursor.at("SUPPRESS") && !cursor.at("CONVERTING") {
+        cursor.eat("OF");
+        cursor.operand()?;
+        cursor.expect("IS")?;
+        if !cursor.eat("OMITTED") {
+            cursor.literal()?;
+        }
+        count += 1;
+    }
+    (count > 0)
+        .then_some(())
+        .ok_or("NAME requires a data item and replacement")
+}
+
+fn validate_json_suppress(cursor: &mut Cursor<'_>, parsing: bool) -> Result<(), &'static str> {
+    if !cursor.eat("SUPPRESS") {
+        return Ok(());
+    }
+    let mut count = 0usize;
+    while !cursor.done() && !cursor.at("CONVERTING") {
+        let generic = cursor.eat("EVERY");
+        if generic {
+            if parsing {
+                return Err("JSON PARSE SUPPRESS requires a data item");
+            }
+            if !cursor.eat("NUMERIC") {
+                cursor.eat("NONNUMERIC");
+            }
+        } else {
+            cursor.operand()?;
+        }
+        if cursor.eat("WHEN") {
+            if parsing {
+                return Err("JSON PARSE SUPPRESS cannot use WHEN");
+            }
+            cursor.json_conversion_value()?;
+            while cursor.eat("OR") {
+                cursor.json_conversion_value()?;
+            }
+        } else if generic {
+            return Err("generic SUPPRESS requires WHEN");
+        }
+        count += 1;
+    }
+    (count > 0)
+        .then_some(())
+        .ok_or("SUPPRESS requires a data item")
+}
+
+fn validate_json_converting(cursor: &mut Cursor<'_>, parsing: bool) -> Result<(), &'static str> {
+    if !cursor.eat("CONVERTING") {
+        return Ok(());
+    }
+    loop {
+        cursor.operand()?;
+        cursor.expect(if parsing { "FROM" } else { "TO" })?;
+        cursor.expect("JSON")?;
+        let boolean = cursor.eat("BOOLEAN") || cursor.eat("BOOL");
+        if !boolean {
+            cursor.expect("NULL")?;
+        }
+        cursor.expect("USING")?;
+        cursor.json_conversion_value()?;
+        if parsing && boolean {
+            cursor.expect("AND")?;
+            cursor.json_conversion_value()?;
+        }
+        if !cursor.eat("ALSO") {
+            break;
+        }
+    }
+    Ok(())
 }
 
 fn validate_xml_parse(tokens: &[Token<'_>]) -> Result<(), &'static str> {
@@ -2460,6 +2688,49 @@ impl<'a> Cursor<'a> {
         self.position =
             consume_operand(self.tokens, self.position).ok_or("operand is malformed")?;
         Ok(())
+    }
+
+    fn literal(&mut self) -> Result<(), &'static str> {
+        if self
+            .tokens
+            .get(self.position)
+            .is_some_and(|token| token.kind == TokenKind::Literal)
+        {
+            self.position += 1;
+            Ok(())
+        } else {
+            Err("literal is missing")
+        }
+    }
+
+    fn json_conversion_value(&mut self) -> Result<(), &'static str> {
+        if [
+            "SPACE",
+            "SPACES",
+            "ZERO",
+            "ZEROES",
+            "ZEROS",
+            "LOW-VALUE",
+            "LOW-VALUES",
+            "HIGH-VALUE",
+            "HIGH-VALUES",
+        ]
+        .iter()
+        .any(|value| self.eat(value))
+        {
+            Ok(())
+        } else {
+            self.atom()
+        }
+    }
+
+    fn atom(&mut self) -> Result<(), &'static str> {
+        if self.tokens.get(self.position).is_some_and(is_operand_atom) {
+            self.position += 1;
+            Ok(())
+        } else {
+            Err("operand is malformed")
+        }
     }
 
     fn operand_list(&mut self, minimum: usize) -> Result<(), &'static str> {

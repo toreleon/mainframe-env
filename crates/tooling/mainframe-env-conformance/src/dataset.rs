@@ -675,6 +675,7 @@ fn dataset_records(service: &DatasetService, dataset: &str) -> Result<Vec<Vec<u8
             member: None,
             key: None,
             max_records: 4_096,
+            control: Default::default(),
         })
         .map_err(|problem| problem.to_string())?
     {
@@ -838,6 +839,7 @@ fn valid_ksds() -> Result<String, String> {
             member: None,
             key: Some(b"AA".to_vec()),
             max_records: 1,
+            control: Default::default(),
         })
         .map_err(|problem| problem.to_string())?
     {

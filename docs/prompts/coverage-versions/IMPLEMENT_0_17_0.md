@@ -31,6 +31,13 @@ simulation is development assurance only and grants no CER-1702 or differential
 credit. CER-1702 must run the real pinned 36-row dataset campaign and produce a
 reviewed candidate-bound licensed receipt before release certification can pass.
 
+The accepted 0.4 implementation enters this gate with its Enterprise COBOL 6.5
+licensed differential explicitly pending at 0/153. Its approved 16-case
+GnuCOBOL reference campaign is local development assurance only and grants no
+CER-1702 or IBM differential credit. CER-1702 must run the real pinned 153-row
+COBOL campaign and produce a reviewed candidate-bound licensed receipt before
+release certification can pass.
+
 ## Implement in this order
 
 1. Implement **CER-1701** pinned environment manifests for product levels,
@@ -40,7 +47,8 @@ reviewed candidate-bound licensed receipt before release certification can pass.
    same source identity. Normalize only documented nondeterministic fields. The
    campaign must include the 34 RACF command-family and 14 RACROUTE rows deferred
    from 0.5 with their licensed numerator still starting at 0/48, plus the
-   deferred 0.6 dataset/VSAM/AMS 36-row campaign starting at 0/36.
+   deferred 0.6 dataset/VSAM/AMS 36-row campaign starting at 0/36 and the
+   deferred 0.4 Enterprise COBOL 6.5 153-row campaign starting at 0/153.
 3. Triage each mismatch to an implementation defect, baseline correction or
    explicit out-of-scope row. Add a focused regression before every code fix and
    invalidate/rerun all affected receipts after a merge.
@@ -76,9 +84,9 @@ reviewed candidate-bound licensed receipt before release certification can pass.
 
 - Every mandatory pinned row is complete at every applicable gate; there is no
   accepted unsupported row and partial rows never round up.
-- Reference simulations, modeled outputs, official documentation, historical
-  receipts, and current-product observations cannot substitute for the deferred
-  licensed RACF/SAF campaign.
+- Reference simulations (including GnuCOBOL), modeled outputs, official
+  documentation, historical receipts, and current-product observations cannot
+  substitute for the deferred licensed COBOL or RACF/SAF campaigns.
 - Inputs, outputs, traces, diagnostics, statuses, environment identities and
   normalization rules are retained with bounded/redacted evidence and digests.
 - A mismatch cannot be waived by changing expected output to match the product.

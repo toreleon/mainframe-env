@@ -1,0 +1,251 @@
+{
+  "schema_version": "mainframe-env.cobol-function-boundary-runtime-fixtures@1",
+  "target_version": "0.4.0",
+  "fixtures": [
+    {
+      "id": "byte-length-national-bytes",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0008",
+      "obligation_id": "boundary-national-byte-count",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. BYTELENNAT. DATA DIVISION. WORKING-STORAGE SECTION. 01 NAT-X PIC N(3) NATIONAL. 01 OUT-X PIC 99. PROCEDURE DIVISION. MOVE FUNCTION BYTE-LENGTH(NAT-X) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "06\n"
+    },
+    {
+      "id": "length-national-characters",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0034",
+      "obligation_id": "boundary-national-character-count",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. LENNAT. DATA DIVISION. WORKING-STORAGE SECTION. 01 NAT-X PIC N(3) NATIONAL. 01 OUT-X PIC 99. PROCEDURE DIVISION. MOVE FUNCTION LENGTH(NAT-X) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "03\n"
+    },
+    {
+      "id": "numval-c-currency",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0046",
+      "obligation_id": "boundary-currency-symbol",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. NUMVALC. DATA DIVISION. WORKING-STORAGE SECTION. 01 SYMBOL-X PIC X(3) VALUE '€'. 01 VALUE-X PIC 99V9. PROCEDURE DIVISION. MOVE FUNCTION NUMVAL-C('€12.5', SYMBOL-X) TO VALUE-X. DISPLAY VALUE-X. STOP RUN.",
+      "expected_output": "125\n"
+    },
+    {
+      "id": "test-numval-error-position",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0068",
+      "obligation_id": "boundary-error-position",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. TESTNUM. DATA DIVISION. WORKING-STORAGE SECTION. 01 BAD-X PIC X(4) VALUE '12A3'. 01 POS-X PIC 9. PROCEDURE DIVISION. MOVE FUNCTION TEST-NUMVAL(BAD-X) TO POS-X. DISPLAY POS-X. STOP RUN.",
+      "expected_output": "3\n"
+    },
+    {
+      "id": "test-formatted-datetime-error-position",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0067",
+      "obligation_id": "boundary-error-position",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. TESTFORMAT. DATA DIVISION. WORKING-STORAGE SECTION. 01 BAD-X PIC X(8) VALUE '12:3X:56'. 01 POS-X PIC 99. PROCEDURE DIVISION. MOVE FUNCTION TEST-FORMATTED-DATETIME('hh:mm:ss', BAD-X) TO POS-X. DISPLAY POS-X. STOP RUN.",
+      "expected_output": "05\n"
+    },
+    {
+      "id": "test-numval-c-currency-position",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0069",
+      "obligation_id": "boundary-currency-position",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. TESTNUMC. DATA DIVISION. WORKING-STORAGE SECTION. 01 CUR-X PIC X(6) VALUE '€12X'. 01 SYMBOL-X PIC X(3) VALUE '€'. 01 POS-X PIC 9. PROCEDURE DIVISION. MOVE FUNCTION TEST-NUMVAL-C(CUR-X, SYMBOL-X) TO POS-X. DISPLAY POS-X. STOP RUN.",
+      "expected_output": "4\n"
+    },
+    {
+      "id": "ulength-byte-slice",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0072",
+      "obligation_id": "boundary-byte-aligned-slice",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. ULENSLICE. DATA DIVISION. WORKING-STORAGE SECTION. 01 UTF-X PIC U(4) BYTE-LENGTH 16 UTF-8. 01 OUT-X PIC 99. PROCEDURE DIVISION. MOVE 'Aé🙂' TO UTF-X. MOVE FUNCTION ULENGTH(UTF-X, 2, 2) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "01\n"
+    },
+    {
+      "id": "upos-multibyte-position",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0073",
+      "obligation_id": "boundary-multibyte-position",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. UPOSBOUND. DATA DIVISION. WORKING-STORAGE SECTION. 01 UTF-X PIC U(4) BYTE-LENGTH 16 UTF-8. 01 OUT-X PIC 99. PROCEDURE DIVISION. MOVE 'Aé🙂' TO UTF-X. MOVE FUNCTION UPOS(UTF-X, 3) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "04\n"
+    },
+    {
+      "id": "usupplementary-first-index",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0076",
+      "obligation_id": "boundary-first-supplementary-index",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. USUPBOUND. DATA DIVISION. WORKING-STORAGE SECTION. 01 UTF-X PIC U(4) BYTE-LENGTH 16 UTF-8. 01 OUT-X PIC 99. PROCEDURE DIVISION. MOVE 'Aé🙂' TO UTF-X. MOVE FUNCTION USUPPLEMENTARY(UTF-X) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "03\n"
+    },
+    {
+      "id": "uwidth-multibyte-width",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0079",
+      "obligation_id": "boundary-multibyte-width",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. UWIDTHBOUND. DATA DIVISION. WORKING-STORAGE SECTION. 01 UTF-X PIC U(4) BYTE-LENGTH 16 UTF-8. 01 OUT-X PIC 99. PROCEDURE DIVISION. MOVE 'Aé🙂' TO UTF-X. MOVE FUNCTION UWIDTH(UTF-X, 3) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "04\n"
+    },
+    {
+      "id": "date-to-yyyymmdd-sliding-window",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0015",
+      "obligation_id": "boundary-sliding-century",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. DATEWINDOW. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUT-X PIC 9(8). PROCEDURE DIVISION. MOVE FUNCTION DATE-TO-YYYYMMDD(240229, 50) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "19240229\n"
+    },
+    {
+      "id": "day-to-yyyyddd-sliding-window",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0017",
+      "obligation_id": "boundary-sliding-century",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. DAYWINDOW. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUT-X PIC 9(7). PROCEDURE DIVISION. MOVE FUNCTION DAY-TO-YYYYDDD(24060, 50) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "1924060\n"
+    },
+    {
+      "id": "year-to-yyyy-default-window",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0082",
+      "obligation_id": "boundary-default-sliding-century",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. YEARWINDOW. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUT-X PIC 9(4). PROCEDURE DIVISION. MOVE FUNCTION YEAR-TO-YYYY(24) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "1924\n"
+    },
+    {
+      "id": "test-date-yyyymmdd-error-fields",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0065",
+      "obligation_id": "boundary-error-subfield",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. TESTDATEFIELDS. DATA DIVISION. WORKING-STORAGE SECTION. 01 YEAR-X PIC 9. 01 MONTH-X PIC 9. 01 DAY-X PIC 9. PROCEDURE DIVISION. MOVE FUNCTION TEST-DATE-YYYYMMDD(12950215) TO YEAR-X. MOVE FUNCTION TEST-DATE-YYYYMMDD(19921415) TO MONTH-X. MOVE FUNCTION TEST-DATE-YYYYMMDD(19950240) TO DAY-X. DISPLAY YEAR-X MONTH-X DAY-X. STOP RUN.",
+      "expected_output": "123\n"
+    },
+    {
+      "id": "test-day-yyyyddd-error-fields",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0066",
+      "obligation_id": "boundary-error-subfield",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. TESTDAYFIELDS. DATA DIVISION. WORKING-STORAGE SECTION. 01 YEAR-X PIC 9. 01 DAY-X PIC 9. PROCEDURE DIVISION. MOVE FUNCTION TEST-DAY-YYYYDDD(1295146) TO YEAR-X. MOVE FUNCTION TEST-DAY-YYYYDDD(1995446) TO DAY-X. DISPLAY YEAR-X DAY-X. STOP RUN.",
+      "expected_output": "12\n"
+    },
+    {
+      "id": "test-formatted-datetime-range-position",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0067",
+      "obligation_id": "boundary-range-error-position",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. TESTFORMATRANGE. DATA DIVISION. WORKING-STORAGE SECTION. 01 MONTH-LATE PIC 99. 01 YEAR-EARLY PIC 99. 01 MONTH-EARLY PIC 99. PROCEDURE DIVISION. MOVE FUNCTION TEST-FORMATTED-DATETIME('YYYYMMDD', '20051314') TO MONTH-LATE. MOVE FUNCTION TEST-FORMATTED-DATETIME('YYYYMMDD', '15990316') TO YEAR-EARLY. MOVE FUNCTION TEST-FORMATTED-DATETIME('YYYYMMDD', '19959215') TO MONTH-EARLY. DISPLAY MONTH-LATE YEAR-EARLY MONTH-EARLY. STOP RUN.",
+      "expected_output": "060205\n"
+    },
+    {
+      "id": "random-sequence-and-reseed",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0053",
+      "obligation_id": "boundary-sequence-and-reseed",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. RANDOMSEQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 R1 PIC V9(18) COMP-3. 01 R2 PIC V9(18) COMP-3. 01 R3 PIC V9(18) COMP-3. 01 R4 PIC V9(18) COMP-3. PROCEDURE DIVISION. MOVE FUNCTION RANDOM(7) TO R1. MOVE FUNCTION RANDOM TO R2. MOVE FUNCTION RANDOM TO R3. MOVE FUNCTION RANDOM(7) TO R4. IF R1 = R4 AND R1 > 0 AND R1 < 1 AND R2 > 0 AND R2 < 1 AND R3 > 0 AND R3 < 1 AND R1 <> R2 AND R2 <> R3 DISPLAY 'SEQ' ELSE DISPLAY 'BAD' END-IF. STOP RUN.",
+      "expected_output": "SEQ\n"
+    },
+    {
+      "id": "display-of-cp037-bytes",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0018",
+      "obligation_id": "boundary-explicit-output-ccsid",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. DISPLAYCCSID. DATA DIVISION. WORKING-STORAGE SECTION. 01 NAT-X PIC N(2) NATIONAL. 01 OUT-X PIC X(2). 01 HEX-X PIC X(4). PROCEDURE DIVISION. MOVE 'AB' TO NAT-X. MOVE FUNCTION DISPLAY-OF(NAT-X, 37) TO OUT-X. MOVE FUNCTION HEX-OF(OUT-X) TO HEX-X. DISPLAY HEX-X. STOP RUN.",
+      "expected_output": "C1C2\n"
+    },
+    {
+      "id": "national-of-cp037-bytes",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0044",
+      "obligation_id": "boundary-explicit-input-ccsid",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. NATIONALCCSID. DATA DIVISION. WORKING-STORAGE SECTION. 01 SOURCE-X PIC X(2). 01 HEX-X PIC X(8). PROCEDURE DIVISION. MOVE FUNCTION HEX-TO-CHAR('C1C2') TO SOURCE-X. MOVE FUNCTION HEX-OF(FUNCTION NATIONAL-OF(SOURCE-X, 37)) TO HEX-X. DISPLAY HEX-X. STOP RUN.",
+      "expected_output": "00410042\n"
+    },
+    {
+      "id": "reverse-national-surrogate-pair",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0056",
+      "obligation_id": "boundary-national-character-reversal",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. REVERSENATIONAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 NAT-X PIC N(4) NATIONAL. 01 HEX-X PIC X(16). PROCEDURE DIVISION. MOVE 'A🙂B' TO NAT-X. MOVE FUNCTION HEX-OF(FUNCTION REVERSE(NAT-X)) TO HEX-X. DISPLAY HEX-X. STOP RUN.",
+      "expected_output": "0042D83DDE420041\n"
+    },
+    {
+      "id": "upper-case-national",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0074",
+      "obligation_id": "boundary-national-case-map",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. UPPERNATIONAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 NAT-X PIC N(2) NATIONAL. 01 HEX-X PIC X(8). PROCEDURE DIVISION. MOVE 'éa' TO NAT-X. MOVE FUNCTION HEX-OF(FUNCTION UPPER-CASE(NAT-X)) TO HEX-X. DISPLAY HEX-X. STOP RUN.",
+      "expected_output": "00C90041\n"
+    },
+    {
+      "id": "lower-case-national",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0037",
+      "obligation_id": "boundary-national-case-map",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. LOWERNATIONAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 NAT-X PIC N(2) NATIONAL. 01 HEX-X PIC X(8). PROCEDURE DIVISION. MOVE 'ÉA' TO NAT-X. MOVE FUNCTION HEX-OF(FUNCTION LOWER-CASE(NAT-X)) TO HEX-X. DISPLAY HEX-X. STOP RUN.",
+      "expected_output": "00E90061\n"
+    },
+    {
+      "id": "trim-national-spaces",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0071",
+      "obligation_id": "boundary-national-space-trim",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. TRIMNATIONAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 NAT-X PIC N(4) NATIONAL. 01 HEX-X PIC X(4). PROCEDURE DIVISION. MOVE '  A ' TO NAT-X. MOVE FUNCTION HEX-OF(FUNCTION TRIM(NAT-X)) TO HEX-X. DISPLAY HEX-X. STOP RUN.",
+      "expected_output": "0041\n"
+    },
+    {
+      "id": "bit-of-packed-storage",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0006",
+      "obligation_id": "boundary-packed-storage-bits",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. BITPACKED. DATA DIVISION. WORKING-STORAGE SECTION. 01 PACKED-X PIC S9(3) COMP-3 VALUE -12. 01 OUT-X PIC X(16). PROCEDURE DIVISION. MOVE FUNCTION BIT-OF(PACKED-X) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "0000000100101101\n"
+    },
+    {
+      "id": "byte-length-packed-storage",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0008",
+      "obligation_id": "boundary-packed-storage-byte-count",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. BYTEPACKED. DATA DIVISION. WORKING-STORAGE SECTION. 01 PACKED-X PIC S9(3) COMP-3 VALUE -12. 01 OUT-X PIC 9. PROCEDURE DIVISION. MOVE FUNCTION BYTE-LENGTH(PACKED-X) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "2\n"
+    },
+    {
+      "id": "content-of-preserves-numeric-type",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0011",
+      "obligation_id": "boundary-numeric-type-preservation",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. CONTENTNUMERIC. DATA DIVISION. WORKING-STORAGE SECTION. 01 PACKED-X PIC S9(3) COMP-3 VALUE -12. 01 TARGET-X PIC S9(3) COMP-3. 01 OUT-X PIC X(4). PROCEDURE DIVISION. MOVE FUNCTION CONTENT-OF(PACKED-X) TO TARGET-X. MOVE FUNCTION HEX-OF(TARGET-X) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "012D\n"
+    },
+    {
+      "id": "hex-of-packed-storage",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0027",
+      "obligation_id": "boundary-packed-storage-hex",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. HEXPACKED. DATA DIVISION. WORKING-STORAGE SECTION. 01 PACKED-X PIC S9(3) COMP-3 VALUE -12. 01 OUT-X PIC X(4). PROCEDURE DIVISION. MOVE FUNCTION HEX-OF(PACKED-X) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "012D\n"
+    },
+    {
+      "id": "length-packed-storage",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0034",
+      "obligation_id": "boundary-packed-storage-length",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. LENPACKED. DATA DIVISION. WORKING-STORAGE SECTION. 01 PACKED-X PIC S9(3) COMP-3 VALUE -12. 01 OUT-X PIC 9. PROCEDURE DIVISION. MOVE FUNCTION LENGTH(PACKED-X) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "2\n"
+    },
+    {
+      "id": "formatted-date-integer-epoch",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0024",
+      "obligation_id": "boundary-integer-date-epoch",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. FORMATDATEEPOCH. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUT-X PIC X(10). PROCEDURE DIVISION. MOVE FUNCTION FORMATTED-DATE('YYYY-MM-DD', 154557) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "2024-02-29\n"
+    },
+    {
+      "id": "formatted-datetime-optional-offset",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0025",
+      "obligation_id": "boundary-integer-date-optional-offset",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. FORMATDATETIME. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUT-X PIC X(15). PROCEDURE DIVISION. MOVE FUNCTION FORMATTED-DATETIME('YYYYMMDDThhmmss', 154557, 45296) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "20240229T123456\n"
+    },
+    {
+      "id": "formatted-time-optional-offset",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0026",
+      "obligation_id": "boundary-optional-offset",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. FORMATTIME. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUT-X PIC X(8). PROCEDURE DIVISION. MOVE FUNCTION FORMATTED-TIME('hh:mm:ss', 45296) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "12:34:56\n"
+    },
+    {
+      "id": "numval-c-default-currency",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0046",
+      "obligation_id": "boundary-default-currency",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. NUMVALCDEFAULT. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUT-X PIC 99V9. PROCEDURE DIVISION. MOVE FUNCTION NUMVAL-C('$12.5') TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "125\n"
+    },
+    {
+      "id": "test-numval-c-default-currency",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0069",
+      "obligation_id": "boundary-default-currency-position",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. TESTNUMVALCDEFAULT. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUT-X PIC 9. PROCEDURE DIVISION. MOVE FUNCTION TEST-NUMVAL-C('$12X') TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "4\n"
+    },
+    {
+      "id": "range-wide-decimal-exactness",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0054",
+      "obligation_id": "boundary-wide-decimal-exactness",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. RANGEWIDE. DATA DIVISION. WORKING-STORAGE SECTION. 01 A-X PIC 9(30) VALUE 999999999999999999999999999999. 01 B-X PIC 9(30) VALUE 999999999999999999999999999998. 01 OUT-X PIC 9. PROCEDURE DIVISION. MOVE FUNCTION RANGE(A-X, B-X) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "1\n"
+    },
+    {
+      "id": "midrange-wide-decimal-exactness",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0041",
+      "obligation_id": "boundary-wide-decimal-exactness",
+      "source": "IDENTIFICATION DIVISION. PROGRAM-ID. MIDRANGEWIDE. DATA DIVISION. WORKING-STORAGE SECTION. 01 A-X PIC 9(30) VALUE 999999999999999999999999999998. 01 B-X PIC 9(30) VALUE 999999999999999999999999999996. 01 OUT-X PIC 9(30). PROCEDURE DIVISION. MOVE FUNCTION MIDRANGE(A-X, B-X) TO OUT-X. DISPLAY OUT-X. STOP RUN.",
+      "expected_output": "999999999999999999999999999997\n"
+    }
+  ]
+}

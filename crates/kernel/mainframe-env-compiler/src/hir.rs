@@ -128,18 +128,7 @@ impl StatementKind {
 
     #[must_use]
     pub const fn supported(self) -> bool {
-        !matches!(
-            self,
-            Self::DuplicateLabel
-                | Self::Invoke
-                | Self::Merge
-                | Self::Release
-                | Self::ReturnStatement
-                | Self::Sort
-                | Self::Delete
-                | Self::Start
-                | Self::StructuredControl
-        )
+        !matches!(self, Self::DuplicateLabel | Self::StructuredControl)
     }
 
     #[must_use]
@@ -531,7 +520,16 @@ fn build_module(
     let mut backing_lengths = layouts
         .iter()
         .filter(|layout| layout.allocated)
-        .map(|layout| (layout.qualified_name.clone(), layout.length))
+        .map(|layout| {
+            (
+                layout.qualified_name.clone(),
+                if layout.dynamic {
+                    layout.dynamic_limit.unwrap_or_default()
+                } else {
+                    layout.length
+                },
+            )
+        })
         .collect::<BTreeMap<_, _>>();
     for layout in layouts {
         if let Some(target) = &layout.alias_of {
@@ -541,11 +539,11 @@ fn build_module(
     }
     for layout in layouts
         .iter()
-        .filter(|layout| layout.allocated && layout.length > 0)
+        .filter(|layout| layout.allocated && (layout.length > 0 || layout.dynamic))
     {
-        let alias = layout
-            .alias_of
-            .as_ref()
+        let alias = (!layout.dynamic)
+            .then_some(layout.alias_of.as_ref())
+            .flatten()
             .and_then(|name| storage.get(name))
             .map(|id| StorageReference {
                 storage: *id,
@@ -1028,14 +1026,16 @@ impl ProcedureParser {
         }
         match kind {
             StatementKind::GoTo => {
-                let target = go_to_target(header_text).ok_or(HirProblem::UnsupportedForm)?;
-                self.transfers.push(InternalTransfer {
-                    node,
-                    target,
-                    through: None,
-                    kind: ControlEdgeKind::Transfer,
-                });
-                self.fallthrough_open = false;
+                let (targets, computed) =
+                    go_to_targets(header_text).ok_or(HirProblem::UnsupportedForm)?;
+                self.transfers
+                    .extend(targets.into_iter().map(|target| InternalTransfer {
+                        node,
+                        target,
+                        through: None,
+                        kind: ControlEdgeKind::Transfer,
+                    }));
+                self.fallthrough_open = computed;
             }
             StatementKind::Perform if scope.is_none() => {
                 let (target, through) =
@@ -1159,12 +1159,23 @@ impl ProcedureParser {
         }
     }
 
-    fn push_label(&mut self, sentence: usize, line: usize, name: &str, range: Range<usize>) {
+    fn push_label(
+        &mut self,
+        sentence: usize,
+        line: usize,
+        name: &str,
+        section: bool,
+        range: Range<usize>,
+    ) {
         let statement = self.statements.len();
         self.statements.push(HirStatement {
             kind: StatementKind::Label,
             official: None,
-            arguments: vec![name.to_string()],
+            arguments: if section {
+                vec![name.to_string(), "SECTION".into()]
+            } else {
+                vec![name.to_string()]
+            },
             options: Vec::new(),
             line,
             source: Vec::new(),
@@ -1329,8 +1340,13 @@ fn parse_procedure(source: &str, max_statements: usize) -> Result<ParsedProcedur
             ProcedureEvent::Terminator { range, line } => {
                 parser.push_terminator(sentence, line, &source[range.clone()], range);
             }
-            ProcedureEvent::Label { name, range, line } => {
-                parser.push_label(sentence, line, &name, range);
+            ProcedureEvent::Label {
+                name,
+                section,
+                range,
+                line,
+            } => {
+                parser.push_label(sentence, line, &name, section, range);
             }
         }
     }
@@ -1369,15 +1385,20 @@ fn perform_targets(text: &str) -> Option<(String, Option<String>)> {
     Some((target, through))
 }
 
-fn go_to_target(text: &str) -> Option<String> {
+fn go_to_targets(text: &str) -> Option<(Vec<String>, bool)> {
     let words: Vec<String> = text
         .split_whitespace()
         .map(|word| word.trim_matches([',', '.']).to_ascii_uppercase())
         .collect();
-    words
-        .windows(2)
-        .find(|pair| pair[0] == "TO")
-        .map(|pair| pair[1].clone())
+    let to = words.iter().position(|word| word == "TO")?;
+    let depending = words.iter().position(|word| word == "DEPENDING");
+    let end = depending.unwrap_or(words.len());
+    let targets = words[to + 1..end]
+        .iter()
+        .filter(|word| word.as_str() != ",")
+        .cloned()
+        .collect::<Vec<_>>();
+    (!targets.is_empty()).then_some((targets, depending.is_some()))
 }
 
 fn semantic_tokens(sentence: &str, keyword_words: usize) -> Vec<String> {
@@ -1469,7 +1490,7 @@ mod tests {
                 .iter()
                 .filter(|kind| !kind.supported())
                 .count(),
-            7
+            0
         );
         assert!(crate::PROCEDURE_STATEMENTS.iter().all(|descriptor| {
             !descriptor.grammar_keywords.is_empty()

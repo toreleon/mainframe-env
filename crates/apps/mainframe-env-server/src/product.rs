@@ -1,3 +1,4 @@
+use crate::cobol::bind_compatible_runtime_services;
 use crate::{DefaultProgramRouter, ServerConfig, default_program_router};
 use axum::http::StatusCode;
 use base64::Engine;
@@ -1442,6 +1443,7 @@ impl ProductServer {
             )
             .map_err(|_| HostProblem::ResourceExhausted)?,
         );
+        bind_compatible_runtime_services(&mut invocation)?;
         let saved = self.online_machine_continuation(session)?;
         let mut saved_version = saved.as_ref().map(|saved| saved.version);
         let mut saved_checkpoint = saved.as_ref().map(|saved| saved.checkpoint.clone());
@@ -1860,6 +1862,7 @@ impl ProductServer {
                         member: member_name(member)?,
                         key: None,
                         max_records: 4096,
+                        control: Default::default(),
                     },
                 )?;
                 let DatasetResult::Records { records, .. } = result else {
@@ -1990,6 +1993,7 @@ impl ProductServer {
                         member: None,
                         key: None,
                         max_records: u32::try_from(max).unwrap_or(u32::MAX),
+                        control: Default::default(),
                     },
                 )?;
                 let DatasetResult::Records { records, .. } = result else {
@@ -2564,7 +2568,8 @@ impl ProductServer {
             | DatasetRequest::Delete { dataset, .. }
             | DatasetRequest::StartBrowse { dataset, .. }
             | DatasetRequest::ReadNext { dataset, .. }
-            | DatasetRequest::EndBrowse { dataset, .. } => Some(dataset.as_str()),
+            | DatasetRequest::EndBrowse { dataset, .. }
+            | DatasetRequest::Close { dataset, .. } => Some(dataset.as_str()),
             DatasetRequest::DefinePath { path, .. } => Some(path.as_str()),
             DatasetRequest::BuildAlternateIndex { index, .. } => Some(index.as_str()),
             DatasetRequest::StageTvs { operation, .. } => Some(match operation {
@@ -2684,6 +2689,7 @@ impl ProductServer {
                         member: Some(member.clone()),
                         key: None,
                         max_records: 4_096,
+                        control: Default::default(),
                     })
                     .map_err(gateway_problem)?
                 {
@@ -3011,6 +3017,7 @@ impl ProductServer {
                         member: None,
                         key: None,
                         max_records: 4096,
+                        control: Default::default(),
                     },
                 )?
                 else {

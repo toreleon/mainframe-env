@@ -21,10 +21,22 @@ use std::collections::{BTreeMap, BTreeSet};
 
 mod abi;
 mod carddemo;
+mod cobol_assurance;
 mod cobol_clauses;
+mod cobol_conditions;
+mod cobol_data;
 mod cobol_exit;
+mod cobol_files;
 mod cobol_frontend;
+mod cobol_function_boundaries;
 mod cobol_functions;
+mod cobol_intrinsics;
+mod cobol_licensed;
+mod cobol_phrases;
+mod cobol_recovery;
+mod cobol_reference;
+mod cobol_registers;
+mod cobol_runtime;
 mod cobol_statements;
 mod dataset;
 mod dataset_reference;
@@ -70,13 +82,28 @@ pub use jcl::{JclExitReceipt, JclFixtureRuntime, jcl_fixture_runtime, verify_jcl
 pub use racf::{racf_runtime, racf_runtime_with};
 pub use racf_oracle::{RACF_ORACLE_RELATIVE_PATH, RacfOracleCampaign, RacfOracleCase};
 
+pub use cobol_assurance::verify_cobol_assurance_sources;
 pub use cobol_clauses::verify_cobol_semantic_fixtures;
+pub use cobol_conditions::verify_cobol_condition_fixtures;
+pub use cobol_data::verify_cobol_data_runtime_fixtures;
 pub use cobol_exit::{CobolExitReceipt, verify_cobol_exit};
+pub use cobol_files::verify_cobol_file_runtime_fixtures;
 pub use cobol_frontend::{
     CobolConformanceHandlers, cobol_conformance_handlers, cobol_frontend_runtime,
     verify_cobol_frontend_fixtures,
 };
+pub use cobol_function_boundaries::verify_cobol_function_boundary_runtime_fixtures;
 pub use cobol_functions::verify_cobol_function_fixtures;
+pub use cobol_intrinsics::verify_cobol_function_runtime_fixtures;
+pub use cobol_licensed::{licensed_fixture_digest, verify_cobol_licensed_receipt_from_env};
+pub use cobol_phrases::verify_cobol_statement_phrase_runtime_fixtures;
+pub use cobol_recovery::verify_cobol_recovery_fixtures;
+pub use cobol_reference::{
+    GnuCobolReferenceReceipt, gnucobol_reference_fixture_digest, run_gnucobol_reference_campaign,
+    verify_gnucobol_reference_allowlist,
+};
+pub use cobol_registers::verify_cobol_register_runtime_fixtures;
+pub use cobol_runtime::verify_cobol_statement_runtime_fixtures;
 pub use cobol_statements::verify_cobol_statement_fixtures;
 
 pub const HELLO_SOURCE: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. HELLO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MSG PIC X(12) VALUE 'HELLO WORLD!'.\nPROCEDURE DIVISION.\nDISPLAY MSG.\nSTOP RUN.\n";
@@ -176,6 +203,15 @@ mod tests {
         }
     }
     #[test]
+    fn display_upon_and_no_advancing_do_not_leak_control_operands() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DISPLAYOPT. PROCEDURE DIVISION. DISPLAY 'A' UPON CONSOLE WITH NO ADVANCING. DISPLAY 'B'. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"AB\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
     fn openmainframe_hello_fixture_matches_exact_oracle_output() {
         let source = include_str!("../../../../conformance/0.1/fixtures/cobol/HELLO.cbl");
         let result = CobolCompiler::default()
@@ -227,9 +263,42 @@ mod tests {
     #[test]
     fn set_address_of_has_a_bounded_virtual_pointer_route() {
         let artifact = compile(
-            "IDENTIFICATION DIVISION.\nPROGRAM-ID. POINTERS.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PTR POINTER.\nLINKAGE SECTION.\n01 BLOCK PIC X.\nPROCEDURE DIVISION.\nSET ADDRESS OF BLOCK TO PTR.\nDISPLAY 'OK'.\nSTOP RUN.\n",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. POINTERS.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 TARGET-X PIC X VALUE 'A'.\n01 PTR POINTER.\nLINKAGE SECTION.\n01 BLOCK PIC X.\nPROCEDURE DIVISION.\nSET PTR TO ADDRESS OF TARGET-X.\nSET ADDRESS OF BLOCK TO PTR.\nMOVE 'Z' TO BLOCK.\nDISPLAY TARGET-X.\nSTOP RUN.\n",
         )
         .unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"Z\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn allocate_and_free_own_bounded_storage_through_a_linkage_alias() {
+        let artifact = compile(
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. HEAP.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PTR POINTER.\n01 OUT-X PIC X(4).\nLINKAGE SECTION.\n01 BLOCK PIC X(4).\nPROCEDURE DIVISION.\nALLOCATE 4 CHARACTERS RETURNING PTR.\nSET ADDRESS OF BLOCK TO PTR.\nMOVE 'HEAP' TO BLOCK.\nMOVE BLOCK TO OUT-X.\nFREE PTR.\nDISPLAY OUT-X.\nSTOP RUN.\n",
+        )
+        .unwrap();
+        let invocation = invocation(&artifact, 1024);
+        let mut machine =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        match drive_to_terminal(&mut machine) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"HEAP\n"),
+            other => panic!("{other:?}"),
+        }
+        assert_eq!(machine.variable("PTR").unwrap().bytes(), [0; 4]);
+        assert!(machine.variable("BLOCK").is_none());
+    }
+    #[test]
+    fn allocate_linkage_target_initializes_declared_values_and_can_omit_returning() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. HEAPINIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR POINTER. LINKAGE SECTION. 01 BLOCK. 05 TEXT-X PIC X(2) VALUE 'AB'. 05 NUM-X PIC 99 VALUE 12. PROCEDURE DIVISION. ALLOCATE BLOCK INITIALIZED. DISPLAY BLOCK. SET PTR TO ADDRESS OF BLOCK. FREE PTR. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"AB12\n"),
+            other => panic!("{other:?}"),
+        }
+
+        let rounded = "IDENTIFICATION DIVISION. PROGRAM-ID. HEAPROUND. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR POINTER. LINKAGE SECTION. 01 BLOCK PIC X(2). PROCEDURE DIVISION. ALLOCATE 1.1 CHARACTERS INITIALIZED RETURNING PTR. SET ADDRESS OF BLOCK TO PTR. MOVE 'OK' TO BLOCK. DISPLAY BLOCK. FREE PTR. STOP RUN.";
+        let artifact = compile(rounded).unwrap();
         match execute(&artifact, 1024) {
             MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"OK\n"),
             other => panic!("{other:?}"),
@@ -243,6 +312,15 @@ mod tests {
         .unwrap();
         match execute(&artifact, 1024) {
             MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"OK\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn search_all_selects_the_matching_sorted_table_element() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SEARCHALL. DATA DIVISION. WORKING-STORAGE SECTION. 01 ROOT-X. 05 TABLE-X OCCURS 4 TIMES ASCENDING KEY IS VALUE-X INDEXED BY IDX. 10 VALUE-X PIC X. PROCEDURE DIVISION. MOVE 'A' TO VALUE-X(1). MOVE 'B' TO VALUE-X(2). MOVE 'C' TO VALUE-X(3). MOVE 'D' TO VALUE-X(4). SEARCH ALL TABLE-X AT END DISPLAY 'MISS' WHEN VALUE-X(IDX) = 'C' DISPLAY IDX END-SEARCH. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"3\n"),
             other => panic!("{other:?}"),
         }
     }
@@ -277,10 +355,10 @@ mod tests {
         ));
     }
     #[test]
-    fn unsupported_source_fails_without_artifact() {
+    fn bounded_dynamic_storage_publishes_and_executes() {
+        let artifact = compile("IDENTIFICATION DIVISION. PROGRAM-ID. X. DATA DIVISION. WORKING-STORAGE SECTION. 01 DYNAMIC-X PIC X DYNAMIC LENGTH LIMIT IS 64. PROCEDURE DIVISION. MOVE 'OK' TO DYNAMIC-X. DISPLAY DYNAMIC-X. STOP RUN.").unwrap();
         assert!(
-            compile("IDENTIFICATION DIVISION. PROGRAM-ID. X. PROCEDURE DIVISION. INVOKE X.")
-                .is_err()
+            matches!(execute(&artifact, 1024), MachineDrive::Completed(done) if done.output.bytes() == b"OK\n")
         );
     }
     #[test]
@@ -307,7 +385,7 @@ mod tests {
             mainframe_env_compiler::PUBLISHABLE_LAYOUT_CATEGORIES,
             mainframe_env_interpreter::SUPPORTED_LAYOUT_CATEGORIES
         );
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CATEGORIES. DATA DIVISION. WORKING-STORAGE SECTION. 01 ROOT. 05 ALPHA PIC A(3). 05 ALNUM PIC X(3). 05 ALNUM-EDIT PIC XX/XX. 05 DBCS-ITEM PIC G(2) DISPLAY-1. 05 NATIONAL-ITEM PIC N(2) NATIONAL. 05 NATIONAL-EDIT PIC 99/99 NATIONAL. 05 UTF8-ITEM PIC U(3) BYTE-LENGTH 9 UTF-8. 05 NUM-DISPLAY PIC 9(3). 05 NUM-EDIT PIC ZZ9. 05 PACKED PIC 9(3) COMP-3. 05 BINARY-X PIC 9(4) BINARY. 05 INDEX-ITEM INDEX. 05 DATA-PTR POINTER. 05 PTR32 POINTER-32. 05 PROC-PTR PROCEDURE-POINTER. 05 FUNC-PTR FUNCTION-POINTER. 05 OBJ OBJECT REFERENCE. 05 FLAG PIC 9. 88 FLAG-ON VALUE 1. 66 ROOT-ALIAS RENAMES ALPHA THRU ALNUM. 01 NATIONAL-ROOT GROUP-USAGE NATIONAL. 05 NATIONAL-CHAR PIC N(2). 01 UTF8-ROOT GROUP-USAGE UTF-8. 05 UTF8-CHAR PIC U(2) BYTE-LENGTH 6. PROCEDURE DIVISION. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CATEGORIES. DATA DIVISION. WORKING-STORAGE SECTION. 01 ROOT. 05 ALPHA PIC A(3). 05 ALNUM PIC X(3). 05 ALNUM-EDIT PIC XX/XX. 05 DBCS-ITEM PIC G(2) DISPLAY-1. 05 NATIONAL-ITEM PIC N(2) NATIONAL. 05 NATIONAL-EDIT PIC 99/99 NATIONAL. 05 UTF8-ITEM PIC U(3) BYTE-LENGTH 9 UTF-8. 05 NUM-DISPLAY PIC 9(3). 05 NUM-EDIT PIC ZZ9. 05 PACKED PIC 9(3) COMP-3. 05 BINARY-X PIC 9(4) BINARY. 05 SHORT-FLOAT COMP-1. 05 LONG-FLOAT COMP-2. 05 INDEX-ITEM INDEX. 05 DATA-PTR POINTER. 05 PTR32 POINTER-32. 05 PROC-PTR PROCEDURE-POINTER. 05 FUNC-PTR FUNCTION-POINTER. 05 OBJ OBJECT REFERENCE. 05 FLAG PIC 9. 88 FLAG-ON VALUE 1. 66 ROOT-ALIAS RENAMES ALPHA THRU ALNUM. 01 NATIONAL-ROOT GROUP-USAGE NATIONAL. 05 NATIONAL-CHAR PIC N(2). 01 UTF8-ROOT GROUP-USAGE UTF-8. 05 UTF8-CHAR PIC U(2) BYTE-LENGTH 6. PROCEDURE DIVISION. STOP RUN.";
         let artifact = compile(source).unwrap();
         let module = decode_binary(artifact.payload(), CodecLimits::default()).unwrap();
         let categories = module
@@ -384,6 +462,326 @@ mod tests {
             assert!(compile(&source).is_ok(), "missing route for {statement}");
         }
     }
+
+    #[test]
+    fn relational_start_and_delete_emit_exact_typed_dataset_effects() {
+        use mainframe_env_host_api::{
+            DatasetRequest, DatasetResult, EffectResult, HostRequest, HostResult, KeyRelation,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. FILEOPS. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT TEST-FILE ASSIGN TO TESTDD ORGANIZATION IS INDEXED ACCESS MODE IS DYNAMIC RECORD KEY IS REC-KEY FILE STATUS IS FILE-STATUS. DATA DIVISION. FILE SECTION. FD TEST-FILE. 01 TEST-RECORD. 05 REC-KEY PIC X(2) VALUE 'BB'. 05 REC-VALUE PIC X(2) VALUE '02'. WORKING-STORAGE SECTION. 01 FILE-STATUS PIC XX. PROCEDURE DIVISION. START TEST-FILE KEY IS NOT LESS THAN REC-KEY INVALID KEY DISPLAY 'BAD-START' END-START. DELETE TEST-FILE RECORD INVALID KEY DISPLAY 'BAD-DELETE' END-DELETE. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut invocation = invocation(&artifact, 1024);
+        invocation.bindings.insert(
+            "cobol.dd.TEST-FILE".into(),
+            mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.dataset-name@1",
+                b"USER.TEST".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        let mut machine =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        let mut resume = MachineResume::Start;
+        let mut effects = 0usize;
+        loop {
+            match machine.drive(resume, Quantum::new(128, 4096).unwrap()) {
+                MachineDrive::Continue => resume = MachineResume::Start,
+                MachineDrive::HostCall(effect) => {
+                    effects += 1;
+                    let outcome = match effect.request {
+                        HostRequest::Dataset(DatasetRequest::StartBrowse {
+                            dataset,
+                            key,
+                            relation,
+                        }) => {
+                            assert_eq!(dataset.as_str(), "USER.TEST");
+                            assert_eq!(key, b"BB");
+                            assert_eq!(relation, KeyRelation::GreaterOrEqual);
+                            HostResult::Dataset(DatasetResult::Browse {
+                                cursor: "cursor-1".into(),
+                                record: None,
+                                identity: None,
+                                key: None,
+                            })
+                        }
+                        HostRequest::Dataset(DatasetRequest::DeleteRecord {
+                            dataset, key, ..
+                        }) => {
+                            assert_eq!(dataset.as_str(), "USER.TEST");
+                            assert_eq!(key, b"BB");
+                            HostResult::Dataset(DatasetResult::Mutated { version: 2 })
+                        }
+                        other => panic!("unexpected file effect: {other:?}"),
+                    };
+                    resume = MachineResume::HostResult(EffectResult {
+                        sequence: effect.sequence,
+                        outcome: Ok(outcome),
+                    });
+                }
+                MachineDrive::Completed(done) => {
+                    assert_eq!(effects, 2);
+                    assert!(done.output.bytes().is_empty());
+                    break;
+                }
+                other => panic!("{other:?}; position={}", machine.position_summary()),
+            }
+        }
+    }
+
+    #[test]
+    fn sort_using_giving_orders_bounded_records_through_typed_effects() {
+        use mainframe_env_host_api::{
+            DatasetRequest, DatasetResult, EffectResult, HostRequest, HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SORTIO. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT INPUT-FILE ASSIGN TO INPUTDD ORGANIZATION IS SEQUENTIAL. SELECT OUTPUT-FILE ASSIGN TO OUTPUTDD ORGANIZATION IS SEQUENTIAL. DATA DIVISION. FILE SECTION. FD INPUT-FILE. 01 INPUT-RECORD PIC X(4). FD OUTPUT-FILE. 01 OUTPUT-RECORD PIC X(4). SD SORT-FILE. 01 SORT-RECORD. 05 SORT-KEY PIC X(2). 05 SORT-DATA PIC X(2). PROCEDURE DIVISION. SORT SORT-FILE ON ASCENDING KEY SORT-KEY USING INPUT-FILE GIVING OUTPUT-FILE. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut invocation = invocation(&artifact, 1024);
+        for (logical, dataset) in [
+            ("INPUT-FILE", b"USER.INPUT".as_slice()),
+            ("OUTPUT-FILE", b"USER.OUTPUT".as_slice()),
+        ] {
+            invocation.bindings.insert(
+                format!("cobol.dd.{logical}"),
+                mainframe_env_execution_api::BoundedPayload::new(
+                    "mainframe-env.dataset-name@1",
+                    dataset.to_vec(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            );
+        }
+        let mut machine =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        let mut resume = MachineResume::Start;
+        let mut effects = 0usize;
+        loop {
+            match machine.drive(resume, Quantum::new(128, 4096).unwrap()) {
+                MachineDrive::Continue => resume = MachineResume::Start,
+                MachineDrive::HostCall(effect) => {
+                    effects += 1;
+                    let outcome = match effect.request {
+                        HostRequest::Dataset(DatasetRequest::Read { dataset, .. }) => {
+                            assert_eq!(dataset.as_str(), "USER.INPUT");
+                            HostResult::Dataset(DatasetResult::Records {
+                                records: vec![b"BB02".to_vec(), b"AA03".to_vec(), b"AA01".to_vec()],
+                                identities: vec![b"BB".to_vec(), b"AA".to_vec(), b"AA".to_vec()],
+                                version: 1,
+                            })
+                        }
+                        HostRequest::Dataset(DatasetRequest::Write {
+                            dataset, records, ..
+                        }) => {
+                            assert_eq!(dataset.as_str(), "USER.OUTPUT");
+                            assert_eq!(
+                                records,
+                                vec![b"AA03".to_vec(), b"AA01".to_vec(), b"BB02".to_vec()]
+                            );
+                            HostResult::Dataset(DatasetResult::Mutated { version: 2 })
+                        }
+                        other => panic!("unexpected sort effect: {other:?}"),
+                    };
+                    resume = MachineResume::HostResult(EffectResult {
+                        sequence: effect.sequence,
+                        outcome: Ok(outcome),
+                    });
+                }
+                MachineDrive::Completed(done) => {
+                    assert_eq!(effects, 2);
+                    assert!(done.output.bytes().is_empty());
+                    break;
+                }
+                other => panic!("{other:?}; position={}", machine.position_summary()),
+            }
+        }
+    }
+
+    #[test]
+    fn sort_input_output_procedures_release_and_return_in_key_order() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SORTPROC. DATA DIVISION. FILE SECTION. SD SORT-FILE. 01 SORT-RECORD. 05 SORT-KEY PIC X(2). 05 SORT-DATA PIC X(2). PROCEDURE DIVISION. SORT SORT-FILE ON ASCENDING KEY SORT-KEY INPUT PROCEDURE FEED OUTPUT PROCEDURE DRAIN. STOP RUN. FEED. MOVE 'BB02' TO SORT-RECORD. RELEASE SORT-RECORD. MOVE 'AA01' TO SORT-RECORD. RELEASE SORT-RECORD. EXIT. DRAIN. RETURN SORT-FILE RECORD INTO SORT-RECORD AT END DISPLAY 'EMPTY' END-RETURN. DISPLAY SORT-RECORD. EXIT.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"AA01\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn release_from_and_return_into_preserve_sort_record_routes() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SORTFROM. DATA DIVISION. FILE SECTION. SD SORT-FILE. 01 SORT-RECORD PIC X(4). WORKING-STORAGE SECTION. 01 SOURCE-X PIC X(4) VALUE 'AA01'. 01 OUT-X PIC X(4). PROCEDURE DIVISION. SORT SORT-FILE ON ASCENDING KEY SORT-RECORD INPUT PROCEDURE FEED OUTPUT PROCEDURE DRAIN. STOP RUN. FEED. RELEASE SORT-RECORD FROM SOURCE-X. EXIT. DRAIN. RETURN SORT-FILE RECORD INTO OUT-X AT END DISPLAY 'BAD' END-RETURN. DISPLAY OUT-X. EXIT.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"AA01\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn invoke_uses_typed_class_method_abi_and_applies_returning_value() {
+        use mainframe_env_host_api::{EffectResult, HostRequest, HostResult, ProgramRequest};
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. OBJECTCALL. DATA DIVISION. WORKING-STORAGE SECTION. 01 RECEIVER OBJECT REFERENCE CUSTOMER. 01 ARG-X PIC X(3) VALUE 'IN'. 01 RESULT-X PIC X(3). PROCEDURE DIVISION. SET RECEIVER TO ADDRESS OF ARG-X. INVOKE RECEIVER 'RUN' USING ARG-X RETURNING RESULT-X ON EXCEPTION DISPLAY 'BAD' END-INVOKE. DISPLAY ARG-X. DISPLAY RESULT-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let mut resume = MachineResume::Start;
+        loop {
+            match machine.drive(resume, Quantum::new(128, 4096).unwrap()) {
+                MachineDrive::Continue => resume = MachineResume::Start,
+                MachineDrive::HostCall(effect) => {
+                    match &effect.request {
+                        HostRequest::Program(ProgramRequest::Invoke {
+                            class,
+                            method,
+                            receiver,
+                            payload,
+                        }) => {
+                            assert_eq!(class.as_str(), "CUSTOMER");
+                            assert_eq!(method.as_str(), "RUN");
+                            assert_eq!(receiver.schema(), "mainframe-env.cobol-object-reference@1");
+                            assert!(receiver.bytes().iter().any(|byte| *byte != 0));
+                            assert_eq!(payload.schema(), "mainframe-env.cobol.call@1");
+                        }
+                        other => panic!("unexpected INVOKE effect: {other:?}"),
+                    }
+                    let result = mainframe_env_interpreter::encode_cobol_call_result(&[
+                        b"OUT".to_vec(),
+                        b"RET".to_vec(),
+                    ])
+                    .unwrap();
+                    resume = MachineResume::HostResult(EffectResult {
+                        sequence: effect.sequence,
+                        outcome: Ok(HostResult::Program(result)),
+                    });
+                }
+                MachineDrive::Completed(done) => {
+                    assert_eq!(done.output.bytes(), b"OUT\nRET\n");
+                    break;
+                }
+                other => panic!("{other:?}; position={}", machine.position_summary()),
+            }
+        }
+    }
+
+    #[test]
+    fn computed_go_to_exit_program_and_stop_returning_preserve_control_results() {
+        let selected = compile("IDENTIFICATION DIVISION. PROGRAM-ID. GOTODEP. DATA DIVISION. WORKING-STORAGE SECTION. 01 SELECTOR-X PIC 9 VALUE 2. PROCEDURE DIVISION. GO TO FIRST-P SECOND-P DEPENDING ON SELECTOR-X. DISPLAY 'FALL'. STOP RUN. FIRST-P. DISPLAY 'ONE'. STOP RUN. SECOND-P. DISPLAY 'TWO'. EXIT PROGRAM. DISPLAY 'BAD'.")
+            .unwrap();
+        assert!(matches!(
+            execute(&selected, 1024),
+            MachineDrive::Completed(done) if done.output.bytes() == b"TWO\n"
+        ));
+
+        let fallthrough = compile("IDENTIFICATION DIVISION. PROGRAM-ID. GOTOFALL. DATA DIVISION. WORKING-STORAGE SECTION. 01 SELECTOR-X PIC 9 VALUE 3. PROCEDURE DIVISION. GO TO FIRST-P SECOND-P DEPENDING ON SELECTOR-X. DISPLAY 'FALL'. STOP RUN. FIRST-P. DISPLAY 'BAD1'. STOP RUN. SECOND-P. DISPLAY 'BAD2'. STOP RUN.")
+            .unwrap();
+        assert!(matches!(
+            execute(&fallthrough, 1024),
+            MachineDrive::Completed(done) if done.output.bytes() == b"FALL\n"
+        ));
+
+        let returning = compile("IDENTIFICATION DIVISION. PROGRAM-ID. STOPCODE. PROCEDURE DIVISION. STOP RUN RETURNING 7.").unwrap();
+        assert!(matches!(
+            execute(&returning, 1024),
+            MachineDrive::Completed(done) if done.return_code == 7
+        ));
+    }
+
+    #[test]
+    fn accept_clock_and_environment_inputs_are_explicit_typed_effects() {
+        use mainframe_env_host_api::{ClockRequest, EffectResult, HostRequest, HostResult};
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. ACCEPTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATE-X PIC X(8). 01 DAY-X PIC X(7). 01 WEEKDAY-X PIC X. 01 TIME-X PIC X(8). 01 ENV-X PIC X(4). PROCEDURE DIVISION. ACCEPT DATE-X FROM DATE YYYYMMDD. ACCEPT DAY-X FROM DAY YYYYDDD. ACCEPT WEEKDAY-X FROM DAY-OF-WEEK. ACCEPT TIME-X FROM TIME. ACCEPT ENV-X FROM ENVIRONMENT 'MODE'. DISPLAY DATE-X. DISPLAY DAY-X. DISPLAY WEEKDAY-X. DISPLAY TIME-X. DISPLAY ENV-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut invocation = invocation(&artifact, 1024);
+        invocation.bindings.insert(
+            "cobol.environment.MODE".into(),
+            mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cobol.environment@1",
+                b"TEST".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        let mut machine =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        let mut resume = MachineResume::Start;
+        loop {
+            match machine.drive(resume, Quantum::new(128, 4096).unwrap()) {
+                MachineDrive::Continue => resume = MachineResume::Start,
+                MachineDrive::HostCall(effect) => {
+                    let value = match effect.request {
+                        HostRequest::Clock(ClockRequest::Date) => "20240229",
+                        HostRequest::Clock(ClockRequest::Time) => "123456789",
+                        other => panic!("unexpected ACCEPT effect: {other:?}"),
+                    };
+                    resume = MachineResume::HostResult(EffectResult {
+                        sequence: effect.sequence,
+                        outcome: Ok(HostResult::Clock(value.into())),
+                    });
+                }
+                MachineDrive::Completed(done) => {
+                    assert_eq!(
+                        done.output.bytes(),
+                        b"20240229\n2024060\n4\n12345678\nTEST\n"
+                    );
+                    break;
+                }
+                other => panic!("{other:?}; position={}", machine.position_summary()),
+            }
+        }
+    }
+
+    #[test]
+    fn cancel_resolves_every_literal_and_dynamic_program_in_source_order() {
+        use mainframe_env_host_api::{EffectResult, HostRequest, HostResult, ProgramRequest};
+
+        let artifact = compile("IDENTIFICATION DIVISION. PROGRAM-ID. CANCELS. DATA DIVISION. WORKING-STORAGE SECTION. 01 PROGRAM-X PIC X(3) VALUE 'TWO'. PROCEDURE DIVISION. CANCEL 'ONE' PROGRAM-X. STOP RUN.").unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let mut resume = MachineResume::Start;
+        loop {
+            match machine.drive(resume, Quantum::new(128, 4096).unwrap()) {
+                MachineDrive::Continue => resume = MachineResume::Start,
+                MachineDrive::HostCall(effect) => {
+                    match effect.request {
+                        HostRequest::Program(ProgramRequest::Cancel { programs }) => assert_eq!(
+                            programs
+                                .iter()
+                                .map(|program| program.as_str())
+                                .collect::<Vec<_>>(),
+                            ["ONE", "TWO"]
+                        ),
+                        other => panic!("unexpected CANCEL effect: {other:?}"),
+                    }
+                    let payload = mainframe_env_execution_api::BoundedPayload::new(
+                        "mainframe-env.program.cancel@1",
+                        Vec::new(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap();
+                    resume = MachineResume::HostResult(EffectResult {
+                        sequence: effect.sequence,
+                        outcome: Ok(HostResult::Program(payload)),
+                    });
+                }
+                MachineDrive::Completed(_) => break,
+                other => panic!("{other:?}"),
+            }
+        }
+    }
     #[test]
     fn internal_data_arithmetic_and_condition_semantics_execute() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. MATH. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9(3) VALUE 2. 01 B PIC 9(3) VALUE 3. 01 OUT PIC X(5). PROCEDURE DIVISION. ADD A TO B. IF B = 5 DISPLAY 'OK' END-IF. MOVE 'DONE' TO OUT. DISPLAY B. DISPLAY OUT. STOP RUN.";
@@ -412,6 +810,50 @@ mod tests {
             MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"SIZE\n5\n"),
             other => panic!("{other:?}"),
         }
+    }
+
+    #[test]
+    fn multiple_arithmetic_receivers_are_atomic_on_size_error() {
+        let normal = compile("IDENTIFICATION DIVISION. PROGRAM-ID. MULTIRECV. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9 VALUE 1. 01 B PIC 9 VALUE 2. 01 C PIC 9 VALUE 3. PROCEDURE DIVISION. ADD A TO B C. SUBTRACT A FROM B C. DISPLAY B C. STOP RUN.").unwrap();
+        assert!(matches!(
+            execute(&normal, 1024),
+            MachineDrive::Completed(done) if done.output.bytes() == b"23\n"
+        ));
+
+        let size_error = compile("IDENTIFICATION DIVISION. PROGRAM-ID. MULTISIZE. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9 VALUE 1. 01 B PIC 9 VALUE 9. 01 C PIC 9 VALUE 5. PROCEDURE DIVISION. ADD A TO B C ON SIZE ERROR DISPLAY 'SIZE' END-ADD. DISPLAY B C. STOP RUN.").unwrap();
+        assert!(matches!(
+            execute(&size_error, 1024),
+            MachineDrive::Completed(done) if done.output.bytes() == b"SIZE\n95\n"
+        ));
+    }
+
+    #[test]
+    fn add_corresponding_matches_numeric_descendants_atomically() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CORR. DATA DIVISION. WORKING-STORAGE SECTION. 01 SOURCE-G. 05 COUNT-X PIC 99 VALUE 2. 05 NESTED-G. 10 AMOUNT-X PIC 99 VALUE 3. 05 TEXT-X PIC X VALUE 'S'. 01 TARGET-G. 05 COUNT-X PIC 99 VALUE 10. 05 NESTED-G. 10 AMOUNT-X PIC 99 VALUE 20. 05 TEXT-X PIC X VALUE 'T'. PROCEDURE DIVISION. ADD CORRESPONDING SOURCE-G TO TARGET-G. DISPLAY COUNT-X OF TARGET-G AMOUNT-X OF NESTED-G OF TARGET-G TEXT-X OF TARGET-G. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        assert!(matches!(
+            execute(&artifact, 1024),
+            MachineDrive::Completed(done) if done.output.bytes() == b"1223T\n"
+        ));
+    }
+
+    #[test]
+    fn move_corresponding_converts_matching_elementary_descendants() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. MOVECORR. DATA DIVISION. WORKING-STORAGE SECTION. 01 SOURCE-G. 05 COUNT-X PIC 9(3) COMP-3 VALUE 12. 05 NESTED-G. 10 TEXT-X PIC X(2) VALUE 'OK'. 05 ONLY-SOURCE PIC X VALUE 'S'. 01 TARGET-G. 05 COUNT-X PIC 9(4) VALUE 0. 05 NESTED-G. 10 TEXT-X PIC X(3) VALUE 'BAD'. 05 ONLY-TARGET PIC X VALUE 'T'. PROCEDURE DIVISION. MOVE CORRESPONDING SOURCE-G TO TARGET-G. DISPLAY COUNT-X OF TARGET-G TEXT-X OF NESTED-G OF TARGET-G ONLY-TARGET. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        assert!(matches!(
+            execute(&artifact, 1024),
+            MachineDrive::Completed(done) if done.output.bytes() == b"0012OK T\n"
+        ));
+    }
+
+    #[test]
+    fn multiply_giving_and_divide_remainder_preserve_source_receivers() {
+        let artifact = compile("IDENTIFICATION DIVISION. PROGRAM-ID. MULDIV. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 99 VALUE 2. 01 B PIC 99 VALUE 7. 01 C PIC 99 VALUE 0. 01 R PIC 99 VALUE 0. PROCEDURE DIVISION. MULTIPLY A BY B GIVING C. DISPLAY B C. DIVIDE B BY A GIVING C REMAINDER R. DISPLAY B C R. STOP RUN.").unwrap();
+        assert!(matches!(
+            execute(&artifact, 1024),
+            MachineDrive::Completed(done) if done.output.bytes() == b"0714\n070301\n"
+        ));
     }
     #[test]
     fn condition_families_ignore_conflicting_prior_file_status() {
@@ -468,6 +910,76 @@ mod tests {
             run(failing, vec![b"R".to_vec()]),
             b"ADD-ERR\nSTR-ERR\nUNSTR-ERR\nJSON-ERR\nXML-ERR\n"
         );
+    }
+    #[test]
+    fn use_after_standard_error_runs_its_declarative_section_and_returns() {
+        use mainframe_env_host_api::{EffectResult, HostProblem};
+
+        let source = "IDENTIFICATION DIVISION.\nPROGRAM-ID. DECLERR.\nENVIRONMENT DIVISION.\nINPUT-OUTPUT SECTION.\nFILE-CONTROL.\nSELECT TEST-FILE ASSIGN TO TESTDD ORGANIZATION IS INDEXED ACCESS MODE IS RANDOM RECORD KEY IS REC-KEY.\nDATA DIVISION.\nFILE SECTION.\nFD TEST-FILE.\n01 TEST-REC.\n05 REC-KEY PIC X VALUE 'A'.\n05 DATA-X PIC X.\nPROCEDURE DIVISION.\nDECLARATIVES.\nERROR-HANDLER SECTION.\nUSE AFTER STANDARD ERROR PROCEDURE ON TEST-FILE.\nHANDLE-P.\nDISPLAY 'DECL'.\nEXIT.\nEND DECLARATIVES.\nMAIN-P.\nREAD TEST-FILE RECORD KEY IS REC-KEY.\nDISPLAY 'DONE'.\nSTOP RUN.\n";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(128, 4096).unwrap())
+        else {
+            panic!("declarative READ did not emit a host effect");
+        };
+        let mut resume = MachineResume::HostResult(EffectResult {
+            sequence: effect.sequence,
+            outcome: Err(HostProblem::Condition {
+                name: "NOTFND".into(),
+                response: 13,
+                response2: 0,
+            }),
+        });
+        loop {
+            match machine.drive(resume, Quantum::new(128, 4096).unwrap()) {
+                MachineDrive::Continue => resume = MachineResume::Start,
+                MachineDrive::Completed(done) => {
+                    assert_eq!(done.output.bytes(), b"DECL\nDONE\n");
+                    break;
+                }
+                other => panic!("{other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn json_and_xml_generate_count_the_exact_emitted_bytes() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. GENCOUNT. DATA DIVISION. WORKING-STORAGE SECTION. 01 SOURCE-X PIC X(3) VALUE 'A&B'. 01 JSON-X PIC X(64). 01 XML-X PIC X(64). 01 JSON-N PIC 99. 01 XML-N PIC 99. PROCEDURE DIVISION. JSON GENERATE JSON-X FROM SOURCE-X COUNT IN JSON-N. XML GENERATE XML-X FROM SOURCE-X COUNT IN XML-N. DISPLAY JSON-N. DISPLAY XML-N. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"18\n28\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn xml_parse_processing_procedure_receives_ordered_events_and_through_range() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. XMLPROCESS. DATA DIVISION. WORKING-STORAGE SECTION. 01 XML-X PIC X(32) VALUE '<ROOT>A&amp;B</ROOT>'. PROCEDURE DIVISION. XML PARSE XML-X PROCESSING PROCEDURE HANDLE THRU HANDLE-END. DISPLAY 'DONE'. STOP RUN. HANDLE. DISPLAY XML-EVENT ':' XML-TEXT. HANDLE-END. EXIT. NEXT-P. DISPLAY 'BAD'.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 4096) {
+            MachineDrive::Completed(done) => assert_eq!(
+                done.output.bytes(),
+                b"START-OF-DOCUMENT:\nSTART-OF-ELEMENT:ROOT\nCONTENT-CHARACTERS:A&B\nEND-OF-ELEMENT:ROOT\nEND-OF-DOCUMENT:\nDONE\n"
+            ),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn json_parse_with_detail_emits_a_deterministic_exception_message() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. JSONDETAIL. DATA DIVISION. WORKING-STORAGE SECTION. 01 BAD-X PIC X(3) VALUE 'BAD'. 01 OUT-X PIC X(8). PROCEDURE DIVISION. JSON PARSE BAD-X INTO OUT-X WITH DETAIL ON EXCEPTION DISPLAY 'ERR' NOT ON EXCEPTION DISPLAY 'BAD' END-JSON. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(
+                done.output.bytes(),
+                b"IGZ0335W JSON PARSE input is invalid\nERR\n"
+            ),
+            other => panic!("{other:?}"),
+        }
     }
 
     #[test]
@@ -571,11 +1083,38 @@ mod tests {
         }
     }
     #[test]
+    fn inspect_leading_first_characters_and_delimited_ranges_are_exact() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. INSPECTPHRASE. DATA DIVISION. WORKING-STORAGE SECTION. 01 TEXT-X PIC X(9) VALUE '000CABACA'. 01 COUNT-X PIC 99 VALUE 1. PROCEDURE DIVISION. INSPECT TEXT-X TALLYING COUNT-X FOR LEADING '0'. INSPECT TEXT-X REPLACING FIRST 'A' BY '2' AFTER INITIAL 'C'. INSPECT TEXT-X REPLACING LEADING '0' BY 'X' BEFORE INITIAL 'C'. INSPECT TEXT-X REPLACING CHARACTERS BY '*' AFTER INITIAL 'B' BEFORE INITIAL 'C'. DISPLAY COUNT-X. DISPLAY TEXT-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"04\nXXXC2B*CA\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
     fn initialize_resolves_multiple_qualified_targets() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. INITQUAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 GROUP-X. 05 FIRST-X PIC X VALUE 'A'. 05 SECOND-X PIC X VALUE 'B'. 01 THIRD-X PIC X VALUE 'C'. PROCEDURE DIVISION. INITIALIZE FIRST-X OF GROUP-X SECOND-X OF GROUP-X THIRD-X. DISPLAY GROUP-X. DISPLAY THIRD-X. STOP RUN.";
         let artifact = compile(source).unwrap();
         match execute(&artifact, 1024) {
             MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"  \n \n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn initialize_with_filler_is_distinct_from_default_group_initialization() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. INITFILL. DATA DIVISION. WORKING-STORAGE SECTION. 01 GROUP-A. 05 FILLER PIC X VALUE 'A'. 05 VALUE-A PIC X VALUE 'B'. 01 GROUP-B. 05 FILLER PIC X VALUE 'C'. 05 VALUE-B PIC X VALUE 'D'. PROCEDURE DIVISION. INITIALIZE GROUP-A. INITIALIZE GROUP-B WITH FILLER. DISPLAY GROUP-A. DISPLAY GROUP-B. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"A \n  \n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn initialize_replacing_multiple_categories_and_then_default_are_distinct() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. INITREPL. DATA DIVISION. WORKING-STORAGE SECTION. 01 GROUP-X. 05 TEXT-X PIC X(2) VALUE 'AB'. 05 NUMBER-X PIC 99 VALUE 12. 05 LETTER-X PIC A VALUE 'Z'. PROCEDURE DIVISION. INITIALIZE GROUP-X REPLACING ALPHANUMERIC DATA BY 'X' NUMERIC DATA BY 7. DISPLAY GROUP-X. MOVE 'AB' TO TEXT-X. MOVE 12 TO NUMBER-X. MOVE 'Z' TO LETTER-X. INITIALIZE GROUP-X REPLACING ALPHANUMERIC DATA BY 'X' NUMERIC DATA BY 7 THEN TO DEFAULT. DISPLAY GROUP-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"X 07Z\nX 07 \n"),
             other => panic!("{other:?}"),
         }
     }
@@ -592,7 +1131,10 @@ mod tests {
 
         let bad = "IDENTIFICATION DIVISION. PROGRAM-ID. BADREF. DATA DIVISION. WORKING-STORAGE SECTION. 01 TABLE-GROUP. 05 TABLE-X PIC X OCCURS 2 TIMES. 01 OUT-X PIC X. PROCEDURE DIVISION. MOVE TABLE-X(3) TO OUT-X. STOP RUN.";
         let artifact = compile(bad).unwrap();
-        assert!(matches!(execute(&artifact, 1024), MachineDrive::Failed(_)));
+        assert!(matches!(
+            execute(&artifact, 1024),
+            MachineDrive::Condition(condition) if condition.name == "SUBSCRIPT-ERROR"
+        ));
     }
     #[test]
     fn justified_right_move_pads_on_the_left() {
@@ -698,6 +1240,45 @@ mod tests {
         }
     }
     #[test]
+    fn out_of_line_perform_times_until_and_varying_repeat_exactly() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. OUTPERF. DATA DIVISION. WORKING-STORAGE SECTION. 01 I PIC 9 VALUE 0. 01 J PIC 9 VALUE 0. PROCEDURE DIVISION. PERFORM TIMES-P 3 TIMES. PERFORM UNTIL-P UNTIL I > 5. PERFORM VARY-P VARYING J FROM 1 BY 1 UNTIL J > 3. DISPLAY I. STOP RUN. TIMES-P. DISPLAY 'T'. ADD 1 TO I. EXIT. UNTIL-P. DISPLAY 'U'. ADD 1 TO I. EXIT. VARY-P. DISPLAY J. EXIT.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 4096) {
+            MachineDrive::Completed(done) => {
+                assert_eq!(done.output.bytes(), b"T\nT\nT\nU\nU\nU\n1\n2\n3\n6\n")
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn out_of_line_perform_repetition_survives_checkpoint_restore() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. OUTPERFCP. DATA DIVISION. WORKING-STORAGE SECTION. 01 I PIC 99 VALUE 0. PROCEDURE DIVISION. PERFORM WORK-P 5 TIMES. DISPLAY I. STOP RUN. WORK-P. ADD 1 TO I. EXIT.";
+        let artifact = compile(source).unwrap();
+        let invocation = invocation(&artifact, 1024);
+        let mut original = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            original.drive(MachineResume::Start, Quantum::new(6, 4096).unwrap()),
+            MachineDrive::Continue
+        );
+        let checkpoint = original.checkpoint().unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored.restore_checkpoint(&checkpoint).unwrap();
+        let original = drive_to_terminal(&mut original);
+        let restored = drive_to_terminal(&mut restored);
+        assert_eq!(original, restored);
+        assert!(matches!(
+            restored,
+            MachineDrive::Completed(done) if done.output.bytes() == b"05\n"
+        ));
+    }
+    #[test]
     fn nested_performs_preserve_the_outer_same_paragraph_endpoint() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. NESTTHRU. PROCEDURE DIVISION. PERFORM OUTER-PARA THRU OUTER-PARA. DISPLAY 'DONE'. STOP RUN. OUTER-PARA. DISPLAY 'OUTER'. PERFORM INNER-PARA THRU INNER-EXIT. OUTER-EXIT. EXIT. INNER-PARA. DISPLAY 'INNER'. INNER-EXIT. EXIT. NEXT-PARA. DISPLAY 'WRONG'.";
         let artifact = compile(source).unwrap();
@@ -714,6 +1295,33 @@ mod tests {
         let artifact = compile(source).unwrap();
         match execute(&artifact, 1024) {
             MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"1\n2\n3\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn exit_perform_transfers_after_the_enclosing_inline_loop() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. EXITPERF. DATA DIVISION. WORKING-STORAGE SECTION. 01 I PIC 9 VALUE 0. PROCEDURE DIVISION.\nPERFORM VARYING I FROM 1 BY 1 UNTIL I > 4\n IF I = 3\n  EXIT PERFORM\n END-IF\n DISPLAY I\nEND-PERFORM.\nDISPLAY 'DONE'.\nSTOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"1\n2\nDONE\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn exit_paragraph_returns_from_an_out_of_line_perform() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. EXITPARA. PROCEDURE DIVISION. PERFORM WORK-P. DISPLAY 'DONE'. STOP RUN. WORK-P. DISPLAY 'WORK'. EXIT PARAGRAPH. DISPLAY 'BAD'. NEXT-P. DISPLAY 'WRONG'.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"WORK\nDONE\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn exit_section_skips_remaining_paragraphs_until_the_next_section() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. EXITSECT. PROCEDURE DIVISION. GO TO WORK-P. FIRST-S SECTION. WORK-P. DISPLAY 'WORK'. EXIT SECTION. DISPLAY 'BAD'. LATE-P. DISPLAY 'LATE'. SECOND-S SECTION. DISPLAY 'NEXT'. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"WORK\nNEXT\n"),
             other => panic!("{other:?}"),
         }
     }
@@ -830,6 +1438,24 @@ mod tests {
         }
     }
     #[test]
+    fn set_up_and_down_by_update_all_numeric_targets() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SETDELTA. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 99 VALUE 10. 01 B PIC 99 VALUE 20. PROCEDURE DIVISION. SET A B UP BY 3. SET A B DOWN BY 1. DISPLAY A B. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"1222\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn set_to_applies_one_value_or_address_to_every_target() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SETMULTI. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 99 VALUE 1. 01 B PIC 99 VALUE 2. 01 ITEM-X PIC X VALUE 'X'. 01 P POINTER. 01 Q POINTER. PROCEDURE DIVISION. SET A B TO 7. SET P Q TO ADDRESS OF ITEM-X. SET P Q TO NULL. DISPLAY A B. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"0707\n"),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
     fn numeric_condition_ranges_accept_leading_zeroes() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. RANGE88. DATA DIVISION. WORKING-STORAGE SECTION. 01 MONTH-RAW PIC X(2) VALUE '04'. 01 MONTH-X REDEFINES MONTH-RAW PIC 99. 88 VALID-MONTH VALUE 1 THROUGH 12. PROCEDURE DIVISION. IF VALID-MONTH DISPLAY 'VALID' END-IF. STOP RUN.";
         let artifact = compile(source).unwrap();
@@ -869,7 +1495,10 @@ mod tests {
 
         let overflow = "IDENTIFICATION DIVISION. PROGRAM-ID. OVERFLOW. DATA DIVISION. WORKING-STORAGE SECTION. 01 X PIC 99 VALUE 99. PROCEDURE DIVISION. ADD 1 TO X. STOP RUN.";
         let artifact = compile(overflow).unwrap();
-        assert!(matches!(execute(&artifact, 1024), MachineDrive::Failed(_)));
+        assert!(matches!(
+            execute(&artifact, 1024),
+            MachineDrive::Condition(condition) if condition.name == "SIZE-ERROR"
+        ));
     }
     #[test]
     fn reached_intrinsic_date_case_length_numval_and_mod_are_deterministic() {
@@ -880,6 +1509,26 @@ mod tests {
                 done.output.bytes(),
                 b"1970010100000000+0000\n20240229\n02\n08\nabc     \n01250\n"
             ),
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn national_length_and_utf8_index_width_boundaries_are_exact() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. UNICODEFN. DATA DIVISION. WORKING-STORAGE SECTION. 01 NAT-X PIC N(3) NATIONAL. 01 UTF-X PIC U(4) BYTE-LENGTH 16 UTF-8. 01 L1 PIC 99. 01 L2 PIC 99. 01 L3 PIC 99. 01 L4 PIC 99. 01 L5 PIC 99. 01 L6 PIC 99. 01 L7 PIC 99. 01 L8 PIC 99. PROCEDURE DIVISION. MOVE 'Aé🙂' TO UTF-X. MOVE FUNCTION LENGTH(NAT-X) TO L1. MOVE FUNCTION BYTE-LENGTH(NAT-X) TO L2. MOVE FUNCTION LENGTH(UTF-X) TO L3. MOVE FUNCTION ULENGTH(UTF-X, 2, 2) TO L4. MOVE FUNCTION UPOS(UTF-X, 3) TO L5. MOVE FUNCTION UWIDTH(UTF-X, 2) TO L6. MOVE FUNCTION UWIDTH(UTF-X, 3) TO L7. MOVE FUNCTION USUPPLEMENTARY(UTF-X) TO L8. DISPLAY L1 L2 L3 L4 L5 L6 L7 L8. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => {
+                assert_eq!(done.output.bytes(), b"0306040104020403\n")
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn test_numval_variants_return_error_positions_and_honor_currency_arguments() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. TESTNUM. DATA DIVISION. WORKING-STORAGE SECTION. 01 BAD-X PIC X(4) VALUE '12A3'. 01 CUR-X PIC X(6) VALUE '€12X'. 01 SYMBOL-X PIC X(3) VALUE '€'. 01 POS-X PIC 9. 01 VALUE-X PIC 99V9. PROCEDURE DIVISION. MOVE FUNCTION TEST-NUMVAL(BAD-X) TO POS-X. DISPLAY POS-X. MOVE FUNCTION TEST-NUMVAL-C(CUR-X, SYMBOL-X) TO POS-X. DISPLAY POS-X. MOVE FUNCTION NUMVAL-C('€12.5', SYMBOL-X) TO VALUE-X. DISPLAY VALUE-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"3\n4\n125\n"),
             other => panic!("{other:?}"),
         }
     }
@@ -907,10 +1556,10 @@ mod tests {
     fn structured_loop_checkpoint_preserves_reentry_state() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. FLOWCP. DATA DIVISION. WORKING-STORAGE SECTION. 01 I PIC 9. 01 TOTAL PIC 99. PROCEDURE DIVISION.\nPERFORM VARYING I FROM 1 BY 1 UNTIL I > 3\n ADD I TO TOTAL\nEND-PERFORM.\nDISPLAY TOTAL.\nSTOP RUN.";
         let artifact = compile(source).unwrap();
-        let invocation = invocation(&artifact, 1024);
+        let dynamic_invocation = invocation(&artifact, 1024);
         let mut first = ReferenceMachine::from_binary(
             artifact.payload(),
-            invocation.clone(),
+            dynamic_invocation.clone(),
             CodecLimits::default(),
         )
         .unwrap();
@@ -923,15 +1572,116 @@ mod tests {
         let checkpoint = first.checkpoint().unwrap();
         assert_eq!(
             checkpoint.schema(),
-            "mainframe-env.reference-machine-checkpoint@7"
+            "mainframe-env.reference-machine-checkpoint@10"
+        );
+        let mut restored = ReferenceMachine::from_binary(
+            artifact.payload(),
+            dynamic_invocation,
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored.restore_checkpoint(&checkpoint).unwrap();
+        assert_eq!(
+            drive_to_terminal(&mut first),
+            drive_to_terminal(&mut restored)
+        );
+    }
+
+    #[test]
+    fn checkpoint_v10_preserves_dynamic_sort_and_allocated_linkage_state() {
+        let dynamic_source = "IDENTIFICATION DIVISION. PROGRAM-ID. DYNCP. DATA DIVISION. WORKING-STORAGE SECTION. 01 DYN-X PIC X DYNAMIC LENGTH LIMIT IS 8. PROCEDURE DIVISION. MOVE 'HELLO' TO DYN-X. DISPLAY DYN-X. STOP RUN.";
+        let artifact = compile(dynamic_source).unwrap();
+        let dynamic_invocation = invocation(&artifact, 1024);
+        let mut first = ReferenceMachine::from_binary(
+            artifact.payload(),
+            dynamic_invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        while first
+            .variable("DYN-X")
+            .is_none_or(|value| value.bytes() != b"HELLO")
+        {
+            assert_eq!(
+                first.drive(MachineResume::Start, Quantum::new(1, 1024).unwrap()),
+                MachineDrive::Continue
+            );
+        }
+        let checkpoint = first.checkpoint().unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            artifact.payload(),
+            dynamic_invocation,
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored.restore_checkpoint(&checkpoint).unwrap();
+        assert_eq!(restored.variable("DYN-X").unwrap().bytes(), b"HELLO");
+        assert_eq!(
+            drive_to_terminal(&mut first),
+            drive_to_terminal(&mut restored)
+        );
+
+        let sort_source = "IDENTIFICATION DIVISION. PROGRAM-ID. SORTCP. DATA DIVISION. FILE SECTION. SD SORT-FILE. 01 SORT-RECORD. 05 SORT-KEY PIC X(2). 05 SORT-DATA PIC X(2). WORKING-STORAGE SECTION. 01 OUT-X PIC X(4). PROCEDURE DIVISION. SORT SORT-FILE ON ASCENDING KEY SORT-KEY INPUT PROCEDURE FEED OUTPUT PROCEDURE DRAIN. STOP RUN. FEED. MOVE 'BB02' TO SORT-RECORD. RELEASE SORT-RECORD. MOVE 'AA01' TO SORT-RECORD. RELEASE SORT-RECORD. EXIT. DRAIN. RETURN SORT-FILE RECORD INTO OUT-X. DISPLAY OUT-X. RETURN SORT-FILE RECORD INTO OUT-X. DISPLAY OUT-X. EXIT.";
+        let artifact = compile(sort_source).unwrap();
+        let sort_invocation = invocation(&artifact, 1024);
+        let mut first = ReferenceMachine::from_binary(
+            artifact.payload(),
+            sort_invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        while !first.position_summary().contains("move [\"'AA01'\"") {
+            assert_eq!(
+                first.drive(MachineResume::Start, Quantum::new(1, 1024).unwrap()),
+                MachineDrive::Continue
+            );
+        }
+        let checkpoint = first.checkpoint().unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            artifact.payload(),
+            sort_invocation,
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored.restore_checkpoint(&checkpoint).unwrap();
+        let expected = drive_to_terminal(&mut first);
+        assert_eq!(expected, drive_to_terminal(&mut restored));
+        assert!(
+            matches!(expected, MachineDrive::Completed(done) if done.output.bytes() == b"AA01\nBB02\n")
+        );
+
+        let heap_source = "IDENTIFICATION DIVISION. PROGRAM-ID. HEAPCP. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR POINTER. LINKAGE SECTION. 01 BLOCK PIC X(4). PROCEDURE DIVISION. ALLOCATE 4 CHARACTERS RETURNING PTR. SET ADDRESS OF BLOCK TO PTR. MOVE 'HEAP' TO BLOCK. DISPLAY BLOCK. FREE PTR. STOP RUN.";
+        let artifact = compile(heap_source).unwrap();
+        let invocation = invocation(&artifact, 1024);
+        let mut first = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        while first
+            .variable("BLOCK")
+            .is_none_or(|value| value.bytes() != b"HEAP")
+        {
+            assert_eq!(
+                first.drive(MachineResume::Start, Quantum::new(1, 1024).unwrap()),
+                MachineDrive::Continue
+            );
+        }
+        let checkpoint = first.checkpoint().unwrap();
+        assert_eq!(
+            checkpoint.schema(),
+            "mainframe-env.reference-machine-checkpoint@10"
         );
         let mut restored =
             ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
                 .unwrap();
         restored.restore_checkpoint(&checkpoint).unwrap();
-        assert_eq!(
-            drive_to_terminal(&mut first),
-            drive_to_terminal(&mut restored)
+        assert_eq!(restored.variable("BLOCK").unwrap().bytes(), b"HEAP");
+        let expected = drive_to_terminal(&mut first);
+        assert_eq!(expected, drive_to_terminal(&mut restored));
+        assert!(
+            matches!(expected, MachineDrive::Completed(done) if done.output.bytes() == b"HEAP\n")
         );
     }
 
@@ -954,7 +1704,9 @@ mod tests {
                 other => panic!("{other:?}"),
             }
         };
-        let HostRequest::Program(ProgramRequest::Call { program, payload }) = &effect.request
+        let HostRequest::Program(ProgramRequest::Call {
+            program, payload, ..
+        }) = &effect.request
         else {
             panic!("unexpected request: {:?}", effect.request);
         };
@@ -980,6 +1732,28 @@ mod tests {
             ),
             MachineDrive::Completed(done) if done.output.bytes() == b"XY\n"
         ));
+    }
+    #[test]
+    fn entry_binding_selects_the_alternate_entry_after_storage_initialization() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. ENTRYPOINT. DATA DIVISION. WORKING-STORAGE SECTION. 01 VALUE-X PIC X(4) VALUE 'INIT'. PROCEDURE DIVISION. DISPLAY 'MAIN'. STOP RUN. ENTRY 'ALT'. DISPLAY VALUE-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut invocation = invocation(&artifact, 1024);
+        invocation.bindings.insert(
+            "cobol.entry".into(),
+            mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cobol-entry@1",
+                b"ALT".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        let mut machine =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        match drive_to_terminal(&mut machine) {
+            MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"INIT\n"),
+            other => panic!("{other:?}"),
+        }
     }
 
     #[test]
@@ -1036,6 +1810,112 @@ mod tests {
             ),
             MachineDrive::Completed(done) if done.output.bytes() == b"ABC\n00\n"
         ));
+    }
+    #[test]
+    fn read_lock_and_wait_phrases_survive_in_the_typed_dataset_effect() {
+        use mainframe_env_host_api::{
+            DatasetReadControl, DatasetReadLockMode, DatasetRequest, HostRequest,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. READCONTROL. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT TEST-FILE ASSIGN TO TESTDD ORGANIZATION IS INDEXED ACCESS MODE IS RANDOM RECORD KEY IS REC-KEY. DATA DIVISION. FILE SECTION. FD TEST-FILE. 01 TEST-REC. 05 REC-KEY PIC X(2) VALUE 'AA'. 05 DATA-X PIC X(2). PROCEDURE DIVISION. READ TEST-FILE RECORD KEY IS REC-KEY WITH KEPT LOCK NO WAIT. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 4096).unwrap())
+        else {
+            panic!("READ did not emit a host effect");
+        };
+        assert!(matches!(
+            effect.request,
+            HostRequest::Dataset(DatasetRequest::Read {
+                control: DatasetReadControl {
+                    lock: DatasetReadLockMode::KeptLock,
+                    wait: Some(false),
+                },
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn open_and_close_apply_every_file_and_retain_each_close_phrase() {
+        use mainframe_env_host_api::{DatasetRequest, HostRequest};
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. MULTIFILE. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT FIRST-FILE ASSIGN TO FIRSTDD ORGANIZATION IS SEQUENTIAL. SELECT SECOND-FILE ASSIGN TO SECONDDD ORGANIZATION IS SEQUENTIAL. DATA DIVISION. FILE SECTION. FD FIRST-FILE. 01 FIRST-REC PIC X. FD SECOND-FILE. 01 SECOND-REC PIC X. PROCEDURE DIVISION. OPEN OUTPUT FIRST-FILE SECOND-FILE. CLOSE FIRST-FILE WITH LOCK SECOND-FILE. DISPLAY 'DONE'. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let mut resume = MachineResume::Start;
+        let mut requests = Vec::new();
+        loop {
+            match machine.drive(resume, Quantum::new(256, 4096).unwrap()) {
+                MachineDrive::Continue => resume = MachineResume::Start,
+                MachineDrive::HostCall(effect) => {
+                    let HostRequest::Dataset(request) = &effect.request else {
+                        panic!("unexpected effect: {:?}", effect.request);
+                    };
+                    let (kind, dataset) = match request {
+                        DatasetRequest::Truncate { dataset, .. } => ("truncate", dataset.as_str()),
+                        DatasetRequest::Close { dataset, .. } => ("close", dataset.as_str()),
+                        other => panic!("unexpected dataset request: {other:?}"),
+                    };
+                    requests.push(format!("{kind}:{dataset}"));
+                    resume = MachineResume::HostResult(
+                        crate::cobol_runtime::effect_result(&effect).unwrap(),
+                    );
+                }
+                MachineDrive::Completed(done) => {
+                    assert_eq!(done.output.bytes(), b"DONE\n");
+                    break;
+                }
+                other => panic!("{other:?}"),
+            }
+        }
+        assert_eq!(
+            requests,
+            [
+                "truncate:FIRSTDD",
+                "truncate:SECONDDD",
+                "close:FIRSTDD",
+                "close:SECONDDD",
+            ]
+        );
+    }
+    #[test]
+    fn write_advancing_updates_linage_and_selects_end_of_page_branches() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. WRITEPAGE. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT PRINT-FILE ASSIGN TO PRINTDD ORGANIZATION IS SEQUENTIAL. DATA DIVISION. FILE SECTION. FD PRINT-FILE LINAGE IS 3 LINES. 01 PRINT-REC PIC X. WORKING-STORAGE SECTION. 01 VALUE-X PIC X VALUE 'A'. PROCEDURE DIVISION. WRITE PRINT-REC FROM VALUE-X AFTER ADVANCING 2 LINES AT END-OF-PAGE DISPLAY 'EOP' NOT AT END-OF-PAGE DISPLAY 'BAD1' END-WRITE. WRITE PRINT-REC FROM VALUE-X BEFORE ADVANCING PAGE AT END-OF-PAGE DISPLAY 'PAGE' NOT AT END-OF-PAGE DISPLAY 'BAD2' END-WRITE. DISPLAY LINAGE-COUNTER. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let mut resume = MachineResume::Start;
+        loop {
+            match machine.drive(resume, Quantum::new(256, 4096).unwrap()) {
+                MachineDrive::Continue => resume = MachineResume::Start,
+                MachineDrive::HostCall(effect) => {
+                    resume = MachineResume::HostResult(
+                        crate::cobol_runtime::effect_result(&effect).unwrap(),
+                    );
+                }
+                MachineDrive::Completed(done) => {
+                    assert_eq!(done.output.bytes(), b"EOP\nPAGE\n1\n");
+                    break;
+                }
+                other => panic!("{other:?}"),
+            }
+        }
     }
 
     #[test]

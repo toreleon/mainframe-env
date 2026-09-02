@@ -136,21 +136,27 @@ fn verify_limits() -> Result<usize, String> {
 }
 
 fn verify_recovery_and_publication() -> Result<usize, String> {
-    let sources = [
-        "IDENTIFICATION DIVISION. PROGRAM-ID. DUP. PROCEDURE DIVISION. DUP. DISPLAY 'A'. DUP. EXIT. STOP RUN.",
+    let recovered = "IDENTIFICATION DIVISION. PROGRAM-ID. DUP. PROCEDURE DIVISION. DUP. DISPLAY 'A'. DUP. EXIT. STOP RUN.";
+    let result = CobolCompiler::default()
+        .compile(request(recovered)?)
+        .map_err(|problem| problem.to_string())?;
+    if matches!(result, CompilerResult::Published { .. }) {
+        return Err("recovered malformed COBOL published".into());
+    }
+    let promoted = [
         "IDENTIFICATION DIVISION. PROGRAM-ID. DYNAMIC. DATA DIVISION. WORKING-STORAGE SECTION. 01 X PIC X DYNAMIC LIMIT 8. PROCEDURE DIVISION. STOP RUN.",
-        "IDENTIFICATION DIVISION. PROGRAM-ID. SORTED. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT IN-FILE ASSIGN TO INDD. SELECT OUT-FILE ASSIGN TO OUTDD. DATA DIVISION. FILE SECTION. FD IN-FILE. 01 IN-REC PIC X. FD OUT-FILE. 01 OUT-REC PIC X. SD WORK-FILE. 01 WORK-REC PIC X. PROCEDURE DIVISION. SORT WORK-FILE USING IN-FILE GIVING OUT-FILE. STOP RUN.",
+        "IDENTIFICATION DIVISION. PROGRAM-ID. FLOAT-X. DATA DIVISION. WORKING-STORAGE SECTION. 01 N COMP-1. PROCEDURE DIVISION. DISPLAY N. STOP RUN.",
         "IDENTIFICATION DIVISION. PROGRAM-ID. FUNCTION-X. DATA DIVISION. WORKING-STORAGE SECTION. 01 N PIC 9V9. PROCEDURE DIVISION. MOVE FUNCTION SQRT(N) TO N. STOP RUN.",
     ];
-    for source in sources {
+    for source in promoted {
         let result = CobolCompiler::default()
             .compile(request(source)?)
             .map_err(|problem| problem.to_string())?;
-        if matches!(result, CompilerResult::Published { .. }) {
-            return Err("recovered or execution-incomplete COBOL published".into());
+        if !matches!(result, CompilerResult::Published { .. }) {
+            return Err("0.4 promoted COBOL execution did not publish".into());
         }
     }
-    Ok(sources.len())
+    Ok(4)
 }
 
 fn verify_prior_artifact() -> Result<usize, String> {

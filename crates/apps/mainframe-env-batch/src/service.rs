@@ -871,6 +871,7 @@ impl BatchService {
                 request: HostRequest::Program(ProgramRequest::Call {
                     program: ProgramName::new(program, 128).map_err(|_| HostProblem::Malformed)?,
                     payload,
+                    service: None,
                 }),
             },
         );
@@ -1703,6 +1704,7 @@ impl BatchService {
                     member: None,
                     key: None,
                     max_records: 4_096,
+                    control: Default::default(),
                 },
             )?
             else {
@@ -1969,6 +1971,7 @@ impl BatchService {
                             member: None,
                             key: None,
                             max_records: 4_096,
+                            control: Default::default(),
                         },
                     )?
                     else {
@@ -2750,6 +2753,7 @@ impl BatchService {
                             .transpose()?,
                         key: None,
                         max_records: 4_096,
+                        control: Default::default(),
                     }),
                 },
             );
@@ -5443,6 +5447,7 @@ mod tests {
                 member: None,
                 key: None,
                 max_records: 64,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, .. })
                 if records.iter().any(|record| {
@@ -5596,6 +5601,7 @@ mod tests {
                 member: None,
                 key: Some(b"AA".to_vec()),
                 max_records: 1,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, version: 2, .. })
                 if records == [b"AA11".to_vec()]
@@ -5869,6 +5875,7 @@ mod tests {
                 member: None,
                 key: None,
                 max_records: 8,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, .. })
                 if records == [b"FIRST".to_vec(), b"SECOND".to_vec()]
@@ -5902,6 +5909,7 @@ mod tests {
                 member: None,
                 key: None,
                 max_records: 8,
+                control: Default::default(),
             })
             .unwrap()
         else {
@@ -6037,6 +6045,7 @@ mod tests {
                 member: None,
                 key: None,
                 max_records: 4,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, .. })
                 if records.len() == 1

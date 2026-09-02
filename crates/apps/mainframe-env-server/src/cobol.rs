@@ -15,7 +15,7 @@ use mainframe_env_execution_api::{
 };
 use mainframe_env_host_api::{
     CapabilityDescriptor, EffectRequest, EffectResult, HostProblem, HostProvider, HostRequest,
-    HostResult, ProgramRequest, ScopedHostService,
+    HostResult, ProgramRequest, RuntimeServiceKind, RuntimeServiceSelector, ScopedHostService,
 };
 use mainframe_env_interpreter::{
     CoordinatorLimits, ExecutionControl, ExecutionCoordinator, ReferenceMachine,
@@ -70,7 +70,26 @@ impl HostProvider for DefaultProgramRouter {
     }
 
     fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
-        if let HostRequest::Program(ProgramRequest::Call { program, payload }) = &effect.request
+        if let HostRequest::Program(ProgramRequest::Call {
+            payload,
+            service: Some(service),
+            ..
+        }) = &effect.request
+            && payload.schema() == "mainframe-env.cobol.call@1"
+        {
+            return EffectResult {
+                sequence: effect.sequence,
+                outcome: self
+                    .cobol
+                    .execute_runtime_service(service, payload)
+                    .map(HostResult::Program),
+            };
+        }
+        if let HostRequest::Program(ProgramRequest::Call {
+            program,
+            payload,
+            service: None,
+        }) = &effect.request
             && payload.schema() == "mainframe-env.cobol.call@1"
         {
             return EffectResult {
@@ -81,7 +100,11 @@ impl HostProvider for DefaultProgramRouter {
                     .map(HostResult::Program),
             };
         }
-        if let HostRequest::Program(ProgramRequest::Call { program, payload }) = &effect.request
+        if let HostRequest::Program(ProgramRequest::Call {
+            program,
+            payload,
+            service: None,
+        }) = &effect.request
             && payload.schema() == "mainframe-env.program.input@1"
             && !self
                 .router
@@ -125,6 +148,42 @@ pub fn default_program_router() -> Arc<DefaultProgramRouter> {
 #[must_use]
 pub const fn compatible_system_services() -> &'static [&'static str] {
     &["CEEDAYS", "COBDATFT", "MVSWAIT", "CEE3ABD"]
+}
+
+pub(crate) fn bind_compatible_runtime_services(
+    invocation: &mut Invocation,
+) -> Result<(), HostProblem> {
+    let limits = InvocationLimits::default();
+    for name in compatible_system_services() {
+        let key = format!("cobol.runtime-service.{name}");
+        let value = format!("le:{name}:1");
+        if let Some(existing) = invocation.bindings.get(&key) {
+            if existing.schema() != "mainframe-env.runtime-service-selector@1"
+                || existing.bytes() != value.as_bytes()
+            {
+                return Err(HostProblem::Malformed);
+            }
+            continue;
+        }
+        if invocation.bindings.len() >= limits.max_bindings {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        invocation.bindings.insert(
+            key,
+            BoundedPayload::new(
+                "mainframe-env.runtime-service-selector@1",
+                value.into_bytes(),
+                limits,
+            )
+            .map_err(|_| HostProblem::ResourceExhausted)?,
+        );
+    }
+    Ok(())
+}
+
+fn with_compatible_runtime_services(mut invocation: Invocation) -> Result<Invocation, HostProblem> {
+    bind_compatible_runtime_services(&mut invocation)?;
+    Ok(invocation)
 }
 
 fn persist_batch_file_cursors(
@@ -181,14 +240,6 @@ impl CobolProgram {
         program: &str,
         payload: &BoundedPayload,
     ) -> Result<BoundedPayload, HostProblem> {
-        if let Some(service) = system_service_program(program) {
-            return match service {
-                SystemServiceProgram::Ceedays => execute_ceedays(payload),
-                SystemServiceProgram::Mvswait => execute_mvswait(payload),
-                SystemServiceProgram::Cobdatft => execute_cobdatft(payload),
-                SystemServiceProgram::Cee3abd => execute_cee3abd(payload),
-            };
-        }
         let store = self.store.get().ok_or(HostProblem::InfrastructureFailure)?;
         let artifacts = self
             .artifacts
@@ -260,6 +311,7 @@ impl CobolProgram {
             invocation.with_provider_generations(parent.provider_generations.clone(), limits)
         })
         .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let invocation = with_compatible_runtime_services(invocation)?;
         let mut machine = ReferenceMachine::from_binary(
             &record.payload,
             invocation.clone(),
@@ -339,6 +391,22 @@ impl CobolProgram {
                 response: -5,
                 response2: 0,
             }),
+        }
+    }
+
+    fn execute_runtime_service(
+        &self,
+        selector: &RuntimeServiceSelector,
+        payload: &BoundedPayload,
+    ) -> Result<BoundedPayload, HostProblem> {
+        if selector.kind != RuntimeServiceKind::LanguageEnvironment || selector.abi_version != 1 {
+            return Err(HostProblem::Unsupported);
+        }
+        match system_service_program(selector.name.as_str()).ok_or(HostProblem::Unsupported)? {
+            SystemServiceProgram::Ceedays => execute_ceedays(payload),
+            SystemServiceProgram::Mvswait => execute_mvswait(payload),
+            SystemServiceProgram::Cobdatft => execute_cobdatft(payload),
+            SystemServiceProgram::Cee3abd => execute_cee3abd(payload),
         }
     }
 
@@ -469,6 +537,7 @@ impl CobolProgram {
             invocation.with_provider_generations(parent.provider_generations.clone(), limits)
         })
         .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let invocation = with_compatible_runtime_services(invocation)?;
         let mut machine = ReferenceMachine::from_binary(
             &record.payload,
             invocation.clone(),
@@ -623,6 +692,7 @@ impl Program for CobolProgram {
             invocation.with_provider_generations(parent.provider_generations.clone(), limits)
         })
         .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let invocation = with_compatible_runtime_services(invocation)?;
         let mut machine = ReferenceMachine::from_binary(
             artifact.payload(),
             invocation.clone(),
@@ -1035,6 +1105,69 @@ mod tests {
         }
         assert_eq!(at, payload.bytes().len());
         values
+    }
+
+    #[test]
+    fn runtime_services_route_by_exact_typed_selector_not_program_name() {
+        let router = default_program_router();
+        let invocation = parent();
+        let request = |selector: RuntimeServiceSelector| EffectRequest {
+            run_unit: invocation.run_unit_id.clone(),
+            sequence: 1,
+            deadline_tick: invocation.deadline_tick,
+            idempotency_key: None,
+            request: HostRequest::Program(ProgramRequest::Call {
+                program: mainframe_env_host_api::ProgramName::new("APPLICATION", 128).unwrap(),
+                payload: call_payload(&[0i32.to_be_bytes().to_vec()]),
+                service: Some(selector),
+            }),
+        };
+        let selected = router.invoke(
+            &invocation,
+            request(RuntimeServiceSelector {
+                kind: RuntimeServiceKind::LanguageEnvironment,
+                name: mainframe_env_host_api::RuntimeServiceName::new("MVSWAIT", 128).unwrap(),
+                abi_version: 1,
+            }),
+        );
+        let HostResult::Program(payload) = selected.outcome.unwrap() else {
+            panic!("typed runtime service did not return a program result")
+        };
+        assert_eq!(call_result(&payload), [0i32.to_be_bytes().to_vec()]);
+
+        let rejected = router.invoke(
+            &invocation,
+            request(RuntimeServiceSelector {
+                kind: RuntimeServiceKind::HostExtension,
+                name: mainframe_env_host_api::RuntimeServiceName::new("MVSWAIT", 128).unwrap(),
+                abi_version: 1,
+            }),
+        );
+        assert_eq!(rejected.outcome, Err(HostProblem::Unsupported));
+    }
+
+    #[test]
+    fn compatible_le_bindings_are_explicit_and_conflicts_fail_closed() {
+        let mut invocation = parent();
+        bind_compatible_runtime_services(&mut invocation).unwrap();
+        for name in compatible_system_services() {
+            let binding = &invocation.bindings[&format!("cobol.runtime-service.{name}")];
+            assert_eq!(binding.schema(), "mainframe-env.runtime-service-selector@1");
+            assert_eq!(binding.bytes(), format!("le:{name}:1").as_bytes());
+        }
+        invocation.bindings.insert(
+            "cobol.runtime-service.MVSWAIT".into(),
+            BoundedPayload::new(
+                "mainframe-env.runtime-service-selector@1",
+                b"extension:MVSWAIT:1".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            bind_compatible_runtime_services(&mut invocation),
+            Err(HostProblem::Malformed)
+        );
     }
 
     #[test]

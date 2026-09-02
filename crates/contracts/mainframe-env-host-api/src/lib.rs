@@ -6,6 +6,7 @@ mod dataset;
 mod names;
 mod registry;
 mod request;
+mod runtime_service;
 mod semantic;
 mod service;
 mod surface;
@@ -23,7 +24,8 @@ pub use dataset::{
     VolumeKind, VolumeSelection, VsamAccessMode, VsamAttributes,
 };
 pub use names::{
-    DatasetName, HostNameProblem, JobName, MemberName, ProgramName, ResourceName, SessionId,
+    ClassName, DatasetName, HostNameProblem, JobName, MemberName, MethodName, ProgramName,
+    ResourceName, RuntimeServiceName, SessionId,
 };
 pub use registry::{
     CapabilityDescriptor, HostProvider, RegistryProblem, RegistryPublisher, RegistrySnapshot,
@@ -32,12 +34,16 @@ pub use registry::{
 };
 pub use request::{
     AccessIntent, AuditEvent, CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest,
-    CicsResponse, CicsUnitOfWorkOutcome, ClockRequest, DatasetAttributes, DatasetOrganization,
-    DatasetRequest, DatasetResult, Db2HostVariable, Db2Operation, Db2Request, Db2Result, Db2Row,
-    EffectRequest, EffectResult, HostLimits, HostProblem, HostRequest, HostResult, ImsOperation,
-    ImsQualifier, ImsRequest, ImsResult, ImsSegment, MqOperation, MqRequest, MqResult, Mutation,
-    ProgramRequest, RecordFormat, SecretRef, SecurityDecision, SecurityRequest, SpoolRequest,
-    StateRequest, TerminalField, TerminalRequest,
+    CicsResponse, CicsUnitOfWorkOutcome, ClockRequest, DatasetAttributes, DatasetCloseControl,
+    DatasetOrganization, DatasetReadControl, DatasetReadLockMode, DatasetReelUnit, DatasetRequest,
+    DatasetResult, Db2HostVariable, Db2Operation, Db2Request, Db2Result, Db2Row, EffectRequest,
+    EffectResult, HostLimits, HostProblem, HostRequest, HostResult, ImsOperation, ImsQualifier,
+    ImsRequest, ImsResult, ImsSegment, KeyRelation, MqOperation, MqRequest, MqResult, Mutation,
+    ProgramRequest, RecordFormat, RuntimeServiceKind, RuntimeServiceSelector, SecretRef,
+    SecurityDecision, SecurityRequest, SpoolRequest, StateRequest, TerminalField, TerminalRequest,
+};
+pub use runtime_service::{
+    RUNTIME_SERVICE_REGISTRY_CONTRACT, RuntimeServiceDescriptor, RuntimeServiceRegistry,
 };
 
 pub const HOST_CONTRACT: &str = "mainframe-env.host@1";

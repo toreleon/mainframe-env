@@ -1692,6 +1692,7 @@ impl DatasetService {
                 member,
                 key,
                 max_records,
+                ..
             } => {
                 if member.is_some() && state.alternate_indexes.contains_key(dataset.as_str()) {
                     return Err(HostProblem::Unsupported);
@@ -4295,10 +4296,31 @@ impl DatasetService {
                     Ok(result)
                 }
             }
-            DatasetRequest::StartBrowse { dataset, key } => {
+            DatasetRequest::StartBrowse {
+                dataset,
+                key,
+                relation,
+            } => {
                 let identities = browse_identities(state, dataset)?;
-                let index =
+                let lower =
                     identities.partition_point(|(logical, _)| logical.as_slice() < key.as_slice());
+                let upper =
+                    identities.partition_point(|(logical, _)| logical.as_slice() <= key.as_slice());
+                let index = match relation {
+                    mainframe_env_host_api::KeyRelation::Equal if lower < upper => lower,
+                    mainframe_env_host_api::KeyRelation::Greater => upper,
+                    mainframe_env_host_api::KeyRelation::GreaterOrEqual => lower,
+                    mainframe_env_host_api::KeyRelation::Less if lower > 0 => lower - 1,
+                    mainframe_env_host_api::KeyRelation::LessOrEqual if upper > 0 => upper - 1,
+                    mainframe_env_host_api::KeyRelation::Equal
+                    | mainframe_env_host_api::KeyRelation::Less
+                    | mainframe_env_host_api::KeyRelation::LessOrEqual => {
+                        return Err(condition("NOTFND", 13));
+                    }
+                };
+                if index >= identities.len() {
+                    return Err(condition("NOTFND", 13));
+                }
                 let active_identities = state
                     .cursors
                     .values()
@@ -4348,6 +4370,7 @@ impl DatasetService {
                 dataset,
                 cursor,
                 reverse,
+                ..
             } => {
                 let identity = {
                     let state_cursor = state
@@ -4396,6 +4419,32 @@ impl DatasetService {
                     record: None,
                     identity: None,
                     key: None,
+                })
+            }
+            DatasetRequest::Close {
+                dataset,
+                cursor,
+                control: _,
+            } => {
+                if let Some(cursor) = cursor {
+                    let removed = state
+                        .cursors
+                        .remove(cursor)
+                        .ok_or_else(|| condition("INVREQ", 16))?;
+                    if removed.dataset != dataset.as_str() {
+                        return Err(condition("INVREQ", 16));
+                    }
+                    return Ok(DatasetResult::Browse {
+                        cursor: cursor.clone(),
+                        record: None,
+                        identity: None,
+                        key: None,
+                    });
+                }
+                let entry = entry(state, dataset)?;
+                Ok(DatasetResult::Attributes {
+                    attributes: entry.attributes.clone(),
+                    version: entry.version,
                 })
             }
         }
@@ -7633,12 +7682,14 @@ fn request_digest(request: &DatasetRequest) -> Result<[u8; 32], HostProblem> {
             member,
             key,
             max_records,
+            control,
         } => {
             digest_field(&mut digest, b"read");
             digest_field(&mut digest, dataset.as_str().as_bytes());
             digest_optional_member(&mut digest, member.as_ref());
             digest_optional_bytes(&mut digest, key.as_deref());
             digest_field(&mut digest, &max_records.to_be_bytes());
+            digest_read_control(&mut digest, control);
         }
         DatasetRequest::ReadGeneric {
             dataset,
@@ -8131,25 +8182,42 @@ fn request_digest(request: &DatasetRequest) -> Result<[u8; 32], HostProblem> {
             digest_optional_u64(&mut digest, current_date.map(u64::from));
             digest_mutation(&mut digest, mutation);
         }
-        DatasetRequest::StartBrowse { dataset, key } => {
+        DatasetRequest::StartBrowse {
+            dataset,
+            key,
+            relation,
+        } => {
             digest_field(&mut digest, b"start-browse");
             digest_field(&mut digest, dataset.as_str().as_bytes());
             digest_field(&mut digest, key);
+            digest_field(&mut digest, &[key_relation_tag(*relation)]);
         }
         DatasetRequest::ReadNext {
             dataset,
             cursor,
             reverse,
+            control,
         } => {
             digest_field(&mut digest, b"read-next");
             digest_field(&mut digest, dataset.as_str().as_bytes());
             digest_field(&mut digest, cursor.as_bytes());
             digest_field(&mut digest, &[u8::from(*reverse)]);
+            digest_read_control(&mut digest, control);
         }
         DatasetRequest::EndBrowse { dataset, cursor } => {
             digest_field(&mut digest, b"end-browse");
             digest_field(&mut digest, dataset.as_str().as_bytes());
             digest_field(&mut digest, cursor.as_bytes());
+        }
+        DatasetRequest::Close {
+            dataset,
+            cursor,
+            control,
+        } => {
+            digest_field(&mut digest, b"close");
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_optional_bytes(&mut digest, cursor.as_deref().map(str::as_bytes));
+            digest_close_control(&mut digest, control);
         }
     }
     Ok(digest.finalize().into())
@@ -8268,6 +8336,55 @@ fn digest_lock_target(digest: &mut Sha256, target: &mainframe_env_host_api::Data
             digest_field(digest, identity);
         }
     }
+}
+
+fn digest_read_control(digest: &mut Sha256, control: &mainframe_env_host_api::DatasetReadControl) {
+    let lock = match control.lock {
+        mainframe_env_host_api::DatasetReadLockMode::Default => 0,
+        mainframe_env_host_api::DatasetReadLockMode::Lock => 1,
+        mainframe_env_host_api::DatasetReadLockMode::KeptLock => 2,
+        mainframe_env_host_api::DatasetReadLockMode::NoLock => 3,
+        mainframe_env_host_api::DatasetReadLockMode::IgnoreLock => 4,
+    };
+    digest_field(digest, &[lock]);
+    digest_field(
+        digest,
+        &[match control.wait {
+            None => 0,
+            Some(false) => 1,
+            Some(true) => 2,
+        }],
+    );
+}
+
+const fn key_relation_tag(relation: mainframe_env_host_api::KeyRelation) -> u8 {
+    match relation {
+        mainframe_env_host_api::KeyRelation::Equal => 0,
+        mainframe_env_host_api::KeyRelation::Greater => 1,
+        mainframe_env_host_api::KeyRelation::GreaterOrEqual => 2,
+        mainframe_env_host_api::KeyRelation::Less => 3,
+        mainframe_env_host_api::KeyRelation::LessOrEqual => 4,
+    }
+}
+
+fn digest_close_control(
+    digest: &mut Sha256,
+    control: &mainframe_env_host_api::DatasetCloseControl,
+) {
+    let reel_or_unit = match control.reel_or_unit {
+        None => 0,
+        Some(mainframe_env_host_api::DatasetReelUnit::Reel) => 1,
+        Some(mainframe_env_host_api::DatasetReelUnit::Unit) => 2,
+    };
+    digest_field(digest, &[reel_or_unit]);
+    digest_field(
+        digest,
+        &[
+            u8::from(control.no_rewind),
+            u8::from(control.removal),
+            u8::from(control.lock),
+        ],
+    );
 }
 
 const fn lock_mode_tag(mode: mainframe_env_host_api::DatasetLockMode) -> u8 {
@@ -8861,7 +8978,7 @@ mod tests {
         let first = service.invoke(request.clone()).unwrap();
         assert_eq!(service.invoke(request).unwrap(), first);
         assert!(
-            matches!(service.invoke(DatasetRequest::Read{dataset:name,member:None,key:None,max_records:1}).unwrap(),DatasetResult::Records{records,..}if records==vec![b"ABCD".to_vec()])
+            matches!(service.invoke(DatasetRequest::Read{dataset:name,member:None,key:None,max_records:1,control:Default::default()}).unwrap(),DatasetResult::Records{records,..}if records==vec![b"ABCD".to_vec()])
         );
     }
 
@@ -9623,6 +9740,7 @@ mod tests {
                 member: None,
                 key: None,
                 max_records: 10,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, .. })
                 if records == [b"AA11".to_vec(), b"BB22".to_vec()]
@@ -9657,6 +9775,7 @@ mod tests {
                 member: None,
                 key: None,
                 max_records: 10,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, .. })
                 if records == [b"AA11".to_vec(), b"BB22".to_vec()]
@@ -9699,6 +9818,7 @@ mod tests {
                 member: None,
                 key: None,
                 max_records: 10,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, identities, .. })
                 if records == [b"AA11".to_vec(), b"BB22".to_vec()]
@@ -9924,6 +10044,7 @@ mod tests {
                 member: None,
                 key: None,
                 max_records: 10,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, .. })
                 if records == [b"ZZ11".to_vec(), b"YY22".to_vec()]
@@ -9935,6 +10056,7 @@ mod tests {
                 member: None,
                 key: None,
                 max_records: 10,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, .. })
                 if records == [b"AA11".to_vec(), b"BB22".to_vec()]
@@ -10078,6 +10200,7 @@ mod tests {
                     member: None,
                     key: Some(b"33".to_vec()),
                     max_records: 1,
+                    control: Default::default(),
                 }),
                 Ok(DatasetResult::Records { records, identities, version: 2 })
                     if records == [b"CC33".to_vec()] && identities == [b"CC".to_vec()]
@@ -10090,6 +10213,7 @@ mod tests {
                     member: None,
                     key: Some(b"33".to_vec()),
                     max_records: 1,
+                    control: Default::default(),
                 }),
                 Err(HostProblem::Condition { ref name, response: 13, .. }) if name == "NOTFND"
             ));
@@ -10120,6 +10244,7 @@ mod tests {
                     member: None,
                     key: Some(b"11".to_vec()),
                     max_records: 1,
+                    control: Default::default(),
                 }),
                 Ok(DatasetResult::Records { records, identities, version: 3 })
                     if records == [b"AA11".to_vec()] && identities == [b"AA".to_vec()]
@@ -10144,6 +10269,7 @@ mod tests {
                 member: None,
                 key: Some(b"11".to_vec()),
                 max_records: 1,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, version: 3, .. })
                 if records == [b"AA11".to_vec()]
@@ -10384,6 +10510,7 @@ mod tests {
                 member: None,
                 key: None,
                 max_records: 10,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, identities, .. })
                 if records == [b"AAX1".to_vec(), b"BBY2".to_vec(), b"CCX3".to_vec()]
@@ -10393,6 +10520,7 @@ mod tests {
             .invoke(DatasetRequest::StartBrowse {
                 dataset: base.clone(),
                 key: b"CC".to_vec(),
+                relation: mainframe_env_host_api::KeyRelation::GreaterOrEqual,
             })
             .unwrap()
         {
@@ -10404,6 +10532,7 @@ mod tests {
                 dataset: base.clone(),
                 cursor: reverse_cursor.clone(),
                 reverse: true,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Browse {
                 record: Some(ref record),
@@ -10446,6 +10575,7 @@ mod tests {
                 member: None,
                 key: Some(b"X".to_vec()),
                 max_records: 10,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, identities, .. })
                 if records == [b"AAX1".to_vec(), b"CCX3".to_vec()]
@@ -10475,6 +10605,7 @@ mod tests {
             .invoke(DatasetRequest::StartBrowse {
                 dataset: duplicate_aix.clone(),
                 key: b"X".to_vec(),
+                relation: mainframe_env_host_api::KeyRelation::GreaterOrEqual,
             })
             .unwrap()
         {
@@ -10487,6 +10618,7 @@ mod tests {
                     dataset: duplicate_aix.clone(),
                     cursor: cursor.clone(),
                     reverse: false,
+                    control: Default::default(),
                 }),
                 Ok(DatasetResult::Browse {
                     record: Some(ref actual),
@@ -10526,6 +10658,7 @@ mod tests {
                 member: None,
                 key: Some(b"X".to_vec()),
                 max_records: 10,
+                control: Default::default(),
             }),
             Err(HostProblem::Condition { ref name, response: 13, .. }) if name == "NOTFND"
         ));
@@ -10556,6 +10689,7 @@ mod tests {
                 member: None,
                 key: Some(b"BB".to_vec()),
                 max_records: 1,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, .. }) if records == [b"BBY2".to_vec()]
         ));
@@ -10611,6 +10745,7 @@ mod tests {
                 member: None,
                 key: Some(b"Z".to_vec()),
                 max_records: 1,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, identities, .. })
                 if records == [b"AAZ9".to_vec()] && identities == [b"AA".to_vec()]
@@ -10651,6 +10786,7 @@ mod tests {
                 member: None,
                 key: Some(b"Z".to_vec()),
                 max_records: 1,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, version: 1, .. })
                 if records == [b"AAY7".to_vec()]
@@ -10661,6 +10797,7 @@ mod tests {
                 member: None,
                 key: Some(b"Y".to_vec()),
                 max_records: 1,
+                control: Default::default(),
             }),
             Err(HostProblem::Condition { ref name, .. }) if name == "NOTFND"
         ));
@@ -10678,6 +10815,7 @@ mod tests {
                 member: None,
                 key: Some(b"Y".to_vec()),
                 max_records: 1,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, version: 2, .. })
                 if records == [b"AAY7".to_vec()]
@@ -11060,6 +11198,7 @@ mod tests {
                     member: None,
                     key: Some(key),
                     max_records: 1,
+                    control: Default::default(),
                 }),
                 Ok(DatasetResult::Records { records, version: 2, .. }) if records == [record]
             ));
@@ -11106,6 +11245,7 @@ mod tests {
                 member: None,
                 key: Some(b"AA".to_vec()),
                 max_records: 1,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, version: 2, .. })
                 if records == [b"AA11".to_vec()]
@@ -11204,6 +11344,7 @@ mod tests {
                 member: None,
                 key: None,
                 max_records: 8,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, version: 1, .. }) if records.is_empty()
         ));
@@ -11221,6 +11362,7 @@ mod tests {
                 member: None,
                 key: Some(b"AA".to_vec()),
                 max_records: 1,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, version: 2, .. })
                 if records == [b"AA11".to_vec()]
@@ -11278,6 +11420,7 @@ mod tests {
                 member: None,
                 key: Some(b"11".to_vec()),
                 max_records: 1,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, version: 1, .. })
                 if records == [b"AA11".to_vec()]
@@ -11292,6 +11435,7 @@ mod tests {
                 member: None,
                 key: Some(b"22".to_vec()),
                 max_records: 1,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, version: 2, .. })
                 if records == [b"AA22".to_vec()]
@@ -11461,6 +11605,7 @@ mod tests {
                 member: None,
                 key: None,
                 max_records: 8,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, version: 2, .. })
                 if records == [b"OLD1".to_vec()]
@@ -12022,6 +12167,7 @@ mod tests {
                     member: None,
                     key: None,
                     max_records: 2,
+                    control: Default::default(),
                 }),
                 Ok(DatasetResult::Records { records, version: 2, .. })
                     if records == [valid]
@@ -12350,6 +12496,7 @@ mod tests {
                     member: None,
                     key: None,
                     max_records: 8,
+                    control: Default::default(),
                 }),
                 Ok(DatasetResult::Records { records: actual, .. }) if actual == records
             ));
@@ -12577,6 +12724,7 @@ mod tests {
                 member: None,
                 key: None,
                 max_records: 8,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, version: 3, .. }) if records.is_empty()
         ));
@@ -12882,6 +13030,7 @@ mod tests {
                 member: None,
                 key: Some(b"AA".to_vec()),
                 max_records: 1,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, version: 3, .. })
                 if records == [b"AA11".to_vec()]
@@ -13183,6 +13332,7 @@ mod tests {
                 member: None,
                 key: None,
                 max_records: 8,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, version: 1, .. }) if records.is_empty()
         ));
@@ -13791,6 +13941,7 @@ mod tests {
                 member: None,
                 key: Some(b"11".to_vec()),
                 max_records: 1,
+                control: Default::default(),
             }),
             Ok(DatasetResult::Records { records, version: 2, .. })
                 if records == [b"AA11".to_vec()]
@@ -13811,7 +13962,8 @@ mod tests {
                 dataset: name.clone(),
                 member: None,
                 key: None,
-                max_records: 1
+                max_records: 1,
+                control: Default::default(),
             }),
             Err(HostProblem::NotFound)
         );
@@ -13833,5 +13985,74 @@ mod tests {
             Err(HostProblem::Condition { response: 22, .. })
         ));
         let _ = HostLimits::default();
+    }
+
+    #[test]
+    fn relational_start_positions_exactly_and_missing_equal_is_conditioned() {
+        use mainframe_env_host_api::KeyRelation;
+
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let dataset = DatasetName::new("USER.INDEXED", 44).unwrap();
+        service
+            .invoke(DatasetRequest::Create {
+                dataset: dataset.clone(),
+                attributes: attrs(DatasetOrganization::KeySequenced),
+                mutation: mutation(1),
+            })
+            .unwrap();
+        service
+            .invoke(DatasetRequest::Write {
+                dataset: dataset.clone(),
+                member: None,
+                records: vec![b"AA01".to_vec(), b"BB02".to_vec(), b"CC03".to_vec()],
+                expected_version: Some(1),
+                mutation: mutation(2),
+            })
+            .unwrap();
+
+        for (relation, key, expected) in [
+            (KeyRelation::Equal, b"BB".as_slice(), b"BB02".as_slice()),
+            (KeyRelation::Greater, b"BB".as_slice(), b"CC03".as_slice()),
+            (
+                KeyRelation::GreaterOrEqual,
+                b"BA".as_slice(),
+                b"BB02".as_slice(),
+            ),
+            (KeyRelation::Less, b"BB".as_slice(), b"AA01".as_slice()),
+            (
+                KeyRelation::LessOrEqual,
+                b"BC".as_slice(),
+                b"BB02".as_slice(),
+            ),
+        ] {
+            let cursor = match service
+                .invoke(DatasetRequest::StartBrowse {
+                    dataset: dataset.clone(),
+                    key: key.to_vec(),
+                    relation,
+                })
+                .unwrap()
+            {
+                DatasetResult::Browse { cursor, .. } => cursor,
+                other => panic!("unexpected browse result: {other:?}"),
+            };
+            assert!(matches!(
+                service.invoke(DatasetRequest::ReadNext {
+                    dataset: dataset.clone(),
+                    cursor,
+                    reverse: false,
+                    control: Default::default(),
+                }),
+                Ok(DatasetResult::Browse { record: Some(record), .. }) if record == expected
+            ));
+        }
+        assert!(matches!(
+            service.invoke(DatasetRequest::StartBrowse {
+                dataset,
+                key: b"BD".to_vec(),
+                relation: KeyRelation::Equal,
+            }),
+            Err(HostProblem::Condition { ref name, response: 13, .. }) if name == "NOTFND"
+        ));
     }
 }

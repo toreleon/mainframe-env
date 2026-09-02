@@ -4,7 +4,10 @@ use crate::dataset::{
     DatasetLockTarget, DatasetProviderCapabilities, DatasetSnapshot, TvsRecordOperation,
     TvsUnitOfWorkReceipt,
 };
-use crate::{DatasetName, JobName, MemberName, ProgramName, ResourceName, SessionId};
+use crate::{
+    ClassName, DatasetName, JobName, MemberName, MethodName, ProgramName, ResourceName,
+    RuntimeServiceName, SessionId,
+};
 use mainframe_env_execution_api::{
     BoundedPayload, CapabilityId, IdempotencyKey, InvocationLimits, PrincipalId, RunUnitId,
 };
@@ -58,6 +61,45 @@ pub enum RecordFormat {
     VariableBlockedSpanned,
     Undefined,
     Line,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum KeyRelation {
+    Equal,
+    Greater,
+    GreaterOrEqual,
+    Less,
+    LessOrEqual,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum DatasetReadLockMode {
+    #[default]
+    Default,
+    Lock,
+    KeptLock,
+    NoLock,
+    IgnoreLock,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct DatasetReadControl {
+    pub lock: DatasetReadLockMode,
+    pub wait: Option<bool>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DatasetReelUnit {
+    Reel,
+    Unit,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct DatasetCloseControl {
+    pub reel_or_unit: Option<DatasetReelUnit>,
+    pub no_rewind: bool,
+    pub removal: bool,
+    pub lock: bool,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AccessIntent {
@@ -199,6 +241,7 @@ pub enum DatasetRequest {
         member: Option<MemberName>,
         key: Option<Vec<u8>>,
         max_records: u32,
+        control: DatasetReadControl,
     },
     ReadGeneric {
         dataset: DatasetName,
@@ -445,15 +488,22 @@ pub enum DatasetRequest {
     StartBrowse {
         dataset: DatasetName,
         key: Vec<u8>,
+        relation: KeyRelation,
     },
     ReadNext {
         dataset: DatasetName,
         cursor: String,
         reverse: bool,
+        control: DatasetReadControl,
     },
     EndBrowse {
         dataset: DatasetName,
         cursor: String,
+    },
+    Close {
+        dataset: DatasetName,
+        cursor: Option<String>,
+        control: DatasetCloseControl,
     },
 }
 
@@ -545,6 +595,13 @@ pub enum ProgramRequest {
     Call {
         program: ProgramName,
         payload: BoundedPayload,
+        service: Option<RuntimeServiceSelector>,
+    },
+    Invoke {
+        class: ClassName,
+        method: MethodName,
+        receiver: BoundedPayload,
+        payload: BoundedPayload,
     },
     Link {
         program: ProgramName,
@@ -559,11 +616,24 @@ pub enum ProgramRequest {
         payload: BoundedPayload,
     },
     Cancel {
-        program: ProgramName,
+        programs: Vec<ProgramName>,
     },
     Abend {
         code: String,
     },
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum RuntimeServiceKind {
+    LanguageEnvironment,
+    HostExtension,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeServiceSelector {
+    pub kind: RuntimeServiceKind,
+    pub name: RuntimeServiceName,
+    pub abi_version: u16,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1034,7 +1104,8 @@ impl HostRequest {
                 | DatasetRequest::ResolveGeneration { .. }
                 | DatasetRequest::ReadNext { .. }
                 | DatasetRequest::StartBrowse { .. }
-                | DatasetRequest::EndBrowse { .. },
+                | DatasetRequest::EndBrowse { .. }
+                | DatasetRequest::Close { .. },
             ) => "host.dataset.read",
             Self::Dataset(_) => "host.dataset.write",
             Self::Program(_) => "host.program.invoke",
@@ -1100,6 +1171,7 @@ impl HostRequest {
                     | SpoolRequest::Purge { .. }
             ) | Self::Program(
                 ProgramRequest::Call { .. }
+                    | ProgramRequest::Invoke { .. }
                     | ProgramRequest::Link { .. }
                     | ProgramRequest::Xctl { .. }
                     | ProgramRequest::Return { .. }
@@ -1169,6 +1241,15 @@ impl HostRequest {
     pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
         match self {
             Self::Dataset(request) => validate_dataset(request, limits),
+            Self::Program(ProgramRequest::Call {
+                service: Some(service),
+                ..
+            }) if service.abi_version == 0 => Err(HostProblem::Malformed),
+            Self::Program(ProgramRequest::Cancel { programs })
+                if programs.is_empty() || programs.len() > limits.max_fields =>
+            {
+                Err(HostProblem::ResourceExhausted)
+            }
             Self::Spool(SpoolRequest::Append {
                 records, mutation, ..
             }) => {
@@ -2017,6 +2098,17 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
         {
             Err(HostProblem::Malformed)
         }
+        DatasetRequest::Close {
+            cursor, control, ..
+        } if cursor
+            .as_ref()
+            .is_some_and(|cursor| cursor.is_empty() || cursor.len() > limits.max_name_bytes)
+            || (control.lock
+                && (control.reel_or_unit.is_some() || control.no_rewind || control.removal))
+            || (control.removal && control.reel_or_unit.is_none()) =>
+        {
+            Err(HostProblem::Malformed)
+        }
         _ => Ok(()),
     }
 }
@@ -2337,6 +2429,35 @@ mod tests {
         assert_eq!(
             request.validate(limits),
             Err(HostProblem::ResourceExhausted)
+        );
+    }
+
+    #[test]
+    fn close_control_rejects_conflicting_lock_and_reel_dispositions() {
+        let dataset = DatasetName::new("USER.DATA", 44).unwrap();
+        let valid = HostRequest::Dataset(DatasetRequest::Close {
+            dataset: dataset.clone(),
+            cursor: None,
+            control: DatasetCloseControl {
+                reel_or_unit: Some(DatasetReelUnit::Reel),
+                no_rewind: true,
+                ..DatasetCloseControl::default()
+            },
+        });
+        assert_eq!(valid.validate(HostLimits::default()), Ok(()));
+
+        let invalid = HostRequest::Dataset(DatasetRequest::Close {
+            dataset,
+            cursor: None,
+            control: DatasetCloseControl {
+                reel_or_unit: Some(DatasetReelUnit::Unit),
+                lock: true,
+                ..DatasetCloseControl::default()
+            },
+        });
+        assert_eq!(
+            invalid.validate(HostLimits::default()),
+            Err(HostProblem::Malformed)
         );
     }
 
