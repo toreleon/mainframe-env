@@ -391,19 +391,21 @@ pub struct MachineSnapshot {
     pub sql_cursors: BTreeMap<String, Vec<String>>,
     pub sort_workspaces: BTreeMap<String, (Vec<Vec<u8>>, usize)>,
     pub active_sort_procedure: Option<(usize, String, u8, Vec<String>)>,
-    pub sort_io: Option<(
-        usize,
-        String,
-        Vec<String>,
-        Vec<String>,
-        Vec<String>,
-        usize,
-        usize,
-    )>,
+    pub sort_io: Option<MachineSnapshotSortIo>,
     pub linkage_addresses: BTreeMap<String, Option<(usize, usize, usize)>>,
     pub freed_allocations: BTreeSet<usize>,
     pub random_state: Option<u64>,
 }
+
+pub type MachineSnapshotSortIo = (
+    usize,
+    String,
+    Vec<String>,
+    Vec<String>,
+    Vec<String>,
+    usize,
+    usize,
+);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MachineSnapshotValue {
@@ -1477,7 +1479,7 @@ impl ReferenceMachine {
                     return Err(MachineProblem::UnexpectedHostResult);
                 }
                 for (target, value) in targets.iter().zip(&values) {
-                    self.write(target, &value)?;
+                    self.write(target, value)?;
                 }
                 if let Some(target) = returning {
                     self.write(
@@ -2304,7 +2306,7 @@ impl ReferenceMachine {
             })
             .filter_map(|candidate| optional_text_attribute(candidate, "control_text"))
             .filter(|text| text.to_ascii_uppercase().starts_with("WHEN "))
-            .map(|text| control_tokens(text))
+            .map(control_tokens)
             .map(|tokens| tokens.into_iter().skip(1).collect::<Vec<_>>())
             .collect::<Vec<_>>();
         let mut found = false;
@@ -4874,7 +4876,7 @@ impl ReferenceMachine {
             return Err(MachineProblem::InvalidOperation);
         }
         for (target, _) in &targets {
-            self.write_reference(&target, &vec![0; target.length])?;
+            self.write_reference(target, &vec![0; target.length])?;
         }
         self.freed_allocations
             .extend(targets.into_iter().map(|(_, base)| base));
@@ -6019,7 +6021,7 @@ impl ReferenceMachine {
                 if let Some(value) = initialize_category(target.category)
                     .and_then(|category| replacements.get(category))
                 {
-                    self.write_reference_value(&[target.name.clone()], value)?;
+                    self.write_reference_value(std::slice::from_ref(&target.name), value)?;
                 } else if !initialize_unmatched {
                     continue;
                 } else if is_numeric(target.category) {
@@ -6068,7 +6070,7 @@ impl ReferenceMachine {
                     .as_ref()
                     .ok_or(MachineProblem::InvalidOperation)?;
                 let value = self
-                    .json_layout_value(&layout, &clauses, &[], true)?
+                    .json_layout_value(&layout, clauses, &[], true)?
                     .ok_or(MachineProblem::DataException)?;
                 if clauses.omitted(&layout) {
                     serde_json::to_string(&value).map_err(|_| MachineProblem::DataException)?
@@ -6376,7 +6378,7 @@ impl ReferenceMachine {
                         .and_then(|object| object.get(clauses.name(&layout)))
                         .ok_or(MachineProblem::DataException)?
                 };
-                self.parse_json_layout(&layout, value, &clauses, &[], true)?;
+                self.parse_json_layout(&layout, value, clauses, &[], true)?;
                 return Ok(());
             }
             let value = value
@@ -9982,7 +9984,7 @@ fn bit_to_char(bits: &[u8]) -> Result<Vec<u8>, MachineProblem> {
     let bits = String::from_utf8_lossy(bits);
     let bits = bits.trim();
     if bits.is_empty()
-        || bits.len() % 8 != 0
+        || !bits.len().is_multiple_of(8)
         || !bits.bytes().all(|byte| matches!(byte, b'0' | b'1'))
     {
         return Err(MachineProblem::DataException);
@@ -10016,7 +10018,7 @@ fn hex_upper(bytes: &[u8]) -> Vec<u8> {
 fn hex_to_char(bytes: &[u8]) -> Result<Vec<u8>, MachineProblem> {
     let text = String::from_utf8_lossy(bytes);
     let text = text.trim();
-    if text.is_empty() || text.len() % 2 != 0 {
+    if text.is_empty() || !text.len().is_multiple_of(2) {
         return Err(MachineProblem::DataException);
     }
     text.as_bytes()
@@ -10326,13 +10328,14 @@ fn utf8_to_national(bytes: &[u8]) -> Result<Vec<u8>, MachineProblem> {
 }
 
 fn national_to_utf8(bytes: &[u8]) -> Result<Vec<u8>, MachineProblem> {
-    if bytes.len() % 2 != 0 {
+    let (pairs, remainder) = bytes.as_chunks::<2>();
+    if !remainder.is_empty() {
         return Err(MachineProblem::DataException);
     }
     String::from_utf16(
-        &bytes
-            .chunks_exact(2)
-            .map(|pair| u16::from_be_bytes([pair[0], pair[1]]))
+        &pairs
+            .iter()
+            .map(|pair| u16::from_be_bytes(*pair))
             .collect::<Vec<_>>(),
     )
     .map(String::into_bytes)
@@ -10834,18 +10837,18 @@ fn decimal_divide(
     )
 }
 
+type DecimalBinaryOperation =
+    fn(
+        &mut CobolArithmetic,
+        CobolDecimal,
+        CobolDecimal,
+    ) -> Result<(CobolDecimal, crate::runtime::CobolArithmeticFlags), RuntimeContractProblem>;
+
 fn decimal_primitive_binary(
     mode: CobolArithmeticMode,
     left: Decimal,
     right: Decimal,
-    operation: fn(
-        &mut CobolArithmetic,
-        CobolDecimal,
-        CobolDecimal,
-    ) -> Result<
-        (CobolDecimal, crate::runtime::CobolArithmeticFlags),
-        RuntimeContractProblem,
-    >,
+    operation: DecimalBinaryOperation,
 ) -> Result<Decimal, MachineProblem> {
     let mut arithmetic =
         CobolArithmetic::new(mode, CobolRounding::Truncation).map_err(runtime_decimal_problem)?;
@@ -11725,8 +11728,8 @@ fn json_figurative_bytes(layout: &LayoutMetadata, value: &str, length: usize) ->
         "SPACE" | "SPACES" if national => &[0x00, 0x20][..],
         "LOW-VALUE" | "LOW-VALUES" if national => &[0x00, 0x00][..],
         "HIGH-VALUE" | "HIGH-VALUES" if national => &[0xff, 0xff][..],
-        "SPACE" | "SPACES" => &[b' '][..],
-        "ZERO" | "ZEROES" | "ZEROS" => &[b'0'][..],
+        "SPACE" | "SPACES" => b" ".as_slice(),
+        "ZERO" | "ZEROES" | "ZEROS" => b"0".as_slice(),
         "LOW-VALUE" | "LOW-VALUES" => &[0x00][..],
         "HIGH-VALUE" | "HIGH-VALUES" => &[0xff][..],
         _ => return None,
