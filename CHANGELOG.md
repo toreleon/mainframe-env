@@ -4,6 +4,20 @@ All notable changes to mainframe-env are documented here.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-02
+
+### Added
+
+- Added the complete pinned RACF command and RACROUTE/SAF surface through one
+  typed, durable, authorization-aware authority.
+- Added audit redaction, migration/recovery, replay, restart, credential/MFA,
+  certificate/keyring, and independent reference-model assurance.
+
+### Known limitations
+
+- The licensed z/OS 3.2 RACF/SAF differential remains exactly 0/48 and is
+  deferred to release certification.
+
 ## [0.4.0] - 2026-09-02
 
 ### Added
