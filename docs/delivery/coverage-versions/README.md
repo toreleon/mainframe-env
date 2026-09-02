@@ -1,11 +1,13 @@
 # IBM coverage release plans
 
-Status: **Proposed implementation plans**
+Status: **0.2.0 through 0.7.0 released; 0.8.0 through 1.0.0 planned**
 Applies after: `mainframe-env 0.1.1`
 Planning authority:
 [`IBM-OFFICIAL-COVERAGE-ROADMAP.md`](../../research/IBM-OFFICIAL-COVERAGE-ROADMAP.md)
 Machine roadmap:
 [`ibm-official-coverage-roadmap.json`](../../../conformance/roadmap/ibm-official-coverage-roadmap.json)
+Operational tracker:
+[GitHub Project synchronization](GITHUB-PROJECT.md)
 
 These documents prepare the implementation and certification work for each
 minor version. They do not authorize a tag, publication, deployment, remote
@@ -13,25 +15,25 @@ push, or a compatibility claim.
 
 ## Version plans
 
-| Version | Primary result | Plan |
-|---|---|---|
-| 0.2.0 | Coverage authority and zero application hardcode | [0.2.0](0.2.0.md) |
-| 0.3.0 | Complete COBOL grammar, directives, clauses, types, and layouts | [0.3.0](0.3.0.md) |
-| 0.4.0 | Complete COBOL execution and differential semantics | [0.4.0](0.4.0.md) |
-| 0.5.0 | Complete RACF command language and SAF | [0.5.0](0.5.0.md) |
-| 0.6.0 | Complete dataset, VSAM, catalog, locking, and AMS surface | [0.6.0](0.6.0.md) |
-| 0.7.0 | Complete JCL converter and planner | [0.7.0](0.7.0.md) |
-| 0.8.0 | Complete JES2 execution and real utility semantics | [0.8.0](0.8.0.md) |
-| 0.9.0 | Complete CICS application API | [0.9.0](0.9.0.md) |
-| 0.10.0 | Complete CICS SPI and FEPI | [0.10.0](0.10.0.md) |
-| 0.11.0 | Complete z/OSMF 3.2 REST portfolio | [0.11.0](0.11.0.md) |
-| 0.12.0 | Generic Db2 parser, catalog, executor, and common SQL | [0.12.0](0.12.0.md) |
-| 0.13.0 | Complete Db2 13 programming surface | [0.13.0](0.13.0.md) |
-| 0.14.0 | Complete IMS 15.6 programming surface | [0.14.0](0.14.0.md) |
-| 0.15.0 | Complete IBM MQ 9.4 programming surface | [0.15.0](0.15.0.md) |
-| 0.16.0 | Complete cross-resource transaction and failure semantics | [0.16.0](0.16.0.md) |
-| 0.17.0 | Licensed IBM differential certification and 1.0 rehearsal | [0.17.0](0.17.0.md) |
-| 1.0.0 | Stable pinned programming-surface release | [1.0.0](1.0.0.md) |
+| Version | State | Primary result | Plan |
+|---|---|---|---|
+| 0.2.0 | Released | Coverage authority and zero application hardcode | [0.2.0](0.2.0.md) |
+| 0.3.0 | Released | Complete COBOL grammar, directives, clauses, types, and layouts | [0.3.0](0.3.0.md) |
+| 0.4.0 | Released | Complete COBOL execution and differential semantics | [0.4.0](0.4.0.md) |
+| 0.5.0 | Released | Complete RACF command language and SAF | [0.5.0](0.5.0.md) |
+| 0.6.0 | Released | Complete dataset, VSAM, catalog, locking, and AMS surface | [0.6.0](0.6.0.md) |
+| 0.7.0 | Released | Complete JCL converter and planner | [0.7.0](0.7.0.md) |
+| 0.8.0 | Planned | Complete JES2 execution and real utility semantics | [0.8.0](0.8.0.md) |
+| 0.9.0 | Planned | Complete CICS application API | [0.9.0](0.9.0.md) |
+| 0.10.0 | Planned | Complete CICS SPI and FEPI | [0.10.0](0.10.0.md) |
+| 0.11.0 | Planned | Complete z/OSMF 3.2 REST portfolio | [0.11.0](0.11.0.md) |
+| 0.12.0 | Planned | Generic Db2 parser, catalog, executor, and common SQL | [0.12.0](0.12.0.md) |
+| 0.13.0 | Planned | Complete Db2 13 programming surface | [0.13.0](0.13.0.md) |
+| 0.14.0 | Planned | Complete IMS 15.6 programming surface | [0.14.0](0.14.0.md) |
+| 0.15.0 | Planned | Complete IBM MQ 9.4 programming surface | [0.15.0](0.15.0.md) |
+| 0.16.0 | Planned | Complete cross-resource transaction and failure semantics | [0.16.0](0.16.0.md) |
+| 0.17.0 | Planned | Licensed IBM differential certification and 1.0 rehearsal | [0.17.0](0.17.0.md) |
+| 1.0.0 | Planned | Stable pinned programming-surface release | [1.0.0](1.0.0.md) |
 
 See [Parallel implementation plan](PARALLEL-IMPLEMENTATION.md) for the work DAG,
 safe concurrency lanes, merge discipline, and critical path.
