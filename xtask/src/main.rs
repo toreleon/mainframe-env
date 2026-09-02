@@ -11,7 +11,8 @@ mod work_package_seal;
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use mainframe_env_conformance::{
     DatasetConformanceRuntime, RACF_ORACLE_RELATIVE_PATH, RacfOracleCampaign,
-    dataset_conformance_runtime, licensed_fixture_digest, run_dataset_reference_simulation,
+    dataset_conformance_runtime, gnucobol_reference_fixture_digest, licensed_fixture_digest,
+    run_dataset_reference_simulation, run_gnucobol_reference_campaign,
     verify_carddemo_application_package_from_env, verify_carddemo_base_batch_from_env,
     verify_carddemo_base_online_from_env, verify_carddemo_batch_programs_from_env,
     verify_carddemo_cics_abi_from_env, verify_carddemo_cics_runtime_from_env,
@@ -32,7 +33,8 @@ use mainframe_env_conformance::{
     verify_cobol_licensed_receipt_from_env, verify_cobol_recovery_fixtures,
     verify_cobol_register_runtime_fixtures, verify_cobol_semantic_fixtures,
     verify_cobol_statement_fixtures, verify_cobol_statement_phrase_runtime_fixtures,
-    verify_cobol_statement_runtime_fixtures, verify_host_abi_libraries, verify_jcl_exit,
+    verify_cobol_statement_runtime_fixtures, verify_gnucobol_reference_allowlist,
+    verify_host_abi_libraries, verify_jcl_exit,
 };
 use mainframe_env_coverage::{
     BindingKey, CompiledSpec, ConformanceDriver, ConformanceLimits, ConformanceObservation,
@@ -100,6 +102,14 @@ struct ConformanceArgs {
 }
 
 #[derive(Debug, Args)]
+struct CobolReferenceArgs {
+    #[arg(long)]
+    check: bool,
+    #[arg(long)]
+    receipt: PathBuf,
+}
+
+#[derive(Debug, Args)]
 struct WorkPackageSealArgs {
     #[arg(long)]
     id: String,
@@ -151,6 +161,7 @@ enum XtaskCommand {
     DatasetOracle(CheckArgs),
     CobolLanguage(CheckArgs),
     CobolExit(CheckArgs),
+    CobolReference(CobolReferenceArgs),
     JclCatalog(CheckArgs),
     JclConformance(CheckArgs),
     JclExit(CheckArgs),
@@ -364,6 +375,11 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             }
         ),
         XtaskCommand::CobolExit(args) => checked!("cobol-exit", args, check_cobol_exit(root)),
+        XtaskCommand::CobolReference(args) => checked!(
+            "cobol-reference",
+            args,
+            check_cobol_reference(root, &args.receipt)
+        ),
         XtaskCommand::JclCatalog(args) => checked!(
             "jcl-catalog",
             args,
@@ -581,6 +597,8 @@ fn check_spec(root: &Path) -> TaskResult {
         schema_names
             == BTreeSet::from([
                 "cobol-language.schema.json",
+                "cobol-gnucobol-reference-allowlist.schema.json",
+                "cobol-gnucobol-reference-receipt.schema.json",
                 "cobol-licensed-differential-adapter.schema.json",
                 "cobol-licensed-differential-receipt.schema.json",
                 "cobol-condition-fixtures.schema.json",
@@ -607,6 +625,20 @@ fn check_spec(root: &Path) -> TaskResult {
         let schema = json(schema_path)?;
         compile_draft_2020_12_schema(&schema, schema_path)?;
     }
+    let gnucobol_allowlist_path =
+        root.join("conformance/0.4/cobol/gnucobol-reference-allowlist.json");
+    let gnucobol_allowlist_schema_path =
+        schema_directory.join("cobol-gnucobol-reference-allowlist.schema.json");
+    validate_schema_instance(
+        &json(&gnucobol_allowlist_schema_path)?,
+        &json(&gnucobol_allowlist_path)?,
+        &gnucobol_allowlist_path,
+    )?;
+    require(
+        verify_gnucobol_reference_allowlist()? == 16
+            && gnucobol_reference_fixture_digest().starts_with("sha256:"),
+        "approved GnuCOBOL reference allowlist drifted",
+    )?;
     let cobol_oracle_path = root.join("conformance/0.4/oracles/cobol-licensed-differential.json");
     let cobol_oracle_schema_path =
         schema_directory.join("cobol-licensed-differential-adapter.schema.json");
@@ -808,6 +840,7 @@ fn check_spec(root: &Path) -> TaskResult {
     )?;
     check_cobol_recovery_bindings(root, &spec, &recovery_path)?;
     check_cobol_condition_bindings(root, &spec, &condition_path)?;
+    check_cobol_reference_policy(root, &spec)?;
     validate_conformance_projections(&schema_directory, &spec)?;
     require(
         !root.join("conformance/spec/verdicts").exists()
@@ -2525,6 +2558,87 @@ fn has_cobol_licensed_oracle(case: &mainframe_env_coverage::ConformanceCase) -> 
         .is_some_and(|oracle| oracle.as_str() == "cobol.enterprise-6.5.licensed")
 }
 
+fn check_cobol_reference_policy(root: &Path, spec: &CompiledSpec) -> TaskResult {
+    require(
+        spec.cases().all(|case| {
+            !case.test_id().as_str().contains("gnucobol")
+                && !case.driver().as_str().contains("gnucobol")
+                && case
+                    .oracle()
+                    .is_none_or(|oracle| !oracle.as_str().contains("gnucobol"))
+        }) && spec
+            .registries()
+            .oracles()
+            .iter()
+            .all(|(oracle, _)| !oracle.as_str().contains("gnucobol")),
+        "GnuCOBOL reference results must not enter the Conformance IR or oracle registry",
+    )?;
+    let adapter_path = root.join("crates/tooling/mainframe-env-conformance/src/cobol_reference.rs");
+    let adapter = read(&adapter_path)?;
+    for required in [
+        "reference: \"gnucobol\"",
+        "licensed_differential_credit: 0",
+        "licensed_cases_pending: 153",
+        "-std=ibm-strict",
+        "PROCESS_TIMEOUT",
+        "MAX_OUTPUT_BYTES",
+        "product bug, harness bug, or documented dialect/runtime divergence",
+    ] {
+        require(
+            adapter.contains(required),
+            &format!("GnuCOBOL reference adapter omits {required}"),
+        )?;
+    }
+    let mut manifests = Vec::new();
+    for component in ["apps", "contracts", "kernel", "providers", "stores"] {
+        collect_extension(
+            &root.join("crates").join(component),
+            OsStr::new("toml"),
+            &mut manifests,
+        )?;
+    }
+    manifests.push(root.join("Cargo.toml"));
+    manifests.push(root.join("Cargo.lock"));
+    for manifest in manifests {
+        let source = read(&manifest)?.to_ascii_lowercase();
+        require(
+            !source.contains("gnucobol") && !source.contains("libcob"),
+            &format!(
+                "production dependency closure links or packages GnuCOBOL in {}",
+                manifest.display()
+            ),
+        )?;
+    }
+    for relative in [
+        "docs/prompts/coverage-versions/IMPLEMENT_0_4_0.md",
+        "docs/delivery/coverage-versions/0.4.0.md",
+        "docs/delivery/coverage-versions/0.4.0-local-assurance.md",
+        "docs/delivery/coverage-versions/status/0.4.0.md",
+    ] {
+        let document = read(&root.join(relative))?;
+        require(
+            document.contains("pass-with-licensed-differential-pending")
+                && document.contains("GnuCOBOL")
+                && document.contains("0/153")
+                && document.contains("0.17"),
+            &format!("{relative} omits the approved GnuCOBOL completion disposition"),
+        )?;
+    }
+    for relative in [
+        "docs/prompts/coverage-versions/IMPLEMENT_0_17_0.md",
+        "docs/delivery/coverage-versions/0.17.0.md",
+    ] {
+        let document = read(&root.join(relative))?;
+        require(
+            document.contains("GnuCOBOL")
+                && document.contains("0/153")
+                && document.contains("153-row"),
+            &format!("{relative} omits the deferred licensed COBOL campaign handoff"),
+        )?;
+    }
+    Ok(())
+}
+
 fn check_cobol_recovery_bindings(
     _root: &Path,
     spec: &CompiledSpec,
@@ -3554,6 +3668,70 @@ fn check_cobol_exit(root: &Path) -> TaskResult {
         receipt.limit_classes,
         receipt.recovery_classes,
         receipt.prior_artifact_bytes,
+    );
+    Ok(())
+}
+
+fn check_cobol_reference(root: &Path, receipt_path: &Path) -> TaskResult {
+    require(
+        receipt_path.is_absolute(),
+        "GnuCOBOL reference receipt path must be absolute",
+    )?;
+    let parent = receipt_path
+        .parent()
+        .ok_or("GnuCOBOL reference receipt has no parent directory")?;
+    let canonical_parent = fs::canonicalize(parent)
+        .map_err(|error| format!("GnuCOBOL reference receipt parent: {error}"))?;
+    let canonical_root = fs::canonicalize(root).map_err(|error| error.to_string())?;
+    require(
+        !canonical_parent.starts_with(&canonical_root),
+        "GnuCOBOL reference receipt must remain outside the candidate tree",
+    )?;
+    let file_name = receipt_path
+        .file_name()
+        .ok_or("GnuCOBOL reference receipt path has no file name")?;
+    let receipt_path = canonical_parent.join(file_name);
+    require(
+        !receipt_path.exists(),
+        "GnuCOBOL reference receipt path already exists; use a fresh path",
+    )?;
+    let candidate = candidate_digest(root)?;
+    let receipt = run_gnucobol_reference_campaign(&candidate)?;
+    require(
+        receipt.reference == "gnucobol"
+            && receipt.licensed_differential_credit == 0
+            && receipt.licensed_cases_pending == 153
+            && receipt.case_count == 16
+            && receipt.passed_cases == 16
+            && receipt.mutants_killed >= 4,
+        "GnuCOBOL reference campaign report drifted",
+    )?;
+    let value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
+    let schema_path =
+        root.join("conformance/spec/schemas/cobol-gnucobol-reference-receipt.schema.json");
+    validate_schema_instance(&json(&schema_path)?, &value, &receipt_path)?;
+    let mut bytes = serde_json::to_vec_pretty(&value).map_err(|error| error.to_string())?;
+    bytes.push(b'\n');
+    let mut output = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&receipt_path)
+        .map_err(|error| format!("create GnuCOBOL reference receipt: {error}"))?;
+    output
+        .write_all(&bytes)
+        .map_err(|error| format!("write GnuCOBOL reference receipt: {error}"))?;
+    output
+        .sync_all()
+        .map_err(|error| format!("sync GnuCOBOL reference receipt: {error}"))?;
+    println!(
+        "cobol-reference reference=gnucobol version=3.2.0 cases={}/{} mutants={} licensed-differential=0/153-pending candidate={} fixtures={} receipt={} receipt-digest=sha256:{:x}",
+        receipt.passed_cases,
+        receipt.case_count,
+        receipt.mutants_killed,
+        receipt.candidate_identity,
+        receipt.fixture_digest,
+        receipt_path.display(),
+        Sha256::digest(&bytes),
     );
     Ok(())
 }

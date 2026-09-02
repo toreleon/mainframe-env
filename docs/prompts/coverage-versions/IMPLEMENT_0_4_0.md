@@ -35,6 +35,27 @@ must rerun the affected 0.3 gate.
 5. Implement **CB-406** condition, resource, cancellation, restart, property,
    metamorphic, prior-artifact, and licensed differential suites.
 
+## Approved 2026-09-02 completion policy
+
+The user-approved 0.4 disposition is
+`pass-with-licensed-differential-pending`. A licensed Enterprise COBOL 6.5
+environment remains unavailable, so:
+
+- preserve the licensed differential numerator at exactly 0/153 and keep the
+  real licensed adapter fail-closed;
+- run GnuCOBOL 3.2.0 out of process with `-std=ibm-strict` only for the explicit
+  bounded portable allowlist, recording its exact binary/runtime identities,
+  flags, locale, encoding, source format, normalization, fixture digest, exit
+  statuses, observations, and candidate identity;
+- label the result `reference=gnucobol`, grant it zero IBM differential credit,
+  and never use it for IBM option/storage, national/UTF-8/DBCS, JSON/XML, LE,
+  VSAM, or subsystem semantics;
+- require exact independently projected mainframe-env-versus-reference
+  comparisons, a portability rationale and pinned IBM source locator for every
+  case, and representative harness mutants; and
+- defer the real licensed 153-row campaign to the 0.17 release-certification
+  hard gate, where it remains mandatory before 1.0.
+
 ## Reuse and architecture guardrails
 
 - Before implementing decimal and floating arithmetic primitives, run a frozen
@@ -71,11 +92,14 @@ must rerun the affected 0.3 gate.
 ## Completion gate
 
 Do not finish until every pinned COBOL row executes all applicable behavior,
-every applicable mutation/restart/recovery row passes, and licensed Enterprise
-COBOL 6.5 positive, negative, boundary, condition, and interaction differentials
-pass. The complete 0.3 recognition/validation and 0.1.1 compatibility suites must
-remain green.
+every applicable mutation/restart/recovery row passes, the approved bounded
+GnuCOBOL campaign and harness mutants pass, and the complete 0.3
+recognition/validation and 0.1.1 compatibility suites remain green. The
+licensed Enterprise COBOL 6.5 positive, negative, boundary, condition, and
+interaction differential stays explicitly pending at 0/153 under the approved
+policy and is a hard 0.17 release-certification dependency.
 
-At handoff, report coverage by all six gates, oracle environment receipts and
-normalization rules, interpreter resource bounds, recovery results, and exact
-row/obligation/test verdict bindings. Never mark unavailable oracle work passed.
+At handoff, report coverage by all six gates, the GnuCOBOL reference receipt and
+normalization rules, interpreter resource bounds, recovery results, exact
+row/obligation/test verdict bindings, and the 0/153 licensed handoff. Never mark
+the unavailable IBM oracle work passed.

@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.example/schemas/cobol-gnucobol-reference-receipt.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_version",
+    "status",
+    "baseline_id",
+    "reference",
+    "licensed_differential_credit",
+    "licensed_cases_pending",
+    "candidate_identity",
+    "fixture_digest",
+    "compiler",
+    "runtime",
+    "compiler_flags",
+    "runtime_arguments",
+    "locale",
+    "encoding_assumptions",
+    "source_format",
+    "normalization_rules",
+    "limits",
+    "case_count",
+    "passed_cases",
+    "mutants_killed",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": { "const": "mainframe-env.cobol-gnucobol-reference-receipt@1" },
+    "target_version": { "const": "0.4.0" },
+    "status": { "const": "pass-with-licensed-differential-pending" },
+    "baseline_id": { "const": "ibm-enterprise-cobol-6.5-2026-05-31" },
+    "reference": { "const": "gnucobol" },
+    "licensed_differential_credit": { "const": 0 },
+    "licensed_cases_pending": { "const": 153 },
+    "candidate_identity": { "$ref": "#/$defs/digest" },
+    "fixture_digest": { "$ref": "#/$defs/digest" },
+    "compiler": { "$ref": "#/$defs/compiler" },
+    "runtime": { "$ref": "#/$defs/runtime" },
+    "compiler_flags": { "const": ["-std=ibm-strict", "-free", "-m"] },
+    "runtime_arguments": { "const": ["<program-id>"] },
+    "locale": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["LANG", "LC_ALL"],
+      "properties": {
+        "LANG": { "const": "C.UTF-8" },
+        "LC_ALL": { "const": "C.UTF-8" }
+      }
+    },
+    "encoding_assumptions": {
+      "const": [
+        "allowlisted source is UTF-8 restricted to portable syntax and ASCII-subset data",
+        "GnuCOBOL stdout and stderr must be valid UTF-8 after CRLF normalization",
+        "mainframe-env output must be valid UTF-8 after CRLF normalization"
+      ]
+    },
+    "source_format": { "const": "free" },
+    "normalization_rules": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_cases", "max_source_bytes", "max_output_bytes", "process_timeout_ms"],
+      "properties": {
+        "max_cases": { "const": 32 },
+        "max_source_bytes": { "const": 16384 },
+        "max_output_bytes": { "const": 65536 },
+        "process_timeout_ms": { "const": 10000 }
+      }
+    },
+    "case_count": { "const": 16 },
+    "passed_cases": { "const": 16 },
+    "mutants_killed": { "type": "integer", "minimum": 4, "maximum": 64 },
+    "cases": {
+      "type": "array",
+      "minItems": 16,
+      "maxItems": 16,
+      "items": { "$ref": "#/$defs/case" }
+    }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "installed_path",
+        "resolved_path",
+        "sha256",
+        "version",
+        "version_exit_status",
+        "version_output_sha256"
+      ],
+      "properties": {
+        "installed_path": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "resolved_path": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "sha256": { "$ref": "#/$defs/digest" },
+        "version": { "const": "3.2.0" },
+        "version_exit_status": { "const": 0 },
+        "version_output_sha256": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "compiler": {
+      "allOf": [
+        { "$ref": "#/$defs/tool" },
+        {
+          "properties": {
+            "installed_path": { "const": "/Users/tore/.homebrew/bin/cobc" },
+            "resolved_path": { "const": "/Users/tore/.homebrew/Cellar/gnucobol/3.2_1/bin/cobc" },
+            "sha256": { "const": "sha256:27240345b880a92924b4869ba77c457cf12d1d2ed6a2cd4e54f425ea1e7f39e9" }
+          }
+        }
+      ]
+    },
+    "runtime": {
+      "allOf": [
+        { "$ref": "#/$defs/tool" },
+        {
+          "properties": {
+            "installed_path": { "const": "/Users/tore/.homebrew/bin/cobcrun" },
+            "resolved_path": { "const": "/Users/tore/.homebrew/Cellar/gnucobol/3.2_1/bin/cobcrun" },
+            "sha256": { "const": "sha256:4ec157f16524270196eb6dd5f6f335db3020bee809e1ecb12a4d84b5edfb6715" }
+          }
+        }
+      ]
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "cohort",
+        "row_id",
+        "source_locator",
+        "program_id",
+        "portable_rationale",
+        "source_sha256",
+        "compile_exit_status",
+        "compile_stdout",
+        "compile_stderr",
+        "reference_exit_status",
+        "reference_stdout",
+        "reference_stderr",
+        "product_exit_status",
+        "product_stdout",
+        "comparison"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$", "maxLength": 128 },
+        "cohort": { "enum": ["statement-control", "decimal-arithmetic", "move-string", "intrinsic"] },
+        "row_id": {
+          "type": "string",
+          "pattern": "^ibm-enterprise-cobol-6\\.5-2026-05-31:(procedure-statements|intrinsic-functions):[0-9]{4}$"
+        },
+        "source_locator": { "type": "string", "pattern": "^pdf-page:[0-9]+;outline:.+$", "maxLength": 246 },
+        "program_id": { "type": "string", "pattern": "^[A-Z][A-Z0-9]{0,7}$" },
+        "portable_rationale": { "type": "string", "minLength": 32, "maxLength": 512 },
+        "source_sha256": { "$ref": "#/$defs/digest" },
+        "compile_exit_status": { "const": 0 },
+        "compile_stdout": { "const": "" },
+        "compile_stderr": { "const": "ld: warning: -undefined suppress is deprecated\nld: warning: -undefined suppress is deprecated\n" },
+        "reference_exit_status": { "const": 0 },
+        "reference_stdout": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "reference_stderr": { "const": "" },
+        "product_exit_status": { "const": 0 },
+        "product_stdout": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "comparison": { "const": "pass" }
+      }
+    }
+  }
+}

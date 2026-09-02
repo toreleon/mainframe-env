@@ -34,6 +34,7 @@ mod cobol_intrinsics;
 mod cobol_licensed;
 mod cobol_phrases;
 mod cobol_recovery;
+mod cobol_reference;
 mod cobol_registers;
 mod cobol_runtime;
 mod cobol_statements;
@@ -97,6 +98,10 @@ pub use cobol_intrinsics::verify_cobol_function_runtime_fixtures;
 pub use cobol_licensed::{licensed_fixture_digest, verify_cobol_licensed_receipt_from_env};
 pub use cobol_phrases::verify_cobol_statement_phrase_runtime_fixtures;
 pub use cobol_recovery::verify_cobol_recovery_fixtures;
+pub use cobol_reference::{
+    GnuCobolReferenceReceipt, gnucobol_reference_fixture_digest, run_gnucobol_reference_campaign,
+    verify_gnucobol_reference_allowlist,
+};
 pub use cobol_registers::verify_cobol_register_runtime_fixtures;
 pub use cobol_runtime::verify_cobol_statement_runtime_fixtures;
 pub use cobol_statements::verify_cobol_statement_fixtures;
