@@ -31,7 +31,7 @@ jobs:
       - run: cargo xtask conformance --check
       - run: cargo xtask evidence seal --check
       - run: cargo xtask runtime-architecture --check
-      - id: linux-release
+      - id: linux-release-path
         shell: bash
         run: |
           version="$(<VERSION)"
@@ -40,16 +40,16 @@ jobs:
             exit 1
           fi
           release_dir="release/$version/targets/x86_64-unknown-linux-gnu"
-          cargo xtask release --target x86_64-unknown-linux-gnu
-          git diff --exit-code -- "$release_dir"
-          cargo xtask release --check --target x86_64-unknown-linux-gnu
           printf 'path=%s\n' "$release_dir" >> "$GITHUB_OUTPUT"
+      - run: cargo xtask release --target x86_64-unknown-linux-gnu
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: linux-release-evidence
-          path: ${{ steps.linux-release.outputs.path }}
+          path: ${{ steps.linux-release-path.outputs.path }}
           if-no-files-found: error
+      - run: git diff --exit-code -- "${{ steps.linux-release-path.outputs.path }}"
+      - run: cargo xtask release --check --target x86_64-unknown-linux-gnu
 
   contract-msrv:
     runs-on: ubuntu-24.04

@@ -9771,7 +9771,7 @@ fn check_runtime_architecture(root: &Path) -> TaskResult {
 }
 
 fn release_server_sqlite_smoke(root: &Path) -> TaskResult {
-    let binary = root.join("target/release/mainframe-env-server");
+    let binary = cargo_target_directory(root).join("release/mainframe-env-server");
     require(binary.is_file(), "release server binary is missing")?;
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)

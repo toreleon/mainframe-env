@@ -10,8 +10,8 @@ The design goal is a stable, robust platform built around a deterministic
 compiler and execution kernel, with asynchronous infrastructure and external
 frameworks isolated behind owned ports.
 
-The current product version prepared for official release is **0.6.0** on the
-0.6 release line. The [0.6 release notes](docs/releases/0.6.md) define its
+The current product version prepared for official release is **0.7.0** on the
+0.7 release line. The [0.7 release notes](docs/releases/0.7.md) define its
 claims and limitations. No tag, package publication, or deployment is
 performed by this release-preparation branch.
 
@@ -24,14 +24,20 @@ Version, phase-commit, and promotion rules are defined in
 
 ## Current status
 
-- The 0.6 product identity is internally consistent and retains reproducible,
+- The 0.7 product identity is internally consistent and retains reproducible,
   unpublished release receipts for the advertised macOS ARM64 and Linux x86-64
   targets.
 - The 0.3 through 0.7 subsystem work was integrated in parallel before product
-  promotion. The 0.6 source baseline therefore contains later accepted work;
-  that does not promote later minor claims into the 0.6 release.
-- The generic platform passes CardDemo corpus certification: 27/27 issues and
-  20/20 journeys with memory, SQLite, PostgreSQL 18, and live Zowe CLI evidence.
+  promotion. The 0.7 source baseline truthfully preserves that integrated
+  history rather than reconstructing alternate product trees.
+- CardDemo online and batch execution currently fails for the documented 0.7
+  compiler/IDCAMS limitations; stale historical CD-006/CD-013 receipts are not
+  refreshed or treated as current passes. The planned corrective patch is
+  0.7.1.
+- Historical accepted 0.1.1/0.2 evidence records CardDemo corpus certification
+  at 27/27 issues and 20/20 journeys with memory, SQLite, PostgreSQL 18, and
+  live Zowe CLI evidence. That historical result is not a current 0.7 pass and
+  does not supersede the current failure and stale-evidence disclosure above.
   CardDemo remains a non-production corpus/workload, not a product feature.
 - Corpus tooling uses `CARDDEMO`; the pinned upstream FTP typo is retained only
   as a bounded compatibility alias.

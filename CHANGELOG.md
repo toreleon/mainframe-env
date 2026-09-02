@@ -4,6 +4,26 @@ All notable changes to mainframe-env are documented here.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-02
+
+### Added
+
+- Added the lossless bounded JCL frontend, catalog-driven validation, procedure
+  and symbol expansion, immutable typed planner, and JES2 JECL annotations.
+- Added exact recognition and validation for all 237 pinned JCL/JES2 rows with
+  deterministic malformed, recovery, scale, compatibility, and CardDemo plan
+  matrices.
+
+### Known limitations
+
+- JCL row-wide execution, condition, recovery, and licensed differential gates
+  remain pending; 0.7 is a converter/planner release, not the 0.8 JES runtime.
+- CD-006 and CD-013 receipts are stale. Fixed-format comment text leaks into a
+  multi-receiver `MOVE` during CardDemo online execution. IDCAMS rejects
+  CardDemo's `DELETE ... CLUSTER` and `DATA/INDEX(NAME(...))` component forms,
+  so the reproduced online and batch journeys fail. These defects are not
+  hidden by weakened gates; 0.7.1 is the planned patch.
+
 ## [0.6.0] - 2026-09-02
 
 ### Added
