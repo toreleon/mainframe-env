@@ -1,0 +1,31 @@
+{
+  "cargo_lock_sha256": "94922358390a8016d4f5b015ebe49cb460495c62032c1f4d6ce88298ee035ea8",
+  "cargo_version": "cargo 1.98.0 (797e8a9bc 2026-08-05)",
+  "deterministic_environment": {
+    "CARGO_INCREMENTAL": "0",
+    "LC_ALL": "C",
+    "MACOSX_DEPLOYMENT_TARGET": "15.0",
+    "SOURCE_DATE_EPOCH": "0",
+    "TZ": "UTC",
+    "ZERO_AR_DATE": "1"
+  },
+  "features": "all",
+  "linker_determinism": "-Wl,-no_uuid",
+  "locked": true,
+  "path_remapping": {
+    "cargo_home": "/cargo",
+    "repository": "/workspace/mainframe-env",
+    "rustup_home": "/rustup"
+  },
+  "profile": "release",
+  "profile_settings": {
+    "codegen_units": 1,
+    "debug": 0,
+    "incremental": false,
+    "strip": "symbols"
+  },
+  "rustc_verbose": "rustc 1.98.0 (88d9e12ae 2026-08-18)\nbinary: rustc\ncommit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea\ncommit-date: 2026-08-18\nrelease: 1.98.0\nLLVM version: 22.1.8",
+  "schema_version": "mainframe-env.release-build-inputs@1",
+  "source_digest": "sha256:67faf4b40e2e8c1c619a9564188d4ffe26efff5354e2c60b7032035e37d8b4f6",
+  "target": "aarch64-apple-darwin"
+}

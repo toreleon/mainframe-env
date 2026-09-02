@@ -1,7 +1,7 @@
 [product]
 name = "mainframe-env"
-version = "0.2.0"
-release_line = "0.2"
+version = "0.7.0"
+release_line = "0.7"
 channel = "stable"
 publish = false
 

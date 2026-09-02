@@ -58,6 +58,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 type TaskResult<T = ()> = Result<T, String>;
 
+const RETAINED_RELEASE_TARGETS: [&str; 2] = ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu"];
+
 #[derive(Debug, Parser)]
 #[command(name = "xtask", disable_version_flag = true)]
 struct Cli {
@@ -5250,8 +5252,49 @@ fn text<'a>(value: &'a Value, key: &str, path: &Path) -> TaskResult<&'a str> {
         .ok_or_else(|| format!("{} must contain string {key:?}", path.display()))
 }
 
-fn check_versions(root: &Path) -> TaskResult {
+fn stable_zero_version(value: &str) -> TaskResult<(u64, u64)> {
+    let components = value.split('.').collect::<Vec<_>>();
+    require(
+        components.len() == 3 && components[0] == "0",
+        "product version must be stable SemVer 0.x.y",
+    )?;
+    let parse_component = |component: &str| -> TaskResult<u64> {
+        require(
+            !component.is_empty()
+                && component.bytes().all(|byte| byte.is_ascii_digit())
+                && (component == "0" || !component.starts_with('0')),
+            "product version must be stable SemVer 0.x.y",
+        )?;
+        component
+            .parse::<u64>()
+            .map_err(|_| "product version component is out of range".into())
+    };
+    Ok((
+        parse_component(components[1])?,
+        parse_component(components[2])?,
+    ))
+}
+
+fn release_line_for_version(version: &str) -> TaskResult<String> {
+    let (minor, _) = stable_zero_version(version)?;
+    Ok(format!("0.{minor}"))
+}
+
+fn product_version(root: &Path) -> TaskResult<String> {
     let version = read(&root.join("VERSION"))?.trim().to_string();
+    stable_zero_version(&version)?;
+    Ok(version)
+}
+
+fn release_target_directory(version: &str, target: &str) -> TaskResult<PathBuf> {
+    stable_zero_version(version)?;
+    validate_release_target(target)?;
+    Ok(PathBuf::from(format!("release/{version}/targets/{target}")))
+}
+
+fn check_versions(root: &Path) -> TaskResult {
+    let version = product_version(root)?;
+    let expected_release_line = release_line_for_version(&version)?;
     let cargo: toml::Value = read(&root.join("Cargo.toml"))?
         .parse()
         .map_err(|error| format!("Cargo.toml: {error}"))?;
@@ -5268,6 +5311,12 @@ fn check_versions(root: &Path) -> TaskResult {
     let release_line = release["product"]["release_line"]
         .as_str()
         .ok_or("product.release_line is missing")?;
+    let channel = release["product"]["channel"]
+        .as_str()
+        .ok_or("product.channel is missing")?;
+    let publish = release["product"]["publish"]
+        .as_bool()
+        .ok_or("product.publish is missing")?;
     let msrv = cargo["workspace"]["package"]["rust-version"]
         .as_str()
         .ok_or("workspace.package.rust-version is missing")?;
@@ -5276,10 +5325,6 @@ fn check_versions(root: &Path) -> TaskResult {
         .ok_or("release rust.pinned is missing")?;
 
     require(
-        version == "0.2.0",
-        "VERSION must identify the 0.2.0 candidate",
-    )?;
-    require(
         cargo_version == version,
         "Cargo workspace version differs from VERSION",
     )?;
@@ -5287,19 +5332,32 @@ fn check_versions(root: &Path) -> TaskResult {
         release_version == version,
         "release.toml version differs from VERSION",
     )?;
-    require(release_line == "0.2", "release line must be 0.2")?;
+    require(
+        release_line == expected_release_line,
+        "release.toml release line is not derived from VERSION",
+    )?;
+    require(channel == "stable", "product channel must be stable")?;
+    require(
+        !publish,
+        "checked-in release configuration must not publish",
+    )?;
     require(msrv == "1.95", "workspace MSRV must be 1.95")?;
     require(pinned == "1.98.0", "pinned Rust toolchain must be 1.98.0")?;
 
     let mut manifests = Vec::new();
     collect_named(root, OsStr::new("Cargo.toml"), &mut manifests)?;
+    let mut workspace_packages = BTreeSet::new();
     for manifest in manifests {
-        if manifest == root.join("Cargo.toml") {
-            continue;
-        }
         let parsed: toml::Value = read(&manifest)?
             .parse()
             .map_err(|error| format!("{}: {error}", manifest.display()))?;
+        if manifest == root.join("Cargo.toml") {
+            continue;
+        }
+        let package_name = parsed["package"]["name"]
+            .as_str()
+            .ok_or_else(|| format!("{} package.name is missing", manifest.display()))?;
+        workspace_packages.insert(package_name.to_string());
         let crate_version = &parsed["package"]["version"];
         let inherits = crate_version
             .get("workspace")
@@ -5312,11 +5370,37 @@ fn check_versions(root: &Path) -> TaskResult {
         )?;
     }
 
+    let lock_path = root.join("Cargo.lock");
+    let lock: toml::Value = read(&lock_path)?
+        .parse()
+        .map_err(|error| format!("Cargo.lock: {error}"))?;
+    let locked_packages = lock["package"]
+        .as_array()
+        .ok_or("Cargo.lock package inventory is missing")?;
+    for package_name in &workspace_packages {
+        let matches = locked_packages
+            .iter()
+            .filter(|package| package["name"].as_str() == Some(package_name))
+            .collect::<Vec<_>>();
+        require(
+            matches.len() == 1 && matches[0]["version"].as_str() == Some(version.as_str()),
+            &format!("Cargo.lock workspace package {package_name} differs from VERSION"),
+        )?;
+    }
+
     let inventory_path = root.join("conformance/0.2/inventory/versions.json");
     let inventory = json(&inventory_path)?;
     require(
         text(&inventory, "product", &inventory_path)? == version,
         "machine version inventory differs from VERSION",
+    )?;
+    require(
+        text(&inventory, "release_line", &inventory_path)? == expected_release_line,
+        "machine version inventory release line differs from VERSION",
+    )?;
+    require(
+        text(&inventory, "channel", &inventory_path)? == channel,
+        "machine version inventory channel differs from release.toml",
     )?;
 
     let notes = read(&root.join(format!("docs/releases/{release_line}.md")))?;
@@ -5324,6 +5408,7 @@ fn check_versions(root: &Path) -> TaskResult {
         notes.contains(&version),
         "release notes omit current version",
     )?;
+    validate_historical_0_2_release(root)?;
     Ok(())
 }
 
@@ -9686,7 +9771,7 @@ fn check_runtime_architecture(root: &Path) -> TaskResult {
 }
 
 fn release_server_sqlite_smoke(root: &Path) -> TaskResult {
-    let binary = root.join("target/release/mainframe-env-server");
+    let binary = cargo_target_directory(root).join("release/mainframe-env-server");
     require(binary.is_file(), "release server binary is missing")?;
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -10071,7 +10156,7 @@ fn repository_digest_excluded(relative: &Path) -> bool {
             && relative.extension() == Some(OsStr::new("json")))
 }
 
-fn release_source_digest(root: &Path) -> TaskResult<String> {
+fn accepted_0_2_release_source_digest(root: &Path) -> TaskResult<String> {
     let accepted_candidate = accepted_0_2_completion(root)?;
     let listing = command_text(
         root,
@@ -10127,6 +10212,73 @@ fn release_source_digest(root: &Path) -> TaskResult<String> {
     Ok(format!("sha256:{:x}", digest.finalize()))
 }
 
+fn release_source_digest(root: &Path) -> TaskResult<String> {
+    let version = product_version(root)?;
+    if version == "0.2.0" {
+        return accepted_0_2_release_source_digest(root);
+    }
+    live_release_source_digest(root, &version)
+}
+
+fn live_release_source_digest(root: &Path, version: &str) -> TaskResult<String> {
+    stable_zero_version(version)?;
+    require_clean_release_source(root, version)?;
+    let head = command_text(root, "git", &["rev-parse", "HEAD"])?;
+    let listing = command_text(root, "git", &["ls-tree", "-r", "--name-only", &head])?;
+    let mut files = listing.lines().map(PathBuf::from).collect::<Vec<_>>();
+    files.sort();
+    let mut digest = Sha256::new();
+    for relative in files {
+        if relative.starts_with("release") {
+            continue;
+        }
+        let relative_text = relative.to_string_lossy();
+        let bytes = git_file_bytes(root, &head, &relative_text)?;
+        digest.update((relative_text.len() as u64).to_be_bytes());
+        digest.update(relative_text.as_bytes());
+        digest.update((bytes.len() as u64).to_be_bytes());
+        digest.update(bytes);
+    }
+    Ok(format!("sha256:{:x}", digest.finalize()))
+}
+
+fn require_clean_release_source(root: &Path, version: &str) -> TaskResult {
+    stable_zero_version(version)?;
+    let allowed = format!("release/{version}/targets/");
+    let mut changed = BTreeSet::new();
+    for arguments in [
+        vec!["diff", "--name-only", "-z"],
+        vec!["diff", "--cached", "--name-only", "-z"],
+        vec!["ls-files", "--others", "--exclude-standard", "-z"],
+    ] {
+        let output = Command::new("git")
+            .args(arguments)
+            .current_dir(root)
+            .output()
+            .map_err(|error| format!("git release source status: {error}"))?;
+        require(
+            output.status.success(),
+            "could not inspect release source cleanliness",
+        )?;
+        for path in output.stdout.split(|byte| *byte == 0) {
+            if path.is_empty() {
+                continue;
+            }
+            let path = std::str::from_utf8(path).map_err(|_| "release source path is not UTF-8")?;
+            if !path.starts_with(&allowed) {
+                changed.insert(path.to_string());
+            }
+        }
+    }
+    require(
+        changed.is_empty(),
+        &format!(
+            "release source is not clean: {}",
+            changed.into_iter().collect::<Vec<_>>().join(", ")
+        ),
+    )
+}
+
 #[cfg(test)]
 fn explicit_release_target(arguments: &[String]) -> TaskResult<String> {
     let positions = arguments
@@ -10151,7 +10303,8 @@ fn validate_release_target(target: &str) -> TaskResult {
             && target.len() <= 128
             && target
                 .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.')),
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+            && RETAINED_RELEASE_TARGETS.contains(&target),
         "release target is invalid",
     )
 }
@@ -10233,13 +10386,26 @@ fn build_release_target(root: &Path, target: &str) -> TaskResult {
     )
 }
 
+fn cargo_target_directory(root: &Path) -> PathBuf {
+    env::var_os("CARGO_TARGET_DIR")
+        .map(PathBuf::from)
+        .map(|path| {
+            if path.is_absolute() {
+                path
+            } else {
+                root.join(path)
+            }
+        })
+        .unwrap_or_else(|| root.join("target"))
+}
+
 fn generate_release_artifacts(root: &Path, target: &str) -> TaskResult {
     if retained_accepted_release(root)?.is_some() {
         return validate_retained_accepted_release(root, target);
     }
     build_release_target(root, target)?;
     let documents = release_documents(root, target)?;
-    validate_release_documents(&documents, target)?;
+    validate_release_documents(root, &documents, target)?;
     for (relative, bytes) in documents {
         let path = root.join(relative);
         if let Some(parent) = path.parent() {
@@ -10257,14 +10423,14 @@ fn check_release_artifacts(root: &Path, target: &str) -> TaskResult {
     let retained = retained_release_documents(root, target)?;
     build_release_target(root, target)?;
     let documents = release_documents(root, target)?;
-    validate_release_documents(&documents, target)?;
+    validate_release_documents(root, &documents, target)?;
     compare_release_documents(&retained, &documents)?;
     validate_checked_in_release_targets(root)?;
     Ok(())
 }
 
 fn retained_accepted_release(root: &Path) -> TaskResult<Option<String>> {
-    if read(&root.join("VERSION"))?.trim() != "0.2.0" {
+    if product_version(root)? != "0.2.0" {
         return Ok(None);
     }
     let accepted = accepted_0_2_completion(root)?;
@@ -10287,8 +10453,9 @@ fn retained_accepted_release(root: &Path) -> TaskResult<Option<String>> {
 fn validate_retained_accepted_release(root: &Path, target: &str) -> TaskResult {
     let accepted = retained_accepted_release(root)?
         .ok_or("retained accepted-release validation requires a later descendant")?;
-    let retained = retained_release_documents(root, target)?;
-    validate_release_documents(&retained, target)?;
+    let retained = retained_release_documents_for_version(root, "0.2.0", target)?;
+    let source_digest = accepted_0_2_release_source_digest(root)?;
+    validate_release_documents_for_identity(&retained, target, "0.2.0", "stable", &source_digest)?;
     for (relative, actual) in &retained {
         let expected = git_file_bytes(root, &accepted, &relative.to_string_lossy())?;
         require(
@@ -10299,7 +10466,27 @@ fn validate_retained_accepted_release(root: &Path, target: &str) -> TaskResult {
             ),
         )?;
     }
-    validate_checked_in_release_targets(root)
+    validate_historical_0_2_release(root)
+}
+
+fn validate_historical_0_2_release(root: &Path) -> TaskResult {
+    let accepted = accepted_0_2_completion(root)?;
+    let source_digest = accepted_0_2_release_source_digest(root)?;
+    validate_checked_in_release_targets_for_identity(root, "0.2.0", "stable", &source_digest)?;
+    for target in RETAINED_RELEASE_TARGETS {
+        let documents = retained_release_documents_for_version(root, "0.2.0", target)?;
+        for (relative, actual) in documents {
+            let expected = git_file_bytes(root, &accepted, &relative.to_string_lossy())?;
+            require(
+                actual == expected,
+                &format!(
+                    "accepted 0.2 release document drifted after completion: {}",
+                    relative.display()
+                ),
+            )?;
+        }
+    }
+    Ok(())
 }
 
 fn compare_release_documents(
@@ -10326,9 +10513,16 @@ fn compare_release_documents(
 }
 
 fn retained_release_documents(root: &Path, target: &str) -> TaskResult<BTreeMap<PathBuf, Vec<u8>>> {
-    validate_release_target(target)?;
-    let version = read(&root.join("VERSION"))?.trim().to_string();
-    let directory = root.join(format!("release/{version}/targets/{target}"));
+    let version = product_version(root)?;
+    retained_release_documents_for_version(root, &version, target)
+}
+
+fn retained_release_documents_for_version(
+    root: &Path,
+    version: &str,
+    target: &str,
+) -> TaskResult<BTreeMap<PathBuf, Vec<u8>>> {
+    let directory = root.join(release_target_directory(version, target)?);
     require(
         directory.is_dir(),
         &format!("retained target evidence is missing for {target}"),
@@ -10358,11 +10552,30 @@ fn retained_release_documents(root: &Path, target: &str) -> TaskResult<BTreeMap<
 }
 
 fn validate_checked_in_release_targets(root: &Path) -> TaskResult {
-    let version = read(&root.join("VERSION"))?.trim().to_string();
+    let version = product_version(root)?;
+    let release_config: toml::Value = read(&root.join("release.toml"))?
+        .parse()
+        .map_err(|error| format!("release.toml: {error}"))?;
+    let channel = release_config["product"]["channel"]
+        .as_str()
+        .ok_or("product.channel is missing")?;
+    let source_digest = release_source_digest(root)?;
+    validate_checked_in_release_targets_for_identity(root, &version, channel, &source_digest)
+}
+
+fn validate_checked_in_release_targets_for_identity(
+    root: &Path,
+    version: &str,
+    channel: &str,
+    source_digest: &str,
+) -> TaskResult {
+    stable_zero_version(version)?;
     let directory = root.join(format!("release/{version}/targets"));
-    if !directory.is_dir() {
-        return Ok(());
-    }
+    require(
+        directory.is_dir(),
+        &format!("retained target evidence is missing for {version}"),
+    )?;
+    let mut targets = BTreeSet::new();
     for entry in
         fs::read_dir(&directory).map_err(|error| format!("{}: {error}", directory.display()))?
     {
@@ -10378,13 +10591,53 @@ fn validate_checked_in_release_targets(root: &Path) -> TaskResult {
             .and_then(OsStr::to_str)
             .ok_or("release receipt target is not UTF-8")?;
         validate_release_target(target)?;
-        let documents = retained_release_documents(root, target)?;
-        validate_release_documents(&documents, target)?;
+        targets.insert(target.to_string());
+        let documents = retained_release_documents_for_version(root, version, target)?;
+        validate_release_documents_for_identity(
+            &documents,
+            target,
+            version,
+            channel,
+            source_digest,
+        )?;
     }
+    require(
+        targets
+            == RETAINED_RELEASE_TARGETS
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
+        "retained release target set differs from the advertised targets",
+    )?;
     Ok(())
 }
 
-fn validate_release_documents(documents: &BTreeMap<PathBuf, Vec<u8>>, target: &str) -> TaskResult {
+fn validate_release_documents(
+    root: &Path,
+    documents: &BTreeMap<PathBuf, Vec<u8>>,
+    target: &str,
+) -> TaskResult {
+    let version = product_version(root)?;
+    let release_config: toml::Value = read(&root.join("release.toml"))?
+        .parse()
+        .map_err(|error| format!("release.toml: {error}"))?;
+    let channel = release_config["product"]["channel"]
+        .as_str()
+        .ok_or("product.channel is missing")?;
+    let source_digest = release_source_digest(root)?;
+    validate_release_documents_for_identity(documents, target, &version, channel, &source_digest)
+}
+
+fn validate_release_documents_for_identity(
+    documents: &BTreeMap<PathBuf, Vec<u8>>,
+    target: &str,
+    version: &str,
+    channel: &str,
+    source_digest: &str,
+) -> TaskResult {
+    stable_zero_version(version)?;
+    validate_release_target(target)?;
+    validate_sha256_identity(source_digest, "release source digest")?;
     require(documents.len() == 6, "target release receipt is incomplete")?;
     let document = |name: &str| {
         documents
@@ -10404,28 +10657,16 @@ fn validate_release_documents(documents: &BTreeMap<PathBuf, Vec<u8>>, target: &s
         .map_err(|error| format!("release licenses: {error}"))?;
     let build_inputs: Value = serde_json::from_slice(document("build-inputs.json")?)
         .map_err(|error| format!("release build inputs: {error}"))?;
-    require(
-        manifest["schema_version"] == Value::String("mainframe-env.release-manifest@1".into())
-            && manifest["target"] == Value::String(target.into())
-            && manifest["published"] == Value::Bool(false)
-            && sbom["bomFormat"] == Value::String("CycloneDX".into())
-            && sbom["specVersion"] == Value::String("1.6".into())
-            && provenance["predicateType"]
-                == Value::String("https://slsa.dev/provenance/v1".into())
-            && provenance["predicate"]["buildDefinition"]["externalParameters"]["target"]
-                == Value::String(target.into())
-            && build_inputs["schema_version"]
-                == Value::String("mainframe-env.release-build-inputs@1".into())
-            && build_inputs["target"] == Value::String(target.into())
-            && build_inputs["rustc_verbose"].as_str().is_some_and(|value| {
-                value.starts_with("rustc 1.98.0") && value.contains("release: 1.98.0")
-            })
-            && build_inputs["cargo_lock_sha256"].as_str().is_some()
-            && build_inputs["source_digest"].as_str().is_some()
-            && build_inputs["deterministic_environment"]["SOURCE_DATE_EPOCH"]
-                == Value::String("0".into())
-            && licenses.starts_with("# License expressions\n"),
-        "target release receipt metadata is inconsistent",
+    validate_release_identity(
+        &manifest,
+        &sbom,
+        &provenance,
+        &build_inputs,
+        licenses,
+        target,
+        version,
+        channel,
+        source_digest,
     )?;
     let artifacts = manifest["artifacts"]
         .as_array()
@@ -10487,6 +10728,60 @@ fn validate_release_documents(documents: &BTreeMap<PathBuf, Vec<u8>>, target: &s
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
+fn validate_release_identity(
+    manifest: &Value,
+    sbom: &Value,
+    provenance: &Value,
+    build_inputs: &Value,
+    licenses: &str,
+    target: &str,
+    version: &str,
+    channel: &str,
+    source_digest: &str,
+) -> TaskResult {
+    require(
+        manifest["schema_version"] == Value::String("mainframe-env.release-manifest@1".into())
+            && manifest["version"] == Value::String(version.into())
+            && manifest["channel"] == Value::String(channel.into())
+            && manifest["tag"] == Value::String(format!("mainframe-env-v{version}"))
+            && manifest["target"] == Value::String(target.into())
+            && manifest["published"] == Value::Bool(false)
+            && sbom["bomFormat"] == Value::String("CycloneDX".into())
+            && sbom["specVersion"] == Value::String("1.6".into())
+            && sbom["metadata"]["component"]["version"] == Value::String(version.into())
+            && provenance["predicateType"]
+                == Value::String("https://slsa.dev/provenance/v1".into())
+            && provenance["predicate"]["buildDefinition"]["externalParameters"]["target"]
+                == Value::String(target.into())
+            && build_inputs["schema_version"]
+                == Value::String("mainframe-env.release-build-inputs@1".into())
+            && build_inputs["target"] == Value::String(target.into())
+            && build_inputs["rustc_verbose"].as_str().is_some_and(|value| {
+                value.starts_with("rustc 1.98.0") && value.contains("release: 1.98.0")
+            })
+            && build_inputs["cargo_lock_sha256"].as_str().is_some()
+            && build_inputs["source_digest"] == Value::String(source_digest.into())
+            && build_inputs["deterministic_environment"]["SOURCE_DATE_EPOCH"]
+                == Value::String("0".into())
+            && licenses.starts_with("# License expressions\n"),
+        "target release receipt metadata is inconsistent",
+    )?;
+    require(
+        provenance["predicate"]["buildDefinition"]["resolvedDependencies"]
+            .as_array()
+            .is_some_and(|dependencies| {
+                dependencies.iter().any(|dependency| {
+                    dependency["uri"].as_str() == Some("source-tree")
+                        && dependency["digest"]["sha256"].as_str()
+                            == source_digest.strip_prefix("sha256:")
+                })
+            }),
+        "release provenance is not bound to the canonical source digest",
+    )?;
+    Ok(())
+}
+
 fn validate_sha256_hex(value: &str, field: &str) -> TaskResult {
     require(
         value.len() == 64
@@ -10499,25 +10794,24 @@ fn validate_sha256_hex(value: &str, field: &str) -> TaskResult {
 
 fn release_documents(root: &Path, target: &str) -> TaskResult<BTreeMap<PathBuf, Vec<u8>>> {
     validate_release_target(target)?;
-    let version = read(&root.join("VERSION"))?.trim().to_string();
+    let version = product_version(root)?;
     let release_config: toml::Value = read(&root.join("release.toml"))?
         .parse()
         .map_err(|error| format!("release.toml: {error}"))?;
     let channel = release_config["product"]["channel"]
         .as_str()
         .ok_or("product.channel is missing")?;
-    let directory = PathBuf::from(format!("release/{version}/targets/{target}"));
+    let directory = release_target_directory(&version, target)?;
     let executable_suffix = if target.contains("windows") {
         ".exe"
     } else {
         ""
     };
-    let server = root.join(format!(
-        "target/{target}/release/mainframe-env-server{executable_suffix}"
+    let target_directory = cargo_target_directory(root);
+    let server = target_directory.join(format!(
+        "{target}/release/mainframe-env-server{executable_suffix}"
     ));
-    let cli = root.join(format!(
-        "target/{target}/release/mainframe-env{executable_suffix}"
-    ));
+    let cli = target_directory.join(format!("{target}/release/mainframe-env{executable_suffix}"));
     require(
         server.is_file(),
         &format!("release server binary was not built for {target}"),
@@ -11048,6 +11342,10 @@ mod tests {
             Err("release target is invalid".into())
         );
         assert_eq!(
+            explicit_release_target(&["--target".into(), "powerpc64-unknown-linux-gnu".into()]),
+            Err("release target is invalid".into())
+        );
+        assert_eq!(
             explicit_release_target(&[
                 "--check".into(),
                 "--target".into(),
@@ -11059,13 +11357,129 @@ mod tests {
     }
 
     #[test]
+    fn stable_product_versions_are_generic_strict_and_derive_the_release_line() {
+        for (version, release_line) in [("0.2.0", "0.2"), ("0.7.0", "0.7"), ("0.17.4", "0.17")] {
+            assert!(stable_zero_version(version).is_ok());
+            assert_eq!(release_line_for_version(version).unwrap(), release_line);
+        }
+        for invalid in [
+            "1.0.0",
+            "0.07.0",
+            "0.7.00",
+            "0.7",
+            "0.7.0-rc.1",
+            "0.7.0+build",
+            "../0.7.0",
+            "0.7.0/targets/forged",
+            "0.x.0",
+        ] {
+            assert!(stable_zero_version(invalid).is_err(), "accepted {invalid}");
+        }
+    }
+
+    #[test]
+    fn post_0_2_release_digest_binds_a_clean_live_source_tree() {
+        let root = temporary_git_repository("live-release-source");
+        fs::write(root.join("VERSION"), b"0.3.0\n").expect("VERSION");
+        fs::write(root.join("source.txt"), b"one\n").expect("source");
+        commit_all(&root, "source one");
+        let first = live_release_source_digest(&root, "0.3.0").expect("first digest");
+
+        fs::write(root.join("source.txt"), b"two\n").expect("dirty source");
+        assert!(live_release_source_digest(&root, "0.3.0").is_err());
+        commit_all(&root, "source two");
+        let second = live_release_source_digest(&root, "0.3.0").expect("second digest");
+        assert_ne!(first, second);
+
+        let receipt = root.join("release/0.3.0/targets/aarch64-apple-darwin/manifest.json");
+        fs::create_dir_all(receipt.parent().expect("receipt parent")).expect("release directory");
+        fs::write(&receipt, b"generated receipt\n").expect("receipt");
+        assert_eq!(
+            live_release_source_digest(&root, "0.3.0").expect("receipt is excluded"),
+            second
+        );
+
+        let historical = root.join("release/0.2.0/targets/aarch64-apple-darwin/manifest.json");
+        fs::create_dir_all(historical.parent().expect("historical parent"))
+            .expect("historical release directory");
+        fs::write(historical, b"forged historical receipt\n").expect("historical receipt");
+        assert!(live_release_source_digest(&root, "0.3.0").is_err());
+        fs::remove_dir_all(root).expect("temporary repository cleanup");
+    }
+
+    #[test]
+    fn release_identity_rejects_a_stale_source_digest() {
+        let source_digest = format!("sha256:{}", "a".repeat(64));
+        let manifest = json!({
+            "schema_version":"mainframe-env.release-manifest@1",
+            "version":"0.3.0",
+            "channel":"stable",
+            "tag":"mainframe-env-v0.3.0",
+            "target":"aarch64-apple-darwin",
+            "published":false
+        });
+        let sbom = json!({
+            "bomFormat":"CycloneDX",
+            "specVersion":"1.6",
+            "metadata":{"component":{"version":"0.3.0"}}
+        });
+        let provenance = json!({
+            "predicateType":"https://slsa.dev/provenance/v1",
+            "predicate":{"buildDefinition":{
+                "externalParameters":{"target":"aarch64-apple-darwin"},
+                "resolvedDependencies":[{
+                    "uri":"source-tree",
+                    "digest":{"sha256":"a".repeat(64)}
+                }]
+            }}
+        });
+        let build_inputs = json!({
+            "schema_version":"mainframe-env.release-build-inputs@1",
+            "target":"aarch64-apple-darwin",
+            "rustc_verbose":"rustc 1.98.0\nrelease: 1.98.0",
+            "cargo_lock_sha256":"b".repeat(64),
+            "source_digest":source_digest,
+            "deterministic_environment":{"SOURCE_DATE_EPOCH":"0"}
+        });
+        assert!(
+            validate_release_identity(
+                &manifest,
+                &sbom,
+                &provenance,
+                &build_inputs,
+                "# License expressions\n",
+                "aarch64-apple-darwin",
+                "0.3.0",
+                "stable",
+                build_inputs["source_digest"].as_str().unwrap(),
+            )
+            .is_ok()
+        );
+        let stale = format!("sha256:{}", "c".repeat(64));
+        assert!(
+            validate_release_identity(
+                &manifest,
+                &sbom,
+                &provenance,
+                &build_inputs,
+                "# License expressions\n",
+                "aarch64-apple-darwin",
+                "0.3.0",
+                "stable",
+                &stale,
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
     fn round_five_tooling_preserves_retained_release_source_digest() {
         let root = repository_root().unwrap();
         let inputs =
             json(&root.join("release/0.2.0/targets/aarch64-apple-darwin/build-inputs.json"))
                 .unwrap();
         assert_eq!(
-            release_source_digest(&root).unwrap(),
+            accepted_0_2_release_source_digest(&root).unwrap(),
             inputs["source_digest"].as_str().unwrap()
         );
     }
@@ -11253,10 +11667,11 @@ mod tests {
             .expect("0.2 amendments remain bound to accepted candidate");
         assert_eq!(
             retained_accepted_release(&root).expect("accepted release mode"),
-            Some("e8dfa89583d866a365f496297d50aeb602e468bf".into())
+            (product_version(&root).unwrap() == "0.2.0")
+                .then(|| "e8dfa89583d866a365f496297d50aeb602e468bf".into())
         );
-        validate_retained_accepted_release(&root, "x86_64-unknown-linux-gnu")
-            .expect("retained Linux release remains byte-bound to accepted 0.2");
+        validate_historical_0_2_release(&root)
+            .expect("both retained targets remain byte-bound to accepted 0.2");
     }
 
     #[test]
