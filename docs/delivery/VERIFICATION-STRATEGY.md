@@ -129,10 +129,11 @@ every event:
   cache.
 
 The non-release job caches `target/debug` by runner, Rust version, lockfile, and
-workspace manifests. A cache miss may make the first run slower, but later
-pull requests restore the trusted default-branch cache and rebuild only changed
-crate outputs. The cache is an optimization only; every command remains able to
-rebuild from an empty cache.
+workspace manifests. Pull requests are restore-only: they may consume the
+trusted default-branch cache but never publish one. A successful `main` or
+manual full run saves a new cache only on a miss. Later pull requests rebuild
+only changed crate outputs. The cache is an optimization only; every command
+remains able to rebuild from an empty cache.
 
 ### Milestone gate
 
