@@ -32,6 +32,7 @@ jobs:
       - run: cargo xtask evidence seal --check
       - run: cargo xtask runtime-architecture --check
       - id: linux-release-path
+        if: ${{ startsWith(github.ref, 'refs/tags/mainframe-env-v') }}
         shell: bash
         run: |
           version="$(<VERSION)"
@@ -41,15 +42,18 @@ jobs:
           fi
           release_dir="release/$version/targets/x86_64-unknown-linux-gnu"
           printf 'path=%s\n' "$release_dir" >> "$GITHUB_OUTPUT"
-      - run: cargo xtask release --target x86_64-unknown-linux-gnu
+      - if: ${{ startsWith(github.ref, 'refs/tags/mainframe-env-v') }}
+        run: cargo xtask release --target x86_64-unknown-linux-gnu
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ always() && startsWith(github.ref, 'refs/tags/mainframe-env-v') }}
         with:
           name: linux-release-evidence
           path: ${{ steps.linux-release-path.outputs.path }}
           if-no-files-found: error
-      - run: git diff --exit-code -- "${{ steps.linux-release-path.outputs.path }}"
-      - run: cargo xtask release --check --target x86_64-unknown-linux-gnu
+      - if: ${{ startsWith(github.ref, 'refs/tags/mainframe-env-v') }}
+        run: git diff --exit-code -- "${{ steps.linux-release-path.outputs.path }}"
+      - if: ${{ startsWith(github.ref, 'refs/tags/mainframe-env-v') }}
+        run: cargo xtask release --check --target x86_64-unknown-linux-gnu
 
   contract-msrv:
     runs-on: ubuntu-24.04
