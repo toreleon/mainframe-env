@@ -109,6 +109,31 @@ Inject:
 - async-context store and composed execution-route regression checks;
 - schema/fixture check when relevant.
 
+### Hosted CI budget policy
+
+Hosted CI implements the risk tiers without repeating release-grade work on
+every event:
+
+- feature-branch pushes do not start a run; the pull-request merge ref is the
+  pre-merge authority;
+- superseded runs for the same pull request are cancelled;
+- documentation-only changes do not start the Rust workflow;
+- pull requests run formatting, specification and COBOL exit checks, workspace
+  tests, Clippy, and the contract MSRV gate;
+- the integrated `main` commit runs the full workspace, documentation,
+  conformance, evidence, and runtime-architecture gates; the MSRV result is not
+  repeated for a standard GitHub merge commit;
+- manual dispatch runs the full integrated gate; and
+- release generation, artifact upload, and reproduction run only on a
+  `mainframe-env-v*` tag and use a clean build rather than the normal debug
+  cache.
+
+The non-release job caches `target/debug` by runner, Rust version, lockfile, and
+workspace manifests. A cache miss may make the first run slower, but later
+pull requests restore the trusted default-branch cache and rebuild only changed
+crate outputs. The cache is an optimization only; every command remains able to
+rebuild from an empty cache.
+
 ### Milestone gate
 
 - affected package suites;
