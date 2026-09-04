@@ -11,30 +11,77 @@ hashes, or test counts into Project fields.
 
 ## Version mapping
 
-| Version | Milestone | Epic | State |
-|---|---|---|---|
-| 0.1.1 | `0.1.1` | [#25](https://github.com/toreleon/mainframe-env/issues/25) | Local release; closed |
-| 0.2.0 | `0.2.0` | [#8](https://github.com/toreleon/mainframe-env/issues/8) | Published; closed |
-| 0.3.0 | `0.3.0` | [#9](https://github.com/toreleon/mainframe-env/issues/9) | Published; closed |
-| 0.4.0 | `0.4.0` | [#10](https://github.com/toreleon/mainframe-env/issues/10) | Published; closed |
-| 0.5.0 | `0.5.0` | [#11](https://github.com/toreleon/mainframe-env/issues/11) | Published; closed |
-| 0.6.0 | `0.6.0` | [#12](https://github.com/toreleon/mainframe-env/issues/12) | Published; closed |
-| 0.7.0 | `0.7.0` | [#13](https://github.com/toreleon/mainframe-env/issues/13) | Published; closed |
-| 0.8.0 | `0.8.0` | [#14](https://github.com/toreleon/mainframe-env/issues/14) | Planned; open |
-| 0.9.0 | `0.9.0` | [#15](https://github.com/toreleon/mainframe-env/issues/15) | Planned; open |
-| 0.10.0 | `0.10.0` | [#16](https://github.com/toreleon/mainframe-env/issues/16) | Planned; open |
-| 0.11.0 | `0.11.0` | [#17](https://github.com/toreleon/mainframe-env/issues/17) | Planned; open |
-| 0.12.0 | `0.12.0` | [#18](https://github.com/toreleon/mainframe-env/issues/18) | Planned; open |
-| 0.13.0 | `0.13.0` | [#19](https://github.com/toreleon/mainframe-env/issues/19) | Planned; open |
-| 0.14.0 | `0.14.0` | [#20](https://github.com/toreleon/mainframe-env/issues/20) | Planned; open |
-| 0.15.0 | `0.15.0` | [#21](https://github.com/toreleon/mainframe-env/issues/21) | Planned; open |
-| 0.16.0 | `0.16.0` | [#22](https://github.com/toreleon/mainframe-env/issues/22) | Planned; open |
-| 0.17.0 | `0.17.0` | [#23](https://github.com/toreleon/mainframe-env/issues/23) | Planned; open |
-| 1.0.0 | `1.0.0` | [#24](https://github.com/toreleon/mainframe-env/issues/24) | Planned; open |
+| Version | Milestone | Epic | Implementation PR | State |
+|---|---|---|---|---|
+| 0.1.1 | `0.1.1` | [#25](https://github.com/toreleon/mainframe-env/issues/25) | — | Local release; closed |
+| 0.2.0 | `0.2.0` | [#8](https://github.com/toreleon/mainframe-env/issues/8) | [#1](https://github.com/toreleon/mainframe-env/pull/1) | Published; closed |
+| 0.3.0 | `0.3.0` | [#9](https://github.com/toreleon/mainframe-env/issues/9) | [#3](https://github.com/toreleon/mainframe-env/pull/3) | Published; closed |
+| 0.4.0 | `0.4.0` | [#10](https://github.com/toreleon/mainframe-env/issues/10) | [#6](https://github.com/toreleon/mainframe-env/pull/6) | Published; closed |
+| 0.5.0 | `0.5.0` | [#11](https://github.com/toreleon/mainframe-env/issues/11) | [#4](https://github.com/toreleon/mainframe-env/pull/4) | Published; closed |
+| 0.6.0 | `0.6.0` | [#12](https://github.com/toreleon/mainframe-env/issues/12) | [#5](https://github.com/toreleon/mainframe-env/pull/5) | Published; closed |
+| 0.7.0 | `0.7.0` | [#13](https://github.com/toreleon/mainframe-env/issues/13) | [#2](https://github.com/toreleon/mainframe-env/pull/2) | Published; closed |
+| 0.8.0 | `0.8.0` | [#14](https://github.com/toreleon/mainframe-env/issues/14) | [#30](https://github.com/toreleon/mainframe-env/pull/30) | Implemented; release [#31](https://github.com/toreleon/mainframe-env/pull/31) open |
+| 0.9.0 | `0.9.0` | [#15](https://github.com/toreleon/mainframe-env/issues/15) | — | Planned; open |
+| 0.10.0 | `0.10.0` | [#16](https://github.com/toreleon/mainframe-env/issues/16) | — | Planned; open |
+| 0.11.0 | `0.11.0` | [#17](https://github.com/toreleon/mainframe-env/issues/17) | — | Planned; open |
+| 0.12.0 | `0.12.0` | [#18](https://github.com/toreleon/mainframe-env/issues/18) | — | Planned; open |
+| 0.13.0 | `0.13.0` | [#19](https://github.com/toreleon/mainframe-env/issues/19) | — | Planned; open |
+| 0.14.0 | `0.14.0` | [#20](https://github.com/toreleon/mainframe-env/issues/20) | — | Planned; open |
+| 0.15.0 | `0.15.0` | [#21](https://github.com/toreleon/mainframe-env/issues/21) | — | Planned; open |
+| 0.16.0 | `0.16.0` | [#22](https://github.com/toreleon/mainframe-env/issues/22) | — | Planned; open |
+| 0.17.0 | `0.17.0` | [#23](https://github.com/toreleon/mainframe-env/issues/23) | — | Planned; open |
+| 1.0.0 | `1.0.0` | [#24](https://github.com/toreleon/mainframe-env/issues/24) | — | Planned; open |
 
-The abandoned 0.7.1 proposal is intentionally absent. Historical pull
-requests #1 through #7 are retained in the Project as completed implementation
-and release records.
+The abandoned 0.7.1 proposal is intentionally absent.
+
+Issue and pull request numbers share one sequence. Epics occupy #8–#25,
+pull requests occupy #1–#7 and #26–#31, and review issues occupy #32–#40.
+
+## Pull request history
+
+Every pull request is retained in the Project as a completed implementation,
+release, or infrastructure record. Merge commits are the durable identity;
+branches are deleted after merge.
+
+| PR | Branch | Merged | Merge commit | Result |
+|---|---|---|---|---|
+| [#1](https://github.com/toreleon/mainframe-env/pull/1) | `impl/0.2.0` | 2026-09-01 | `3610140` | 0.2.0 coverage authority |
+| [#2](https://github.com/toreleon/mainframe-env/pull/2) | `impl/0.7.0` | 2026-09-01 | `c6c7589` | 0.7.0 JCL converter and planner |
+| [#3](https://github.com/toreleon/mainframe-env/pull/3) | `impl/0.3.0` | 2026-09-01 | `4b82f55` | 0.3.0 COBOL structure and type system |
+| [#4](https://github.com/toreleon/mainframe-env/pull/4) | `impl/0.5.0` | 2026-09-01 | `b4f8fc7` | 0.5.0 RACF command language and SAF |
+| [#5](https://github.com/toreleon/mainframe-env/pull/5) | `impl/0.6.0` | 2026-09-01 | `d8b1e28` | 0.6.0 dataset, VSAM, and AMS coverage |
+| [#6](https://github.com/toreleon/mainframe-env/pull/6) | `impl/0.4.0` | 2026-09-02 | `c7a07a9` | 0.4.0 COBOL execution semantics |
+| [#7](https://github.com/toreleon/mainframe-env/pull/7) | `codex/official-releases-0.2-0.7` | 2026-09-02 | `7eaabd6` | 0.2.0–0.7.0 release chain |
+| [#26](https://github.com/toreleon/mainframe-env/pull/26) | `codex/github-project-sync` | 2026-09-02 | `00db798` | Roadmap and release status sync |
+| [#27](https://github.com/toreleon/mainframe-env/pull/27) | `codex/ci-budget` | 2026-09-02 | `9ac7935` | Reduced hosted runner usage |
+| [#28](https://github.com/toreleon/mainframe-env/pull/28) | `codex/ci-cache-trust` | 2026-09-02 | `e381e40` | Read-only pull request caches |
+| [#29](https://github.com/toreleon/mainframe-env/pull/29) | `codex/ci-gate-tiers` | 2026-09-02 | `2926c54` | Certification gates on explicit runs |
+| [#30](https://github.com/toreleon/mainframe-env/pull/30) | `impl/0.8.0` | 2026-09-04 | `26cded1` | 0.8.0 JES2 runtime and real utilities |
+| [#31](https://github.com/toreleon/mainframe-env/pull/31) | `release/0.8.0` | open | — | Proposed 0.8.0 release |
+
+`2926c54` from #29 is the integrated candidate that
+[the 0.8.0 status report](status/0.8.0.md) records as the starting point for
+`impl/0.8.0`.
+
+## Review issues
+
+Rule 3 permits expanding an epic into child issues once a version becomes
+active. The 0.8.0 review is the first expansion.
+
+| Issue | Priority | Finding |
+|---|---|---|
+| [#40](https://github.com/toreleon/mainframe-env/issues/40) | P0 | Review tracker; child of epic #14 |
+| [#32](https://github.com/toreleon/mainframe-env/issues/32) | P0 | Abend state is lost across warm restart |
+| [#33](https://github.com/toreleon/mainframe-env/issues/33) | P0 | Warm restart duplicates committed `DISP=MOD` appends |
+| [#34](https://github.com/toreleon/mainframe-env/issues/34) | P0 | Utility record framing silently corrupts data |
+| [#35](https://github.com/toreleon/mainframe-env/issues/35) | P1 | Datasets are created before their allocation lock is held |
+| [#36](https://github.com/toreleon/mainframe-env/issues/36) | P1 | DISP abnormal-termination default does not follow the JCL rule |
+| [#37](https://github.com/toreleon/mainframe-env/issues/37) | P1 | `normalize_records` pads fixed records with ASCII, not EBCDIC |
+| [#38](https://github.com/toreleon/mainframe-env/issues/38) | P1 | `dispose_dds` failure masks the original abend |
+| [#39](https://github.com/toreleon/mainframe-env/issues/39) | P2 | Minor findings: gate scope, spool rollback, dead type, hygiene |
+
+Findings and reproductions stay in [the 0.8.0 review](review/0.8.0.md); the
+Project carries only priority and status.
 
 ## Operating rules
 
@@ -47,4 +94,22 @@ and release records.
    merge state determine implementation completion.
 5. Close the epic and milestone only after the release contract is satisfied.
    A local tag is not represented as a published GitHub Release.
-6. Update this mapping when versions are added, removed, or renumbered.
+6. Update this mapping when versions are added, removed, or renumbered, and
+   when a pull request merges or a version changes state.
+
+## Open deviations
+
+Recorded so the history stays accurate rather than tidy. These are statements
+of fact, not proposals.
+
+- Epic [#14](https://github.com/toreleon/mainframe-env/issues/14) (0.8.0) is
+  closed and the 0.8.0 milestone still carries open review issues #32–#40,
+  while release [#31](https://github.com/toreleon/mainframe-env/pull/31) is
+  unmerged. Rule 5 expects the epic to stay open until the release contract is
+  satisfied. Three of those issues (#32, #33, #34) are confirmed defects
+  against 0.8.0 exit-gate claims.
+- The licensed z/OS 3.2/JES2 differential stands at 0/16 pending for 0.8.0
+  under the approved `pass-with-licensed-differential-pending` disposition. It
+  is a hard gate for
+  [#23](https://github.com/toreleon/mainframe-env/issues/23) (0.17.0) and must
+  clear before 1.0.0.
