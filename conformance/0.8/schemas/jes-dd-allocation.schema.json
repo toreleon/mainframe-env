@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/jes-dd-allocation@1",
+  "title": "mainframe-env typed JES DD allocation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "ordinal", "name", "source", "disposition", "concatenation", "temporary"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.jes-dd-allocation@1"},
+    "ordinal": {"type": "integer", "minimum": 0, "maximum": 1023},
+    "name": {"type": "string", "pattern": "^[A-Z0-9@$#]{1,128}$"},
+    "source": {"enum": ["dataset", "inline", "dummy", "sysout"]},
+    "disposition": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "normal", "abnormal"],
+          "properties": {
+            "status": {"enum": ["old", "shared", "new", "modify"]},
+            "normal": {"enum": ["pass", "keep", "catalog", "delete", "uncatalog"]},
+            "abnormal": {"enum": ["keep", "catalog", "delete", "uncatalog"]}
+          }
+        }
+      ]
+    },
+    "concatenation": {"type": "boolean"},
+    "temporary": {"type": "boolean"}
+  }
+}

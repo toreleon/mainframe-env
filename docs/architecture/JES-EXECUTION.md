@@ -64,6 +64,27 @@ identity and are removed at their specified terminal disposition or bounded job
 cleanup. Cross-resource outcomes remain explicit under the common UOW contract;
 0.8 does not claim the 0.16 mixed-provider matrix.
 
+`mainframe-env.jes-dd-allocation@1` classifies every accepted DD as dataset,
+inline data, DUMMY, or SYSOUT before an effect is issued. Dataset status and
+normal/abnormal dispositions are position-validated and defaulted explicitly;
+invalid source combinations, output concatenations, temporary cataloging, and
+abnormal PASS fail closed. OLD and MOD obtain exclusive dataset-wide ownership,
+SHR obtains shared ownership, and duplicate references are folded into the most
+restrictive single lock. The lock is owned by the submitting principal and
+scoped by job identity in the shared dataset authority, so two jobs owned by the
+same principal still conflict correctly.
+
+New non-GDG datasets begin in the dataset authority's allocated state. CATLG
+publishes the cataloged lifecycle state and UNCATLG returns it to allocated;
+catalog listing omits allocated entries while direct allocated-name access
+remains possible. MOD writes use the typed append request. Compatible
+concatenations use the authority's bounded ordered concatenation request, while
+mixed inline/member groups are read in declared order with the same aggregate
+bound. PASS retains a job-scoped temporary allocation between steps, and a
+terminal cleanup pass removes any remaining temporary datasets. A partial
+allocation failure applies abnormal disposition to completed allocations and
+releases every acquired lock before it is surfaced.
+
 ## Spool and output
 
 Spool files and output groups have stable identities, exact job/step/DD

@@ -76,17 +76,17 @@ impl DatasetService {
                 mutation,
             } => {
                 let entry = entry(state, dataset)?;
-                if entry.vsam.access_mode == mainframe_env_host_api::VsamAccessMode::NonRls {
+                if entry.vsam.access_mode == mainframe_env_host_api::VsamAccessMode::NonRls
+                    && matches!(target, mainframe_env_host_api::DatasetLockTarget::Record(_))
+                {
                     return Err(HostProblem::UnsupportedCapability {
                         capability: "rls".into(),
-                        detail: "AcquireLock requires dataset RLS or TVS mode".into(),
+                        detail: "record locks require dataset RLS or TVS mode".into(),
                     });
                 }
                 if entry.vsam.access_mode == mainframe_env_host_api::VsamAccessMode::Tvs {
                     let transaction = transaction.as_ref().ok_or(HostProblem::Malformed)?;
                     require_active_tvs(state, transaction, owner.as_str())?;
-                } else if transaction.is_some() {
-                    return Err(HostProblem::Malformed);
                 }
                 validate_lock_target(entry, target)?;
                 let expires_at = now_tick
@@ -174,7 +174,10 @@ impl DatasetService {
                 if lock.dataset != *dataset || lock.owner != *owner {
                     return Err(HostProblem::Unauthorized);
                 }
-                if lock.transaction.is_some() {
+                if entry(state, dataset)?.vsam.access_mode
+                    == mainframe_env_host_api::VsamAccessMode::Tvs
+                    && lock.transaction.is_some()
+                {
                     return Err(condition("INVREQ", 16));
                 }
                 let result = DatasetResult::Mutated {
@@ -1425,6 +1428,11 @@ impl DatasetService {
                 let mut catalog =
                     BTreeMap::<String, mainframe_env_host_api::CatalogListEntry>::new();
                 for (name, entry) in &state.entries {
+                    if entry.lifecycle.state
+                        == mainframe_env_host_api::DatasetLifecycleState::Allocated
+                    {
+                        continue;
+                    }
                     catalog.insert(
                         name.clone(),
                         mainframe_env_host_api::CatalogListEntry {
@@ -7403,6 +7411,7 @@ fn lifecycle_transition_allowed(
         || matches!(
             (current, next),
             (State::Allocated, State::Cataloged)
+                | (State::Cataloged | State::Closed, State::Allocated)
                 | (State::Cataloged | State::Closed, State::Open)
                 | (State::Open, State::Closed | State::RecoveryRequired)
                 | (State::Cataloged | State::Closed, State::Migrated)

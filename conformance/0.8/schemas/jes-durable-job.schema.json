@@ -3,7 +3,7 @@
   "$id": "https://mainframe-env.invalid/schemas/jes-durable-job@2",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "id", "name", "owner", "class", "priority", "state", "return_code", "abend_code", "active_step", "initiator", "steps", "attempt", "version", "submit_key", "plan", "spool", "events"],
+  "required": ["schema_version", "id", "name", "owner", "class", "priority", "state", "return_code", "abend_code", "active_step", "initiator", "steps", "attempt", "version", "submit_key", "plan", "dataset_resolutions", "temporary_datasets", "spool", "events"],
   "properties": {
     "schema_version": {"const": "mainframe-env.jes-durable-job@2"},
     "id": {"type": "string", "pattern": "^JOB[0-9]{5,8}$"},
@@ -51,6 +51,18 @@
     "version": {"type": "integer", "minimum": 1},
     "submit_key": {"type": "string", "minLength": 1, "maxLength": 128},
     "plan": {"type": "object"},
+    "dataset_resolutions": {
+      "type": "object",
+      "maxProperties": 4096,
+      "propertyNames": {"minLength": 1, "maxLength": 256},
+      "additionalProperties": {"type": "string", "minLength": 1, "maxLength": 128}
+    },
+    "temporary_datasets": {
+      "type": "array",
+      "maxItems": 4096,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 128}
+    },
     "spool": {
       "type": "object",
       "maxProperties": 128,

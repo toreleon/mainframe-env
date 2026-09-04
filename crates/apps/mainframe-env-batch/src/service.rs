@@ -10,17 +10,19 @@ use crate::program::{
 };
 use crate::{
     BatchControllerGeneration, BatchControllerInstallReceipt, BatchControllerPlan,
-    BatchControllerSelector, Disposition, JES_DURABLE_JOB_CONTRACT, JclBundle, JclLimits,
+    BatchControllerSelector, DdAllocationPlan, DdDispositionPlan, DdSourceKind,
+    DdStatusDisposition, DdTerminalDisposition, JES_DURABLE_JOB_CONTRACT, JclBundle, JclLimits,
     JesSchedulerConfiguration, JobPlan, JobSelectionCandidate, JobState, ProgramInput,
     StepExecution, StepPlan, StepState, StepTermination, decode_program_output, parse_jcl,
-    select_job,
+    plan_dd_allocations, select_job,
 };
 use mainframe_env_execution_api::{
     BoundedPayload, IdempotencyKey, Invocation, InvocationLimits, PrincipalId,
 };
 use mainframe_env_host_api::{
     AccessIntent, CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest,
-    DatasetAttributes, DatasetName, DatasetOrganization, DatasetRequest, DatasetResult,
+    DatasetAttributes, DatasetDefinition, DatasetLifecycleState, DatasetLockMode,
+    DatasetLockTarget, DatasetName, DatasetOrganization, DatasetRequest, DatasetResult,
     Db2Operation, Db2Request, EffectRequest, HostProblem, HostRequest, HostResult, ImsOperation,
     ImsQualifier, ImsRequest, MemberName, Mutation, ProgramName, ProgramRequest, RecordFormat,
     ResourceName, ScopedHostService, SecurityDecision, SecurityRequest,
@@ -100,8 +102,22 @@ struct Job {
     version: u64,
     submit_key: String,
     plan: JobPlan,
+    #[serde(default)]
+    dataset_resolutions: BTreeMap<String, String>,
+    #[serde(default)]
+    temporary_datasets: Vec<String>,
     spool: BTreeMap<String, Vec<Vec<u8>>>,
     events: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+struct DdRuntimeAllocation {
+    ordinal: usize,
+    dataset: DatasetName,
+    member: Option<MemberName>,
+    disposition: DdDispositionPlan,
+    lock_id: Option<String>,
+    lock_owner: PrincipalId,
 }
 
 struct State {
@@ -382,6 +398,8 @@ impl BatchService {
             version: 1,
             submit_key: key.as_str().into(),
             plan,
+            dataset_resolutions: BTreeMap::new(),
+            temporary_datasets: Vec::new(),
             spool,
             events: vec![
                 "submitted".into(),
@@ -521,6 +539,11 @@ impl BatchService {
             running
         };
         let outcome = self.execute(invocation, &mut job);
+        let cleanup = self.cleanup_job_temporary_datasets(invocation, &mut job);
+        let outcome = match (outcome, cleanup) {
+            (Ok(return_code), Ok(())) => Ok(return_code),
+            (Err(problem), Ok(())) | (_, Err(problem)) => Err(problem),
+        };
         let mut state = self.lock()?;
         let current = state.jobs.get(&id).cloned().ok_or(HostProblem::NotFound)?;
         job.version = current.version + 1;
@@ -605,7 +628,6 @@ impl BatchService {
         let restart = job.plan.restart_step.clone();
         let mut restart_reached = restart.is_none();
         let mut effect_sequence = 0u64;
-        let mut dataset_resolutions = BTreeMap::new();
         for step in &steps {
             if let Some(previous) = job.steps.iter().find(|current| current.name == step.name)
                 && previous.state.terminal()
@@ -651,19 +673,21 @@ impl BatchService {
             }
             job.active_step = Some(step.name.clone());
             self.mark_step(job, step, StepState::Allocating, None)?;
+            let allocation_plans = plan_dd_allocations(&step.dds)?;
+            let mut allocations = Vec::new();
             let step_result = (|| -> Result<crate::ProgramOutput, HostProblem> {
-                self.allocate_dds(
+                allocations = self.allocate_dds(
                     invocation,
                     job,
                     step,
-                    &mut dataset_resolutions,
+                    &allocation_plans,
                     &mut effect_sequence,
                 )?;
                 let mut dds = step.dds.clone();
                 self.hydrate_dds(
                     invocation,
                     job,
-                    &dataset_resolutions,
+                    &allocations,
                     &mut dds,
                     &mut effect_sequence,
                 )?;
@@ -672,8 +696,12 @@ impl BatchService {
                     if !is_program_library_dd(dd)
                         && let Some(raw_name) = dd.dataset.clone()
                     {
-                        dd.dataset =
-                            Some(resolved_dataset(job, dd, &raw_name, &dataset_resolutions));
+                        dd.dataset = Some(resolved_dataset(
+                            job,
+                            dd,
+                            &raw_name,
+                            &job.dataset_resolutions,
+                        ));
                     }
                 }
                 let input = ProgramInput {
@@ -681,6 +709,7 @@ impl BatchService {
                     dds,
                 };
                 let execution = program_execution(&step.program);
+                let dataset_resolutions = job.dataset_resolutions.clone();
                 let idcams_return_code = if execution == ProgramExecution::Idcams {
                     Some(self.execute_idcams(
                         invocation,
@@ -726,6 +755,7 @@ impl BatchService {
                     job,
                     step,
                     &dataset_resolutions,
+                    &allocations,
                     &output.dd_outputs,
                     &mut effect_sequence,
                 )?;
@@ -738,7 +768,7 @@ impl BatchService {
                         invocation,
                         job,
                         step,
-                        &dataset_resolutions,
+                        &allocations,
                         &mut effect_sequence,
                         true,
                     );
@@ -807,7 +837,7 @@ impl BatchService {
                 invocation,
                 job,
                 step,
-                &dataset_resolutions,
+                &allocations,
                 &mut effect_sequence,
                 false,
             ) {
@@ -886,6 +916,62 @@ impl BatchService {
         }
         self.persist_job(job, Some(expected))?;
         state.jobs.insert(job.id.clone(), job.clone());
+        Ok(())
+    }
+
+    fn cleanup_job_temporary_datasets(
+        &self,
+        invocation: &Invocation,
+        job: &mut Job,
+    ) -> Result<(), HostProblem> {
+        let mut sequence = 0u64;
+        for dataset in job.temporary_datasets.clone() {
+            self.authorize(
+                invocation,
+                "DATASET",
+                &dataset,
+                AccessIntent::Update,
+                next_effect_sequence(invocation, &mut sequence)?,
+            )?;
+            let sequence_value = next_effect_sequence(invocation, &mut sequence)?;
+            let key = IdempotencyKey::new(
+                format!("jes:{}:job-cleanup:{sequence_value}", job.id),
+                InvocationLimits::default(),
+            )
+            .map_err(|_| HostProblem::ResourceExhausted)?;
+            let result = self.host.invoke(
+                invocation,
+                invocation.deadline_tick.saturating_sub(1),
+                false,
+                EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence: sequence_value,
+                    deadline_tick: invocation.deadline_tick,
+                    idempotency_key: Some(key.clone()),
+                    request: HostRequest::Dataset(DatasetRequest::Delete {
+                        dataset: DatasetName::new(&dataset, 128)
+                            .map_err(|_| HostProblem::InfrastructureFailure)?,
+                        member: None,
+                        expected_version: None,
+                        purge: true,
+                        current_date: None,
+                        mutation: Mutation {
+                            sequence: sequence_value,
+                            idempotency_key: key,
+                            transaction: Some(job.id.clone()),
+                        },
+                    }),
+                },
+            );
+            match result.effect.outcome {
+                Ok(HostResult::Dataset(DatasetResult::Mutated { .. }))
+                | Err(HostProblem::NotFound) => {
+                    job.temporary_datasets.retain(|current| current != &dataset);
+                }
+                Ok(_) => return Err(HostProblem::ProviderFailure),
+                Err(problem) => return Err(problem),
+            }
+        }
         Ok(())
     }
 
@@ -1997,6 +2083,7 @@ impl BatchService {
                 job,
                 step,
                 dataset_resolutions,
+                &[],
                 &BTreeMap::from([(output_name, records)]),
                 effect_sequence,
             )?;
@@ -2159,6 +2246,7 @@ impl BatchService {
                     job,
                     step,
                     dataset_resolutions,
+                    &[],
                     &BTreeMap::from([(dd, collected)]),
                     effect_sequence,
                 )?;
@@ -2465,6 +2553,7 @@ impl BatchService {
             job,
             step,
             dataset_resolutions,
+            &[],
             &BTreeMap::from([(dd, records)]),
             effect_sequence,
         )?;
@@ -2814,107 +2903,173 @@ impl BatchService {
     fn allocate_dds(
         &self,
         invocation: &Invocation,
-        job: &Job,
+        job: &mut Job,
         step: &StepPlan,
-        dataset_resolutions: &mut BTreeMap<String, String>,
+        plans: &[DdAllocationPlan],
         effect_sequence: &mut u64,
-    ) -> Result<(), HostProblem> {
-        for dd in &step.dds {
-            if is_program_library_dd(dd) {
-                continue;
-            }
-            let Some(raw_name) = &dd.dataset else {
-                continue;
-            };
-            let name = resolved_dataset(job, dd, raw_name, dataset_resolutions);
-            self.authorize(
-                invocation,
-                "DATASET",
-                &name,
-                AccessIntent::Update,
-                next_effect_sequence(invocation, effect_sequence)?,
-            )?;
-            if let Some(relative) = dd.generation {
-                if dataset_resolutions.contains_key(&dataset_resolution_key(dd, raw_name)) {
+    ) -> Result<Vec<DdRuntimeAllocation>, HostProblem> {
+        if plans.len() != step.dds.len() {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let lock_owner = invocation.principal.id().clone();
+        let mut allocations = Vec::new();
+        let mut lock_modes = BTreeMap::<String, DatasetLockMode>::new();
+        let allocation_result = (|| -> Result<(), HostProblem> {
+            for (dd, plan) in step.dds.iter().zip(plans) {
+                if is_program_library_dd(dd) || plan.source != DdSourceKind::Dataset {
                     continue;
                 }
-                let sequence = next_effect_sequence(invocation, effect_sequence)?;
-                let key = effect_key(job, step, sequence)?;
-                let base_name = DatasetName::new(raw_name.to_ascii_uppercase(), 128)
-                    .map_err(|_| HostProblem::Malformed)?;
-                let (request, idempotency_key) =
-                    if relative == 1 && dd.disposition.contains(&Disposition::New) {
-                        (
-                            DatasetRequest::CreateGeneration {
-                                base: base_name,
-                                attributes: dataset_attributes_for_dd(dd)?,
-                                records: Vec::new(),
+                let Some(raw_name) = &dd.dataset else {
+                    return Err(HostProblem::InfrastructureFailure);
+                };
+                let disposition = plan.disposition.ok_or(HostProblem::InfrastructureFailure)?;
+                let name = resolved_dataset(job, dd, raw_name, &job.dataset_resolutions);
+                self.authorize(
+                    invocation,
+                    "DATASET",
+                    &name,
+                    if disposition.status == DdStatusDisposition::Shared {
+                        AccessIntent::Read
+                    } else {
+                        AccessIntent::Update
+                    },
+                    next_effect_sequence(invocation, effect_sequence)?,
+                )?;
+                if let Some(relative) = dd.generation {
+                    let resolution_key = dataset_resolution_key(dd, raw_name);
+                    if !job.dataset_resolutions.contains_key(&resolution_key) {
+                        let sequence = next_effect_sequence(invocation, effect_sequence)?;
+                        let key = effect_key(job, step, sequence)?;
+                        let base_name = DatasetName::new(raw_name.to_ascii_uppercase(), 128)
+                            .map_err(|_| HostProblem::Malformed)?;
+                        let (request, idempotency_key) =
+                            if relative == 1 && disposition.status == DdStatusDisposition::New {
+                                (
+                                    DatasetRequest::CreateGeneration {
+                                        base: base_name,
+                                        attributes: dataset_attributes_for_dd(dd)?,
+                                        records: Vec::new(),
+                                        mutation: Mutation {
+                                            sequence,
+                                            idempotency_key: key.clone(),
+                                            transaction: Some(job.id.clone()),
+                                        },
+                                    },
+                                    Some(key),
+                                )
+                            } else {
+                                (
+                                    DatasetRequest::ResolveGeneration {
+                                        base: base_name,
+                                        relative,
+                                    },
+                                    None,
+                                )
+                            };
+                        let result = self.host.invoke(
+                            invocation,
+                            invocation.deadline_tick.saturating_sub(1),
+                            false,
+                            EffectRequest {
+                                run_unit: invocation.run_unit_id.clone(),
+                                sequence,
+                                deadline_tick: invocation.deadline_tick,
+                                idempotency_key,
+                                request: HostRequest::Dataset(request),
+                            },
+                        );
+                        let HostResult::Dataset(DatasetResult::Generation { dataset, .. }) =
+                            result.effect.outcome?
+                        else {
+                            return Err(HostProblem::ProviderFailure);
+                        };
+                        job.dataset_resolutions
+                            .insert(resolution_key, dataset.as_str().to_string());
+                    }
+                }
+                let resolved = DatasetName::new(
+                    resolved_dataset(job, dd, raw_name, &job.dataset_resolutions),
+                    128,
+                )
+                .map_err(|_| HostProblem::Malformed)?;
+                let mut create = disposition.status == DdStatusDisposition::New
+                    && dd.generation.is_none()
+                    && dd.member.is_none();
+                if disposition.status == DdStatusDisposition::Modify && dd.member.is_none() {
+                    create = match self.dataset_attributes(invocation, &resolved, effect_sequence) {
+                        Ok(_) => false,
+                        Err(HostProblem::NotFound) => true,
+                        Err(problem) => return Err(problem),
+                    };
+                }
+                if create {
+                    let sequence = next_effect_sequence(invocation, effect_sequence)?;
+                    let key = effect_key(job, step, sequence)?;
+                    let mut definition =
+                        DatasetDefinition::compatibility(dataset_attributes_for_dd(dd)?);
+                    definition.lifecycle.state = DatasetLifecycleState::Allocated;
+                    let result = self.host.invoke(
+                        invocation,
+                        invocation.deadline_tick.saturating_sub(1),
+                        false,
+                        EffectRequest {
+                            run_unit: invocation.run_unit_id.clone(),
+                            sequence,
+                            deadline_tick: invocation.deadline_tick,
+                            idempotency_key: Some(key.clone()),
+                            request: HostRequest::Dataset(DatasetRequest::Define {
+                                dataset: resolved.clone(),
+                                definition: Box::new(definition),
                                 mutation: Mutation {
                                     sequence,
-                                    idempotency_key: key.clone(),
+                                    idempotency_key: key,
                                     transaction: Some(job.id.clone()),
                                 },
-                            },
-                            Some(key),
-                        )
-                    } else {
-                        (
-                            DatasetRequest::ResolveGeneration {
-                                base: base_name,
-                                relative,
-                            },
-                            None,
-                        )
-                    };
-                let result = self.host.invoke(
-                    invocation,
-                    invocation.deadline_tick.saturating_sub(1),
-                    false,
-                    EffectRequest {
-                        run_unit: invocation.run_unit_id.clone(),
-                        sequence,
-                        deadline_tick: invocation.deadline_tick,
-                        idempotency_key,
-                        request: HostRequest::Dataset(request),
-                    },
-                );
-                let HostResult::Dataset(DatasetResult::Generation { dataset, .. }) =
-                    result.effect.outcome?
-                else {
-                    return Err(HostProblem::ProviderFailure);
-                };
-                dataset_resolutions.insert(
-                    dataset_resolution_key(dd, raw_name),
-                    dataset.as_str().to_string(),
-                );
-                continue;
-            }
-            let mut create = dd.disposition.contains(&Disposition::New);
-            if dd.disposition.first() == Some(&Disposition::Modify) && dd.member.is_none() {
-                let sequence = next_effect_sequence(invocation, effect_sequence)?;
-                let result = self.host.invoke(
-                    invocation,
-                    invocation.deadline_tick.saturating_sub(1),
-                    false,
-                    EffectRequest {
-                        run_unit: invocation.run_unit_id.clone(),
-                        sequence,
-                        deadline_tick: invocation.deadline_tick,
-                        idempotency_key: None,
-                        request: HostRequest::Dataset(DatasetRequest::Attributes {
-                            dataset: DatasetName::new(name.clone(), 128)
-                                .map_err(|_| HostProblem::Malformed)?,
-                        }),
-                    },
-                );
-                match result.effect.outcome {
-                    Ok(HostResult::Dataset(DatasetResult::Attributes { .. })) => {}
-                    Err(HostProblem::NotFound) => create = true,
-                    Ok(_) => return Err(HostProblem::ProviderFailure),
-                    Err(problem) => return Err(problem),
+                            }),
+                        },
+                    );
+                    match result.effect.outcome? {
+                        HostResult::Dataset(_) => {}
+                        _ => return Err(HostProblem::ProviderFailure),
+                    }
                 }
+                if dd.temporary
+                    && !job
+                        .temporary_datasets
+                        .iter()
+                        .any(|dataset| dataset == resolved.as_str())
+                {
+                    job.temporary_datasets.push(resolved.as_str().to_string());
+                }
+                let requested_mode = if disposition.status == DdStatusDisposition::Shared {
+                    DatasetLockMode::Shared
+                } else {
+                    DatasetLockMode::Exclusive
+                };
+                lock_modes
+                    .entry(resolved.as_str().to_string())
+                    .and_modify(|mode| {
+                        if requested_mode == DatasetLockMode::Exclusive {
+                            *mode = DatasetLockMode::Exclusive;
+                        }
+                    })
+                    .or_insert(requested_mode);
+                allocations.push(DdRuntimeAllocation {
+                    ordinal: plan.ordinal,
+                    dataset: resolved,
+                    member: dd
+                        .member
+                        .as_ref()
+                        .map(|member| {
+                            MemberName::new(member, 8).map_err(|_| HostProblem::Malformed)
+                        })
+                        .transpose()?,
+                    disposition,
+                    lock_id: None,
+                    lock_owner: lock_owner.clone(),
+                });
             }
-            if create && dd.member.is_none() {
+            for (dataset, mode) in lock_modes {
                 let sequence = next_effect_sequence(invocation, effect_sequence)?;
                 let key = effect_key(job, step, sequence)?;
                 let result = self.host.invoke(
@@ -2926,10 +3081,15 @@ impl BatchService {
                         sequence,
                         deadline_tick: invocation.deadline_tick,
                         idempotency_key: Some(key.clone()),
-                        request: HostRequest::Dataset(DatasetRequest::Create {
-                            dataset: DatasetName::new(name, 128)
+                        request: HostRequest::Dataset(DatasetRequest::AcquireLock {
+                            dataset: DatasetName::new(&dataset, 128)
                                 .map_err(|_| HostProblem::Malformed)?,
-                            attributes: dataset_attributes_for_dd(dd)?,
+                            target: DatasetLockTarget::Dataset,
+                            owner: lock_owner.clone(),
+                            mode,
+                            now_tick: sequence,
+                            lease_ticks: invocation.deadline_tick.saturating_sub(sequence).max(1),
+                            transaction: Some(job.id.clone()),
                             mutation: Mutation {
                                 sequence,
                                 idempotency_key: key,
@@ -2938,98 +3098,181 @@ impl BatchService {
                         }),
                     },
                 );
-                match result.effect.outcome? {
-                    HostResult::Dataset(_) => {}
-                    _ => return Err(HostProblem::ProviderFailure),
+                let HostResult::Dataset(DatasetResult::Locks { locks }) = result.effect.outcome?
+                else {
+                    return Err(HostProblem::ProviderFailure);
+                };
+                let lock = locks.first().ok_or(HostProblem::ProviderFailure)?;
+                for allocation in &mut allocations {
+                    if allocation.dataset.as_str() == dataset {
+                        allocation.lock_id = Some(lock.lock_id.clone());
+                    }
                 }
             }
+            Ok(())
+        })();
+        if let Err(problem) = allocation_result {
+            let cleanup =
+                self.dispose_dds(invocation, job, step, &allocations, effect_sequence, true);
+            return Err(cleanup.err().unwrap_or(problem));
         }
-        Ok(())
+        Ok(allocations)
+    }
+
+    fn dataset_attributes(
+        &self,
+        invocation: &Invocation,
+        dataset: &DatasetName,
+        effect_sequence: &mut u64,
+    ) -> Result<DatasetAttributes, HostProblem> {
+        let sequence = next_effect_sequence(invocation, effect_sequence)?;
+        let result = self.host.invoke(
+            invocation,
+            invocation.deadline_tick.saturating_sub(1),
+            false,
+            EffectRequest {
+                run_unit: invocation.run_unit_id.clone(),
+                sequence,
+                deadline_tick: invocation.deadline_tick,
+                idempotency_key: None,
+                request: HostRequest::Dataset(DatasetRequest::Attributes {
+                    dataset: dataset.clone(),
+                }),
+            },
+        );
+        let HostResult::Dataset(DatasetResult::Attributes { attributes, .. }) =
+            result.effect.outcome?
+        else {
+            return Err(HostProblem::ProviderFailure);
+        };
+        Ok(attributes)
+    }
+
+    fn read_dataset_records(
+        &self,
+        invocation: &Invocation,
+        allocation: &DdRuntimeAllocation,
+        effect_sequence: &mut u64,
+    ) -> Result<Vec<Vec<u8>>, HostProblem> {
+        let sequence = next_effect_sequence(invocation, effect_sequence)?;
+        let result = self.host.invoke(
+            invocation,
+            invocation.deadline_tick.saturating_sub(1),
+            false,
+            EffectRequest {
+                run_unit: invocation.run_unit_id.clone(),
+                sequence,
+                deadline_tick: invocation.deadline_tick,
+                idempotency_key: None,
+                request: HostRequest::Dataset(DatasetRequest::Read {
+                    dataset: allocation.dataset.clone(),
+                    member: allocation.member.clone(),
+                    key: None,
+                    max_records: 4_096,
+                    control: Default::default(),
+                }),
+            },
+        );
+        let HostResult::Dataset(DatasetResult::Records { records, .. }) = result.effect.outcome?
+        else {
+            return Err(HostProblem::ProviderFailure);
+        };
+        Ok(records)
     }
 
     fn hydrate_dds(
         &self,
         invocation: &Invocation,
         job: &Job,
-        dataset_resolutions: &BTreeMap<String, String>,
+        allocations: &[DdRuntimeAllocation],
         dds: &mut [crate::DdPlan],
         effect_sequence: &mut u64,
     ) -> Result<(), HostProblem> {
-        for dd in dds {
-            if is_program_library_dd(dd) {
+        let _ = job;
+        let mut start = 0usize;
+        while start < dds.len() {
+            let name = dds[start].name.clone();
+            let mut end = start + 1;
+            while end < dds.len()
+                && dds[end].concatenation
+                && dds[end].name.eq_ignore_ascii_case(&name)
+            {
+                end += 1;
+            }
+            if is_program_library_dd(&dds[start]) {
+                start = end;
                 continue;
             }
-            let Some(raw_name) = dd.dataset.clone() else {
-                continue;
-            };
-            if dd.disposition.contains(&Disposition::New) {
-                dd.ccsid = dataset_attributes_for_dd(dd)?.ccsid;
-                continue;
+            let mut payload = Vec::new();
+            let group_allocations = allocations
+                .iter()
+                .filter(|allocation| (start..end).contains(&allocation.ordinal))
+                .collect::<Vec<_>>();
+            let can_read_as_concatenation = group_allocations.len() > 1
+                && group_allocations.iter().all(|allocation| {
+                    !matches!(allocation.disposition.status, DdStatusDisposition::New)
+                        && allocation.member == group_allocations[0].member
+                })
+                && group_allocations.len() == end - start;
+            let mut ccsid = None;
+            for allocation in &group_allocations {
+                let attributes =
+                    self.dataset_attributes(invocation, &allocation.dataset, effect_sequence)?;
+                if ccsid.is_some() && ccsid != attributes.ccsid {
+                    return Err(HostProblem::Unsupported);
+                }
+                ccsid = attributes.ccsid;
             }
-            let attribute_sequence = next_effect_sequence(invocation, effect_sequence)?;
-            let attributes = self.host.invoke(
-                invocation,
-                invocation.deadline_tick.saturating_sub(1),
-                false,
-                EffectRequest {
-                    run_unit: invocation.run_unit_id.clone(),
-                    sequence: attribute_sequence,
-                    deadline_tick: invocation.deadline_tick,
-                    idempotency_key: None,
-                    request: HostRequest::Dataset(DatasetRequest::Attributes {
-                        dataset: DatasetName::new(
-                            resolved_dataset(job, dd, &raw_name, dataset_resolutions),
-                            128,
-                        )
-                        .map_err(|_| HostProblem::Malformed)?,
-                    }),
-                },
-            );
-            let HostResult::Dataset(DatasetResult::Attributes { attributes, .. }) =
-                attributes.effect.outcome?
-            else {
-                return Err(HostProblem::ProviderFailure);
-            };
-            dd.ccsid = attributes.ccsid;
-            let sequence = next_effect_sequence(invocation, effect_sequence)?;
-            let result = self.host.invoke(
-                invocation,
-                invocation.deadline_tick.saturating_sub(1),
-                false,
-                EffectRequest {
-                    run_unit: invocation.run_unit_id.clone(),
-                    sequence,
-                    deadline_tick: invocation.deadline_tick,
-                    idempotency_key: None,
-                    request: HostRequest::Dataset(DatasetRequest::Read {
-                        dataset: DatasetName::new(
-                            resolved_dataset(job, dd, &raw_name, dataset_resolutions),
-                            128,
-                        )
-                        .map_err(|_| HostProblem::Malformed)?,
-                        member: dd
-                            .member
-                            .as_ref()
-                            .map(|member| {
-                                MemberName::new(member, 8).map_err(|_| HostProblem::Malformed)
-                            })
-                            .transpose()?,
-                        key: None,
-                        max_records: 4_096,
-                        control: Default::default(),
-                    }),
-                },
-            );
-            let HostResult::Dataset(DatasetResult::Records { records, .. }) =
-                result.effect.outcome?
-            else {
-                return Err(HostProblem::ProviderFailure);
-            };
-            dd.inline_data.clear();
-            for record in records {
-                dd.inline_data.extend_from_slice(&record);
-                dd.inline_data.push(b'\n');
+            if can_read_as_concatenation {
+                let sequence = next_effect_sequence(invocation, effect_sequence)?;
+                let result = self.host.invoke(
+                    invocation,
+                    invocation.deadline_tick.saturating_sub(1),
+                    false,
+                    EffectRequest {
+                        run_unit: invocation.run_unit_id.clone(),
+                        sequence,
+                        deadline_tick: invocation.deadline_tick,
+                        idempotency_key: None,
+                        request: HostRequest::Dataset(DatasetRequest::ReadConcatenation {
+                            datasets: group_allocations
+                                .iter()
+                                .map(|allocation| allocation.dataset.clone())
+                                .collect(),
+                            member: group_allocations[0].member.clone(),
+                            max_records: 4_096,
+                        }),
+                    },
+                );
+                let HostResult::Dataset(DatasetResult::Records { records, .. }) =
+                    result.effect.outcome?
+                else {
+                    return Err(HostProblem::ProviderFailure);
+                };
+                append_inline_records(&mut payload, records);
+            } else {
+                for (ordinal, dd) in dds.iter().enumerate().take(end).skip(start) {
+                    if let Some(allocation) = allocations
+                        .iter()
+                        .find(|allocation| allocation.ordinal == ordinal)
+                    {
+                        if allocation.disposition.status != DdStatusDisposition::New {
+                            let records =
+                                self.read_dataset_records(invocation, allocation, effect_sequence)?;
+                            append_inline_records(&mut payload, records);
+                        }
+                    } else {
+                        payload.extend_from_slice(&dd.inline_data);
+                    }
+                }
             }
+            dds[start].inline_data = payload;
+            dds[start].ccsid = ccsid.or(dds[start].ccsid);
+            for dd in &mut dds[start + 1..end] {
+                dd.inline_data.clear();
+                dd.ccsid = ccsid.or(dd.ccsid);
+            }
+            start = end;
         }
         Ok(())
     }
@@ -3040,14 +3283,16 @@ impl BatchService {
         job: &mut Job,
         step: &StepPlan,
         dataset_resolutions: &BTreeMap<String, String>,
+        allocations: &[DdRuntimeAllocation],
         outputs: &BTreeMap<String, Vec<Vec<u8>>>,
         effect_sequence: &mut u64,
     ) -> Result<(), HostProblem> {
         for (name, records) in outputs {
-            let dd = step
+            let (ordinal, dd) = step
                 .dds
                 .iter()
-                .find(|dd| dd.name.eq_ignore_ascii_case(name))
+                .enumerate()
+                .find(|(_, dd)| dd.name.eq_ignore_ascii_case(name))
                 .ok_or(HostProblem::NotFound)?;
             if dd
                 .sysout
@@ -3087,7 +3332,36 @@ impl BatchService {
                 }
                 continue;
             }
-            let Some(raw_name) = &dd.dataset else {
+            let fallback;
+            let allocation = if let Some(allocation) = allocations
+                .iter()
+                .find(|allocation| allocation.ordinal == ordinal)
+            {
+                allocation
+            } else if let Some(raw_name) = &dd.dataset {
+                let plans = plan_dd_allocations(&step.dds)?;
+                fallback = DdRuntimeAllocation {
+                    ordinal,
+                    dataset: DatasetName::new(
+                        resolved_dataset(job, dd, raw_name, dataset_resolutions),
+                        128,
+                    )
+                    .map_err(|_| HostProblem::Malformed)?,
+                    member: dd
+                        .member
+                        .as_ref()
+                        .map(|member| {
+                            MemberName::new(member, 8).map_err(|_| HostProblem::Malformed)
+                        })
+                        .transpose()?,
+                    disposition: plans[ordinal]
+                        .disposition
+                        .ok_or(HostProblem::InfrastructureFailure)?,
+                    lock_id: None,
+                    lock_owner: dd_lock_owner(job)?,
+                };
+                &fallback
+            } else {
                 continue;
             };
             let attribute_sequence = next_effect_sequence(invocation, effect_sequence)?;
@@ -3101,11 +3375,7 @@ impl BatchService {
                     deadline_tick: invocation.deadline_tick,
                     idempotency_key: None,
                     request: HostRequest::Dataset(DatasetRequest::Attributes {
-                        dataset: DatasetName::new(
-                            resolved_dataset(job, dd, raw_name, dataset_resolutions),
-                            128,
-                        )
-                        .map_err(|_| HostProblem::Malformed)?,
+                        dataset: allocation.dataset.clone(),
                     }),
                 },
             );
@@ -3116,6 +3386,9 @@ impl BatchService {
             };
             let records = normalize_records(records, &attributes)?;
             if attributes.organization == DatasetOrganization::Relative {
+                if allocation.disposition.status == DdStatusDisposition::Modify {
+                    return Err(HostProblem::Unsupported);
+                }
                 for (position, record) in records.into_iter().enumerate() {
                     let sequence = next_effect_sequence(invocation, effect_sequence)?;
                     let key = effect_key(job, step, sequence)?;
@@ -3129,11 +3402,7 @@ impl BatchService {
                             deadline_tick: invocation.deadline_tick,
                             idempotency_key: Some(key.clone()),
                             request: HostRequest::Dataset(DatasetRequest::WriteRelative {
-                                dataset: DatasetName::new(
-                                    resolved_dataset(job, dd, raw_name, dataset_resolutions),
-                                    128,
-                                )
-                                .map_err(|_| HostProblem::Malformed)?,
+                                dataset: allocation.dataset.clone(),
                                 record_number: u64::try_from(position + 1)
                                     .map_err(|_| HostProblem::ResourceExhausted)?,
                                 record,
@@ -3141,7 +3410,7 @@ impl BatchService {
                                 mutation: Mutation {
                                     sequence,
                                     idempotency_key: key,
-                                    transaction: Some(job.id.clone()),
+                                    transaction: allocation.lock_id.clone(),
                                 },
                             }),
                         },
@@ -3157,6 +3426,31 @@ impl BatchService {
             }
             let sequence = next_effect_sequence(invocation, effect_sequence)?;
             let key = effect_key(job, step, sequence)?;
+            let request = if allocation.disposition.status == DdStatusDisposition::Modify {
+                DatasetRequest::Append {
+                    dataset: allocation.dataset.clone(),
+                    member: allocation.member.clone(),
+                    records,
+                    expected_version: None,
+                    mutation: Mutation {
+                        sequence,
+                        idempotency_key: key.clone(),
+                        transaction: allocation.lock_id.clone(),
+                    },
+                }
+            } else {
+                DatasetRequest::Write {
+                    dataset: allocation.dataset.clone(),
+                    member: allocation.member.clone(),
+                    records,
+                    expected_version: None,
+                    mutation: Mutation {
+                        sequence,
+                        idempotency_key: key.clone(),
+                        transaction: allocation.lock_id.clone(),
+                    },
+                }
+            };
             let result = self.host.invoke(
                 invocation,
                 invocation.deadline_tick.saturating_sub(1),
@@ -3166,27 +3460,7 @@ impl BatchService {
                     sequence,
                     deadline_tick: invocation.deadline_tick,
                     idempotency_key: Some(key.clone()),
-                    request: HostRequest::Dataset(DatasetRequest::Write {
-                        dataset: DatasetName::new(
-                            resolved_dataset(job, dd, raw_name, dataset_resolutions),
-                            128,
-                        )
-                        .map_err(|_| HostProblem::Malformed)?,
-                        member: dd
-                            .member
-                            .as_ref()
-                            .map(|member| {
-                                MemberName::new(member, 8).map_err(|_| HostProblem::Malformed)
-                            })
-                            .transpose()?,
-                        records,
-                        expected_version: None,
-                        mutation: Mutation {
-                            sequence,
-                            idempotency_key: key,
-                            transaction: Some(job.id.clone()),
-                        },
-                    }),
+                    request: HostRequest::Dataset(request),
                 },
             );
             if !matches!(
@@ -3202,59 +3476,63 @@ impl BatchService {
     fn dispose_dds(
         &self,
         invocation: &Invocation,
-        job: &Job,
+        job: &mut Job,
         step: &StepPlan,
-        dataset_resolutions: &BTreeMap<String, String>,
+        allocations: &[DdRuntimeAllocation],
         effect_sequence: &mut u64,
         abnormal: bool,
     ) -> Result<(), HostProblem> {
-        for dd in &step.dds {
-            if is_program_library_dd(dd) {
+        let mut first_problem = None;
+        let mut disposed = BTreeMap::<String, ()>::new();
+        for allocation in allocations {
+            let terminal = if abnormal {
+                allocation.disposition.abnormal
+            } else {
+                allocation.disposition.normal
+            };
+            if matches!(
+                terminal,
+                DdTerminalDisposition::Pass | DdTerminalDisposition::Keep
+            ) {
                 continue;
             }
-            let Some(raw_name) = &dd.dataset else {
-                continue;
-            };
-            let terminal = if abnormal {
-                dd.disposition.get(2)
-            } else {
-                dd.disposition.get(1)
-            };
-            let delete = terminal == Some(&Disposition::Delete)
-                || (dd.temporary
-                    && !matches!(
-                        terminal,
-                        Some(
-                            Disposition::Pass
-                                | Disposition::Keep
-                                | Disposition::Catalog
-                                | Disposition::Uncatalog
-                        )
-                    ));
-            if !delete {
+            let disposition_key = format!(
+                "{}({})",
+                allocation.dataset.as_str(),
+                allocation.member.as_ref().map_or("", MemberName::as_str)
+            );
+            if disposed.insert(disposition_key, ()).is_some() {
                 continue;
             }
             let sequence = next_effect_sequence(invocation, effect_sequence)?;
             let key = effect_key(job, step, sequence)?;
-            let request = DatasetRequest::Delete {
-                dataset: DatasetName::new(
-                    resolved_dataset(job, dd, raw_name, dataset_resolutions),
-                    128,
-                )
-                .map_err(|_| HostProblem::Malformed)?,
-                member: dd
-                    .member
-                    .as_ref()
-                    .map(|member| MemberName::new(member, 8).map_err(|_| HostProblem::Malformed))
-                    .transpose()?,
-                expected_version: None,
-                purge: true,
-                current_date: None,
-                mutation: Mutation {
-                    sequence,
-                    idempotency_key: key.clone(),
-                    transaction: Some(job.id.clone()),
+            let mutation = Mutation {
+                sequence,
+                idempotency_key: key.clone(),
+                transaction: allocation.lock_id.clone(),
+            };
+            let request = match terminal {
+                DdTerminalDisposition::Delete => DatasetRequest::Delete {
+                    dataset: allocation.dataset.clone(),
+                    member: allocation.member.clone(),
+                    expected_version: None,
+                    purge: true,
+                    current_date: None,
+                    mutation,
                 },
+                DdTerminalDisposition::Catalog => DatasetRequest::SetLifecycle {
+                    dataset: allocation.dataset.clone(),
+                    state: DatasetLifecycleState::Cataloged,
+                    expected_version: None,
+                    mutation,
+                },
+                DdTerminalDisposition::Uncatalog => DatasetRequest::SetLifecycle {
+                    dataset: allocation.dataset.clone(),
+                    state: DatasetLifecycleState::Allocated,
+                    expected_version: None,
+                    mutation,
+                },
+                DdTerminalDisposition::Pass | DdTerminalDisposition::Keep => unreachable!(),
             };
             let outcome = self.host.invoke(
                 invocation,
@@ -3268,7 +3546,50 @@ impl BatchService {
                     request: HostRequest::Dataset(request),
                 },
             );
-            outcome.effect.outcome?;
+            if let Err(problem) = outcome.effect.outcome {
+                first_problem.get_or_insert(problem);
+            } else if terminal == DdTerminalDisposition::Delete {
+                job.temporary_datasets
+                    .retain(|dataset| dataset != allocation.dataset.as_str());
+            }
+        }
+        let mut released = BTreeMap::<String, ()>::new();
+        for allocation in allocations {
+            let Some(lock_id) = &allocation.lock_id else {
+                continue;
+            };
+            if released.insert(lock_id.clone(), ()).is_some() {
+                continue;
+            }
+            let sequence = next_effect_sequence(invocation, effect_sequence)?;
+            let key = effect_key(job, step, sequence)?;
+            let result = self.host.invoke(
+                invocation,
+                invocation.deadline_tick.saturating_sub(1),
+                false,
+                EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence,
+                    deadline_tick: invocation.deadline_tick,
+                    idempotency_key: Some(key.clone()),
+                    request: HostRequest::Dataset(DatasetRequest::ReleaseLock {
+                        dataset: allocation.dataset.clone(),
+                        lock_id: lock_id.clone(),
+                        owner: allocation.lock_owner.clone(),
+                        mutation: Mutation {
+                            sequence,
+                            idempotency_key: key,
+                            transaction: Some(job.id.clone()),
+                        },
+                    }),
+                },
+            );
+            if let Err(problem) = result.effect.outcome {
+                first_problem.get_or_insert(problem);
+            }
+        }
+        if let Some(problem) = first_problem {
+            return Err(problem);
         }
         Ok(())
     }
@@ -3537,6 +3858,18 @@ fn dataset_attributes_for_dd(dd: &crate::DdPlan) -> Result<DatasetAttributes, Ho
         key_length: None,
         ccsid: Some(37),
     })
+}
+
+fn dd_lock_owner(job: &Job) -> Result<PrincipalId, HostProblem> {
+    PrincipalId::new(&job.owner, InvocationLimits::default())
+        .map_err(|_| HostProblem::ResourceExhausted)
+}
+
+fn append_inline_records(target: &mut Vec<u8>, records: Vec<Vec<u8>>) {
+    for record in records {
+        target.extend_from_slice(&record);
+        target.push(b'\n');
+    }
 }
 
 fn is_program_library_dd(dd: &crate::DdPlan) -> bool {
@@ -4837,6 +5170,28 @@ mod tests {
                             })
                             .ok_or(HostProblem::NotFound)
                     }),
+                HostRequest::Dataset(DatasetRequest::ReadConcatenation {
+                    datasets, ..
+                }) => self
+                    .records
+                    .lock()
+                    .map_err(|_| HostProblem::InfrastructureFailure)
+                    .and_then(|state| {
+                        let mut combined = Vec::new();
+                        for dataset in datasets {
+                            combined.extend(
+                                state
+                                    .get(dataset.as_str())
+                                    .cloned()
+                                    .ok_or(HostProblem::NotFound)?,
+                            );
+                        }
+                        Ok(HostResult::Dataset(DatasetResult::Records {
+                            identities: vec![Vec::new(); combined.len()],
+                            records: combined,
+                            version: 1,
+                        }))
+                    }),
                 HostRequest::Dataset(DatasetRequest::Write {
                     dataset, records, ..
                 }) => self
@@ -4847,6 +5202,45 @@ mod tests {
                         state.insert(dataset.as_str().into(), records);
                         HostResult::Dataset(DatasetResult::Mutated { version: 2 })
                     }),
+                HostRequest::Dataset(DatasetRequest::Append {
+                    dataset, records, ..
+                }) => self
+                    .records
+                    .lock()
+                    .map_err(|_| HostProblem::InfrastructureFailure)
+                    .and_then(|mut state| {
+                        state
+                            .get_mut(dataset.as_str())
+                            .ok_or(HostProblem::NotFound)?
+                            .extend(records);
+                        Ok(HostResult::Dataset(DatasetResult::Mutated {
+                            version: 2,
+                        }))
+                    }),
+                HostRequest::Dataset(DatasetRequest::AcquireLock {
+                    dataset,
+                    target,
+                    owner,
+                    mode,
+                    now_tick,
+                    lease_ticks,
+                    ..
+                }) => Ok(HostResult::Dataset(DatasetResult::Locks {
+                    locks: vec![mainframe_env_host_api::DatasetLockReceipt {
+                        lock_id: format!("lock-{}-{}", dataset.as_str(), effect.sequence),
+                        dataset,
+                        target,
+                        owner,
+                        mode,
+                        expires_at: now_tick.saturating_add(lease_ticks),
+                        transaction: None,
+                        version: 1,
+                    }],
+                })),
+                HostRequest::Dataset(DatasetRequest::ReleaseLock { .. })
+                | HostRequest::Dataset(DatasetRequest::SetLifecycle { .. }) => Ok(
+                    HostResult::Dataset(DatasetResult::Mutated { version: 2 }),
+                ),
                 HostRequest::Dataset(
                     DatasetRequest::Create { dataset, .. }
                     | DatasetRequest::Define { dataset, .. },
@@ -5572,6 +5966,94 @@ mod tests {
     }
 
     #[test]
+    fn dd_concatenation_preserves_declared_dataset_order() {
+        let records = Arc::new(Mutex::new(BTreeMap::from([
+            ("IBMUSER.INPUT1".into(), vec![b"FIRST".to_vec()]),
+            ("IBMUSER.INPUT2".into(), vec![b"SECOND".to_vec()]),
+            ("IBMUSER.OUTPUT".into(), Vec::new()),
+        ])));
+        let service = service_with_datasets(records.clone());
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//CONCAT JOB CLASS=A\n//COPY EXEC PGM=IEBGENER\n//SYSUT1 DD DSN=IBMUSER.INPUT1,DISP=SHR\n// DD DSN=IBMUSER.INPUT2,DISP=SHR\n//SYSUT2 DD DSN=IBMUSER.OUTPUT,DISP=OLD\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("dataset-concatenation", InvocationLimits::default())
+                    .unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed
+        );
+        assert_eq!(
+            records.lock().unwrap()["IBMUSER.OUTPUT"],
+            vec![b"FIRST".to_vec(), b"SECOND".to_vec()]
+        );
+    }
+
+    #[test]
+    fn modify_disposition_appends_instead_of_replacing() {
+        let records = Arc::new(Mutex::new(BTreeMap::from([(
+            "IBMUSER.OUTPUT".into(),
+            vec![b"OLD".to_vec()],
+        )])));
+        let service = service_with_datasets(records.clone());
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//MODOUT JOB CLASS=A\n//COPY EXEC PGM=IEBGENER\n//SYSUT1 DD *\nNEW\n/*\n//SYSUT2 DD DSN=IBMUSER.OUTPUT,DISP=MOD\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("dataset-mod-append", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed
+        );
+        assert_eq!(
+            records.lock().unwrap()["IBMUSER.OUTPUT"],
+            vec![b"OLD".to_vec(), b"NEW".to_vec()]
+        );
+    }
+
+    #[test]
+    fn dummy_dd_is_an_empty_typed_source() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())), builtins());
+        let invocation = invocation();
+        let submitted = service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//DUMMY JOB CLASS=A\n//COPY EXEC PGM=IEBGENER\n//SYSUT1 DD DUMMY\n//SYSUT2 DD SYSOUT=*\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("dummy-dd", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed
+        );
+        assert_eq!(
+            service.spool(&submitted.id, "SYSUT2", 0, 8),
+            Err(HostProblem::NotFound)
+        );
+    }
+
+    #[test]
     fn iebgener_internal_reader_submits_the_copied_jcl() {
         let records = Arc::new(Mutex::new(BTreeMap::from([(
             "IBMUSER.JCL".into(),
@@ -5631,6 +6113,163 @@ mod tests {
         assert_eq!(
             service.run_next(&invocation, false).unwrap().unwrap().state,
             JobState::Completed
+        );
+        assert!(records.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn passed_temporary_dataset_is_removed_at_job_terminal_cleanup() {
+        let records = Arc::new(Mutex::new(BTreeMap::new()));
+        let service = service_with_datasets(records.clone());
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//TCLEAN JOB CLASS=A\n//MAKE EXEC PGM=IEFBR14\n//WORK DD DSN=&&WORK,DISP=(NEW,PASS,DELETE)\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("temporary-terminal-cleanup", InvocationLimits::default())
+                    .unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed
+        );
+        assert!(records.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn catalog_and_uncatalog_dispositions_use_dataset_lifecycle_authority() {
+        let (service, dataset) = service_with_real_datasets();
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//CATJOB JOB CLASS=A\n//MAKE EXEC PGM=IEFBR14\n//DATA DD DSN=USER.DISP,DISP=(NEW,CATLG,DELETE)\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("catalog-disposition", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed
+        );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Describe {
+                dataset: DatasetName::new("USER.DISP", 128).unwrap(),
+            }),
+            Ok(DatasetResult::Description(ref description))
+                if description.definition.lifecycle.state == DatasetLifecycleState::Cataloged
+        ));
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//UNCATJOB JOB CLASS=A\n//USE EXEC PGM=IEFBR14\n//DATA DD DSN=USER.DISP,DISP=(OLD,UNCATLG,KEEP)\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("uncatalog-disposition", InvocationLimits::default())
+                    .unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed
+        );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Describe {
+                dataset: DatasetName::new("USER.DISP", 128).unwrap(),
+            }),
+            Ok(DatasetResult::Description(ref description))
+                if description.definition.lifecycle.state == DatasetLifecycleState::Allocated
+        ));
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::ListCatalog {
+                pattern: "USER.DISP".into(),
+                start: None,
+                max_items: 8,
+            }),
+            Ok(DatasetResult::CatalogEntries { entries, more: false }) if entries.is_empty()
+        ));
+    }
+
+    #[test]
+    fn dd_lock_conflict_fails_the_job_without_running_the_program() {
+        let (service, dataset) = service_with_real_datasets();
+        seed_real_dataset(&dataset, "USER.LOCKED", Vec::new(), 800);
+        let owner = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let DatasetResult::Locks { locks } = dataset
+            .invoke(DatasetRequest::AcquireLock {
+                dataset: DatasetName::new("USER.LOCKED", 128).unwrap(),
+                target: DatasetLockTarget::Dataset,
+                owner: owner.clone(),
+                mode: DatasetLockMode::Exclusive,
+                now_tick: 1,
+                lease_ticks: 99,
+                transaction: Some("OTHERJOB".into()),
+                mutation: dataset_test_mutation(801),
+            })
+            .unwrap()
+        else {
+            panic!("expected allocation lock");
+        };
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//LOCKJOB JOB CLASS=A\n//STEP EXEC PGM=IEFBR14\n//DATA DD DSN=USER.LOCKED,DISP=SHR\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("dd-lock-conflict", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Failed
+        );
+        dataset
+            .invoke(DatasetRequest::ReleaseLock {
+                dataset: DatasetName::new("USER.LOCKED", 128).unwrap(),
+                lock_id: locks[0].lock_id.clone(),
+                owner,
+                mutation: dataset_test_mutation(802),
+            })
+            .unwrap();
+    }
+
+    #[test]
+    fn partial_dd_allocation_failure_rolls_back_created_datasets() {
+        let records = Arc::new(Mutex::new(BTreeMap::new()));
+        let service = service_with_datasets(records.clone());
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//PARTIAL JOB CLASS=A\n//STEP EXEC PGM=IEFBR14\n//ONE DD DSN=USER.PARTIAL,DISP=NEW\n//TWO DD DSN=USER.PARTIAL,DISP=NEW\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("partial-dd-allocation", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Failed
         );
         assert!(records.lock().unwrap().is_empty());
     }

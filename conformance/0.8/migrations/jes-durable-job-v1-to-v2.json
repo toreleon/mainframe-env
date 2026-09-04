@@ -10,6 +10,7 @@
     "job identity, owner, plan, submit key, state, attempt, spool and event order remain exact",
     "legacy PascalCase job states remain readable",
     "step executions are derived once from the immutable plan without executing effects",
+    "dataset resolution and temporary-dataset maps default empty without resolving or allocating data",
     "selected or running jobs recover to queued unless the bounded attempt limit is exhausted",
     "a CAS conflict publishes no partial migrated projection"
   ]

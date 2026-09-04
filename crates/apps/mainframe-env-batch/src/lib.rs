@@ -4,6 +4,7 @@
 
 mod ams;
 mod controller;
+mod dd;
 mod jcl;
 mod jcl_catalog;
 mod jcl_expand;
@@ -21,6 +22,11 @@ pub use controller::{
     BATCH_CONTROLLER_REGISTRY_CONTRACT, BatchControllerDefinition, BatchControllerGeneration,
     BatchControllerInstallReceipt, BatchControllerPlan, BatchControllerProgram,
     BatchControllerSelector,
+};
+
+pub use dd::{
+    DdAllocationPlan, DdDispositionPlan, DdSourceKind, DdStatusDisposition, DdTerminalDisposition,
+    JES_DD_ALLOCATION_CONTRACT, plan_dd_allocations,
 };
 
 pub use ams::{

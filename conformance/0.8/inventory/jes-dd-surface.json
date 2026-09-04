@@ -1,0 +1,18 @@
+{
+  "schema_version": "mainframe-env.jes-dd-surface@1",
+  "target_version": "0.8.0",
+  "plan_authority": "mainframe-env.jcl-plan@1",
+  "dataset_authority": "mainframe-env.dataset-request@2",
+  "allocation_contract": "mainframe-env.jes-dd-allocation@1",
+  "sources": ["dataset", "inline", "dummy", "sysout"],
+  "status_dispositions": ["OLD", "SHR", "NEW", "MOD"],
+  "terminal_dispositions": ["PASS", "KEEP", "CATLG", "DELETE", "UNCATLG"],
+  "invariants": [
+    "each DD is planned once into one typed source and validated disposition",
+    "dataset ownership uses one ordered 0.6 dataset-authority lock per resolved name",
+    "concatenation preserves JCL declaration order and a single bounded record limit",
+    "MOD appends through the dataset authority; no write path reports summary success",
+    "temporary names are job-scoped and terminal cleanup is bounded and idempotent",
+    "partial allocation failure applies abnormal disposition and releases acquired locks"
+  ]
+}
