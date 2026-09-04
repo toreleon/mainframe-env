@@ -128,6 +128,31 @@ NJE and MAS are bounded routing and ownership abstractions over these same job,
 work, and spool authorities. They are not a claim of physical JES2 sysplex,
 SNA, printer, punch, or byte-for-byte spool implementation parity.
 
+Every job records its submission kind and origin. External jobs retain an
+external origin, internal-reader jobs retain the parent job and producing step,
+and started tasks retain the authorized started-task name. Internal-reader
+records are reparsed and admitted through the normal converter and durable job
+authority; denied admission creates no child job. Started-task start and stop
+use the `STARTED` SAF class, while subsequent selection and job/output controls
+remain protected by the job resource.
+
+`mainframe-env.jes-topology@1` is the bounded NJE/MAS projection. Nodes expose
+connected/enabled state and inbound capacity. MAS members name exactly one node
+and expose enabled/active capacity. A queued or held job may be routed only to
+available execution and output nodes; selection is then restricted to an
+eligible member on the execution node. The selected member is recorded in the
+same CAS-protected job projection as the lifecycle transition. It is an
+operator-visible semantic owner, not a replacement for common `WorkStore`
+claims, leases, retries, or cancellation.
+
+Scheduler enablement and topology configuration have versioned single-writer
+records in `ProviderStateStore/jes-scheduler` and
+`ProviderStateStore/jes-topology`. `OPERCMDS` protects their start, stop, and
+install controls. `JESJOBS` protects hold, release, cancel, class/priority
+change, job routing, selection, output controls, access, and purge. Every
+control validates its source state and all capacity/routing invariants before
+publishing a CAS transition.
+
 ## Typed program and utility routing
 
 The common program catalog resolves an external program name once into a typed

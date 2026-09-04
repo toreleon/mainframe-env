@@ -6,6 +6,7 @@
     {"$ref": "#/$defs/scheduler"},
     {"$ref": "#/$defs/spool"},
     {"$ref": "#/$defs/output"},
+    {"$ref": "#/$defs/topology"},
     {"$ref": "#/$defs/checkpoint"}
   ],
   "$defs": {
@@ -92,6 +93,49 @@
         "retain_until_tick": {"type": "integer", "minimum": 0},
         "state": {"enum": ["awaiting-selection", "held", "released", "selected", "printing", "complete", "cancelled", "purged"]},
         "spool_files": {"type": "array", "maxItems": 128, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 64}}
+      }
+    },
+    "topology": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "local_node", "nodes", "members"],
+      "properties": {
+        "schema_version": {"const": "mainframe-env.jes-topology@1"},
+        "local_node": {"type": "string", "pattern": "^[A-Z0-9@$#]{1,16}$"},
+        "nodes": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 256,
+          "propertyNames": {"pattern": "^[A-Z0-9@$#]{1,16}$"},
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "connected", "enabled", "max_inbound_jobs"],
+            "properties": {
+              "name": {"type": "string", "pattern": "^[A-Z0-9@$#]{1,16}$"},
+              "connected": {"type": "boolean"},
+              "enabled": {"type": "boolean"},
+              "max_inbound_jobs": {"type": "integer", "minimum": 1, "maximum": 16384}
+            }
+          }
+        },
+        "members": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 4096,
+          "propertyNames": {"pattern": "^[A-Z0-9@$#]{1,16}$"},
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "node", "enabled", "max_active"],
+            "properties": {
+              "name": {"type": "string", "pattern": "^[A-Z0-9@$#]{1,16}$"},
+              "node": {"type": "string", "pattern": "^[A-Z0-9@$#]{1,16}$"},
+              "enabled": {"type": "boolean"},
+              "max_active": {"type": "integer", "minimum": 1, "maximum": 16384}
+            }
+          }
+        }
       }
     },
     "checkpoint": {

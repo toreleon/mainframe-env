@@ -9,6 +9,47 @@
     "id": {"type": "string", "pattern": "^JOB[0-9]{5,8}$"},
     "name": {"type": "string", "pattern": "^[A-Z0-9@$#]{1,128}$"},
     "owner": {"type": "string", "minLength": 1, "maxLength": 128},
+    "kind": {"enum": ["batch", "started-task"]},
+    "origin": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {"kind": {"const": "external"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "parent_job_id", "step_name"],
+          "properties": {
+            "kind": {"const": "internal-reader"},
+            "parent_job_id": {"type": "string", "pattern": "^JOB[0-9]{5,8}$"},
+            "step_name": {"type": "string", "minLength": 1, "maxLength": 128}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "task_name"],
+          "properties": {
+            "kind": {"const": "started-task"},
+            "task_name": {"type": "string", "pattern": "^[A-Z0-9@$#]{1,16}$"}
+          }
+        }
+      ]
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["origin_node", "execution_node", "output_node", "owner_member"],
+      "properties": {
+        "origin_node": {"type": "string", "pattern": "^[A-Z0-9@$#]{1,16}$"},
+        "execution_node": {"type": "string", "pattern": "^[A-Z0-9@$#]{1,16}$"},
+        "output_node": {"type": "string", "pattern": "^[A-Z0-9@$#]{1,16}$"},
+        "owner_member": {"type": ["string", "null"], "pattern": "^[A-Z0-9@$#]{1,16}$"}
+      }
+    },
     "class": {"type": "string", "pattern": "^[A-Z0-9]$"},
     "priority": {"type": "integer", "minimum": 0, "maximum": 255},
     "state": {"enum": ["submitted", "held", "queued", "selected", "running", "output", "completed", "failed", "cancelled"]},

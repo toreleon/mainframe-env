@@ -12,10 +12,11 @@ use crate::{
     BatchControllerGeneration, BatchControllerInstallReceipt, BatchControllerPlan,
     BatchControllerSelector, DdAllocationPlan, DdDispositionPlan, DdSourceKind,
     DdStatusDisposition, DdTerminalDisposition, JES_DURABLE_JOB_CONTRACT, JES_OUTPUT_CONTRACT,
-    JES_SPOOL_CONTRACT, JclBundle, JclLimits, JesOutputGroup, JesOutputState,
-    JesSchedulerConfiguration, JesSpoolDescriptor, JesSpoolState, JobPlan, JobSelectionCandidate,
-    JobState, ProgramInput, StepExecution, StepPlan, StepState, StepTermination,
-    decode_program_output, parse_jcl, plan_dd_allocations, select_job,
+    JES_SPOOL_CONTRACT, JclBundle, JclLimits, JesJobKind, JesJobRoute, JesOutputGroup,
+    JesOutputState, JesSchedulerConfiguration, JesSpoolDescriptor, JesSpoolState,
+    JesSubmissionOrigin, JesTopology, JobPlan, JobSelectionCandidate, JobState, ProgramInput,
+    StepExecution, StepPlan, StepState, StepTermination, decode_program_output, parse_jcl,
+    plan_dd_allocations, select_job,
 };
 use mainframe_env_execution_api::{
     BoundedPayload, IdempotencyKey, Invocation, InvocationLimits, PrincipalId,
@@ -37,6 +38,9 @@ use std::sync::{Arc, Mutex};
 
 const CONTROLLER_STATE_NAMESPACE: &str = "batch-controller-state";
 const CONTROLLER_STATE_KEY: &str = "registry";
+const SCHEDULER_STATE_NAMESPACE: &str = "jes-scheduler";
+const TOPOLOGY_STATE_NAMESPACE: &str = "jes-topology";
+const CONFIGURATION_STATE_KEY: &str = "configuration";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BatchLimits {
@@ -47,6 +51,8 @@ pub struct BatchLimits {
     pub max_spool_records: usize,
     pub max_spool_bytes: usize,
     pub spool_retention_ticks: u64,
+    pub max_nje_nodes: usize,
+    pub max_mas_members: usize,
     pub max_events: usize,
     pub max_attempts: u32,
 }
@@ -61,6 +67,8 @@ impl Default for BatchLimits {
             max_spool_records: 262_144,
             max_spool_bytes: 256 * 1024 * 1024,
             spool_retention_ticks: 86_400,
+            max_nje_nodes: 256,
+            max_mas_members: 4_096,
             max_events: 65536,
             max_attempts: 3,
         }
@@ -82,6 +90,9 @@ pub struct JobSnapshot {
     pub steps: Vec<StepExecution>,
     pub attempt: u32,
     pub version: u64,
+    pub kind: JesJobKind,
+    pub origin: JesSubmissionOrigin,
+    pub route: JesJobRoute,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -91,6 +102,12 @@ struct Job {
     id: String,
     name: String,
     owner: String,
+    #[serde(default)]
+    kind: JesJobKind,
+    #[serde(default)]
+    origin: JesSubmissionOrigin,
+    #[serde(default)]
+    route: JesJobRoute,
     class: char,
     priority: u8,
     state: JobState,
@@ -142,12 +159,23 @@ struct DurableControllers {
     registry: BatchControllerRegistry,
 }
 
+struct DurableScheduler {
+    store_version: u64,
+    configuration: JesSchedulerConfiguration,
+}
+
+struct DurableTopology {
+    store_version: u64,
+    configuration: JesTopology,
+}
+
 pub struct BatchService {
     host: Arc<ScopedHostService>,
     store: Arc<dyn ProviderStateStore>,
     jcl_limits: JclLimits,
     limits: BatchLimits,
-    scheduler: JesSchedulerConfiguration,
+    scheduler: Mutex<DurableScheduler>,
+    topology: Mutex<DurableTopology>,
     controllers: Mutex<DurableControllers>,
     state: Mutex<State>,
 }
@@ -176,6 +204,9 @@ impl BatchService {
         scheduler: JesSchedulerConfiguration,
     ) -> Result<Arc<Self>, HostProblem> {
         scheduler.validate()?;
+        if limits.max_nje_nodes == 0 || limits.max_mas_members == 0 {
+            return Err(HostProblem::Malformed);
+        }
         let mut jobs = BTreeMap::new();
         let mut replay = BTreeMap::new();
         for row in store
@@ -271,12 +302,51 @@ impl BatchService {
             }
             None => (0, BatchControllerRegistry::default()),
         };
+        let (scheduler_store_version, scheduler) = match store
+            .get_provider_state(SCHEDULER_STATE_NAMESPACE, CONFIGURATION_STATE_KEY)
+            .map_err(store_error)?
+        {
+            Some(record) => {
+                let configuration: JesSchedulerConfiguration =
+                    serde_json::from_slice(&record.payload)
+                        .map_err(|_| HostProblem::InfrastructureFailure)?;
+                configuration.validate()?;
+                (record.version, configuration)
+            }
+            None => (0, scheduler),
+        };
+        let (topology_store_version, topology) = match store
+            .get_provider_state(TOPOLOGY_STATE_NAMESPACE, CONFIGURATION_STATE_KEY)
+            .map_err(store_error)?
+        {
+            Some(record) => {
+                let configuration: JesTopology = serde_json::from_slice(&record.payload)
+                    .map_err(|_| HostProblem::InfrastructureFailure)?;
+                configuration.validate(limits.max_nje_nodes, limits.max_mas_members)?;
+                (record.version, configuration)
+            }
+            None => {
+                let configuration = JesTopology::single_node(limits.max_active);
+                configuration.validate(limits.max_nje_nodes, limits.max_mas_members)?;
+                (0, configuration)
+            }
+        };
+        for job in jobs.values().filter(|job| !job.state.terminal()) {
+            topology.validate_route(&job.route)?;
+        }
         Ok(Arc::new(Self {
             host,
             store,
             jcl_limits,
             limits,
-            scheduler,
+            scheduler: Mutex::new(DurableScheduler {
+                store_version: scheduler_store_version,
+                configuration: scheduler,
+            }),
+            topology: Mutex::new(DurableTopology {
+                store_version: topology_store_version,
+                configuration: topology,
+            }),
             controllers: Mutex::new(DurableControllers {
                 store_version: controller_store_version,
                 registry: controller_registry,
@@ -326,22 +396,96 @@ impl BatchService {
         key: &IdempotencyKey,
         hold: bool,
     ) -> Result<JobSnapshot, HostProblem> {
+        self.submit_with_origin(
+            invocation,
+            bundle,
+            key,
+            hold,
+            JesJobKind::Batch,
+            JesSubmissionOrigin::External,
+        )
+    }
+
+    pub fn start_task(
+        &self,
+        invocation: &Invocation,
+        task_name: &str,
+        bundle: &JclBundle,
+        key: &IdempotencyKey,
+    ) -> Result<JobSnapshot, HostProblem> {
+        validate_jes_name(task_name)?;
+        self.submit_with_origin(
+            invocation,
+            bundle,
+            key,
+            false,
+            JesJobKind::StartedTask,
+            JesSubmissionOrigin::StartedTask {
+                task_name: task_name.to_ascii_uppercase(),
+            },
+        )
+    }
+
+    fn submit_internal_reader(
+        &self,
+        invocation: &Invocation,
+        parent_job_id: &str,
+        step_name: &str,
+        bundle: &JclBundle,
+        key: &IdempotencyKey,
+    ) -> Result<JobSnapshot, HostProblem> {
+        self.submit_with_origin(
+            invocation,
+            bundle,
+            key,
+            false,
+            JesJobKind::Batch,
+            JesSubmissionOrigin::InternalReader {
+                parent_job_id: parent_job_id.into(),
+                step_name: step_name.into(),
+            },
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn submit_with_origin(
+        &self,
+        invocation: &Invocation,
+        bundle: &JclBundle,
+        key: &IdempotencyKey,
+        hold: bool,
+        kind: JesJobKind,
+        origin: JesSubmissionOrigin,
+    ) -> Result<JobSnapshot, HostProblem> {
         let plan = parse_jcl(bundle, self.jcl_limits)?;
+        let (security_class, resource) = match &origin {
+            JesSubmissionOrigin::External => ("JESJOBS", format!("JOB.{}", plan.name)),
+            JesSubmissionOrigin::InternalReader { parent_job_id, .. } => {
+                ("JESJOBS", format!("JOB.{parent_job_id}.INTRDR"))
+            }
+            JesSubmissionOrigin::StartedTask { task_name } => {
+                ("STARTED", format!("{task_name}.{}", plan.name))
+            }
+        };
         self.authorize(
             invocation,
-            "JESJOBS",
-            &format!("JOB.{}", plan.name),
+            security_class,
+            &resource,
             AccessIntent::Execute,
             1,
         )?;
-        let class =
-            self.scheduler
-                .classes
-                .get(&plan.class)
-                .ok_or(HostProblem::UnsupportedCapability {
-                    capability: "jes.class".into(),
-                    detail: format!("job class {} is not configured", plan.class),
-                })?;
+        let class = self
+            .scheduler
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .configuration
+            .classes
+            .get(&plan.class)
+            .cloned()
+            .ok_or(HostProblem::UnsupportedCapability {
+                capability: "jes.class".into(),
+                detail: format!("job class {} is not configured", plan.class),
+            })?;
         if plan.priority < class.priority_floor || plan.priority > class.priority_ceiling {
             return Err(HostProblem::Condition {
                 name: "PRIORITY_OUT_OF_CLASS_RANGE".into(),
@@ -349,10 +493,21 @@ impl BatchService {
                 response2: 0,
             });
         }
+        let route = self.default_route()?;
+        let topology = self.topology()?;
+        let inbound_limit = topology
+            .nodes
+            .get(&route.execution_node)
+            .ok_or(HostProblem::InfrastructureFailure)?
+            .max_inbound_jobs;
         let mut state = self.lock()?;
         if let Some(id) = state.replay.get(key.as_str()) {
             let job = state.jobs.get(id).ok_or(HostProblem::UnknownOutcome)?;
-            return if job.plan == plan && job.owner == invocation.principal.id().as_str() {
+            return if job.plan == plan
+                && job.owner == invocation.principal.id().as_str()
+                && job.kind == kind
+                && job.origin == origin
+            {
                 Ok(snapshot(job))
             } else {
                 Err(HostProblem::IdempotencyConflict)
@@ -365,6 +520,14 @@ impl BatchService {
                 .filter(|job| job.state == JobState::Queued)
                 .count()
                 >= self.limits.max_queued
+            || state
+                .jobs
+                .values()
+                .filter(|job| {
+                    !job.state.terminal() && job.route.execution_node == route.execution_node
+                })
+                .count()
+                >= inbound_limit
         {
             return Err(HostProblem::ResourceExhausted);
         }
@@ -380,11 +543,24 @@ impl BatchService {
             .lines()
             .map(|line| line.as_bytes().to_vec())
             .collect();
+        let origin_event = match &origin {
+            JesSubmissionOrigin::External => "origin:external".into(),
+            JesSubmissionOrigin::InternalReader {
+                parent_job_id,
+                step_name,
+            } => format!("origin:internal-reader:{parent_job_id}:{step_name}"),
+            JesSubmissionOrigin::StartedTask { task_name } => {
+                format!("origin:started-task:{task_name}")
+            }
+        };
         let mut job = Job {
             schema_version: JES_DURABLE_JOB_CONTRACT.into(),
             id: id.clone(),
             name: plan.name.clone(),
             owner: invocation.principal.id().as_str().into(),
+            kind,
+            origin,
+            route,
             class: plan.class,
             priority: plan.priority,
             state: if hold || class.held_by_default {
@@ -410,6 +586,7 @@ impl BatchService {
             events: vec![
                 "submitted".into(),
                 "admitted".into(),
+                origin_event,
                 if hold || class.held_by_default {
                     "held"
                 } else {
@@ -453,18 +630,25 @@ impl BatchService {
         Ok(result)
     }
 
-    pub fn hold(&self, id: &str) -> Result<JobSnapshot, HostProblem> {
-        self.transition(id, JobState::Queued, JobState::Held, "held")
+    pub fn hold(&self, invocation: &Invocation, id: &str) -> Result<JobSnapshot, HostProblem> {
+        self.transition(invocation, id, JobState::Queued, JobState::Held, "held")
     }
 
-    pub fn release(&self, id: &str) -> Result<JobSnapshot, HostProblem> {
-        self.transition(id, JobState::Held, JobState::Queued, "released")
+    pub fn release(&self, invocation: &Invocation, id: &str) -> Result<JobSnapshot, HostProblem> {
+        self.transition(invocation, id, JobState::Held, JobState::Queued, "released")
     }
 
     pub fn cancel(&self, invocation: &Invocation, id: &str) -> Result<JobSnapshot, HostProblem> {
         self.ensure_spool_migrated(invocation, id)?;
         let mut state = self.lock()?;
         let current = state.jobs.get(id).cloned().ok_or(HostProblem::NotFound)?;
+        self.authorize(
+            invocation,
+            "JESJOBS",
+            &format!("JOB.{}", current.name),
+            AccessIntent::Alter,
+            1,
+        )?;
         if !matches!(
             current.state,
             JobState::Queued | JobState::Held | JobState::Running
@@ -495,6 +679,234 @@ impl BatchService {
         Ok(result)
     }
 
+    pub fn stop_task(
+        &self,
+        invocation: &Invocation,
+        task_name: &str,
+        id: &str,
+    ) -> Result<JobSnapshot, HostProblem> {
+        validate_jes_name(task_name)?;
+        let job = self
+            .lock()?
+            .jobs
+            .get(id)
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
+        if job.kind != JesJobKind::StartedTask
+            || !matches!(
+                &job.origin,
+                JesSubmissionOrigin::StartedTask { task_name: current }
+                    if current.eq_ignore_ascii_case(task_name)
+            )
+        {
+            return Err(HostProblem::NotFound);
+        }
+        self.authorize(
+            invocation,
+            "STARTED",
+            &format!("{}.{}", task_name.to_ascii_uppercase(), job.name),
+            AccessIntent::Control,
+            1,
+        )?;
+        self.cancel(invocation, id)
+    }
+
+    pub fn change_class(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+        class: char,
+    ) -> Result<JobSnapshot, HostProblem> {
+        let definition = self
+            .scheduler
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .configuration
+            .classes
+            .get(&class)
+            .cloned()
+            .ok_or(HostProblem::UnsupportedCapability {
+                capability: "jes.class".into(),
+                detail: format!("job class {class} is not configured"),
+            })?;
+        self.mutate_queued_job(invocation, id, "class-changed", |job| {
+            if job.priority < definition.priority_floor
+                || job.priority > definition.priority_ceiling
+            {
+                return Err(HostProblem::Condition {
+                    name: "PRIORITY_OUT_OF_CLASS_RANGE".into(),
+                    response: 400,
+                    response2: 0,
+                });
+            }
+            job.class = class;
+            Ok(())
+        })
+    }
+
+    pub fn change_priority(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+        priority: u8,
+    ) -> Result<JobSnapshot, HostProblem> {
+        let scheduler = self
+            .scheduler
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .configuration
+            .clone();
+        self.mutate_queued_job(invocation, id, "priority-changed", |job| {
+            let definition = scheduler
+                .classes
+                .get(&job.class)
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            if priority < definition.priority_floor || priority > definition.priority_ceiling {
+                return Err(HostProblem::Condition {
+                    name: "PRIORITY_OUT_OF_CLASS_RANGE".into(),
+                    response: 400,
+                    response2: 0,
+                });
+            }
+            job.priority = priority;
+            Ok(())
+        })
+    }
+
+    pub fn topology(&self) -> Result<JesTopology, HostProblem> {
+        Ok(self
+            .topology
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .configuration
+            .clone())
+    }
+
+    pub fn install_topology(
+        &self,
+        invocation: &Invocation,
+        configuration: JesTopology,
+    ) -> Result<(), HostProblem> {
+        configuration.validate(self.limits.max_nje_nodes, self.limits.max_mas_members)?;
+        self.authorize(
+            invocation,
+            "OPERCMDS",
+            "JES2.TOPOLOGY",
+            AccessIntent::Alter,
+            1,
+        )?;
+        {
+            let state = self.lock()?;
+            let mut inbound = BTreeMap::<String, usize>::new();
+            for job in state.jobs.values().filter(|job| !job.state.terminal()) {
+                configuration.validate_route(&job.route)?;
+                let count = inbound.entry(job.route.execution_node.clone()).or_default();
+                *count = count.checked_add(1).ok_or(HostProblem::ResourceExhausted)?;
+            }
+            for (node, count) in inbound {
+                if count
+                    > configuration
+                        .nodes
+                        .get(&node)
+                        .ok_or(HostProblem::InfrastructureFailure)?
+                        .max_inbound_jobs
+                {
+                    return Err(HostProblem::ResourceExhausted);
+                }
+            }
+        }
+        let mut durable = self
+            .topology
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let version = durable
+            .store_version
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: TOPOLOGY_STATE_NAMESPACE.into(),
+                    key: CONFIGURATION_STATE_KEY.into(),
+                    version,
+                    payload: serde_json::to_vec(&configuration)
+                        .map_err(|_| HostProblem::InfrastructureFailure)?,
+                },
+                (durable.store_version > 0).then_some(durable.store_version),
+            )
+            .map_err(store_error)?;
+        durable.store_version = version;
+        durable.configuration = configuration;
+        Ok(())
+    }
+
+    pub fn route_job(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+        execution_node: &str,
+        output_node: &str,
+    ) -> Result<JobSnapshot, HostProblem> {
+        let execution_node = execution_node.to_ascii_uppercase();
+        let output_node = output_node.to_ascii_uppercase();
+        let topology = self.topology()?;
+        let inbound_limit = topology
+            .nodes
+            .get(&execution_node)
+            .ok_or(HostProblem::NotFound)?
+            .max_inbound_jobs;
+        if self
+            .lock()?
+            .jobs
+            .values()
+            .filter(|job| {
+                job.id != id && !job.state.terminal() && job.route.execution_node == execution_node
+            })
+            .count()
+            >= inbound_limit
+        {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        self.mutate_queued_job(invocation, id, "job-routed", |job| {
+            let previous_output_node = job.route.output_node.clone();
+            let route = JesJobRoute {
+                origin_node: job.route.origin_node.clone(),
+                execution_node: execution_node.clone(),
+                output_node: output_node.clone(),
+                owner_member: None,
+            };
+            topology.validate_route(&route)?;
+            job.route = route;
+            for descriptor in job.spool_files.values_mut() {
+                if descriptor.destination == previous_output_node {
+                    descriptor.destination.clone_from(&output_node);
+                }
+            }
+            for group in job.output_groups.values_mut() {
+                if group.destination == previous_output_node {
+                    group.destination.clone_from(&output_node);
+                }
+            }
+            Ok(())
+        })
+    }
+
+    pub fn start_initiator(
+        &self,
+        invocation: &Invocation,
+        initiator: &str,
+    ) -> Result<(), HostProblem> {
+        self.set_initiator(invocation, initiator, true)
+    }
+
+    pub fn stop_initiator(
+        &self,
+        invocation: &Invocation,
+        initiator: &str,
+    ) -> Result<(), HostProblem> {
+        self.set_initiator(invocation, initiator, false)
+    }
+
     pub fn run_next(
         &self,
         invocation: &Invocation,
@@ -509,13 +921,59 @@ impl BatchService {
         initiator: &str,
         cancelled: bool,
     ) -> Result<Option<JobSnapshot>, HostProblem> {
+        let topology = self.topology()?;
+        let members = topology
+            .members
+            .values()
+            .filter(|member| member.enabled && member.node == topology.local_node)
+            .map(|member| member.name.clone())
+            .collect::<Vec<_>>();
+        if members.is_empty() {
+            return Err(HostProblem::UnsupportedCapability {
+                capability: "jes.mas.member".into(),
+                detail: "no enabled local MAS member".into(),
+            });
+        }
+        for member in members {
+            if let Some(job) = self.run_next_on_member(invocation, &member, initiator, cancelled)? {
+                return Ok(Some(job));
+            }
+        }
+        Ok(None)
+    }
+
+    pub fn run_next_on_member(
+        &self,
+        invocation: &Invocation,
+        member: &str,
+        initiator: &str,
+        cancelled: bool,
+    ) -> Result<Option<JobSnapshot>, HostProblem> {
         if self.limits.max_active == 0 {
             return Err(HostProblem::ResourceExhausted);
         }
+        let member = member.to_ascii_uppercase();
+        let topology = self.topology()?;
+        let member_definition = topology
+            .members
+            .get(&member)
+            .filter(|member| member.enabled && topology.node_available(&member.node))
+            .cloned()
+            .ok_or(HostProblem::UnsupportedCapability {
+                capability: "jes.mas.member".into(),
+                detail: format!("MAS member {member} is unavailable"),
+            })?;
+        let scheduler = self
+            .scheduler
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .configuration
+            .clone();
         let id = {
             let state = self.lock()?;
             let mut class_active = BTreeMap::<char, usize>::new();
             let mut initiator_active = 0usize;
+            let mut member_active = 0usize;
             for job in state
                 .jobs
                 .values()
@@ -525,11 +983,25 @@ impl BatchService {
                 if job.initiator.as_deref() == Some(initiator) {
                     initiator_active += 1;
                 }
+                if job.route.owner_member.as_deref() == Some(member.as_str()) {
+                    member_active += 1;
+                }
+            }
+            if member_active >= member_definition.max_active {
+                return Ok(None);
             }
             let candidates = state
                 .jobs
                 .values()
                 .filter(|job| job.owner == invocation.principal.id().as_str())
+                .filter(|job| {
+                    job.route.execution_node == member_definition.node
+                        && job
+                            .route
+                            .owner_member
+                            .as_deref()
+                            .is_none_or(|owner| owner == member)
+                })
                 .map(|job| JobSelectionCandidate {
                     id: &job.id,
                     class: job.class,
@@ -537,7 +1009,7 @@ impl BatchService {
                     state: job.state,
                 });
             select_job(
-                &self.scheduler,
+                &scheduler,
                 initiator,
                 initiator_active,
                 &class_active,
@@ -569,6 +1041,7 @@ impl BatchService {
             selected.version += 1;
             selected.state = JobState::Selected;
             selected.initiator = Some(initiator.into());
+            selected.route.owner_member = Some(member.clone());
             selected.events.push(format!("selected:{initiator}"));
             self.persist_job(&selected, Some(current.version))?;
             state.jobs.insert(id.clone(), selected.clone());
@@ -577,6 +1050,7 @@ impl BatchService {
             running.attempt += 1;
             running.state = JobState::Running;
             running.initiator = Some(initiator.into());
+            running.route.owner_member = Some(member);
             running.events.push("running".into());
             self.persist_job(&running, Some(selected.version))?;
             state.jobs.insert(id.clone(), running.clone());
@@ -3661,8 +4135,10 @@ impl BatchService {
                         .push_str(std::str::from_utf8(record).map_err(|_| HostProblem::Malformed)?);
                     source.push('\n');
                 }
-                self.submit(
+                self.submit_internal_reader(
                     invocation,
+                    &job.id,
+                    &step.name,
                     &JclBundle {
                         primary: source,
                         ..Default::default()
@@ -3672,7 +4148,6 @@ impl BatchService {
                         InvocationLimits::default(),
                     )
                     .map_err(|_| HostProblem::ResourceExhausted)?,
-                    false,
                 )?;
                 self.append_spool_records(
                     invocation,
@@ -4474,6 +4949,7 @@ impl BatchService {
 
     fn transition(
         &self,
+        invocation: &Invocation,
         id: &str,
         from: JobState,
         to: JobState,
@@ -4482,12 +4958,15 @@ impl BatchService {
         let mut state = self.lock()?;
         let current = state.jobs.get(id).cloned().ok_or(HostProblem::NotFound)?;
         if current.state != from {
-            return Err(HostProblem::Condition {
-                name: "INVALID_STATE".into(),
-                response: 409,
-                response2: 0,
-            });
+            return Err(invalid_state());
         }
+        self.authorize(
+            invocation,
+            "JESJOBS",
+            &format!("JOB.{}", current.name),
+            AccessIntent::Control,
+            1,
+        )?;
         let mut next = current.clone();
         next.version += 1;
         next.state = to;
@@ -4496,6 +4975,105 @@ impl BatchService {
         let result = snapshot(&next);
         state.jobs.insert(id.into(), next);
         Ok(result)
+    }
+
+    fn mutate_queued_job(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+        event: &str,
+        mutation: impl FnOnce(&mut Job) -> Result<(), HostProblem>,
+    ) -> Result<JobSnapshot, HostProblem> {
+        let mut state = self.lock()?;
+        let current = state.jobs.get(id).cloned().ok_or(HostProblem::NotFound)?;
+        if !matches!(current.state, JobState::Queued | JobState::Held) {
+            return Err(invalid_state());
+        }
+        self.authorize(
+            invocation,
+            "JESJOBS",
+            &format!("JOB.{}", current.name),
+            AccessIntent::Control,
+            1,
+        )?;
+        let mut next = current.clone();
+        mutation(&mut next)?;
+        next.version = next
+            .version
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        next.events.push(event.into());
+        self.persist_job(&next, Some(current.version))?;
+        let result = snapshot(&next);
+        state.jobs.insert(id.into(), next);
+        Ok(result)
+    }
+
+    fn set_initiator(
+        &self,
+        invocation: &Invocation,
+        initiator: &str,
+        enabled: bool,
+    ) -> Result<(), HostProblem> {
+        validate_jes_name(initiator)?;
+        let initiator = initiator.to_ascii_uppercase();
+        self.authorize(
+            invocation,
+            "OPERCMDS",
+            &format!("JES2.INITIATOR.{initiator}"),
+            AccessIntent::Control,
+            1,
+        )?;
+        let mut durable = self
+            .scheduler
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let current = durable
+            .configuration
+            .initiators
+            .get(&initiator)
+            .ok_or(HostProblem::NotFound)?;
+        if current.enabled == enabled {
+            return Ok(());
+        }
+        let mut configuration = durable.configuration.clone();
+        configuration
+            .initiators
+            .get_mut(&initiator)
+            .ok_or(HostProblem::InfrastructureFailure)?
+            .enabled = enabled;
+        configuration.validate()?;
+        let version = durable
+            .store_version
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: SCHEDULER_STATE_NAMESPACE.into(),
+                    key: CONFIGURATION_STATE_KEY.into(),
+                    version,
+                    payload: serde_json::to_vec(&configuration)
+                        .map_err(|_| HostProblem::InfrastructureFailure)?,
+                },
+                (durable.store_version > 0).then_some(durable.store_version),
+            )
+            .map_err(store_error)?;
+        durable.store_version = version;
+        durable.configuration = configuration;
+        Ok(())
+    }
+
+    fn default_route(&self) -> Result<JesJobRoute, HostProblem> {
+        let topology = self.topology()?;
+        let route = JesJobRoute {
+            origin_node: topology.local_node.clone(),
+            execution_node: topology.local_node.clone(),
+            output_node: topology.local_node.clone(),
+            owner_member: None,
+        };
+        topology.validate_route(&route)?;
+        Ok(route)
     }
 
     fn authorize(
@@ -5738,7 +6316,9 @@ fn spool_route(job: &Job, dd: Option<&crate::DdPlan>) -> SpoolRoute {
         .unwrap_or(job.class);
     SpoolRoute {
         class,
-        destination: parameter("DEST").unwrap_or("LOCAL").to_ascii_uppercase(),
+        destination: parameter("DEST")
+            .unwrap_or(job.route.output_node.as_str())
+            .to_ascii_uppercase(),
         writer: parameter("WRITER").map(str::to_ascii_uppercase),
         forms: parameter("FORMS").map(str::to_ascii_uppercase),
         copies: parameter("COPIES")
@@ -5802,6 +6382,19 @@ fn invalid_state() -> HostProblem {
     }
 }
 
+fn validate_jes_name(value: &str) -> Result<(), HostProblem> {
+    if value.is_empty()
+        || value.len() > 16
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'@' | b'#' | b'$'))
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
+}
+
 fn snapshot(job: &Job) -> JobSnapshot {
     JobSnapshot {
         id: job.id.clone(),
@@ -5817,6 +6410,9 @@ fn snapshot(job: &Job) -> JobSnapshot {
         steps: job.steps.clone(),
         attempt: job.attempt,
         version: job.version,
+        kind: job.kind,
+        origin: job.origin.clone(),
+        route: job.route.clone(),
     }
 }
 
@@ -5877,6 +6473,8 @@ mod tests {
     struct SecurityProvider {
         descriptor: CapabilityDescriptor,
         deny_spool: bool,
+        deny_control: bool,
+        deny_internal_reader: bool,
     }
 
     struct FailDatasetCommitOnceStore {
@@ -6287,6 +6885,17 @@ mod tests {
                 {
                     Ok(HostResult::Security(SecurityDecision::Deny))
                 }
+                HostRequest::Security(SecurityRequest::Authorize { intent, .. })
+                    if self.deny_control
+                        && matches!(intent, AccessIntent::Control | AccessIntent::Alter) =>
+                {
+                    Ok(HostResult::Security(SecurityDecision::Deny))
+                }
+                HostRequest::Security(SecurityRequest::Authorize { resource, .. })
+                    if self.deny_internal_reader && resource.as_str().ends_with(".INTRDR") =>
+                {
+                    Ok(HostResult::Security(SecurityDecision::Deny))
+                }
                 HostRequest::Security(_) => Ok(HostResult::Security(SecurityDecision::Allow)),
                 _ => Err(HostProblem::Malformed),
             };
@@ -6301,13 +6910,15 @@ mod tests {
         program: Arc<dyn HostProvider>,
         extra: Vec<Arc<dyn HostProvider>>,
     ) -> Arc<ScopedHostService> {
-        host_with_security(program, extra, false)
+        host_with_security(program, extra, false, false, false)
     }
 
     fn host_with_security(
         program: Arc<dyn HostProvider>,
         mut extra: Vec<Arc<dyn HostProvider>>,
         deny_spool: bool,
+        deny_control: bool,
+        deny_internal_reader: bool,
     ) -> Arc<ScopedHostService> {
         let limits = InvocationLimits::default();
         let security: Arc<dyn HostProvider> = Arc::new(SecurityProvider {
@@ -6326,6 +6937,8 @@ mod tests {
                 ready: true,
             },
             deny_spool,
+            deny_control,
+            deny_internal_reader,
         });
         let mut providers = vec![security, program];
         providers.append(&mut extra);
@@ -6535,9 +7148,12 @@ mod tests {
                 .id,
             submitted.id
         );
-        assert_eq!(service.hold(&submitted.id).unwrap().state, JobState::Held);
         assert_eq!(
-            service.release(&submitted.id).unwrap().state,
+            service.hold(&invocation, &submitted.id).unwrap().state,
+            JobState::Held
+        );
+        assert_eq!(
+            service.release(&invocation, &submitted.id).unwrap().state,
             JobState::Queued
         );
         let completed = service.run_next(&invocation, false).unwrap().unwrap();
@@ -6644,7 +7260,7 @@ mod tests {
         let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
         let providers = spool_test_providers(store.clone());
         let service = BatchService::open(
-            host_with_security(builtins(), providers, true),
+            host_with_security(builtins(), providers, true, false, false),
             store.clone(),
             Default::default(),
             Default::default(),
@@ -6704,6 +7320,208 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn started_task_identity_and_authorized_stop_are_durable() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let invocation = invocation();
+        let first = service(store.clone(), builtins());
+        let started = first
+            .start_task(
+                &invocation,
+                "PAYROLL",
+                &JclBundle {
+                    primary: "//STCJOB JOB CLASS=A\n//RUN EXEC PGM=IEFBR14\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("start-payroll", InvocationLimits::default()).unwrap(),
+            )
+            .unwrap();
+        assert_eq!(started.kind, JesJobKind::StartedTask);
+        assert_eq!(
+            started.origin,
+            JesSubmissionOrigin::StartedTask {
+                task_name: "PAYROLL".into()
+            }
+        );
+        assert_eq!(
+            first
+                .stop_task(&invocation, "PAYROLL", &started.id)
+                .unwrap()
+                .state,
+            JobState::Cancelled
+        );
+        drop(first);
+        let restarted = service(store, builtins());
+        let recovered = restarted.get(&started.id).unwrap();
+        assert_eq!(recovered.kind, JesJobKind::StartedTask);
+        assert!(matches!(
+            recovered.origin,
+            JesSubmissionOrigin::StartedTask { ref task_name } if task_name == "PAYROLL"
+        ));
+    }
+
+    #[test]
+    fn nje_route_and_mas_member_ownership_drive_selection_and_survive_restart() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let invocation = invocation();
+        let first = service(store.clone(), builtins());
+        let topology = JesTopology {
+            schema_version: crate::JES_TOPOLOGY_CONTRACT.into(),
+            local_node: "LOCAL".into(),
+            nodes: BTreeMap::from([
+                (
+                    "LOCAL".into(),
+                    crate::JesNodeDefinition {
+                        name: "LOCAL".into(),
+                        connected: true,
+                        enabled: true,
+                        max_inbound_jobs: 8,
+                    },
+                ),
+                (
+                    "REMOTE".into(),
+                    crate::JesNodeDefinition {
+                        name: "REMOTE".into(),
+                        connected: true,
+                        enabled: true,
+                        max_inbound_jobs: 8,
+                    },
+                ),
+            ]),
+            members: BTreeMap::from([
+                (
+                    "MEMBER1".into(),
+                    crate::JesMasMemberDefinition {
+                        name: "MEMBER1".into(),
+                        node: "LOCAL".into(),
+                        enabled: true,
+                        max_active: 1,
+                    },
+                ),
+                (
+                    "MEMBER2".into(),
+                    crate::JesMasMemberDefinition {
+                        name: "MEMBER2".into(),
+                        node: "REMOTE".into(),
+                        enabled: true,
+                        max_active: 1,
+                    },
+                ),
+            ]),
+        };
+        first
+            .install_topology(&invocation, topology.clone())
+            .unwrap();
+        let submitted = first
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("remote-job", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let routed = first
+            .route_job(&invocation, &submitted.id, "REMOTE", "REMOTE")
+            .unwrap();
+        assert_eq!(routed.route.execution_node, "REMOTE");
+        assert_eq!(
+            first
+                .run_next_on_member(&invocation, "MEMBER1", "INIT0001", false)
+                .unwrap(),
+            None
+        );
+        let completed = first
+            .run_next_on_member(&invocation, "MEMBER2", "INIT0001", false)
+            .unwrap()
+            .unwrap();
+        assert_eq!(completed.state, JobState::Completed);
+        assert_eq!(completed.route.owner_member.as_deref(), Some("MEMBER2"));
+        drop(first);
+
+        let restarted = service(store, builtins());
+        assert_eq!(restarted.topology().unwrap(), topology);
+        assert_eq!(
+            restarted
+                .get(&submitted.id)
+                .unwrap()
+                .route
+                .owner_member
+                .as_deref(),
+            Some("MEMBER2")
+        );
+    }
+
+    #[test]
+    fn initiator_and_queued_job_controls_are_authorized_and_persisted() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let invocation = invocation();
+        let first = service(store.clone(), builtins());
+        let submitted = first
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("controlled-job", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            first
+                .change_class(&invocation, &submitted.id, 'B')
+                .unwrap()
+                .class,
+            'B'
+        );
+        assert_eq!(
+            first
+                .change_priority(&invocation, &submitted.id, 42)
+                .unwrap()
+                .priority,
+            42
+        );
+        first.stop_initiator(&invocation, "INIT0001").unwrap();
+        assert_eq!(first.run_next(&invocation, false).unwrap(), None);
+        drop(first);
+
+        let restarted = service(store, builtins());
+        assert_eq!(restarted.run_next(&invocation, false).unwrap(), None);
+        restarted.start_initiator(&invocation, "INIT0001").unwrap();
+        assert_eq!(
+            restarted
+                .run_next(&invocation, false)
+                .unwrap()
+                .unwrap()
+                .state,
+            JobState::Completed
+        );
+    }
+
+    #[test]
+    fn denied_operator_control_publishes_no_job_transition() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let providers = spool_test_providers(store.clone());
+        let service = BatchService::open(
+            host_with_security(builtins(), providers, false, true, false),
+            store,
+            Default::default(),
+            Default::default(),
+        )
+        .unwrap();
+        let invocation = invocation();
+        let submitted = service
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("deny-control", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.hold(&invocation, &submitted.id),
+            Err(HostProblem::Unauthorized)
+        );
+        assert_eq!(service.get(&submitted.id).unwrap().state, JobState::Queued);
     }
 
     #[test]
@@ -7138,7 +7956,7 @@ mod tests {
         )])));
         let service = service_with_datasets(records);
         let invocation = invocation();
-        service
+        let parent = service
             .submit(
                 &invocation,
                 &JclBundle {
@@ -7158,14 +7976,58 @@ mod tests {
             .unwrap();
         assert!(!more);
         assert_eq!(jobs.len(), 2);
-        assert!(
-            jobs.iter()
-                .any(|job| job.name == "CHILD" && job.state == JobState::Queued)
+        let child = jobs.iter().find(|job| job.name == "CHILD").unwrap();
+        assert_eq!(child.state, JobState::Queued);
+        assert_eq!(
+            child.origin,
+            JesSubmissionOrigin::InternalReader {
+                parent_job_id: parent.id,
+                step_name: "SUBMIT".into(),
+            }
         );
         let drained = service.drain_queued(&invocation).unwrap();
         assert_eq!(drained.len(), 1);
         assert_eq!(drained[0].name, "CHILD");
         assert_eq!(drained[0].state, JobState::Completed);
+    }
+
+    #[test]
+    fn denied_internal_reader_submission_creates_no_child_job() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let providers = spool_test_providers(store.clone());
+        let service = BatchService::open(
+            host_with_security(builtins(), providers, false, false, true),
+            store,
+            Default::default(),
+            Default::default(),
+        )
+        .unwrap();
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IEFBR14\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("denied-internal-reader", InvocationLimits::default())
+                    .unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Failed
+        );
+        assert_eq!(
+            service
+                .list(Some(invocation.principal.id()), None, 8)
+                .unwrap()
+                .0
+                .len(),
+            1
+        );
     }
 
     #[test]
@@ -8426,6 +9288,9 @@ mod tests {
         object.remove("schema_version");
         object.remove("initiator");
         object.remove("steps");
+        object.remove("kind");
+        object.remove("origin");
+        object.remove("route");
         object.remove("spool_sequence");
         object.remove("spool_files");
         object.remove("output_groups");
@@ -8461,6 +9326,9 @@ mod tests {
         assert_eq!(snapshot.state, JobState::Queued);
         assert_eq!(snapshot.steps.len(), 1);
         assert_eq!(snapshot.steps[0].state, StepState::Pending);
+        assert_eq!(snapshot.kind, JesJobKind::Batch);
+        assert_eq!(snapshot.origin, JesSubmissionOrigin::External);
+        assert_eq!(snapshot.route, JesJobRoute::default());
         assert_eq!(
             recovered.spool(&invocation, &id, "LEGACY", 0, 8).unwrap().0,
             vec![b"OLD".to_vec()]

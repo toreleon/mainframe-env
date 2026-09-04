@@ -9,17 +9,157 @@ pub const JES_DURABLE_JOB_CONTRACT: &str = "mainframe-env.jes-durable-job@2";
 pub const JES_CHECKPOINT_CONTRACT: &str = "mainframe-env.jes-checkpoint@1";
 pub const JES_SPOOL_CONTRACT: &str = "mainframe-env.jes-spool@1";
 pub const JES_OUTPUT_CONTRACT: &str = "mainframe-env.jes-output@1";
+pub const JES_TOPOLOGY_CONTRACT: &str = "mainframe-env.jes-topology@1";
 pub const JES_UTILITY_REGISTRY_CONTRACT: &str = "mainframe-env.jes-utility-registry@1";
 
 const MAX_INITIATOR_NAME_BYTES: usize = 16;
 const MAX_CLASSES: usize = 36;
 const MAX_INITIATORS: usize = 4_096;
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum JesJobKind {
+    #[default]
     Batch,
     StartedTask,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum JesSubmissionOrigin {
+    #[default]
+    External,
+    InternalReader {
+        parent_job_id: String,
+        step_name: String,
+    },
+    StartedTask {
+        task_name: String,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct JesJobRoute {
+    pub origin_node: String,
+    pub execution_node: String,
+    pub output_node: String,
+    pub owner_member: Option<String>,
+}
+
+impl Default for JesJobRoute {
+    fn default() -> Self {
+        Self {
+            origin_node: "LOCAL".into(),
+            execution_node: "LOCAL".into(),
+            output_node: "LOCAL".into(),
+            owner_member: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct JesNodeDefinition {
+    pub name: String,
+    pub connected: bool,
+    pub enabled: bool,
+    pub max_inbound_jobs: usize,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct JesMasMemberDefinition {
+    pub name: String,
+    pub node: String,
+    pub enabled: bool,
+    pub max_active: usize,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct JesTopology {
+    pub schema_version: String,
+    pub local_node: String,
+    pub nodes: BTreeMap<String, JesNodeDefinition>,
+    pub members: BTreeMap<String, JesMasMemberDefinition>,
+}
+
+impl JesTopology {
+    #[must_use]
+    pub fn single_node(max_active: usize) -> Self {
+        Self {
+            schema_version: JES_TOPOLOGY_CONTRACT.into(),
+            local_node: "LOCAL".into(),
+            nodes: BTreeMap::from([(
+                "LOCAL".into(),
+                JesNodeDefinition {
+                    name: "LOCAL".into(),
+                    connected: true,
+                    enabled: true,
+                    max_inbound_jobs: 16_384,
+                },
+            )]),
+            members: BTreeMap::from([(
+                "MEMBER1".into(),
+                JesMasMemberDefinition {
+                    name: "MEMBER1".into(),
+                    node: "LOCAL".into(),
+                    enabled: true,
+                    max_active,
+                },
+            )]),
+        }
+    }
+
+    pub fn validate(&self, max_nodes: usize, max_members: usize) -> Result<(), HostProblem> {
+        if self.schema_version != JES_TOPOLOGY_CONTRACT
+            || self.nodes.is_empty()
+            || self.nodes.len() > max_nodes
+            || self.members.is_empty()
+            || self.members.len() > max_members
+            || !self.nodes.contains_key(&self.local_node)
+        {
+            return Err(HostProblem::Malformed);
+        }
+        for (name, node) in &self.nodes {
+            if name != &node.name || !valid_topology_name(name) || node.max_inbound_jobs == 0 {
+                return Err(HostProblem::Malformed);
+            }
+        }
+        for (name, member) in &self.members {
+            if name != &member.name
+                || !valid_topology_name(name)
+                || !self.nodes.contains_key(&member.node)
+                || member.max_active == 0
+            {
+                return Err(HostProblem::Malformed);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn validate_route(&self, route: &JesJobRoute) -> Result<(), HostProblem> {
+        if !self.nodes.contains_key(&route.origin_node)
+            || !self.node_available(&route.execution_node)
+            || !self.node_available(&route.output_node)
+            || route.owner_member.as_ref().is_some_and(|member| {
+                self.members.get(member).is_none_or(|definition| {
+                    !definition.enabled || definition.node != route.execution_node
+                })
+            })
+        {
+            Err(HostProblem::UnsupportedCapability {
+                capability: "jes.nje-mas.route".into(),
+                detail: "node or MAS member is unavailable".into(),
+            })
+        } else {
+            Ok(())
+        }
+    }
+
+    #[must_use]
+    pub fn node_available(&self, name: &str) -> bool {
+        self.nodes
+            .get(name)
+            .is_some_and(|node| node.connected && node.enabled)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -316,7 +456,11 @@ pub enum JesControlOperation {
     HoldOutput,
     ReleaseOutput,
     RouteOutput,
+    SelectOutput,
+    CompleteOutput,
     PurgeOutput,
+    RouteJob,
+    InstallTopology,
     StartInitiator,
     StopInitiator,
     StartTask,
@@ -547,6 +691,14 @@ fn valid_class(class: char) -> bool {
     class.is_ascii_uppercase() || class.is_ascii_digit()
 }
 
+fn valid_topology_name(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 16
+        && value.bytes().all(|byte| {
+            byte.is_ascii_uppercase() || byte.is_ascii_digit() || matches!(byte, b'@' | b'#' | b'$')
+        })
+}
+
 fn valid_sha256(value: &str) -> bool {
     value.len() == 71
         && value.starts_with("sha256:")
@@ -647,6 +799,17 @@ mod tests {
             .unwrap()
             .priority_ceiling = 9;
         assert_eq!(configuration.validate(), Err(HostProblem::Malformed));
+
+        let mut topology = JesTopology::single_node(1);
+        topology.members.get_mut("MEMBER1").unwrap().node = "MISSING".into();
+        assert_eq!(topology.validate(2, 2), Err(HostProblem::Malformed));
+
+        let mut topology = JesTopology::single_node(1);
+        topology.nodes.get_mut("LOCAL").unwrap().connected = false;
+        assert!(matches!(
+            topology.validate_route(&JesJobRoute::default()),
+            Err(HostProblem::UnsupportedCapability { .. })
+        ));
     }
 
     #[test]
@@ -682,6 +845,9 @@ mod tests {
             .unwrap();
         validator
             .validate(&serde_json::to_value(JesSchedulerConfiguration::single_node(1)).unwrap())
+            .unwrap();
+        validator
+            .validate(&serde_json::to_value(JesTopology::single_node(1)).unwrap())
             .unwrap();
         validator
             .validate(

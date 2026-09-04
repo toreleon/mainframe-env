@@ -3919,6 +3919,11 @@ fn control_name(control: &str, keyword: &str) -> Option<String> {
 }
 
 fn job_json(job: mainframe_env_batch::JobSnapshot) -> Value {
+    let job_type = if job.kind == mainframe_env_batch::JesJobKind::StartedTask {
+        "STC"
+    } else {
+        "JOB"
+    };
     let retcode = job
         .abend_code
         .map(|code| format!("ABEND {code}"))
@@ -3928,9 +3933,13 @@ fn job_json(job: mainframe_env_batch::JobSnapshot) -> Value {
         "jobname":job.name,
         "owner":job.owner,
         "status":if matches!(job.state, mainframe_env_batch::JobState::Completed | mainframe_env_batch::JobState::Failed | mainframe_env_batch::JobState::Cancelled) {"OUTPUT"} else {"ACTIVE"},
-        "type":"JOB",
+        "type":job_type,
         "class":job.class.to_string(),
-        "retcode":retcode
+        "retcode":retcode,
+        "origin-node":job.route.origin_node,
+        "execution-node":job.route.execution_node,
+        "output-node":job.route.output_node,
+        "mas-member":job.route.owner_member
     })
 }
 
