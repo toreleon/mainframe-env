@@ -59,6 +59,11 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 type TaskResult<T = ()> = Result<T, String>;
 
 const RETAINED_RELEASE_TARGETS: [&str; 2] = ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu"];
+const JES_ORACLE_CANDIDATE_DOMAIN: &[u8] = b"mainframe-env.jes-oracle-candidate@1\0";
+const JES_ORACLE_DERIVED_PATHS: [&str; 2] = [
+    "conformance/0.8/evidence/jes-806-matrix.json",
+    "docs/delivery/coverage-versions/status/0.8.0.md",
+];
 
 #[derive(Debug, Parser)]
 #[command(name = "xtask", disable_version_flag = true)]
@@ -161,6 +166,8 @@ enum XtaskCommand {
     SemanticIdentities(CheckArgs),
     DatasetContract(CheckArgs),
     DatasetOracle(CheckArgs),
+    JesOracle(CheckArgs),
+    JesOracleCandidate,
     CobolLanguage(CheckArgs),
     CobolExit(CheckArgs),
     CobolReference(CobolReferenceArgs),
@@ -367,6 +374,14 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         XtaskCommand::DatasetOracle(args) => {
             checked!("dataset-oracle", args, check_dataset_oracle(root))
         }
+        XtaskCommand::JesOracle(args) => {
+            checked!("jes-oracle", args, check_jes_oracle(root))
+        }
+        XtaskCommand::JesOracleCandidate => (
+            "jes-oracle-candidate",
+            false,
+            print_jes_oracle_candidate(root),
+        ),
         XtaskCommand::CobolLanguage(args) => checked!(
             "cobol-language",
             args,
@@ -4563,7 +4578,8 @@ fn check_carddemo_base_batch(root: &Path) -> TaskResult {
         "{}",
         serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let evidence = json(&root.join("conformance/0.1.1/evidence/issues/CD-023.json"))?;
+    let historical_path = root.join("conformance/0.1.1/evidence/issues/CD-023.json");
+    let evidence = json(&historical_path)?;
     require(
         receipt.status == "pass"
             && receipt.journeys_passed == 3
@@ -4572,12 +4588,79 @@ fn check_carddemo_base_batch(root: &Path) -> TaskResult {
             && evidence["status"] == Value::String("pass".into()),
         "CD-023 evidence is not a complete derived pass",
     )?;
+    let historical_receipt = evidence["base_batch_receipt"]
+        .as_object()
+        .ok_or("CD-023 historical base-batch receipt is malformed")?;
+    let historical_digest = canonical_evidence_digest(historical_receipt)?;
     require(
-        evidence["base_batch_receipt"] == receipt_value,
-        "CD-023 base-batch receipt is stale",
+        evidence["evidence_digest"].as_str() == Some(historical_digest.as_str()),
+        "CD-023 historical evidence digest differs",
+    )?;
+    let historical_completion = find_completion_commit(
+        root,
+        "Certify CardDemo base batch journeys",
+        &[
+            ("CardDemo-Issue", "CD-023=pass"),
+            ("Evidence-Digest", historical_digest.as_str()),
+            ("Target-Product", "0.1.1"),
+        ],
+    )?;
+    verify_commit_bound_live_file(
+        root,
+        &historical_completion,
+        "conformance/0.1.1/evidence/issues/CD-023.json",
+        &historical_path,
+    )?;
+
+    let versioned_path = root.join("conformance/0.8/evidence/carddemo-base-batch.json");
+    let expected = if versioned_path.is_file() {
+        let versioned = json(&versioned_path)?;
+        require(
+            versioned["schema_version"]
+                == Value::String("mainframe-env.carddemo-base-batch-version-evidence@1".into())
+                && versioned["target_version"] == Value::String("0.8.0".into())
+                && versioned["supersedes"]
+                    == Value::String("conformance/0.1.1/evidence/issues/CD-023.json".into())
+                && versioned["historical_receipt_rewritten"] == Value::Bool(false),
+            "0.8 CardDemo base-batch evidence header is invalid",
+        )?;
+        let expected = versioned["receipt"]
+            .as_object()
+            .ok_or("0.8 CardDemo base-batch receipt is malformed")?;
+        let expected_digest = canonical_evidence_digest(expected)?;
+        require(
+            versioned["evidence_digest"].as_str() == Some(expected_digest.as_str()),
+            "0.8 CardDemo base-batch evidence digest differs",
+        )?;
+        for field in [
+            "schema_version",
+            "status",
+            "corpus_commit",
+            "journeys_passed",
+            "initialization_jobs",
+            "operational_jobs",
+            "cics_file_controls",
+            "internal_submissions",
+            "warm_restart_controls",
+            "rollback_controls",
+            "cancellation_controls",
+        ] {
+            require(
+                expected.get(field) == historical_receipt.get(field),
+                &format!("0.8 CardDemo compatibility projection changed {field}"),
+            )?;
+        }
+        Value::Object(expected.clone())
+    } else {
+        Value::Object(historical_receipt.clone())
+    };
+    require(
+        expected == receipt_value,
+        "CardDemo base-batch receipt is stale",
     )?;
     require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
+        versioned_path.is_file()
+            || evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
         "CD-023 evidence digest differs",
     )?;
     Ok(())
@@ -5479,6 +5562,7 @@ fn check_declared_dependency_graph(root: &Path) -> TaskResult {
         root.join("conformance/0.5/inventory/dependency-additions.json"),
         root.join("conformance/0.6/inventory/dependency-additions.json"),
         root.join("conformance/0.7/inventory/dependency-additions.json"),
+        root.join("conformance/0.8/inventory/dependency-additions.json"),
     ] {
         if !additions_path.is_file() {
             continue;
@@ -5684,50 +5768,64 @@ fn check_profiles(root: &Path) -> TaskResult {
         .iter()
         .filter_map(|row| row.get("name").and_then(Value::as_str).map(str::to_string))
         .collect::<BTreeSet<_>>();
-    let additions_path = root.join("conformance/0.2/inventory/package-additions.json");
-    if additions_path.is_file() {
-        let additions = json(&additions_path)?;
-        for package in array(&additions, "packages", &additions_path)? {
-            require(
-                known.insert(text(package, "name", &additions_path)?.to_string()),
-                "package addition duplicates a historical profile package",
-            )?;
+    for additions_path in [
+        root.join("conformance/0.2/inventory/package-additions.json"),
+        root.join("conformance/0.8/inventory/package-additions.json"),
+    ] {
+        if additions_path.is_file() {
+            let additions = json(&additions_path)?;
+            for package in array(&additions, "packages", &additions_path)? {
+                require(
+                    known.insert(text(package, "name", &additions_path)?.to_string()),
+                    "package addition duplicates a historical profile package",
+                )?;
+            }
         }
     }
     let excluded = excluded_names(root)?;
-    let additions_path = root.join("conformance/0.3/inventory/dependency-additions.json");
-    let additions = json(&additions_path)?;
     let mut profile_additions = BTreeMap::<String, BTreeSet<String>>::new();
-    for addition in array(&additions, "profile_additions", &additions_path)? {
-        let values = addition.as_array().ok_or_else(|| {
-            format!(
-                "{} contains a malformed profile addition",
-                additions_path.display()
-            )
-        })?;
-        let profile = values.first().and_then(Value::as_str).ok_or_else(|| {
-            format!(
-                "{} profile addition has no profile",
-                additions_path.display()
-            )
-        })?;
-        let package = values.get(1).and_then(Value::as_str).ok_or_else(|| {
-            format!(
-                "{} profile addition has no package",
-                additions_path.display()
-            )
-        })?;
-        require(
-            matches!(profile, "core-server" | "conformance") && package == "mainframe-env-coverage",
-            "0.3 profile addition is outside the reviewed coverage boundary",
-        )?;
-        require(
-            profile_additions
-                .entry(profile.into())
-                .or_default()
-                .insert(package.into()),
-            "0.3 profile addition is duplicated",
-        )?;
+    for additions_path in [
+        root.join("conformance/0.3/inventory/dependency-additions.json"),
+        root.join("conformance/0.8/inventory/dependency-additions.json"),
+    ] {
+        let additions = json(&additions_path)?;
+        let additions = additions
+            .get("profile_additions")
+            .and_then(Value::as_array)
+            .ok_or_else(|| format!("{} omits profile_additions", additions_path.display()))?;
+        for addition in additions {
+            let values = addition.as_array().ok_or_else(|| {
+                format!(
+                    "{} contains a malformed profile addition",
+                    additions_path.display()
+                )
+            })?;
+            let profile = values.first().and_then(Value::as_str).ok_or_else(|| {
+                format!(
+                    "{} profile addition has no profile",
+                    additions_path.display()
+                )
+            })?;
+            let package = values.get(1).and_then(Value::as_str).ok_or_else(|| {
+                format!(
+                    "{} profile addition has no package",
+                    additions_path.display()
+                )
+            })?;
+            require(
+                values.len() == 2
+                    && matches!(profile, "core-server" | "conformance")
+                    && known.contains(package),
+                "profile addition is outside the reviewed package boundary",
+            )?;
+            require(
+                profile_additions
+                    .entry(profile.into())
+                    .or_default()
+                    .insert(package.into()),
+                "profile addition is duplicated",
+            )?;
+        }
     }
 
     for profile in array(&profiles, "profiles", &profiles_path)? {
@@ -5838,6 +5936,10 @@ fn check_schemas(root: &Path) -> TaskResult {
     if jcl_schemas.is_dir() {
         collect_extension(&jcl_schemas, OsStr::new("json"), &mut files)?;
     }
+    let jes_schemas = root.join("conformance/0.8/schemas");
+    if jes_schemas.is_dir() {
+        collect_extension(&jes_schemas, OsStr::new("json"), &mut files)?;
+    }
     require(!files.is_empty(), "no evidence schemas found")?;
     files.sort();
     for file in &files {
@@ -5915,6 +6017,146 @@ fn check_schemas(root: &Path) -> TaskResult {
     let ams_fixture = root.join("conformance/0.6/fixtures/ams-commands.json");
     let ams_schema = root.join("conformance/0.6/schemas/ams-command-fixtures.schema.json");
     validate_schema_instance(&json(&ams_schema)?, &json(&ams_fixture)?, &ams_fixture)?;
+    let jes_migration = root.join("conformance/0.8/migrations/jes-durable-job-v1-to-v2.json");
+    let jes_migration_schema = root.join("conformance/0.8/schemas/jes-state-migration.schema.json");
+    validate_schema_instance(
+        &json(&jes_migration_schema)?,
+        &json(&jes_migration)?,
+        &jes_migration,
+    )?;
+    let jes_differential = root.join("conformance/0.8/oracles/jes-licensed-differential.json");
+    let jes_differential_schema =
+        root.join("conformance/0.8/schemas/jes-licensed-differential-adapter.schema.json");
+    validate_schema_instance(
+        &json(&jes_differential_schema)?,
+        &json(&jes_differential)?,
+        &jes_differential,
+    )?;
+    let jes_dependency_additions = root.join("conformance/0.8/inventory/dependency-additions.json");
+    let jes_dependency_additions_schema =
+        root.join("conformance/0.8/schemas/jes-dependency-additions.schema.json");
+    validate_schema_instance(
+        &json(&jes_dependency_additions_schema)?,
+        &json(&jes_dependency_additions)?,
+        &jes_dependency_additions,
+    )?;
+    let jes_package_additions = root.join("conformance/0.8/inventory/package-additions.json");
+    let jes_package_additions_schema =
+        root.join("conformance/0.8/schemas/jes-package-additions.schema.json");
+    validate_schema_instance(
+        &json(&jes_package_additions_schema)?,
+        &json(&jes_package_additions)?,
+        &jes_package_additions,
+    )?;
+    for (artifact, schema) in [
+        (
+            "conformance/0.8/evidence/carddemo-base-batch.json",
+            "conformance/0.8/schemas/carddemo-base-batch-evidence.schema.json",
+        ),
+        (
+            "conformance/0.8/inventory/jes-dd-surface.json",
+            "conformance/0.8/schemas/jes-dd-surface.schema.json",
+        ),
+        (
+            "conformance/0.8/inventory/jes-operations-surface.json",
+            "conformance/0.8/schemas/jes-operations-surface.schema.json",
+        ),
+        (
+            "conformance/0.8/inventory/jes-recovery-surface.json",
+            "conformance/0.8/schemas/jes-recovery-surface.schema.json",
+        ),
+        (
+            "conformance/0.8/inventory/jes-spool-output-surface.json",
+            "conformance/0.8/schemas/jes-spool-output-surface.schema.json",
+        ),
+        (
+            "conformance/0.8/inventory/jes-utility-surface.json",
+            "conformance/0.8/schemas/jes-utility-surface.schema.json",
+        ),
+        (
+            "conformance/0.8/migrations/jes-embedded-spool-to-artifacts.json",
+            "conformance/0.8/schemas/jes-spool-migration.schema.json",
+        ),
+    ] {
+        let artifact = root.join(artifact);
+        let schema = root.join(schema);
+        validate_schema_instance(&json(&schema)?, &json(&artifact)?, &artifact)?;
+    }
+    let recovery_path = root.join("conformance/0.8/inventory/jes-recovery-surface.json");
+    let recovery = json(&recovery_path)?;
+    let state_migration_digests = recovery["state_migration_digests"]
+        .as_object()
+        .ok_or_else(|| format!("{} omits state_migration_digests", recovery_path.display()))?;
+    for (relative, expected) in state_migration_digests {
+        let actual = format!("sha256:{}", file_digest(&root.join(relative))?);
+        require(
+            expected.as_str() == Some(actual.as_str()),
+            &format!("JES state/migration digest drifted for {relative}"),
+        )?;
+    }
+    let jes_evidence_schema =
+        json(&root.join("conformance/0.8/schemas/jes-work-package-evidence.schema.json"))?;
+    for work_package in ["JES-802", "JES-803", "JES-804", "JES-805", "JES-806"] {
+        let path = root.join(format!(
+            "conformance/0.8/evidence/{}-matrix.json",
+            work_package.to_ascii_lowercase()
+        ));
+        let evidence = json(&path)?;
+        validate_schema_instance(&jes_evidence_schema, &evidence, &path)?;
+        let rows = array(&evidence, "rows", &path)?;
+        unique_rows(rows, "id", &path)?;
+        let pending = rows
+            .iter()
+            .filter(|row| row["result"] == Value::String("pending".into()))
+            .count();
+        let status = text(&evidence, "status", &path)?;
+        require(
+            (pending == 0 && status == "pass")
+                || (pending == 1 && status == "pass-with-licensed-differential-pending"),
+            &format!("{} status does not match its row results", path.display()),
+        )?;
+        if work_package == "JES-806" && pending == 1 {
+            require(
+                rows.iter().any(|row| {
+                    row["id"] == Value::String("licensed-zos-3.2-jes2".into())
+                        && row["result"] == Value::String("pending".into())
+                }),
+                "JES-806 may defer only its licensed z/OS 3.2/JES2 row",
+            )?;
+        }
+    }
+    let jes_adapter = json(&jes_differential)?;
+    require(
+        jes_adapter["licensed_receipt_required_for_pass"] == Value::Bool(true)
+            && jes_adapter["generated_historical_or_local_result_counts_as_pass"]
+                == Value::Bool(false),
+        "JES pending completion policy weakened the fail-closed licensed adapter",
+    )?;
+    for relative in [
+        "docs/prompts/coverage-versions/IMPLEMENT_0_8_0.md",
+        "docs/delivery/coverage-versions/0.8.0.md",
+        "docs/delivery/coverage-versions/status/0.8.0.md",
+    ] {
+        let document = read(&root.join(relative))?;
+        require(
+            document.contains("pass-with-licensed-differential-pending")
+                && document.contains("0/16")
+                && document.contains("Hercules"),
+            &format!("{relative} omits the approved 0.8 pending-differential disposition"),
+        )?;
+    }
+    for relative in [
+        "docs/prompts/coverage-versions/IMPLEMENT_0_17_0.md",
+        "docs/delivery/coverage-versions/0.17.0.md",
+    ] {
+        let document = read(&root.join(relative))?;
+        require(
+            document.contains("0/16")
+                && document.contains("16-scenario")
+                && document.contains("JES2"),
+            &format!("{relative} omits the deferred licensed JES2 campaign handoff"),
+        )?;
+    }
     let certification = root.join("conformance/0.6/evidence/dataset-certification.json");
     let certification_schema =
         root.join("conformance/0.6/schemas/dataset-certification.schema.json");
@@ -5969,6 +6211,204 @@ fn check_dataset_oracle_receipt(root: &Path, receipt_path: Option<PathBuf>) -> T
         "dataset-oracle baseline=ibm-zos-3.2-dfsms-ams-2026-06 cases=36 status=pass candidate={candidate}"
     );
     Ok(())
+}
+
+fn check_jes_oracle(root: &Path) -> TaskResult {
+    check_jes_oracle_receipt(
+        root,
+        env::var_os("MAINFRAME_ENV_JES_LICENSED_ORACLE_RECEIPT").map(PathBuf::from),
+    )
+}
+
+fn check_jes_oracle_receipt(root: &Path, receipt_path: Option<PathBuf>) -> TaskResult {
+    let receipt_path = receipt_path.ok_or(
+            "licensed z/OS 3.2 JES2 differential is pending; set MAINFRAME_ENV_JES_LICENSED_ORACLE_RECEIPT to a reviewed receipt",
+        )?;
+    require(
+        receipt_path.is_file(),
+        "MAINFRAME_ENV_JES_LICENSED_ORACLE_RECEIPT is not a readable file",
+    )?;
+    let receipt_path = fs::canonicalize(&receipt_path)
+        .map_err(|error| format!("licensed JES2 receipt: {error}"))?;
+    let canonical_root =
+        fs::canonicalize(root).map_err(|error| format!("repository root: {error}"))?;
+    require(
+        !receipt_path.starts_with(canonical_root),
+        "licensed JES2 receipt must remain external to the candidate tree",
+    )?;
+    let schema_path =
+        root.join("conformance/0.8/schemas/jes-licensed-differential-receipt.schema.json");
+    let receipt = json(&receipt_path)?;
+    validate_schema_instance(&json(&schema_path)?, &receipt, &receipt_path)?;
+    let adapter = validate_jes_oracle_adapter(root)?;
+    let candidate = jes_oracle_candidate_digest(root)?;
+    require(
+        receipt["candidate_digest"].as_str() == Some(candidate.as_str()),
+        "licensed JES2 oracle receipt was produced from a different candidate",
+    )?;
+    let adapter_path = root.join("conformance/0.8/oracles/jes-licensed-differential.json");
+    let required = array(&adapter, "required_scenarios", &adapter_path)?
+        .iter()
+        .map(|value| {
+            value
+                .as_str()
+                .map(str::to_string)
+                .ok_or_else(|| "JES2 adapter contains a non-string scenario".to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    let observed = array(&receipt, "scenarios", &receipt_path)?
+        .iter()
+        .map(|scenario| {
+            require(
+                scenario["status"] == Value::String("pass".into()),
+                "licensed JES2 receipt contains a non-passing scenario",
+            )?;
+            Ok(text(scenario, "id", &receipt_path)?.to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        observed == required,
+        "licensed JES2 receipt scenario set differs from the required campaign",
+    )?;
+    println!(
+        "jes-oracle baseline=ibm-zos-3.2-jcl-jes2-2026-06 cases=16 status=pass candidate={candidate}"
+    );
+    Ok(())
+}
+
+fn validate_jes_oracle_adapter(root: &Path) -> TaskResult<Value> {
+    let adapter_path = root.join("conformance/0.8/oracles/jes-licensed-differential.json");
+    let schema_path =
+        root.join("conformance/0.8/schemas/jes-licensed-differential-adapter.schema.json");
+    let adapter = json(&adapter_path)?;
+    validate_schema_instance(&json(&schema_path)?, &adapter, &adapter_path)?;
+    Ok(adapter)
+}
+
+fn print_jes_oracle_candidate(root: &Path) -> TaskResult {
+    validate_jes_oracle_adapter(root)?;
+    println!("{}", jes_oracle_candidate_digest(root)?);
+    Ok(())
+}
+
+#[derive(Debug, Eq, PartialEq)]
+struct GitIndexFile {
+    mode: String,
+    path: String,
+}
+
+fn jes_oracle_candidate_digest(root: &Path) -> TaskResult<String> {
+    let unstaged = git_null_paths(root, &["diff", "--name-only", "-z", "--"])?
+        .into_iter()
+        .filter(|path| !jes_oracle_candidate_excluded(path))
+        .collect::<Vec<_>>();
+    require(
+        unstaged.is_empty(),
+        &format!(
+            "licensed JES2 candidate has unstaged tracked paths: {unstaged:?}; stage the exact candidate before producing or checking a receipt"
+        ),
+    )?;
+
+    let mut files = git_index_files(root)?;
+    files.retain(|file| !jes_oracle_candidate_excluded(&file.path));
+    let mut digest = Sha256::new();
+    digest.update(JES_ORACLE_CANDIDATE_DOMAIN);
+    digest.update(
+        u64::try_from(files.len())
+            .map_err(|_| "too many Git index files for JES2 candidate".to_string())?
+            .to_be_bytes(),
+    );
+    for file in files {
+        let bytes = git_index_file_bytes(root, &file.path)?;
+        digest_length_prefixed(&mut digest, file.mode.as_bytes())?;
+        digest_length_prefixed(&mut digest, file.path.as_bytes())?;
+        digest_length_prefixed(&mut digest, &bytes)?;
+    }
+    Ok(format!("sha256:{:x}", digest.finalize()))
+}
+
+fn git_index_files(root: &Path) -> TaskResult<Vec<GitIndexFile>> {
+    let output = Command::new("git")
+        .args(["ls-files", "--cached", "--stage", "-z"])
+        .current_dir(root)
+        .output()
+        .map_err(|error| format!("git ls-files: {error}"))?;
+    require(output.status.success(), "git ls-files failed")?;
+    let listing = String::from_utf8(output.stdout)
+        .map_err(|_| "Git index contains a non-UTF-8 path".to_string())?;
+    let mut files = Vec::new();
+    for row in listing.split_terminator('\0') {
+        let (metadata, path) = row
+            .split_once('\t')
+            .ok_or_else(|| format!("invalid Git index row {row:?}"))?;
+        let fields = metadata.split_whitespace().collect::<Vec<_>>();
+        require(
+            fields.len() == 3 && fields[2] == "0",
+            &format!("unmerged or invalid Git index entry for {path:?}"),
+        )?;
+        require(
+            matches!(fields[0], "100644" | "100755"),
+            &format!("unsupported Git index mode {} for {path:?}", fields[0]),
+        )?;
+        let candidate = Path::new(path);
+        require(
+            !candidate.is_absolute()
+                && !candidate
+                    .components()
+                    .any(|component| matches!(component, std::path::Component::ParentDir)),
+            &format!("unsafe Git index path {path:?}"),
+        )?;
+        files.push(GitIndexFile {
+            mode: fields[0].to_string(),
+            path: path.to_string(),
+        });
+    }
+    files.sort_by(|left, right| left.path.cmp(&right.path));
+    require(
+        files.windows(2).all(|pair| pair[0].path != pair[1].path),
+        "Git index contains duplicate paths",
+    )?;
+    Ok(files)
+}
+
+fn git_null_paths(root: &Path, arguments: &[&str]) -> TaskResult<Vec<String>> {
+    let output = Command::new("git")
+        .args(arguments)
+        .current_dir(root)
+        .output()
+        .map_err(|error| format!("git: {error}"))?;
+    require(output.status.success(), "git failed")?;
+    let listing = String::from_utf8(output.stdout)
+        .map_err(|_| "Git reported a non-UTF-8 path".to_string())?;
+    Ok(listing.split_terminator('\0').map(str::to_string).collect())
+}
+
+fn git_index_file_bytes(root: &Path, relative: &str) -> TaskResult<Vec<u8>> {
+    let object = format!(":{relative}");
+    let output = Command::new("git")
+        .args(["show", &object])
+        .current_dir(root)
+        .output()
+        .map_err(|error| format!("git show {object}: {error}"))?;
+    require(
+        output.status.success(),
+        &format!("Git index object is missing: {relative}"),
+    )?;
+    Ok(output.stdout)
+}
+
+fn digest_length_prefixed(digest: &mut Sha256, value: &[u8]) -> TaskResult {
+    digest.update(
+        u64::try_from(value.len())
+            .map_err(|_| "JES2 candidate field is too large".to_string())?
+            .to_be_bytes(),
+    );
+    digest.update(value);
+    Ok(())
+}
+
+fn jes_oracle_candidate_excluded(path: &str) -> bool {
+    JES_ORACLE_DERIVED_PATHS.contains(&path)
 }
 
 fn validate_schema_instance(schema: &Value, instance: &Value, path: &Path) -> TaskResult {
@@ -7803,8 +8243,14 @@ pub(super) fn register(router: Router<super::GatewayState>) -> Router<super::Gat
 }
 
 fn check_dehardcoding(root: &Path) -> TaskResult {
-    let mut rust_files = Vec::new();
-    collect_extension(&root.join("crates"), OsStr::new("rs"), &mut rust_files)?;
+    // Conformance is tied to the candidate index/commit. Untracked developer
+    // files are neither shipped product code nor safe for a gate to inspect.
+    let tracked = command_text(root, "git", &["ls-files", "--cached", "--", "crates"])?;
+    let mut rust_files = tracked
+        .lines()
+        .filter(|path| Path::new(path).extension() == Some(OsStr::new("rs")))
+        .map(|path| root.join(path))
+        .collect::<Vec<_>>();
     rust_files.sort();
     let conformance = root.join("crates/tooling/mainframe-env-conformance");
     let forbidden_application_identities = [
@@ -11215,6 +11661,18 @@ mod tests {
     }
 
     #[test]
+    fn jes_oracle_requires_an_external_reviewed_receipt() {
+        let root = repository_root().expect("repository root");
+        let pending = check_jes_oracle_receipt(&root, None)
+            .expect_err("missing licensed receipt must remain pending");
+        assert!(pending.contains("licensed z/OS 3.2 JES2 differential is pending"));
+        let local_artifact = root.join("conformance/0.8/oracles/jes-licensed-differential.json");
+        let error = check_jes_oracle_receipt(&root, Some(local_artifact))
+            .expect_err("a candidate-tree artifact must not substitute for a licensed receipt");
+        assert!(error.contains("must remain external to the candidate tree"));
+    }
+
+    #[test]
     fn strict_cli_rejects_unknown_duplicate_and_surplus_arguments() {
         for arguments in [
             vec!["xtask", "evidence", "seal", "--unknown"],
@@ -11242,6 +11700,8 @@ mod tests {
         }
         assert!(Cli::try_parse_from(["xtask", "evidence", "seal", "--check"]).is_ok());
         assert!(Cli::try_parse_from(["xtask", "evidence", "callback"]).is_ok());
+        assert!(Cli::try_parse_from(["xtask", "jes-oracle-candidate"]).is_ok());
+        assert!(Cli::try_parse_from(["xtask", "jes-oracle-candidate", "surplus"]).is_err());
         assert!(
             Cli::try_parse_from([
                 "xtask",
@@ -11299,6 +11759,55 @@ mod tests {
                 .success()
         );
         command_text(root, "git", &["rev-parse", "HEAD"]).expect("commit identity")
+    }
+
+    #[test]
+    fn jes_oracle_candidate_is_index_bound_and_ignores_only_derived_reports() {
+        let root = temporary_git_repository("jes-oracle-index-candidate");
+        fs::write(root.join("source.txt"), b"accepted source\n").expect("source");
+        commit_all(&root, "baseline");
+
+        let baseline = jes_oracle_candidate_digest(&root).expect("baseline candidate");
+        fs::write(root.join("unrelated-untracked.txt"), b"not in candidate\n")
+            .expect("untracked file");
+        assert_eq!(
+            jes_oracle_candidate_digest(&root).expect("untracked-insensitive candidate"),
+            baseline
+        );
+
+        fs::write(root.join("source.txt"), b"staged source\n").expect("source update");
+        let error = jes_oracle_candidate_digest(&root)
+            .expect_err("unstaged tracked source must invalidate campaign readiness");
+        assert!(error.contains("unstaged tracked paths"));
+        assert!(
+            Command::new("git")
+                .args(["add", "source.txt"])
+                .current_dir(&root)
+                .status()
+                .expect("git add")
+                .success()
+        );
+        let staged = jes_oracle_candidate_digest(&root).expect("staged candidate");
+        assert_ne!(staged, baseline);
+
+        for relative in JES_ORACLE_DERIVED_PATHS {
+            let path = root.join(relative);
+            fs::create_dir_all(path.parent().expect("derived parent")).expect("derived directory");
+            fs::write(&path, b"pending report\n").expect("derived report");
+            assert!(
+                Command::new("git")
+                    .args(["add", "--", relative])
+                    .current_dir(&root)
+                    .status()
+                    .expect("git add derived report")
+                    .success()
+            );
+        }
+        assert_eq!(
+            jes_oracle_candidate_digest(&root).expect("derived-report-insensitive candidate"),
+            staged
+        );
+        fs::remove_dir_all(root).expect("temporary repository cleanup");
     }
 
     #[test]

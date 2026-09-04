@@ -1,0 +1,20 @@
+{
+  "schema_version": "mainframe-env.jes-state-migration@1",
+  "target_version": "0.8.0",
+  "from": "mainframe-env.jes-durable-job@1",
+  "to": "mainframe-env.jes-durable-job@2",
+  "authority": "mainframe-env-store-api.ProviderStateStore/jes-job",
+  "strategy": "read-old-write-new-cas",
+  "rollback": "retain-v1-compatible-fields",
+  "invariants": [
+    "job identity, owner, plan, submit key, state, attempt, spool and event order remain exact",
+    "legacy PascalCase job states remain readable",
+    "step executions are derived once from the immutable plan without executing effects",
+    "dataset resolution and temporary-dataset maps default empty without resolving or allocating data",
+    "legacy jobs default to batch, external submission and LOCAL unowned routing without moving work",
+    "typed program registrations are derived once from the frozen common catalog without executing a step",
+    "cancellation, purge intent and effect sequence default empty without claiming an outcome",
+    "selected or running jobs recover to queued unless the bounded attempt limit is exhausted",
+    "a CAS conflict publishes no partial migrated projection"
+  ]
+}

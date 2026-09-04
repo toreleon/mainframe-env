@@ -193,7 +193,15 @@ fn parse_if(statement: &str) -> Result<AmsStatement, HostProblem> {
         .strip_prefix("IF ")
         .and_then(|value| value.split_once(" THEN "))
         .ok_or(HostProblem::Malformed)?;
-    let tokens = condition.split_whitespace().collect::<Vec<_>>();
+    let normalized = condition
+        .replace("¬=", " NE ")
+        .replace("!=", " NE ")
+        .replace("<=", " LE ")
+        .replace(">=", " GE ")
+        .replace('=', " EQ ")
+        .replace('<', " LT ")
+        .replace('>', " GT ");
+    let tokens = normalized.split_whitespace().collect::<Vec<_>>();
     if tokens.len() != 3 {
         return Err(HostProblem::Malformed);
     }
@@ -484,10 +492,11 @@ mod tests {
             "SHCDS DATASET(USER.A)",
             "VERIFY USER.A",
             "IF MAXCC LE 08 THEN SET MAXCC = 0",
+            "IF LASTCC=12 THEN SET MAXCC=0",
         ];
         assert_eq!(
             validate_idcams_control(controls.join("\n").as_bytes()),
-            Ok(32)
+            Ok(33)
         );
     }
 

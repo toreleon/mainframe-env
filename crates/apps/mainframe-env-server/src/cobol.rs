@@ -544,6 +544,7 @@ impl CobolProgram {
             CodecLimits::default(),
         )
         .map_err(|_| HostProblem::ProviderFailure)?;
+        install_batch_environment(&mut machine, &input)?;
         let coordinator = ExecutionCoordinator::durable(
             Arc::clone(self.host.get().ok_or(HostProblem::InfrastructureFailure)?),
             Arc::clone(self.store.get().ok_or(HostProblem::InfrastructureFailure)?),
@@ -699,6 +700,7 @@ impl Program for CobolProgram {
             CodecLimits::default(),
         )
         .map_err(|_| HostProblem::ProviderFailure)?;
+        install_batch_environment(&mut machine, input)?;
         let coordinator = match (self.host.get(), self.store.get()) {
             (Some(host), Some(store)) => ExecutionCoordinator::durable(
                 Arc::clone(host),
@@ -743,6 +745,28 @@ impl Program for CobolProgram {
             | ExecutionOutcome::Transfer(_) => Err(HostProblem::Unsupported),
         }
     }
+}
+
+fn install_batch_environment(
+    machine: &mut ReferenceMachine,
+    input: &ProgramInput,
+) -> Result<(), HostProblem> {
+    let Some(execution) = &input.execution else {
+        return Ok(());
+    };
+    machine
+        .install_mvs_tiot(
+            &execution.job_name,
+            &execution.step_name,
+            input.dds.iter().map(|dd| dd.name.as_str()),
+        )
+        .map(|_| ())
+        .map_err(|problem| match problem {
+            mainframe_env_interpreter::MachineProblem::ResourceExhausted => {
+                HostProblem::ResourceExhausted
+            }
+            _ => HostProblem::Malformed,
+        })
 }
 
 fn decode_cobol_call_values(payload: &BoundedPayload) -> Result<Vec<Vec<u8>>, HostProblem> {
@@ -1194,10 +1218,56 @@ mod tests {
                     source_end_line: 1,
                     parameters: Vec::new(),
                 }],
+                execution: None,
             })
             .unwrap();
         assert_eq!(output.return_code, 0);
         assert_eq!(output.records, vec![b"BATCH COBOL".to_vec()]);
+    }
+
+    #[test]
+    fn batch_cobol_installs_a_bounded_mvs_tiot_from_execution_context() {
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. TIOTTEST.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MARKER PIC X(4) VALUE 'KEEP'.\n01 PSAPTR POINTER.\n01 BUMP-TIOT PIC S9(08) BINARY VALUE ZERO.\n01 TIOT-INDEX REDEFINES BUMP-TIOT POINTER.\nLINKAGE SECTION.\n01 PSA-BLOCK.\n  05 FILLER PIC X(16).\n  05 TCB-POINT POINTER.\n01 TCB-BLOCK.\n  05 FILLER PIC X(12).\n  05 TIOT-POINT POINTER.\n01 TIOT-BLOCK.\n  05 TIOTNJOB PIC X(08).\n  05 TIOTJSTP PIC X(08).\n  05 TIOTPSTP PIC X(08).\n01 TIOT-ENTRY.\n  05 TIOT-SEG.\n    10 TIO-LEN PIC X(01).\n    10 FILLER PIC X(03).\n    10 TIOCDDNM PIC X(08).\n    10 FILLER PIC X(05).\n    10 UCB-ADDR PIC X(03).\n      88 NULL-UCB VALUE LOW-VALUES.\n  05 FILLER PIC X(04).\n    88 END-OF-TIOT VALUE LOW-VALUES.\nPROCEDURE DIVISION.\nSET ADDRESS OF PSA-BLOCK TO PSAPTR.\nSET ADDRESS OF TCB-BLOCK TO TCB-POINT.\nSET ADDRESS OF TIOT-BLOCK TO TIOT-POINT.\nSET TIOT-INDEX TO TIOT-POINT.\nDISPLAY TIOTNJOB ':' TIOTJSTP.\nCOMPUTE BUMP-TIOT = BUMP-TIOT + LENGTH OF TIOT-BLOCK.\nSET ADDRESS OF TIOT-ENTRY TO TIOT-INDEX.\nDISPLAY TIOCDDNM.\nDISPLAY MARKER.\nSTOP RUN.\n";
+        let program = CobolProgram::new();
+        let output = program
+            .execute(
+                &parent(),
+                &ProgramInput {
+                    parameter: None,
+                    dds: vec![DdPlan {
+                        name: "SYSIN".into(),
+                        dataset: None,
+                        member: None,
+                        generation: None,
+                        organization: None,
+                        record_format: None,
+                        logical_record_length: None,
+                        ccsid: None,
+                        temporary: false,
+                        sysout: None,
+                        disposition: Vec::new(),
+                        inline_data: source.to_vec(),
+                        concatenation: false,
+                        source_line: 1,
+                        source_end_line: 1,
+                        parameters: Vec::new(),
+                    }],
+                    execution: Some(mainframe_env_batch::ProgramExecutionContext {
+                        job_name: "TIOTJOB".into(),
+                        step_name: "STEP1".into(),
+                    }),
+                },
+            )
+            .unwrap();
+        assert_eq!(output.return_code, 0);
+        assert_eq!(
+            output.records,
+            vec![
+                b"TIOTJOB :STEP1   ".to_vec(),
+                b"SYSIN   ".to_vec(),
+                b"KEEP".to_vec()
+            ]
+        );
     }
 
     #[test]
@@ -1292,6 +1362,7 @@ mod tests {
                             parameters: Vec::new(),
                         },
                     ],
+                    execution: None,
                 },
             )
             .unwrap();
@@ -1330,6 +1401,7 @@ mod tests {
                     source_end_line: 1,
                     parameters: Vec::new(),
                 }],
+                execution: None,
             })
             .unwrap();
         assert_eq!(output.records, vec![b"DURABLE".to_vec()]);

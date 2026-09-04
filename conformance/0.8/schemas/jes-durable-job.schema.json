@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/jes-durable-job@2",
+  "title": "mainframe-env durable JES job",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "name", "owner", "class", "priority", "state", "return_code", "abend_code", "active_step", "initiator", "steps", "attempt", "version", "submit_key", "plan", "dataset_resolutions", "temporary_datasets", "spool", "events"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.jes-durable-job@2"},
+    "id": {"type": "string", "pattern": "^JOB[0-9]{5,8}$"},
+    "name": {"type": "string", "pattern": "^[A-Z0-9@$#]{1,16}$"},
+    "owner": {"type": "string", "pattern": "^[A-Za-z0-9._:/@-]{1,128}$"},
+    "kind": {"enum": ["batch", "started-task"]},
+    "origin": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {"kind": {"const": "external"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "parent_job_id", "step_name"],
+          "properties": {
+            "kind": {"const": "internal-reader"},
+            "parent_job_id": {"type": "string", "pattern": "^JOB[0-9]{5,8}$"},
+            "step_name": {"type": "string", "minLength": 1, "maxLength": 128}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "task_name"],
+          "properties": {
+            "kind": {"const": "started-task"},
+            "task_name": {"type": "string", "pattern": "^[A-Z0-9@$#]{1,16}$"}
+          }
+        }
+      ]
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["origin_node", "execution_node", "output_node", "owner_member"],
+      "properties": {
+        "origin_node": {"type": "string", "pattern": "^[A-Z0-9@$#]{1,16}$"},
+        "execution_node": {"type": "string", "pattern": "^[A-Z0-9@$#]{1,16}$"},
+        "output_node": {"type": "string", "pattern": "^[A-Z0-9@$#]{1,16}$"},
+        "owner_member": {"type": ["string", "null"], "pattern": "^[A-Z0-9@$#]{1,16}$"}
+      }
+    },
+    "cancellation": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "requested_by", "reason", "requested_tick", "state"],
+          "properties": {
+            "id": {"type": "string", "minLength": 1, "maxLength": 128},
+            "requested_by": {"type": "string", "minLength": 1, "maxLength": 128},
+            "reason": {"type": "string", "minLength": 1, "maxLength": 4096},
+            "requested_tick": {"type": "integer", "minimum": 0},
+            "state": {"enum": ["requested", "observed", "completed"]}
+          }
+        }
+      ]
+    },
+    "purge_pending": {"type": "boolean"},
+    "effect_sequence": {"type": "integer", "minimum": 0},
+    "class": {"type": "string", "pattern": "^[A-Z0-9]$"},
+    "priority": {"type": "integer", "minimum": 0, "maximum": 255},
+    "state": {"enum": ["submitted", "held", "queued", "selected", "running", "output", "completed", "failed", "cancelled"]},
+    "return_code": {"type": ["integer", "null"], "minimum": 0, "maximum": 4095},
+    "abend_code": {"type": ["string", "null"], "pattern": "^[A-Z0-9]{1,16}$"},
+    "active_step": {"type": ["string", "null"], "maxLength": 128},
+    "initiator": {"type": ["string", "null"], "pattern": "^[A-Z0-9@$#]{1,16}$"},
+    "steps": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "state", "attempt", "termination"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1, "maxLength": 128},
+          "state": {"enum": ["pending", "bypassed-restart", "skipped-condition", "allocating", "running", "disposing", "completed", "abended", "failed", "cancelled"]},
+          "attempt": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+          "termination": {
+            "oneOf": [
+              {"type": "null"},
+              {
+                "type": "object",
+                "required": ["kind"],
+                "properties": {
+                  "kind": {"enum": ["return-code", "abend", "cancelled", "failed"]},
+                  "code": {"type": ["integer", "string"]},
+                  "system": {"type": "boolean"},
+                  "reason": {"type": "string", "maxLength": 4096},
+                  "category": {"type": "string", "maxLength": 128}
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      }
+    },
+    "attempt": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+    "version": {"type": "integer", "minimum": 1},
+    "submit_key": {"type": "string", "pattern": "^[A-Za-z0-9._:/@-]{1,128}$"},
+    "plan": {"type": "object"},
+    "program_registrations": {
+      "type": "object",
+      "maxProperties": 4096,
+      "propertyNames": {"minLength": 1, "maxLength": 128},
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["schema_version", "program", "disposition", "handler"],
+        "properties": {
+          "schema_version": {"const": "mainframe-env.jes-utility-registry@1"},
+          "program": {"type": "string", "pattern": "^[A-Z0-9@$#_-]{1,128}$"},
+          "disposition": {
+            "type": ["string", "null"],
+            "enum": [null, "implemented", "cics-file-control", "network-ftp", "report-rexx", "db2-tso", "ims-controller"]
+          },
+          "handler": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind"],
+                "properties": {"kind": {"enum": ["program-service", "sdsf", "db2-tso", "ims-controller", "unsupported"]}}
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "handler"],
+                "properties": {
+                  "kind": {"const": "utility"},
+                  "handler": {"enum": ["iefbr14", "iebgener", "iebcopy", "iebcompr", "iebdg", "iebedit", "iebupdte", "idcams", "sort"]}
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "dataset_resolutions": {
+      "type": "object",
+      "maxProperties": 4096,
+      "propertyNames": {"minLength": 1, "maxLength": 256},
+      "additionalProperties": {"type": "string", "minLength": 1, "maxLength": 128}
+    },
+    "temporary_datasets": {
+      "type": "array",
+      "maxItems": 4096,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 128}
+    },
+    "spool_sequence": {"type": "integer", "minimum": 0},
+    "spool_files": {
+      "type": "object",
+      "maxProperties": 128,
+      "propertyNames": {"minLength": 1, "maxLength": 64},
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["schema_version", "id", "job_id", "step_name", "dd_name", "class", "destination", "writer", "forms", "record_count", "byte_count", "created_tick", "retain_until_tick", "state"],
+        "properties": {
+          "schema_version": {"const": "mainframe-env.jes-spool@1"},
+          "id": {"type": "string", "minLength": 1, "maxLength": 64},
+          "job_id": {"type": "string", "pattern": "^JOB[0-9]{5,8}$"},
+          "step_name": {"type": ["string", "null"], "maxLength": 128},
+          "dd_name": {"type": "string", "minLength": 1, "maxLength": 128},
+          "class": {"type": "string", "pattern": "^[A-Z0-9]$"},
+          "destination": {"type": "string", "minLength": 1, "maxLength": 128},
+          "writer": {"type": ["string", "null"], "maxLength": 128},
+          "forms": {"type": ["string", "null"], "maxLength": 128},
+          "record_count": {"type": "integer", "minimum": 0, "maximum": 262144},
+          "byte_count": {"type": "integer", "minimum": 0, "maximum": 268435456},
+          "created_tick": {"type": "integer", "minimum": 0},
+          "retain_until_tick": {"type": "integer", "minimum": 0},
+          "state": {"enum": ["open", "closed", "held", "released", "selected", "complete", "cancelled", "purged"]}
+        }
+      }
+    },
+    "output_groups": {
+      "type": "object",
+      "maxProperties": 128,
+      "propertyNames": {"minLength": 1, "maxLength": 64},
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["schema_version", "id", "job_id", "class", "destination", "writer", "forms", "copies", "retain_until_tick", "state", "spool_files"],
+        "properties": {
+          "schema_version": {"const": "mainframe-env.jes-output@1"},
+          "id": {"type": "string", "minLength": 1, "maxLength": 64},
+          "job_id": {"type": "string", "pattern": "^JOB[0-9]{5,8}$"},
+          "class": {"type": "string", "pattern": "^[A-Z0-9]$"},
+          "destination": {"type": "string", "minLength": 1, "maxLength": 128},
+          "writer": {"type": ["string", "null"], "maxLength": 128},
+          "forms": {"type": ["string", "null"], "maxLength": 128},
+          "copies": {"type": "integer", "minimum": 1, "maximum": 255},
+          "retain_until_tick": {"type": "integer", "minimum": 0},
+          "state": {"enum": ["awaiting-selection", "held", "released", "selected", "printing", "complete", "cancelled", "purged"]},
+          "spool_files": {"type": "array", "maxItems": 128, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 64}}
+        }
+      }
+    },
+    "spool": {
+      "type": "object",
+      "maxProperties": 128,
+      "additionalProperties": {
+        "type": "array",
+        "maxItems": 262144,
+        "items": {
+          "type": "array",
+          "maxItems": 1048576,
+          "items": {"type": "integer", "minimum": 0, "maximum": 255}
+        }
+      }
+    },
+    "events": {"type": "array", "maxItems": 65536, "items": {"type": "string", "minLength": 1, "maxLength": 4096}}
+  }
+}

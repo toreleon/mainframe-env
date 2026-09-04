@@ -7575,9 +7575,10 @@ async fn exercise_mq_authorization_routes(
     .map_err(|_| CorpusProblem::new("carddemo.authorization.jcl", "CBPAUP0J is not UTF-8"))?;
     let purge_job =
         submit_job_with_retcode(&server, &server.router(), &purge_jcl, "CC 0000").await?;
+    let spool_invocation = base_batch_control_invocation()?;
     let (purge_output, _) = server
         .batch_service()
-        .spool(&purge_job, "SYSPRINT", 0, 64)
+        .spool(&spool_invocation, &purge_job, "SYSPRINT", 0, 64)
         .map_err(terminal_problem)?;
     let purge_output = String::from_utf8_lossy(&purge_output.concat()).to_string();
     if !purge_output.contains("PROGRAM=CBPAUP0C")
@@ -8987,6 +8988,7 @@ async fn exercise_base_batch_routes(
     server
         .install_batch_programs(definitions)
         .map_err(terminal_problem)?;
+    let control_invocation = base_batch_control_invocation()?;
     let racf = server.racf_service();
     for object in carddemo_base_seed_objects(corpus_dir)? {
         racf.permit(
@@ -9106,7 +9108,7 @@ async fn exercise_base_batch_routes(
     }
     if server
         .batch_service()
-        .spool(&close_id, "CMDOUT", 0, 16)
+        .spool(&control_invocation, &close_id, "CMDOUT", 0, 16)
         .map_err(terminal_problem)?
         .0
         != [
@@ -9276,7 +9278,7 @@ async fn exercise_base_batch_routes(
     }
     if server
         .batch_service()
-        .spool(&open_id, "CMDOUT", 0, 16)
+        .spool(&control_invocation, &open_id, "CMDOUT", 0, 16)
         .map_err(terminal_problem)?
         .0
         != [
@@ -9331,7 +9333,6 @@ async fn exercise_base_batch_routes(
             .to_string(),
     );
 
-    let control_invocation = base_batch_control_invocation()?;
     let cancelled = server
         .batch_service()
         .submit(
@@ -9477,17 +9478,22 @@ fn base_batch_job_headers() -> BTreeMap<String, String> {
 
 fn base_batch_control_invocation() -> Result<Invocation, CorpusProblem> {
     let limits = InvocationLimits::default();
-    let grants = ["host.security.authorize", "host.program.invoke"]
-        .into_iter()
-        .map(|capability| {
-            CapabilityId::new(capability, limits).map_err(|_| {
-                CorpusProblem::new(
-                    "carddemo.base_batch.control_invalid",
-                    "control capability is invalid",
-                )
-            })
+    let grants = [
+        "host.security.authorize",
+        "host.program.invoke",
+        "host.spool.read",
+        "host.spool.write",
+    ]
+    .into_iter()
+    .map(|capability| {
+        CapabilityId::new(capability, limits).map_err(|_| {
+            CorpusProblem::new(
+                "carddemo.base_batch.control_invalid",
+                "control capability is invalid",
+            )
         })
-        .collect::<Result<BTreeSet<_>, _>>()?;
+    })
+    .collect::<Result<BTreeSet<_>, _>>()?;
     Invocation::new(
         RequestId::new("carddemo-base-batch-control-request", limits)
             .expect("static control request"),
@@ -9523,15 +9529,16 @@ fn base_batch_control_invocation() -> Result<Invocation, CorpusProblem> {
 }
 
 fn base_batch_spool_text(server: &ProductServer, id: &str) -> Result<String, CorpusProblem> {
+    let invocation = base_batch_control_invocation()?;
     let mut text = String::new();
     for (_, name, records, _) in server
         .batch_service()
-        .spool_files(id)
+        .spool_files(&invocation, id)
         .map_err(terminal_problem)?
     {
         let (values, more) = server
             .batch_service()
-            .spool(id, &name, 0, records.max(1))
+            .spool(&invocation, id, &name, 0, records.max(1))
             .map_err(terminal_problem)?;
         if more {
             return Err(CorpusProblem::new(
@@ -9746,6 +9753,7 @@ fn base_batch_spool_digests(
     server: &ProductServer,
     job_ids: &BTreeMap<String, String>,
 ) -> Result<BTreeMap<String, String>, CorpusProblem> {
+    let invocation = base_batch_control_invocation()?;
     let mut observations = BTreeMap::new();
     for (label, id) in job_ids {
         let job = server.batch_service().get(id).map_err(terminal_problem)?;
@@ -9772,13 +9780,13 @@ fn base_batch_spool_digests(
         );
         for (_, name, records, _) in server
             .batch_service()
-            .spool_files(id)
+            .spool_files(&invocation, id)
             .map_err(terminal_problem)?
         {
             digest_field(&mut digest, name.as_bytes());
             let (values, more) = server
                 .batch_service()
-                .spool(id, &name, 0, records.max(1))
+                .spool(&invocation, id, &name, 0, records.max(1))
                 .map_err(terminal_problem)?;
             if more {
                 return Err(CorpusProblem::new(
@@ -10311,7 +10319,13 @@ async fn exercise_batch_program_routes(
         })?;
     let (output, _) = server
         .batch_service()
-        .spool(&link_job.id, "SYSPRINT", 0, 64)
+        .spool(
+            &base_batch_control_invocation()?,
+            &link_job.id,
+            "SYSPRINT",
+            0,
+            64,
+        )
         .map_err(terminal_problem)?;
     if !output.iter().any(|record| record == b"00")
         || !output.iter().any(|record| record.starts_with(b"ABCD"))
@@ -10837,6 +10851,7 @@ async fn submit_job_with_retcode(
     }
     let job: serde_json::Value = serde_json::from_slice(&body)
         .map_err(|error| CorpusProblem::new("carddemo.utility.job_failed", error.to_string()))?;
+    let spool_invocation = base_batch_control_invocation()?;
     if job["status"] != "OUTPUT" || job["retcode"] != expected_retcode {
         let detail = job["jobid"].as_str().map_or_else(BTreeMap::new, |id| {
             [
@@ -10846,7 +10861,7 @@ async fn submit_job_with_retcode(
             .filter_map(|name| {
                 server
                     .batch_service()
-                    .spool(id, name, 0, 4096)
+                    .spool(&spool_invocation, id, name, 0, 4096)
                     .ok()
                     .map(|(records, _)| {
                         (

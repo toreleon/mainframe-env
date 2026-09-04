@@ -6,31 +6,48 @@ use crate::controller::{
     ResolvedBatchController,
 };
 use crate::program::{
-    ProgramExecution, TsoProgramExecution, program_execution, tso_program_execution,
+    ProgramRegistration, RegisteredProgramHandler, TsoProgramExecution,
+    resolve_program_registration, tso_program_execution,
 };
 use crate::{
     BatchControllerGeneration, BatchControllerInstallReceipt, BatchControllerPlan,
-    BatchControllerSelector, Disposition, JclBundle, JclLimits, JobPlan, ProgramInput, StepPlan,
-    decode_program_output, parse_jcl,
+    BatchControllerSelector, CancellationState, DdAllocationPlan, DdDispositionPlan, DdSourceKind,
+    DdStatusDisposition, DdTerminalDisposition, JES_DURABLE_JOB_CONTRACT, JES_OUTPUT_CONTRACT,
+    JES_SPOOL_CONTRACT, JclBundle, JclLimits, JesCancellation, JesCheckpoint, JesJobKind,
+    JesJobRoute, JesOutputGroup, JesOutputState, JesSchedulerConfiguration, JesSpoolDescriptor,
+    JesSpoolState, JesSubmissionOrigin, JesTopology, JobPlan, JobSelectionCandidate, JobState,
+    ProgramExecutionContext, ProgramInput, StepExecution, StepPlan, StepState, StepTermination,
+    decode_program_output, parse_jcl, plan_dd_allocations, select_job,
 };
 use mainframe_env_execution_api::{
-    BoundedPayload, IdempotencyKey, Invocation, InvocationLimits, PrincipalId,
+    ArtifactRef, BoundedPayload, ExecutionId, IdempotencyKey, Invocation, InvocationLimits,
+    PrincipalId, RunUnitId,
 };
 use mainframe_env_host_api::{
     AccessIntent, CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest,
-    DatasetAttributes, DatasetName, DatasetOrganization, DatasetRequest, DatasetResult,
+    DatasetAttributes, DatasetDefinition, DatasetLifecycleState, DatasetLockMode,
+    DatasetLockTarget, DatasetName, DatasetOrganization, DatasetRequest, DatasetResult,
     Db2Operation, Db2Request, EffectRequest, HostProblem, HostRequest, HostResult, ImsOperation,
-    ImsQualifier, ImsRequest, MemberName, Mutation, ProgramName, ProgramRequest, RecordFormat,
-    ResourceName, ScopedHostService, SecurityDecision, SecurityRequest,
+    ImsQualifier, ImsRequest, JobName, MemberName, Mutation, ProgramName, ProgramRequest,
+    RecordFormat, ResourceName, ScopedHostService, SecurityDecision, SecurityRequest, SpoolRequest,
+    SpoolResult,
 };
-use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
+use mainframe_env_store_api::{
+    CheckpointRecord, CheckpointStore, ProviderStateRecord, ProviderStateStore, StoreError,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
 
 const CONTROLLER_STATE_NAMESPACE: &str = "batch-controller-state";
 const CONTROLLER_STATE_KEY: &str = "registry";
+const SCHEDULER_STATE_NAMESPACE: &str = "jes-scheduler";
+const TOPOLOGY_STATE_NAMESPACE: &str = "jes-topology";
+const CONFIGURATION_STATE_KEY: &str = "configuration";
+const MAX_DURABLE_JOB_EVENTS: usize = 65_536;
+const MAX_JOB_EVENT_BYTES: usize = 4_096;
+const MAX_JOB_NUMBER: u64 = 99_999_999;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BatchLimits {
@@ -40,6 +57,9 @@ pub struct BatchLimits {
     pub max_spool_files: usize,
     pub max_spool_records: usize,
     pub max_spool_bytes: usize,
+    pub spool_retention_ticks: u64,
+    pub max_nje_nodes: usize,
+    pub max_mas_members: usize,
     pub max_events: usize,
     pub max_attempts: u32,
 }
@@ -53,21 +73,13 @@ impl Default for BatchLimits {
             max_spool_files: 128,
             max_spool_records: 262_144,
             max_spool_bytes: 256 * 1024 * 1024,
+            spool_retention_ticks: 86_400,
+            max_nje_nodes: 256,
+            max_mas_members: 4_096,
             max_events: 65536,
             max_attempts: 3,
         }
     }
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub enum JobState {
-    Submitted,
-    Held,
-    Queued,
-    Running,
-    Completed,
-    Failed,
-    Cancelled,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -81,15 +93,35 @@ pub struct JobSnapshot {
     pub return_code: Option<i32>,
     pub abend_code: Option<String>,
     pub active_step: Option<String>,
+    pub initiator: Option<String>,
+    pub steps: Vec<StepExecution>,
     pub attempt: u32,
     pub version: u64,
+    pub kind: JesJobKind,
+    pub origin: JesSubmissionOrigin,
+    pub route: JesJobRoute,
+    pub cancellation: Option<JesCancellation>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct Job {
+    #[serde(default = "legacy_jes_job_contract")]
+    schema_version: String,
     id: String,
     name: String,
     owner: String,
+    #[serde(default)]
+    kind: JesJobKind,
+    #[serde(default)]
+    origin: JesSubmissionOrigin,
+    #[serde(default)]
+    route: JesJobRoute,
+    #[serde(default)]
+    cancellation: Option<JesCancellation>,
+    #[serde(default)]
+    purge_pending: bool,
+    #[serde(default)]
+    effect_sequence: u64,
     class: char,
     priority: u8,
     state: JobState,
@@ -97,12 +129,39 @@ struct Job {
     #[serde(default)]
     abend_code: Option<String>,
     active_step: Option<String>,
+    #[serde(default)]
+    initiator: Option<String>,
+    #[serde(default)]
+    steps: Vec<StepExecution>,
     attempt: u32,
     version: u64,
     submit_key: String,
     plan: JobPlan,
+    #[serde(default)]
+    program_registrations: BTreeMap<String, ProgramRegistration>,
+    #[serde(default)]
+    dataset_resolutions: BTreeMap<String, String>,
+    #[serde(default)]
+    temporary_datasets: Vec<String>,
+    #[serde(default)]
+    spool_sequence: u64,
+    #[serde(default)]
+    spool_files: BTreeMap<String, JesSpoolDescriptor>,
+    #[serde(default)]
+    output_groups: BTreeMap<String, JesOutputGroup>,
+    #[serde(default)]
     spool: BTreeMap<String, Vec<Vec<u8>>>,
     events: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+struct DdRuntimeAllocation {
+    ordinal: usize,
+    dataset: DatasetName,
+    member: Option<MemberName>,
+    disposition: DdDispositionPlan,
+    lock_id: Option<String>,
+    lock_owner: PrincipalId,
 }
 
 struct State {
@@ -116,11 +175,24 @@ struct DurableControllers {
     registry: BatchControllerRegistry,
 }
 
+struct DurableScheduler {
+    store_version: u64,
+    configuration: JesSchedulerConfiguration,
+}
+
+struct DurableTopology {
+    store_version: u64,
+    configuration: JesTopology,
+}
+
 pub struct BatchService {
     host: Arc<ScopedHostService>,
     store: Arc<dyn ProviderStateStore>,
+    checkpoint_store: Option<Arc<dyn CheckpointStore>>,
     jcl_limits: JclLimits,
     limits: BatchLimits,
+    scheduler: Mutex<DurableScheduler>,
+    topology: Mutex<DurableTopology>,
     controllers: Mutex<DurableControllers>,
     state: Mutex<State>,
 }
@@ -132,27 +204,148 @@ impl BatchService {
         jcl_limits: JclLimits,
         limits: BatchLimits,
     ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_with_scheduler(
+            host,
+            store,
+            jcl_limits,
+            limits,
+            JesSchedulerConfiguration::single_node(limits.max_active),
+        )
+    }
+
+    pub fn open_with_scheduler(
+        host: Arc<ScopedHostService>,
+        store: Arc<dyn ProviderStateStore>,
+        jcl_limits: JclLimits,
+        limits: BatchLimits,
+        scheduler: JesSchedulerConfiguration,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_configured(host, store, None, jcl_limits, limits, scheduler)
+    }
+
+    pub fn open_with_checkpoint_store(
+        host: Arc<ScopedHostService>,
+        store: Arc<dyn ProviderStateStore>,
+        checkpoint_store: Arc<dyn CheckpointStore>,
+        jcl_limits: JclLimits,
+        limits: BatchLimits,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_configured(
+            host,
+            store,
+            Some(checkpoint_store),
+            jcl_limits,
+            limits,
+            JesSchedulerConfiguration::single_node(limits.max_active),
+        )
+    }
+
+    fn open_configured(
+        host: Arc<ScopedHostService>,
+        store: Arc<dyn ProviderStateStore>,
+        checkpoint_store: Option<Arc<dyn CheckpointStore>>,
+        jcl_limits: JclLimits,
+        limits: BatchLimits,
+        scheduler: JesSchedulerConfiguration,
+    ) -> Result<Arc<Self>, HostProblem> {
+        scheduler.validate()?;
+        if limits.max_nje_nodes == 0
+            || limits.max_mas_members == 0
+            || !(4..=MAX_DURABLE_JOB_EVENTS).contains(&limits.max_events)
+            || limits.max_attempts == 0
+        {
+            return Err(HostProblem::Malformed);
+        }
         let mut jobs = BTreeMap::new();
         let mut replay = BTreeMap::new();
-        for row in store
-            .list_provider_state("jes-job", limits.max_jobs)
-            .map_err(store_error)?
-        {
+        let durable_jobs = store
+            .list_provider_state(
+                "jes-job",
+                limits
+                    .max_jobs
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?,
+            )
+            .map_err(store_error)?;
+        if durable_jobs.len() > limits.max_jobs {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let mut durable_ids = BTreeSet::new();
+        let mut durable_submit_keys = BTreeSet::new();
+        let mut highest_job_number = 0u64;
+        for row in durable_jobs {
             let mut job: Job = serde_json::from_slice(&row.payload)
                 .map_err(|_| HostProblem::InfrastructureFailure)?;
-            if job.version != row.version {
+            let job_number = durable_job_number(&job.id)?;
+            if row.namespace != "jes-job"
+                || row.key != job.id
+                || job.version != row.version
+                || !durable_ids.insert(job.id.clone())
+                || !durable_submit_keys.insert(job.submit_key.clone())
+            {
                 return Err(HostProblem::InfrastructureFailure);
             }
-            if job.state == JobState::Running {
-                let previous = job.version;
-                job.version += 1;
+            highest_job_number = highest_job_number.max(job_number);
+            if !matches!(
+                job.schema_version.as_str(),
+                "mainframe-env.jes-durable-job@1" | JES_DURABLE_JOB_CONTRACT
+            ) {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            ensure_job_event_capacity(&job, limits.max_events, 0)?;
+            let previous = job.version;
+            let mut changed = false;
+            if job.schema_version != JES_DURABLE_JOB_CONTRACT {
+                job.schema_version = JES_DURABLE_JOB_CONTRACT.into();
+                if job.steps.is_empty() {
+                    job.steps = initial_step_executions(&job.plan);
+                }
+                push_job_event(
+                    &mut job,
+                    limits.max_events,
+                    "migrated:jes-durable-job@1-to-2",
+                )?;
+                changed = true;
+            }
+            if job.program_registrations.is_empty() {
+                job.program_registrations = resolve_plan_programs(&job.plan)?;
+                push_job_event(
+                    &mut job,
+                    limits.max_events,
+                    "migrated:program-registrations",
+                )?;
+                changed = true;
+            } else {
+                validate_plan_programs(&job.plan, &job.program_registrations)?;
+            }
+            validate_durable_job_shape(&job, jcl_limits, limits)?;
+            if matches!(job.state, JobState::Selected | JobState::Running) {
+                job.version = next_job_version(job.version)?;
                 job.state = if job.attempt >= limits.max_attempts {
                     JobState::Failed
                 } else {
                     JobState::Queued
                 };
                 job.active_step = None;
-                job.events.push("warm-start-recovered".into());
+                job.initiator = None;
+                for step in &mut job.steps {
+                    if !step.state.terminal() {
+                        step.state = StepState::Pending;
+                        step.termination = None;
+                    }
+                }
+                push_job_event(&mut job, limits.max_events, "warm-start-recovered")?;
+                changed = true;
+            } else if job.state == JobState::Output {
+                job.version = next_job_version(job.version)?;
+                job.state = JobState::Completed;
+                job.initiator = None;
+                push_job_event(&mut job, limits.max_events, "warm-start-output-completed")?;
+                changed = true;
+            } else if changed {
+                job.version = next_job_version(job.version)?;
+            }
+            if changed {
                 store
                     .put_provider_state(job_record(&job)?, Some(previous))
                     .map_err(store_error)?;
@@ -175,6 +368,12 @@ impl BatchService {
             })
             .transpose()?
             .unwrap_or(1);
+        if !(1..=MAX_JOB_NUMBER + 1).contains(&next_id) {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        if next_id <= highest_job_number {
+            return Err(HostProblem::InfrastructureFailure);
+        }
         let (controller_store_version, controller_registry) = match store
             .get_provider_state(CONTROLLER_STATE_NAMESPACE, CONTROLLER_STATE_KEY)
             .map_err(store_error)?
@@ -194,11 +393,63 @@ impl BatchService {
             }
             None => (0, BatchControllerRegistry::default()),
         };
+        let (scheduler_store_version, scheduler) = match store
+            .get_provider_state(SCHEDULER_STATE_NAMESPACE, CONFIGURATION_STATE_KEY)
+            .map_err(store_error)?
+        {
+            Some(record) => {
+                let configuration: JesSchedulerConfiguration =
+                    serde_json::from_slice(&record.payload)
+                        .map_err(|_| HostProblem::InfrastructureFailure)?;
+                configuration.validate()?;
+                (record.version, configuration)
+            }
+            None => (0, scheduler),
+        };
+        let (topology_store_version, topology) = match store
+            .get_provider_state(TOPOLOGY_STATE_NAMESPACE, CONFIGURATION_STATE_KEY)
+            .map_err(store_error)?
+        {
+            Some(record) => {
+                let configuration: JesTopology = serde_json::from_slice(&record.payload)
+                    .map_err(|_| HostProblem::InfrastructureFailure)?;
+                configuration.validate(limits.max_nje_nodes, limits.max_mas_members)?;
+                (record.version, configuration)
+            }
+            None => {
+                let configuration = JesTopology::single_node(limits.max_active);
+                configuration.validate(limits.max_nje_nodes, limits.max_mas_members)?;
+                (0, configuration)
+            }
+        };
+        for job in jobs.values().filter(|job| !job.state.terminal()) {
+            topology.validate_route(&job.route)?;
+        }
+        if let Some(checkpoints) = &checkpoint_store {
+            for job in jobs.values() {
+                let execution_id = checkpoint_execution_id(&job.id)?;
+                if let Some(record) = checkpoints
+                    .get_checkpoint(&execution_id)
+                    .map_err(store_error)?
+                {
+                    validate_checkpoint_record(job, &record)?;
+                }
+            }
+        }
         Ok(Arc::new(Self {
             host,
             store,
+            checkpoint_store,
             jcl_limits,
             limits,
+            scheduler: Mutex::new(DurableScheduler {
+                store_version: scheduler_store_version,
+                configuration: scheduler,
+            }),
+            topology: Mutex::new(DurableTopology {
+                store_version: topology_store_version,
+                configuration: topology,
+            }),
             controllers: Mutex::new(DurableControllers {
                 store_version: controller_store_version,
                 registry: controller_registry,
@@ -248,31 +499,143 @@ impl BatchService {
         key: &IdempotencyKey,
         hold: bool,
     ) -> Result<JobSnapshot, HostProblem> {
+        self.submit_with_origin(
+            invocation,
+            bundle,
+            key,
+            hold,
+            JesJobKind::Batch,
+            JesSubmissionOrigin::External,
+        )
+    }
+
+    pub fn start_task(
+        &self,
+        invocation: &Invocation,
+        task_name: &str,
+        bundle: &JclBundle,
+        key: &IdempotencyKey,
+    ) -> Result<JobSnapshot, HostProblem> {
+        validate_jes_name(task_name)?;
+        self.submit_with_origin(
+            invocation,
+            bundle,
+            key,
+            false,
+            JesJobKind::StartedTask,
+            JesSubmissionOrigin::StartedTask {
+                task_name: task_name.to_ascii_uppercase(),
+            },
+        )
+    }
+
+    fn submit_internal_reader(
+        &self,
+        invocation: &Invocation,
+        parent_job_id: &str,
+        step_name: &str,
+        bundle: &JclBundle,
+        key: &IdempotencyKey,
+    ) -> Result<JobSnapshot, HostProblem> {
+        self.submit_with_origin(
+            invocation,
+            bundle,
+            key,
+            false,
+            JesJobKind::Batch,
+            JesSubmissionOrigin::InternalReader {
+                parent_job_id: parent_job_id.into(),
+                step_name: step_name.into(),
+            },
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn submit_with_origin(
+        &self,
+        invocation: &Invocation,
+        bundle: &JclBundle,
+        key: &IdempotencyKey,
+        hold: bool,
+        kind: JesJobKind,
+        origin: JesSubmissionOrigin,
+    ) -> Result<JobSnapshot, HostProblem> {
         let plan = parse_jcl(bundle, self.jcl_limits)?;
+        let (security_class, resource) = match &origin {
+            JesSubmissionOrigin::External => ("JESJOBS", format!("JOB.{}", plan.name)),
+            JesSubmissionOrigin::InternalReader { parent_job_id, .. } => {
+                ("JESJOBS", format!("JOB.{parent_job_id}.INTRDR"))
+            }
+            JesSubmissionOrigin::StartedTask { task_name } => {
+                ("STARTED", format!("{task_name}.{}", plan.name))
+            }
+        };
         self.authorize(
             invocation,
-            "JESJOBS",
-            &format!("JOB.{}", plan.name),
+            security_class,
+            &resource,
             AccessIntent::Execute,
             1,
         )?;
+        let class = self
+            .scheduler
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .configuration
+            .classes
+            .get(&plan.class)
+            .cloned()
+            .ok_or(HostProblem::UnsupportedCapability {
+                capability: "jes.class".into(),
+                detail: format!("job class {} is not configured", plan.class),
+            })?;
+        if plan.priority < class.priority_floor || plan.priority > class.priority_ceiling {
+            return Err(HostProblem::Condition {
+                name: "PRIORITY_OUT_OF_CLASS_RANGE".into(),
+                response: 400,
+                response2: 0,
+            });
+        }
+        let route = self.default_route()?;
+        let topology = self.topology()?;
+        let inbound_limit = topology
+            .nodes
+            .get(&route.execution_node)
+            .ok_or(HostProblem::InfrastructureFailure)?
+            .max_inbound_jobs;
         let mut state = self.lock()?;
         if let Some(id) = state.replay.get(key.as_str()) {
             let job = state.jobs.get(id).ok_or(HostProblem::UnknownOutcome)?;
-            return if job.plan == plan && job.owner == invocation.principal.id().as_str() {
+            return if job.plan == plan
+                && job.owner == invocation.principal.id().as_str()
+                && job.kind == kind
+                && job.origin == origin
+            {
                 Ok(snapshot(job))
             } else {
                 Err(HostProblem::IdempotencyConflict)
             };
         }
-        if state.jobs.len() >= self.limits.max_jobs
+        if self.limits.max_events < 4
+            || state.jobs.len() >= self.limits.max_jobs
             || state
                 .jobs
                 .values()
                 .filter(|job| job.state == JobState::Queued)
                 .count()
                 >= self.limits.max_queued
+            || state
+                .jobs
+                .values()
+                .filter(|job| {
+                    !job.state.terminal() && job.route.execution_node == route.execution_node
+                })
+                .count()
+                >= inbound_limit
         {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        if state.next_id > MAX_JOB_NUMBER {
             return Err(HostProblem::ResourceExhausted);
         }
         let id = format!("JOB{:05}", state.next_id);
@@ -282,26 +645,36 @@ impl BatchService {
             .checked_add(1)
             .ok_or(HostProblem::ResourceExhausted)?;
         self.persist_meta(state.next_id, previous_meta)?;
-        let mut spool = BTreeMap::new();
-        spool.insert(
-            "JESJCL".into(),
-            plan.source
-                .lines()
-                .map(|line| line.as_bytes().to_vec())
-                .collect(),
-        );
-        spool.insert(
-            "JESMSGLG".into(),
-            vec![format!("{id} SUBMITTED").into_bytes()],
-        );
-        spool.insert("JOBLOG".into(), vec![format!("{id} ADMITTED").into_bytes()]);
-        let job = Job {
+        let jcl_records = plan
+            .source
+            .lines()
+            .map(|line| line.as_bytes().to_vec())
+            .collect();
+        let program_registrations = resolve_plan_programs(&plan)?;
+        let origin_event = match &origin {
+            JesSubmissionOrigin::External => "origin:external".into(),
+            JesSubmissionOrigin::InternalReader {
+                parent_job_id,
+                step_name,
+            } => format!("origin:internal-reader:{parent_job_id}:{step_name}"),
+            JesSubmissionOrigin::StartedTask { task_name } => {
+                format!("origin:started-task:{task_name}")
+            }
+        };
+        let mut job = Job {
+            schema_version: JES_DURABLE_JOB_CONTRACT.into(),
             id: id.clone(),
             name: plan.name.clone(),
             owner: invocation.principal.id().as_str().into(),
+            kind,
+            origin,
+            route,
+            cancellation: None,
+            purge_pending: false,
+            effect_sequence: 0,
             class: plan.class,
             priority: plan.priority,
-            state: if hold {
+            state: if hold || class.held_by_default {
                 JobState::Held
             } else {
                 JobState::Queued
@@ -309,35 +682,89 @@ impl BatchService {
             return_code: None,
             abend_code: None,
             active_step: None,
+            initiator: None,
+            steps: initial_step_executions(&plan),
             attempt: 0,
             version: 1,
             submit_key: key.as_str().into(),
             plan,
-            spool,
+            program_registrations,
+            dataset_resolutions: BTreeMap::new(),
+            temporary_datasets: Vec::new(),
+            spool_sequence: 0,
+            spool_files: BTreeMap::new(),
+            output_groups: BTreeMap::new(),
+            spool: BTreeMap::new(),
             events: vec![
                 "submitted".into(),
                 "admitted".into(),
-                if hold { "held" } else { "queued" }.into(),
+                origin_event,
+                if hold || class.held_by_default {
+                    "held"
+                } else {
+                    "queued"
+                }
+                .into(),
             ],
         };
-        self.persist_job(&job, None)?;
+        if let Err(problem) = (|| {
+            self.append_spool_records(invocation, &mut job, None, None, "JESJCL", jcl_records)?;
+            self.append_spool_records(
+                invocation,
+                &mut job,
+                None,
+                None,
+                "JESMSGLG",
+                vec![format!("{id} SUBMITTED").into_bytes()],
+            )?;
+            self.append_spool_records(
+                invocation,
+                &mut job,
+                None,
+                None,
+                "JOBLOG",
+                vec![format!("{id} ADMITTED").into_bytes()],
+            )
+        })() {
+            let _ = self.purge_spool_authority(invocation, &mut job);
+            return Err(problem);
+        }
+        if let Err(problem) = self.persist_job(&job, None) {
+            return match self.purge_spool_authority(invocation, &mut job) {
+                Ok(SpoolResult::Mutated { .. }) => Err(problem),
+                Ok(SpoolResult::PurgePending { .. }) | Err(_) => Err(HostProblem::UnknownOutcome),
+                Ok(_) => Err(HostProblem::ProviderFailure),
+            };
+        }
         let result = snapshot(&job);
         state.replay.insert(key.as_str().into(), id.clone());
         state.jobs.insert(id, job);
         Ok(result)
     }
 
-    pub fn hold(&self, id: &str) -> Result<JobSnapshot, HostProblem> {
-        self.transition(id, JobState::Queued, JobState::Held, "held")
+    pub fn hold(&self, invocation: &Invocation, id: &str) -> Result<JobSnapshot, HostProblem> {
+        self.transition(invocation, id, JobState::Queued, JobState::Held, "held")
     }
 
-    pub fn release(&self, id: &str) -> Result<JobSnapshot, HostProblem> {
-        self.transition(id, JobState::Held, JobState::Queued, "released")
+    pub fn release(&self, invocation: &Invocation, id: &str) -> Result<JobSnapshot, HostProblem> {
+        self.transition(invocation, id, JobState::Held, JobState::Queued, "released")
     }
 
-    pub fn cancel(&self, id: &str) -> Result<JobSnapshot, HostProblem> {
+    pub fn cancel(&self, invocation: &Invocation, id: &str) -> Result<JobSnapshot, HostProblem> {
+        let requested_cancellation = invocation.cancellation.clone();
+        let mut finalization = invocation.clone();
+        finalization.cancellation = None;
+        let invocation = &finalization;
+        self.ensure_spool_migrated(invocation, id)?;
         let mut state = self.lock()?;
         let current = state.jobs.get(id).cloned().ok_or(HostProblem::NotFound)?;
+        self.authorize(
+            invocation,
+            "JESJOBS",
+            &format!("JOB.{}", current.name),
+            AccessIntent::Alter,
+            1,
+        )?;
         if !matches!(
             current.state,
             JobState::Queued | JobState::Held | JobState::Running
@@ -348,16 +775,287 @@ impl BatchService {
                 response2: 0,
             });
         }
+        ensure_job_event_capacity(&current, self.limits.max_events, 1)?;
         let mut next = current.clone();
-        next.version += 1;
+        next.version = next_job_version(next.version)?;
         next.state = JobState::Cancelled;
         next.active_step = None;
-        next.events.push("cancelled".into());
-        append_spool(&mut next, "JESMSGLG", b"CANCELLED".to_vec(), self.limits)?;
+        next.cancellation = Some(JesCancellation {
+            id: format!("{}-CANCEL-{}", next.id, next.version),
+            requested_by: invocation.principal.id().as_str().into(),
+            reason: requested_cancellation.as_ref().map_or_else(
+                || "operator cancellation".into(),
+                |value| value.reason.clone(),
+            ),
+            requested_tick: requested_cancellation
+                .as_ref()
+                .map_or(0, |value| value.requested_at_tick),
+            state: CancellationState::Completed,
+        });
+        push_job_event(&mut next, self.limits.max_events, "cancelled")?;
+        self.append_spool_records(
+            invocation,
+            &mut next,
+            None,
+            None,
+            "JESMSGLG",
+            vec![b"CANCELLED".to_vec()],
+        )?;
+        self.cancel_output(invocation, &mut next)?;
         self.persist_job(&next, Some(current.version))?;
         let result = snapshot(&next);
-        state.jobs.insert(id.into(), next);
+        state.jobs.insert(id.into(), next.clone());
+        self.persist_checkpoint(&next, next.effect_sequence)?;
         Ok(result)
+    }
+
+    pub fn stop_task(
+        &self,
+        invocation: &Invocation,
+        task_name: &str,
+        id: &str,
+    ) -> Result<JobSnapshot, HostProblem> {
+        validate_jes_name(task_name)?;
+        let job = self
+            .lock()?
+            .jobs
+            .get(id)
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
+        if job.kind != JesJobKind::StartedTask
+            || !matches!(
+                &job.origin,
+                JesSubmissionOrigin::StartedTask { task_name: current }
+                    if current.eq_ignore_ascii_case(task_name)
+            )
+        {
+            return Err(HostProblem::NotFound);
+        }
+        self.authorize(
+            invocation,
+            "STARTED",
+            &format!("{}.{}", task_name.to_ascii_uppercase(), job.name),
+            AccessIntent::Control,
+            1,
+        )?;
+        self.cancel(invocation, id)
+    }
+
+    pub fn change_class(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+        class: char,
+    ) -> Result<JobSnapshot, HostProblem> {
+        let definition = self
+            .scheduler
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .configuration
+            .classes
+            .get(&class)
+            .cloned()
+            .ok_or(HostProblem::UnsupportedCapability {
+                capability: "jes.class".into(),
+                detail: format!("job class {class} is not configured"),
+            })?;
+        self.mutate_queued_job(invocation, id, "class-changed", |job| {
+            if job.priority < definition.priority_floor
+                || job.priority > definition.priority_ceiling
+            {
+                return Err(HostProblem::Condition {
+                    name: "PRIORITY_OUT_OF_CLASS_RANGE".into(),
+                    response: 400,
+                    response2: 0,
+                });
+            }
+            job.class = class;
+            Ok(())
+        })
+    }
+
+    pub fn change_priority(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+        priority: u8,
+    ) -> Result<JobSnapshot, HostProblem> {
+        let scheduler = self
+            .scheduler
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .configuration
+            .clone();
+        self.mutate_queued_job(invocation, id, "priority-changed", |job| {
+            let definition = scheduler
+                .classes
+                .get(&job.class)
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            if priority < definition.priority_floor || priority > definition.priority_ceiling {
+                return Err(HostProblem::Condition {
+                    name: "PRIORITY_OUT_OF_CLASS_RANGE".into(),
+                    response: 400,
+                    response2: 0,
+                });
+            }
+            job.priority = priority;
+            Ok(())
+        })
+    }
+
+    pub fn topology(&self) -> Result<JesTopology, HostProblem> {
+        Ok(self
+            .topology
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .configuration
+            .clone())
+    }
+
+    pub fn checkpoint(&self, id: &str) -> Result<Option<JesCheckpoint>, HostProblem> {
+        let job = self
+            .lock()?
+            .jobs
+            .get(id)
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
+        let Some(store) = &self.checkpoint_store else {
+            return Ok(None);
+        };
+        store
+            .get_checkpoint(&checkpoint_execution_id(id)?)
+            .map_err(store_error)?
+            .map(|record| {
+                validate_checkpoint_record(&job, &record)?;
+                serde_json::from_slice(&record.payload)
+                    .map_err(|_| HostProblem::InfrastructureFailure)
+            })
+            .transpose()
+    }
+
+    pub fn install_topology(
+        &self,
+        invocation: &Invocation,
+        configuration: JesTopology,
+    ) -> Result<(), HostProblem> {
+        configuration.validate(self.limits.max_nje_nodes, self.limits.max_mas_members)?;
+        self.authorize(
+            invocation,
+            "OPERCMDS",
+            "JES2.TOPOLOGY",
+            AccessIntent::Alter,
+            1,
+        )?;
+        {
+            let state = self.lock()?;
+            let mut inbound = BTreeMap::<String, usize>::new();
+            for job in state.jobs.values().filter(|job| !job.state.terminal()) {
+                configuration.validate_route(&job.route)?;
+                let count = inbound.entry(job.route.execution_node.clone()).or_default();
+                *count = count.checked_add(1).ok_or(HostProblem::ResourceExhausted)?;
+            }
+            for (node, count) in inbound {
+                if count
+                    > configuration
+                        .nodes
+                        .get(&node)
+                        .ok_or(HostProblem::InfrastructureFailure)?
+                        .max_inbound_jobs
+                {
+                    return Err(HostProblem::ResourceExhausted);
+                }
+            }
+        }
+        let mut durable = self
+            .topology
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let version = durable
+            .store_version
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: TOPOLOGY_STATE_NAMESPACE.into(),
+                    key: CONFIGURATION_STATE_KEY.into(),
+                    version,
+                    payload: serde_json::to_vec(&configuration)
+                        .map_err(|_| HostProblem::InfrastructureFailure)?,
+                },
+                (durable.store_version > 0).then_some(durable.store_version),
+            )
+            .map_err(store_error)?;
+        durable.store_version = version;
+        durable.configuration = configuration;
+        Ok(())
+    }
+
+    pub fn route_job(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+        execution_node: &str,
+        output_node: &str,
+    ) -> Result<JobSnapshot, HostProblem> {
+        let execution_node = execution_node.to_ascii_uppercase();
+        let output_node = output_node.to_ascii_uppercase();
+        let topology = self.topology()?;
+        let inbound_limit = topology
+            .nodes
+            .get(&execution_node)
+            .ok_or(HostProblem::NotFound)?
+            .max_inbound_jobs;
+        if self
+            .lock()?
+            .jobs
+            .values()
+            .filter(|job| {
+                job.id != id && !job.state.terminal() && job.route.execution_node == execution_node
+            })
+            .count()
+            >= inbound_limit
+        {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        self.mutate_queued_job(invocation, id, "job-routed", |job| {
+            let previous_output_node = job.route.output_node.clone();
+            let route = JesJobRoute {
+                origin_node: job.route.origin_node.clone(),
+                execution_node: execution_node.clone(),
+                output_node: output_node.clone(),
+                owner_member: None,
+            };
+            topology.validate_route(&route)?;
+            job.route = route;
+            for descriptor in job.spool_files.values_mut() {
+                if descriptor.destination == previous_output_node {
+                    descriptor.destination.clone_from(&output_node);
+                }
+            }
+            for group in job.output_groups.values_mut() {
+                if group.destination == previous_output_node {
+                    group.destination.clone_from(&output_node);
+                }
+            }
+            Ok(())
+        })
+    }
+
+    pub fn start_initiator(
+        &self,
+        invocation: &Invocation,
+        initiator: &str,
+    ) -> Result<(), HostProblem> {
+        self.set_initiator(invocation, initiator, true)
+    }
+
+    pub fn stop_initiator(
+        &self,
+        invocation: &Invocation,
+        initiator: &str,
+    ) -> Result<(), HostProblem> {
+        self.set_initiator(invocation, initiator, false)
     }
 
     pub fn run_next(
@@ -365,25 +1063,117 @@ impl BatchService {
         invocation: &Invocation,
         cancelled: bool,
     ) -> Result<Option<JobSnapshot>, HostProblem> {
+        self.run_next_on(invocation, "INIT0001", cancelled)
+    }
+
+    pub fn run_next_on(
+        &self,
+        invocation: &Invocation,
+        initiator: &str,
+        cancelled: bool,
+    ) -> Result<Option<JobSnapshot>, HostProblem> {
+        let topology = self.topology()?;
+        let members = topology
+            .members
+            .values()
+            .filter(|member| member.enabled && member.node == topology.local_node)
+            .map(|member| member.name.clone())
+            .collect::<Vec<_>>();
+        if members.is_empty() {
+            return Err(HostProblem::UnsupportedCapability {
+                capability: "jes.mas.member".into(),
+                detail: "no enabled local MAS member".into(),
+            });
+        }
+        for member in members {
+            if let Some(job) = self.run_next_on_member(invocation, &member, initiator, cancelled)? {
+                return Ok(Some(job));
+            }
+        }
+        Ok(None)
+    }
+
+    pub fn run_next_on_member(
+        &self,
+        invocation: &Invocation,
+        member: &str,
+        initiator: &str,
+        cancelled: bool,
+    ) -> Result<Option<JobSnapshot>, HostProblem> {
         if self.limits.max_active == 0 {
             return Err(HostProblem::ResourceExhausted);
         }
+        let member = member.to_ascii_uppercase();
+        let topology = self.topology()?;
+        let member_definition = topology
+            .members
+            .get(&member)
+            .filter(|member| member.enabled && topology.node_available(&member.node))
+            .cloned()
+            .ok_or(HostProblem::UnsupportedCapability {
+                capability: "jes.mas.member".into(),
+                detail: format!("MAS member {member} is unavailable"),
+            })?;
+        let scheduler = self
+            .scheduler
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .configuration
+            .clone();
         let id = {
             let state = self.lock()?;
-            state
+            let mut class_active = BTreeMap::<char, usize>::new();
+            let mut initiator_active = 0usize;
+            let mut member_active = 0usize;
+            for job in state
                 .jobs
                 .values()
+                .filter(|job| matches!(job.state, JobState::Selected | JobState::Running))
+            {
+                *class_active.entry(job.class).or_default() += 1;
+                if job.initiator.as_deref() == Some(initiator) {
+                    initiator_active += 1;
+                }
+                if job.route.owner_member.as_deref() == Some(member.as_str()) {
+                    member_active += 1;
+                }
+            }
+            if member_active >= member_definition.max_active {
+                return Ok(None);
+            }
+            let candidates = state
+                .jobs
+                .values()
+                .filter(|job| job.owner == invocation.principal.id().as_str())
                 .filter(|job| {
-                    job.state == JobState::Queued && job.owner == invocation.principal.id().as_str()
+                    job.route.execution_node == member_definition.node
+                        && job
+                            .route
+                            .owner_member
+                            .as_deref()
+                            .is_none_or(|owner| owner == member)
                 })
-                .max_by_key(|job| (job.priority, std::cmp::Reverse(job.id.clone())))
-                .map(|job| job.id.clone())
+                .map(|job| JobSelectionCandidate {
+                    id: &job.id,
+                    class: job.class,
+                    priority: job.priority,
+                    state: job.state,
+                });
+            select_job(
+                &scheduler,
+                initiator,
+                initiator_active,
+                &class_active,
+                candidates,
+            )?
+            .map(str::to_string)
         };
         let Some(id) = id else {
             return Ok(None);
         };
-        if cancelled {
-            return self.cancel(&id).map(Some);
+        self.ensure_spool_migrated(invocation, &id)?;
+        if cancelled || invocation.cancellation.is_some() {
+            return self.cancel(invocation, &id).map(Some);
         }
         let mut job = {
             let mut state = self.lock()?;
@@ -398,32 +1188,87 @@ impl BatchService {
                 AccessIntent::Execute,
                 2,
             )?;
-            let mut running = current.clone();
-            running.version += 1;
-            running.attempt += 1;
+            ensure_job_event_capacity(&current, self.limits.max_events, 4)?;
+            let selected_version = next_job_version(current.version)?;
+            let running_version = next_job_version(selected_version)?;
+            let running_attempt = current
+                .attempt
+                .checked_add(1)
+                .filter(|attempt| *attempt <= self.limits.max_attempts)
+                .ok_or(HostProblem::ResourceExhausted)?;
+            let mut selected = current.clone();
+            selected.version = selected_version;
+            selected.state = JobState::Selected;
+            selected.initiator = Some(initiator.into());
+            selected.route.owner_member = Some(member.clone());
+            push_job_event(
+                &mut selected,
+                self.limits.max_events,
+                format!("selected:{initiator}"),
+            )?;
+            self.persist_job(&selected, Some(current.version))?;
+            state.jobs.insert(id.clone(), selected.clone());
+            let mut running = selected.clone();
+            running.version = running_version;
+            running.attempt = running_attempt;
             running.state = JobState::Running;
-            running.events.push("running".into());
-            self.persist_job(&running, Some(current.version))?;
+            running.initiator = Some(initiator.into());
+            running.route.owner_member = Some(member);
+            push_job_event(&mut running, self.limits.max_events, "running")?;
+            self.persist_job(&running, Some(selected.version))?;
             state.jobs.insert(id.clone(), running.clone());
             running
         };
         let outcome = self.execute(invocation, &mut job);
+        if outcome == Err(HostProblem::UnknownOutcome) {
+            return Err(HostProblem::UnknownOutcome);
+        }
+        let cleanup = self.cleanup_job_temporary_datasets(invocation, &mut job);
+        let outcome = match (outcome, cleanup) {
+            (Ok(return_code), Ok(())) => Ok(return_code),
+            (Err(problem), Ok(())) | (_, Err(problem)) => Err(problem),
+        };
         let mut state = self.lock()?;
         let current = state.jobs.get(&id).cloned().ok_or(HostProblem::NotFound)?;
-        job.version = current.version + 1;
+        ensure_job_event_capacity(
+            &job,
+            self.limits.max_events,
+            if outcome.is_ok() { 2 } else { 1 },
+        )?;
+        let terminal_version = next_job_version(current.version)?;
+        let completed_version = outcome
+            .is_ok()
+            .then(|| next_job_version(terminal_version))
+            .transpose()?;
+        job.version = terminal_version;
         let terminal_step = job.active_step.clone();
         job.active_step = None;
         match outcome {
             Ok(return_code) => {
                 job.return_code = Some(return_code);
-                job.state = JobState::Completed;
-                job.events.push("completed".into());
-                append_spool(
+                job.state = JobState::Output;
+                push_job_event(&mut job, self.limits.max_events, "output")?;
+                self.append_spool_records(
+                    invocation,
                     &mut job,
+                    None,
+                    None,
                     "JESMSGLG",
-                    format!("ENDED RC={return_code:04}").into_bytes(),
-                    self.limits,
+                    vec![format!("ENDED RC={return_code:04}").into_bytes()],
                 )?;
+                self.complete_output(invocation, &mut job)?;
+                self.persist_job(&job, Some(current.version))?;
+                state.jobs.insert(id.clone(), job.clone());
+                let output_version = job.version;
+                job.version = completed_version.ok_or(HostProblem::InfrastructureFailure)?;
+                job.state = JobState::Completed;
+                job.initiator = None;
+                push_job_event(&mut job, self.limits.max_events, "completed")?;
+                self.persist_job(&job, Some(output_version))?;
+                let result = snapshot(&job);
+                state.jobs.insert(id, job.clone());
+                self.persist_checkpoint(&job, job.effect_sequence)?;
+                return Ok(Some(result));
             }
             Err(problem) => {
                 if let HostProblem::Condition { name, .. } = &problem
@@ -431,27 +1276,74 @@ impl BatchService {
                 {
                     job.abend_code = Some(code.to_string());
                 }
-                job.state = JobState::Failed;
-                job.events.push(format!("failed:{problem:?}"));
+                let cancelled = problem == HostProblem::Cancelled;
+                job.state = if cancelled {
+                    JobState::Cancelled
+                } else {
+                    JobState::Failed
+                };
+                job.initiator = None;
+                if let Some(cancellation) = job.cancellation.as_mut() {
+                    cancellation.state = CancellationState::Completed;
+                } else if cancelled {
+                    job.cancellation = Some(JesCancellation {
+                        id: format!("{}-CANCEL-{}", job.id, job.version),
+                        requested_by: invocation.principal.id().as_str().into(),
+                        reason: "execution cancellation".into(),
+                        requested_tick: 0,
+                        state: CancellationState::Completed,
+                    });
+                }
+                push_job_event(
+                    &mut job,
+                    self.limits.max_events,
+                    if cancelled {
+                        String::from("cancelled:execution")
+                    } else {
+                        format!("failed:{problem:?}")
+                    },
+                )?;
                 if let Some(step) = terminal_step {
-                    append_spool(
+                    self.append_spool_records(
+                        invocation,
                         &mut job,
+                        Some(&step),
+                        None,
                         "JOBLOG",
-                        format!("{step} FAILED {problem:?}").into_bytes(),
-                        self.limits,
+                        vec![
+                            format!(
+                                "{step} {} {problem:?}",
+                                if cancelled { "CANCELLED" } else { "FAILED" }
+                            )
+                            .into_bytes(),
+                        ],
                     )?;
                 }
-                append_spool(
+                self.append_spool_records(
+                    invocation,
                     &mut job,
+                    None,
+                    None,
                     "JESMSGLG",
-                    format!("FAILED {problem:?}").into_bytes(),
-                    self.limits,
+                    vec![
+                        format!(
+                            "{} {problem:?}",
+                            if cancelled { "CANCELLED" } else { "FAILED" }
+                        )
+                        .into_bytes(),
+                    ],
                 )?;
+                if cancelled {
+                    self.cancel_output(invocation, &mut job)?;
+                } else {
+                    self.complete_output(invocation, &mut job)?;
+                }
             }
         }
         self.persist_job(&job, Some(current.version))?;
         let result = snapshot(&job);
-        state.jobs.insert(id, job);
+        state.jobs.insert(id, job.clone());
+        self.persist_checkpoint(&job, job.effect_sequence)?;
         Ok(Some(result))
     }
 
@@ -475,64 +1367,123 @@ impl BatchService {
     fn execute(&self, invocation: &Invocation, job: &mut Job) -> Result<i32, HostProblem> {
         let mut max_rc = 0;
         let mut abended = false;
+        let mut first_abend = None::<String>;
         let steps = job.plan.steps.clone();
         let restart = job.plan.restart_step.clone();
         let mut restart_reached = restart.is_none();
         let mut effect_sequence = 0u64;
-        let mut dataset_resolutions = BTreeMap::new();
         for step in &steps {
+            if let Some(previous) = job.steps.iter().find(|current| current.name == step.name)
+                && previous.state.terminal()
+            {
+                if let Some(StepTermination::ReturnCode { code }) = &previous.termination {
+                    max_rc = max_rc.max(*code);
+                }
+                continue;
+            }
+            if let Some(cancellation) = &invocation.cancellation {
+                job.cancellation = Some(JesCancellation {
+                    id: cancellation.id.as_str().into(),
+                    requested_by: invocation.principal.id().as_str().into(),
+                    reason: cancellation.reason.clone(),
+                    requested_tick: cancellation.requested_at_tick,
+                    state: CancellationState::Observed,
+                });
+                self.mark_step(
+                    job,
+                    step,
+                    StepState::Cancelled,
+                    Some(StepTermination::Cancelled {
+                        reason: cancellation.reason.clone(),
+                    }),
+                    effect_sequence,
+                )?;
+                return Err(HostProblem::Cancelled);
+            }
             if !restart_reached {
                 restart_reached = restart.as_deref() == Some(step.name.as_str());
                 if !restart_reached {
-                    append_spool(
+                    self.append_spool_records(
+                        invocation,
                         job,
+                        Some(&step.name),
+                        None,
                         "JOBLOG",
-                        format!("{} BYPASSED RESTART", step.name).into_bytes(),
-                        self.limits,
+                        vec![format!("{} BYPASSED RESTART", step.name).into_bytes()],
                     )?;
+                    self.mark_step(job, step, StepState::BypassedRestart, None, effect_sequence)?;
                     continue;
                 }
             }
             if !step.condition.should_run(max_rc, abended) {
-                append_spool(
+                self.append_spool_records(
+                    invocation,
                     job,
+                    Some(&step.name),
+                    None,
                     "JOBLOG",
-                    format!("{} SKIPPED COND", step.name).into_bytes(),
-                    self.limits,
+                    vec![format!("{} SKIPPED COND", step.name).into_bytes()],
+                )?;
+                self.mark_step(
+                    job,
+                    step,
+                    StepState::SkippedCondition,
+                    None,
+                    effect_sequence,
                 )?;
                 continue;
             }
             job.active_step = Some(step.name.clone());
+            self.mark_step(job, step, StepState::Allocating, None, effect_sequence)?;
+            let allocation_plans = plan_dd_allocations(&step.dds)?;
+            let mut allocations = Vec::new();
             let step_result = (|| -> Result<crate::ProgramOutput, HostProblem> {
-                self.allocate_dds(
+                allocations = self.allocate_dds(
                     invocation,
                     job,
                     step,
-                    &mut dataset_resolutions,
+                    &allocation_plans,
                     &mut effect_sequence,
                 )?;
                 let mut dds = step.dds.clone();
                 self.hydrate_dds(
                     invocation,
                     job,
-                    &dataset_resolutions,
+                    &allocations,
                     &mut dds,
                     &mut effect_sequence,
                 )?;
+                self.mark_step(job, step, StepState::Running, None, effect_sequence)?;
                 for dd in &mut dds {
                     if !is_program_library_dd(dd)
                         && let Some(raw_name) = dd.dataset.clone()
                     {
-                        dd.dataset =
-                            Some(resolved_dataset(job, dd, &raw_name, &dataset_resolutions));
+                        dd.dataset = Some(resolved_dataset(
+                            job,
+                            dd,
+                            &raw_name,
+                            &job.dataset_resolutions,
+                        ));
                     }
                 }
                 let input = ProgramInput {
                     parameter: step.parameter.clone(),
                     dds,
+                    execution: Some(ProgramExecutionContext {
+                        job_name: job.name.clone(),
+                        step_name: step.name.clone(),
+                    }),
                 };
-                let execution = program_execution(&step.program);
-                let idcams_return_code = if execution == ProgramExecution::Idcams {
+                let registration = job
+                    .program_registrations
+                    .get(&step.name)
+                    .filter(|registration| registration.program == step.program)
+                    .cloned()
+                    .ok_or(HostProblem::InfrastructureFailure)?;
+                let dataset_resolutions = job.dataset_resolutions.clone();
+                let idcams_return_code = if registration.handler
+                    == RegisteredProgramHandler::Utility(crate::UtilityHandler::Idcams)
+                {
                     Some(self.execute_idcams(
                         invocation,
                         job,
@@ -544,30 +1495,30 @@ impl BatchService {
                 } else {
                     None
                 };
-                let mut output = match execution {
-                    ProgramExecution::Sdsf => {
+                let mut output = match registration.handler {
+                    RegisteredProgramHandler::Sdsf => {
                         self.execute_sdsf(invocation, job, step, &input, &mut effect_sequence)?
                     }
-                    ProgramExecution::Db2Tso => {
+                    RegisteredProgramHandler::Db2Tso => {
                         self.execute_db2_tso(invocation, job, step, &input, &mut effect_sequence)?
                     }
-                    ProgramExecution::ImsController => self.execute_ims_controller(
+                    RegisteredProgramHandler::ImsController => self.execute_ims_controller(
                         invocation,
                         job,
                         step,
                         &input,
                         &mut effect_sequence,
                     )?,
-                    ProgramExecution::ProgramService | ProgramExecution::Idcams => self
-                        .execute_program_controller(
-                            invocation,
-                            job,
-                            step,
-                            &input,
-                            &mut effect_sequence,
-                            &step.program,
-                        )?,
-                    ProgramExecution::Unsupported => return Err(HostProblem::Unsupported),
+                    RegisteredProgramHandler::ProgramService
+                    | RegisteredProgramHandler::Utility(_) => self.execute_program_controller(
+                        invocation,
+                        job,
+                        step,
+                        &input,
+                        &mut effect_sequence,
+                        &registration.program,
+                    )?,
+                    RegisteredProgramHandler::Unsupported => return Err(HostProblem::Unsupported),
                 };
                 if let Some(return_code) = idcams_return_code {
                     output.return_code = return_code;
@@ -577,6 +1528,7 @@ impl BatchService {
                     job,
                     step,
                     &dataset_resolutions,
+                    &allocations,
                     &output.dd_outputs,
                     &mut effect_sequence,
                 )?;
@@ -585,45 +1537,520 @@ impl BatchService {
             let output = match step_result {
                 Ok(output) => output,
                 Err(problem) => {
-                    self.dispose_dds(
+                    let disposition = self.dispose_dds(
                         invocation,
                         job,
                         step,
-                        &dataset_resolutions,
+                        &allocations,
                         &mut effect_sequence,
                         true,
+                    );
+                    let terminal_problem = disposition.err().unwrap_or(problem);
+                    if let Some(code) = abend_code(&terminal_problem) {
+                        first_abend.get_or_insert_with(|| code.clone());
+                        job.abend_code = Some(code.clone());
+                        self.mark_step(
+                            job,
+                            step,
+                            StepState::Abended,
+                            Some(StepTermination::Abend { code, system: true }),
+                            effect_sequence,
+                        )?;
+                        abended = true;
+                        continue;
+                    }
+                    let state = if terminal_problem == HostProblem::Cancelled {
+                        StepState::Cancelled
+                    } else {
+                        StepState::Failed
+                    };
+                    if state == StepState::Cancelled {
+                        job.cancellation = Some(JesCancellation {
+                            id: format!("{}-CANCEL-{}", job.id, job.version),
+                            requested_by: invocation.principal.id().as_str().into(),
+                            reason: "provider cancellation".into(),
+                            requested_tick: 0,
+                            state: CancellationState::Observed,
+                        });
+                    }
+                    self.mark_step(
+                        job,
+                        step,
+                        state,
+                        Some(if state == StepState::Cancelled {
+                            StepTermination::Cancelled {
+                                reason: "execution cancellation observed".into(),
+                            }
+                        } else {
+                            StepTermination::Failed {
+                                category: problem_category(&terminal_problem).into(),
+                            }
+                        }),
+                        effect_sequence,
                     )?;
-                    return Err(problem);
+                    return Err(terminal_problem);
                 }
             };
-            max_rc = max_rc.max(output.return_code);
-            for record in output.records {
-                append_spool(job, "SYSPRINT", record, self.limits)?;
+            if !(0..=4_095).contains(&output.return_code) {
+                self.mark_step(
+                    job,
+                    step,
+                    StepState::Failed,
+                    Some(StepTermination::Failed {
+                        category: "invalid-return-code".into(),
+                    }),
+                    effect_sequence,
+                )?;
+                return Err(HostProblem::ProviderFailure);
             }
-            append_spool(
+            max_rc = max_rc.max(output.return_code);
+            self.append_spool_records(
+                invocation,
                 job,
-                "JOBLOG",
-                format!(
-                    "{} {} RC={:04}",
-                    step.name, step.program, output.return_code
-                )
-                .into_bytes(),
-                self.limits,
+                Some(&step.name),
+                step.dds
+                    .iter()
+                    .find(|dd| dd.name.eq_ignore_ascii_case("SYSPRINT")),
+                "SYSPRINT",
+                output.records,
             )?;
-            abended = output.return_code < 0;
-            self.dispose_dds(
+            self.append_spool_records(
+                invocation,
+                job,
+                Some(&step.name),
+                None,
+                "JOBLOG",
+                vec![
+                    format!(
+                        "{} {} RC={:04}",
+                        step.name, step.program, output.return_code
+                    )
+                    .into_bytes(),
+                ],
+            )?;
+            self.mark_step(job, step, StepState::Disposing, None, effect_sequence)?;
+            if let Err(problem) = self.dispose_dds(
                 invocation,
                 job,
                 step,
-                &dataset_resolutions,
+                &allocations,
                 &mut effect_sequence,
-                abended,
+                false,
+            ) {
+                self.mark_step(
+                    job,
+                    step,
+                    StepState::Failed,
+                    Some(StepTermination::Failed {
+                        category: problem_category(&problem).into(),
+                    }),
+                    effect_sequence,
+                )?;
+                return Err(problem);
+            }
+            self.mark_step(
+                job,
+                step,
+                StepState::Completed,
+                Some(StepTermination::ReturnCode {
+                    code: output.return_code,
+                }),
+                effect_sequence,
             )?;
-            if abended {
-                break;
+        }
+        if let Some(code) = first_abend {
+            Err(HostProblem::Condition {
+                name: format!("ABEND:{code}"),
+                response: 500,
+                response2: 0,
+            })
+        } else {
+            Ok(max_rc)
+        }
+    }
+
+    fn mark_step(
+        &self,
+        job: &mut Job,
+        step: &StepPlan,
+        next: StepState,
+        termination: Option<StepTermination>,
+        effect_sequence: u64,
+    ) -> Result<(), HostProblem> {
+        // Keep two durable event slots for the job's output/completed or
+        // failed/cancelled terminal projection before publishing a step edge.
+        ensure_job_event_capacity(job, self.limits.max_events, 3)?;
+        let execution = job
+            .steps
+            .iter_mut()
+            .find(|current| current.name == step.name)
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        if !execution.state.can_transition_to(next)
+            || next.terminal() != termination.is_some()
+                && !matches!(
+                    next,
+                    StepState::BypassedRestart | StepState::SkippedCondition
+                )
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        if next == StepState::Allocating {
+            execution.attempt = execution
+                .attempt
+                .checked_add(1)
+                .ok_or(HostProblem::ResourceExhausted)?;
+        }
+        execution.state = next;
+        execution.termination = termination;
+        job.effect_sequence = effect_sequence;
+        push_job_event(
+            job,
+            self.limits.max_events,
+            format!("step:{}:{next:?}", step.name),
+        )?;
+        let expected = job.version;
+        job.version = job
+            .version
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        let mut state = self.lock()?;
+        let current = state.jobs.get(&job.id).ok_or(HostProblem::NotFound)?;
+        if current.version != expected || current.state != JobState::Running {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        self.persist_job(job, Some(expected))?;
+        state.jobs.insert(job.id.clone(), job.clone());
+        self.persist_checkpoint(job, effect_sequence)?;
+        Ok(())
+    }
+
+    fn cleanup_job_temporary_datasets(
+        &self,
+        invocation: &Invocation,
+        job: &mut Job,
+    ) -> Result<(), HostProblem> {
+        let mut sequence = 0u64;
+        for dataset in job.temporary_datasets.clone() {
+            self.authorize(
+                invocation,
+                "DATASET",
+                &dataset,
+                AccessIntent::Update,
+                next_effect_sequence(invocation, &mut sequence)?,
+            )?;
+            let sequence_value = next_effect_sequence(invocation, &mut sequence)?;
+            let key = IdempotencyKey::new(
+                format!("jes:{}:job-cleanup:{sequence_value}", job.id),
+                InvocationLimits::default(),
+            )
+            .map_err(|_| HostProblem::ResourceExhausted)?;
+            let result = self.host.invoke(
+                invocation,
+                invocation.deadline_tick.saturating_sub(1),
+                false,
+                EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence: sequence_value,
+                    deadline_tick: invocation.deadline_tick,
+                    idempotency_key: Some(key.clone()),
+                    request: HostRequest::Dataset(DatasetRequest::Delete {
+                        dataset: DatasetName::new(&dataset, 128)
+                            .map_err(|_| HostProblem::InfrastructureFailure)?,
+                        member: None,
+                        expected_version: None,
+                        purge: true,
+                        current_date: None,
+                        mutation: Mutation {
+                            sequence: sequence_value,
+                            idempotency_key: key,
+                            transaction: Some(job.id.clone()),
+                        },
+                    }),
+                },
+            );
+            match result.effect.outcome {
+                Ok(HostResult::Dataset(DatasetResult::Mutated { .. }))
+                | Err(HostProblem::NotFound) => {
+                    job.temporary_datasets.retain(|current| current != &dataset);
+                }
+                Ok(_) => return Err(HostProblem::ProviderFailure),
+                Err(problem) => return Err(problem),
             }
         }
-        Ok(max_rc)
+        Ok(())
+    }
+
+    fn append_spool_records(
+        &self,
+        invocation: &Invocation,
+        job: &mut Job,
+        step_name: Option<&str>,
+        dd: Option<&crate::DdPlan>,
+        file: &str,
+        records: Vec<Vec<u8>>,
+    ) -> Result<(), HostProblem> {
+        if records.is_empty() {
+            return Ok(());
+        }
+        let internal_name = spool_internal_name(step_name, file);
+        let resource = spool_resource(job, &internal_name);
+        let authorize_sequence = next_spool_sequence(invocation, job)?;
+        self.authorize(
+            invocation,
+            "JESJOBS",
+            &resource,
+            AccessIntent::Update,
+            authorize_sequence,
+        )?;
+        let sequence = next_spool_sequence(invocation, job)?;
+        let key = IdempotencyKey::new(
+            format!("jes:{}:spool:{sequence}", job.id),
+            InvocationLimits::default(),
+        )
+        .map_err(|_| HostProblem::ResourceExhausted)?;
+        let record_count = records.len();
+        let byte_count = records
+            .iter()
+            .try_fold(0usize, |total, record| total.checked_add(record.len()))
+            .ok_or(HostProblem::ResourceExhausted)?;
+        if !job.spool_files.contains_key(&internal_name)
+            && job.spool_files.len() >= self.limits.max_spool_files
+        {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let total_records = job
+            .spool_files
+            .values()
+            .try_fold(record_count, |total, file| {
+                total.checked_add(file.record_count)
+            })
+            .ok_or(HostProblem::ResourceExhausted)?;
+        let total_bytes = job
+            .spool_files
+            .values()
+            .try_fold(byte_count, |total, file| total.checked_add(file.byte_count))
+            .ok_or(HostProblem::ResourceExhausted)?;
+        if total_records > self.limits.max_spool_records
+            || total_bytes > self.limits.max_spool_bytes
+        {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let result = self.host.invoke(
+            invocation,
+            invocation.deadline_tick.saturating_sub(1),
+            false,
+            EffectRequest {
+                run_unit: invocation.run_unit_id.clone(),
+                sequence,
+                deadline_tick: invocation.deadline_tick,
+                idempotency_key: Some(key.clone()),
+                request: HostRequest::Spool(SpoolRequest::Append {
+                    job: JobName::new(&job.id, 128).map_err(|_| HostProblem::Malformed)?,
+                    file: internal_name.clone(),
+                    records,
+                    mutation: Mutation {
+                        sequence,
+                        idempotency_key: key,
+                        transaction: Some(job.id.clone()),
+                    },
+                }),
+            },
+        );
+        let HostResult::Spool(SpoolResult::Mutated { version, .. }) = result.effect.outcome? else {
+            return Err(HostProblem::ProviderFailure);
+        };
+        let route = spool_route(job, dd);
+        let output_id = output_group_id(job, &route);
+        let descriptor = job
+            .spool_files
+            .entry(internal_name.clone())
+            .or_insert_with(|| JesSpoolDescriptor {
+                schema_version: JES_SPOOL_CONTRACT.into(),
+                id: spool_descriptor_id(&job.id, &internal_name),
+                job_id: job.id.clone(),
+                step_name: step_name.map(str::to_string),
+                dd_name: file.to_ascii_uppercase(),
+                class: route.class,
+                destination: route.destination.clone(),
+                writer: route.writer.clone(),
+                forms: route.forms.clone(),
+                record_count: 0,
+                byte_count: 0,
+                created_tick: 0,
+                retain_until_tick: self.limits.spool_retention_ticks,
+                state: if route.hold {
+                    JesSpoolState::Held
+                } else {
+                    JesSpoolState::Open
+                },
+            });
+        descriptor.record_count = descriptor
+            .record_count
+            .checked_add(record_count)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        descriptor.byte_count = descriptor
+            .byte_count
+            .checked_add(byte_count)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        let retain_until_tick = descriptor.retain_until_tick;
+        let internal_name_for_group = internal_name.clone();
+        let _ = descriptor;
+        let group = job
+            .output_groups
+            .entry(output_id.clone())
+            .or_insert_with(|| JesOutputGroup {
+                schema_version: JES_OUTPUT_CONTRACT.into(),
+                id: output_id,
+                job_id: job.id.clone(),
+                class: route.class,
+                destination: route.destination,
+                writer: route.writer,
+                forms: route.forms,
+                copies: route.copies,
+                retain_until_tick,
+                state: if route.hold {
+                    JesOutputState::Held
+                } else {
+                    JesOutputState::AwaitingSelection
+                },
+                spool_files: Vec::new(),
+            });
+        if !group
+            .spool_files
+            .iter()
+            .any(|file| file == &internal_name_for_group)
+        {
+            if group.spool_files.len() >= self.limits.max_spool_files {
+                return Err(HostProblem::ResourceExhausted);
+            }
+            group.spool_files.push(internal_name_for_group);
+        }
+        let _ = version;
+        Ok(())
+    }
+
+    fn complete_output(&self, invocation: &Invocation, job: &mut Job) -> Result<(), HostProblem> {
+        self.seal_output(invocation, job, false)
+    }
+
+    fn cancel_output(&self, invocation: &Invocation, job: &mut Job) -> Result<(), HostProblem> {
+        self.seal_output(invocation, job, true)
+    }
+
+    fn seal_output(
+        &self,
+        invocation: &Invocation,
+        job: &mut Job,
+        cancelled: bool,
+    ) -> Result<(), HostProblem> {
+        let files = job.spool_files.keys().cloned().collect::<Vec<_>>();
+        for file in files {
+            let resource = spool_resource(job, &file);
+            let authorize_sequence = next_spool_sequence(invocation, job)?;
+            self.authorize(
+                invocation,
+                "JESJOBS",
+                &resource,
+                AccessIntent::Update,
+                authorize_sequence,
+            )?;
+            let sequence = next_spool_sequence(invocation, job)?;
+            let key = IdempotencyKey::new(
+                format!("jes:{}:spool:{sequence}", job.id),
+                InvocationLimits::default(),
+            )
+            .map_err(|_| HostProblem::ResourceExhausted)?;
+            let result = self.host.invoke(
+                invocation,
+                invocation.deadline_tick.saturating_sub(1),
+                false,
+                EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence,
+                    deadline_tick: invocation.deadline_tick,
+                    idempotency_key: Some(key.clone()),
+                    request: HostRequest::Spool(SpoolRequest::Seal {
+                        job: JobName::new(&job.id, 128).map_err(|_| HostProblem::Malformed)?,
+                        file: file.clone(),
+                        mutation: Mutation {
+                            sequence,
+                            idempotency_key: key,
+                            transaction: Some(job.id.clone()),
+                        },
+                    }),
+                },
+            );
+            let HostResult::Spool(SpoolResult::Mutated { .. }) = result.effect.outcome? else {
+                return Err(HostProblem::ProviderFailure);
+            };
+            let descriptor = job
+                .spool_files
+                .get_mut(&file)
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            descriptor.state = if cancelled {
+                JesSpoolState::Cancelled
+            } else if descriptor.state == JesSpoolState::Held {
+                JesSpoolState::Held
+            } else {
+                JesSpoolState::Closed
+            };
+        }
+        for group in job.output_groups.values_mut() {
+            group.state = if cancelled {
+                JesOutputState::Cancelled
+            } else if group.state == JesOutputState::Held {
+                JesOutputState::Held
+            } else {
+                JesOutputState::AwaitingSelection
+            };
+        }
+        Ok(())
+    }
+
+    fn purge_spool_authority(
+        &self,
+        invocation: &Invocation,
+        job: &mut Job,
+    ) -> Result<SpoolResult, HostProblem> {
+        let resource = format!("JOB.{}", job.name);
+        let authorize_sequence = next_spool_sequence(invocation, job)?;
+        self.authorize(
+            invocation,
+            "JESJOBS",
+            &resource,
+            AccessIntent::Alter,
+            authorize_sequence,
+        )?;
+        let sequence = next_spool_sequence(invocation, job)?;
+        let key = IdempotencyKey::new(
+            format!("jes:{}:spool:{sequence}", job.id),
+            InvocationLimits::default(),
+        )
+        .map_err(|_| HostProblem::ResourceExhausted)?;
+        let outcome = self.host.invoke(
+            invocation,
+            invocation.deadline_tick.saturating_sub(1),
+            false,
+            EffectRequest {
+                run_unit: invocation.run_unit_id.clone(),
+                sequence,
+                deadline_tick: invocation.deadline_tick,
+                idempotency_key: Some(key.clone()),
+                request: HostRequest::Spool(SpoolRequest::Purge {
+                    job: JobName::new(&job.id, 128).map_err(|_| HostProblem::Malformed)?,
+                    mutation: Mutation {
+                        sequence,
+                        idempotency_key: key,
+                        transaction: Some(job.id.clone()),
+                    },
+                }),
+            },
+        );
+        match outcome.effect.outcome? {
+            HostResult::Spool(result @ SpoolResult::Mutated { .. })
+            | HostResult::Spool(result @ SpoolResult::PurgePending { .. }) => Ok(result),
+            _ => Err(HostProblem::ProviderFailure),
+        }
     }
 
     fn execute_sdsf(
@@ -1377,12 +2804,18 @@ impl BatchService {
                     Ok(()) => 0,
                     Err(problem) => {
                         let code = ams_condition_code(&problem);
-                        append_spool(
+                        self.append_spool_records(
+                            invocation,
                             job,
+                            Some(&step.name),
+                            step.dds
+                                .iter()
+                                .find(|dd| dd.name.eq_ignore_ascii_case("SYSPRINT")),
                             "SYSPRINT",
-                            format!("IDCAMS {} CC={code:02} {problem:?}", command.label())
-                                .into_bytes(),
-                            self.limits,
+                            vec![
+                                format!("IDCAMS {} CC={code:02} {problem:?}", command.label())
+                                    .into_bytes(),
+                            ],
                         )?;
                         code
                     }
@@ -1427,9 +2860,14 @@ impl BatchService {
             | "define-generationdatagroup"
             | "define-nonvsam"
             | "define-path"
-            | "define-usercatalog" => {
-                self.define_idcams(invocation, job, step, command.source(), effect_sequence)
-            }
+            | "define-usercatalog" => self.define_idcams(
+                invocation,
+                job,
+                step,
+                command.id(),
+                command.source(),
+                effect_sequence,
+            ),
             "repro" => self.repro_idcams(
                 invocation,
                 job,
@@ -1442,7 +2880,9 @@ impl BatchService {
             "delete" => {
                 self.delete_idcams(invocation, job, step, effect_sequence, command.source())
             }
-            "listcat" => self.listcat_idcams(invocation, job, effect_sequence, command.source()),
+            "listcat" => {
+                self.listcat_idcams(invocation, job, step, effect_sequence, command.source())
+            }
             _ => self.execute_ams_typed_command(
                 invocation,
                 job,
@@ -1637,6 +3077,7 @@ impl BatchService {
         &self,
         invocation: &Invocation,
         job: &mut Job,
+        step: &StepPlan,
         effect_sequence: &mut u64,
         statement: &str,
     ) -> Result<(), HostProblem> {
@@ -1654,10 +3095,9 @@ impl BatchService {
         else {
             return Err(HostProblem::ProviderFailure);
         };
-        for entry in entries {
-            append_spool(
-                job,
-                "SYSPRINT",
+        let mut records = entries
+            .into_iter()
+            .map(|entry| {
                 format!(
                     "{} {:?} VERSION={} RELATE={}",
                     entry.name.as_str(),
@@ -1665,18 +3105,22 @@ impl BatchService {
                     entry.version,
                     entry.related.as_ref().map_or("-", DatasetName::as_str)
                 )
-                .into_bytes(),
-                self.limits,
-            )?;
-        }
+                .into_bytes()
+            })
+            .collect::<Vec<_>>();
         if more {
-            append_spool(
-                job,
-                "SYSPRINT",
-                b"IDCAMS LISTCAT MORE".to_vec(),
-                self.limits,
-            )?;
+            records.push(b"IDCAMS LISTCAT MORE".to_vec());
         }
+        self.append_spool_records(
+            invocation,
+            job,
+            Some(&step.name),
+            step.dds
+                .iter()
+                .find(|dd| dd.name.eq_ignore_ascii_case("SYSPRINT")),
+            "SYSPRINT",
+            records,
+        )?;
         Ok(())
     }
 
@@ -1734,6 +3178,7 @@ impl BatchService {
                 job,
                 step,
                 dataset_resolutions,
+                &[],
                 &BTreeMap::from([(output_name, records)]),
                 effect_sequence,
             )?;
@@ -1896,6 +3341,7 @@ impl BatchService {
                     job,
                     step,
                     dataset_resolutions,
+                    &[],
                     &BTreeMap::from([(dd, collected)]),
                     effect_sequence,
                 )?;
@@ -1922,11 +3368,15 @@ impl BatchService {
                     effect_sequence,
                     DatasetRequest::Diagnose { dataset: target },
                 )?;
-                append_spool(
+                self.append_spool_records(
+                    invocation,
                     job,
+                    Some(&step.name),
+                    step.dds
+                        .iter()
+                        .find(|dd| dd.name.eq_ignore_ascii_case("SYSPRINT")),
                     "SYSPRINT",
-                    format!("{} {result:?}", command.label()).into_bytes(),
-                    self.limits,
+                    vec![format!("{} {result:?}", command.label()).into_bytes()],
                 )?;
             }
             "export" | "export-disconnect" => self.export_idcams(
@@ -1949,11 +3399,15 @@ impl BatchService {
                         dataset: ams_target(command)?,
                     },
                 )?;
-                append_spool(
+                self.append_spool_records(
+                    invocation,
                     job,
+                    Some(&step.name),
+                    step.dds
+                        .iter()
+                        .find(|dd| dd.name.eq_ignore_ascii_case("SYSPRINT")),
                     "SYSPRINT",
-                    format!("LISTDATA {result:?}").into_bytes(),
-                    self.limits,
+                    vec![format!("LISTDATA {result:?}").into_bytes()],
                 )?;
             }
             "print" => {
@@ -1990,14 +3444,28 @@ impl BatchService {
                 if skip > 4_096 || count > 4_096 {
                     return Err(HostProblem::ResourceExhausted);
                 }
-                for record in records.into_iter().skip(skip).take(count) {
-                    let record = if statement.contains(" HEX") {
-                        hex_bytes(&record).into_bytes()
-                    } else {
-                        record
-                    };
-                    append_spool(job, "SYSPRINT", record, self.limits)?;
-                }
+                let records = records
+                    .into_iter()
+                    .skip(skip)
+                    .take(count)
+                    .map(|record| {
+                        if statement.contains(" HEX") {
+                            hex_bytes(&record).into_bytes()
+                        } else {
+                            record
+                        }
+                    })
+                    .collect();
+                self.append_spool_records(
+                    invocation,
+                    job,
+                    Some(&step.name),
+                    step.dds
+                        .iter()
+                        .find(|dd| dd.name.eq_ignore_ascii_case("SYSPRINT")),
+                    "SYSPRINT",
+                    records,
+                )?;
             }
             "recover" => {
                 self.import_idcams(invocation, job, step, input, effect_sequence, statement)?
@@ -2043,11 +3511,15 @@ impl BatchService {
                         )?
                     }
                 };
-                append_spool(
+                self.append_spool_records(
+                    invocation,
                     job,
+                    Some(&step.name),
+                    step.dds
+                        .iter()
+                        .find(|dd| dd.name.eq_ignore_ascii_case("SYSPRINT")),
                     "SYSPRINT",
-                    format!("SHCDS {result:?}").into_bytes(),
-                    self.limits,
+                    vec![format!("SHCDS {result:?}").into_bytes()],
                 )?;
             }
             "verify" => {
@@ -2202,6 +3674,7 @@ impl BatchService {
             job,
             step,
             dataset_resolutions,
+            &[],
             &BTreeMap::from([(dd, records)]),
             effect_sequence,
         )?;
@@ -2341,12 +3814,13 @@ impl BatchService {
         invocation: &Invocation,
         job: &Job,
         step: &StepPlan,
+        command: &str,
         statement: &str,
         effect_sequence: &mut u64,
     ) -> Result<(), HostProblem> {
         let sequence = next_effect_sequence(invocation, effect_sequence)?;
         let key = effect_key(job, step, sequence)?;
-        let request = if statement.starts_with("DEFINE ALIAS") {
+        let request = if command == "define-alias" {
             DatasetRequest::DefineAlias {
                 alias: dataset_name(&operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?)?,
                 target: dataset_name(
@@ -2358,7 +3832,7 @@ impl BatchService {
                     transaction: Some(job.id.clone()),
                 },
             }
-        } else if statement.starts_with("DEFINE USERCATALOG") {
+        } else if command == "define-usercatalog" {
             DatasetRequest::DefineCatalog {
                 catalog: dataset_name(
                     &operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?,
@@ -2370,7 +3844,7 @@ impl BatchService {
                     transaction: Some(job.id.clone()),
                 },
             }
-        } else if statement.starts_with("DEFINE NONVSAM") {
+        } else if command == "define-nonvsam" {
             let (minimum, maximum) = pair_operand(statement, "RECORDSIZE").unwrap_or((80, 80));
             let mut definition =
                 mainframe_env_host_api::DatasetDefinition::compatibility(DatasetAttributes {
@@ -2397,7 +3871,7 @@ impl BatchService {
                     transaction: Some(job.id.clone()),
                 },
             }
-        } else if statement.contains(" PATH ") || statement.starts_with("DEFINE PATH") {
+        } else if command == "define-path" {
             DatasetRequest::DefinePath {
                 path: DatasetName::new(
                     operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?,
@@ -2415,7 +3889,7 @@ impl BatchService {
                     transaction: Some(job.id.clone()),
                 },
             }
-        } else if statement.contains("GENERATIONDATAGROUP") {
+        } else if command == "define-generationdatagroup" {
             DatasetRequest::DefineGenerationGroup {
                 base: DatasetName::new(
                     operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?,
@@ -2431,7 +3905,8 @@ impl BatchService {
                     transaction: Some(job.id.clone()),
                 },
             }
-        } else if statement.contains("ALTERNATEINDEX") {
+        } else if command == "define-alternateindex" {
+            validate_vsam_component_clauses(statement)?;
             let (key_length, key_offset) =
                 pair_operand(statement, "KEYS").ok_or(HostProblem::Malformed)?;
             DatasetRequest::DefineAlternateIndex {
@@ -2455,7 +3930,8 @@ impl BatchService {
                     transaction: Some(job.id.clone()),
                 },
             }
-        } else if statement.starts_with("DEFINE CLUSTER") {
+        } else if command == "define-cluster" {
+            validate_vsam_component_clauses(statement)?;
             let (minimum, maximum) = pair_operand(statement, "RECORDSIZE").unwrap_or((80, 80));
             let keys = pair_operand(statement, "KEYS");
             let organization = if statement.contains(" LINEAR") {
@@ -2551,107 +4027,220 @@ impl BatchService {
     fn allocate_dds(
         &self,
         invocation: &Invocation,
-        job: &Job,
+        job: &mut Job,
         step: &StepPlan,
-        dataset_resolutions: &mut BTreeMap<String, String>,
+        plans: &[DdAllocationPlan],
         effect_sequence: &mut u64,
-    ) -> Result<(), HostProblem> {
-        for dd in &step.dds {
-            if is_program_library_dd(dd) {
-                continue;
-            }
-            let Some(raw_name) = &dd.dataset else {
-                continue;
-            };
-            let name = resolved_dataset(job, dd, raw_name, dataset_resolutions);
-            self.authorize(
-                invocation,
-                "DATASET",
-                &name,
-                AccessIntent::Update,
-                next_effect_sequence(invocation, effect_sequence)?,
-            )?;
-            if let Some(relative) = dd.generation {
-                if dataset_resolutions.contains_key(&dataset_resolution_key(dd, raw_name)) {
+    ) -> Result<Vec<DdRuntimeAllocation>, HostProblem> {
+        if plans.len() != step.dds.len() {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let lock_owner = invocation.principal.id().clone();
+        let mut allocations = Vec::new();
+        let mut lock_modes = BTreeMap::<String, DatasetLockMode>::new();
+        let allocation_result = (|| -> Result<(), HostProblem> {
+            for (dd, plan) in step.dds.iter().zip(plans) {
+                if is_program_library_dd(dd) || plan.source != DdSourceKind::Dataset {
                     continue;
                 }
-                let sequence = next_effect_sequence(invocation, effect_sequence)?;
-                let key = effect_key(job, step, sequence)?;
-                let base_name = DatasetName::new(raw_name.to_ascii_uppercase(), 128)
-                    .map_err(|_| HostProblem::Malformed)?;
-                let (request, idempotency_key) =
-                    if relative == 1 && dd.disposition.contains(&Disposition::New) {
-                        (
-                            DatasetRequest::CreateGeneration {
-                                base: base_name,
-                                attributes: dataset_attributes_for_dd(dd)?,
-                                records: Vec::new(),
+                let Some(raw_name) = &dd.dataset else {
+                    return Err(HostProblem::InfrastructureFailure);
+                };
+                let disposition = plan.disposition.ok_or(HostProblem::InfrastructureFailure)?;
+                let name = resolved_dataset(job, dd, raw_name, &job.dataset_resolutions);
+                let access_intent = if disposition.status == DdStatusDisposition::Shared {
+                    AccessIntent::Read
+                } else {
+                    AccessIntent::Update
+                };
+                self.authorize(
+                    invocation,
+                    "DATASET",
+                    &name,
+                    access_intent,
+                    next_effect_sequence(invocation, effect_sequence)?,
+                )?;
+                if let Some(relative) = dd.generation {
+                    let resolution_key = dataset_resolution_key(dd, raw_name);
+                    if !job.dataset_resolutions.contains_key(&resolution_key) {
+                        let sequence = next_effect_sequence(invocation, effect_sequence)?;
+                        let key = effect_key(job, step, sequence)?;
+                        let base_name = DatasetName::new(raw_name.to_ascii_uppercase(), 128)
+                            .map_err(|_| HostProblem::Malformed)?;
+                        let (request, idempotency_key) =
+                            if relative == 1 && disposition.status == DdStatusDisposition::New {
+                                (
+                                    DatasetRequest::CreateGeneration {
+                                        base: base_name,
+                                        attributes: dataset_attributes_for_dd(dd)?,
+                                        records: Vec::new(),
+                                        mutation: Mutation {
+                                            sequence,
+                                            idempotency_key: key.clone(),
+                                            transaction: Some(job.id.clone()),
+                                        },
+                                    },
+                                    Some(key),
+                                )
+                            } else {
+                                (
+                                    DatasetRequest::ResolveGeneration {
+                                        base: base_name,
+                                        relative,
+                                    },
+                                    None,
+                                )
+                            };
+                        let result = self.host.invoke(
+                            invocation,
+                            invocation.deadline_tick.saturating_sub(1),
+                            false,
+                            EffectRequest {
+                                run_unit: invocation.run_unit_id.clone(),
+                                sequence,
+                                deadline_tick: invocation.deadline_tick,
+                                idempotency_key,
+                                request: HostRequest::Dataset(request),
+                            },
+                        );
+                        let HostResult::Dataset(DatasetResult::Generation { dataset, .. }) =
+                            result.effect.outcome?
+                        else {
+                            return Err(HostProblem::ProviderFailure);
+                        };
+                        job.dataset_resolutions
+                            .insert(resolution_key, dataset.as_str().to_string());
+                    }
+                }
+                let mut resolved = DatasetName::new(
+                    resolved_dataset(job, dd, raw_name, &job.dataset_resolutions),
+                    128,
+                )
+                .map_err(|_| HostProblem::Malformed)?;
+                let mut existing = false;
+                if disposition.status != DdStatusDisposition::New {
+                    match self.dataset_attributes(invocation, &resolved, effect_sequence) {
+                        Ok(_) => {
+                            existing = true;
+                            match self.resolve_dd_access_path(
+                                invocation,
+                                &resolved,
+                                effect_sequence,
+                            ) {
+                                Ok(target) => {
+                                    self.authorize(
+                                        invocation,
+                                        "DATASET",
+                                        target.as_str(),
+                                        access_intent,
+                                        next_effect_sequence(invocation, effect_sequence)?,
+                                    )?;
+                                    resolved = target;
+                                }
+                                Err(HostProblem::NotFound) => {}
+                                Err(problem) => return Err(problem),
+                            }
+                        }
+                        Err(HostProblem::NotFound) => {
+                            match self.resolve_dd_access_path(
+                                invocation,
+                                &resolved,
+                                effect_sequence,
+                            ) {
+                                Ok(target) => {
+                                    self.authorize(
+                                        invocation,
+                                        "DATASET",
+                                        target.as_str(),
+                                        access_intent,
+                                        next_effect_sequence(invocation, effect_sequence)?,
+                                    )?;
+                                    resolved = target;
+                                    existing = true;
+                                }
+                                Err(HostProblem::NotFound)
+                                    if disposition.status == DdStatusDisposition::Modify
+                                        && dd.member.is_none() => {}
+                                Err(problem) => return Err(problem),
+                            }
+                        }
+                        Err(problem) => return Err(problem),
+                    }
+                }
+                let mut create = disposition.status == DdStatusDisposition::New
+                    && dd.generation.is_none()
+                    && dd.member.is_none();
+                if disposition.status == DdStatusDisposition::Modify && dd.member.is_none() {
+                    create = !existing;
+                }
+                if create {
+                    let sequence = next_effect_sequence(invocation, effect_sequence)?;
+                    let key = effect_key(job, step, sequence)?;
+                    let mut definition =
+                        DatasetDefinition::compatibility(dataset_attributes_for_dd(dd)?);
+                    definition.lifecycle.state = DatasetLifecycleState::Allocated;
+                    let result = self.host.invoke(
+                        invocation,
+                        invocation.deadline_tick.saturating_sub(1),
+                        false,
+                        EffectRequest {
+                            run_unit: invocation.run_unit_id.clone(),
+                            sequence,
+                            deadline_tick: invocation.deadline_tick,
+                            idempotency_key: Some(key.clone()),
+                            request: HostRequest::Dataset(DatasetRequest::Define {
+                                dataset: resolved.clone(),
+                                definition: Box::new(definition),
                                 mutation: Mutation {
                                     sequence,
-                                    idempotency_key: key.clone(),
+                                    idempotency_key: key,
                                     transaction: Some(job.id.clone()),
                                 },
-                            },
-                            Some(key),
-                        )
-                    } else {
-                        (
-                            DatasetRequest::ResolveGeneration {
-                                base: base_name,
-                                relative,
-                            },
-                            None,
-                        )
-                    };
-                let result = self.host.invoke(
-                    invocation,
-                    invocation.deadline_tick.saturating_sub(1),
-                    false,
-                    EffectRequest {
-                        run_unit: invocation.run_unit_id.clone(),
-                        sequence,
-                        deadline_tick: invocation.deadline_tick,
-                        idempotency_key,
-                        request: HostRequest::Dataset(request),
-                    },
-                );
-                let HostResult::Dataset(DatasetResult::Generation { dataset, .. }) =
-                    result.effect.outcome?
-                else {
-                    return Err(HostProblem::ProviderFailure);
-                };
-                dataset_resolutions.insert(
-                    dataset_resolution_key(dd, raw_name),
-                    dataset.as_str().to_string(),
-                );
-                continue;
-            }
-            let mut create = dd.disposition.contains(&Disposition::New);
-            if dd.disposition.first() == Some(&Disposition::Modify) && dd.member.is_none() {
-                let sequence = next_effect_sequence(invocation, effect_sequence)?;
-                let result = self.host.invoke(
-                    invocation,
-                    invocation.deadline_tick.saturating_sub(1),
-                    false,
-                    EffectRequest {
-                        run_unit: invocation.run_unit_id.clone(),
-                        sequence,
-                        deadline_tick: invocation.deadline_tick,
-                        idempotency_key: None,
-                        request: HostRequest::Dataset(DatasetRequest::Attributes {
-                            dataset: DatasetName::new(name.clone(), 128)
-                                .map_err(|_| HostProblem::Malformed)?,
-                        }),
-                    },
-                );
-                match result.effect.outcome {
-                    Ok(HostResult::Dataset(DatasetResult::Attributes { .. })) => {}
-                    Err(HostProblem::NotFound) => create = true,
-                    Ok(_) => return Err(HostProblem::ProviderFailure),
-                    Err(problem) => return Err(problem),
+                            }),
+                        },
+                    );
+                    match result.effect.outcome? {
+                        HostResult::Dataset(_) => {}
+                        _ => return Err(HostProblem::ProviderFailure),
+                    }
                 }
+                if dd.temporary
+                    && !job
+                        .temporary_datasets
+                        .iter()
+                        .any(|dataset| dataset == resolved.as_str())
+                {
+                    job.temporary_datasets.push(resolved.as_str().to_string());
+                }
+                let requested_mode = if disposition.status == DdStatusDisposition::Shared {
+                    DatasetLockMode::Shared
+                } else {
+                    DatasetLockMode::Exclusive
+                };
+                lock_modes
+                    .entry(resolved.as_str().to_string())
+                    .and_modify(|mode| {
+                        if requested_mode == DatasetLockMode::Exclusive {
+                            *mode = DatasetLockMode::Exclusive;
+                        }
+                    })
+                    .or_insert(requested_mode);
+                allocations.push(DdRuntimeAllocation {
+                    ordinal: plan.ordinal,
+                    dataset: resolved,
+                    member: dd
+                        .member
+                        .as_ref()
+                        .map(|member| {
+                            MemberName::new(member, 8).map_err(|_| HostProblem::Malformed)
+                        })
+                        .transpose()?,
+                    disposition,
+                    lock_id: None,
+                    lock_owner: lock_owner.clone(),
+                });
             }
-            if create && dd.member.is_none() {
+            for (dataset, mode) in lock_modes {
                 let sequence = next_effect_sequence(invocation, effect_sequence)?;
                 let key = effect_key(job, step, sequence)?;
                 let result = self.host.invoke(
@@ -2663,10 +4252,15 @@ impl BatchService {
                         sequence,
                         deadline_tick: invocation.deadline_tick,
                         idempotency_key: Some(key.clone()),
-                        request: HostRequest::Dataset(DatasetRequest::Create {
-                            dataset: DatasetName::new(name, 128)
+                        request: HostRequest::Dataset(DatasetRequest::AcquireLock {
+                            dataset: DatasetName::new(&dataset, 128)
                                 .map_err(|_| HostProblem::Malformed)?,
-                            attributes: dataset_attributes_for_dd(dd)?,
+                            target: DatasetLockTarget::Dataset,
+                            owner: lock_owner.clone(),
+                            mode,
+                            now_tick: sequence,
+                            lease_ticks: invocation.deadline_tick.saturating_sub(sequence).max(1),
+                            transaction: Some(job.id.clone()),
                             mutation: Mutation {
                                 sequence,
                                 idempotency_key: key,
@@ -2675,98 +4269,217 @@ impl BatchService {
                         }),
                     },
                 );
-                match result.effect.outcome? {
-                    HostResult::Dataset(_) => {}
-                    _ => return Err(HostProblem::ProviderFailure),
+                let HostResult::Dataset(DatasetResult::Locks { locks }) = result.effect.outcome?
+                else {
+                    return Err(HostProblem::ProviderFailure);
+                };
+                let lock = locks.first().ok_or(HostProblem::ProviderFailure)?;
+                for allocation in &mut allocations {
+                    if allocation.dataset.as_str() == dataset {
+                        allocation.lock_id = Some(lock.lock_id.clone());
+                    }
                 }
             }
+            Ok(())
+        })();
+        if let Err(problem) = allocation_result {
+            let cleanup =
+                self.dispose_dds(invocation, job, step, &allocations, effect_sequence, true);
+            return Err(cleanup.err().unwrap_or(problem));
         }
-        Ok(())
+        Ok(allocations)
+    }
+
+    fn dataset_attributes(
+        &self,
+        invocation: &Invocation,
+        dataset: &DatasetName,
+        effect_sequence: &mut u64,
+    ) -> Result<DatasetAttributes, HostProblem> {
+        let sequence = next_effect_sequence(invocation, effect_sequence)?;
+        let result = self.host.invoke(
+            invocation,
+            invocation.deadline_tick.saturating_sub(1),
+            false,
+            EffectRequest {
+                run_unit: invocation.run_unit_id.clone(),
+                sequence,
+                deadline_tick: invocation.deadline_tick,
+                idempotency_key: None,
+                request: HostRequest::Dataset(DatasetRequest::Attributes {
+                    dataset: dataset.clone(),
+                }),
+            },
+        );
+        let HostResult::Dataset(DatasetResult::Attributes { attributes, .. }) =
+            result.effect.outcome?
+        else {
+            return Err(HostProblem::ProviderFailure);
+        };
+        Ok(attributes)
+    }
+
+    fn resolve_dd_access_path(
+        &self,
+        invocation: &Invocation,
+        dataset: &DatasetName,
+        effect_sequence: &mut u64,
+    ) -> Result<DatasetName, HostProblem> {
+        let mut current = dataset.clone();
+        for _ in 0..2 {
+            let DatasetResult::CatalogEntries { entries, .. } = self.ams_dataset_read(
+                invocation,
+                effect_sequence,
+                DatasetRequest::ListCatalog {
+                    pattern: current.as_str().to_string(),
+                    start: None,
+                    max_items: 2,
+                },
+            )?
+            else {
+                return Err(HostProblem::ProviderFailure);
+            };
+            let entry = entries
+                .into_iter()
+                .find(|entry| entry.name == current)
+                .ok_or(HostProblem::NotFound)?;
+            if !matches!(
+                entry.kind,
+                mainframe_env_host_api::CatalogEntryKind::Path
+                    | mainframe_env_host_api::CatalogEntryKind::AlternateIndex
+            ) {
+                return Err(HostProblem::NotFound);
+            }
+            current = entry.related.ok_or(HostProblem::InfrastructureFailure)?;
+        }
+        Ok(current)
+    }
+
+    fn read_dataset_records(
+        &self,
+        invocation: &Invocation,
+        allocation: &DdRuntimeAllocation,
+        effect_sequence: &mut u64,
+    ) -> Result<Vec<Vec<u8>>, HostProblem> {
+        let sequence = next_effect_sequence(invocation, effect_sequence)?;
+        let result = self.host.invoke(
+            invocation,
+            invocation.deadline_tick.saturating_sub(1),
+            false,
+            EffectRequest {
+                run_unit: invocation.run_unit_id.clone(),
+                sequence,
+                deadline_tick: invocation.deadline_tick,
+                idempotency_key: None,
+                request: HostRequest::Dataset(DatasetRequest::Read {
+                    dataset: allocation.dataset.clone(),
+                    member: allocation.member.clone(),
+                    key: None,
+                    max_records: 4_096,
+                    control: Default::default(),
+                }),
+            },
+        );
+        let HostResult::Dataset(DatasetResult::Records { records, .. }) = result.effect.outcome?
+        else {
+            return Err(HostProblem::ProviderFailure);
+        };
+        Ok(records)
     }
 
     fn hydrate_dds(
         &self,
         invocation: &Invocation,
         job: &Job,
-        dataset_resolutions: &BTreeMap<String, String>,
+        allocations: &[DdRuntimeAllocation],
         dds: &mut [crate::DdPlan],
         effect_sequence: &mut u64,
     ) -> Result<(), HostProblem> {
-        for dd in dds {
-            if is_program_library_dd(dd) {
+        let _ = job;
+        let mut start = 0usize;
+        while start < dds.len() {
+            let name = dds[start].name.clone();
+            let mut end = start + 1;
+            while end < dds.len()
+                && dds[end].concatenation
+                && dds[end].name.eq_ignore_ascii_case(&name)
+            {
+                end += 1;
+            }
+            if is_program_library_dd(&dds[start]) {
+                start = end;
                 continue;
             }
-            let Some(raw_name) = dd.dataset.clone() else {
-                continue;
-            };
-            if dd.disposition.contains(&Disposition::New) {
-                dd.ccsid = dataset_attributes_for_dd(dd)?.ccsid;
-                continue;
+            let mut payload = Vec::new();
+            let group_allocations = allocations
+                .iter()
+                .filter(|allocation| (start..end).contains(&allocation.ordinal))
+                .collect::<Vec<_>>();
+            let can_read_as_concatenation = group_allocations.len() > 1
+                && group_allocations.iter().all(|allocation| {
+                    !matches!(allocation.disposition.status, DdStatusDisposition::New)
+                        && allocation.member == group_allocations[0].member
+                })
+                && group_allocations.len() == end - start;
+            let mut ccsid = None;
+            for allocation in &group_allocations {
+                let attributes =
+                    self.dataset_attributes(invocation, &allocation.dataset, effect_sequence)?;
+                if ccsid.is_some() && ccsid != attributes.ccsid {
+                    return Err(HostProblem::Unsupported);
+                }
+                ccsid = attributes.ccsid;
             }
-            let attribute_sequence = next_effect_sequence(invocation, effect_sequence)?;
-            let attributes = self.host.invoke(
-                invocation,
-                invocation.deadline_tick.saturating_sub(1),
-                false,
-                EffectRequest {
-                    run_unit: invocation.run_unit_id.clone(),
-                    sequence: attribute_sequence,
-                    deadline_tick: invocation.deadline_tick,
-                    idempotency_key: None,
-                    request: HostRequest::Dataset(DatasetRequest::Attributes {
-                        dataset: DatasetName::new(
-                            resolved_dataset(job, dd, &raw_name, dataset_resolutions),
-                            128,
-                        )
-                        .map_err(|_| HostProblem::Malformed)?,
-                    }),
-                },
-            );
-            let HostResult::Dataset(DatasetResult::Attributes { attributes, .. }) =
-                attributes.effect.outcome?
-            else {
-                return Err(HostProblem::ProviderFailure);
-            };
-            dd.ccsid = attributes.ccsid;
-            let sequence = next_effect_sequence(invocation, effect_sequence)?;
-            let result = self.host.invoke(
-                invocation,
-                invocation.deadline_tick.saturating_sub(1),
-                false,
-                EffectRequest {
-                    run_unit: invocation.run_unit_id.clone(),
-                    sequence,
-                    deadline_tick: invocation.deadline_tick,
-                    idempotency_key: None,
-                    request: HostRequest::Dataset(DatasetRequest::Read {
-                        dataset: DatasetName::new(
-                            resolved_dataset(job, dd, &raw_name, dataset_resolutions),
-                            128,
-                        )
-                        .map_err(|_| HostProblem::Malformed)?,
-                        member: dd
-                            .member
-                            .as_ref()
-                            .map(|member| {
-                                MemberName::new(member, 8).map_err(|_| HostProblem::Malformed)
-                            })
-                            .transpose()?,
-                        key: None,
-                        max_records: 4_096,
-                        control: Default::default(),
-                    }),
-                },
-            );
-            let HostResult::Dataset(DatasetResult::Records { records, .. }) =
-                result.effect.outcome?
-            else {
-                return Err(HostProblem::ProviderFailure);
-            };
-            dd.inline_data.clear();
-            for record in records {
-                dd.inline_data.extend_from_slice(&record);
-                dd.inline_data.push(b'\n');
+            if can_read_as_concatenation {
+                let sequence = next_effect_sequence(invocation, effect_sequence)?;
+                let result = self.host.invoke(
+                    invocation,
+                    invocation.deadline_tick.saturating_sub(1),
+                    false,
+                    EffectRequest {
+                        run_unit: invocation.run_unit_id.clone(),
+                        sequence,
+                        deadline_tick: invocation.deadline_tick,
+                        idempotency_key: None,
+                        request: HostRequest::Dataset(DatasetRequest::ReadConcatenation {
+                            datasets: group_allocations
+                                .iter()
+                                .map(|allocation| allocation.dataset.clone())
+                                .collect(),
+                            member: group_allocations[0].member.clone(),
+                            max_records: 4_096,
+                        }),
+                    },
+                );
+                let HostResult::Dataset(DatasetResult::Records { records, .. }) =
+                    result.effect.outcome?
+                else {
+                    return Err(HostProblem::ProviderFailure);
+                };
+                append_inline_records(&mut payload, records);
+            } else {
+                for (ordinal, dd) in dds.iter().enumerate().take(end).skip(start) {
+                    if let Some(allocation) = allocations
+                        .iter()
+                        .find(|allocation| allocation.ordinal == ordinal)
+                    {
+                        if allocation.disposition.status != DdStatusDisposition::New {
+                            let records =
+                                self.read_dataset_records(invocation, allocation, effect_sequence)?;
+                            append_inline_records(&mut payload, records);
+                        }
+                    } else {
+                        payload.extend_from_slice(&dd.inline_data);
+                    }
+                }
             }
+            dds[start].inline_data = payload;
+            dds[start].ccsid = ccsid.or(dds[start].ccsid);
+            for dd in &mut dds[start + 1..end] {
+                dd.inline_data.clear();
+                dd.ccsid = ccsid.or(dd.ccsid);
+            }
+            start = end;
         }
         Ok(())
     }
@@ -2777,14 +4490,16 @@ impl BatchService {
         job: &mut Job,
         step: &StepPlan,
         dataset_resolutions: &BTreeMap<String, String>,
+        allocations: &[DdRuntimeAllocation],
         outputs: &BTreeMap<String, Vec<Vec<u8>>>,
         effect_sequence: &mut u64,
     ) -> Result<(), HostProblem> {
         for (name, records) in outputs {
-            let dd = step
+            let (ordinal, dd) = step
                 .dds
                 .iter()
-                .find(|dd| dd.name.eq_ignore_ascii_case(name))
+                .enumerate()
+                .find(|(_, dd)| dd.name.eq_ignore_ascii_case(name))
                 .ok_or(HostProblem::NotFound)?;
             if dd
                 .sysout
@@ -2797,8 +4512,10 @@ impl BatchService {
                         .push_str(std::str::from_utf8(record).map_err(|_| HostProblem::Malformed)?);
                     source.push('\n');
                 }
-                self.submit(
+                self.submit_internal_reader(
                     invocation,
+                    &job.id,
+                    &step.name,
                     &JclBundle {
                         primary: source,
                         ..Default::default()
@@ -2808,23 +4525,58 @@ impl BatchService {
                         InvocationLimits::default(),
                     )
                     .map_err(|_| HostProblem::ResourceExhausted)?,
-                    false,
                 )?;
-                append_spool(
+                self.append_spool_records(
+                    invocation,
                     job,
+                    Some(&step.name),
+                    Some(dd),
                     &dd.name,
-                    b"INTERNAL READER SUBMITTED".to_vec(),
-                    self.limits,
+                    vec![b"INTERNAL READER SUBMITTED".to_vec()],
                 )?;
                 continue;
             }
             if dd.sysout.is_some() {
-                for record in records {
-                    append_spool(job, &dd.name, record.clone(), self.limits)?;
-                }
+                self.append_spool_records(
+                    invocation,
+                    job,
+                    Some(&step.name),
+                    Some(dd),
+                    &dd.name,
+                    records.clone(),
+                )?;
                 continue;
             }
-            let Some(raw_name) = &dd.dataset else {
+            let fallback;
+            let allocation = if let Some(allocation) = allocations
+                .iter()
+                .find(|allocation| allocation.ordinal == ordinal)
+            {
+                allocation
+            } else if let Some(raw_name) = &dd.dataset {
+                let plans = plan_dd_allocations(&step.dds)?;
+                fallback = DdRuntimeAllocation {
+                    ordinal,
+                    dataset: DatasetName::new(
+                        resolved_dataset(job, dd, raw_name, dataset_resolutions),
+                        128,
+                    )
+                    .map_err(|_| HostProblem::Malformed)?,
+                    member: dd
+                        .member
+                        .as_ref()
+                        .map(|member| {
+                            MemberName::new(member, 8).map_err(|_| HostProblem::Malformed)
+                        })
+                        .transpose()?,
+                    disposition: plans[ordinal]
+                        .disposition
+                        .ok_or(HostProblem::InfrastructureFailure)?,
+                    lock_id: None,
+                    lock_owner: dd_lock_owner(job)?,
+                };
+                &fallback
+            } else {
                 continue;
             };
             let attribute_sequence = next_effect_sequence(invocation, effect_sequence)?;
@@ -2838,11 +4590,7 @@ impl BatchService {
                     deadline_tick: invocation.deadline_tick,
                     idempotency_key: None,
                     request: HostRequest::Dataset(DatasetRequest::Attributes {
-                        dataset: DatasetName::new(
-                            resolved_dataset(job, dd, raw_name, dataset_resolutions),
-                            128,
-                        )
-                        .map_err(|_| HostProblem::Malformed)?,
+                        dataset: allocation.dataset.clone(),
                     }),
                 },
             );
@@ -2853,6 +4601,9 @@ impl BatchService {
             };
             let records = normalize_records(records, &attributes)?;
             if attributes.organization == DatasetOrganization::Relative {
+                if allocation.disposition.status == DdStatusDisposition::Modify {
+                    return Err(HostProblem::Unsupported);
+                }
                 for (position, record) in records.into_iter().enumerate() {
                     let sequence = next_effect_sequence(invocation, effect_sequence)?;
                     let key = effect_key(job, step, sequence)?;
@@ -2866,11 +4617,7 @@ impl BatchService {
                             deadline_tick: invocation.deadline_tick,
                             idempotency_key: Some(key.clone()),
                             request: HostRequest::Dataset(DatasetRequest::WriteRelative {
-                                dataset: DatasetName::new(
-                                    resolved_dataset(job, dd, raw_name, dataset_resolutions),
-                                    128,
-                                )
-                                .map_err(|_| HostProblem::Malformed)?,
+                                dataset: allocation.dataset.clone(),
                                 record_number: u64::try_from(position + 1)
                                     .map_err(|_| HostProblem::ResourceExhausted)?,
                                 record,
@@ -2878,7 +4625,7 @@ impl BatchService {
                                 mutation: Mutation {
                                     sequence,
                                     idempotency_key: key,
-                                    transaction: Some(job.id.clone()),
+                                    transaction: allocation.lock_id.clone(),
                                 },
                             }),
                         },
@@ -2894,6 +4641,31 @@ impl BatchService {
             }
             let sequence = next_effect_sequence(invocation, effect_sequence)?;
             let key = effect_key(job, step, sequence)?;
+            let request = if allocation.disposition.status == DdStatusDisposition::Modify {
+                DatasetRequest::Append {
+                    dataset: allocation.dataset.clone(),
+                    member: allocation.member.clone(),
+                    records,
+                    expected_version: None,
+                    mutation: Mutation {
+                        sequence,
+                        idempotency_key: key.clone(),
+                        transaction: allocation.lock_id.clone(),
+                    },
+                }
+            } else {
+                DatasetRequest::Write {
+                    dataset: allocation.dataset.clone(),
+                    member: allocation.member.clone(),
+                    records,
+                    expected_version: None,
+                    mutation: Mutation {
+                        sequence,
+                        idempotency_key: key.clone(),
+                        transaction: allocation.lock_id.clone(),
+                    },
+                }
+            };
             let result = self.host.invoke(
                 invocation,
                 invocation.deadline_tick.saturating_sub(1),
@@ -2903,27 +4675,7 @@ impl BatchService {
                     sequence,
                     deadline_tick: invocation.deadline_tick,
                     idempotency_key: Some(key.clone()),
-                    request: HostRequest::Dataset(DatasetRequest::Write {
-                        dataset: DatasetName::new(
-                            resolved_dataset(job, dd, raw_name, dataset_resolutions),
-                            128,
-                        )
-                        .map_err(|_| HostProblem::Malformed)?,
-                        member: dd
-                            .member
-                            .as_ref()
-                            .map(|member| {
-                                MemberName::new(member, 8).map_err(|_| HostProblem::Malformed)
-                            })
-                            .transpose()?,
-                        records,
-                        expected_version: None,
-                        mutation: Mutation {
-                            sequence,
-                            idempotency_key: key,
-                            transaction: Some(job.id.clone()),
-                        },
-                    }),
+                    request: HostRequest::Dataset(request),
                 },
             );
             if !matches!(
@@ -2939,59 +4691,64 @@ impl BatchService {
     fn dispose_dds(
         &self,
         invocation: &Invocation,
-        job: &Job,
+        job: &mut Job,
         step: &StepPlan,
-        dataset_resolutions: &BTreeMap<String, String>,
+        allocations: &[DdRuntimeAllocation],
         effect_sequence: &mut u64,
         abnormal: bool,
     ) -> Result<(), HostProblem> {
-        for dd in &step.dds {
-            if is_program_library_dd(dd) {
+        let mut first_problem = None;
+        let mut disposed = BTreeMap::<String, ()>::new();
+        let mut deleted_datasets = BTreeMap::<String, ()>::new();
+        for allocation in allocations {
+            let terminal = if abnormal {
+                allocation.disposition.abnormal
+            } else {
+                allocation.disposition.normal
+            };
+            if matches!(
+                terminal,
+                DdTerminalDisposition::Pass | DdTerminalDisposition::Keep
+            ) {
                 continue;
             }
-            let Some(raw_name) = &dd.dataset else {
-                continue;
-            };
-            let terminal = if abnormal {
-                dd.disposition.get(2)
-            } else {
-                dd.disposition.get(1)
-            };
-            let delete = terminal == Some(&Disposition::Delete)
-                || (dd.temporary
-                    && !matches!(
-                        terminal,
-                        Some(
-                            Disposition::Pass
-                                | Disposition::Keep
-                                | Disposition::Catalog
-                                | Disposition::Uncatalog
-                        )
-                    ));
-            if !delete {
+            let disposition_key = format!(
+                "{}({})",
+                allocation.dataset.as_str(),
+                allocation.member.as_ref().map_or("", MemberName::as_str)
+            );
+            if disposed.insert(disposition_key, ()).is_some() {
                 continue;
             }
             let sequence = next_effect_sequence(invocation, effect_sequence)?;
             let key = effect_key(job, step, sequence)?;
-            let request = DatasetRequest::Delete {
-                dataset: DatasetName::new(
-                    resolved_dataset(job, dd, raw_name, dataset_resolutions),
-                    128,
-                )
-                .map_err(|_| HostProblem::Malformed)?,
-                member: dd
-                    .member
-                    .as_ref()
-                    .map(|member| MemberName::new(member, 8).map_err(|_| HostProblem::Malformed))
-                    .transpose()?,
-                expected_version: None,
-                purge: true,
-                current_date: None,
-                mutation: Mutation {
-                    sequence,
-                    idempotency_key: key.clone(),
-                    transaction: Some(job.id.clone()),
+            let mutation = Mutation {
+                sequence,
+                idempotency_key: key.clone(),
+                transaction: allocation.lock_id.clone(),
+            };
+            let request = match terminal {
+                DdTerminalDisposition::Delete => DatasetRequest::Delete {
+                    dataset: allocation.dataset.clone(),
+                    member: allocation.member.clone(),
+                    expected_version: None,
+                    purge: true,
+                    current_date: None,
+                    mutation,
                 },
+                DdTerminalDisposition::Catalog => DatasetRequest::SetLifecycle {
+                    dataset: allocation.dataset.clone(),
+                    state: DatasetLifecycleState::Cataloged,
+                    expected_version: None,
+                    mutation,
+                },
+                DdTerminalDisposition::Uncatalog => DatasetRequest::SetLifecycle {
+                    dataset: allocation.dataset.clone(),
+                    state: DatasetLifecycleState::Allocated,
+                    expected_version: None,
+                    mutation,
+                },
+                DdTerminalDisposition::Pass | DdTerminalDisposition::Keep => unreachable!(),
             };
             let outcome = self.host.invoke(
                 invocation,
@@ -3005,7 +4762,56 @@ impl BatchService {
                     request: HostRequest::Dataset(request),
                 },
             );
-            outcome.effect.outcome?;
+            if let Err(problem) = outcome.effect.outcome {
+                first_problem.get_or_insert(problem);
+            } else if terminal == DdTerminalDisposition::Delete {
+                job.temporary_datasets
+                    .retain(|dataset| dataset != allocation.dataset.as_str());
+                if allocation.member.is_none() {
+                    deleted_datasets.insert(allocation.dataset.as_str().to_string(), ());
+                }
+            }
+        }
+        let mut released = BTreeMap::<String, ()>::new();
+        for allocation in allocations {
+            if deleted_datasets.contains_key(allocation.dataset.as_str()) {
+                continue;
+            }
+            let Some(lock_id) = &allocation.lock_id else {
+                continue;
+            };
+            if released.insert(lock_id.clone(), ()).is_some() {
+                continue;
+            }
+            let sequence = next_effect_sequence(invocation, effect_sequence)?;
+            let key = effect_key(job, step, sequence)?;
+            let result = self.host.invoke(
+                invocation,
+                invocation.deadline_tick.saturating_sub(1),
+                false,
+                EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence,
+                    deadline_tick: invocation.deadline_tick,
+                    idempotency_key: Some(key.clone()),
+                    request: HostRequest::Dataset(DatasetRequest::ReleaseLock {
+                        dataset: allocation.dataset.clone(),
+                        lock_id: lock_id.clone(),
+                        owner: allocation.lock_owner.clone(),
+                        mutation: Mutation {
+                            sequence,
+                            idempotency_key: key,
+                            transaction: Some(job.id.clone()),
+                        },
+                    }),
+                },
+            );
+            if let Err(problem) = result.effect.outcome {
+                first_problem.get_or_insert(problem);
+            }
+        }
+        if let Some(problem) = first_problem {
+            return Err(problem);
         }
         Ok(())
     }
@@ -3045,6 +4851,7 @@ impl BatchService {
 
     pub fn spool(
         &self,
+        invocation: &Invocation,
         id: &str,
         file: &str,
         start: usize,
@@ -3053,60 +4860,304 @@ impl BatchService {
         if max == 0 || max > self.limits.max_spool_records {
             return Err(HostProblem::ResourceExhausted);
         }
-        let state = self.lock()?;
-        let records = state
+        self.ensure_spool_migrated(invocation, id)?;
+        let job = self
+            .lock()?
             .jobs
             .get(id)
-            .ok_or(HostProblem::NotFound)?
-            .spool
-            .get(file)
+            .cloned()
             .ok_or(HostProblem::NotFound)?;
-        Ok((
-            records.iter().skip(start).take(max).cloned().collect(),
-            start.saturating_add(max) < records.len(),
-        ))
+        let requested = file.to_ascii_uppercase();
+        let files = if job.spool_files.contains_key(&requested) {
+            vec![requested]
+        } else {
+            job.spool_files
+                .iter()
+                .filter(|(_, descriptor)| descriptor.dd_name == requested)
+                .map(|(name, _)| name.clone())
+                .collect::<Vec<_>>()
+        };
+        if files.is_empty() {
+            return Err(HostProblem::NotFound);
+        }
+        self.read_spool_files(invocation, &job, &files, start, max)
     }
 
-    pub fn spool_files(&self, id: &str) -> Result<Vec<(usize, String, usize, usize)>, HostProblem> {
-        let state = self.lock()?;
-        let job = state.jobs.get(id).ok_or(HostProblem::NotFound)?;
-        Ok(job
-            .spool
-            .iter()
+    pub fn spool_files(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+    ) -> Result<Vec<(usize, String, usize, usize)>, HostProblem> {
+        self.ensure_spool_migrated(invocation, id)?;
+        let job = self
+            .lock()?
+            .jobs
+            .get(id)
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
+        self.authorize(
+            invocation,
+            "JESJOBS",
+            &format!("JOB.{}.*", job.name),
+            AccessIntent::Read,
+            1,
+        )?;
+        let result = self.host.invoke(
+            invocation,
+            invocation.deadline_tick.saturating_sub(1),
+            false,
+            EffectRequest {
+                run_unit: invocation.run_unit_id.clone(),
+                sequence: 2,
+                deadline_tick: invocation.deadline_tick,
+                idempotency_key: None,
+                request: HostRequest::Spool(SpoolRequest::List {
+                    job: JobName::new(&job.id, 128).map_err(|_| HostProblem::Malformed)?,
+                }),
+            },
+        );
+        let HostResult::Spool(SpoolResult::Files { files }) = result.effect.outcome? else {
+            return Err(HostProblem::ProviderFailure);
+        };
+        files
+            .into_iter()
             .enumerate()
-            .map(|(id, (name, records))| {
-                (
-                    id,
-                    name.clone(),
-                    records.len(),
-                    records.iter().map(Vec::len).sum(),
-                )
+            .map(|(index, file)| {
+                if !job.spool_files.contains_key(&file.file) {
+                    return Err(HostProblem::InfrastructureFailure);
+                }
+                Ok((
+                    index,
+                    file.file,
+                    usize::try_from(file.record_count)
+                        .map_err(|_| HostProblem::ResourceExhausted)?,
+                    usize::try_from(file.byte_count).map_err(|_| HostProblem::ResourceExhausted)?,
+                ))
             })
-            .collect())
+            .collect()
     }
 
     pub fn spool_by_index(
         &self,
+        invocation: &Invocation,
         id: &str,
         file: usize,
         start: usize,
         max: usize,
     ) -> Result<(Vec<Vec<u8>>, bool), HostProblem> {
-        let state = self.lock()?;
-        let job = state.jobs.get(id).ok_or(HostProblem::NotFound)?;
-        let records = job.spool.values().nth(file).ok_or(HostProblem::NotFound)?;
         if max == 0 || max > self.limits.max_spool_records {
             return Err(HostProblem::ResourceExhausted);
         }
-        Ok((
-            records.iter().skip(start).take(max).cloned().collect(),
-            start.saturating_add(max) < records.len(),
-        ))
+        self.ensure_spool_migrated(invocation, id)?;
+        let job = self
+            .lock()?
+            .jobs
+            .get(id)
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
+        let name = job
+            .spool_files
+            .keys()
+            .nth(file)
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
+        self.read_spool_files(invocation, &job, &[name], start, max)
     }
 
-    pub fn purge(&self, id: &str) -> Result<(), HostProblem> {
+    pub fn output_groups(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+    ) -> Result<Vec<JesOutputGroup>, HostProblem> {
+        self.ensure_spool_migrated(invocation, id)?;
+        let job = self
+            .lock()?
+            .jobs
+            .get(id)
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
+        self.authorize(
+            invocation,
+            "JESJOBS",
+            &format!("JOB.{}.*", job.name),
+            AccessIntent::Read,
+            1,
+        )?;
+        Ok(job.output_groups.into_values().collect())
+    }
+
+    pub fn hold_output(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+        output_id: &str,
+    ) -> Result<JesOutputGroup, HostProblem> {
+        self.ensure_spool_migrated(invocation, id)?;
+        self.transition_output(
+            invocation,
+            id,
+            output_id,
+            &[JesOutputState::AwaitingSelection, JesOutputState::Released],
+            JesOutputState::Held,
+            JesSpoolState::Held,
+            "output-held",
+        )
+    }
+
+    pub fn release_output(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+        output_id: &str,
+    ) -> Result<JesOutputGroup, HostProblem> {
+        self.ensure_spool_migrated(invocation, id)?;
+        self.transition_output(
+            invocation,
+            id,
+            output_id,
+            &[JesOutputState::Held],
+            JesOutputState::Released,
+            JesSpoolState::Released,
+            "output-released",
+        )
+    }
+
+    pub fn select_output(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+        output_id: &str,
+    ) -> Result<JesOutputGroup, HostProblem> {
+        self.ensure_spool_migrated(invocation, id)?;
+        self.transition_output(
+            invocation,
+            id,
+            output_id,
+            &[JesOutputState::AwaitingSelection, JesOutputState::Released],
+            JesOutputState::Selected,
+            JesSpoolState::Selected,
+            "output-selected",
+        )
+    }
+
+    pub fn complete_selected_output(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+        output_id: &str,
+    ) -> Result<JesOutputGroup, HostProblem> {
+        self.ensure_spool_migrated(invocation, id)?;
+        self.transition_output(
+            invocation,
+            id,
+            output_id,
+            &[JesOutputState::Selected, JesOutputState::Printing],
+            JesOutputState::Complete,
+            JesSpoolState::Complete,
+            "output-complete",
+        )
+    }
+
+    pub fn route_output(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+        output_id: &str,
+        destination: &str,
+        writer: Option<&str>,
+        forms: Option<&str>,
+    ) -> Result<JesOutputGroup, HostProblem> {
+        validate_output_route(destination, writer, forms)?;
+        self.ensure_spool_migrated(invocation, id)?;
         let mut state = self.lock()?;
-        let job = state.jobs.get(id).ok_or(HostProblem::NotFound)?;
+        let current = state.jobs.get(id).cloned().ok_or(HostProblem::NotFound)?;
+        let current_group = current
+            .output_groups
+            .get(output_id)
+            .ok_or(HostProblem::NotFound)?;
+        if !matches!(
+            current_group.state,
+            JesOutputState::AwaitingSelection | JesOutputState::Held | JesOutputState::Released
+        ) {
+            return Err(invalid_state());
+        }
+        self.authorize(
+            invocation,
+            "JESJOBS",
+            &format!("JOB.{}.{}", current.name, output_id),
+            AccessIntent::Control,
+            1,
+        )?;
+        ensure_job_event_capacity(&current, self.limits.max_events, 1)?;
+        let mut next = current.clone();
+        next.version = next_job_version(next.version)?;
+        let group = next
+            .output_groups
+            .get_mut(output_id)
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        group.destination = destination.to_ascii_uppercase();
+        group.writer = writer.map(str::to_ascii_uppercase);
+        group.forms = forms.map(str::to_ascii_uppercase);
+        for file in &group.spool_files {
+            let descriptor = next
+                .spool_files
+                .get_mut(file)
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            descriptor.destination.clone_from(&group.destination);
+            descriptor.writer.clone_from(&group.writer);
+            descriptor.forms.clone_from(&group.forms);
+        }
+        push_job_event(
+            &mut next,
+            self.limits.max_events,
+            format!("output-routed:{output_id}"),
+        )?;
+        self.persist_job(&next, Some(current.version))?;
+        let result = next
+            .output_groups
+            .get(output_id)
+            .cloned()
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        state.jobs.insert(id.into(), next);
+        Ok(result)
+    }
+
+    pub fn purge_expired(
+        &self,
+        invocation: &Invocation,
+        now_tick: u64,
+        max: usize,
+    ) -> Result<Vec<String>, HostProblem> {
+        if max == 0 || max > self.limits.max_jobs {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let ids = self
+            .lock()?
+            .jobs
+            .values()
+            .filter(|job| {
+                job.state.terminal()
+                    && !job.output_groups.is_empty()
+                    && job
+                        .output_groups
+                        .values()
+                        .all(|group| group.retain_until_tick <= now_tick)
+            })
+            .take(max)
+            .map(|job| job.id.clone())
+            .collect::<Vec<_>>();
+        let mut purged = Vec::with_capacity(ids.len());
+        for id in ids {
+            self.purge(invocation, &id)?;
+            purged.push(id);
+        }
+        Ok(purged)
+    }
+
+    pub fn purge(&self, invocation: &Invocation, id: &str) -> Result<(), HostProblem> {
+        self.ensure_spool_migrated(invocation, id)?;
+        let mut state = self.lock()?;
+        let mut job = state.jobs.get(id).cloned().ok_or(HostProblem::NotFound)?;
         if !matches!(
             job.state,
             JobState::Completed | JobState::Failed | JobState::Cancelled
@@ -3117,6 +5168,36 @@ impl BatchService {
                 response2: 0,
             });
         }
+        self.authorize(
+            invocation,
+            "JESJOBS",
+            &format!("JOB.{}", job.name),
+            AccessIntent::Alter,
+            1,
+        )?;
+        if !job.purge_pending {
+            ensure_job_event_capacity(&job, self.limits.max_events, 1)?;
+            let current_version = job.version;
+            job.version = job
+                .version
+                .checked_add(1)
+                .ok_or(HostProblem::ResourceExhausted)?;
+            job.purge_pending = true;
+            push_job_event(&mut job, self.limits.max_events, "purge-pending")?;
+            self.persist_job(&job, Some(current_version))?;
+            state.jobs.insert(id.into(), job.clone());
+        }
+        match self.purge_spool_authority(invocation, &mut job)? {
+            SpoolResult::Mutated { .. } => {}
+            SpoolResult::PurgePending { .. } => return Err(HostProblem::UnknownOutcome),
+            _ => return Err(HostProblem::ProviderFailure),
+        }
+        if let Some(checkpoints) = &self.checkpoint_store {
+            match checkpoints.delete_checkpoint(&checkpoint_execution_id(id)?) {
+                Ok(()) | Err(StoreError::NotFound) => {}
+                Err(_) => return Err(HostProblem::UnknownOutcome),
+            }
+        }
         self.store
             .delete_provider_state("jes-job", id, job.version)
             .map_err(store_error)?;
@@ -3126,8 +5207,172 @@ impl BatchService {
         Ok(())
     }
 
+    fn ensure_spool_migrated(&self, invocation: &Invocation, id: &str) -> Result<(), HostProblem> {
+        let mut state = self.lock()?;
+        let current = state.jobs.get(id).cloned().ok_or(HostProblem::NotFound)?;
+        if current.spool.is_empty() {
+            return Ok(());
+        }
+        ensure_job_event_capacity(&current, self.limits.max_events, 1)?;
+        let mut next = current.clone();
+        for (file, records) in current.spool {
+            if !records.is_empty() {
+                self.append_spool_records(invocation, &mut next, None, None, &file, records)?;
+            }
+        }
+        next.spool.clear();
+        next.version = next_job_version(next.version)?;
+        push_job_event(
+            &mut next,
+            self.limits.max_events,
+            "migrated:embedded-spool-to-artifacts",
+        )?;
+        self.persist_job(&next, Some(current.version))?;
+        state.jobs.insert(id.into(), next);
+        Ok(())
+    }
+
+    fn read_spool_files(
+        &self,
+        invocation: &Invocation,
+        job: &Job,
+        files: &[String],
+        start: usize,
+        max: usize,
+    ) -> Result<(Vec<Vec<u8>>, bool), HostProblem> {
+        let total_records = files.iter().try_fold(0usize, |total, file| {
+            let descriptor = job
+                .spool_files
+                .get(file)
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            total
+                .checked_add(descriptor.record_count)
+                .ok_or(HostProblem::ResourceExhausted)
+        })?;
+        let mut skip = start;
+        let mut records = Vec::with_capacity(max.min(total_records.saturating_sub(start)));
+        for (index, file) in files.iter().enumerate() {
+            let descriptor = job
+                .spool_files
+                .get(file)
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            if skip >= descriptor.record_count {
+                skip -= descriptor.record_count;
+                continue;
+            }
+            let remaining = max.saturating_sub(records.len());
+            if remaining == 0 {
+                break;
+            }
+            let sequence = u64::try_from(index)
+                .ok()
+                .and_then(|index| index.checked_mul(2))
+                .and_then(|sequence| sequence.checked_add(1))
+                .ok_or(HostProblem::ResourceExhausted)?;
+            self.authorize(
+                invocation,
+                "JESJOBS",
+                &spool_resource(job, file),
+                AccessIntent::Read,
+                sequence,
+            )?;
+            let result = self.host.invoke(
+                invocation,
+                invocation.deadline_tick.saturating_sub(1),
+                false,
+                EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence: sequence.saturating_add(1),
+                    deadline_tick: invocation.deadline_tick,
+                    idempotency_key: None,
+                    request: HostRequest::Spool(SpoolRequest::Read {
+                        job: JobName::new(&job.id, 128).map_err(|_| HostProblem::Malformed)?,
+                        file: file.clone(),
+                        start: u64::try_from(skip).map_err(|_| HostProblem::ResourceExhausted)?,
+                        max_records: u32::try_from(remaining)
+                            .map_err(|_| HostProblem::ResourceExhausted)?,
+                    }),
+                },
+            );
+            let HostResult::Spool(SpoolResult::Records {
+                records: selected, ..
+            }) = result.effect.outcome?
+            else {
+                return Err(HostProblem::ProviderFailure);
+            };
+            records.extend(selected);
+            skip = 0;
+        }
+        let consumed = start.saturating_add(records.len());
+        Ok((records, consumed < total_records))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn transition_output(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+        output_id: &str,
+        from: &[JesOutputState],
+        to: JesOutputState,
+        spool_state: JesSpoolState,
+        event: &str,
+    ) -> Result<JesOutputGroup, HostProblem> {
+        let mut state = self.lock()?;
+        let current = state.jobs.get(id).cloned().ok_or(HostProblem::NotFound)?;
+        let current_group = current
+            .output_groups
+            .get(output_id)
+            .ok_or(HostProblem::NotFound)?;
+        if !from.contains(&current_group.state) || !current_group.state.can_transition_to(to) {
+            return Err(invalid_state());
+        }
+        self.authorize(
+            invocation,
+            "JESJOBS",
+            &format!("JOB.{}.{}", current.name, output_id),
+            AccessIntent::Control,
+            1,
+        )?;
+        ensure_job_event_capacity(&current, self.limits.max_events, 1)?;
+        let mut next = current.clone();
+        next.version = next_job_version(next.version)?;
+        let files = {
+            let group = next
+                .output_groups
+                .get_mut(output_id)
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            group.state = to;
+            group.spool_files.clone()
+        };
+        for file in files {
+            let descriptor = next
+                .spool_files
+                .get_mut(&file)
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            if !descriptor.state.can_transition_to(spool_state) {
+                return Err(invalid_state());
+            }
+            descriptor.state = spool_state;
+        }
+        push_job_event(
+            &mut next,
+            self.limits.max_events,
+            format!("{event}:{output_id}"),
+        )?;
+        self.persist_job(&next, Some(current.version))?;
+        let result = next
+            .output_groups
+            .get(output_id)
+            .cloned()
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        state.jobs.insert(id.into(), next);
+        Ok(result)
+    }
+
     fn transition(
         &self,
+        invocation: &Invocation,
         id: &str,
         from: JobState,
         to: JobState,
@@ -3136,20 +5381,124 @@ impl BatchService {
         let mut state = self.lock()?;
         let current = state.jobs.get(id).cloned().ok_or(HostProblem::NotFound)?;
         if current.state != from {
-            return Err(HostProblem::Condition {
-                name: "INVALID_STATE".into(),
-                response: 409,
-                response2: 0,
-            });
+            return Err(invalid_state());
         }
+        self.authorize(
+            invocation,
+            "JESJOBS",
+            &format!("JOB.{}", current.name),
+            AccessIntent::Control,
+            1,
+        )?;
+        ensure_job_event_capacity(&current, self.limits.max_events, 1)?;
         let mut next = current.clone();
-        next.version += 1;
+        next.version = next_job_version(next.version)?;
         next.state = to;
-        next.events.push(event.into());
+        push_job_event(&mut next, self.limits.max_events, event)?;
         self.persist_job(&next, Some(current.version))?;
         let result = snapshot(&next);
         state.jobs.insert(id.into(), next);
         Ok(result)
+    }
+
+    fn mutate_queued_job(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+        event: &str,
+        mutation: impl FnOnce(&mut Job) -> Result<(), HostProblem>,
+    ) -> Result<JobSnapshot, HostProblem> {
+        let mut state = self.lock()?;
+        let current = state.jobs.get(id).cloned().ok_or(HostProblem::NotFound)?;
+        if !matches!(current.state, JobState::Queued | JobState::Held) {
+            return Err(invalid_state());
+        }
+        self.authorize(
+            invocation,
+            "JESJOBS",
+            &format!("JOB.{}", current.name),
+            AccessIntent::Control,
+            1,
+        )?;
+        ensure_job_event_capacity(&current, self.limits.max_events, 1)?;
+        let mut next = current.clone();
+        mutation(&mut next)?;
+        next.version = next
+            .version
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        push_job_event(&mut next, self.limits.max_events, event)?;
+        self.persist_job(&next, Some(current.version))?;
+        let result = snapshot(&next);
+        state.jobs.insert(id.into(), next);
+        Ok(result)
+    }
+
+    fn set_initiator(
+        &self,
+        invocation: &Invocation,
+        initiator: &str,
+        enabled: bool,
+    ) -> Result<(), HostProblem> {
+        validate_jes_name(initiator)?;
+        let initiator = initiator.to_ascii_uppercase();
+        self.authorize(
+            invocation,
+            "OPERCMDS",
+            &format!("JES2.INITIATOR.{initiator}"),
+            AccessIntent::Control,
+            1,
+        )?;
+        let mut durable = self
+            .scheduler
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let current = durable
+            .configuration
+            .initiators
+            .get(&initiator)
+            .ok_or(HostProblem::NotFound)?;
+        if current.enabled == enabled {
+            return Ok(());
+        }
+        let mut configuration = durable.configuration.clone();
+        configuration
+            .initiators
+            .get_mut(&initiator)
+            .ok_or(HostProblem::InfrastructureFailure)?
+            .enabled = enabled;
+        configuration.validate()?;
+        let version = durable
+            .store_version
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: SCHEDULER_STATE_NAMESPACE.into(),
+                    key: CONFIGURATION_STATE_KEY.into(),
+                    version,
+                    payload: serde_json::to_vec(&configuration)
+                        .map_err(|_| HostProblem::InfrastructureFailure)?,
+                },
+                (durable.store_version > 0).then_some(durable.store_version),
+            )
+            .map_err(store_error)?;
+        durable.store_version = version;
+        durable.configuration = configuration;
+        Ok(())
+    }
+
+    fn default_route(&self) -> Result<JesJobRoute, HostProblem> {
+        let topology = self.topology()?;
+        let route = JesJobRoute {
+            origin_node: topology.local_node.clone(),
+            execution_node: topology.local_node.clone(),
+            output_node: topology.local_node.clone(),
+            owner_member: None,
+        };
+        topology.validate_route(&route)?;
+        Ok(route)
     }
 
     fn authorize(
@@ -3207,6 +5556,66 @@ impl BatchService {
         self.store
             .put_provider_state(job_record(job)?, expected)
             .map_err(store_error)
+    }
+
+    fn persist_checkpoint(&self, job: &Job, effect_sequence: u64) -> Result<(), HostProblem> {
+        let Some(store) = &self.checkpoint_store else {
+            return Ok(());
+        };
+        if job.attempt == 0 {
+            return Ok(());
+        }
+        let checkpoint = JesCheckpoint {
+            schema_version: crate::JES_CHECKPOINT_CONTRACT.into(),
+            job_id: job.id.clone(),
+            job_version: job.version,
+            attempt: job.attempt,
+            active_step: job.active_step.clone(),
+            effect_sequence,
+            committed_steps: job
+                .steps
+                .iter()
+                .filter(|step| step.state.terminal())
+                .map(|step| step.name.clone())
+                .collect(),
+            dataset_resolutions: job.dataset_resolutions.clone(),
+            cancellation: job.cancellation.clone(),
+            state_digest: job_checkpoint_digest(job)?,
+        };
+        checkpoint.validate(self.jcl_limits.max_steps, self.limits.max_events)?;
+        let payload =
+            serde_json::to_vec(&checkpoint).map_err(|_| HostProblem::InfrastructureFailure)?;
+        let payload_digest: [u8; 32] = Sha256::digest(&payload).into();
+        store
+            .put_checkpoint(CheckpointRecord {
+                execution_id: checkpoint_execution_id(&job.id)?,
+                run_unit_id: RunUnitId::new(
+                    format!("jes-run-{}", job.id),
+                    InvocationLimits::default(),
+                )
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+                session_id: None,
+                schema_version: 1,
+                machine_schema_version: 2,
+                artifact: ArtifactRef::new(
+                    "mainframe-env-batch@0.8.0",
+                    InvocationLimits::default(),
+                )
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+                provider_generation: "1".into(),
+                required_host_interfaces: BTreeMap::new(),
+                effect_sequence,
+                transaction: Some(job.id.clone()),
+                principal: PrincipalId::new(&job.owner, InvocationLimits::default())
+                    .map_err(|_| HostProblem::InfrastructureFailure)?,
+                security_classification: "batch".into(),
+                encryption_key_reference: None,
+                payload_size: u64::try_from(payload.len())
+                    .map_err(|_| HostProblem::ResourceExhausted)?,
+                payload_digest,
+                payload,
+            })
+            .map_err(|_| HostProblem::UnknownOutcome)
     }
 
     fn persist_controllers(
@@ -3276,6 +5685,18 @@ fn dataset_attributes_for_dd(dd: &crate::DdPlan) -> Result<DatasetAttributes, Ho
     })
 }
 
+fn dd_lock_owner(job: &Job) -> Result<PrincipalId, HostProblem> {
+    PrincipalId::new(&job.owner, InvocationLimits::default())
+        .map_err(|_| HostProblem::ResourceExhausted)
+}
+
+fn append_inline_records(target: &mut Vec<u8>, records: Vec<Vec<u8>>) {
+    for record in records {
+        target.extend_from_slice(&record);
+        target.push(b'\n');
+    }
+}
+
 fn is_program_library_dd(dd: &crate::DdPlan) -> bool {
     dd.name.eq_ignore_ascii_case("STEPLIB")
         || dd.name.eq_ignore_ascii_case("JOBLIB")
@@ -3327,13 +5748,11 @@ fn resolved_dataset(
             job.id,
             raw.trim_start_matches('&').to_ascii_uppercase()
         )
-    } else if dd.generation.is_some() {
+    } else {
         resolutions
             .get(&dataset_resolution_key(dd, raw))
             .cloned()
             .unwrap_or_else(|| raw.to_ascii_uppercase())
-    } else {
-        raw.to_ascii_uppercase()
     }
 }
 
@@ -3470,14 +5889,40 @@ fn ams_condition_code(problem: &HostProblem) -> u8 {
     }
 }
 
+fn abend_code(problem: &HostProblem) -> Option<String> {
+    match problem {
+        HostProblem::Condition { name, .. } => name.strip_prefix("ABEND:").and_then(|code| {
+            (!code.is_empty()
+                && code.len() <= 16
+                && code
+                    .bytes()
+                    .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit()))
+            .then(|| code.to_string())
+        }),
+        _ => None,
+    }
+}
+
+fn problem_category(problem: &HostProblem) -> &'static str {
+    match problem {
+        HostProblem::Malformed => "malformed",
+        HostProblem::Unsupported | HostProblem::UnsupportedCapability { .. } => "unsupported",
+        HostProblem::NotFound => "not-found",
+        HostProblem::Condition { .. } => "condition",
+        HostProblem::Unauthorized => "unauthorized",
+        HostProblem::Cancelled => "cancelled",
+        HostProblem::TimedOut => "timed-out",
+        HostProblem::ResourceExhausted => "resource-exhausted",
+        HostProblem::ProviderFailure => "provider-failure",
+        HostProblem::InfrastructureFailure => "infrastructure-failure",
+        HostProblem::MissingIdempotency => "missing-idempotency",
+        HostProblem::IdempotencyConflict => "idempotency-conflict",
+        HostProblem::UnknownOutcome => "unknown-outcome",
+    }
+}
+
 fn unimplemented_ams_operand(command: &AmsCommand) -> Option<(&'static str, &'static str)> {
     let terms = ams_top_level_terms(command);
-    if terms
-        .iter()
-        .any(|term| matches!(term.as_str(), "DATA" | "INDEX" | "FREESPACE"))
-    {
-        return Some(("vsam-components", "DATA/INDEX component override"));
-    }
     terms
         .iter()
         .find(|term| !ams_operand_allowed(command.id(), term))
@@ -3493,6 +5938,20 @@ fn ams_top_level_terms(command: &AmsCommand) -> Vec<String> {
     if rest.starts_with('(') && rest.ends_with(')') {
         rest = &rest[1..rest.len().saturating_sub(1)];
     }
+    let mut terms = ams_fragment_terms(rest);
+    if matches!(
+        command.id(),
+        "alter" | "delete" | "diagnose" | "examine" | "listdata" | "verify"
+    ) && terms
+        .first()
+        .is_some_and(|(_, parenthesized)| !parenthesized)
+    {
+        terms.remove(0);
+    }
+    terms.into_iter().map(|(term, _)| term).collect()
+}
+
+fn ams_fragment_terms(rest: &str) -> Vec<(String, bool)> {
     let bytes = rest.as_bytes();
     let mut at = 0usize;
     let mut terms = Vec::<(String, bool)>::new();
@@ -3546,16 +6005,42 @@ fn ams_top_level_terms(command: &AmsCommand) -> Vec<String> {
             }
         }
     }
-    if matches!(
-        command.id(),
-        "alter" | "delete" | "diagnose" | "examine" | "listdata" | "verify"
-    ) && terms
-        .first()
-        .is_some_and(|(_, parenthesized)| !parenthesized)
-    {
-        terms.remove(0);
+    terms
+}
+
+fn validate_vsam_component_clauses(statement: &str) -> Result<(), HostProblem> {
+    for component in ["DATA", "INDEX"] {
+        let Some(clause) = operand(statement, &[component]) else {
+            continue;
+        };
+        let terms = ams_fragment_terms(&clause);
+        let supported = if component == "DATA" {
+            ["NAME", "CISZ", "CONTROLINTERVALSIZE"].as_slice()
+        } else {
+            ["NAME"].as_slice()
+        };
+        if terms.is_empty()
+            || terms
+                .iter()
+                .any(|(term, parenthesized)| !parenthesized || !supported.contains(&term.as_str()))
+            || terms.iter().filter(|(term, _)| term == "NAME").count() != 1
+        {
+            return Err(HostProblem::UnsupportedCapability {
+                capability: "vsam-components".into(),
+                detail: format!(
+                    "{component} contains a component override outside the durable dataset model"
+                ),
+            });
+        }
+        dataset_name(&operand(&clause, &["NAME"]).ok_or(HostProblem::Malformed)?)?;
+        if component == "DATA"
+            && operand(&clause, &["CISZ", "CONTROLINTERVALSIZE"])
+                .is_some_and(|value| value.parse::<u32>().is_err())
+        {
+            return Err(HostProblem::Malformed);
+        }
     }
-    terms.into_iter().map(|(term, _)| term).collect()
+    Ok(())
 }
 
 fn ams_operand_allowed(command: &str, operand: &str) -> bool {
@@ -3666,24 +6151,27 @@ fn ams_operand_allowed(command: &str, operand: &str) -> bool {
         "bldindex" => &["INDATASET", "OUTDATASET"],
         "dcollect" => &["OUTFILE", "OFILE"],
         "define-alias" => &["NAME", "RELATE"],
-        "define-alternateindex" => &[
-            "NAME",
-            "RELATE",
-            "KEYS",
-            "UNIQUEKEY",
-            "NONUNIQUEKEY",
-            "UPGRADE",
-            "NOUPGRADE",
-            "DATA",
-            "INDEX",
-            "FREESPACE",
-        ],
+        "define-alternateindex" => {
+            return DEFINITION.contains(&operand)
+                || matches!(
+                    operand,
+                    "RELATE" | "UNIQUEKEY" | "NONUNIQUEKEY" | "UPGRADE" | "NOUPGRADE"
+                );
+        }
         "define-generationdatagroup" => {
             &["NAME", "LIMIT", "SCRATCH", "NOSCRATCH", "EMPTY", "NOEMPTY"]
         }
         "define-path" => &["NAME", "PATHENTRY"],
         "define-usercatalog" => &["NAME"],
-        "delete" => &["PURGE", "CURRENTDATE"],
+        "delete" => &[
+            "CLUSTER",
+            "ALTERNATEINDEX",
+            "PATH",
+            "GENERATIONDATAGROUP",
+            "NONVSAM",
+            "PURGE",
+            "CURRENTDATE",
+        ],
         "diagnose" | "examine" | "listdata" | "verify" => &["INDATASET", "DATASET", "ENTRIES"],
         "export" | "export-disconnect" => &["ENTRIES", "INDATASET", "OUTFILE", "OFILE"],
         "import" | "import-connect" => &["INFILE", "IFILE", "OUTDATASET", "INDATASET", "DATASET"],
@@ -3770,10 +6258,15 @@ fn apply_ams_definition_operands(
             return Err(HostProblem::Malformed);
         }
     }
-    for name in ["RECORDSIZE", "KEYS", "SHAREOPTIONS"] {
+    for name in ["RECORDSIZE", "KEYS", "SHAREOPTIONS", "FREESPACE"] {
         if operand(statement, &[name]).is_some() && pair_operand(statement, name).is_none() {
             return Err(HostProblem::Malformed);
         }
+    }
+    if pair_operand(statement, "FREESPACE").is_some_and(|(control_interval, control_area)| {
+        control_interval > 100 || control_area > 100
+    }) {
+        return Err(HostProblem::Malformed);
     }
     let indexed = ams_word(statement, "INDEXED");
     let nonindexed = ams_word(statement, "NONINDEXED");
@@ -4263,25 +6756,279 @@ fn effect_key(job: &Job, step: &StepPlan, sequence: u64) -> Result<IdempotencyKe
     .map_err(|_| HostProblem::ResourceExhausted)
 }
 
-fn append_spool(
-    job: &mut Job,
-    file: &str,
-    record: Vec<u8>,
-    limits: BatchLimits,
-) -> Result<(), HostProblem> {
-    if !job.spool.contains_key(file) && job.spool.len() >= limits.max_spool_files {
+fn next_spool_sequence(invocation: &Invocation, job: &mut Job) -> Result<u64, HostProblem> {
+    job.spool_sequence = job
+        .spool_sequence
+        .checked_add(1)
+        .ok_or(HostProblem::ResourceExhausted)?;
+    if job.spool_sequence > invocation.limits.max_effects {
         return Err(HostProblem::ResourceExhausted);
     }
-    let records = job.spool.values().map(Vec::len).sum::<usize>();
-    let bytes = job.spool.values().flatten().map(Vec::len).sum::<usize>();
-    if records >= limits.max_spool_records
-        || bytes
-            .checked_add(record.len())
-            .is_none_or(|bytes| bytes > limits.max_spool_bytes)
+    Ok(job.spool_sequence)
+}
+
+fn spool_internal_name(step_name: Option<&str>, file: &str) -> String {
+    let candidate = step_name.map_or_else(
+        || file.to_ascii_uppercase(),
+        |step| {
+            format!(
+                "{}:{}",
+                step.to_ascii_uppercase(),
+                file.to_ascii_uppercase()
+            )
+        },
+    );
+    if candidate.len() <= 64 {
+        candidate
+    } else {
+        let mut digest = Sha256::new();
+        digest.update(b"mainframe-env.jes-spool-file@1");
+        digest.update(candidate.as_bytes());
+        let encoded = format!("{:x}", digest.finalize());
+        format!("F-{}", &encoded[..60])
+    }
+}
+
+#[derive(Clone)]
+struct SpoolRoute {
+    class: char,
+    destination: String,
+    writer: Option<String>,
+    forms: Option<String>,
+    copies: u16,
+    hold: bool,
+}
+
+fn spool_route(job: &Job, dd: Option<&crate::DdPlan>) -> SpoolRoute {
+    let dd_parameter = |keyword: &str| {
+        dd.and_then(|dd| {
+            dd.parameters
+                .iter()
+                .find(|parameter| parameter.identity().keyword() == keyword)
+                .map(|parameter| parameter.normalized_value())
+        })
+    };
+    let output = dd_parameter("OUTPUT")
+        .map(|name| name.trim_start_matches("*.").to_ascii_uppercase())
+        .and_then(|name| {
+            job.plan
+                .outputs
+                .iter()
+                .find(|output| output.name.eq_ignore_ascii_case(&name))
+        });
+    let parameter = |keyword: &str| {
+        dd_parameter(keyword).or_else(|| {
+            output.and_then(|output| {
+                output
+                    .parameters
+                    .iter()
+                    .find(|parameter| parameter.identity().keyword() == keyword)
+                    .map(|parameter| parameter.normalized_value())
+            })
+        })
+    };
+    let class = dd
+        .and_then(|dd| dd.sysout.as_deref())
+        .and_then(|value| {
+            value
+                .trim_matches(['(', ')'])
+                .split(',')
+                .next()
+                .filter(|value| *value != "*")
+                .and_then(|value| value.chars().next())
+        })
+        .or_else(|| parameter("CLASS").and_then(|value| value.chars().next()))
+        .unwrap_or(job.class);
+    SpoolRoute {
+        class,
+        destination: parameter("DEST")
+            .unwrap_or(job.route.output_node.as_str())
+            .to_ascii_uppercase(),
+        writer: parameter("WRITER").map(str::to_ascii_uppercase),
+        forms: parameter("FORMS").map(str::to_ascii_uppercase),
+        copies: parameter("COPIES")
+            .and_then(|value| value.trim_matches(['(', ')']).split(',').next())
+            .and_then(|value| value.parse().ok())
+            .filter(|copies| (1..=255).contains(copies))
+            .unwrap_or(1),
+        hold: parameter("HOLD").is_some_and(|value| value.eq_ignore_ascii_case("YES"))
+            || parameter("OUTDISP").is_some_and(|value| value.eq_ignore_ascii_case("HOLD")),
+    }
+}
+
+fn spool_descriptor_id(job: &str, file: &str) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"mainframe-env.jes-spool-id@1");
+    digest.update(job.as_bytes());
+    digest.update(file.as_bytes());
+    let encoded = format!("{:x}", digest.finalize());
+    format!("SP-{}", &encoded[..60])
+}
+
+fn spool_resource(job: &Job, file: &str) -> String {
+    format!("JOB.{}.{}", job.name, spool_descriptor_id(&job.id, file))
+}
+
+fn output_group_id(job: &Job, route: &SpoolRoute) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"mainframe-env.jes-output-id@1");
+    digest.update(job.id.as_bytes());
+    digest.update([route.class as u8]);
+    digest.update(route.destination.as_bytes());
+    digest.update(route.writer.as_deref().unwrap_or("").as_bytes());
+    digest.update(route.forms.as_deref().unwrap_or("").as_bytes());
+    let encoded = format!("{:x}", digest.finalize());
+    format!("OUT-{}", &encoded[..60])
+}
+
+fn validate_output_route(
+    destination: &str,
+    writer: Option<&str>,
+    forms: Option<&str>,
+) -> Result<(), HostProblem> {
+    for value in [Some(destination), writer, forms].into_iter().flatten() {
+        if value.is_empty()
+            || value.len() > 128
+            || value.chars().any(|character| {
+                character.is_control() || character.is_whitespace() || !character.is_ascii()
+            })
+        {
+            return Err(HostProblem::Malformed);
+        }
+    }
+    Ok(())
+}
+
+fn invalid_state() -> HostProblem {
+    HostProblem::Condition {
+        name: "INVALID_STATE".into(),
+        response: 409,
+        response2: 0,
+    }
+}
+
+fn validate_jes_name(value: &str) -> Result<(), HostProblem> {
+    if value.is_empty()
+        || value.len() > 16
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'@' | b'#' | b'$'))
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
+}
+
+fn durable_job_number(value: &str) -> Result<u64, HostProblem> {
+    let digits = value
+        .strip_prefix("JOB")
+        .filter(|digits| (5..=8).contains(&digits.len()))
+        .filter(|digits| digits.bytes().all(|byte| byte.is_ascii_digit()))
+        .ok_or(HostProblem::InfrastructureFailure)?;
+    let number = digits
+        .parse::<u64>()
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    if number == 0 || number > MAX_JOB_NUMBER {
+        Err(HostProblem::InfrastructureFailure)
+    } else {
+        Ok(number)
+    }
+}
+
+fn validate_durable_job_shape(
+    job: &Job,
+    jcl_limits: JclLimits,
+    limits: BatchLimits,
+) -> Result<(), HostProblem> {
+    let identity_limits = InvocationLimits::default();
+    if job.version == 0
+        || validate_jes_name(&job.name).is_err()
+        || job.name != job.name.to_ascii_uppercase()
+        || PrincipalId::new(&job.owner, identity_limits).is_err()
+        || IdempotencyKey::new(&job.submit_key, identity_limits).is_err()
+        || job.name != job.plan.name
+        || job.plan.steps.len() > jcl_limits.max_steps
+        || job.steps.len() != job.plan.steps.len()
+        || job
+            .steps
+            .iter()
+            .zip(&job.plan.steps)
+            .any(|(execution, plan)| execution.name != plan.name || execution.attempt > job.attempt)
+        || job
+            .events
+            .iter()
+            .any(|event| event.is_empty() || event.len() > MAX_JOB_EVENT_BYTES)
+        || job.spool_files.len() > limits.max_spool_files
+        || job.output_groups.len() > limits.max_spool_files
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let spool_records = job
+        .spool_files
+        .values()
+        .try_fold(0usize, |total, file| total.checked_add(file.record_count))
+        .ok_or(HostProblem::ResourceExhausted)?;
+    let spool_bytes = job
+        .spool_files
+        .values()
+        .try_fold(0usize, |total, file| total.checked_add(file.byte_count))
+        .ok_or(HostProblem::ResourceExhausted)?;
+    let embedded_records = job
+        .spool
+        .values()
+        .try_fold(0usize, |total, records| total.checked_add(records.len()))
+        .ok_or(HostProblem::ResourceExhausted)?;
+    let embedded_bytes = job
+        .spool
+        .values()
+        .flat_map(|records| records.iter())
+        .try_fold(0usize, |total, record| total.checked_add(record.len()))
+        .ok_or(HostProblem::ResourceExhausted)?;
+    if spool_records
+        .checked_add(embedded_records)
+        .is_none_or(|total| total > limits.max_spool_records)
+        || spool_bytes
+            .checked_add(embedded_bytes)
+            .is_none_or(|total| total > limits.max_spool_bytes)
     {
         return Err(HostProblem::ResourceExhausted);
     }
-    job.spool.entry(file.into()).or_default().push(record);
+    Ok(())
+}
+
+fn ensure_job_event_capacity(
+    job: &Job,
+    max_events: usize,
+    additional: usize,
+) -> Result<(), HostProblem> {
+    if job
+        .events
+        .len()
+        .checked_add(additional)
+        .is_none_or(|count| count > max_events || count > MAX_DURABLE_JOB_EVENTS)
+    {
+        Err(HostProblem::ResourceExhausted)
+    } else {
+        Ok(())
+    }
+}
+
+fn next_job_version(version: u64) -> Result<u64, HostProblem> {
+    version.checked_add(1).ok_or(HostProblem::ResourceExhausted)
+}
+
+fn push_job_event(
+    job: &mut Job,
+    max_events: usize,
+    event: impl Into<String>,
+) -> Result<(), HostProblem> {
+    let event = event.into();
+    if event.is_empty() || event.len() > MAX_JOB_EVENT_BYTES {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    ensure_job_event_capacity(job, max_events, 1)?;
+    job.events.push(event);
     Ok(())
 }
 
@@ -4296,9 +7043,126 @@ fn snapshot(job: &Job) -> JobSnapshot {
         return_code: job.return_code,
         abend_code: job.abend_code.clone(),
         active_step: job.active_step.clone(),
+        initiator: job.initiator.clone(),
+        steps: job.steps.clone(),
         attempt: job.attempt,
         version: job.version,
+        kind: job.kind,
+        origin: job.origin.clone(),
+        route: job.route.clone(),
+        cancellation: job.cancellation.clone(),
     }
+}
+
+fn legacy_jes_job_contract() -> String {
+    "mainframe-env.jes-durable-job@1".into()
+}
+
+fn resolve_plan_programs(
+    plan: &JobPlan,
+) -> Result<BTreeMap<String, ProgramRegistration>, HostProblem> {
+    let mut registrations = BTreeMap::new();
+    for step in &plan.steps {
+        if registrations
+            .insert(
+                step.name.clone(),
+                resolve_program_registration(&step.program)?,
+            )
+            .is_some()
+        {
+            return Err(HostProblem::Malformed);
+        }
+    }
+    Ok(registrations)
+}
+
+fn validate_plan_programs(
+    plan: &JobPlan,
+    registrations: &BTreeMap<String, ProgramRegistration>,
+) -> Result<(), HostProblem> {
+    if registrations.len() != plan.steps.len() {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    for step in &plan.steps {
+        let registration = registrations
+            .get(&step.name)
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        registration
+            .validate()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        if registration.program != step.program
+            || registration
+                != &resolve_program_registration(&step.program)
+                    .map_err(|_| HostProblem::InfrastructureFailure)?
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+    }
+    Ok(())
+}
+
+fn checkpoint_execution_id(job_id: &str) -> Result<ExecutionId, HostProblem> {
+    ExecutionId::new(
+        format!("jes-checkpoint-{job_id}"),
+        InvocationLimits::default(),
+    )
+    .map_err(|_| HostProblem::InfrastructureFailure)
+}
+
+fn job_checkpoint_digest(job: &Job) -> Result<String, HostProblem> {
+    let bytes = serde_json::to_vec(job).map_err(|_| HostProblem::InfrastructureFailure)?;
+    Ok(format!("sha256:{:x}", Sha256::digest(bytes)))
+}
+
+fn validate_checkpoint_record(job: &Job, record: &CheckpointRecord) -> Result<(), HostProblem> {
+    let payload_digest: [u8; 32] = Sha256::digest(&record.payload).into();
+    if record.execution_id != checkpoint_execution_id(&job.id)?
+        || record.run_unit_id.as_str() != format!("jes-run-{}", job.id)
+        || record.schema_version != 1
+        || record.machine_schema_version != 2
+        || record.artifact.as_str() != "mainframe-env-batch@0.8.0"
+        || record.provider_generation != "1"
+        || record.transaction.as_deref() != Some(job.id.as_str())
+        || record.principal.as_str() != job.owner
+        || record.security_classification != "batch"
+        || record.payload_size != record.payload.len() as u64
+        || record.payload_digest != payload_digest
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let checkpoint: JesCheckpoint =
+        serde_json::from_slice(&record.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
+    checkpoint
+        .validate(job.plan.steps.len(), 65_536)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    if checkpoint.job_id != job.id
+        || checkpoint.job_version > job.version
+        || checkpoint.attempt > job.attempt
+        || checkpoint.effect_sequence != record.effect_sequence
+        || checkpoint.committed_steps.iter().any(|name| {
+            job.steps
+                .iter()
+                .find(|step| &step.name == name)
+                .is_none_or(|step| !step.state.terminal())
+        })
+        || checkpoint.job_version == job.version
+            && checkpoint.state_digest != job_checkpoint_digest(job)?
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(())
+}
+
+fn initial_step_executions(plan: &JobPlan) -> Vec<StepExecution> {
+    plan.steps
+        .iter()
+        .map(|step| StepExecution {
+            name: step.name.clone(),
+            state: StepState::Pending,
+            attempt: 0,
+            termination: None,
+        })
+        .collect()
 }
 
 fn job_record(job: &Job) -> Result<ProviderStateRecord, HostProblem> {
@@ -4326,13 +7190,14 @@ mod tests {
     use crate::{Program, ProgramOutput, ProgramRouter};
     use mainframe_env_dataset::{DatasetLimits, DatasetService, dataset_providers};
     use mainframe_env_execution_api::{
-        ArtifactRef, CapabilityId, ExecutionId, Principal, RequestId, ResourceLimits, RunUnitId,
-        Selector, ServiceClass, TraceId,
+        ArtifactRef, Cancellation, CancellationId, CapabilityId, ExecutionId, Principal, RequestId,
+        ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
     };
     use mainframe_env_host_api::{
         CapabilityDescriptor, CicsDisposition, CicsResponse, DatasetResult, EffectResult,
         HostLimits, HostProvider, RegistrySnapshot,
     };
+    use mainframe_env_spool::{ProviderArtifactStore, SpoolLimits, SpoolService, spool_providers};
     use mainframe_env_store::{MemoryStore, SqliteStateStore};
     use mainframe_env_store_api::{ProviderStateMutation, ProviderStateWrite};
     use std::collections::BTreeSet;
@@ -4340,11 +7205,65 @@ mod tests {
 
     struct SecurityProvider {
         descriptor: CapabilityDescriptor,
+        deny_spool: bool,
+        deny_control: bool,
+        deny_internal_reader: bool,
     }
 
     struct FailDatasetCommitOnceStore {
         inner: MemoryStore,
         fail_next_mutation: AtomicBool,
+    }
+
+    struct FailNthCheckpointStore {
+        inner: Arc<MemoryStore>,
+        writes: AtomicUsize,
+        fail_at: usize,
+    }
+
+    struct FailDeleteCheckpointOnceStore {
+        inner: Arc<MemoryStore>,
+        fail: AtomicBool,
+    }
+
+    impl CheckpointStore for FailNthCheckpointStore {
+        fn put_checkpoint(&self, record: CheckpointRecord) -> Result<(), StoreError> {
+            if self.writes.fetch_add(1, Ordering::SeqCst) + 1 == self.fail_at {
+                Err(StoreError::Infrastructure(
+                    "injected-checkpoint-crash".into(),
+                ))
+            } else {
+                self.inner.put_checkpoint(record)
+            }
+        }
+
+        fn get_checkpoint(&self, id: &ExecutionId) -> Result<Option<CheckpointRecord>, StoreError> {
+            self.inner.get_checkpoint(id)
+        }
+
+        fn delete_checkpoint(&self, id: &ExecutionId) -> Result<(), StoreError> {
+            self.inner.delete_checkpoint(id)
+        }
+    }
+
+    impl CheckpointStore for FailDeleteCheckpointOnceStore {
+        fn put_checkpoint(&self, record: CheckpointRecord) -> Result<(), StoreError> {
+            self.inner.put_checkpoint(record)
+        }
+
+        fn get_checkpoint(&self, id: &ExecutionId) -> Result<Option<CheckpointRecord>, StoreError> {
+            self.inner.get_checkpoint(id)
+        }
+
+        fn delete_checkpoint(&self, id: &ExecutionId) -> Result<(), StoreError> {
+            if self.fail.swap(false, Ordering::SeqCst) {
+                Err(StoreError::Infrastructure(
+                    "injected-checkpoint-delete-failure".into(),
+                ))
+            } else {
+                self.inner.delete_checkpoint(id)
+            }
+        }
     }
 
     impl FailDatasetCommitOnceStore {
@@ -4524,6 +7443,61 @@ mod tests {
                             })
                             .ok_or(HostProblem::NotFound)
                     }),
+                HostRequest::Dataset(DatasetRequest::ReadConcatenation {
+                    datasets, ..
+                }) => self
+                    .records
+                    .lock()
+                    .map_err(|_| HostProblem::InfrastructureFailure)
+                    .and_then(|state| {
+                        let mut combined = Vec::new();
+                        for dataset in datasets {
+                            combined.extend(
+                                state
+                                    .get(dataset.as_str())
+                                    .cloned()
+                                    .ok_or(HostProblem::NotFound)?,
+                            );
+                        }
+                        Ok(HostResult::Dataset(DatasetResult::Records {
+                            identities: vec![Vec::new(); combined.len()],
+                            records: combined,
+                            version: 1,
+                        }))
+                    }),
+                HostRequest::Dataset(DatasetRequest::ListCatalog {
+                    pattern,
+                    start,
+                    max_items,
+                }) => self
+                    .records
+                    .lock()
+                    .map_err(|_| HostProblem::InfrastructureFailure)
+                    .map(|state| {
+                        let mut entries = state
+                            .keys()
+                            .filter(|name| **name == pattern)
+                            .filter(|name| {
+                                start
+                                    .as_ref()
+                                    .is_none_or(|start| name.as_str() > start.as_str())
+                            })
+                            .filter_map(|name| {
+                                DatasetName::new(name, 128).ok().map(|name| {
+                                    mainframe_env_host_api::CatalogListEntry {
+                                        name,
+                                        kind: mainframe_env_host_api::CatalogEntryKind::Dataset,
+                                        related: None,
+                                        version: 1,
+                                    }
+                                })
+                            })
+                            .collect::<Vec<_>>();
+                        let max_items = usize::try_from(max_items).unwrap_or(usize::MAX);
+                        let more = entries.len() > max_items;
+                        entries.truncate(max_items);
+                        HostResult::Dataset(DatasetResult::CatalogEntries { entries, more })
+                    }),
                 HostRequest::Dataset(DatasetRequest::Write {
                     dataset, records, ..
                 }) => self
@@ -4534,6 +7508,45 @@ mod tests {
                         state.insert(dataset.as_str().into(), records);
                         HostResult::Dataset(DatasetResult::Mutated { version: 2 })
                     }),
+                HostRequest::Dataset(DatasetRequest::Append {
+                    dataset, records, ..
+                }) => self
+                    .records
+                    .lock()
+                    .map_err(|_| HostProblem::InfrastructureFailure)
+                    .and_then(|mut state| {
+                        state
+                            .get_mut(dataset.as_str())
+                            .ok_or(HostProblem::NotFound)?
+                            .extend(records);
+                        Ok(HostResult::Dataset(DatasetResult::Mutated {
+                            version: 2,
+                        }))
+                    }),
+                HostRequest::Dataset(DatasetRequest::AcquireLock {
+                    dataset,
+                    target,
+                    owner,
+                    mode,
+                    now_tick,
+                    lease_ticks,
+                    ..
+                }) => Ok(HostResult::Dataset(DatasetResult::Locks {
+                    locks: vec![mainframe_env_host_api::DatasetLockReceipt {
+                        lock_id: format!("lock-{}-{}", dataset.as_str(), effect.sequence),
+                        dataset,
+                        target,
+                        owner,
+                        mode,
+                        expires_at: now_tick.saturating_add(lease_ticks),
+                        transaction: None,
+                        version: 1,
+                    }],
+                })),
+                HostRequest::Dataset(DatasetRequest::ReleaseLock { .. })
+                | HostRequest::Dataset(DatasetRequest::SetLifecycle { .. }) => Ok(
+                    HostResult::Dataset(DatasetResult::Mutated { version: 2 }),
+                ),
                 HostRequest::Dataset(
                     DatasetRequest::Create { dataset, .. }
                     | DatasetRequest::Define { dataset, .. },
@@ -4684,6 +7697,22 @@ mod tests {
 
         fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
             let outcome = match effect.request {
+                HostRequest::Security(SecurityRequest::Authorize { resource, .. })
+                    if self.deny_spool && resource.as_str().contains(".SP-") =>
+                {
+                    Ok(HostResult::Security(SecurityDecision::Deny))
+                }
+                HostRequest::Security(SecurityRequest::Authorize { intent, .. })
+                    if self.deny_control
+                        && matches!(intent, AccessIntent::Control | AccessIntent::Alter) =>
+                {
+                    Ok(HostResult::Security(SecurityDecision::Deny))
+                }
+                HostRequest::Security(SecurityRequest::Authorize { resource, .. })
+                    if self.deny_internal_reader && resource.as_str().ends_with(".INTRDR") =>
+                {
+                    Ok(HostResult::Security(SecurityDecision::Deny))
+                }
                 HostRequest::Security(_) => Ok(HostResult::Security(SecurityDecision::Allow)),
                 _ => Err(HostProblem::Malformed),
             };
@@ -4694,13 +7723,19 @@ mod tests {
         }
     }
 
-    fn host(program: Arc<dyn HostProvider>) -> Arc<ScopedHostService> {
-        host_with(program, Vec::new())
-    }
-
     fn host_with(
         program: Arc<dyn HostProvider>,
+        extra: Vec<Arc<dyn HostProvider>>,
+    ) -> Arc<ScopedHostService> {
+        host_with_security(program, extra, false, false, false)
+    }
+
+    fn host_with_security(
+        program: Arc<dyn HostProvider>,
         mut extra: Vec<Arc<dyn HostProvider>>,
+        deny_spool: bool,
+        deny_control: bool,
+        deny_internal_reader: bool,
     ) -> Arc<ScopedHostService> {
         let limits = InvocationLimits::default();
         let security: Arc<dyn HostProvider> = Arc::new(SecurityProvider {
@@ -4718,6 +7753,9 @@ mod tests {
                 max_result_bytes: 65536,
                 ready: true,
             },
+            deny_spool,
+            deny_control,
+            deny_internal_reader,
         });
         let mut providers = vec![security, program];
         providers.append(&mut extra);
@@ -4734,6 +7772,8 @@ mod tests {
             "host.program.invoke",
             "host.dataset.read",
             "host.dataset.write",
+            "host.spool.read",
+            "host.spool.write",
             "host.cics.execute",
         ]
         .into_iter()
@@ -4771,7 +7811,93 @@ mod tests {
         store: Arc<dyn ProviderStateStore>,
         program: Arc<dyn HostProvider>,
     ) -> Arc<BatchService> {
-        BatchService::open(host(program), store, Default::default(), Default::default()).unwrap()
+        let providers = spool_test_providers(store.clone());
+        BatchService::open(
+            host_with(program, providers),
+            store,
+            Default::default(),
+            Default::default(),
+        )
+        .unwrap()
+    }
+
+    fn durable_store_with_corruption(
+        key: &str,
+        corrupt: impl FnOnce(&mut Job),
+    ) -> Arc<MemoryStore> {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let running = service(store.clone(), builtins());
+        let submitted = running
+            .submit(
+                &invocation(),
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new(key, InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let row = store
+            .get_provider_state("jes-job", &submitted.id)
+            .unwrap()
+            .unwrap();
+        let mut job: Job = serde_json::from_slice(&row.payload).unwrap();
+        corrupt(&mut job);
+        job.version = row.version + 1;
+        store
+            .put_provider_state(job_record(&job).unwrap(), Some(row.version))
+            .unwrap();
+        drop(running);
+        store
+    }
+
+    fn assert_durable_store_rejected(store: Arc<MemoryStore>) {
+        let provider_store: Arc<dyn ProviderStateStore> = store;
+        let providers = spool_test_providers(provider_store.clone());
+        assert!(matches!(
+            BatchService::open(
+                host_with(builtins(), providers),
+                provider_store,
+                Default::default(),
+                Default::default(),
+            ),
+            Err(HostProblem::InfrastructureFailure)
+        ));
+    }
+
+    fn service_with_checkpoint_store(
+        store: Arc<MemoryStore>,
+        checkpoint_store: Arc<dyn CheckpointStore>,
+        program: Arc<dyn HostProvider>,
+    ) -> Result<Arc<BatchService>, HostProblem> {
+        let provider_store: Arc<dyn ProviderStateStore> = store;
+        let providers = spool_test_providers(provider_store.clone());
+        BatchService::open_with_checkpoint_store(
+            host_with(program, providers),
+            provider_store,
+            checkpoint_store,
+            Default::default(),
+            Default::default(),
+        )
+    }
+
+    fn sqlite_service_with_checkpoint_store(
+        store: Arc<SqliteStateStore>,
+    ) -> Result<Arc<BatchService>, HostProblem> {
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let checkpoint_store: Arc<dyn CheckpointStore> = store;
+        let providers = spool_test_providers(provider_store.clone());
+        BatchService::open_with_checkpoint_store(
+            host_with(builtins(), providers),
+            provider_store,
+            checkpoint_store,
+            Default::default(),
+            Default::default(),
+        )
+    }
+
+    fn spool_test_providers(store: Arc<dyn ProviderStateStore>) -> Vec<Arc<dyn HostProvider>> {
+        let artifacts = ProviderArtifactStore::new(store.clone(), 4 * 1024 * 1024).unwrap();
+        let spool = SpoolService::open(store, artifacts, SpoolLimits::default()).unwrap();
+        spool_providers(spool, InvocationLimits::default())
     }
 
     fn builtins() -> Arc<dyn HostProvider> {
@@ -4802,6 +7928,7 @@ mod tests {
         records: Arc<Mutex<BTreeMap<String, Vec<Vec<u8>>>>>,
     ) -> Arc<BatchService> {
         let limits = InvocationLimits::default();
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
         let generations = Arc::new(Mutex::new(BTreeMap::new()));
         let provider = |capability: &str| {
             Arc::new(DatasetProvider {
@@ -4819,15 +7946,14 @@ mod tests {
                 generations: generations.clone(),
             }) as Arc<dyn HostProvider>
         };
+        let mut providers = vec![
+            provider("host.dataset.read"),
+            provider("host.dataset.write"),
+        ];
+        providers.extend(spool_test_providers(store.clone()));
         BatchService::open(
-            host_with(
-                builtins(),
-                vec![
-                    provider("host.dataset.read"),
-                    provider("host.dataset.write"),
-                ],
-            ),
-            Arc::new(MemoryStore::new(Default::default())),
+            host_with(builtins(), providers),
+            store,
             Default::default(),
             Default::default(),
         )
@@ -4838,8 +7964,9 @@ mod tests {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let dataset_store: Arc<dyn ProviderStateStore> = store.clone();
         let dataset = DatasetService::open(dataset_store, DatasetLimits::default()).unwrap();
-        let providers = dataset_providers(dataset.clone(), InvocationLimits::default());
+        let mut providers = dataset_providers(dataset.clone(), InvocationLimits::default());
         let batch_store: Arc<dyn ProviderStateStore> = store;
+        providers.extend(spool_test_providers(batch_store.clone()));
         let batch = BatchService::open(
             host_with(builtins(), providers),
             batch_store,
@@ -4911,19 +8038,397 @@ mod tests {
                 .id,
             submitted.id
         );
-        assert_eq!(service.hold(&submitted.id).unwrap().state, JobState::Held);
         assert_eq!(
-            service.release(&submitted.id).unwrap().state,
+            service.hold(&invocation, &submitted.id).unwrap().state,
+            JobState::Held
+        );
+        assert_eq!(
+            service.release(&invocation, &submitted.id).unwrap().state,
             JobState::Queued
         );
         let completed = service.run_next(&invocation, false).unwrap().unwrap();
         assert_eq!(completed.state, JobState::Completed);
         assert_eq!(completed.return_code, Some(0));
-        let (records, more) = service.spool(&submitted.id, "SYSPRINT", 0, 10).unwrap();
+        assert_eq!(completed.initiator, None);
+        assert_eq!(completed.steps.len(), 1);
+        assert_eq!(completed.steps[0].state, StepState::Completed);
+        assert_eq!(completed.steps[0].attempt, 1);
+        assert_eq!(
+            completed.steps[0].termination,
+            Some(StepTermination::ReturnCode { code: 0 })
+        );
+        let lifecycle = {
+            let state = service.lock().unwrap();
+            state.jobs.get(&submitted.id).unwrap().events.clone()
+        };
+        assert_eq!(
+            &lifecycle[lifecycle.len() - 8..],
+            [
+                "selected:INIT0001",
+                "running",
+                "step:STEP1:Allocating",
+                "step:STEP1:Running",
+                "step:STEP1:Disposing",
+                "step:STEP1:Completed",
+                "output",
+                "completed",
+            ]
+        );
+        let (records, more) = service
+            .spool(&invocation, &submitted.id, "SYSPRINT", 0, 10)
+            .unwrap();
         assert_eq!(records, vec![b"IEFBR14".to_vec()]);
         assert!(!more);
-        service.purge(&submitted.id).unwrap();
+        service.purge(&invocation, &submitted.id).unwrap();
         assert_eq!(service.get(&submitted.id), Err(HostProblem::NotFound));
+    }
+
+    #[test]
+    fn spool_descriptors_preserve_step_ownership_and_output_routing_transitions() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())), builtins());
+        let invocation = invocation();
+        let bundle = JclBundle {
+            primary: "//OUTJOB JOB CLASS=A\n//OUT1 OUTPUT CLASS=B,DEST=REMOTE,OUTDISP=HOLD\n//STEP1 EXEC PGM=IEFBR14\n//SYSPRINT DD SYSOUT=*,OUTPUT=*.OUT1\n"
+                .into(),
+            ..Default::default()
+        };
+        let conversion = crate::convert_jcl(&bundle, Default::default()).unwrap();
+        assert!(conversion.is_valid(), "{:?}", conversion.diagnostics());
+        let submitted = service
+            .submit(
+                &invocation,
+                &bundle,
+                &IdempotencyKey::new("output-routing", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed
+        );
+        let routed = {
+            let state = service.lock().unwrap();
+            let job = state.jobs.get(&submitted.id).unwrap();
+            let descriptor = job
+                .spool_files
+                .values()
+                .find(|descriptor| descriptor.dd_name == "SYSPRINT")
+                .unwrap();
+            assert_eq!(descriptor.step_name.as_deref(), Some("STEP1"));
+            assert_eq!(descriptor.state, JesSpoolState::Held);
+            job.output_groups
+                .values()
+                .find(|group| group.class == 'B')
+                .cloned()
+                .unwrap()
+        };
+        assert_eq!(routed.destination, "REMOTE");
+        assert_eq!(routed.writer, None);
+        assert_eq!(routed.forms, None);
+        assert_eq!(routed.copies, 1);
+        assert_eq!(routed.state, JesOutputState::Held);
+
+        let rerouted = service
+            .route_output(
+                &invocation,
+                &submitted.id,
+                &routed.id,
+                "NODE2",
+                Some("WTR2"),
+                Some("BLUE"),
+            )
+            .unwrap();
+        assert_eq!(rerouted.destination, "NODE2");
+        assert_eq!(
+            service
+                .release_output(&invocation, &submitted.id, &routed.id)
+                .unwrap()
+                .state,
+            JesOutputState::Released
+        );
+        assert_eq!(
+            service
+                .select_output(&invocation, &submitted.id, &routed.id)
+                .unwrap()
+                .state,
+            JesOutputState::Selected
+        );
+        assert_eq!(
+            service
+                .complete_selected_output(&invocation, &submitted.id, &routed.id)
+                .unwrap()
+                .state,
+            JesOutputState::Complete
+        );
+    }
+
+    #[test]
+    fn spool_access_is_denied_before_artifact_mutation() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let providers = spool_test_providers(store.clone());
+        let service = BatchService::open(
+            host_with_security(builtins(), providers, true, false, false),
+            store.clone(),
+            Default::default(),
+            Default::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            service.submit(
+                &invocation(),
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("denied-spool", InvocationLimits::default()).unwrap(),
+                false,
+            ),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(
+            store
+                .list_provider_state("spool-artifact", 16)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn artifact_backed_spool_survives_service_restart_and_retention_purge() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let invocation = invocation();
+        let first = service(store.clone(), builtins());
+        let submitted = first
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("spool-restart", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        first.run_next(&invocation, false).unwrap().unwrap();
+        drop(first);
+
+        let restarted = service(store.clone(), builtins());
+        assert_eq!(
+            restarted
+                .spool(&invocation, &submitted.id, "SYSPRINT", 0, 8)
+                .unwrap()
+                .0,
+            vec![b"IEFBR14".to_vec()]
+        );
+        assert_eq!(
+            restarted
+                .purge_expired(&invocation, BatchLimits::default().spool_retention_ticks, 8)
+                .unwrap(),
+            vec![submitted.id.clone()]
+        );
+        assert_eq!(restarted.get(&submitted.id), Err(HostProblem::NotFound));
+        assert!(
+            store
+                .list_provider_state("spool-artifact", 16)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn started_task_identity_and_authorized_stop_are_durable() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let invocation = invocation();
+        let first = service(store.clone(), builtins());
+        let started = first
+            .start_task(
+                &invocation,
+                "PAYROLL",
+                &JclBundle {
+                    primary: "//STCJOB JOB CLASS=A\n//RUN EXEC PGM=IEFBR14\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("start-payroll", InvocationLimits::default()).unwrap(),
+            )
+            .unwrap();
+        assert_eq!(started.kind, JesJobKind::StartedTask);
+        assert_eq!(
+            started.origin,
+            JesSubmissionOrigin::StartedTask {
+                task_name: "PAYROLL".into()
+            }
+        );
+        assert_eq!(
+            first
+                .stop_task(&invocation, "PAYROLL", &started.id)
+                .unwrap()
+                .state,
+            JobState::Cancelled
+        );
+        drop(first);
+        let restarted = service(store, builtins());
+        let recovered = restarted.get(&started.id).unwrap();
+        assert_eq!(recovered.kind, JesJobKind::StartedTask);
+        assert!(matches!(
+            recovered.origin,
+            JesSubmissionOrigin::StartedTask { ref task_name } if task_name == "PAYROLL"
+        ));
+    }
+
+    #[test]
+    fn nje_route_and_mas_member_ownership_drive_selection_and_survive_restart() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let invocation = invocation();
+        let first = service(store.clone(), builtins());
+        let topology = JesTopology {
+            schema_version: crate::JES_TOPOLOGY_CONTRACT.into(),
+            local_node: "LOCAL".into(),
+            nodes: BTreeMap::from([
+                (
+                    "LOCAL".into(),
+                    crate::JesNodeDefinition {
+                        name: "LOCAL".into(),
+                        connected: true,
+                        enabled: true,
+                        max_inbound_jobs: 8,
+                    },
+                ),
+                (
+                    "REMOTE".into(),
+                    crate::JesNodeDefinition {
+                        name: "REMOTE".into(),
+                        connected: true,
+                        enabled: true,
+                        max_inbound_jobs: 8,
+                    },
+                ),
+            ]),
+            members: BTreeMap::from([
+                (
+                    "MEMBER1".into(),
+                    crate::JesMasMemberDefinition {
+                        name: "MEMBER1".into(),
+                        node: "LOCAL".into(),
+                        enabled: true,
+                        max_active: 1,
+                    },
+                ),
+                (
+                    "MEMBER2".into(),
+                    crate::JesMasMemberDefinition {
+                        name: "MEMBER2".into(),
+                        node: "REMOTE".into(),
+                        enabled: true,
+                        max_active: 1,
+                    },
+                ),
+            ]),
+        };
+        first
+            .install_topology(&invocation, topology.clone())
+            .unwrap();
+        let submitted = first
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("remote-job", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let routed = first
+            .route_job(&invocation, &submitted.id, "REMOTE", "REMOTE")
+            .unwrap();
+        assert_eq!(routed.route.execution_node, "REMOTE");
+        assert_eq!(
+            first
+                .run_next_on_member(&invocation, "MEMBER1", "INIT0001", false)
+                .unwrap(),
+            None
+        );
+        let completed = first
+            .run_next_on_member(&invocation, "MEMBER2", "INIT0001", false)
+            .unwrap()
+            .unwrap();
+        assert_eq!(completed.state, JobState::Completed);
+        assert_eq!(completed.route.owner_member.as_deref(), Some("MEMBER2"));
+        drop(first);
+
+        let restarted = service(store, builtins());
+        assert_eq!(restarted.topology().unwrap(), topology);
+        assert_eq!(
+            restarted
+                .get(&submitted.id)
+                .unwrap()
+                .route
+                .owner_member
+                .as_deref(),
+            Some("MEMBER2")
+        );
+    }
+
+    #[test]
+    fn initiator_and_queued_job_controls_are_authorized_and_persisted() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let invocation = invocation();
+        let first = service(store.clone(), builtins());
+        let submitted = first
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("controlled-job", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            first
+                .change_class(&invocation, &submitted.id, 'B')
+                .unwrap()
+                .class,
+            'B'
+        );
+        assert_eq!(
+            first
+                .change_priority(&invocation, &submitted.id, 42)
+                .unwrap()
+                .priority,
+            42
+        );
+        first.stop_initiator(&invocation, "INIT0001").unwrap();
+        assert_eq!(first.run_next(&invocation, false).unwrap(), None);
+        drop(first);
+
+        let restarted = service(store, builtins());
+        assert_eq!(restarted.run_next(&invocation, false).unwrap(), None);
+        restarted.start_initiator(&invocation, "INIT0001").unwrap();
+        assert_eq!(
+            restarted
+                .run_next(&invocation, false)
+                .unwrap()
+                .unwrap()
+                .state,
+            JobState::Completed
+        );
+    }
+
+    #[test]
+    fn denied_operator_control_publishes_no_job_transition() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let providers = spool_test_providers(store.clone());
+        let service = BatchService::open(
+            host_with_security(builtins(), providers, false, true, false),
+            store,
+            Default::default(),
+            Default::default(),
+        )
+        .unwrap();
+        let invocation = invocation();
+        let submitted = service
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("deny-control", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.hold(&invocation, &submitted.id),
+            Err(HostProblem::Unauthorized)
+        );
+        assert_eq!(service.get(&submitted.id).unwrap().state, JobState::Queued);
     }
 
     #[test]
@@ -5100,7 +8605,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            service.cancel(&queued.id).unwrap().state,
+            service.cancel(&invocation, &queued.id).unwrap().state,
             JobState::Cancelled
         );
         assert_eq!(missing.state, JobState::Queued);
@@ -5129,7 +8634,7 @@ mod tests {
             );
             assert!(
                 service
-                    .spool(&submitted.id, "JESMSGLG", 0, 20)
+                    .spool(&invocation, &submitted.id, "JESMSGLG", 0, 20)
                     .unwrap()
                     .0
                     .iter()
@@ -5155,9 +8660,12 @@ mod tests {
             },
             controls: controls.clone(),
         });
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let mut providers = vec![cics];
+        providers.extend(spool_test_providers(store.clone()));
         let service = BatchService::open(
-            host_with(builtins(), vec![cics]),
-            Arc::new(MemoryStore::new(Default::default())),
+            host_with(builtins(), providers),
+            store,
             Default::default(),
             Default::default(),
         )
@@ -5183,7 +8691,7 @@ mod tests {
         assert!(controls[0].values().all(|value| value.bytes() == b"CLOSED"));
         assert!(
             service
-                .spool(&submitted.id, "CMDOUT", 0, 16)
+                .spool(&invocation, &submitted.id, "CMDOUT", 0, 16)
                 .unwrap()
                 .0
                 .iter()
@@ -5210,11 +8718,17 @@ mod tests {
         let completed = service.run_next(&invocation, false).unwrap().unwrap();
         assert_eq!(completed.state, JobState::Completed);
         assert_eq!(
-            service.spool(&submitted.id, "SYSPRINT", 0, 10).unwrap().0,
+            service
+                .spool(&invocation, &submitted.id, "SYSPRINT", 0, 10)
+                .unwrap()
+                .0,
             vec![b"SYSUT2 RECORDS=2".to_vec()]
         );
         assert_eq!(
-            service.spool(&submitted.id, "SYSUT2", 0, 10).unwrap().0,
+            service
+                .spool(&invocation, &submitted.id, "SYSUT2", 0, 10)
+                .unwrap()
+                .0,
             vec![b"FIRST".to_vec(), b"SECOND".to_vec()]
         );
     }
@@ -5251,6 +8765,153 @@ mod tests {
     }
 
     #[test]
+    fn registered_copy_generate_edit_and_update_utilities_mutate_exact_datasets() {
+        let records = Arc::new(Mutex::new(BTreeMap::from([
+            (
+                "IBMUSER.COPYIN".into(),
+                vec![b"ONE".to_vec(), b"TWO".to_vec()],
+            ),
+            ("IBMUSER.COPYOUT".into(), Vec::new()),
+            ("IBMUSER.GENOUT".into(), Vec::new()),
+            (
+                "IBMUSER.JCLIN".into(),
+                vec![
+                    b"//JOB1 JOB".to_vec(),
+                    b"//S1 EXEC PGM=A".to_vec(),
+                    b"//JOB2 JOB".to_vec(),
+                    b"//S2 EXEC PGM=B".to_vec(),
+                ],
+            ),
+            ("IBMUSER.JCLOUT".into(), Vec::new()),
+            ("IBMUSER.UPD".into(), vec![b"OLD".to_vec()]),
+        ])));
+        let service = service_with_datasets(records.clone());
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//UTILJOB JOB CLASS=A\n//COPY EXEC PGM=IEBCOPY\n//INPUT DD DSN=IBMUSER.COPYIN,DISP=SHR\n//OUTPUT DD DSN=IBMUSER.COPYOUT,DISP=OLD\n//SYSIN DD *\n COPY INDD=INPUT,OUTDD=OUTPUT\n/*\n//GEN EXEC PGM=IEBDG\n//DATA DD DSN=IBMUSER.GENOUT,DISP=OLD\n//SYSIN DD *\n DSD OUTPUT=(DATA)\n FD NAME=FIELD,LENGTH=4\n CREATE QUANTITY=2\n END\n/*\n//EDIT EXEC PGM=IEBEDIT\n//SYSUT1 DD DSN=IBMUSER.JCLIN,DISP=SHR\n//SYSUT2 DD DSN=IBMUSER.JCLOUT,DISP=OLD\n//SYSIN DD *\n EDIT START=JOB2\n/*\n//UPDATE EXEC PGM=IEBUPDTE\n//SYSUT2 DD DSN=IBMUSER.UPD(MEMBER),DISP=OLD\n//SYSIN DD *\n./ REPL NAME=MEMBER\nNEW ONE\nNEW TWO\n./ ENDUP\n/*\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("real-utility-families", InvocationLimits::default())
+                    .unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed
+        );
+        let records = records.lock().unwrap();
+        assert_eq!(
+            records["IBMUSER.COPYOUT"],
+            [b"ONE".to_vec(), b"TWO".to_vec()]
+        );
+        assert_eq!(
+            records["IBMUSER.GENOUT"],
+            [b"0001".to_vec(), b"0002".to_vec()]
+        );
+        assert_eq!(
+            records["IBMUSER.JCLOUT"],
+            [b"//JOB2 JOB".to_vec(), b"//S2 EXEC PGM=B".to_vec()]
+        );
+        assert_eq!(
+            records["IBMUSER.UPD"],
+            [b"NEW ONE".to_vec(), b"NEW TWO".to_vec()]
+        );
+    }
+
+    #[test]
+    fn dd_concatenation_preserves_declared_dataset_order() {
+        let records = Arc::new(Mutex::new(BTreeMap::from([
+            ("IBMUSER.INPUT1".into(), vec![b"FIRST".to_vec()]),
+            ("IBMUSER.INPUT2".into(), vec![b"SECOND".to_vec()]),
+            ("IBMUSER.OUTPUT".into(), Vec::new()),
+        ])));
+        let service = service_with_datasets(records.clone());
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//CONCAT JOB CLASS=A\n//COPY EXEC PGM=IEBGENER\n//SYSUT1 DD DSN=IBMUSER.INPUT1,DISP=SHR\n// DD DSN=IBMUSER.INPUT2,DISP=SHR\n//SYSUT2 DD DSN=IBMUSER.OUTPUT,DISP=OLD\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("dataset-concatenation", InvocationLimits::default())
+                    .unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed
+        );
+        assert_eq!(
+            records.lock().unwrap()["IBMUSER.OUTPUT"],
+            vec![b"FIRST".to_vec(), b"SECOND".to_vec()]
+        );
+    }
+
+    #[test]
+    fn modify_disposition_appends_instead_of_replacing() {
+        let records = Arc::new(Mutex::new(BTreeMap::from([(
+            "IBMUSER.OUTPUT".into(),
+            vec![b"OLD".to_vec()],
+        )])));
+        let service = service_with_datasets(records.clone());
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//MODOUT JOB CLASS=A\n//COPY EXEC PGM=IEBGENER\n//SYSUT1 DD *\nNEW\n/*\n//SYSUT2 DD DSN=IBMUSER.OUTPUT,DISP=MOD\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("dataset-mod-append", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed
+        );
+        assert_eq!(
+            records.lock().unwrap()["IBMUSER.OUTPUT"],
+            vec![b"OLD".to_vec(), b"NEW".to_vec()]
+        );
+    }
+
+    #[test]
+    fn dummy_dd_is_an_empty_typed_source() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())), builtins());
+        let invocation = invocation();
+        let submitted = service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//DUMMY JOB CLASS=A\n//COPY EXEC PGM=IEBGENER\n//SYSUT1 DD DUMMY\n//SYSUT2 DD SYSOUT=*\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("dummy-dd", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed
+        );
+        assert_eq!(
+            service.spool(&invocation, &submitted.id, "SYSUT2", 0, 8),
+            Err(HostProblem::NotFound)
+        );
+    }
+
+    #[test]
     fn iebgener_internal_reader_submits_the_copied_jcl() {
         let records = Arc::new(Mutex::new(BTreeMap::from([(
             "IBMUSER.JCL".into(),
@@ -5261,7 +8922,7 @@ mod tests {
         )])));
         let service = service_with_datasets(records);
         let invocation = invocation();
-        service
+        let parent = service
             .submit(
                 &invocation,
                 &JclBundle {
@@ -5281,14 +8942,58 @@ mod tests {
             .unwrap();
         assert!(!more);
         assert_eq!(jobs.len(), 2);
-        assert!(
-            jobs.iter()
-                .any(|job| job.name == "CHILD" && job.state == JobState::Queued)
+        let child = jobs.iter().find(|job| job.name == "CHILD").unwrap();
+        assert_eq!(child.state, JobState::Queued);
+        assert_eq!(
+            child.origin,
+            JesSubmissionOrigin::InternalReader {
+                parent_job_id: parent.id,
+                step_name: "SUBMIT".into(),
+            }
         );
         let drained = service.drain_queued(&invocation).unwrap();
         assert_eq!(drained.len(), 1);
         assert_eq!(drained[0].name, "CHILD");
         assert_eq!(drained[0].state, JobState::Completed);
+    }
+
+    #[test]
+    fn denied_internal_reader_submission_creates_no_child_job() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let providers = spool_test_providers(store.clone());
+        let service = BatchService::open(
+            host_with_security(builtins(), providers, false, false, true),
+            store,
+            Default::default(),
+            Default::default(),
+        )
+        .unwrap();
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IEFBR14\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("denied-internal-reader", InvocationLimits::default())
+                    .unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Failed
+        );
+        assert_eq!(
+            service
+                .list(Some(invocation.principal.id()), None, 8)
+                .unwrap()
+                .0
+                .len(),
+            1
+        );
     }
 
     #[test]
@@ -5310,6 +9015,163 @@ mod tests {
         assert_eq!(
             service.run_next(&invocation, false).unwrap().unwrap().state,
             JobState::Completed
+        );
+        assert!(records.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn passed_temporary_dataset_is_removed_at_job_terminal_cleanup() {
+        let records = Arc::new(Mutex::new(BTreeMap::new()));
+        let service = service_with_datasets(records.clone());
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//TCLEAN JOB CLASS=A\n//MAKE EXEC PGM=IEFBR14\n//WORK DD DSN=&&WORK,DISP=(NEW,PASS,DELETE)\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("temporary-terminal-cleanup", InvocationLimits::default())
+                    .unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed
+        );
+        assert!(records.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn catalog_and_uncatalog_dispositions_use_dataset_lifecycle_authority() {
+        let (service, dataset) = service_with_real_datasets();
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//CATJOB JOB CLASS=A\n//MAKE EXEC PGM=IEFBR14\n//DATA DD DSN=USER.DISP,DISP=(NEW,CATLG,DELETE)\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("catalog-disposition", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed
+        );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Describe {
+                dataset: DatasetName::new("USER.DISP", 128).unwrap(),
+            }),
+            Ok(DatasetResult::Description(ref description))
+                if description.definition.lifecycle.state == DatasetLifecycleState::Cataloged
+        ));
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//UNCATJOB JOB CLASS=A\n//USE EXEC PGM=IEFBR14\n//DATA DD DSN=USER.DISP,DISP=(OLD,UNCATLG,KEEP)\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("uncatalog-disposition", InvocationLimits::default())
+                    .unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed
+        );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Describe {
+                dataset: DatasetName::new("USER.DISP", 128).unwrap(),
+            }),
+            Ok(DatasetResult::Description(ref description))
+                if description.definition.lifecycle.state == DatasetLifecycleState::Allocated
+        ));
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::ListCatalog {
+                pattern: "USER.DISP".into(),
+                start: None,
+                max_items: 8,
+            }),
+            Ok(DatasetResult::CatalogEntries { entries, more: false }) if entries.is_empty()
+        ));
+    }
+
+    #[test]
+    fn dd_lock_conflict_fails_the_job_without_running_the_program() {
+        let (service, dataset) = service_with_real_datasets();
+        seed_real_dataset(&dataset, "USER.LOCKED", Vec::new(), 800);
+        let owner = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let DatasetResult::Locks { locks } = dataset
+            .invoke(DatasetRequest::AcquireLock {
+                dataset: DatasetName::new("USER.LOCKED", 128).unwrap(),
+                target: DatasetLockTarget::Dataset,
+                owner: owner.clone(),
+                mode: DatasetLockMode::Exclusive,
+                now_tick: 1,
+                lease_ticks: 99,
+                transaction: Some("OTHERJOB".into()),
+                mutation: dataset_test_mutation(801),
+            })
+            .unwrap()
+        else {
+            panic!("expected allocation lock");
+        };
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//LOCKJOB JOB CLASS=A\n//STEP EXEC PGM=IEFBR14\n//DATA DD DSN=USER.LOCKED,DISP=SHR\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("dd-lock-conflict", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Failed
+        );
+        dataset
+            .invoke(DatasetRequest::ReleaseLock {
+                dataset: DatasetName::new("USER.LOCKED", 128).unwrap(),
+                lock_id: locks[0].lock_id.clone(),
+                owner,
+                mutation: dataset_test_mutation(802),
+            })
+            .unwrap();
+    }
+
+    #[test]
+    fn partial_dd_allocation_failure_rolls_back_created_datasets() {
+        let records = Arc::new(Mutex::new(BTreeMap::new()));
+        let service = service_with_datasets(records.clone());
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//PARTIAL JOB CLASS=A\n//STEP EXEC PGM=IEFBR14\n//ONE DD DSN=USER.PARTIAL,DISP=NEW\n//TWO DD DSN=USER.PARTIAL,DISP=NEW\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("partial-dd-allocation", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Failed
         );
         assert!(records.lock().unwrap().is_empty());
     }
@@ -5357,6 +9219,33 @@ mod tests {
         assert_eq!(completed.state, JobState::Completed);
         assert_eq!(completed.return_code, Some(0));
         assert!(!records.lock().unwrap().contains_key("IBMUSER.MISSING"));
+    }
+
+    #[test]
+    fn modify_delete_disposition_removes_an_existing_dataset_under_its_allocation_lock() {
+        let (service, dataset) = service_with_real_datasets();
+        seed_real_dataset(&dataset, "IBMUSER.EXISTING", vec![b"OLD".to_vec()], 802);
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//MODJOB JOB CLASS=A\n//PREDEL EXEC PGM=IEFBR14\n//DD1 DD DSN=IBMUSER.EXISTING,DISP=(MOD,DELETE,DELETE)\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("mod-existing-delete", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let completed = service.run_next(&invocation, false).unwrap().unwrap();
+        assert_eq!(completed.state, JobState::Completed);
+        assert_eq!(completed.return_code, Some(0));
+        assert_eq!(
+            dataset.invoke(DatasetRequest::Attributes {
+                dataset: DatasetName::new("IBMUSER.EXISTING", 128).unwrap(),
+            }),
+            Err(HostProblem::NotFound)
+        );
     }
 
     #[test]
@@ -5460,13 +9349,16 @@ mod tests {
         ));
         assert!(
             service
-                .spool(&submitted.id, "SYSPRINT", 0, 64)
+                .spool(&invocation, &submitted.id, "SYSPRINT", 0, 64)
                 .unwrap()
                 .0
                 .iter()
                 .any(|record| String::from_utf8_lossy(record).contains("LISTDATA"))
         );
-        let syprint = service.spool(&submitted.id, "SYSPRINT", 0, 64).unwrap().0;
+        let syprint = service
+            .spool(&invocation, &submitted.id, "SYSPRINT", 0, 64)
+            .unwrap()
+            .0;
         assert!(syprint.iter().any(|record| {
             let record = String::from_utf8_lossy(record);
             record.contains("USER.CAT") && record.contains("UserCatalog")
@@ -5542,8 +9434,9 @@ mod tests {
             ))
         ));
 
-        let providers = dataset_providers(dataset.clone(), InvocationLimits::default());
+        let mut providers = dataset_providers(dataset.clone(), InvocationLimits::default());
         let batch_store: Arc<dyn ProviderStateStore> = store.clone();
+        providers.extend(spool_test_providers(batch_store.clone()));
         let batch = BatchService::open(
             host_with(builtins(), providers),
             batch_store,
@@ -5573,7 +9466,7 @@ mod tests {
         );
         assert!(
             batch
-                .spool(&job.id, "SYSPRINT", 0, 8)
+                .spool(&invocation, &job.id, "SYSPRINT", 0, 8)
                 .unwrap()
                 .0
                 .iter()
@@ -5803,7 +9696,7 @@ mod tests {
         );
         assert!(
             service
-                .spool(&job.id, "SYSPRINT", 0, 8)
+                .spool(&invocation, &job.id, "SYSPRINT", 0, 8)
                 .unwrap()
                 .0
                 .iter()
@@ -5961,7 +9854,7 @@ mod tests {
             .submit(
                 &invocation,
                 &JclBundle {
-                    primary: "//CAPJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//SYSIN DD *\n ALTER LIBRARYENTRY NAME(LIB)\n ALTER VOLUMEENTRY NAME(VOL001)\n CREATE LIBRARYENTRY NAME(LIB)\n CREATE VOLUMEENTRY NAME(VOL001)\n DEFINE PAGESPACE (NAME(PAGE.ONE))\n SETCACHE NAME(VOL001)\n ALLOCATE DATASET(USER.PHYS) UNIT(3390)\n ALLOCATE DATASET(USER.TAPE) TAPE UNIT(3490)\n ALLOCATE DATASET(USER.ACS) ACSROUTINE(STANDARD)\n ALLOCATE DATASET(USER.COMP) COMPRESS(GENERIC)\n ALLOCATE DATASET(USER.ENC) KEYLABEL(KEY.ONE)\n DEFINE CLUSTER (NAME(USER.STRIPE) INDEXED KEYS(2 0) RECORDSIZE(4 4) STRIPECOUNT(2) EXTENDED)\n ALLOCATE DATASET(USER.UNKNOWN) FROBULATE(1)\n DEFINE CLUSTER (NAME(USER.REUSE) INDEXED KEYS(2 0) RECORDSIZE(4 4) REUSE)\n DEFINE CLUSTER (NAME(USER.COMPNT) INDEXED KEYS(2 0) RECORDSIZE(4 4) DATA(RECORDSIZE(4 4)))\n ALTER USER.A MIGRATE\n ALTER USER.A RECALL\n ALTER USER.A OPEN BUFNO(8)\n/*\n".into(),
+                    primary: "//CAPJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//SYSIN DD *\n ALTER LIBRARYENTRY NAME(LIB)\n ALTER VOLUMEENTRY NAME(VOL001)\n CREATE LIBRARYENTRY NAME(LIB)\n CREATE VOLUMEENTRY NAME(VOL001)\n DEFINE PAGESPACE (NAME(PAGE.ONE))\n SETCACHE NAME(VOL001)\n ALLOCATE DATASET(USER.PHYS) UNIT(3390)\n ALLOCATE DATASET(USER.TAPE) TAPE UNIT(3490)\n ALLOCATE DATASET(USER.ACS) ACSROUTINE(STANDARD)\n ALLOCATE DATASET(USER.COMP) COMPRESS(GENERIC)\n ALLOCATE DATASET(USER.ENC) KEYLABEL(KEY.ONE)\n DEFINE CLUSTER (NAME(USER.STRIPE) INDEXED KEYS(2 0) RECORDSIZE(4 4) STRIPECOUNT(2) EXTENDED)\n ALLOCATE DATASET(USER.UNKNOWN) FROBULATE(1)\n DEFINE CLUSTER (NAME(USER.REUSE) INDEXED KEYS(2 0) RECORDSIZE(4 4) REUSE)\n DEFINE CLUSTER (NAME(USER.COMPNT) INDEXED KEYS(2 0) RECORDSIZE(4 4) DATA(NAME(USER.COMPNT.DATA) RECORDSIZE(4 4)))\n ALTER USER.A MIGRATE\n ALTER USER.A RECALL\n ALTER USER.A OPEN BUFNO(8)\n/*\n".into(),
                     ..Default::default()
                 },
                 &IdempotencyKey::new("ams-capabilities", InvocationLimits::default()).unwrap(),
@@ -5971,7 +9864,10 @@ mod tests {
         let completed = service.run_next(&invocation, false).unwrap().unwrap();
         assert_eq!(completed.state, JobState::Completed);
         assert_eq!(completed.return_code, Some(12));
-        let syprint = service.spool(&submitted.id, "SYSPRINT", 0, 64).unwrap().0;
+        let syprint = service
+            .spool(&invocation, &submitted.id, "SYSPRINT", 0, 64)
+            .unwrap()
+            .0;
         for label in [
             "ALTER LIBRARYENTRY",
             "ALTER VOLUMEENTRY",
@@ -5992,7 +9888,6 @@ mod tests {
             "compression",
             "encryption",
             "striping",
-            "vsam-data-options",
             "vsam-components",
             "migration-recall",
             "ams-combined-alter",
@@ -6218,8 +10113,109 @@ mod tests {
         );
     }
 
+    #[test]
+    fn dd_allocation_resolves_an_alternate_index_path_to_its_base_dataset() {
+        let (service, dataset) = service_with_real_datasets();
+        let base = DatasetName::new("IBMUSER.BASE", 128).unwrap();
+        dataset
+            .invoke(DatasetRequest::Create {
+                dataset: base.clone(),
+                attributes: DatasetAttributes {
+                    organization: DatasetOrganization::KeySequenced,
+                    record_format: RecordFormat::Fixed,
+                    logical_record_length: 8,
+                    key_offset: Some(0),
+                    key_length: Some(2),
+                    ccsid: Some(37),
+                },
+                mutation: dataset_test_mutation(560),
+            })
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::Write {
+                dataset: base.clone(),
+                member: None,
+                records: vec![b"01RECORD".to_vec()],
+                expected_version: Some(1),
+                mutation: dataset_test_mutation(561),
+            })
+            .unwrap();
+        let index = DatasetName::new("IBMUSER.BASE.AIX", 128).unwrap();
+        dataset
+            .invoke(DatasetRequest::DefineAlternateIndex {
+                base,
+                index: index.clone(),
+                key_offset: 2,
+                key_length: 2,
+                allow_duplicates: true,
+                upgrade: true,
+                mutation: dataset_test_mutation(562),
+            })
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::DefinePath {
+                path: DatasetName::new("IBMUSER.BASE.PATH", 128).unwrap(),
+                index,
+                mutation: dataset_test_mutation(563),
+            })
+            .unwrap();
+        let invocation = invocation();
+        let mut effect_sequence = 0;
+        assert_eq!(
+            service
+                .resolve_dd_access_path(
+                    &invocation,
+                    &DatasetName::new("IBMUSER.BASE.PATH", 128).unwrap(),
+                    &mut effect_sequence,
+                )
+                .unwrap(),
+            DatasetName::new("IBMUSER.BASE", 128).unwrap()
+        );
+        let submitted = service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//PATHJOB JOB CLASS=A\n//READ EXEC PGM=IEFBR14\n//INPUT DD DSN=IBMUSER.BASE.PATH,DISP=SHR\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("dd-path-resolution", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let completed = service.run_next(&invocation, false).unwrap().unwrap();
+        assert_eq!(
+            completed.state,
+            JobState::Completed,
+            "{completed:?} {:?}",
+            service
+                .spool(&invocation, &submitted.id, "JESMSGLG", 0, 16)
+                .unwrap()
+                .0
+        );
+        assert_eq!(completed.return_code, Some(0));
+    }
+
     struct CobolProgram {
         calls: Arc<AtomicUsize>,
+    }
+
+    struct AbendProgram;
+    struct CancelledProgram;
+
+    impl Program for AbendProgram {
+        fn execute(&self, _: &Invocation, _: &ProgramInput) -> Result<ProgramOutput, HostProblem> {
+            Err(HostProblem::Condition {
+                name: "ABEND:S0C7".into(),
+                response: 500,
+                response2: 7,
+            })
+        }
+    }
+
+    impl Program for CancelledProgram {
+        fn execute(&self, _: &Invocation, _: &ProgramInput) -> Result<ProgramOutput, HostProblem> {
+            Err(HostProblem::Cancelled)
+        }
     }
 
     impl Program for CobolProgram {
@@ -6259,6 +10255,943 @@ mod tests {
         let completed = service.run_next(&invocation, false).unwrap().unwrap();
         assert_eq!(completed.return_code, Some(4));
         assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn abend_propagates_after_only_cleanup_and_skips_normal_steps() {
+        let cleanup_calls = Arc::new(AtomicUsize::new(0));
+        let router: Arc<dyn HostProvider> = ProgramRouter::new(
+            BTreeMap::from([
+                ("FAILPGM".into(), Arc::new(AbendProgram) as Arc<dyn Program>),
+                (
+                    "CLEANUP".into(),
+                    Arc::new(CobolProgram {
+                        calls: cleanup_calls.clone(),
+                    }) as Arc<dyn Program>,
+                ),
+            ]),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let service = service(Arc::new(MemoryStore::new(Default::default())), router);
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//ABENDJOB JOB CLASS=A\n//FAIL EXEC PGM=FAILPGM\n//NORMAL EXEC PGM=CLEANUP\n//RECOVER EXEC PGM=CLEANUP,COND=ONLY\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("abend-cleanup", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let failed = service.run_next(&invocation, false).unwrap().unwrap();
+        assert_eq!(failed.state, JobState::Failed);
+        assert_eq!(failed.abend_code.as_deref(), Some("S0C7"));
+        assert_eq!(cleanup_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            failed
+                .steps
+                .iter()
+                .map(|step| step.state)
+                .collect::<Vec<_>>(),
+            vec![
+                StepState::Abended,
+                StepState::SkippedCondition,
+                StepState::Completed
+            ]
+        );
+    }
+
+    #[test]
+    fn configured_initiator_selects_only_eligible_classes() {
+        let mut scheduler = JesSchedulerConfiguration::single_node(1);
+        scheduler.initiators.get_mut("INIT0001").unwrap().classes = BTreeSet::from(['B']);
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let providers = spool_test_providers(store.clone());
+        let service = BatchService::open_with_scheduler(
+            host_with(builtins(), providers),
+            store,
+            Default::default(),
+            Default::default(),
+            scheduler,
+        )
+        .unwrap();
+        let invocation = invocation();
+        let class_a = service
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("class-a", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let class_b = service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//BJOB JOB CLASS=B,PRTY=1\n//STEP1 EXEC PGM=IEFBR14\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("class-b", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service
+                .run_next_on(&invocation, "INIT0001", false)
+                .unwrap()
+                .unwrap()
+                .id,
+            class_b.id
+        );
+        assert_eq!(service.get(&class_a.id).unwrap().state, JobState::Queued);
+    }
+
+    #[test]
+    fn legacy_durable_job_migrates_and_recovers_without_losing_plan() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let invocation = invocation();
+        let first = service(store.clone(), builtins());
+        let id = first
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("legacy-job", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap()
+            .id;
+        let row = store.get_provider_state("jes-job", &id).unwrap().unwrap();
+        let mut value: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        let object = value.as_object_mut().unwrap();
+        object.remove("schema_version");
+        object.remove("initiator");
+        object.remove("steps");
+        object.remove("kind");
+        object.remove("origin");
+        object.remove("route");
+        object.remove("program_registrations");
+        object.remove("cancellation");
+        object.remove("purge_pending");
+        object.remove("effect_sequence");
+        object.remove("spool_sequence");
+        object.remove("spool_files");
+        object.remove("output_groups");
+        object.insert(
+            "spool".into(),
+            serde_json::json!({"LEGACY": [[79, 76, 68]]}),
+        );
+        object.insert("state".into(), serde_json::Value::String("Running".into()));
+        object.insert("attempt".into(), serde_json::json!(1));
+        object.insert("version".into(), serde_json::json!(2));
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "jes-job".into(),
+                    key: id.clone(),
+                    version: 2,
+                    payload: serde_json::to_vec(&value).unwrap(),
+                },
+                Some(row.version),
+            )
+            .unwrap();
+        for namespace in ["jes-spool", "spool-artifact"] {
+            for record in store.list_provider_state(namespace, 128).unwrap() {
+                store
+                    .delete_provider_state(namespace, &record.key, record.version)
+                    .unwrap();
+            }
+        }
+        drop(first);
+
+        let recovered = service(store.clone(), builtins());
+        let snapshot = recovered.get(&id).unwrap();
+        assert_eq!(snapshot.state, JobState::Queued);
+        assert_eq!(snapshot.steps.len(), 1);
+        assert_eq!(snapshot.steps[0].state, StepState::Pending);
+        assert_eq!(snapshot.kind, JesJobKind::Batch);
+        assert_eq!(snapshot.origin, JesSubmissionOrigin::External);
+        assert_eq!(snapshot.route, JesJobRoute::default());
+        assert_eq!(snapshot.cancellation, None);
+        assert_eq!(
+            recovered.spool(&invocation, &id, "LEGACY", 0, 8).unwrap().0,
+            vec![b"OLD".to_vec()]
+        );
+        let migrated = store.get_provider_state("jes-job", &id).unwrap().unwrap();
+        let migrated: serde_json::Value = serde_json::from_slice(&migrated.payload).unwrap();
+        assert_eq!(migrated["schema_version"], JES_DURABLE_JOB_CONTRACT);
+        assert_eq!(migrated["state"], "queued");
+        assert_eq!(migrated["spool"], serde_json::json!({}));
+        assert!(migrated["spool_files"].get("LEGACY").is_some());
+        assert!(migrated["program_registrations"].get("STEP1").is_some());
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../conformance/0.8/schemas/jes-durable-job.schema.json"
+        ))
+        .unwrap();
+        jsonschema::draft202012::options()
+            .offline()
+            .build(&schema)
+            .unwrap()
+            .validate(&migrated)
+            .unwrap();
+    }
+
+    #[test]
+    fn durable_program_registration_substitution_fails_closed_before_execution() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let invocation = invocation();
+        let first = service(store.clone(), builtins());
+        let job = first
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("registration-substitution", InvocationLimits::default())
+                    .unwrap(),
+                false,
+            )
+            .unwrap();
+        let row = store
+            .get_provider_state("jes-job", &job.id)
+            .unwrap()
+            .unwrap();
+        let mut value: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        value["program_registrations"]["STEP1"]["handler"] =
+            serde_json::json!({"kind": "unsupported"});
+        value["version"] = serde_json::json!(row.version + 1);
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "jes-job".into(),
+                    key: job.id,
+                    version: row.version + 1,
+                    payload: serde_json::to_vec(&value).unwrap(),
+                },
+                Some(row.version),
+            )
+            .unwrap();
+        drop(first);
+
+        let provider_store: Arc<dyn ProviderStateStore> = store;
+        let providers = spool_test_providers(provider_store.clone());
+        assert!(matches!(
+            BatchService::open(
+                host_with(builtins(), providers),
+                provider_store,
+                Default::default(),
+                Default::default(),
+            ),
+            Err(HostProblem::InfrastructureFailure)
+        ));
+    }
+
+    #[test]
+    fn durable_job_identity_and_next_id_corruption_fail_closed() {
+        let invocation = invocation();
+        let keyed_store = Arc::new(MemoryStore::new(Default::default()));
+        let keyed = service(keyed_store.clone(), builtins());
+        let submitted = keyed
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("identity-key", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let row = keyed_store
+            .get_provider_state("jes-job", &submitted.id)
+            .unwrap()
+            .unwrap();
+        let mut job: Job = serde_json::from_slice(&row.payload).unwrap();
+        job.id = "JOB99999".into();
+        job.version = row.version + 1;
+        keyed_store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: row.namespace,
+                    key: row.key,
+                    version: job.version,
+                    payload: serde_json::to_vec(&job).unwrap(),
+                },
+                Some(row.version),
+            )
+            .unwrap();
+        drop(keyed);
+        let provider_store: Arc<dyn ProviderStateStore> = keyed_store;
+        let providers = spool_test_providers(provider_store.clone());
+        assert!(matches!(
+            BatchService::open(
+                host_with(builtins(), providers),
+                provider_store,
+                Default::default(),
+                Default::default(),
+            ),
+            Err(HostProblem::InfrastructureFailure)
+        ));
+
+        let meta_store = Arc::new(MemoryStore::new(Default::default()));
+        let meta_service = service(meta_store.clone(), builtins());
+        meta_service
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("identity-meta", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let meta = meta_store
+            .get_provider_state("jes-meta", "next-id")
+            .unwrap()
+            .unwrap();
+        meta_store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: meta.namespace,
+                    key: meta.key,
+                    version: meta.version + 1,
+                    payload: 1u64.to_be_bytes().to_vec(),
+                },
+                Some(meta.version),
+            )
+            .unwrap();
+        drop(meta_service);
+        let provider_store: Arc<dyn ProviderStateStore> = meta_store;
+        let providers = spool_test_providers(provider_store.clone());
+        assert!(matches!(
+            BatchService::open(
+                host_with(builtins(), providers),
+                provider_store,
+                Default::default(),
+                Default::default(),
+            ),
+            Err(HostProblem::InfrastructureFailure)
+        ));
+    }
+
+    #[test]
+    fn durable_job_shape_corruption_fails_closed() {
+        assert_durable_store_rejected(durable_store_with_corruption("shape-submit-key", |job| {
+            job.submit_key = "invalid key".into()
+        }));
+        assert_durable_store_rejected(durable_store_with_corruption("shape-owner", |job| {
+            job.owner = "invalid owner".into();
+        }));
+        assert_durable_store_rejected(durable_store_with_corruption("shape-plan", |job| {
+            job.name = "OTHERJOB".into();
+        }));
+        assert_durable_store_rejected(durable_store_with_corruption("shape-steps", |job| {
+            job.steps.clear();
+        }));
+        assert_durable_store_rejected(durable_store_with_corruption("shape-events", |job| {
+            job.events[0] = "x".repeat(MAX_JOB_EVENT_BYTES + 1);
+        }));
+    }
+
+    #[test]
+    fn invocation_cancellation_is_terminal_before_selection_and_purge_safe() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let checkpoint_store: Arc<dyn CheckpointStore> = store.clone();
+        let service =
+            service_with_checkpoint_store(store.clone(), checkpoint_store, builtins()).unwrap();
+        let normal = invocation();
+        let submitted = service
+            .submit(
+                &normal,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("checkpoint-cancel", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let mut cancelled = invocation();
+        cancelled.cancellation = Some(
+            Cancellation::new(
+                CancellationId::new("cancel-job", InvocationLimits::default()).unwrap(),
+                "operator requested stop",
+                17,
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        let result = service.run_next(&cancelled, false).unwrap().unwrap();
+        assert_eq!(result.state, JobState::Cancelled);
+        assert_eq!(result.steps[0].state, StepState::Pending);
+        assert!(matches!(
+            result.cancellation,
+            Some(JesCancellation {
+                state: CancellationState::Completed,
+                requested_tick: 17,
+                ..
+            })
+        ));
+        assert_eq!(service.checkpoint(&submitted.id).unwrap(), None);
+        service.purge(&normal, &submitted.id).unwrap();
+        assert!(
+            store
+                .get_checkpoint(&checkpoint_execution_id(&submitted.id).unwrap())
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn provider_cancellation_is_observed_in_step_job_and_common_checkpoint() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let checkpoint_store: Arc<dyn CheckpointStore> = store.clone();
+        let router: Arc<dyn HostProvider> = ProgramRouter::new(
+            BTreeMap::from([(
+                "CANCPGM".into(),
+                Arc::new(CancelledProgram) as Arc<dyn Program>,
+            )]),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let service = service_with_checkpoint_store(store, checkpoint_store, router).unwrap();
+        let invocation = invocation();
+        let submitted = service
+            .submit(
+                &invocation,
+                &bundle("CANCPGM"),
+                &IdempotencyKey::new("provider-cancel", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let cancelled = service.run_next(&invocation, false).unwrap().unwrap();
+        assert_eq!(cancelled.state, JobState::Cancelled);
+        assert_eq!(cancelled.steps[0].state, StepState::Cancelled);
+        assert_eq!(
+            cancelled.cancellation.as_ref().unwrap().state,
+            CancellationState::Completed
+        );
+        let checkpoint = service.checkpoint(&submitted.id).unwrap().unwrap();
+        assert_eq!(checkpoint.job_version, cancelled.version);
+        assert_eq!(
+            checkpoint.cancellation.unwrap().state,
+            CancellationState::Completed
+        );
+    }
+
+    #[test]
+    fn purge_checkpoint_delete_failure_retains_retryable_job_intent() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let checkpoint_store: Arc<dyn CheckpointStore> = Arc::new(FailDeleteCheckpointOnceStore {
+            inner: store.clone(),
+            fail: AtomicBool::new(true),
+        });
+        let service = service_with_checkpoint_store(store, checkpoint_store, builtins()).unwrap();
+        let invocation = invocation();
+        let submitted = service
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("purge-checkpoint-failure", InvocationLimits::default())
+                    .unwrap(),
+                false,
+            )
+            .unwrap();
+        service.run_next(&invocation, false).unwrap().unwrap();
+        assert_eq!(
+            service.purge(&invocation, &submitted.id),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert!(
+            service
+                .lock()
+                .unwrap()
+                .jobs
+                .get(&submitted.id)
+                .unwrap()
+                .purge_pending
+        );
+        service.purge(&invocation, &submitted.id).unwrap();
+        assert_eq!(service.get(&submitted.id), Err(HostProblem::NotFound));
+    }
+
+    #[test]
+    fn crash_after_committed_step_checkpoint_gap_restarts_without_duplicate_program_effect() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let failing_checkpoints: Arc<dyn CheckpointStore> = Arc::new(FailNthCheckpointStore {
+            inner: store.clone(),
+            writes: AtomicUsize::new(0),
+            fail_at: 4,
+        });
+        let calls = Arc::new(AtomicUsize::new(0));
+        let router: Arc<dyn HostProvider> = ProgramRouter::new(
+            BTreeMap::from([(
+                "CRASHPGM".into(),
+                Arc::new(CobolProgram {
+                    calls: calls.clone(),
+                }) as Arc<dyn Program>,
+            )]),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let first =
+            service_with_checkpoint_store(store.clone(), failing_checkpoints, router.clone())
+                .unwrap();
+        let invocation = invocation();
+        let submitted = first
+            .submit(
+                &invocation,
+                &bundle("CRASHPGM"),
+                &IdempotencyKey::new("checkpoint-crash", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            first.run_next(&invocation, false),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(first.get(&submitted.id).unwrap().state, JobState::Running);
+        assert_eq!(
+            first.get(&submitted.id).unwrap().steps[0].state,
+            StepState::Completed
+        );
+        drop(first);
+
+        let checkpoint_store: Arc<dyn CheckpointStore> = store.clone();
+        let restarted = service_with_checkpoint_store(store, checkpoint_store, router).unwrap();
+        assert_eq!(
+            restarted.get(&submitted.id).unwrap().state,
+            JobState::Queued
+        );
+        let completed = restarted.run_next(&invocation, false).unwrap().unwrap();
+        assert_eq!(completed.state, JobState::Completed);
+        assert_eq!(completed.return_code, Some(4));
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            restarted
+                .spool(&invocation, &submitted.id, "SYSPRINT", 0, 8)
+                .unwrap()
+                .0,
+            vec![b"COBOL OUTPUT".to_vec()]
+        );
+    }
+
+    #[test]
+    fn queue_and_spool_overload_fail_before_unbounded_growth() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let providers = spool_test_providers(store.clone());
+        let service = BatchService::open(
+            host_with(builtins(), providers),
+            store.clone(),
+            Default::default(),
+            BatchLimits {
+                max_jobs: 1,
+                max_queued: 1,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("overload-one", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//SECOND JOB CLASS=A\n//S EXEC PGM=IEFBR14\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("overload-two", InvocationLimits::default()).unwrap(),
+                false,
+            ),
+            Err(HostProblem::ResourceExhausted)
+        );
+
+        let restart_store = Arc::new(MemoryStore::new(Default::default()));
+        let restart_provider: Arc<dyn ProviderStateStore> = restart_store.clone();
+        let restart_service = BatchService::open(
+            host_with(builtins(), spool_test_providers(restart_provider.clone())),
+            restart_provider,
+            Default::default(),
+            BatchLimits {
+                max_jobs: 2,
+                max_queued: 2,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        for (name, key) in [("ONE", "restart-one"), ("TWO", "restart-two")] {
+            restart_service
+                .submit(
+                    &invocation,
+                    &JclBundle {
+                        primary: format!("//{name} JOB CLASS=A\n//STEP1 EXEC PGM=IEFBR14\n"),
+                        ..Default::default()
+                    },
+                    &IdempotencyKey::new(key, InvocationLimits::default()).unwrap(),
+                    false,
+                )
+                .unwrap();
+        }
+        drop(restart_service);
+        let restart_provider: Arc<dyn ProviderStateStore> = restart_store;
+        let providers = spool_test_providers(restart_provider.clone());
+        assert!(matches!(
+            BatchService::open(
+                host_with(builtins(), providers),
+                restart_provider,
+                Default::default(),
+                BatchLimits {
+                    max_jobs: 1,
+                    max_queued: 1,
+                    ..Default::default()
+                },
+            ),
+            Err(HostProblem::ResourceExhausted)
+        ));
+
+        let restart_spool_store = Arc::new(MemoryStore::new(Default::default()));
+        let restart_spool_provider: Arc<dyn ProviderStateStore> = restart_spool_store.clone();
+        let restart_spool = BatchService::open(
+            host_with(
+                builtins(),
+                spool_test_providers(restart_spool_provider.clone()),
+            ),
+            restart_spool_provider,
+            Default::default(),
+            Default::default(),
+        )
+        .unwrap();
+        restart_spool
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("restart-spool-bound", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        drop(restart_spool);
+        let restart_provider: Arc<dyn ProviderStateStore> = restart_spool_store;
+        let providers = spool_test_providers(restart_provider.clone());
+        assert!(matches!(
+            BatchService::open(
+                host_with(builtins(), providers),
+                restart_provider,
+                Default::default(),
+                BatchLimits {
+                    max_spool_records: 3,
+                    ..Default::default()
+                },
+            ),
+            Err(HostProblem::ResourceExhausted)
+        ));
+
+        let bounded_store: Arc<dyn ProviderStateStore> =
+            Arc::new(MemoryStore::new(Default::default()));
+        let providers = spool_test_providers(bounded_store.clone());
+        let bounded = BatchService::open(
+            host_with(builtins(), providers),
+            bounded_store.clone(),
+            Default::default(),
+            BatchLimits {
+                max_spool_records: 3,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            bounded.submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("spool-overload", InvocationLimits::default()).unwrap(),
+                false,
+            ),
+            Err(HostProblem::ResourceExhausted)
+        );
+        assert!(bounded.list(None, None, 8).unwrap().0.is_empty());
+        assert!(
+            bounded_store
+                .list_provider_state("spool-artifact", 16)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn event_overload_preserves_bounds_and_rejects_unlogged_transitions() {
+        let invocation = invocation();
+        let control_store: Arc<dyn ProviderStateStore> =
+            Arc::new(MemoryStore::new(Default::default()));
+        let control = BatchService::open(
+            host_with(builtins(), spool_test_providers(control_store.clone())),
+            control_store,
+            Default::default(),
+            BatchLimits {
+                max_events: 4,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let controlled = control
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("event-control", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            control.hold(&invocation, &controlled.id),
+            Err(HostProblem::ResourceExhausted)
+        );
+        let unchanged = control.lock().unwrap().jobs[&controlled.id].clone();
+        assert_eq!(unchanged.state, JobState::Queued);
+        assert_eq!(unchanged.version, controlled.version);
+        assert_eq!(unchanged.events.len(), 4);
+
+        let execution_store: Arc<dyn ProviderStateStore> =
+            Arc::new(MemoryStore::new(Default::default()));
+        let execution = BatchService::open(
+            host_with(builtins(), spool_test_providers(execution_store.clone())),
+            execution_store,
+            Default::default(),
+            BatchLimits {
+                max_events: 8,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let submitted = execution
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("event-execution", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let failed = execution.run_next(&invocation, false).unwrap().unwrap();
+        assert_eq!(failed.state, JobState::Failed);
+        assert_eq!(failed.steps[0].state, StepState::Pending);
+        let bounded = execution.lock().unwrap().jobs[&submitted.id].clone();
+        assert_eq!(bounded.events.len(), 7);
+        assert_eq!(
+            &bounded.events[bounded.events.len() - 3..],
+            ["selected:INIT0001", "running", "failed:ResourceExhausted"]
+        );
+    }
+
+    #[test]
+    fn sqlite_backup_restores_jobs_spool_checkpoint_scheduler_and_topology() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-jes-backup-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let primary = directory.join("primary.db");
+        let backup = directory.join("backup.db");
+        let url = format!("sqlite://{}?mode=rwc", primary.display());
+        let store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 65_536).unwrap());
+        let service = sqlite_service_with_checkpoint_store(store.clone()).unwrap();
+        let invocation = invocation();
+        let topology = service.topology().unwrap();
+        service
+            .install_topology(&invocation, topology.clone())
+            .unwrap();
+        service.stop_initiator(&invocation, "INIT0001").unwrap();
+        service.start_initiator(&invocation, "INIT0001").unwrap();
+        let submitted = service
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("backup-job", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        service.run_next(&invocation, false).unwrap().unwrap();
+        store.backup_to(&backup).unwrap();
+        drop(service);
+        drop(store);
+
+        let restored_url = format!("sqlite://{}?mode=rw", backup.display());
+        let restored_store =
+            Arc::new(SqliteStateStore::open(&restored_url, 8 * 1024 * 1024, 65_536).unwrap());
+        restored_store.integrity_check().unwrap();
+        let restored = sqlite_service_with_checkpoint_store(restored_store.clone()).unwrap();
+        assert_eq!(
+            restored.get(&submitted.id).unwrap().state,
+            JobState::Completed
+        );
+        assert_eq!(restored.topology().unwrap(), topology);
+        assert!(restored.checkpoint(&submitted.id).unwrap().is_some());
+        assert_eq!(
+            restored
+                .spool(&invocation, &submitted.id, "SYSPRINT", 0, 8)
+                .unwrap()
+                .0,
+            vec![b"IEFBR14".to_vec()]
+        );
+        assert!(
+            restored_store
+                .get_provider_state(SCHEDULER_STATE_NAMESPACE, CONFIGURATION_STATE_KEY)
+                .unwrap()
+                .is_some()
+        );
+        drop(restored);
+        drop(restored_store);
+        let _ = std::fs::remove_file(primary);
+        let _ = std::fs::remove_file(backup);
+        let _ = std::fs::remove_dir(directory);
+    }
+
+    #[test]
+    fn corrupted_common_checkpoint_fails_closed_on_restart() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let checkpoint_store: Arc<dyn CheckpointStore> = store.clone();
+        let service =
+            service_with_checkpoint_store(store.clone(), checkpoint_store, builtins()).unwrap();
+        let invocation = invocation();
+        let submitted = service
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("checkpoint-corrupt", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        service.run_next(&invocation, false).unwrap().unwrap();
+        let execution_id = checkpoint_execution_id(&submitted.id).unwrap();
+        let mut checkpoint = store.get_checkpoint(&execution_id).unwrap().unwrap();
+        checkpoint.payload[0] ^= 0xff;
+        store.put_checkpoint(checkpoint).unwrap();
+        drop(service);
+
+        let checkpoint_store: Arc<dyn CheckpointStore> = store.clone();
+        let provider_store: Arc<dyn ProviderStateStore> = store;
+        let providers = spool_test_providers(provider_store.clone());
+        assert!(matches!(
+            BatchService::open_with_checkpoint_store(
+                host_with(builtins(), providers),
+                provider_store,
+                checkpoint_store,
+                Default::default(),
+                Default::default(),
+            ),
+            Err(HostProblem::InfrastructureFailure)
+        ));
+    }
+
+    #[test]
+    fn warm_start_exhausts_bounded_attempts_without_reexecuting() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let invocation = invocation();
+        let first = service(store.clone(), builtins());
+        let submitted = first
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("attempt-exhaustion", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let row = store
+            .get_provider_state("jes-job", &submitted.id)
+            .unwrap()
+            .unwrap();
+        let mut job: Job = serde_json::from_slice(&row.payload).unwrap();
+        job.version += 1;
+        job.attempt = BatchLimits::default().max_attempts;
+        job.state = JobState::Running;
+        store
+            .put_provider_state(job_record(&job).unwrap(), Some(row.version))
+            .unwrap();
+        drop(first);
+
+        let restarted = service(store, builtins());
+        assert_eq!(
+            restarted.get(&submitted.id).unwrap().state,
+            JobState::Failed
+        );
+        assert_eq!(restarted.run_next(&invocation, false).unwrap(), None);
+    }
+
+    #[test]
+    fn durable_version_increment_is_checked() {
+        assert_eq!(
+            next_job_version(u64::MAX),
+            Err(HostProblem::ResourceExhausted)
+        );
+        assert_eq!(next_job_version(41), Ok(42));
+    }
+
+    #[test]
+    fn job_identifier_exhaustion_is_bounded_and_restart_safe() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let invocation = invocation();
+        let first = service(store.clone(), builtins());
+        let existing = first
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("job-id-existing", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let meta = store
+            .get_provider_state("jes-meta", "next-id")
+            .unwrap()
+            .unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "jes-meta".into(),
+                    key: "next-id".into(),
+                    version: meta.version + 1,
+                    payload: (MAX_JOB_NUMBER + 1).to_be_bytes().to_vec(),
+                },
+                Some(meta.version),
+            )
+            .unwrap();
+        drop(first);
+
+        let exhausted = service(store.clone(), builtins());
+        assert_eq!(exhausted.get(&existing.id).unwrap().id, existing.id);
+        assert_eq!(
+            exhausted.submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("job-id-exhausted", InvocationLimits::default()).unwrap(),
+                false,
+            ),
+            Err(HostProblem::ResourceExhausted)
+        );
+        drop(exhausted);
+
+        let meta = store
+            .get_provider_state("jes-meta", "next-id")
+            .unwrap()
+            .unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "jes-meta".into(),
+                    key: "next-id".into(),
+                    version: meta.version + 1,
+                    payload: (MAX_JOB_NUMBER + 2).to_be_bytes().to_vec(),
+                },
+                Some(meta.version),
+            )
+            .unwrap();
+        let provider_store: Arc<dyn ProviderStateStore> = store;
+        let providers = spool_test_providers(provider_store.clone());
+        assert!(matches!(
+            BatchService::open(
+                host_with(builtins(), providers),
+                provider_store,
+                Default::default(),
+                Default::default(),
+            ),
+            Err(HostProblem::InfrastructureFailure)
+        ));
     }
 
     #[test]

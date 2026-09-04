@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/spool-result@2",
+  "title": "mainframe-env spool provider result",
+  "type": "object",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "version", "replayed"],
+      "properties": {
+        "kind": {"const": "mutated"},
+        "version": {"type": "integer", "minimum": 1},
+        "replayed": {"type": "boolean"}
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "files"],
+      "properties": {
+        "kind": {"const": "files"},
+        "files": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["file", "record_count", "byte_count", "sealed", "version"],
+            "properties": {
+              "file": {"type": "string", "minLength": 1, "maxLength": 128},
+              "record_count": {"type": "integer", "minimum": 0, "maximum": 262144},
+              "byte_count": {"type": "integer", "minimum": 0, "maximum": 268435456},
+              "sealed": {"type": "boolean"},
+              "version": {"type": "integer", "minimum": 1}
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "records", "more", "version"],
+      "properties": {
+        "kind": {"const": "records"},
+        "records": {
+          "type": "array",
+          "maxItems": 262144,
+          "items": {
+            "type": "array",
+            "maxItems": 1048576,
+            "items": {"type": "integer", "minimum": 0, "maximum": 255}
+          }
+        },
+        "more": {"type": "boolean"},
+        "version": {"type": "integer", "minimum": 1}
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "remaining_artifacts"],
+      "properties": {
+        "kind": {"const": "purge-pending"},
+        "remaining_artifacts": {"type": "integer", "minimum": 1, "maximum": 262144}
+      }
+    }
+  ]
+}

@@ -21,6 +21,7 @@ mainframe-env-host-api.workspace = true
 mainframe-env-interpreter.workspace = true
 mainframe-env-ir.workspace = true
 mainframe-env-racf.workspace = true
+mainframe-env-spool.workspace = true
 mainframe-env-store.workspace = true
 mainframe-env-store-api.workspace = true
 mainframe-env-source.workspace = true

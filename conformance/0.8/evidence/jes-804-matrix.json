@@ -1,0 +1,20 @@
+{
+  "schema_version": "mainframe-env.jes-work-package-evidence@1",
+  "target_version": "0.8.0",
+  "work_package": "JES-804",
+  "status": "pass",
+  "rows": [
+    {"id": "started-task-identity", "result": "pass", "evidence": "service::tests::started_task_identity_and_authorized_stop_are_durable"},
+    {"id": "started-task-stop", "result": "pass", "evidence": "service::tests::started_task_identity_and_authorized_stop_are_durable"},
+    {"id": "internal-reader-provenance", "result": "pass", "evidence": "service::tests::iebgener_internal_reader_submits_the_copied_jcl"},
+    {"id": "internal-reader-saf-deny", "result": "pass", "evidence": "service::tests::denied_internal_reader_submission_creates_no_child_job"},
+    {"id": "nje-route", "result": "pass", "evidence": "service::tests::nje_route_and_mas_member_ownership_drive_selection_and_survive_restart"},
+    {"id": "mas-selection-ownership", "result": "pass", "evidence": "service::tests::nje_route_and_mas_member_ownership_drive_selection_and_survive_restart"},
+    {"id": "topology-restart", "result": "pass", "evidence": "service::tests::nje_route_and_mas_member_ownership_drive_selection_and_survive_restart"},
+    {"id": "change-class-priority", "result": "pass", "evidence": "service::tests::initiator_and_queued_job_controls_are_authorized_and_persisted"},
+    {"id": "initiator-start-stop-restart", "result": "pass", "evidence": "service::tests::initiator_and_queued_job_controls_are_authorized_and_persisted"},
+    {"id": "job-control-saf-deny", "result": "pass", "evidence": "service::tests::denied_operator_control_publishes_no_job_transition"},
+    {"id": "legacy-job-kind-route-default", "result": "pass", "evidence": "service::tests::legacy_durable_job_migrates_and_recovers_without_losing_plan"},
+    {"id": "operator-visible-member-node", "result": "pass", "evidence": "product::tests::composed_job_auth_console_and_shutdown_routes_pass"}
+  ]
+}

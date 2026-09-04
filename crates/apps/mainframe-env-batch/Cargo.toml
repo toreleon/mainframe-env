@@ -19,5 +19,6 @@ sha2.workspace = true
 
 [dev-dependencies]
 mainframe-env-dataset.workspace = true
+mainframe-env-spool.workspace = true
 jsonschema.workspace = true
 mainframe-env-store = { path = "../../stores/mainframe-env-store" }

@@ -4,6 +4,7 @@
 
 mod ams;
 mod controller;
+mod dd;
 mod jcl;
 mod jcl_catalog;
 mod jcl_expand;
@@ -13,6 +14,7 @@ mod jcl_plan;
 mod jcl_schema;
 mod jcl_statement;
 mod jcl_syntax;
+mod jes;
 mod program;
 mod service;
 
@@ -20,6 +22,11 @@ pub use controller::{
     BATCH_CONTROLLER_REGISTRY_CONTRACT, BatchControllerDefinition, BatchControllerGeneration,
     BatchControllerInstallReceipt, BatchControllerPlan, BatchControllerProgram,
     BatchControllerSelector,
+};
+
+pub use dd::{
+    DdAllocationPlan, DdDispositionPlan, DdSourceKind, DdStatusDisposition, DdTerminalDisposition,
+    JES_DD_ALLOCATION_CONTRACT, plan_dd_allocations,
 };
 
 pub use ams::{
@@ -58,9 +65,19 @@ pub use jcl_syntax::{
     JCL_SYNTAX_CONTRACT, JclLanguage, JclLosslessSyntax, JclRecord, JclRecordFields, JclRecordKind,
     JclSyntaxAnalysis, JclSyntaxKind, JclSyntaxLimits, JclSyntaxProblem, analyze_jcl_syntax,
 };
-pub use program::{
-    Program, ProgramInput, ProgramOutput, ProgramRouter, SystemServiceProgram, UtilityDisposition,
-    common_program_catalog_sha256, decode_program_output, system_service_program,
-    utility_disposition,
+pub use jes::{
+    CancellationState, InitiatorDefinition, JES_CHECKPOINT_CONTRACT, JES_DURABLE_JOB_CONTRACT,
+    JES_OUTPUT_CONTRACT, JES_RUNTIME_CONTRACT, JES_SPOOL_CONTRACT, JES_TOPOLOGY_CONTRACT,
+    JES_UTILITY_REGISTRY_CONTRACT, JesCancellation, JesCheckpoint, JesClassDefinition,
+    JesControlOperation, JesJobKind, JesJobRoute, JesMasMemberDefinition, JesNodeDefinition,
+    JesOutputGroup, JesOutputState, JesQueue, JesSchedulerConfiguration, JesSpoolDescriptor,
+    JesSpoolState, JesSubmissionOrigin, JesTopology, JobSelectionCandidate, JobState,
+    StepExecution, StepState, StepTermination, UtilityFamily, UtilityHandler, select_job,
 };
-pub use service::{BatchLimits, BatchService, JobSnapshot, JobState};
+pub use program::{
+    Program, ProgramExecutionContext, ProgramInput, ProgramOutput, ProgramRegistration,
+    ProgramRouter, RegisteredProgramHandler, SystemServiceProgram, UtilityDisposition,
+    common_program_catalog_sha256, decode_program_output, resolve_program_registration,
+    system_service_program, utility_disposition,
+};
+pub use service::{BatchLimits, BatchService, JobSnapshot};
