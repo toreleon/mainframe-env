@@ -1,0 +1,57 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "predicate": {
+    "buildDefinition": {
+      "buildType": "mainframe-env.cargo-release@1",
+      "externalParameters": {
+        "all_features": true,
+        "locked": true,
+        "profile": "release",
+        "target": "aarch64-apple-darwin"
+      },
+      "resolvedDependencies": [
+        {
+          "digest": {
+            "sha256": "a369af7a1f653e58316a0384703377f20d8ca31730ad71c51e1afb35a37d4f2c"
+          },
+          "uri": "Cargo.lock"
+        },
+        {
+          "digest": {
+            "sha256": "2c4131d2a0a5e107c31aa7fc4198dd110ee57159e06c3dc1af4ffc421fbc4ffe"
+          },
+          "uri": "build-inputs.json"
+        },
+        {
+          "digest": {
+            "sha256": "4b95607b1143d254d62b23ef2afc5d7f180a5a299859e9345515ee0de97c7d40"
+          },
+          "uri": "source-tree"
+        }
+      ]
+    },
+    "runDetails": {
+      "builder": {
+        "id": "mainframe-env-cargo/aarch64-apple-darwin"
+      },
+      "metadata": {
+        "invocationId": "mainframe-env-v0.8.0-aarch64-apple-darwin-local"
+      }
+    }
+  },
+  "predicateType": "https://slsa.dev/provenance/v1",
+  "subject": [
+    {
+      "digest": {
+        "sha256": "dadf2aff356b2a59ac7c5d1468b523302533988cf5dca4ebe23e601a6e7111ca"
+      },
+      "name": "mainframe-env-server"
+    },
+    {
+      "digest": {
+        "sha256": "1a3605218de67af7a5a322c48566b35f48e0045788c9f94bb139413f7369ca43"
+      },
+      "name": "mainframe-env"
+    }
+  ]
+}

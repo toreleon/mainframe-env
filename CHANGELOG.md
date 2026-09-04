@@ -4,6 +4,29 @@ All notable changes to mainframe-env are documented here.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-04
+
+### Added
+
+- Added deterministic JES2 scheduling, DD allocation and DISP processing,
+  artifact-backed spool, output routing, started tasks, internal readers,
+  bounded NJE/MAS topology, operator controls, and durable recovery.
+- Added admission-pinned typed program registrations and real bounded semantics
+  for all nine required utility families without program-name dispatch or
+  generic-success fallback.
+- Certified the pinned CardDemo base-batch corpus across 3 journeys, 12
+  initialization jobs, and 9 operational jobs.
+
+### Known limitations
+
+- The licensed z/OS 3.2/JES2 differential remains exactly 0/16 pending under
+  the approved `pass-with-licensed-differential-pending` policy. Hercules,
+  MVS 3.8J, modeled behavior, local output, and generated or historical
+  evidence receive zero licensed equivalence credit.
+- The authentic licensed campaign is a hard gate for 0.17 release
+  certification and 1.0, while the standalone receipt adapter remains
+  fail-closed.
+
 ## [0.7.0] - 2026-09-02
 
 ### Added
