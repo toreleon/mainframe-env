@@ -6,7 +6,8 @@ use crate::controller::{
     ResolvedBatchController,
 };
 use crate::program::{
-    ProgramExecution, TsoProgramExecution, program_execution, tso_program_execution,
+    ProgramRegistration, RegisteredProgramHandler, TsoProgramExecution,
+    resolve_program_registration, tso_program_execution,
 };
 use crate::{
     BatchControllerGeneration, BatchControllerInstallReceipt, BatchControllerPlan,
@@ -124,6 +125,8 @@ struct Job {
     submit_key: String,
     plan: JobPlan,
     #[serde(default)]
+    program_registrations: BTreeMap<String, ProgramRegistration>,
+    #[serde(default)]
     dataset_resolutions: BTreeMap<String, String>,
     #[serde(default)]
     temporary_datasets: Vec<String>,
@@ -233,6 +236,13 @@ impl BatchService {
                 }
                 job.events.push("migrated:jes-durable-job@1-to-2".into());
                 changed = true;
+            }
+            if job.program_registrations.is_empty() {
+                job.program_registrations = resolve_plan_programs(&job.plan)?;
+                job.events.push("migrated:program-registrations".into());
+                changed = true;
+            } else {
+                validate_plan_programs(&job.plan, &job.program_registrations)?;
             }
             if matches!(job.state, JobState::Selected | JobState::Running) {
                 job.version += 1;
@@ -543,6 +553,7 @@ impl BatchService {
             .lines()
             .map(|line| line.as_bytes().to_vec())
             .collect();
+        let program_registrations = resolve_plan_programs(&plan)?;
         let origin_event = match &origin {
             JesSubmissionOrigin::External => "origin:external".into(),
             JesSubmissionOrigin::InternalReader {
@@ -577,6 +588,7 @@ impl BatchService {
             version: 1,
             submit_key: key.as_str().into(),
             plan,
+            program_registrations,
             dataset_resolutions: BTreeMap::new(),
             temporary_datasets: Vec::new(),
             spool_sequence: 0,
@@ -1238,9 +1250,16 @@ impl BatchService {
                     parameter: step.parameter.clone(),
                     dds,
                 };
-                let execution = program_execution(&step.program);
+                let registration = job
+                    .program_registrations
+                    .get(&step.name)
+                    .filter(|registration| registration.program == step.program)
+                    .cloned()
+                    .ok_or(HostProblem::InfrastructureFailure)?;
                 let dataset_resolutions = job.dataset_resolutions.clone();
-                let idcams_return_code = if execution == ProgramExecution::Idcams {
+                let idcams_return_code = if registration.handler
+                    == RegisteredProgramHandler::Utility(crate::UtilityHandler::Idcams)
+                {
                     Some(self.execute_idcams(
                         invocation,
                         job,
@@ -1252,30 +1271,30 @@ impl BatchService {
                 } else {
                     None
                 };
-                let mut output = match execution {
-                    ProgramExecution::Sdsf => {
+                let mut output = match registration.handler {
+                    RegisteredProgramHandler::Sdsf => {
                         self.execute_sdsf(invocation, job, step, &input, &mut effect_sequence)?
                     }
-                    ProgramExecution::Db2Tso => {
+                    RegisteredProgramHandler::Db2Tso => {
                         self.execute_db2_tso(invocation, job, step, &input, &mut effect_sequence)?
                     }
-                    ProgramExecution::ImsController => self.execute_ims_controller(
+                    RegisteredProgramHandler::ImsController => self.execute_ims_controller(
                         invocation,
                         job,
                         step,
                         &input,
                         &mut effect_sequence,
                     )?,
-                    ProgramExecution::ProgramService | ProgramExecution::Idcams => self
-                        .execute_program_controller(
-                            invocation,
-                            job,
-                            step,
-                            &input,
-                            &mut effect_sequence,
-                            &step.program,
-                        )?,
-                    ProgramExecution::Unsupported => return Err(HostProblem::Unsupported),
+                    RegisteredProgramHandler::ProgramService
+                    | RegisteredProgramHandler::Utility(_) => self.execute_program_controller(
+                        invocation,
+                        job,
+                        step,
+                        &input,
+                        &mut effect_sequence,
+                        &registration.program,
+                    )?,
+                    RegisteredProgramHandler::Unsupported => return Err(HostProblem::Unsupported),
                 };
                 if let Some(return_code) = idcams_return_code {
                     output.return_code = return_code;
@@ -6420,6 +6439,49 @@ fn legacy_jes_job_contract() -> String {
     "mainframe-env.jes-durable-job@1".into()
 }
 
+fn resolve_plan_programs(
+    plan: &JobPlan,
+) -> Result<BTreeMap<String, ProgramRegistration>, HostProblem> {
+    let mut registrations = BTreeMap::new();
+    for step in &plan.steps {
+        if registrations
+            .insert(
+                step.name.clone(),
+                resolve_program_registration(&step.program)?,
+            )
+            .is_some()
+        {
+            return Err(HostProblem::Malformed);
+        }
+    }
+    Ok(registrations)
+}
+
+fn validate_plan_programs(
+    plan: &JobPlan,
+    registrations: &BTreeMap<String, ProgramRegistration>,
+) -> Result<(), HostProblem> {
+    if registrations.len() != plan.steps.len() {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    for step in &plan.steps {
+        let registration = registrations
+            .get(&step.name)
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        registration
+            .validate()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        if registration.program != step.program
+            || registration
+                != &resolve_program_registration(&step.program)
+                    .map_err(|_| HostProblem::InfrastructureFailure)?
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+    }
+    Ok(())
+}
+
 fn initial_step_executions(plan: &JobPlan) -> Vec<StepExecution> {
     plan.steps
         .iter()
@@ -7858,6 +7920,65 @@ mod tests {
     }
 
     #[test]
+    fn registered_copy_generate_edit_and_update_utilities_mutate_exact_datasets() {
+        let records = Arc::new(Mutex::new(BTreeMap::from([
+            (
+                "IBMUSER.COPYIN".into(),
+                vec![b"ONE".to_vec(), b"TWO".to_vec()],
+            ),
+            ("IBMUSER.COPYOUT".into(), Vec::new()),
+            ("IBMUSER.GENOUT".into(), Vec::new()),
+            (
+                "IBMUSER.JCLIN".into(),
+                vec![
+                    b"//JOB1 JOB".to_vec(),
+                    b"//S1 EXEC PGM=A".to_vec(),
+                    b"//JOB2 JOB".to_vec(),
+                    b"//S2 EXEC PGM=B".to_vec(),
+                ],
+            ),
+            ("IBMUSER.JCLOUT".into(), Vec::new()),
+            ("IBMUSER.UPD".into(), vec![b"OLD".to_vec()]),
+        ])));
+        let service = service_with_datasets(records.clone());
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//UTILJOB JOB CLASS=A\n//COPY EXEC PGM=IEBCOPY\n//INPUT DD DSN=IBMUSER.COPYIN,DISP=SHR\n//OUTPUT DD DSN=IBMUSER.COPYOUT,DISP=OLD\n//SYSIN DD *\n COPY INDD=INPUT,OUTDD=OUTPUT\n/*\n//GEN EXEC PGM=IEBDG\n//DATA DD DSN=IBMUSER.GENOUT,DISP=OLD\n//SYSIN DD *\n DSD OUTPUT=(DATA)\n FD NAME=FIELD,LENGTH=4\n CREATE QUANTITY=2\n END\n/*\n//EDIT EXEC PGM=IEBEDIT\n//SYSUT1 DD DSN=IBMUSER.JCLIN,DISP=SHR\n//SYSUT2 DD DSN=IBMUSER.JCLOUT,DISP=OLD\n//SYSIN DD *\n EDIT START=JOB2\n/*\n//UPDATE EXEC PGM=IEBUPDTE\n//SYSUT2 DD DSN=IBMUSER.UPD(MEMBER),DISP=OLD\n//SYSIN DD *\n./ REPL NAME=MEMBER\nNEW ONE\nNEW TWO\n./ ENDUP\n/*\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("real-utility-families", InvocationLimits::default())
+                    .unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed
+        );
+        let records = records.lock().unwrap();
+        assert_eq!(
+            records["IBMUSER.COPYOUT"],
+            [b"ONE".to_vec(), b"TWO".to_vec()]
+        );
+        assert_eq!(
+            records["IBMUSER.GENOUT"],
+            [b"0001".to_vec(), b"0002".to_vec()]
+        );
+        assert_eq!(
+            records["IBMUSER.JCLOUT"],
+            [b"//JOB2 JOB".to_vec(), b"//S2 EXEC PGM=B".to_vec()]
+        );
+        assert_eq!(
+            records["IBMUSER.UPD"],
+            [b"NEW ONE".to_vec(), b"NEW TWO".to_vec()]
+        );
+    }
+
+    #[test]
     fn dd_concatenation_preserves_declared_dataset_order() {
         let records = Arc::new(Mutex::new(BTreeMap::from([
             ("IBMUSER.INPUT1".into(), vec![b"FIRST".to_vec()]),
@@ -9291,6 +9412,7 @@ mod tests {
         object.remove("kind");
         object.remove("origin");
         object.remove("route");
+        object.remove("program_registrations");
         object.remove("spool_sequence");
         object.remove("spool_files");
         object.remove("output_groups");
@@ -9339,6 +9461,7 @@ mod tests {
         assert_eq!(migrated["state"], "queued");
         assert_eq!(migrated["spool"], serde_json::json!({}));
         assert!(migrated["spool_files"].get("LEGACY").is_some());
+        assert!(migrated["program_registrations"].get("STEP1").is_some());
         let schema: serde_json::Value = serde_json::from_str(include_str!(
             "../../../../conformance/0.8/schemas/jes-durable-job.schema.json"
         ))
@@ -9349,6 +9472,54 @@ mod tests {
             .unwrap()
             .validate(&migrated)
             .unwrap();
+    }
+
+    #[test]
+    fn durable_program_registration_substitution_fails_closed_before_execution() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let invocation = invocation();
+        let first = service(store.clone(), builtins());
+        let job = first
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("registration-substitution", InvocationLimits::default())
+                    .unwrap(),
+                false,
+            )
+            .unwrap();
+        let row = store
+            .get_provider_state("jes-job", &job.id)
+            .unwrap()
+            .unwrap();
+        let mut value: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        value["program_registrations"]["STEP1"]["handler"] =
+            serde_json::json!({"kind": "unsupported"});
+        value["version"] = serde_json::json!(row.version + 1);
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "jes-job".into(),
+                    key: job.id,
+                    version: row.version + 1,
+                    payload: serde_json::to_vec(&value).unwrap(),
+                },
+                Some(row.version),
+            )
+            .unwrap();
+        drop(first);
+
+        let provider_store: Arc<dyn ProviderStateStore> = store;
+        let providers = spool_test_providers(provider_store.clone());
+        assert!(matches!(
+            BatchService::open(
+                host_with(builtins(), providers),
+                provider_store,
+                Default::default(),
+                Default::default(),
+            ),
+            Err(HostProblem::InfrastructureFailure)
+        ));
     }
 
     #[test]

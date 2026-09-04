@@ -75,8 +75,9 @@ pub use jes::{
     StepExecution, StepState, StepTermination, UtilityFamily, UtilityHandler, select_job,
 };
 pub use program::{
-    Program, ProgramInput, ProgramOutput, ProgramRouter, SystemServiceProgram, UtilityDisposition,
-    common_program_catalog_sha256, decode_program_output, system_service_program,
-    utility_disposition,
+    Program, ProgramInput, ProgramOutput, ProgramRegistration, ProgramRouter,
+    RegisteredProgramHandler, SystemServiceProgram, UtilityDisposition,
+    common_program_catalog_sha256, decode_program_output, resolve_program_registration,
+    system_service_program, utility_disposition,
 };
 pub use service::{BatchLimits, BatchService, JobSnapshot};

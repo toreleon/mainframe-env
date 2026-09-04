@@ -1,4 +1,4 @@
-use crate::DdPlan;
+use crate::{DdPlan, UtilityHandler};
 use mainframe_env_encoding::CodePage;
 use mainframe_env_execution_api::{BoundedPayload, CapabilityId, Invocation, InvocationLimits};
 use mainframe_env_host_api::{
@@ -39,7 +39,8 @@ pub trait Program: Send + Sync {
     ) -> Result<ProgramOutput, HostProblem>;
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum UtilityDisposition {
     Implemented,
     CicsFileControl,
@@ -49,7 +50,8 @@ pub enum UtilityDisposition {
     ImsController,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub(crate) enum ProgramExecution {
     ProgramService,
     Idcams,
@@ -57,6 +59,45 @@ pub(crate) enum ProgramExecution {
     Db2Tso,
     ImsController,
     Unsupported,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case", tag = "kind", content = "handler")]
+pub enum RegisteredProgramHandler {
+    ProgramService,
+    Utility(UtilityHandler),
+    Sdsf,
+    Db2Tso,
+    ImsController,
+    Unsupported,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ProgramRegistration {
+    pub schema_version: String,
+    pub program: String,
+    pub disposition: Option<UtilityDisposition>,
+    pub handler: RegisteredProgramHandler,
+}
+
+impl ProgramRegistration {
+    pub fn validate(&self) -> Result<(), HostProblem> {
+        if self.schema_version != crate::JES_UTILITY_REGISTRY_CONTRACT
+            || self.program.is_empty()
+            || self.program.len() > 128
+            || !self.program.bytes().all(|byte| {
+                byte.is_ascii_alphanumeric() || matches!(byte, b'$' | b'@' | b'#' | b'_' | b'-')
+            })
+            || matches!(self.handler, RegisteredProgramHandler::Utility(_))
+                != self
+                    .disposition
+                    .is_some_and(|value| value == UtilityDisposition::Implemented)
+        {
+            Err(HostProblem::Malformed)
+        } else {
+            Ok(())
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -78,8 +119,29 @@ fn common_program(program: &str) -> Option<&'static CommonProgramEntry> {
         .find(|entry| entry.name.eq_ignore_ascii_case(program))
 }
 
-pub(crate) fn program_execution(program: &str) -> ProgramExecution {
-    common_program(program).map_or(ProgramExecution::ProgramService, |entry| entry.execution)
+pub fn resolve_program_registration(program: &str) -> Result<ProgramRegistration, HostProblem> {
+    let program = program.to_ascii_uppercase();
+    let entry = common_program(&program);
+    let handler = if let Some(builtin) = entry.and_then(|entry| entry.builtin) {
+        RegisteredProgramHandler::Utility(builtin.utility_handler())
+    } else {
+        match entry.map_or(ProgramExecution::ProgramService, |entry| entry.execution) {
+            ProgramExecution::ProgramService => RegisteredProgramHandler::ProgramService,
+            ProgramExecution::Idcams => RegisteredProgramHandler::Utility(UtilityHandler::Idcams),
+            ProgramExecution::Sdsf => RegisteredProgramHandler::Sdsf,
+            ProgramExecution::Db2Tso => RegisteredProgramHandler::Db2Tso,
+            ProgramExecution::ImsController => RegisteredProgramHandler::ImsController,
+            ProgramExecution::Unsupported => RegisteredProgramHandler::Unsupported,
+        }
+    };
+    let registration = ProgramRegistration {
+        schema_version: crate::JES_UTILITY_REGISTRY_CONTRACT.into(),
+        program,
+        disposition: entry.map(|entry| entry.disposition),
+        handler,
+    };
+    registration.validate()?;
+    Ok(registration)
 }
 
 pub(crate) fn tso_program_execution(program: &str) -> Option<TsoProgramExecution> {
@@ -235,15 +297,35 @@ pub fn decode_program_output(payload: &BoundedPayload) -> Result<ProgramOutput, 
 
 struct Builtin(&'static CommonProgramEntry);
 
+impl BuiltinProgram {
+    const fn utility_handler(self) -> UtilityHandler {
+        match self {
+            Self::Iefbr14 => UtilityHandler::Iefbr14,
+            Self::Iebgener => UtilityHandler::Iebgener,
+            Self::Iebcopy => UtilityHandler::Iebcopy,
+            Self::Iebcompr => UtilityHandler::Iebcompr,
+            Self::Iebdg => UtilityHandler::Iebdg,
+            Self::Iebedit => UtilityHandler::Iebedit,
+            Self::Iebupdte => UtilityHandler::Iebupdte,
+            Self::Idcams => UtilityHandler::Idcams,
+            Self::Sort => UtilityHandler::Sort,
+        }
+    }
+}
+
 impl Program for Builtin {
-    fn execute(&self, _: &Invocation, input: &ProgramInput) -> Result<ProgramOutput, HostProblem> {
+    fn execute(
+        &self,
+        invocation: &Invocation,
+        input: &ProgramInput,
+    ) -> Result<ProgramOutput, HostProblem> {
         match self.0.builtin.ok_or(HostProblem::InfrastructureFailure)? {
             BuiltinProgram::Iefbr14 => output(0, vec![self.0.name.as_bytes().to_vec()]),
             BuiltinProgram::Iebgener => {
                 let records = dd_records(input, "SYSUT1")?;
                 output_to(0, records, "SYSUT2")
             }
-            BuiltinProgram::Iebcopy => output(0, vec![summary(self.0.name, input)]),
+            BuiltinProgram::Iebcopy => iebcopy(input),
             BuiltinProgram::Iebcompr => {
                 let left = dd_records(input, "SYSUT1")?;
                 let right = dd_records(input, "SYSUT2")?;
@@ -256,9 +338,9 @@ impl Program for Builtin {
                     }],
                 )
             }
-            BuiltinProgram::Iebdg | BuiltinProgram::Iebedit | BuiltinProgram::Iebupdte => {
-                output(0, vec![summary(self.0.name, input)])
-            }
+            BuiltinProgram::Iebdg => iebdg(input, invocation.limits.max_output_bytes),
+            BuiltinProgram::Iebedit => iebedit(input),
+            BuiltinProgram::Iebupdte => iebupdte(input),
             BuiltinProgram::Idcams => {
                 let control = input
                     .dds
@@ -593,13 +675,236 @@ fn edit_zoned(value: &[u8], edit: &str, ccsid: Option<u16>) -> Result<Vec<u8>, H
     }
 }
 
-fn summary(name: &str, input: &ProgramInput) -> Vec<u8> {
-    format!(
-        "{name} DD={} PARM={}",
-        input.dds.len(),
-        input.parameter.as_deref().unwrap_or("")
-    )
-    .into_bytes()
+fn iebcopy(input: &ProgramInput) -> Result<ProgramOutput, HostProblem> {
+    let control = optional_dd_text(input, "SYSIN")?;
+    if control
+        .as_ref()
+        .is_some_and(|control| !control.split_whitespace().any(|word| word == "COPY"))
+    {
+        return Err(HostProblem::Unsupported);
+    }
+    let input_dd = control
+        .as_deref()
+        .and_then(|control| control_parameter(control, "INDD"))
+        .unwrap_or_else(|| "SYSUT1".into());
+    let output_dd = control
+        .as_deref()
+        .and_then(|control| control_parameter(control, "OUTDD"))
+        .unwrap_or_else(|| "SYSUT2".into());
+    if input_dd == output_dd {
+        return Err(HostProblem::Malformed);
+    }
+    let records = dd_records(input, &input_dd)?;
+    output_to(0, records, &output_dd)
+}
+
+fn iebdg(input: &ProgramInput, max_output_bytes: u64) -> Result<ProgramOutput, HostProblem> {
+    let control = dd_text(input, "SYSIN")?;
+    if !control.contains("DSD") || !control.contains("CREATE") {
+        return Err(HostProblem::Unsupported);
+    }
+    let output_dd = control_parameter(&control, "OUTPUT").unwrap_or_else(|| "SYSUT2".into());
+    let quantity = control_parameter(&control, "QUANTITY")
+        .or_else(|| control_parameter(&control, "RECORDS"))
+        .ok_or(HostProblem::Malformed)?
+        .parse::<usize>()
+        .map_err(|_| HostProblem::Malformed)?;
+    if quantity == 0 || quantity > 262_144 {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let target = input
+        .dds
+        .iter()
+        .find(|dd| dd.name.eq_ignore_ascii_case(&output_dd))
+        .ok_or(HostProblem::NotFound)?;
+    let length = control_parameter(&control, "LENGTH")
+        .map(|value| value.parse::<usize>().map_err(|_| HostProblem::Malformed))
+        .transpose()?
+        .or_else(|| target.logical_record_length.map(|value| value as usize))
+        .unwrap_or(80);
+    if length == 0 || length > 1024 * 1024 {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let output_bytes = u64::try_from(quantity)
+        .ok()
+        .and_then(|quantity| {
+            u64::try_from(length)
+                .ok()
+                .and_then(|length| quantity.checked_mul(length))
+        })
+        .ok_or(HostProblem::ResourceExhausted)?;
+    if output_bytes > max_output_bytes {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let value = control_parameter(&control, "VALUE").map(String::into_bytes);
+    let records = (1..=quantity)
+        .map(|ordinal| {
+            if let Some(value) = &value {
+                if value.is_empty() {
+                    return Err(HostProblem::Malformed);
+                }
+                Ok(value.iter().copied().cycle().take(length).collect())
+            } else {
+                let digits = format!("{ordinal:0length$}");
+                Ok(digits.as_bytes()[digits.len().saturating_sub(length)..].to_vec())
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    output_to(0, records, &output_dd)
+}
+
+fn iebedit(input: &ProgramInput) -> Result<ProgramOutput, HostProblem> {
+    let records = dd_records(input, "SYSUT1")?;
+    let control = dd_text(input, "SYSIN")?;
+    if !control.contains("EDIT") {
+        return Err(HostProblem::Unsupported);
+    }
+    let start = control_parameter(&control, "START").ok_or(HostProblem::Malformed)?;
+    let (start_index, end_index) = if let Ok(position) = start.parse::<usize>() {
+        if position == 0 || position > records.len() {
+            return Err(HostProblem::Malformed);
+        }
+        let stop = control_parameter(&control, "STOP")
+            .or_else(|| control_parameter(&control, "END"))
+            .map(|value| value.parse::<usize>().map_err(|_| HostProblem::Malformed))
+            .transpose()?
+            .unwrap_or(records.len());
+        if stop < position || stop > records.len() {
+            return Err(HostProblem::Malformed);
+        }
+        (position - 1, stop)
+    } else {
+        let start = records
+            .iter()
+            .position(|record| jcl_card(record, &start, "JOB"))
+            .ok_or(HostProblem::NotFound)?;
+        let end = records[start + 1..]
+            .iter()
+            .position(|record| jcl_job_card(record))
+            .map_or(records.len(), |offset| start + 1 + offset);
+        (start, end)
+    };
+    let selected = records[start_index..end_index].to_vec();
+    let selected = if let Some(step) = control_parameter(&control, "STEPNAME") {
+        let step_start = selected
+            .iter()
+            .position(|record| jcl_card(record, &step, "EXEC"))
+            .ok_or(HostProblem::NotFound)?;
+        let step_end = selected[step_start + 1..]
+            .iter()
+            .position(|record| jcl_exec_or_job_card(record))
+            .map_or(selected.len(), |offset| step_start + 1 + offset);
+        let mut output = selected
+            .first()
+            .filter(|record| jcl_job_card(record))
+            .cloned()
+            .into_iter()
+            .collect::<Vec<_>>();
+        output.extend_from_slice(&selected[step_start..step_end]);
+        output
+    } else {
+        selected
+    };
+    output_to(0, selected, "SYSUT2")
+}
+
+fn iebupdte(input: &ProgramInput) -> Result<ProgramOutput, HostProblem> {
+    let target = input
+        .dds
+        .iter()
+        .find(|dd| dd.name.eq_ignore_ascii_case("SYSUT2"))
+        .ok_or(HostProblem::NotFound)?;
+    let target_member = target.member.as_deref().ok_or(HostProblem::Unsupported)?;
+    let controls = dd_records(input, "SYSIN")?;
+    let mut header = None;
+    let mut records = Vec::new();
+    for record in controls {
+        let text = std::str::from_utf8(&record).map_err(|_| HostProblem::Malformed)?;
+        let upper = text.trim().to_ascii_uppercase();
+        if upper.starts_with("./ ADD ") || upper.starts_with("./ REPL ") {
+            if header.is_some() {
+                return Err(HostProblem::Unsupported);
+            }
+            let member = control_parameter(&upper, "NAME").ok_or(HostProblem::Malformed)?;
+            if !member.eq_ignore_ascii_case(target_member) {
+                return Err(HostProblem::Malformed);
+            }
+            header = Some(member);
+        } else if upper.starts_with("./ ENDUP") {
+            break;
+        } else if upper.starts_with("./") {
+            return Err(HostProblem::Unsupported);
+        } else if header.is_some() {
+            records.push(record);
+        }
+    }
+    let member = header.ok_or(HostProblem::Malformed)?;
+    let count = records.len();
+    Ok(ProgramOutput {
+        return_code: 0,
+        records: vec![format!("IEBUPDTE MEMBER={member} RECORDS={count}").into_bytes()],
+        dd_outputs: BTreeMap::from([("SYSUT2".into(), records)]),
+    })
+}
+
+fn optional_dd_text(input: &ProgramInput, name: &str) -> Result<Option<String>, HostProblem> {
+    match dd_text(input, name) {
+        Ok(value) => Ok(Some(value)),
+        Err(HostProblem::NotFound) => Ok(None),
+        Err(problem) => Err(problem),
+    }
+}
+
+fn control_parameter(control: &str, keyword: &str) -> Option<String> {
+    let needle = format!("{keyword}=");
+    let start = control.match_indices(&needle).find_map(|(offset, _)| {
+        (offset == 0
+            || !control.as_bytes()[offset - 1].is_ascii_alphanumeric()
+                && control.as_bytes()[offset - 1] != b'_')
+            .then_some(offset + needle.len())
+    })?;
+    let tail = control[start..].trim_start();
+    let value = if let Some(inner) = tail.strip_prefix('(') {
+        &inner[..inner.find(')')?]
+    } else {
+        &tail[..tail
+            .find(|character: char| character == ',' || character.is_ascii_whitespace())
+            .unwrap_or(tail.len())]
+    };
+    let value = value.trim().trim_matches(['\'', '"']).to_ascii_uppercase();
+    (!value.is_empty()).then_some(value)
+}
+
+fn jcl_card(record: &[u8], name: &str, operation: &str) -> bool {
+    let Ok(text) = std::str::from_utf8(record) else {
+        return false;
+    };
+    let Some(text) = text.strip_prefix("//") else {
+        return false;
+    };
+    let mut fields = text.split_ascii_whitespace();
+    fields.next().is_some_and(|value| value == name)
+        && fields.next().is_some_and(|value| value == operation)
+}
+
+fn jcl_job_card(record: &[u8]) -> bool {
+    let Ok(text) = std::str::from_utf8(record) else {
+        return false;
+    };
+    let Some(text) = text.strip_prefix("//") else {
+        return false;
+    };
+    text.split_ascii_whitespace().nth(1) == Some("JOB")
+}
+
+fn jcl_exec_or_job_card(record: &[u8]) -> bool {
+    let Ok(text) = std::str::from_utf8(record) else {
+        return false;
+    };
+    let Some(text) = text.strip_prefix("//") else {
+        return false;
+    };
+    matches!(text.split_ascii_whitespace().nth(1), Some("EXEC" | "JOB"))
 }
 
 fn output(return_code: i32, records: Vec<Vec<u8>>) -> Result<ProgramOutput, HostProblem> {
@@ -684,6 +989,27 @@ mod tests {
         }
     }
 
+    fn add_dd(input: &mut ProgramInput, name: &str, bytes: &[u8]) {
+        input.dds.push(DdPlan {
+            name: name.into(),
+            dataset: None,
+            member: None,
+            generation: None,
+            organization: None,
+            record_format: None,
+            logical_record_length: None,
+            ccsid: None,
+            temporary: false,
+            sysout: None,
+            disposition: Vec::new(),
+            inline_data: bytes.to_vec(),
+            concatenation: false,
+            source_line: 1,
+            source_end_line: 1,
+            parameters: Vec::new(),
+        });
+    }
+
     #[test]
     fn every_accepted_builtin_has_a_real_route() {
         let router = ProgramRouter::with_builtins(InvocationLimits::default());
@@ -711,6 +1037,34 @@ mod tests {
         );
         assert!(common_program_catalog_sha256().starts_with("sha256:"));
         assert_eq!(utility_disposition("UNKNOWN"), None);
+        for program in [
+            "IEFBR14", "IEBGENER", "IEBCOPY", "IEBCOMPR", "IEBDG", "IEBEDIT", "IEBUPDTE", "IDCAMS",
+            "SORT",
+        ] {
+            assert!(matches!(
+                resolve_program_registration(program).unwrap().handler,
+                RegisteredProgramHandler::Utility(_)
+            ));
+        }
+        assert_eq!(
+            resolve_program_registration("APPLICATION").unwrap().handler,
+            RegisteredProgramHandler::ProgramService
+        );
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../conformance/0.8/schemas/jes-program-registration.schema.json"
+        ))
+        .unwrap();
+        let validator = jsonschema::draft202012::options()
+            .offline()
+            .build(&schema)
+            .unwrap();
+        for program in ["IEBCOPY", "IDCAMS", "SDSF", "APPLICATION"] {
+            validator
+                .validate(
+                    &serde_json::to_value(resolve_program_registration(program).unwrap()).unwrap(),
+                )
+                .unwrap();
+        }
     }
 
     #[test]
@@ -731,6 +1085,113 @@ mod tests {
                 .unwrap()
                 .records,
             vec![b"SORTOUT RECORDS=2".to_vec()]
+        );
+    }
+
+    #[test]
+    fn copy_generation_edit_and_update_utilities_produce_exact_dd_effects() {
+        let mut copy = input("INPUT", b"ONE\nTWO\n");
+        add_dd(&mut copy, "OUTPUT", b"");
+        add_dd(&mut copy, "SYSIN", b" COPY INDD=INPUT,OUTDD=OUTPUT\n");
+        assert_eq!(
+            Builtin(common_program("IEBCOPY").unwrap())
+                .execute(&invocation(), &copy)
+                .unwrap()
+                .dd_outputs["OUTPUT"],
+            [b"ONE".to_vec(), b"TWO".to_vec()]
+        );
+
+        let mut compare = input("SYSUT1", b"SAME\n");
+        add_dd(&mut compare, "SYSUT2", b"SAME\n");
+        assert_eq!(
+            Builtin(common_program("IEBCOMPR").unwrap())
+                .execute(&invocation(), &compare)
+                .unwrap()
+                .return_code,
+            0
+        );
+        compare.dds.last_mut().unwrap().inline_data = b"DIFFERENT\n".to_vec();
+        assert_eq!(
+            Builtin(common_program("IEBCOMPR").unwrap())
+                .execute(&invocation(), &compare)
+                .unwrap()
+                .return_code,
+            8
+        );
+
+        let mut generate = input(
+            "SYSIN",
+            b" DSD OUTPUT=(DATA)\n FD NAME=FIELD,LENGTH=4\n CREATE QUANTITY=3\n END\n",
+        );
+        add_dd(&mut generate, "DATA", b"");
+        assert_eq!(
+            Builtin(common_program("IEBDG").unwrap())
+                .execute(&invocation(), &generate)
+                .unwrap()
+                .dd_outputs["DATA"],
+            [b"0001".to_vec(), b"0002".to_vec(), b"0003".to_vec()]
+        );
+
+        let mut edit = input(
+            "SYSUT1",
+            b"//JOB1 JOB\n//S1 EXEC PGM=A\n//D1 DD *\n//JOB2 JOB\n//S2 EXEC PGM=B\n//D2 DD *\n",
+        );
+        add_dd(&mut edit, "SYSIN", b" EDIT START=JOB2\n");
+        add_dd(&mut edit, "SYSUT2", b"");
+        assert_eq!(
+            Builtin(common_program("IEBEDIT").unwrap())
+                .execute(&invocation(), &edit)
+                .unwrap()
+                .dd_outputs["SYSUT2"],
+            [
+                b"//JOB2 JOB".to_vec(),
+                b"//S2 EXEC PGM=B".to_vec(),
+                b"//D2 DD *".to_vec()
+            ]
+        );
+
+        let mut update = input(
+            "SYSIN",
+            b"./ ADD NAME=MEMBER\nRECORD ONE\nRECORD TWO\n./ ENDUP\n",
+        );
+        add_dd(&mut update, "SYSUT2", b"");
+        update.dds.last_mut().unwrap().member = Some("MEMBER".into());
+        assert_eq!(
+            Builtin(common_program("IEBUPDTE").unwrap())
+                .execute(&invocation(), &update)
+                .unwrap()
+                .dd_outputs["SYSUT2"],
+            [b"RECORD ONE".to_vec(), b"RECORD TWO".to_vec()]
+        );
+    }
+
+    #[test]
+    fn unsupported_utility_controls_fail_without_generic_success() {
+        let mut copy = input("SYSUT1", b"ONE\n");
+        add_dd(&mut copy, "SYSUT2", b"");
+        add_dd(&mut copy, "SYSIN", b" COMPRESS\n");
+        assert_eq!(
+            Builtin(common_program("IEBCOPY").unwrap()).execute(&invocation(), &copy),
+            Err(HostProblem::Unsupported)
+        );
+
+        let mut edit = input("SYSUT1", b"//JOB JOB\n");
+        add_dd(&mut edit, "SYSUT2", b"");
+        add_dd(&mut edit, "SYSIN", b" COPY\n");
+        assert_eq!(
+            Builtin(common_program("IEBEDIT").unwrap()).execute(&invocation(), &edit),
+            Err(HostProblem::Unsupported)
+        );
+
+        let mut update = input(
+            "SYSIN",
+            b"./ ADD NAME=MEMBER\nONE\n./ ADD NAME=SECOND\nTWO\n./ ENDUP\n",
+        );
+        add_dd(&mut update, "SYSUT2", b"");
+        update.dds.last_mut().unwrap().member = Some("MEMBER".into());
+        assert_eq!(
+            Builtin(common_program("IEBUPDTE").unwrap()).execute(&invocation(), &update),
+            Err(HostProblem::Unsupported)
         );
     }
 

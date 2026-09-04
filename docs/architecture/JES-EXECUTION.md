@@ -156,16 +156,29 @@ publishing a CAS transition.
 ## Typed program and utility routing
 
 The common program catalog resolves an external program name once into a typed
-registration. JES dispatches only that registration: registered utility,
+registration during job admission and retains it in the durable job projection.
+JES dispatches only that registration: registered utility,
 registered subsystem controller, or ordinary `ProgramService`. The execution
-loop does not branch on a raw program name. Unknown ordinary programs reach
-`ProgramService`; cataloged unavailable routes fail explicitly.
+loop validates the step-to-registration binding and does not resolve or branch
+on a raw program name. Unknown ordinary programs reach `ProgramService`;
+cataloged unavailable routes fail explicitly. A missing or substituted durable
+registration fails before any step effect.
 
 The required utility identities are IEFBR14, IEBGENER, IEBCOPY, IEBCOMPR,
 IEBDG, IEBEDIT, IEBUPDTE, IDCAMS, and SORT. Their typed families are allocation,
 copy, compare, generation, edit, update, catalog, sort, and diagnostic. A
 utility may emit an explicit condition or unavailable capability, but it may
 not return a DD-count or command-name summary as semantic success.
+
+IEFBR14 applies only typed allocation/DISP effects. IEBGENER and IEBCOPY copy
+exact records from their selected input DD to output DD; IEBCOMPR returns CC 0
+or 8 from byte-exact comparison. IEBDG implements a bounded deterministic
+DSD/FD/CREATE record generator. IEBEDIT selects a bounded job or positional
+range and optional step into SYSUT2. IEBUPDTE applies one explicit ADD/REPL
+member body to the allocated SYSUT2 member. IDCAMS remains the typed
+dataset/catalog command family, and SORT performs bounded record ordering and
+OUTREC projection. Unsupported controls fail explicitly before output
+mutation; diagnostic record counts are not used as proof of semantic success.
 
 ## Evolution and recovery
 

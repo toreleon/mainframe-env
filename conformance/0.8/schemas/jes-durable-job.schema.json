@@ -92,6 +92,43 @@
     "version": {"type": "integer", "minimum": 1},
     "submit_key": {"type": "string", "minLength": 1, "maxLength": 128},
     "plan": {"type": "object"},
+    "program_registrations": {
+      "type": "object",
+      "maxProperties": 4096,
+      "propertyNames": {"minLength": 1, "maxLength": 128},
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["schema_version", "program", "disposition", "handler"],
+        "properties": {
+          "schema_version": {"const": "mainframe-env.jes-utility-registry@1"},
+          "program": {"type": "string", "pattern": "^[A-Z0-9@$#_-]{1,128}$"},
+          "disposition": {
+            "type": ["string", "null"],
+            "enum": [null, "implemented", "cics-file-control", "network-ftp", "report-rexx", "db2-tso", "ims-controller"]
+          },
+          "handler": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind"],
+                "properties": {"kind": {"enum": ["program-service", "sdsf", "db2-tso", "ims-controller", "unsupported"]}}
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "handler"],
+                "properties": {
+                  "kind": {"const": "utility"},
+                  "handler": {"enum": ["iefbr14", "iebgener", "iebcopy", "iebcompr", "iebdg", "iebedit", "iebupdte", "idcams", "sort"]}
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
     "dataset_resolutions": {
       "type": "object",
       "maxProperties": 4096,
