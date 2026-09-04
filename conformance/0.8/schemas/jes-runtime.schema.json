@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://mainframe-env.invalid/schemas/jes-runtime@1",
   "title": "mainframe-env JES runtime contracts",
+  "type": "object",
   "oneOf": [
     {"$ref": "#/$defs/scheduler"},
     {"$ref": "#/$defs/spool"},

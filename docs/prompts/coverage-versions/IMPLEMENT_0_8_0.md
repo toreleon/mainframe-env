@@ -35,6 +35,23 @@ private adapters may proceed. Do not merge a public JES execution route.
 5. Implement **JES-806** restart, cancellation, overload, crash-point,
    backup/restore, migration and licensed differential suites.
 
+## Approved 2026-09-04 completion policy
+
+For this development cycle, a licensed z/OS 3.2/JES2 receipt is unavailable.
+The user-approved 0.8 disposition is
+`pass-with-licensed-differential-pending`:
+
+- preserve the licensed differential numerator at exactly 0/16 and keep
+  `cargo xtask jes-oracle --check` fail-closed;
+- never treat Hercules, MVS 3.8J, modeled/generated output, CardDemo,
+  historical transcripts, or current-product output as licensed z/OS 3.2/JES2
+  differential evidence;
+- complete JES-806 from the bounded local restart, cancellation, overload,
+  crash-point, backup/restore, migration, CardDemo, and unchanged-candidate
+  gates while reporting the licensed row explicitly pending; and
+- defer the real licensed 16-scenario campaign to the 0.17 CER-1702
+  release-certification hard gate, where it remains mandatory before 1.0.
+
 ## Reuse and architecture guardrails
 
 - Extend the common execution/work stores, leases, outbox, scheduler lanes,
@@ -68,9 +85,12 @@ private adapters may proceed. Do not merge a public JES execution route.
 Do not finish until there is no batch program-name dispatch or utility summary
 success; scheduling, spool, output, real utilities, SAF, DISP, return-code/abend,
 restart, cancellation, overload and unknown-outcome matrices pass; durable job/
-output state passes migration and backup/restore; licensed z/OS 3.2/JES2
-differentials pass; and CardDemo batch journeys remain exact.
+output state passes migration and backup/restore; and CardDemo batch journeys
+remain exact. Under the approved policy, the licensed z/OS 3.2/JES2
+differential remains explicitly pending at 0/16 and is a hard 0.17
+release-certification dependency.
 
 At handoff, include route/utility inventories, lifecycle and failure matrices,
-state/migration digests, differential receipts and full unchanged-candidate
-validation. Do not claim physical JES2 sysplex or spool implementation parity.
+state/migration digests, the pending differential reason and exact candidate,
+and full unchanged-candidate validation. Do not claim physical JES2 sysplex,
+spool implementation, Hercules, or licensed z/OS equivalence.

@@ -180,6 +180,17 @@ dataset/catalog command family, and SORT performs bounded record ordering and
 OUTREC projection. Unsupported controls fail explicitly before output
 mutation; diagnostic record counts are not used as proof of semantic success.
 
+Batch `ProgramService` requests also carry an optional typed execution context
+containing the validated job and step names. When a compiled COBOL module
+declares the complete conventional PSA/TCB/TIOT linkage layout, the interpreter
+uses that context and the allocated DD names to install one bounded synthetic
+low-storage chain before execution. Modules that do not declare the layout are
+unchanged; partial, disconnected, oversized, or malformed layouts fail closed.
+The initializer patch is limited to the pointer field and preserves unrelated
+COBOL `VALUE` data. This is an application-compatibility model for programs
+that inspect TIOT names, not a physical MVS control-block or JES2 spool parity
+claim.
+
 ## Evolution and recovery
 
 Writers emit durable job version 2. Version 1 remains readable and migrates by
@@ -189,6 +200,35 @@ publishes no partial state. The finite reader range and rollback projection are
 recorded in
 `conformance/0.8/migrations/jes-durable-job-v1-to-v2.json`.
 
+Step transitions publish the job projection first and then a digest-bound
+`mainframe-env.jes-checkpoint@1` envelope through the common `CheckpointStore`.
+An unavailable checkpoint acknowledgement is `unknown-outcome`; the running
+job remains visible for warm recovery. A checkpoint may lag its job, but it may
+not be ahead, name a nonterminal committed step, change principal/transaction,
+or fail its payload/job-state digest. After restart, terminal steps are retained
+and skipped, while incomplete steps return to pending below the bounded attempt
+limit. Attempt exhaustion becomes terminal failure without reexecution.
+
+Cancellation before selection terminates the queued job without starting a
+step. A cancellation observed during execution records observed and completed
+states in the step, job, output, and common checkpoint projections. Finalization
+uses a cancellation-cleared control context for only the SAF-authorized cleanup
+and terminal records; workload effects remain cancelled. Purge writes a job
+intent before deleting spool artifacts and the common checkpoint. Any uncertain
+cross-resource delete leaves that intent visible and retryable.
+
+The supported full-state backup profile uses the SQLite authority with
+provider-backed spool artifacts, so `VACUUM INTO` captures job, spool metadata,
+artifact chunks, checkpoints, scheduler, and topology together. Restore must
+pass database integrity plus every authority's open-time semantic validation
+before serving data.
+
 Licensed z/OS 3.2/JES2 observations remain a distinct oracle authority. Local
 models, CardDemo, generated catalogs, or historical transcripts cannot produce
-`differential=pass`.
+`differential=pass`. `cargo xtask jes-oracle --check` accepts only a schema-valid
+16-scenario receipt from an attested licensed z/OS 3.2 JES2 environment whose
+candidate digest matches the live repository. Under the user-approved
+2026-09-04 development disposition, absence of that receipt leaves differential
+credit at 0/16 and does not block 0.8 implementation completion; the unchanged
+campaign remains a hard 0.17 release-certification gate. Hercules, MVS 3.8J,
+local models, and current-product observations receive zero licensed credit.

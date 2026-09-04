@@ -1,6 +1,10 @@
 {
   "schema_version": "mainframe-env.conformance-dependency-additions@1",
   "target_version": "0.8.0",
+  "profile_additions": [
+    ["core-server", "mainframe-env-spool"],
+    ["conformance", "mainframe-env-spool"]
+  ],
   "edges": [
     ["mainframe-env-conformance", "mainframe-env-spool"],
     ["mainframe-env-server", "mainframe-env-spool"],

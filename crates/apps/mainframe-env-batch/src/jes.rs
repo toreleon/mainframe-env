@@ -881,5 +881,33 @@ mod tests {
             .unwrap()
             .validate(&migration)
             .unwrap();
+
+        let differential_schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../conformance/0.8/schemas/jes-licensed-differential-adapter.schema.json"
+        ))
+        .unwrap();
+        let differential: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../conformance/0.8/oracles/jes-licensed-differential.json"
+        ))
+        .unwrap();
+        jsonschema::draft202012::options()
+            .offline()
+            .build(&differential_schema)
+            .unwrap()
+            .validate(&differential)
+            .unwrap();
+        assert_eq!(differential["candidate_identity"]["source"], "git-index");
+        assert_eq!(
+            differential["candidate_identity"]["command"],
+            "cargo xtask jes-oracle-candidate"
+        );
+        assert_eq!(
+            differential["required_scenarios"].as_array().unwrap().len(),
+            16
+        );
+        assert_eq!(
+            differential["generated_historical_or_local_result_counts_as_pass"],
+            false
+        );
     }
 }

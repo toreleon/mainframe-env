@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://mainframe-env.invalid/schemas/spool-result@2",
   "title": "mainframe-env spool provider result",
+  "type": "object",
   "oneOf": [
     {
       "type": "object",

@@ -84,6 +84,7 @@ pub trait JournalStore: Send + Sync {
 pub trait CheckpointStore: Send + Sync {
     fn put_checkpoint(&self, record: CheckpointRecord) -> Result<(), StoreError>;
     fn get_checkpoint(&self, id: &ExecutionId) -> Result<Option<CheckpointRecord>, StoreError>;
+    fn delete_checkpoint(&self, id: &ExecutionId) -> Result<(), StoreError>;
 }
 
 pub trait SessionStore: Send + Sync {

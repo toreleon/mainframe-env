@@ -11,16 +11,17 @@ use crate::program::{
 };
 use crate::{
     BatchControllerGeneration, BatchControllerInstallReceipt, BatchControllerPlan,
-    BatchControllerSelector, DdAllocationPlan, DdDispositionPlan, DdSourceKind,
+    BatchControllerSelector, CancellationState, DdAllocationPlan, DdDispositionPlan, DdSourceKind,
     DdStatusDisposition, DdTerminalDisposition, JES_DURABLE_JOB_CONTRACT, JES_OUTPUT_CONTRACT,
-    JES_SPOOL_CONTRACT, JclBundle, JclLimits, JesJobKind, JesJobRoute, JesOutputGroup,
-    JesOutputState, JesSchedulerConfiguration, JesSpoolDescriptor, JesSpoolState,
-    JesSubmissionOrigin, JesTopology, JobPlan, JobSelectionCandidate, JobState, ProgramInput,
-    StepExecution, StepPlan, StepState, StepTermination, decode_program_output, parse_jcl,
-    plan_dd_allocations, select_job,
+    JES_SPOOL_CONTRACT, JclBundle, JclLimits, JesCancellation, JesCheckpoint, JesJobKind,
+    JesJobRoute, JesOutputGroup, JesOutputState, JesSchedulerConfiguration, JesSpoolDescriptor,
+    JesSpoolState, JesSubmissionOrigin, JesTopology, JobPlan, JobSelectionCandidate, JobState,
+    ProgramExecutionContext, ProgramInput, StepExecution, StepPlan, StepState, StepTermination,
+    decode_program_output, parse_jcl, plan_dd_allocations, select_job,
 };
 use mainframe_env_execution_api::{
-    BoundedPayload, IdempotencyKey, Invocation, InvocationLimits, PrincipalId,
+    ArtifactRef, BoundedPayload, ExecutionId, IdempotencyKey, Invocation, InvocationLimits,
+    PrincipalId, RunUnitId,
 };
 use mainframe_env_host_api::{
     AccessIntent, CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest,
@@ -31,10 +32,12 @@ use mainframe_env_host_api::{
     RecordFormat, ResourceName, ScopedHostService, SecurityDecision, SecurityRequest, SpoolRequest,
     SpoolResult,
 };
-use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
+use mainframe_env_store_api::{
+    CheckpointRecord, CheckpointStore, ProviderStateRecord, ProviderStateStore, StoreError,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
 
 const CONTROLLER_STATE_NAMESPACE: &str = "batch-controller-state";
@@ -42,6 +45,9 @@ const CONTROLLER_STATE_KEY: &str = "registry";
 const SCHEDULER_STATE_NAMESPACE: &str = "jes-scheduler";
 const TOPOLOGY_STATE_NAMESPACE: &str = "jes-topology";
 const CONFIGURATION_STATE_KEY: &str = "configuration";
+const MAX_DURABLE_JOB_EVENTS: usize = 65_536;
+const MAX_JOB_EVENT_BYTES: usize = 4_096;
+const MAX_JOB_NUMBER: u64 = 99_999_999;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BatchLimits {
@@ -94,6 +100,7 @@ pub struct JobSnapshot {
     pub kind: JesJobKind,
     pub origin: JesSubmissionOrigin,
     pub route: JesJobRoute,
+    pub cancellation: Option<JesCancellation>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -109,6 +116,12 @@ struct Job {
     origin: JesSubmissionOrigin,
     #[serde(default)]
     route: JesJobRoute,
+    #[serde(default)]
+    cancellation: Option<JesCancellation>,
+    #[serde(default)]
+    purge_pending: bool,
+    #[serde(default)]
+    effect_sequence: u64,
     class: char,
     priority: u8,
     state: JobState,
@@ -175,6 +188,7 @@ struct DurableTopology {
 pub struct BatchService {
     host: Arc<ScopedHostService>,
     store: Arc<dyn ProviderStateStore>,
+    checkpoint_store: Option<Arc<dyn CheckpointStore>>,
     jcl_limits: JclLimits,
     limits: BatchLimits,
     scheduler: Mutex<DurableScheduler>,
@@ -206,27 +220,79 @@ impl BatchService {
         limits: BatchLimits,
         scheduler: JesSchedulerConfiguration,
     ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_configured(host, store, None, jcl_limits, limits, scheduler)
+    }
+
+    pub fn open_with_checkpoint_store(
+        host: Arc<ScopedHostService>,
+        store: Arc<dyn ProviderStateStore>,
+        checkpoint_store: Arc<dyn CheckpointStore>,
+        jcl_limits: JclLimits,
+        limits: BatchLimits,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_configured(
+            host,
+            store,
+            Some(checkpoint_store),
+            jcl_limits,
+            limits,
+            JesSchedulerConfiguration::single_node(limits.max_active),
+        )
+    }
+
+    fn open_configured(
+        host: Arc<ScopedHostService>,
+        store: Arc<dyn ProviderStateStore>,
+        checkpoint_store: Option<Arc<dyn CheckpointStore>>,
+        jcl_limits: JclLimits,
+        limits: BatchLimits,
+        scheduler: JesSchedulerConfiguration,
+    ) -> Result<Arc<Self>, HostProblem> {
         scheduler.validate()?;
-        if limits.max_nje_nodes == 0 || limits.max_mas_members == 0 {
+        if limits.max_nje_nodes == 0
+            || limits.max_mas_members == 0
+            || !(4..=MAX_DURABLE_JOB_EVENTS).contains(&limits.max_events)
+            || limits.max_attempts == 0
+        {
             return Err(HostProblem::Malformed);
         }
         let mut jobs = BTreeMap::new();
         let mut replay = BTreeMap::new();
-        for row in store
-            .list_provider_state("jes-job", limits.max_jobs)
-            .map_err(store_error)?
-        {
+        let durable_jobs = store
+            .list_provider_state(
+                "jes-job",
+                limits
+                    .max_jobs
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?,
+            )
+            .map_err(store_error)?;
+        if durable_jobs.len() > limits.max_jobs {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let mut durable_ids = BTreeSet::new();
+        let mut durable_submit_keys = BTreeSet::new();
+        let mut highest_job_number = 0u64;
+        for row in durable_jobs {
             let mut job: Job = serde_json::from_slice(&row.payload)
                 .map_err(|_| HostProblem::InfrastructureFailure)?;
-            if job.version != row.version {
+            let job_number = durable_job_number(&job.id)?;
+            if row.namespace != "jes-job"
+                || row.key != job.id
+                || job.version != row.version
+                || !durable_ids.insert(job.id.clone())
+                || !durable_submit_keys.insert(job.submit_key.clone())
+            {
                 return Err(HostProblem::InfrastructureFailure);
             }
+            highest_job_number = highest_job_number.max(job_number);
             if !matches!(
                 job.schema_version.as_str(),
                 "mainframe-env.jes-durable-job@1" | JES_DURABLE_JOB_CONTRACT
             ) {
                 return Err(HostProblem::InfrastructureFailure);
             }
+            ensure_job_event_capacity(&job, limits.max_events, 0)?;
             let previous = job.version;
             let mut changed = false;
             if job.schema_version != JES_DURABLE_JOB_CONTRACT {
@@ -234,18 +300,27 @@ impl BatchService {
                 if job.steps.is_empty() {
                     job.steps = initial_step_executions(&job.plan);
                 }
-                job.events.push("migrated:jes-durable-job@1-to-2".into());
+                push_job_event(
+                    &mut job,
+                    limits.max_events,
+                    "migrated:jes-durable-job@1-to-2",
+                )?;
                 changed = true;
             }
             if job.program_registrations.is_empty() {
                 job.program_registrations = resolve_plan_programs(&job.plan)?;
-                job.events.push("migrated:program-registrations".into());
+                push_job_event(
+                    &mut job,
+                    limits.max_events,
+                    "migrated:program-registrations",
+                )?;
                 changed = true;
             } else {
                 validate_plan_programs(&job.plan, &job.program_registrations)?;
             }
+            validate_durable_job_shape(&job, jcl_limits, limits)?;
             if matches!(job.state, JobState::Selected | JobState::Running) {
-                job.version += 1;
+                job.version = next_job_version(job.version)?;
                 job.state = if job.attempt >= limits.max_attempts {
                     JobState::Failed
                 } else {
@@ -259,16 +334,16 @@ impl BatchService {
                         step.termination = None;
                     }
                 }
-                job.events.push("warm-start-recovered".into());
+                push_job_event(&mut job, limits.max_events, "warm-start-recovered")?;
                 changed = true;
             } else if job.state == JobState::Output {
-                job.version += 1;
+                job.version = next_job_version(job.version)?;
                 job.state = JobState::Completed;
                 job.initiator = None;
-                job.events.push("warm-start-output-completed".into());
+                push_job_event(&mut job, limits.max_events, "warm-start-output-completed")?;
                 changed = true;
             } else if changed {
-                job.version += 1;
+                job.version = next_job_version(job.version)?;
             }
             if changed {
                 store
@@ -293,6 +368,12 @@ impl BatchService {
             })
             .transpose()?
             .unwrap_or(1);
+        if !(1..=MAX_JOB_NUMBER + 1).contains(&next_id) {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        if next_id <= highest_job_number {
+            return Err(HostProblem::InfrastructureFailure);
+        }
         let (controller_store_version, controller_registry) = match store
             .get_provider_state(CONTROLLER_STATE_NAMESPACE, CONTROLLER_STATE_KEY)
             .map_err(store_error)?
@@ -344,9 +425,21 @@ impl BatchService {
         for job in jobs.values().filter(|job| !job.state.terminal()) {
             topology.validate_route(&job.route)?;
         }
+        if let Some(checkpoints) = &checkpoint_store {
+            for job in jobs.values() {
+                let execution_id = checkpoint_execution_id(&job.id)?;
+                if let Some(record) = checkpoints
+                    .get_checkpoint(&execution_id)
+                    .map_err(store_error)?
+                {
+                    validate_checkpoint_record(job, &record)?;
+                }
+            }
+        }
         Ok(Arc::new(Self {
             host,
             store,
+            checkpoint_store,
             jcl_limits,
             limits,
             scheduler: Mutex::new(DurableScheduler {
@@ -523,7 +616,8 @@ impl BatchService {
                 Err(HostProblem::IdempotencyConflict)
             };
         }
-        if state.jobs.len() >= self.limits.max_jobs
+        if self.limits.max_events < 4
+            || state.jobs.len() >= self.limits.max_jobs
             || state
                 .jobs
                 .values()
@@ -539,6 +633,9 @@ impl BatchService {
                 .count()
                 >= inbound_limit
         {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        if state.next_id > MAX_JOB_NUMBER {
             return Err(HostProblem::ResourceExhausted);
         }
         let id = format!("JOB{:05}", state.next_id);
@@ -572,6 +669,9 @@ impl BatchService {
             kind,
             origin,
             route,
+            cancellation: None,
+            purge_pending: false,
+            effect_sequence: 0,
             class: plan.class,
             priority: plan.priority,
             state: if hold || class.held_by_default {
@@ -651,6 +751,10 @@ impl BatchService {
     }
 
     pub fn cancel(&self, invocation: &Invocation, id: &str) -> Result<JobSnapshot, HostProblem> {
+        let requested_cancellation = invocation.cancellation.clone();
+        let mut finalization = invocation.clone();
+        finalization.cancellation = None;
+        let invocation = &finalization;
         self.ensure_spool_migrated(invocation, id)?;
         let mut state = self.lock()?;
         let current = state.jobs.get(id).cloned().ok_or(HostProblem::NotFound)?;
@@ -671,11 +775,24 @@ impl BatchService {
                 response2: 0,
             });
         }
+        ensure_job_event_capacity(&current, self.limits.max_events, 1)?;
         let mut next = current.clone();
-        next.version += 1;
+        next.version = next_job_version(next.version)?;
         next.state = JobState::Cancelled;
         next.active_step = None;
-        next.events.push("cancelled".into());
+        next.cancellation = Some(JesCancellation {
+            id: format!("{}-CANCEL-{}", next.id, next.version),
+            requested_by: invocation.principal.id().as_str().into(),
+            reason: requested_cancellation.as_ref().map_or_else(
+                || "operator cancellation".into(),
+                |value| value.reason.clone(),
+            ),
+            requested_tick: requested_cancellation
+                .as_ref()
+                .map_or(0, |value| value.requested_at_tick),
+            state: CancellationState::Completed,
+        });
+        push_job_event(&mut next, self.limits.max_events, "cancelled")?;
         self.append_spool_records(
             invocation,
             &mut next,
@@ -687,7 +804,8 @@ impl BatchService {
         self.cancel_output(invocation, &mut next)?;
         self.persist_job(&next, Some(current.version))?;
         let result = snapshot(&next);
-        state.jobs.insert(id.into(), next);
+        state.jobs.insert(id.into(), next.clone());
+        self.persist_checkpoint(&next, next.effect_sequence)?;
         Ok(result)
     }
 
@@ -792,6 +910,27 @@ impl BatchService {
             .map_err(|_| HostProblem::InfrastructureFailure)?
             .configuration
             .clone())
+    }
+
+    pub fn checkpoint(&self, id: &str) -> Result<Option<JesCheckpoint>, HostProblem> {
+        let job = self
+            .lock()?
+            .jobs
+            .get(id)
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
+        let Some(store) = &self.checkpoint_store else {
+            return Ok(None);
+        };
+        store
+            .get_checkpoint(&checkpoint_execution_id(id)?)
+            .map_err(store_error)?
+            .map(|record| {
+                validate_checkpoint_record(&job, &record)?;
+                serde_json::from_slice(&record.payload)
+                    .map_err(|_| HostProblem::InfrastructureFailure)
+            })
+            .transpose()
     }
 
     pub fn install_topology(
@@ -1033,7 +1172,7 @@ impl BatchService {
             return Ok(None);
         };
         self.ensure_spool_migrated(invocation, &id)?;
-        if cancelled {
+        if cancelled || invocation.cancellation.is_some() {
             return self.cancel(invocation, &id).map(Some);
         }
         let mut job = {
@@ -1049,26 +1188,41 @@ impl BatchService {
                 AccessIntent::Execute,
                 2,
             )?;
+            ensure_job_event_capacity(&current, self.limits.max_events, 4)?;
+            let selected_version = next_job_version(current.version)?;
+            let running_version = next_job_version(selected_version)?;
+            let running_attempt = current
+                .attempt
+                .checked_add(1)
+                .filter(|attempt| *attempt <= self.limits.max_attempts)
+                .ok_or(HostProblem::ResourceExhausted)?;
             let mut selected = current.clone();
-            selected.version += 1;
+            selected.version = selected_version;
             selected.state = JobState::Selected;
             selected.initiator = Some(initiator.into());
             selected.route.owner_member = Some(member.clone());
-            selected.events.push(format!("selected:{initiator}"));
+            push_job_event(
+                &mut selected,
+                self.limits.max_events,
+                format!("selected:{initiator}"),
+            )?;
             self.persist_job(&selected, Some(current.version))?;
             state.jobs.insert(id.clone(), selected.clone());
-            let mut running = current.clone();
-            running.version = selected.version + 1;
-            running.attempt += 1;
+            let mut running = selected.clone();
+            running.version = running_version;
+            running.attempt = running_attempt;
             running.state = JobState::Running;
             running.initiator = Some(initiator.into());
             running.route.owner_member = Some(member);
-            running.events.push("running".into());
+            push_job_event(&mut running, self.limits.max_events, "running")?;
             self.persist_job(&running, Some(selected.version))?;
             state.jobs.insert(id.clone(), running.clone());
             running
         };
         let outcome = self.execute(invocation, &mut job);
+        if outcome == Err(HostProblem::UnknownOutcome) {
+            return Err(HostProblem::UnknownOutcome);
+        }
         let cleanup = self.cleanup_job_temporary_datasets(invocation, &mut job);
         let outcome = match (outcome, cleanup) {
             (Ok(return_code), Ok(())) => Ok(return_code),
@@ -1076,14 +1230,24 @@ impl BatchService {
         };
         let mut state = self.lock()?;
         let current = state.jobs.get(&id).cloned().ok_or(HostProblem::NotFound)?;
-        job.version = current.version + 1;
+        ensure_job_event_capacity(
+            &job,
+            self.limits.max_events,
+            if outcome.is_ok() { 2 } else { 1 },
+        )?;
+        let terminal_version = next_job_version(current.version)?;
+        let completed_version = outcome
+            .is_ok()
+            .then(|| next_job_version(terminal_version))
+            .transpose()?;
+        job.version = terminal_version;
         let terminal_step = job.active_step.clone();
         job.active_step = None;
         match outcome {
             Ok(return_code) => {
                 job.return_code = Some(return_code);
                 job.state = JobState::Output;
-                job.events.push("output".into());
+                push_job_event(&mut job, self.limits.max_events, "output")?;
                 self.append_spool_records(
                     invocation,
                     &mut job,
@@ -1096,13 +1260,14 @@ impl BatchService {
                 self.persist_job(&job, Some(current.version))?;
                 state.jobs.insert(id.clone(), job.clone());
                 let output_version = job.version;
-                job.version += 1;
+                job.version = completed_version.ok_or(HostProblem::InfrastructureFailure)?;
                 job.state = JobState::Completed;
                 job.initiator = None;
-                job.events.push("completed".into());
+                push_job_event(&mut job, self.limits.max_events, "completed")?;
                 self.persist_job(&job, Some(output_version))?;
                 let result = snapshot(&job);
-                state.jobs.insert(id, job);
+                state.jobs.insert(id, job.clone());
+                self.persist_checkpoint(&job, job.effect_sequence)?;
                 return Ok(Some(result));
             }
             Err(problem) => {
@@ -1111,9 +1276,33 @@ impl BatchService {
                 {
                     job.abend_code = Some(code.to_string());
                 }
-                job.state = JobState::Failed;
+                let cancelled = problem == HostProblem::Cancelled;
+                job.state = if cancelled {
+                    JobState::Cancelled
+                } else {
+                    JobState::Failed
+                };
                 job.initiator = None;
-                job.events.push(format!("failed:{problem:?}"));
+                if let Some(cancellation) = job.cancellation.as_mut() {
+                    cancellation.state = CancellationState::Completed;
+                } else if cancelled {
+                    job.cancellation = Some(JesCancellation {
+                        id: format!("{}-CANCEL-{}", job.id, job.version),
+                        requested_by: invocation.principal.id().as_str().into(),
+                        reason: "execution cancellation".into(),
+                        requested_tick: 0,
+                        state: CancellationState::Completed,
+                    });
+                }
+                push_job_event(
+                    &mut job,
+                    self.limits.max_events,
+                    if cancelled {
+                        String::from("cancelled:execution")
+                    } else {
+                        format!("failed:{problem:?}")
+                    },
+                )?;
                 if let Some(step) = terminal_step {
                     self.append_spool_records(
                         invocation,
@@ -1121,7 +1310,13 @@ impl BatchService {
                         Some(&step),
                         None,
                         "JOBLOG",
-                        vec![format!("{step} FAILED {problem:?}").into_bytes()],
+                        vec![
+                            format!(
+                                "{step} {} {problem:?}",
+                                if cancelled { "CANCELLED" } else { "FAILED" }
+                            )
+                            .into_bytes(),
+                        ],
                     )?;
                 }
                 self.append_spool_records(
@@ -1130,14 +1325,25 @@ impl BatchService {
                     None,
                     None,
                     "JESMSGLG",
-                    vec![format!("FAILED {problem:?}").into_bytes()],
+                    vec![
+                        format!(
+                            "{} {problem:?}",
+                            if cancelled { "CANCELLED" } else { "FAILED" }
+                        )
+                        .into_bytes(),
+                    ],
                 )?;
-                self.complete_output(invocation, &mut job)?;
+                if cancelled {
+                    self.cancel_output(invocation, &mut job)?;
+                } else {
+                    self.complete_output(invocation, &mut job)?;
+                }
             }
         }
         self.persist_job(&job, Some(current.version))?;
         let result = snapshot(&job);
-        state.jobs.insert(id, job);
+        state.jobs.insert(id, job.clone());
+        self.persist_checkpoint(&job, job.effect_sequence)?;
         Ok(Some(result))
     }
 
@@ -1176,6 +1382,13 @@ impl BatchService {
                 continue;
             }
             if let Some(cancellation) = &invocation.cancellation {
+                job.cancellation = Some(JesCancellation {
+                    id: cancellation.id.as_str().into(),
+                    requested_by: invocation.principal.id().as_str().into(),
+                    reason: cancellation.reason.clone(),
+                    requested_tick: cancellation.requested_at_tick,
+                    state: CancellationState::Observed,
+                });
                 self.mark_step(
                     job,
                     step,
@@ -1183,6 +1396,7 @@ impl BatchService {
                     Some(StepTermination::Cancelled {
                         reason: cancellation.reason.clone(),
                     }),
+                    effect_sequence,
                 )?;
                 return Err(HostProblem::Cancelled);
             }
@@ -1197,7 +1411,7 @@ impl BatchService {
                         "JOBLOG",
                         vec![format!("{} BYPASSED RESTART", step.name).into_bytes()],
                     )?;
-                    self.mark_step(job, step, StepState::BypassedRestart, None)?;
+                    self.mark_step(job, step, StepState::BypassedRestart, None, effect_sequence)?;
                     continue;
                 }
             }
@@ -1210,11 +1424,17 @@ impl BatchService {
                     "JOBLOG",
                     vec![format!("{} SKIPPED COND", step.name).into_bytes()],
                 )?;
-                self.mark_step(job, step, StepState::SkippedCondition, None)?;
+                self.mark_step(
+                    job,
+                    step,
+                    StepState::SkippedCondition,
+                    None,
+                    effect_sequence,
+                )?;
                 continue;
             }
             job.active_step = Some(step.name.clone());
-            self.mark_step(job, step, StepState::Allocating, None)?;
+            self.mark_step(job, step, StepState::Allocating, None, effect_sequence)?;
             let allocation_plans = plan_dd_allocations(&step.dds)?;
             let mut allocations = Vec::new();
             let step_result = (|| -> Result<crate::ProgramOutput, HostProblem> {
@@ -1233,7 +1453,7 @@ impl BatchService {
                     &mut dds,
                     &mut effect_sequence,
                 )?;
-                self.mark_step(job, step, StepState::Running, None)?;
+                self.mark_step(job, step, StepState::Running, None, effect_sequence)?;
                 for dd in &mut dds {
                     if !is_program_library_dd(dd)
                         && let Some(raw_name) = dd.dataset.clone()
@@ -1249,6 +1469,10 @@ impl BatchService {
                 let input = ProgramInput {
                     parameter: step.parameter.clone(),
                     dds,
+                    execution: Some(ProgramExecutionContext {
+                        job_name: job.name.clone(),
+                        step_name: step.name.clone(),
+                    }),
                 };
                 let registration = job
                     .program_registrations
@@ -1330,6 +1554,7 @@ impl BatchService {
                             step,
                             StepState::Abended,
                             Some(StepTermination::Abend { code, system: true }),
+                            effect_sequence,
                         )?;
                         abended = true;
                         continue;
@@ -1339,6 +1564,15 @@ impl BatchService {
                     } else {
                         StepState::Failed
                     };
+                    if state == StepState::Cancelled {
+                        job.cancellation = Some(JesCancellation {
+                            id: format!("{}-CANCEL-{}", job.id, job.version),
+                            requested_by: invocation.principal.id().as_str().into(),
+                            reason: "provider cancellation".into(),
+                            requested_tick: 0,
+                            state: CancellationState::Observed,
+                        });
+                    }
                     self.mark_step(
                         job,
                         step,
@@ -1352,6 +1586,7 @@ impl BatchService {
                                 category: problem_category(&terminal_problem).into(),
                             }
                         }),
+                        effect_sequence,
                     )?;
                     return Err(terminal_problem);
                 }
@@ -1364,6 +1599,7 @@ impl BatchService {
                     Some(StepTermination::Failed {
                         category: "invalid-return-code".into(),
                     }),
+                    effect_sequence,
                 )?;
                 return Err(HostProblem::ProviderFailure);
             }
@@ -1392,7 +1628,7 @@ impl BatchService {
                     .into_bytes(),
                 ],
             )?;
-            self.mark_step(job, step, StepState::Disposing, None)?;
+            self.mark_step(job, step, StepState::Disposing, None, effect_sequence)?;
             if let Err(problem) = self.dispose_dds(
                 invocation,
                 job,
@@ -1408,6 +1644,7 @@ impl BatchService {
                     Some(StepTermination::Failed {
                         category: problem_category(&problem).into(),
                     }),
+                    effect_sequence,
                 )?;
                 return Err(problem);
             }
@@ -1418,6 +1655,7 @@ impl BatchService {
                 Some(StepTermination::ReturnCode {
                     code: output.return_code,
                 }),
+                effect_sequence,
             )?;
         }
         if let Some(code) = first_abend {
@@ -1437,7 +1675,11 @@ impl BatchService {
         step: &StepPlan,
         next: StepState,
         termination: Option<StepTermination>,
+        effect_sequence: u64,
     ) -> Result<(), HostProblem> {
+        // Keep two durable event slots for the job's output/completed or
+        // failed/cancelled terminal projection before publishing a step edge.
+        ensure_job_event_capacity(job, self.limits.max_events, 3)?;
         let execution = job
             .steps
             .iter_mut()
@@ -1460,10 +1702,12 @@ impl BatchService {
         }
         execution.state = next;
         execution.termination = termination;
-        if job.events.len() >= self.limits.max_events {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        job.events.push(format!("step:{}:{next:?}", step.name));
+        job.effect_sequence = effect_sequence;
+        push_job_event(
+            job,
+            self.limits.max_events,
+            format!("step:{}:{next:?}", step.name),
+        )?;
         let expected = job.version;
         job.version = job
             .version
@@ -1476,6 +1720,7 @@ impl BatchService {
         }
         self.persist_job(job, Some(expected))?;
         state.jobs.insert(job.id.clone(), job.clone());
+        self.persist_checkpoint(job, effect_sequence)?;
         Ok(())
     }
 
@@ -1568,6 +1813,28 @@ impl BatchService {
             .iter()
             .try_fold(0usize, |total, record| total.checked_add(record.len()))
             .ok_or(HostProblem::ResourceExhausted)?;
+        if !job.spool_files.contains_key(&internal_name)
+            && job.spool_files.len() >= self.limits.max_spool_files
+        {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let total_records = job
+            .spool_files
+            .values()
+            .try_fold(record_count, |total, file| {
+                total.checked_add(file.record_count)
+            })
+            .ok_or(HostProblem::ResourceExhausted)?;
+        let total_bytes = job
+            .spool_files
+            .values()
+            .try_fold(byte_count, |total, file| total.checked_add(file.byte_count))
+            .ok_or(HostProblem::ResourceExhausted)?;
+        if total_records > self.limits.max_spool_records
+            || total_bytes > self.limits.max_spool_bytes
+        {
+            return Err(HostProblem::ResourceExhausted);
+        }
         let result = self.host.invoke(
             invocation,
             invocation.deadline_tick.saturating_sub(1),
@@ -2593,9 +2860,14 @@ impl BatchService {
             | "define-generationdatagroup"
             | "define-nonvsam"
             | "define-path"
-            | "define-usercatalog" => {
-                self.define_idcams(invocation, job, step, command.source(), effect_sequence)
-            }
+            | "define-usercatalog" => self.define_idcams(
+                invocation,
+                job,
+                step,
+                command.id(),
+                command.source(),
+                effect_sequence,
+            ),
             "repro" => self.repro_idcams(
                 invocation,
                 job,
@@ -3542,12 +3814,13 @@ impl BatchService {
         invocation: &Invocation,
         job: &Job,
         step: &StepPlan,
+        command: &str,
         statement: &str,
         effect_sequence: &mut u64,
     ) -> Result<(), HostProblem> {
         let sequence = next_effect_sequence(invocation, effect_sequence)?;
         let key = effect_key(job, step, sequence)?;
-        let request = if statement.starts_with("DEFINE ALIAS") {
+        let request = if command == "define-alias" {
             DatasetRequest::DefineAlias {
                 alias: dataset_name(&operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?)?,
                 target: dataset_name(
@@ -3559,7 +3832,7 @@ impl BatchService {
                     transaction: Some(job.id.clone()),
                 },
             }
-        } else if statement.starts_with("DEFINE USERCATALOG") {
+        } else if command == "define-usercatalog" {
             DatasetRequest::DefineCatalog {
                 catalog: dataset_name(
                     &operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?,
@@ -3571,7 +3844,7 @@ impl BatchService {
                     transaction: Some(job.id.clone()),
                 },
             }
-        } else if statement.starts_with("DEFINE NONVSAM") {
+        } else if command == "define-nonvsam" {
             let (minimum, maximum) = pair_operand(statement, "RECORDSIZE").unwrap_or((80, 80));
             let mut definition =
                 mainframe_env_host_api::DatasetDefinition::compatibility(DatasetAttributes {
@@ -3598,7 +3871,7 @@ impl BatchService {
                     transaction: Some(job.id.clone()),
                 },
             }
-        } else if statement.contains(" PATH ") || statement.starts_with("DEFINE PATH") {
+        } else if command == "define-path" {
             DatasetRequest::DefinePath {
                 path: DatasetName::new(
                     operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?,
@@ -3616,7 +3889,7 @@ impl BatchService {
                     transaction: Some(job.id.clone()),
                 },
             }
-        } else if statement.contains("GENERATIONDATAGROUP") {
+        } else if command == "define-generationdatagroup" {
             DatasetRequest::DefineGenerationGroup {
                 base: DatasetName::new(
                     operand(statement, &["NAME"]).ok_or(HostProblem::Malformed)?,
@@ -3632,7 +3905,8 @@ impl BatchService {
                     transaction: Some(job.id.clone()),
                 },
             }
-        } else if statement.contains("ALTERNATEINDEX") {
+        } else if command == "define-alternateindex" {
+            validate_vsam_component_clauses(statement)?;
             let (key_length, key_offset) =
                 pair_operand(statement, "KEYS").ok_or(HostProblem::Malformed)?;
             DatasetRequest::DefineAlternateIndex {
@@ -3656,7 +3930,8 @@ impl BatchService {
                     transaction: Some(job.id.clone()),
                 },
             }
-        } else if statement.starts_with("DEFINE CLUSTER") {
+        } else if command == "define-cluster" {
+            validate_vsam_component_clauses(statement)?;
             let (minimum, maximum) = pair_operand(statement, "RECORDSIZE").unwrap_or((80, 80));
             let keys = pair_operand(statement, "KEYS");
             let organization = if statement.contains(" LINEAR") {
@@ -3773,15 +4048,16 @@ impl BatchService {
                 };
                 let disposition = plan.disposition.ok_or(HostProblem::InfrastructureFailure)?;
                 let name = resolved_dataset(job, dd, raw_name, &job.dataset_resolutions);
+                let access_intent = if disposition.status == DdStatusDisposition::Shared {
+                    AccessIntent::Read
+                } else {
+                    AccessIntent::Update
+                };
                 self.authorize(
                     invocation,
                     "DATASET",
                     &name,
-                    if disposition.status == DdStatusDisposition::Shared {
-                        AccessIntent::Read
-                    } else {
-                        AccessIntent::Update
-                    },
+                    access_intent,
                     next_effect_sequence(invocation, effect_sequence)?,
                 )?;
                 if let Some(relative) = dd.generation {
@@ -3836,20 +4112,66 @@ impl BatchService {
                             .insert(resolution_key, dataset.as_str().to_string());
                     }
                 }
-                let resolved = DatasetName::new(
+                let mut resolved = DatasetName::new(
                     resolved_dataset(job, dd, raw_name, &job.dataset_resolutions),
                     128,
                 )
                 .map_err(|_| HostProblem::Malformed)?;
+                let mut existing = false;
+                if disposition.status != DdStatusDisposition::New {
+                    match self.dataset_attributes(invocation, &resolved, effect_sequence) {
+                        Ok(_) => {
+                            existing = true;
+                            match self.resolve_dd_access_path(
+                                invocation,
+                                &resolved,
+                                effect_sequence,
+                            ) {
+                                Ok(target) => {
+                                    self.authorize(
+                                        invocation,
+                                        "DATASET",
+                                        target.as_str(),
+                                        access_intent,
+                                        next_effect_sequence(invocation, effect_sequence)?,
+                                    )?;
+                                    resolved = target;
+                                }
+                                Err(HostProblem::NotFound) => {}
+                                Err(problem) => return Err(problem),
+                            }
+                        }
+                        Err(HostProblem::NotFound) => {
+                            match self.resolve_dd_access_path(
+                                invocation,
+                                &resolved,
+                                effect_sequence,
+                            ) {
+                                Ok(target) => {
+                                    self.authorize(
+                                        invocation,
+                                        "DATASET",
+                                        target.as_str(),
+                                        access_intent,
+                                        next_effect_sequence(invocation, effect_sequence)?,
+                                    )?;
+                                    resolved = target;
+                                    existing = true;
+                                }
+                                Err(HostProblem::NotFound)
+                                    if disposition.status == DdStatusDisposition::Modify
+                                        && dd.member.is_none() => {}
+                                Err(problem) => return Err(problem),
+                            }
+                        }
+                        Err(problem) => return Err(problem),
+                    }
+                }
                 let mut create = disposition.status == DdStatusDisposition::New
                     && dd.generation.is_none()
                     && dd.member.is_none();
                 if disposition.status == DdStatusDisposition::Modify && dd.member.is_none() {
-                    create = match self.dataset_attributes(invocation, &resolved, effect_sequence) {
-                        Ok(_) => false,
-                        Err(HostProblem::NotFound) => true,
-                        Err(problem) => return Err(problem),
-                    };
+                    create = !existing;
                 }
                 if create {
                     let sequence = next_effect_sequence(invocation, effect_sequence)?;
@@ -3995,6 +4317,42 @@ impl BatchService {
             return Err(HostProblem::ProviderFailure);
         };
         Ok(attributes)
+    }
+
+    fn resolve_dd_access_path(
+        &self,
+        invocation: &Invocation,
+        dataset: &DatasetName,
+        effect_sequence: &mut u64,
+    ) -> Result<DatasetName, HostProblem> {
+        let mut current = dataset.clone();
+        for _ in 0..2 {
+            let DatasetResult::CatalogEntries { entries, .. } = self.ams_dataset_read(
+                invocation,
+                effect_sequence,
+                DatasetRequest::ListCatalog {
+                    pattern: current.as_str().to_string(),
+                    start: None,
+                    max_items: 2,
+                },
+            )?
+            else {
+                return Err(HostProblem::ProviderFailure);
+            };
+            let entry = entries
+                .into_iter()
+                .find(|entry| entry.name == current)
+                .ok_or(HostProblem::NotFound)?;
+            if !matches!(
+                entry.kind,
+                mainframe_env_host_api::CatalogEntryKind::Path
+                    | mainframe_env_host_api::CatalogEntryKind::AlternateIndex
+            ) {
+                return Err(HostProblem::NotFound);
+            }
+            current = entry.related.ok_or(HostProblem::InfrastructureFailure)?;
+        }
+        Ok(current)
     }
 
     fn read_dataset_records(
@@ -4341,6 +4699,7 @@ impl BatchService {
     ) -> Result<(), HostProblem> {
         let mut first_problem = None;
         let mut disposed = BTreeMap::<String, ()>::new();
+        let mut deleted_datasets = BTreeMap::<String, ()>::new();
         for allocation in allocations {
             let terminal = if abnormal {
                 allocation.disposition.abnormal
@@ -4408,10 +4767,16 @@ impl BatchService {
             } else if terminal == DdTerminalDisposition::Delete {
                 job.temporary_datasets
                     .retain(|dataset| dataset != allocation.dataset.as_str());
+                if allocation.member.is_none() {
+                    deleted_datasets.insert(allocation.dataset.as_str().to_string(), ());
+                }
             }
         }
         let mut released = BTreeMap::<String, ()>::new();
         for allocation in allocations {
+            if deleted_datasets.contains_key(allocation.dataset.as_str()) {
+                continue;
+            }
             let Some(lock_id) = &allocation.lock_id else {
                 continue;
             };
@@ -4723,8 +5088,9 @@ impl BatchService {
             AccessIntent::Control,
             1,
         )?;
+        ensure_job_event_capacity(&current, self.limits.max_events, 1)?;
         let mut next = current.clone();
-        next.version = next.version.saturating_add(1);
+        next.version = next_job_version(next.version)?;
         let group = next
             .output_groups
             .get_mut(output_id)
@@ -4741,7 +5107,11 @@ impl BatchService {
             descriptor.writer.clone_from(&group.writer);
             descriptor.forms.clone_from(&group.forms);
         }
-        next.events.push(format!("output-routed:{output_id}"));
+        push_job_event(
+            &mut next,
+            self.limits.max_events,
+            format!("output-routed:{output_id}"),
+        )?;
         self.persist_job(&next, Some(current.version))?;
         let result = next
             .output_groups
@@ -4798,10 +5168,35 @@ impl BatchService {
                 response2: 0,
             });
         }
+        self.authorize(
+            invocation,
+            "JESJOBS",
+            &format!("JOB.{}", job.name),
+            AccessIntent::Alter,
+            1,
+        )?;
+        if !job.purge_pending {
+            ensure_job_event_capacity(&job, self.limits.max_events, 1)?;
+            let current_version = job.version;
+            job.version = job
+                .version
+                .checked_add(1)
+                .ok_or(HostProblem::ResourceExhausted)?;
+            job.purge_pending = true;
+            push_job_event(&mut job, self.limits.max_events, "purge-pending")?;
+            self.persist_job(&job, Some(current_version))?;
+            state.jobs.insert(id.into(), job.clone());
+        }
         match self.purge_spool_authority(invocation, &mut job)? {
             SpoolResult::Mutated { .. } => {}
             SpoolResult::PurgePending { .. } => return Err(HostProblem::UnknownOutcome),
             _ => return Err(HostProblem::ProviderFailure),
+        }
+        if let Some(checkpoints) = &self.checkpoint_store {
+            match checkpoints.delete_checkpoint(&checkpoint_execution_id(id)?) {
+                Ok(()) | Err(StoreError::NotFound) => {}
+                Err(_) => return Err(HostProblem::UnknownOutcome),
+            }
         }
         self.store
             .delete_provider_state("jes-job", id, job.version)
@@ -4818,6 +5213,7 @@ impl BatchService {
         if current.spool.is_empty() {
             return Ok(());
         }
+        ensure_job_event_capacity(&current, self.limits.max_events, 1)?;
         let mut next = current.clone();
         for (file, records) in current.spool {
             if !records.is_empty() {
@@ -4825,9 +5221,12 @@ impl BatchService {
             }
         }
         next.spool.clear();
-        next.version = next.version.saturating_add(1);
-        next.events
-            .push("migrated:embedded-spool-to-artifacts".into());
+        next.version = next_job_version(next.version)?;
+        push_job_event(
+            &mut next,
+            self.limits.max_events,
+            "migrated:embedded-spool-to-artifacts",
+        )?;
         self.persist_job(&next, Some(current.version))?;
         state.jobs.insert(id.into(), next);
         Ok(())
@@ -4935,8 +5334,9 @@ impl BatchService {
             AccessIntent::Control,
             1,
         )?;
+        ensure_job_event_capacity(&current, self.limits.max_events, 1)?;
         let mut next = current.clone();
-        next.version = next.version.saturating_add(1);
+        next.version = next_job_version(next.version)?;
         let files = {
             let group = next
                 .output_groups
@@ -4955,7 +5355,11 @@ impl BatchService {
             }
             descriptor.state = spool_state;
         }
-        next.events.push(format!("{event}:{output_id}"));
+        push_job_event(
+            &mut next,
+            self.limits.max_events,
+            format!("{event}:{output_id}"),
+        )?;
         self.persist_job(&next, Some(current.version))?;
         let result = next
             .output_groups
@@ -4986,10 +5390,11 @@ impl BatchService {
             AccessIntent::Control,
             1,
         )?;
+        ensure_job_event_capacity(&current, self.limits.max_events, 1)?;
         let mut next = current.clone();
-        next.version += 1;
+        next.version = next_job_version(next.version)?;
         next.state = to;
-        next.events.push(event.into());
+        push_job_event(&mut next, self.limits.max_events, event)?;
         self.persist_job(&next, Some(current.version))?;
         let result = snapshot(&next);
         state.jobs.insert(id.into(), next);
@@ -5015,13 +5420,14 @@ impl BatchService {
             AccessIntent::Control,
             1,
         )?;
+        ensure_job_event_capacity(&current, self.limits.max_events, 1)?;
         let mut next = current.clone();
         mutation(&mut next)?;
         next.version = next
             .version
             .checked_add(1)
             .ok_or(HostProblem::ResourceExhausted)?;
-        next.events.push(event.into());
+        push_job_event(&mut next, self.limits.max_events, event)?;
         self.persist_job(&next, Some(current.version))?;
         let result = snapshot(&next);
         state.jobs.insert(id.into(), next);
@@ -5150,6 +5556,66 @@ impl BatchService {
         self.store
             .put_provider_state(job_record(job)?, expected)
             .map_err(store_error)
+    }
+
+    fn persist_checkpoint(&self, job: &Job, effect_sequence: u64) -> Result<(), HostProblem> {
+        let Some(store) = &self.checkpoint_store else {
+            return Ok(());
+        };
+        if job.attempt == 0 {
+            return Ok(());
+        }
+        let checkpoint = JesCheckpoint {
+            schema_version: crate::JES_CHECKPOINT_CONTRACT.into(),
+            job_id: job.id.clone(),
+            job_version: job.version,
+            attempt: job.attempt,
+            active_step: job.active_step.clone(),
+            effect_sequence,
+            committed_steps: job
+                .steps
+                .iter()
+                .filter(|step| step.state.terminal())
+                .map(|step| step.name.clone())
+                .collect(),
+            dataset_resolutions: job.dataset_resolutions.clone(),
+            cancellation: job.cancellation.clone(),
+            state_digest: job_checkpoint_digest(job)?,
+        };
+        checkpoint.validate(self.jcl_limits.max_steps, self.limits.max_events)?;
+        let payload =
+            serde_json::to_vec(&checkpoint).map_err(|_| HostProblem::InfrastructureFailure)?;
+        let payload_digest: [u8; 32] = Sha256::digest(&payload).into();
+        store
+            .put_checkpoint(CheckpointRecord {
+                execution_id: checkpoint_execution_id(&job.id)?,
+                run_unit_id: RunUnitId::new(
+                    format!("jes-run-{}", job.id),
+                    InvocationLimits::default(),
+                )
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+                session_id: None,
+                schema_version: 1,
+                machine_schema_version: 2,
+                artifact: ArtifactRef::new(
+                    "mainframe-env-batch@0.8.0",
+                    InvocationLimits::default(),
+                )
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+                provider_generation: "1".into(),
+                required_host_interfaces: BTreeMap::new(),
+                effect_sequence,
+                transaction: Some(job.id.clone()),
+                principal: PrincipalId::new(&job.owner, InvocationLimits::default())
+                    .map_err(|_| HostProblem::InfrastructureFailure)?,
+                security_classification: "batch".into(),
+                encryption_key_reference: None,
+                payload_size: u64::try_from(payload.len())
+                    .map_err(|_| HostProblem::ResourceExhausted)?,
+                payload_digest,
+                payload,
+            })
+            .map_err(|_| HostProblem::UnknownOutcome)
     }
 
     fn persist_controllers(
@@ -5282,13 +5748,11 @@ fn resolved_dataset(
             job.id,
             raw.trim_start_matches('&').to_ascii_uppercase()
         )
-    } else if dd.generation.is_some() {
+    } else {
         resolutions
             .get(&dataset_resolution_key(dd, raw))
             .cloned()
             .unwrap_or_else(|| raw.to_ascii_uppercase())
-    } else {
-        raw.to_ascii_uppercase()
     }
 }
 
@@ -5459,12 +5923,6 @@ fn problem_category(problem: &HostProblem) -> &'static str {
 
 fn unimplemented_ams_operand(command: &AmsCommand) -> Option<(&'static str, &'static str)> {
     let terms = ams_top_level_terms(command);
-    if terms
-        .iter()
-        .any(|term| matches!(term.as_str(), "DATA" | "INDEX" | "FREESPACE"))
-    {
-        return Some(("vsam-components", "DATA/INDEX component override"));
-    }
     terms
         .iter()
         .find(|term| !ams_operand_allowed(command.id(), term))
@@ -5480,6 +5938,20 @@ fn ams_top_level_terms(command: &AmsCommand) -> Vec<String> {
     if rest.starts_with('(') && rest.ends_with(')') {
         rest = &rest[1..rest.len().saturating_sub(1)];
     }
+    let mut terms = ams_fragment_terms(rest);
+    if matches!(
+        command.id(),
+        "alter" | "delete" | "diagnose" | "examine" | "listdata" | "verify"
+    ) && terms
+        .first()
+        .is_some_and(|(_, parenthesized)| !parenthesized)
+    {
+        terms.remove(0);
+    }
+    terms.into_iter().map(|(term, _)| term).collect()
+}
+
+fn ams_fragment_terms(rest: &str) -> Vec<(String, bool)> {
     let bytes = rest.as_bytes();
     let mut at = 0usize;
     let mut terms = Vec::<(String, bool)>::new();
@@ -5533,16 +6005,42 @@ fn ams_top_level_terms(command: &AmsCommand) -> Vec<String> {
             }
         }
     }
-    if matches!(
-        command.id(),
-        "alter" | "delete" | "diagnose" | "examine" | "listdata" | "verify"
-    ) && terms
-        .first()
-        .is_some_and(|(_, parenthesized)| !parenthesized)
-    {
-        terms.remove(0);
+    terms
+}
+
+fn validate_vsam_component_clauses(statement: &str) -> Result<(), HostProblem> {
+    for component in ["DATA", "INDEX"] {
+        let Some(clause) = operand(statement, &[component]) else {
+            continue;
+        };
+        let terms = ams_fragment_terms(&clause);
+        let supported = if component == "DATA" {
+            ["NAME", "CISZ", "CONTROLINTERVALSIZE"].as_slice()
+        } else {
+            ["NAME"].as_slice()
+        };
+        if terms.is_empty()
+            || terms
+                .iter()
+                .any(|(term, parenthesized)| !parenthesized || !supported.contains(&term.as_str()))
+            || terms.iter().filter(|(term, _)| term == "NAME").count() != 1
+        {
+            return Err(HostProblem::UnsupportedCapability {
+                capability: "vsam-components".into(),
+                detail: format!(
+                    "{component} contains a component override outside the durable dataset model"
+                ),
+            });
+        }
+        dataset_name(&operand(&clause, &["NAME"]).ok_or(HostProblem::Malformed)?)?;
+        if component == "DATA"
+            && operand(&clause, &["CISZ", "CONTROLINTERVALSIZE"])
+                .is_some_and(|value| value.parse::<u32>().is_err())
+        {
+            return Err(HostProblem::Malformed);
+        }
     }
-    terms.into_iter().map(|(term, _)| term).collect()
+    Ok(())
 }
 
 fn ams_operand_allowed(command: &str, operand: &str) -> bool {
@@ -5653,24 +6151,27 @@ fn ams_operand_allowed(command: &str, operand: &str) -> bool {
         "bldindex" => &["INDATASET", "OUTDATASET"],
         "dcollect" => &["OUTFILE", "OFILE"],
         "define-alias" => &["NAME", "RELATE"],
-        "define-alternateindex" => &[
-            "NAME",
-            "RELATE",
-            "KEYS",
-            "UNIQUEKEY",
-            "NONUNIQUEKEY",
-            "UPGRADE",
-            "NOUPGRADE",
-            "DATA",
-            "INDEX",
-            "FREESPACE",
-        ],
+        "define-alternateindex" => {
+            return DEFINITION.contains(&operand)
+                || matches!(
+                    operand,
+                    "RELATE" | "UNIQUEKEY" | "NONUNIQUEKEY" | "UPGRADE" | "NOUPGRADE"
+                );
+        }
         "define-generationdatagroup" => {
             &["NAME", "LIMIT", "SCRATCH", "NOSCRATCH", "EMPTY", "NOEMPTY"]
         }
         "define-path" => &["NAME", "PATHENTRY"],
         "define-usercatalog" => &["NAME"],
-        "delete" => &["PURGE", "CURRENTDATE"],
+        "delete" => &[
+            "CLUSTER",
+            "ALTERNATEINDEX",
+            "PATH",
+            "GENERATIONDATAGROUP",
+            "NONVSAM",
+            "PURGE",
+            "CURRENTDATE",
+        ],
         "diagnose" | "examine" | "listdata" | "verify" => &["INDATASET", "DATASET", "ENTRIES"],
         "export" | "export-disconnect" => &["ENTRIES", "INDATASET", "OUTFILE", "OFILE"],
         "import" | "import-connect" => &["INFILE", "IFILE", "OUTDATASET", "INDATASET", "DATASET"],
@@ -5757,10 +6258,15 @@ fn apply_ams_definition_operands(
             return Err(HostProblem::Malformed);
         }
     }
-    for name in ["RECORDSIZE", "KEYS", "SHAREOPTIONS"] {
+    for name in ["RECORDSIZE", "KEYS", "SHAREOPTIONS", "FREESPACE"] {
         if operand(statement, &[name]).is_some() && pair_operand(statement, name).is_none() {
             return Err(HostProblem::Malformed);
         }
+    }
+    if pair_operand(statement, "FREESPACE").is_some_and(|(control_interval, control_area)| {
+        control_interval > 100 || control_area > 100
+    }) {
+        return Err(HostProblem::Malformed);
     }
     let indexed = ams_word(statement, "INDEXED");
     let nonindexed = ams_word(statement, "NONINDEXED");
@@ -6414,6 +6920,118 @@ fn validate_jes_name(value: &str) -> Result<(), HostProblem> {
     }
 }
 
+fn durable_job_number(value: &str) -> Result<u64, HostProblem> {
+    let digits = value
+        .strip_prefix("JOB")
+        .filter(|digits| (5..=8).contains(&digits.len()))
+        .filter(|digits| digits.bytes().all(|byte| byte.is_ascii_digit()))
+        .ok_or(HostProblem::InfrastructureFailure)?;
+    let number = digits
+        .parse::<u64>()
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    if number == 0 || number > MAX_JOB_NUMBER {
+        Err(HostProblem::InfrastructureFailure)
+    } else {
+        Ok(number)
+    }
+}
+
+fn validate_durable_job_shape(
+    job: &Job,
+    jcl_limits: JclLimits,
+    limits: BatchLimits,
+) -> Result<(), HostProblem> {
+    let identity_limits = InvocationLimits::default();
+    if job.version == 0
+        || validate_jes_name(&job.name).is_err()
+        || job.name != job.name.to_ascii_uppercase()
+        || PrincipalId::new(&job.owner, identity_limits).is_err()
+        || IdempotencyKey::new(&job.submit_key, identity_limits).is_err()
+        || job.name != job.plan.name
+        || job.plan.steps.len() > jcl_limits.max_steps
+        || job.steps.len() != job.plan.steps.len()
+        || job
+            .steps
+            .iter()
+            .zip(&job.plan.steps)
+            .any(|(execution, plan)| execution.name != plan.name || execution.attempt > job.attempt)
+        || job
+            .events
+            .iter()
+            .any(|event| event.is_empty() || event.len() > MAX_JOB_EVENT_BYTES)
+        || job.spool_files.len() > limits.max_spool_files
+        || job.output_groups.len() > limits.max_spool_files
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let spool_records = job
+        .spool_files
+        .values()
+        .try_fold(0usize, |total, file| total.checked_add(file.record_count))
+        .ok_or(HostProblem::ResourceExhausted)?;
+    let spool_bytes = job
+        .spool_files
+        .values()
+        .try_fold(0usize, |total, file| total.checked_add(file.byte_count))
+        .ok_or(HostProblem::ResourceExhausted)?;
+    let embedded_records = job
+        .spool
+        .values()
+        .try_fold(0usize, |total, records| total.checked_add(records.len()))
+        .ok_or(HostProblem::ResourceExhausted)?;
+    let embedded_bytes = job
+        .spool
+        .values()
+        .flat_map(|records| records.iter())
+        .try_fold(0usize, |total, record| total.checked_add(record.len()))
+        .ok_or(HostProblem::ResourceExhausted)?;
+    if spool_records
+        .checked_add(embedded_records)
+        .is_none_or(|total| total > limits.max_spool_records)
+        || spool_bytes
+            .checked_add(embedded_bytes)
+            .is_none_or(|total| total > limits.max_spool_bytes)
+    {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    Ok(())
+}
+
+fn ensure_job_event_capacity(
+    job: &Job,
+    max_events: usize,
+    additional: usize,
+) -> Result<(), HostProblem> {
+    if job
+        .events
+        .len()
+        .checked_add(additional)
+        .is_none_or(|count| count > max_events || count > MAX_DURABLE_JOB_EVENTS)
+    {
+        Err(HostProblem::ResourceExhausted)
+    } else {
+        Ok(())
+    }
+}
+
+fn next_job_version(version: u64) -> Result<u64, HostProblem> {
+    version.checked_add(1).ok_or(HostProblem::ResourceExhausted)
+}
+
+fn push_job_event(
+    job: &mut Job,
+    max_events: usize,
+    event: impl Into<String>,
+) -> Result<(), HostProblem> {
+    let event = event.into();
+    if event.is_empty() || event.len() > MAX_JOB_EVENT_BYTES {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    ensure_job_event_capacity(job, max_events, 1)?;
+    job.events.push(event);
+    Ok(())
+}
+
 fn snapshot(job: &Job) -> JobSnapshot {
     JobSnapshot {
         id: job.id.clone(),
@@ -6432,6 +7050,7 @@ fn snapshot(job: &Job) -> JobSnapshot {
         kind: job.kind,
         origin: job.origin.clone(),
         route: job.route.clone(),
+        cancellation: job.cancellation.clone(),
     }
 }
 
@@ -6482,6 +7101,58 @@ fn validate_plan_programs(
     Ok(())
 }
 
+fn checkpoint_execution_id(job_id: &str) -> Result<ExecutionId, HostProblem> {
+    ExecutionId::new(
+        format!("jes-checkpoint-{job_id}"),
+        InvocationLimits::default(),
+    )
+    .map_err(|_| HostProblem::InfrastructureFailure)
+}
+
+fn job_checkpoint_digest(job: &Job) -> Result<String, HostProblem> {
+    let bytes = serde_json::to_vec(job).map_err(|_| HostProblem::InfrastructureFailure)?;
+    Ok(format!("sha256:{:x}", Sha256::digest(bytes)))
+}
+
+fn validate_checkpoint_record(job: &Job, record: &CheckpointRecord) -> Result<(), HostProblem> {
+    let payload_digest: [u8; 32] = Sha256::digest(&record.payload).into();
+    if record.execution_id != checkpoint_execution_id(&job.id)?
+        || record.run_unit_id.as_str() != format!("jes-run-{}", job.id)
+        || record.schema_version != 1
+        || record.machine_schema_version != 2
+        || record.artifact.as_str() != "mainframe-env-batch@0.8.0"
+        || record.provider_generation != "1"
+        || record.transaction.as_deref() != Some(job.id.as_str())
+        || record.principal.as_str() != job.owner
+        || record.security_classification != "batch"
+        || record.payload_size != record.payload.len() as u64
+        || record.payload_digest != payload_digest
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let checkpoint: JesCheckpoint =
+        serde_json::from_slice(&record.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
+    checkpoint
+        .validate(job.plan.steps.len(), 65_536)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    if checkpoint.job_id != job.id
+        || checkpoint.job_version > job.version
+        || checkpoint.attempt > job.attempt
+        || checkpoint.effect_sequence != record.effect_sequence
+        || checkpoint.committed_steps.iter().any(|name| {
+            job.steps
+                .iter()
+                .find(|step| &step.name == name)
+                .is_none_or(|step| !step.state.terminal())
+        })
+        || checkpoint.job_version == job.version
+            && checkpoint.state_digest != job_checkpoint_digest(job)?
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(())
+}
+
 fn initial_step_executions(plan: &JobPlan) -> Vec<StepExecution> {
     plan.steps
         .iter()
@@ -6519,8 +7190,8 @@ mod tests {
     use crate::{Program, ProgramOutput, ProgramRouter};
     use mainframe_env_dataset::{DatasetLimits, DatasetService, dataset_providers};
     use mainframe_env_execution_api::{
-        ArtifactRef, CapabilityId, ExecutionId, Principal, RequestId, ResourceLimits, RunUnitId,
-        Selector, ServiceClass, TraceId,
+        ArtifactRef, Cancellation, CancellationId, CapabilityId, ExecutionId, Principal, RequestId,
+        ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
     };
     use mainframe_env_host_api::{
         CapabilityDescriptor, CicsDisposition, CicsResponse, DatasetResult, EffectResult,
@@ -6542,6 +7213,57 @@ mod tests {
     struct FailDatasetCommitOnceStore {
         inner: MemoryStore,
         fail_next_mutation: AtomicBool,
+    }
+
+    struct FailNthCheckpointStore {
+        inner: Arc<MemoryStore>,
+        writes: AtomicUsize,
+        fail_at: usize,
+    }
+
+    struct FailDeleteCheckpointOnceStore {
+        inner: Arc<MemoryStore>,
+        fail: AtomicBool,
+    }
+
+    impl CheckpointStore for FailNthCheckpointStore {
+        fn put_checkpoint(&self, record: CheckpointRecord) -> Result<(), StoreError> {
+            if self.writes.fetch_add(1, Ordering::SeqCst) + 1 == self.fail_at {
+                Err(StoreError::Infrastructure(
+                    "injected-checkpoint-crash".into(),
+                ))
+            } else {
+                self.inner.put_checkpoint(record)
+            }
+        }
+
+        fn get_checkpoint(&self, id: &ExecutionId) -> Result<Option<CheckpointRecord>, StoreError> {
+            self.inner.get_checkpoint(id)
+        }
+
+        fn delete_checkpoint(&self, id: &ExecutionId) -> Result<(), StoreError> {
+            self.inner.delete_checkpoint(id)
+        }
+    }
+
+    impl CheckpointStore for FailDeleteCheckpointOnceStore {
+        fn put_checkpoint(&self, record: CheckpointRecord) -> Result<(), StoreError> {
+            self.inner.put_checkpoint(record)
+        }
+
+        fn get_checkpoint(&self, id: &ExecutionId) -> Result<Option<CheckpointRecord>, StoreError> {
+            self.inner.get_checkpoint(id)
+        }
+
+        fn delete_checkpoint(&self, id: &ExecutionId) -> Result<(), StoreError> {
+            if self.fail.swap(false, Ordering::SeqCst) {
+                Err(StoreError::Infrastructure(
+                    "injected-checkpoint-delete-failure".into(),
+                ))
+            } else {
+                self.inner.delete_checkpoint(id)
+            }
+        }
     }
 
     impl FailDatasetCommitOnceStore {
@@ -6742,6 +7464,39 @@ mod tests {
                             records: combined,
                             version: 1,
                         }))
+                    }),
+                HostRequest::Dataset(DatasetRequest::ListCatalog {
+                    pattern,
+                    start,
+                    max_items,
+                }) => self
+                    .records
+                    .lock()
+                    .map_err(|_| HostProblem::InfrastructureFailure)
+                    .map(|state| {
+                        let mut entries = state
+                            .keys()
+                            .filter(|name| **name == pattern)
+                            .filter(|name| {
+                                start
+                                    .as_ref()
+                                    .is_none_or(|start| name.as_str() > start.as_str())
+                            })
+                            .filter_map(|name| {
+                                DatasetName::new(name, 128).ok().map(|name| {
+                                    mainframe_env_host_api::CatalogListEntry {
+                                        name,
+                                        kind: mainframe_env_host_api::CatalogEntryKind::Dataset,
+                                        related: None,
+                                        version: 1,
+                                    }
+                                })
+                            })
+                            .collect::<Vec<_>>();
+                        let max_items = usize::try_from(max_items).unwrap_or(usize::MAX);
+                        let more = entries.len() > max_items;
+                        entries.truncate(max_items);
+                        HostResult::Dataset(DatasetResult::CatalogEntries { entries, more })
                     }),
                 HostRequest::Dataset(DatasetRequest::Write {
                     dataset, records, ..
@@ -7066,6 +7821,79 @@ mod tests {
         .unwrap()
     }
 
+    fn durable_store_with_corruption(
+        key: &str,
+        corrupt: impl FnOnce(&mut Job),
+    ) -> Arc<MemoryStore> {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let running = service(store.clone(), builtins());
+        let submitted = running
+            .submit(
+                &invocation(),
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new(key, InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let row = store
+            .get_provider_state("jes-job", &submitted.id)
+            .unwrap()
+            .unwrap();
+        let mut job: Job = serde_json::from_slice(&row.payload).unwrap();
+        corrupt(&mut job);
+        job.version = row.version + 1;
+        store
+            .put_provider_state(job_record(&job).unwrap(), Some(row.version))
+            .unwrap();
+        drop(running);
+        store
+    }
+
+    fn assert_durable_store_rejected(store: Arc<MemoryStore>) {
+        let provider_store: Arc<dyn ProviderStateStore> = store;
+        let providers = spool_test_providers(provider_store.clone());
+        assert!(matches!(
+            BatchService::open(
+                host_with(builtins(), providers),
+                provider_store,
+                Default::default(),
+                Default::default(),
+            ),
+            Err(HostProblem::InfrastructureFailure)
+        ));
+    }
+
+    fn service_with_checkpoint_store(
+        store: Arc<MemoryStore>,
+        checkpoint_store: Arc<dyn CheckpointStore>,
+        program: Arc<dyn HostProvider>,
+    ) -> Result<Arc<BatchService>, HostProblem> {
+        let provider_store: Arc<dyn ProviderStateStore> = store;
+        let providers = spool_test_providers(provider_store.clone());
+        BatchService::open_with_checkpoint_store(
+            host_with(program, providers),
+            provider_store,
+            checkpoint_store,
+            Default::default(),
+            Default::default(),
+        )
+    }
+
+    fn sqlite_service_with_checkpoint_store(
+        store: Arc<SqliteStateStore>,
+    ) -> Result<Arc<BatchService>, HostProblem> {
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let checkpoint_store: Arc<dyn CheckpointStore> = store;
+        let providers = spool_test_providers(provider_store.clone());
+        BatchService::open_with_checkpoint_store(
+            host_with(builtins(), providers),
+            provider_store,
+            checkpoint_store,
+            Default::default(),
+            Default::default(),
+        )
+    }
+
     fn spool_test_providers(store: Arc<dyn ProviderStateStore>) -> Vec<Arc<dyn HostProvider>> {
         let artifacts = ProviderArtifactStore::new(store.clone(), 4 * 1024 * 1024).unwrap();
         let spool = SpoolService::open(store, artifacts, SpoolLimits::default()).unwrap();
@@ -7228,6 +8056,23 @@ mod tests {
         assert_eq!(
             completed.steps[0].termination,
             Some(StepTermination::ReturnCode { code: 0 })
+        );
+        let lifecycle = {
+            let state = service.lock().unwrap();
+            state.jobs.get(&submitted.id).unwrap().events.clone()
+        };
+        assert_eq!(
+            &lifecycle[lifecycle.len() - 8..],
+            [
+                "selected:INIT0001",
+                "running",
+                "step:STEP1:Allocating",
+                "step:STEP1:Running",
+                "step:STEP1:Disposing",
+                "step:STEP1:Completed",
+                "output",
+                "completed",
+            ]
         );
         let (records, more) = service
             .spool(&invocation, &submitted.id, "SYSPRINT", 0, 10)
@@ -8377,6 +9222,33 @@ mod tests {
     }
 
     #[test]
+    fn modify_delete_disposition_removes_an_existing_dataset_under_its_allocation_lock() {
+        let (service, dataset) = service_with_real_datasets();
+        seed_real_dataset(&dataset, "IBMUSER.EXISTING", vec![b"OLD".to_vec()], 802);
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//MODJOB JOB CLASS=A\n//PREDEL EXEC PGM=IEFBR14\n//DD1 DD DSN=IBMUSER.EXISTING,DISP=(MOD,DELETE,DELETE)\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("mod-existing-delete", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let completed = service.run_next(&invocation, false).unwrap().unwrap();
+        assert_eq!(completed.state, JobState::Completed);
+        assert_eq!(completed.return_code, Some(0));
+        assert_eq!(
+            dataset.invoke(DatasetRequest::Attributes {
+                dataset: DatasetName::new("IBMUSER.EXISTING", 128).unwrap(),
+            }),
+            Err(HostProblem::NotFound)
+        );
+    }
+
+    #[test]
     fn idcams_delete_define_and_repro_mutate_exact_dataset_state() {
         let records = Arc::new(Mutex::new(BTreeMap::from([
             (
@@ -8982,7 +9854,7 @@ mod tests {
             .submit(
                 &invocation,
                 &JclBundle {
-                    primary: "//CAPJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//SYSIN DD *\n ALTER LIBRARYENTRY NAME(LIB)\n ALTER VOLUMEENTRY NAME(VOL001)\n CREATE LIBRARYENTRY NAME(LIB)\n CREATE VOLUMEENTRY NAME(VOL001)\n DEFINE PAGESPACE (NAME(PAGE.ONE))\n SETCACHE NAME(VOL001)\n ALLOCATE DATASET(USER.PHYS) UNIT(3390)\n ALLOCATE DATASET(USER.TAPE) TAPE UNIT(3490)\n ALLOCATE DATASET(USER.ACS) ACSROUTINE(STANDARD)\n ALLOCATE DATASET(USER.COMP) COMPRESS(GENERIC)\n ALLOCATE DATASET(USER.ENC) KEYLABEL(KEY.ONE)\n DEFINE CLUSTER (NAME(USER.STRIPE) INDEXED KEYS(2 0) RECORDSIZE(4 4) STRIPECOUNT(2) EXTENDED)\n ALLOCATE DATASET(USER.UNKNOWN) FROBULATE(1)\n DEFINE CLUSTER (NAME(USER.REUSE) INDEXED KEYS(2 0) RECORDSIZE(4 4) REUSE)\n DEFINE CLUSTER (NAME(USER.COMPNT) INDEXED KEYS(2 0) RECORDSIZE(4 4) DATA(RECORDSIZE(4 4)))\n ALTER USER.A MIGRATE\n ALTER USER.A RECALL\n ALTER USER.A OPEN BUFNO(8)\n/*\n".into(),
+                    primary: "//CAPJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//SYSIN DD *\n ALTER LIBRARYENTRY NAME(LIB)\n ALTER VOLUMEENTRY NAME(VOL001)\n CREATE LIBRARYENTRY NAME(LIB)\n CREATE VOLUMEENTRY NAME(VOL001)\n DEFINE PAGESPACE (NAME(PAGE.ONE))\n SETCACHE NAME(VOL001)\n ALLOCATE DATASET(USER.PHYS) UNIT(3390)\n ALLOCATE DATASET(USER.TAPE) TAPE UNIT(3490)\n ALLOCATE DATASET(USER.ACS) ACSROUTINE(STANDARD)\n ALLOCATE DATASET(USER.COMP) COMPRESS(GENERIC)\n ALLOCATE DATASET(USER.ENC) KEYLABEL(KEY.ONE)\n DEFINE CLUSTER (NAME(USER.STRIPE) INDEXED KEYS(2 0) RECORDSIZE(4 4) STRIPECOUNT(2) EXTENDED)\n ALLOCATE DATASET(USER.UNKNOWN) FROBULATE(1)\n DEFINE CLUSTER (NAME(USER.REUSE) INDEXED KEYS(2 0) RECORDSIZE(4 4) REUSE)\n DEFINE CLUSTER (NAME(USER.COMPNT) INDEXED KEYS(2 0) RECORDSIZE(4 4) DATA(NAME(USER.COMPNT.DATA) RECORDSIZE(4 4)))\n ALTER USER.A MIGRATE\n ALTER USER.A RECALL\n ALTER USER.A OPEN BUFNO(8)\n/*\n".into(),
                     ..Default::default()
                 },
                 &IdempotencyKey::new("ams-capabilities", InvocationLimits::default()).unwrap(),
@@ -9016,7 +9888,6 @@ mod tests {
             "compression",
             "encryption",
             "striping",
-            "vsam-data-options",
             "vsam-components",
             "migration-recall",
             "ams-combined-alter",
@@ -9242,11 +10113,94 @@ mod tests {
         );
     }
 
+    #[test]
+    fn dd_allocation_resolves_an_alternate_index_path_to_its_base_dataset() {
+        let (service, dataset) = service_with_real_datasets();
+        let base = DatasetName::new("IBMUSER.BASE", 128).unwrap();
+        dataset
+            .invoke(DatasetRequest::Create {
+                dataset: base.clone(),
+                attributes: DatasetAttributes {
+                    organization: DatasetOrganization::KeySequenced,
+                    record_format: RecordFormat::Fixed,
+                    logical_record_length: 8,
+                    key_offset: Some(0),
+                    key_length: Some(2),
+                    ccsid: Some(37),
+                },
+                mutation: dataset_test_mutation(560),
+            })
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::Write {
+                dataset: base.clone(),
+                member: None,
+                records: vec![b"01RECORD".to_vec()],
+                expected_version: Some(1),
+                mutation: dataset_test_mutation(561),
+            })
+            .unwrap();
+        let index = DatasetName::new("IBMUSER.BASE.AIX", 128).unwrap();
+        dataset
+            .invoke(DatasetRequest::DefineAlternateIndex {
+                base,
+                index: index.clone(),
+                key_offset: 2,
+                key_length: 2,
+                allow_duplicates: true,
+                upgrade: true,
+                mutation: dataset_test_mutation(562),
+            })
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::DefinePath {
+                path: DatasetName::new("IBMUSER.BASE.PATH", 128).unwrap(),
+                index,
+                mutation: dataset_test_mutation(563),
+            })
+            .unwrap();
+        let invocation = invocation();
+        let mut effect_sequence = 0;
+        assert_eq!(
+            service
+                .resolve_dd_access_path(
+                    &invocation,
+                    &DatasetName::new("IBMUSER.BASE.PATH", 128).unwrap(),
+                    &mut effect_sequence,
+                )
+                .unwrap(),
+            DatasetName::new("IBMUSER.BASE", 128).unwrap()
+        );
+        let submitted = service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//PATHJOB JOB CLASS=A\n//READ EXEC PGM=IEFBR14\n//INPUT DD DSN=IBMUSER.BASE.PATH,DISP=SHR\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("dd-path-resolution", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let completed = service.run_next(&invocation, false).unwrap().unwrap();
+        assert_eq!(
+            completed.state,
+            JobState::Completed,
+            "{completed:?} {:?}",
+            service
+                .spool(&invocation, &submitted.id, "JESMSGLG", 0, 16)
+                .unwrap()
+                .0
+        );
+        assert_eq!(completed.return_code, Some(0));
+    }
+
     struct CobolProgram {
         calls: Arc<AtomicUsize>,
     }
 
     struct AbendProgram;
+    struct CancelledProgram;
 
     impl Program for AbendProgram {
         fn execute(&self, _: &Invocation, _: &ProgramInput) -> Result<ProgramOutput, HostProblem> {
@@ -9255,6 +10209,12 @@ mod tests {
                 response: 500,
                 response2: 7,
             })
+        }
+    }
+
+    impl Program for CancelledProgram {
+        fn execute(&self, _: &Invocation, _: &ProgramInput) -> Result<ProgramOutput, HostProblem> {
+            Err(HostProblem::Cancelled)
         }
     }
 
@@ -9413,6 +10373,9 @@ mod tests {
         object.remove("origin");
         object.remove("route");
         object.remove("program_registrations");
+        object.remove("cancellation");
+        object.remove("purge_pending");
+        object.remove("effect_sequence");
         object.remove("spool_sequence");
         object.remove("spool_files");
         object.remove("output_groups");
@@ -9451,6 +10414,7 @@ mod tests {
         assert_eq!(snapshot.kind, JesJobKind::Batch);
         assert_eq!(snapshot.origin, JesSubmissionOrigin::External);
         assert_eq!(snapshot.route, JesJobRoute::default());
+        assert_eq!(snapshot.cancellation, None);
         assert_eq!(
             recovered.spool(&invocation, &id, "LEGACY", 0, 8).unwrap().0,
             vec![b"OLD".to_vec()]
@@ -9509,6 +10473,714 @@ mod tests {
             .unwrap();
         drop(first);
 
+        let provider_store: Arc<dyn ProviderStateStore> = store;
+        let providers = spool_test_providers(provider_store.clone());
+        assert!(matches!(
+            BatchService::open(
+                host_with(builtins(), providers),
+                provider_store,
+                Default::default(),
+                Default::default(),
+            ),
+            Err(HostProblem::InfrastructureFailure)
+        ));
+    }
+
+    #[test]
+    fn durable_job_identity_and_next_id_corruption_fail_closed() {
+        let invocation = invocation();
+        let keyed_store = Arc::new(MemoryStore::new(Default::default()));
+        let keyed = service(keyed_store.clone(), builtins());
+        let submitted = keyed
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("identity-key", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let row = keyed_store
+            .get_provider_state("jes-job", &submitted.id)
+            .unwrap()
+            .unwrap();
+        let mut job: Job = serde_json::from_slice(&row.payload).unwrap();
+        job.id = "JOB99999".into();
+        job.version = row.version + 1;
+        keyed_store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: row.namespace,
+                    key: row.key,
+                    version: job.version,
+                    payload: serde_json::to_vec(&job).unwrap(),
+                },
+                Some(row.version),
+            )
+            .unwrap();
+        drop(keyed);
+        let provider_store: Arc<dyn ProviderStateStore> = keyed_store;
+        let providers = spool_test_providers(provider_store.clone());
+        assert!(matches!(
+            BatchService::open(
+                host_with(builtins(), providers),
+                provider_store,
+                Default::default(),
+                Default::default(),
+            ),
+            Err(HostProblem::InfrastructureFailure)
+        ));
+
+        let meta_store = Arc::new(MemoryStore::new(Default::default()));
+        let meta_service = service(meta_store.clone(), builtins());
+        meta_service
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("identity-meta", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let meta = meta_store
+            .get_provider_state("jes-meta", "next-id")
+            .unwrap()
+            .unwrap();
+        meta_store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: meta.namespace,
+                    key: meta.key,
+                    version: meta.version + 1,
+                    payload: 1u64.to_be_bytes().to_vec(),
+                },
+                Some(meta.version),
+            )
+            .unwrap();
+        drop(meta_service);
+        let provider_store: Arc<dyn ProviderStateStore> = meta_store;
+        let providers = spool_test_providers(provider_store.clone());
+        assert!(matches!(
+            BatchService::open(
+                host_with(builtins(), providers),
+                provider_store,
+                Default::default(),
+                Default::default(),
+            ),
+            Err(HostProblem::InfrastructureFailure)
+        ));
+    }
+
+    #[test]
+    fn durable_job_shape_corruption_fails_closed() {
+        assert_durable_store_rejected(durable_store_with_corruption("shape-submit-key", |job| {
+            job.submit_key = "invalid key".into()
+        }));
+        assert_durable_store_rejected(durable_store_with_corruption("shape-owner", |job| {
+            job.owner = "invalid owner".into();
+        }));
+        assert_durable_store_rejected(durable_store_with_corruption("shape-plan", |job| {
+            job.name = "OTHERJOB".into();
+        }));
+        assert_durable_store_rejected(durable_store_with_corruption("shape-steps", |job| {
+            job.steps.clear();
+        }));
+        assert_durable_store_rejected(durable_store_with_corruption("shape-events", |job| {
+            job.events[0] = "x".repeat(MAX_JOB_EVENT_BYTES + 1);
+        }));
+    }
+
+    #[test]
+    fn invocation_cancellation_is_terminal_before_selection_and_purge_safe() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let checkpoint_store: Arc<dyn CheckpointStore> = store.clone();
+        let service =
+            service_with_checkpoint_store(store.clone(), checkpoint_store, builtins()).unwrap();
+        let normal = invocation();
+        let submitted = service
+            .submit(
+                &normal,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("checkpoint-cancel", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let mut cancelled = invocation();
+        cancelled.cancellation = Some(
+            Cancellation::new(
+                CancellationId::new("cancel-job", InvocationLimits::default()).unwrap(),
+                "operator requested stop",
+                17,
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        let result = service.run_next(&cancelled, false).unwrap().unwrap();
+        assert_eq!(result.state, JobState::Cancelled);
+        assert_eq!(result.steps[0].state, StepState::Pending);
+        assert!(matches!(
+            result.cancellation,
+            Some(JesCancellation {
+                state: CancellationState::Completed,
+                requested_tick: 17,
+                ..
+            })
+        ));
+        assert_eq!(service.checkpoint(&submitted.id).unwrap(), None);
+        service.purge(&normal, &submitted.id).unwrap();
+        assert!(
+            store
+                .get_checkpoint(&checkpoint_execution_id(&submitted.id).unwrap())
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn provider_cancellation_is_observed_in_step_job_and_common_checkpoint() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let checkpoint_store: Arc<dyn CheckpointStore> = store.clone();
+        let router: Arc<dyn HostProvider> = ProgramRouter::new(
+            BTreeMap::from([(
+                "CANCPGM".into(),
+                Arc::new(CancelledProgram) as Arc<dyn Program>,
+            )]),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let service = service_with_checkpoint_store(store, checkpoint_store, router).unwrap();
+        let invocation = invocation();
+        let submitted = service
+            .submit(
+                &invocation,
+                &bundle("CANCPGM"),
+                &IdempotencyKey::new("provider-cancel", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let cancelled = service.run_next(&invocation, false).unwrap().unwrap();
+        assert_eq!(cancelled.state, JobState::Cancelled);
+        assert_eq!(cancelled.steps[0].state, StepState::Cancelled);
+        assert_eq!(
+            cancelled.cancellation.as_ref().unwrap().state,
+            CancellationState::Completed
+        );
+        let checkpoint = service.checkpoint(&submitted.id).unwrap().unwrap();
+        assert_eq!(checkpoint.job_version, cancelled.version);
+        assert_eq!(
+            checkpoint.cancellation.unwrap().state,
+            CancellationState::Completed
+        );
+    }
+
+    #[test]
+    fn purge_checkpoint_delete_failure_retains_retryable_job_intent() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let checkpoint_store: Arc<dyn CheckpointStore> = Arc::new(FailDeleteCheckpointOnceStore {
+            inner: store.clone(),
+            fail: AtomicBool::new(true),
+        });
+        let service = service_with_checkpoint_store(store, checkpoint_store, builtins()).unwrap();
+        let invocation = invocation();
+        let submitted = service
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("purge-checkpoint-failure", InvocationLimits::default())
+                    .unwrap(),
+                false,
+            )
+            .unwrap();
+        service.run_next(&invocation, false).unwrap().unwrap();
+        assert_eq!(
+            service.purge(&invocation, &submitted.id),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert!(
+            service
+                .lock()
+                .unwrap()
+                .jobs
+                .get(&submitted.id)
+                .unwrap()
+                .purge_pending
+        );
+        service.purge(&invocation, &submitted.id).unwrap();
+        assert_eq!(service.get(&submitted.id), Err(HostProblem::NotFound));
+    }
+
+    #[test]
+    fn crash_after_committed_step_checkpoint_gap_restarts_without_duplicate_program_effect() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let failing_checkpoints: Arc<dyn CheckpointStore> = Arc::new(FailNthCheckpointStore {
+            inner: store.clone(),
+            writes: AtomicUsize::new(0),
+            fail_at: 4,
+        });
+        let calls = Arc::new(AtomicUsize::new(0));
+        let router: Arc<dyn HostProvider> = ProgramRouter::new(
+            BTreeMap::from([(
+                "CRASHPGM".into(),
+                Arc::new(CobolProgram {
+                    calls: calls.clone(),
+                }) as Arc<dyn Program>,
+            )]),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let first =
+            service_with_checkpoint_store(store.clone(), failing_checkpoints, router.clone())
+                .unwrap();
+        let invocation = invocation();
+        let submitted = first
+            .submit(
+                &invocation,
+                &bundle("CRASHPGM"),
+                &IdempotencyKey::new("checkpoint-crash", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            first.run_next(&invocation, false),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(first.get(&submitted.id).unwrap().state, JobState::Running);
+        assert_eq!(
+            first.get(&submitted.id).unwrap().steps[0].state,
+            StepState::Completed
+        );
+        drop(first);
+
+        let checkpoint_store: Arc<dyn CheckpointStore> = store.clone();
+        let restarted = service_with_checkpoint_store(store, checkpoint_store, router).unwrap();
+        assert_eq!(
+            restarted.get(&submitted.id).unwrap().state,
+            JobState::Queued
+        );
+        let completed = restarted.run_next(&invocation, false).unwrap().unwrap();
+        assert_eq!(completed.state, JobState::Completed);
+        assert_eq!(completed.return_code, Some(4));
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            restarted
+                .spool(&invocation, &submitted.id, "SYSPRINT", 0, 8)
+                .unwrap()
+                .0,
+            vec![b"COBOL OUTPUT".to_vec()]
+        );
+    }
+
+    #[test]
+    fn queue_and_spool_overload_fail_before_unbounded_growth() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let providers = spool_test_providers(store.clone());
+        let service = BatchService::open(
+            host_with(builtins(), providers),
+            store.clone(),
+            Default::default(),
+            BatchLimits {
+                max_jobs: 1,
+                max_queued: 1,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("overload-one", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//SECOND JOB CLASS=A\n//S EXEC PGM=IEFBR14\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("overload-two", InvocationLimits::default()).unwrap(),
+                false,
+            ),
+            Err(HostProblem::ResourceExhausted)
+        );
+
+        let restart_store = Arc::new(MemoryStore::new(Default::default()));
+        let restart_provider: Arc<dyn ProviderStateStore> = restart_store.clone();
+        let restart_service = BatchService::open(
+            host_with(builtins(), spool_test_providers(restart_provider.clone())),
+            restart_provider,
+            Default::default(),
+            BatchLimits {
+                max_jobs: 2,
+                max_queued: 2,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        for (name, key) in [("ONE", "restart-one"), ("TWO", "restart-two")] {
+            restart_service
+                .submit(
+                    &invocation,
+                    &JclBundle {
+                        primary: format!("//{name} JOB CLASS=A\n//STEP1 EXEC PGM=IEFBR14\n"),
+                        ..Default::default()
+                    },
+                    &IdempotencyKey::new(key, InvocationLimits::default()).unwrap(),
+                    false,
+                )
+                .unwrap();
+        }
+        drop(restart_service);
+        let restart_provider: Arc<dyn ProviderStateStore> = restart_store;
+        let providers = spool_test_providers(restart_provider.clone());
+        assert!(matches!(
+            BatchService::open(
+                host_with(builtins(), providers),
+                restart_provider,
+                Default::default(),
+                BatchLimits {
+                    max_jobs: 1,
+                    max_queued: 1,
+                    ..Default::default()
+                },
+            ),
+            Err(HostProblem::ResourceExhausted)
+        ));
+
+        let restart_spool_store = Arc::new(MemoryStore::new(Default::default()));
+        let restart_spool_provider: Arc<dyn ProviderStateStore> = restart_spool_store.clone();
+        let restart_spool = BatchService::open(
+            host_with(
+                builtins(),
+                spool_test_providers(restart_spool_provider.clone()),
+            ),
+            restart_spool_provider,
+            Default::default(),
+            Default::default(),
+        )
+        .unwrap();
+        restart_spool
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("restart-spool-bound", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        drop(restart_spool);
+        let restart_provider: Arc<dyn ProviderStateStore> = restart_spool_store;
+        let providers = spool_test_providers(restart_provider.clone());
+        assert!(matches!(
+            BatchService::open(
+                host_with(builtins(), providers),
+                restart_provider,
+                Default::default(),
+                BatchLimits {
+                    max_spool_records: 3,
+                    ..Default::default()
+                },
+            ),
+            Err(HostProblem::ResourceExhausted)
+        ));
+
+        let bounded_store: Arc<dyn ProviderStateStore> =
+            Arc::new(MemoryStore::new(Default::default()));
+        let providers = spool_test_providers(bounded_store.clone());
+        let bounded = BatchService::open(
+            host_with(builtins(), providers),
+            bounded_store.clone(),
+            Default::default(),
+            BatchLimits {
+                max_spool_records: 3,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            bounded.submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("spool-overload", InvocationLimits::default()).unwrap(),
+                false,
+            ),
+            Err(HostProblem::ResourceExhausted)
+        );
+        assert!(bounded.list(None, None, 8).unwrap().0.is_empty());
+        assert!(
+            bounded_store
+                .list_provider_state("spool-artifact", 16)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn event_overload_preserves_bounds_and_rejects_unlogged_transitions() {
+        let invocation = invocation();
+        let control_store: Arc<dyn ProviderStateStore> =
+            Arc::new(MemoryStore::new(Default::default()));
+        let control = BatchService::open(
+            host_with(builtins(), spool_test_providers(control_store.clone())),
+            control_store,
+            Default::default(),
+            BatchLimits {
+                max_events: 4,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let controlled = control
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("event-control", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            control.hold(&invocation, &controlled.id),
+            Err(HostProblem::ResourceExhausted)
+        );
+        let unchanged = control.lock().unwrap().jobs[&controlled.id].clone();
+        assert_eq!(unchanged.state, JobState::Queued);
+        assert_eq!(unchanged.version, controlled.version);
+        assert_eq!(unchanged.events.len(), 4);
+
+        let execution_store: Arc<dyn ProviderStateStore> =
+            Arc::new(MemoryStore::new(Default::default()));
+        let execution = BatchService::open(
+            host_with(builtins(), spool_test_providers(execution_store.clone())),
+            execution_store,
+            Default::default(),
+            BatchLimits {
+                max_events: 8,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let submitted = execution
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("event-execution", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let failed = execution.run_next(&invocation, false).unwrap().unwrap();
+        assert_eq!(failed.state, JobState::Failed);
+        assert_eq!(failed.steps[0].state, StepState::Pending);
+        let bounded = execution.lock().unwrap().jobs[&submitted.id].clone();
+        assert_eq!(bounded.events.len(), 7);
+        assert_eq!(
+            &bounded.events[bounded.events.len() - 3..],
+            ["selected:INIT0001", "running", "failed:ResourceExhausted"]
+        );
+    }
+
+    #[test]
+    fn sqlite_backup_restores_jobs_spool_checkpoint_scheduler_and_topology() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-jes-backup-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let primary = directory.join("primary.db");
+        let backup = directory.join("backup.db");
+        let url = format!("sqlite://{}?mode=rwc", primary.display());
+        let store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 65_536).unwrap());
+        let service = sqlite_service_with_checkpoint_store(store.clone()).unwrap();
+        let invocation = invocation();
+        let topology = service.topology().unwrap();
+        service
+            .install_topology(&invocation, topology.clone())
+            .unwrap();
+        service.stop_initiator(&invocation, "INIT0001").unwrap();
+        service.start_initiator(&invocation, "INIT0001").unwrap();
+        let submitted = service
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("backup-job", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        service.run_next(&invocation, false).unwrap().unwrap();
+        store.backup_to(&backup).unwrap();
+        drop(service);
+        drop(store);
+
+        let restored_url = format!("sqlite://{}?mode=rw", backup.display());
+        let restored_store =
+            Arc::new(SqliteStateStore::open(&restored_url, 8 * 1024 * 1024, 65_536).unwrap());
+        restored_store.integrity_check().unwrap();
+        let restored = sqlite_service_with_checkpoint_store(restored_store.clone()).unwrap();
+        assert_eq!(
+            restored.get(&submitted.id).unwrap().state,
+            JobState::Completed
+        );
+        assert_eq!(restored.topology().unwrap(), topology);
+        assert!(restored.checkpoint(&submitted.id).unwrap().is_some());
+        assert_eq!(
+            restored
+                .spool(&invocation, &submitted.id, "SYSPRINT", 0, 8)
+                .unwrap()
+                .0,
+            vec![b"IEFBR14".to_vec()]
+        );
+        assert!(
+            restored_store
+                .get_provider_state(SCHEDULER_STATE_NAMESPACE, CONFIGURATION_STATE_KEY)
+                .unwrap()
+                .is_some()
+        );
+        drop(restored);
+        drop(restored_store);
+        let _ = std::fs::remove_file(primary);
+        let _ = std::fs::remove_file(backup);
+        let _ = std::fs::remove_dir(directory);
+    }
+
+    #[test]
+    fn corrupted_common_checkpoint_fails_closed_on_restart() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let checkpoint_store: Arc<dyn CheckpointStore> = store.clone();
+        let service =
+            service_with_checkpoint_store(store.clone(), checkpoint_store, builtins()).unwrap();
+        let invocation = invocation();
+        let submitted = service
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("checkpoint-corrupt", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        service.run_next(&invocation, false).unwrap().unwrap();
+        let execution_id = checkpoint_execution_id(&submitted.id).unwrap();
+        let mut checkpoint = store.get_checkpoint(&execution_id).unwrap().unwrap();
+        checkpoint.payload[0] ^= 0xff;
+        store.put_checkpoint(checkpoint).unwrap();
+        drop(service);
+
+        let checkpoint_store: Arc<dyn CheckpointStore> = store.clone();
+        let provider_store: Arc<dyn ProviderStateStore> = store;
+        let providers = spool_test_providers(provider_store.clone());
+        assert!(matches!(
+            BatchService::open_with_checkpoint_store(
+                host_with(builtins(), providers),
+                provider_store,
+                checkpoint_store,
+                Default::default(),
+                Default::default(),
+            ),
+            Err(HostProblem::InfrastructureFailure)
+        ));
+    }
+
+    #[test]
+    fn warm_start_exhausts_bounded_attempts_without_reexecuting() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let invocation = invocation();
+        let first = service(store.clone(), builtins());
+        let submitted = first
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("attempt-exhaustion", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let row = store
+            .get_provider_state("jes-job", &submitted.id)
+            .unwrap()
+            .unwrap();
+        let mut job: Job = serde_json::from_slice(&row.payload).unwrap();
+        job.version += 1;
+        job.attempt = BatchLimits::default().max_attempts;
+        job.state = JobState::Running;
+        store
+            .put_provider_state(job_record(&job).unwrap(), Some(row.version))
+            .unwrap();
+        drop(first);
+
+        let restarted = service(store, builtins());
+        assert_eq!(
+            restarted.get(&submitted.id).unwrap().state,
+            JobState::Failed
+        );
+        assert_eq!(restarted.run_next(&invocation, false).unwrap(), None);
+    }
+
+    #[test]
+    fn durable_version_increment_is_checked() {
+        assert_eq!(
+            next_job_version(u64::MAX),
+            Err(HostProblem::ResourceExhausted)
+        );
+        assert_eq!(next_job_version(41), Ok(42));
+    }
+
+    #[test]
+    fn job_identifier_exhaustion_is_bounded_and_restart_safe() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let invocation = invocation();
+        let first = service(store.clone(), builtins());
+        let existing = first
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("job-id-existing", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let meta = store
+            .get_provider_state("jes-meta", "next-id")
+            .unwrap()
+            .unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "jes-meta".into(),
+                    key: "next-id".into(),
+                    version: meta.version + 1,
+                    payload: (MAX_JOB_NUMBER + 1).to_be_bytes().to_vec(),
+                },
+                Some(meta.version),
+            )
+            .unwrap();
+        drop(first);
+
+        let exhausted = service(store.clone(), builtins());
+        assert_eq!(exhausted.get(&existing.id).unwrap().id, existing.id);
+        assert_eq!(
+            exhausted.submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("job-id-exhausted", InvocationLimits::default()).unwrap(),
+                false,
+            ),
+            Err(HostProblem::ResourceExhausted)
+        );
+        drop(exhausted);
+
+        let meta = store
+            .get_provider_state("jes-meta", "next-id")
+            .unwrap()
+            .unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "jes-meta".into(),
+                    key: "next-id".into(),
+                    version: meta.version + 1,
+                    payload: (MAX_JOB_NUMBER + 2).to_be_bytes().to_vec(),
+                },
+                Some(meta.version),
+            )
+            .unwrap();
         let provider_store: Arc<dyn ProviderStateStore> = store;
         let providers = spool_test_providers(provider_store.clone());
         assert!(matches!(

@@ -1,14 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://mainframe-env.invalid/schemas/jes-durable-job@2",
+  "title": "mainframe-env durable JES job",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "id", "name", "owner", "class", "priority", "state", "return_code", "abend_code", "active_step", "initiator", "steps", "attempt", "version", "submit_key", "plan", "dataset_resolutions", "temporary_datasets", "spool", "events"],
   "properties": {
     "schema_version": {"const": "mainframe-env.jes-durable-job@2"},
     "id": {"type": "string", "pattern": "^JOB[0-9]{5,8}$"},
-    "name": {"type": "string", "pattern": "^[A-Z0-9@$#]{1,128}$"},
-    "owner": {"type": "string", "minLength": 1, "maxLength": 128},
+    "name": {"type": "string", "pattern": "^[A-Z0-9@$#]{1,16}$"},
+    "owner": {"type": "string", "pattern": "^[A-Za-z0-9._:/@-]{1,128}$"},
     "kind": {"enum": ["batch", "started-task"]},
     "origin": {
       "oneOf": [
@@ -50,6 +51,25 @@
         "owner_member": {"type": ["string", "null"], "pattern": "^[A-Z0-9@$#]{1,16}$"}
       }
     },
+    "cancellation": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "requested_by", "reason", "requested_tick", "state"],
+          "properties": {
+            "id": {"type": "string", "minLength": 1, "maxLength": 128},
+            "requested_by": {"type": "string", "minLength": 1, "maxLength": 128},
+            "reason": {"type": "string", "minLength": 1, "maxLength": 4096},
+            "requested_tick": {"type": "integer", "minimum": 0},
+            "state": {"enum": ["requested", "observed", "completed"]}
+          }
+        }
+      ]
+    },
+    "purge_pending": {"type": "boolean"},
+    "effect_sequence": {"type": "integer", "minimum": 0},
     "class": {"type": "string", "pattern": "^[A-Z0-9]$"},
     "priority": {"type": "integer", "minimum": 0, "maximum": 255},
     "state": {"enum": ["submitted", "held", "queued", "selected", "running", "output", "completed", "failed", "cancelled"]},
@@ -90,7 +110,7 @@
     },
     "attempt": {"type": "integer", "minimum": 0, "maximum": 4294967295},
     "version": {"type": "integer", "minimum": 1},
-    "submit_key": {"type": "string", "minLength": 1, "maxLength": 128},
+    "submit_key": {"type": "string", "pattern": "^[A-Za-z0-9._:/@-]{1,128}$"},
     "plan": {"type": "object"},
     "program_registrations": {
       "type": "object",

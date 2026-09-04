@@ -440,6 +440,16 @@ impl CheckpointStore for MemoryStore {
     fn get_checkpoint(&self, id: &ExecutionId) -> Result<Option<CheckpointRecord>, StoreError> {
         Ok(self.lock()?.checkpoints.get(id).cloned())
     }
+
+    fn delete_checkpoint(&self, id: &ExecutionId) -> Result<(), StoreError> {
+        let mut state = self.lock()?;
+        let checkpoint = state.checkpoints.remove(id).ok_or(StoreError::NotFound)?;
+        state.blob_bytes = state
+            .blob_bytes
+            .checked_sub(checkpoint.payload.len())
+            .ok_or(StoreError::IncompatibleVersion)?;
+        Ok(())
+    }
 }
 
 impl SessionStore for MemoryStore {

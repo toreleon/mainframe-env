@@ -384,6 +384,13 @@ macro_rules! durable_implementations {
                     .map(|row| decode_checkpoint(&row.payload))
                     .transpose()
             }
+
+            fn delete_checkpoint(&self, id: &ExecutionId) -> Result<(), StoreError> {
+                let record = self
+                    .get_provider_state("durable-checkpoint", id.as_str())?
+                    .ok_or(StoreError::NotFound)?;
+                self.delete_provider_state("durable-checkpoint", id.as_str(), record.version)
+            }
         }
 
         impl SessionStore for $store {

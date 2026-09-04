@@ -1182,6 +1182,325 @@ impl ReferenceMachine {
         self.dataset_cursors = cursors;
         Ok(())
     }
+
+    /// Installs the bounded low-storage chain used by batch programs that inspect
+    /// the MVS PSA, TCB, and TIOT through COBOL linkage pointers.
+    ///
+    /// The compatibility storage is only installed when the compiled module
+    /// declares the complete structure. Modules with none of the conventional
+    /// names are left unchanged; partial declarations fail closed.
+    pub fn install_mvs_tiot<'a, I>(
+        &mut self,
+        job_name: &str,
+        step_name: &str,
+        raw_dd_names: I,
+    ) -> Result<bool, MachineProblem>
+    where
+        I: IntoIterator<Item = &'a str>,
+    {
+        const REQUIRED: [&str; 16] = [
+            "PSAPTR",
+            "PSA-BLOCK",
+            "TCB-POINT",
+            "TCB-BLOCK",
+            "TIOT-POINT",
+            "TIOT-BLOCK",
+            "TIOTNJOB",
+            "TIOTJSTP",
+            "TIOTPSTP",
+            "TIOT-INDEX",
+            "TIOT-ENTRY",
+            "TIOT-SEG",
+            "TIO-LEN",
+            "TIOCDDNM",
+            "UCB-ADDR",
+            "END-OF-TIOT",
+        ];
+
+        let declared = REQUIRED
+            .iter()
+            .filter(|name| self.layout(name).is_some())
+            .count();
+        if declared == 0 {
+            return Ok(false);
+        }
+        if declared != REQUIRED.len() {
+            return Err(MachineProblem::InvalidArtifact(
+                "partial MVS PSA/TCB/TIOT layout".into(),
+            ));
+        }
+
+        let valid_mvs_name = |name: &str| {
+            !name.is_empty()
+                && name.len() <= 8
+                && name.bytes().enumerate().all(|(index, byte)| {
+                    byte.is_ascii_uppercase()
+                        || matches!(byte, b'$' | b'@' | b'#')
+                        || (index > 0 && byte.is_ascii_digit())
+                })
+        };
+        let job_name = job_name.to_ascii_uppercase();
+        let step_name = step_name.to_ascii_uppercase();
+        if !valid_mvs_name(&job_name) || !valid_mvs_name(&step_name) {
+            return Err(MachineProblem::InvalidOperation);
+        }
+        let mut seen = BTreeSet::new();
+        let mut dd_names = Vec::new();
+        for name in raw_dd_names {
+            let name = name.to_ascii_uppercase();
+            if !valid_mvs_name(&name) {
+                return Err(MachineProblem::InvalidOperation);
+            }
+            if seen.insert(name.clone()) {
+                dd_names.push(name);
+            }
+        }
+        if dd_names.len() > self.invocation.limits.max_frames as usize {
+            return Err(MachineProblem::ResourceExhausted);
+        }
+
+        let required_layout = |name: &str| {
+            self.layout(name).cloned().ok_or_else(|| {
+                MachineProblem::InvalidArtifact(format!("missing MVS layout {name}"))
+            })
+        };
+        let psaptr = required_layout("PSAPTR")?;
+        let psa = required_layout("PSA-BLOCK")?;
+        let tcb_point = required_layout("TCB-POINT")?;
+        let tcb = required_layout("TCB-BLOCK")?;
+        let tiot_point = required_layout("TIOT-POINT")?;
+        let tiot = required_layout("TIOT-BLOCK")?;
+        let tiot_job = required_layout("TIOTNJOB")?;
+        let tiot_job_step = required_layout("TIOTJSTP")?;
+        let tiot_proc_step = required_layout("TIOTPSTP")?;
+        let tiot_index = required_layout("TIOT-INDEX")?;
+        let entry = required_layout("TIOT-ENTRY")?;
+        let segment = required_layout("TIOT-SEG")?;
+        let segment_length = required_layout("TIO-LEN")?;
+        let dd_name = required_layout("TIOCDDNM")?;
+        let ucb_address = required_layout("UCB-ADDR")?;
+        let end_of_tiot = required_layout("END-OF-TIOT")?;
+        let end_marker = end_of_tiot
+            .parent
+            .as_ref()
+            .and_then(|parent| self.layouts.get(parent))
+            .cloned()
+            .ok_or_else(|| {
+                MachineProblem::InvalidArtifact("missing MVS TIOT end-marker storage".into())
+            })?;
+
+        let pointer_like = |layout: &LayoutMetadata| is_pointer_like(layout.category);
+        if !pointer_like(&psaptr)
+            || !pointer_like(&tcb_point)
+            || !pointer_like(&tiot_point)
+            || !pointer_like(&tiot_index)
+            || psaptr.length != tcb_point.length
+            || psaptr.length != tiot_point.length
+            || psaptr.length != tiot_index.length
+            || !psa.linkage
+            || !tcb.linkage
+            || !tiot.linkage
+            || !entry.linkage
+            || segment.length == 0
+            || segment.length > usize::from(u8::MAX)
+            || entry.length < segment.length
+            || segment_length.length != 1
+            || dd_name.length != 8
+            || ucb_address.length == 0
+            || tiot_job.length != 8
+            || tiot_job_step.length != 8
+            || tiot_proc_step.length != 8
+            || end_marker.length < 4
+        {
+            return Err(MachineProblem::InvalidArtifact(format!(
+                "invalid MVS PSA/TCB/TIOT layout: pointers={:?}/{:?}/{:?}/{:?} lengths={}/{}/{}/{} linkage={}/{}/{}/{} segment={} entry={} fields={}/{}/{}/{}/{}/{}/{} end={}",
+                psaptr.category,
+                tcb_point.category,
+                tiot_point.category,
+                tiot_index.category,
+                psaptr.length,
+                tcb_point.length,
+                tiot_point.length,
+                tiot_index.length,
+                psa.linkage,
+                tcb.linkage,
+                tiot.linkage,
+                entry.linkage,
+                segment.length,
+                entry.length,
+                segment_length.length,
+                dd_name.length,
+                ucb_address.length,
+                tiot_job.length,
+                tiot_job_step.length,
+                tiot_proc_step.length,
+                end_of_tiot.length,
+                end_of_tiot.offset,
+            )));
+        }
+
+        let relative =
+            |root: &LayoutMetadata, child: &LayoutMetadata| -> Result<usize, MachineProblem> {
+                let root = self
+                    .views
+                    .get(&root.name)
+                    .ok_or(MachineProblem::UnknownStorage)?;
+                let child = self
+                    .views
+                    .get(&child.name)
+                    .ok_or(MachineProblem::UnknownStorage)?;
+                if root.base != child.base
+                    || child.offset < root.offset
+                    || child
+                        .offset
+                        .checked_add(child.length)
+                        .is_none_or(|end| end > root.offset.saturating_add(root.length))
+                {
+                    return Err(MachineProblem::InvalidArtifact(
+                        "disconnected MVS PSA/TCB/TIOT layout".into(),
+                    ));
+                }
+                Ok(child.offset - root.offset)
+            };
+        let tcb_pointer_offset = relative(&psa, &tcb_point)?;
+        let tiot_pointer_offset = relative(&tcb, &tiot_point)?;
+        let tiot_job_offset = relative(&tiot, &tiot_job)?;
+        let tiot_job_step_offset = relative(&tiot, &tiot_job_step)?;
+        let tiot_proc_step_offset = relative(&tiot, &tiot_proc_step)?;
+        let segment_length_offset = relative(&segment, &segment_length)?;
+        let dd_name_offset = relative(&segment, &dd_name)?;
+        let ucb_address_offset = relative(&segment, &ucb_address)?;
+        let end_marker_offset = relative(&entry, &end_marker)?;
+        if end_marker_offset < segment.length {
+            return Err(MachineProblem::InvalidArtifact(
+                "overlapping MVS TIOT end marker".into(),
+            ));
+        }
+
+        let align = |value: usize| {
+            value
+                .checked_add(7)
+                .map(|value| value & !7usize)
+                .ok_or(MachineProblem::ResourceExhausted)
+        };
+        let psa_offset = 0usize;
+        let tcb_offset = align(psa.length)?;
+        let tiot_offset = align(
+            tcb_offset
+                .checked_add(tcb.length)
+                .ok_or(MachineProblem::ResourceExhausted)?,
+        )?;
+        let entries_offset = tiot_offset
+            .checked_add(tiot.length)
+            .ok_or(MachineProblem::ResourceExhausted)?;
+        let entries_length = if dd_names.is_empty() {
+            entry.length
+        } else {
+            dd_names
+                .len()
+                .checked_sub(1)
+                .and_then(|count| count.checked_mul(segment.length))
+                .and_then(|length| length.checked_add(entry.length))
+                .ok_or(MachineProblem::ResourceExhausted)?
+        };
+        let total_length = entries_offset
+            .checked_add(entries_length)
+            .ok_or(MachineProblem::ResourceExhausted)?;
+        let current_storage = self.bases.iter().try_fold(0usize, |total, base| {
+            total
+                .checked_add(base.len())
+                .ok_or(MachineProblem::ResourceExhausted)
+        })?;
+        let storage_limit = usize::try_from(self.invocation.limits.max_storage_bytes)
+            .map_err(|_| MachineProblem::ResourceExhausted)?;
+        if current_storage
+            .checked_add(total_length)
+            .is_none_or(|total| total > storage_limit)
+        {
+            return Err(MachineProblem::ResourceExhausted);
+        }
+
+        let base = self.bases.len();
+        let psa_address = self.address_bytes_for(base, psa_offset, psaptr.length)?;
+        let tcb_address = self.address_bytes_for(base, tcb_offset, tcb_point.length)?;
+        let tiot_address = self.address_bytes_for(base, tiot_offset, tiot_point.length)?;
+        let psaptr_view = self
+            .views
+            .get(&psaptr.name)
+            .cloned()
+            .ok_or(MachineProblem::UnknownStorage)?;
+        let (initializer, initial_storage_id, initial_storage_view) = self
+            .operations
+            .iter()
+            .filter(|operation| operation.identity.name() == "init")
+            .filter_map(|operation| {
+                let id = operation.storage.first()?.storage;
+                let view = self.views_by_id.get(&id)?;
+                (view.base == psaptr_view.base
+                    && view.offset <= psaptr_view.offset
+                    && psaptr_view
+                        .offset
+                        .checked_add(psaptr_view.length)
+                        .is_some_and(|end| end <= view.offset.saturating_add(view.length)))
+                .then_some((operation, id, view.clone()))
+            })
+            .min_by_key(|(_, _, view)| view.length)
+            .ok_or(MachineProblem::UnknownStorage)?;
+        let mut entry_initial = self
+            .entry_initials
+            .get(&initial_storage_id)
+            .cloned()
+            .unwrap_or(bytes_attribute(initializer, "initial")?.to_vec());
+        let psaptr_initial_offset = psaptr_view
+            .offset
+            .checked_sub(initial_storage_view.offset)
+            .ok_or(MachineProblem::InvalidOperation)?;
+        let psaptr_initial_end = psaptr_initial_offset
+            .checked_add(psa_address.len())
+            .ok_or(MachineProblem::ResourceExhausted)?;
+        entry_initial
+            .get_mut(psaptr_initial_offset..psaptr_initial_end)
+            .ok_or(MachineProblem::InvalidOperation)?
+            .copy_from_slice(&psa_address);
+        let mut storage = vec![0; total_length];
+        storage[tcb_pointer_offset..tcb_pointer_offset + tcb_address.len()]
+            .copy_from_slice(&tcb_address);
+        let tiot_pointer_start = tcb_offset + tiot_pointer_offset;
+        storage[tiot_pointer_start..tiot_pointer_start + tiot_address.len()]
+            .copy_from_slice(&tiot_address);
+
+        let write_name = |storage: &mut [u8], offset: usize, name: &str| {
+            storage[offset..offset + 8].fill(b' ');
+            storage[offset..offset + name.len()].copy_from_slice(name.as_bytes());
+        };
+        write_name(&mut storage, tiot_offset + tiot_job_offset, &job_name);
+        write_name(&mut storage, tiot_offset + tiot_job_step_offset, &step_name);
+        write_name(
+            &mut storage,
+            tiot_offset + tiot_proc_step_offset,
+            &step_name,
+        );
+        for (index, name) in dd_names.iter().enumerate() {
+            let offset = entries_offset
+                + index
+                    .checked_mul(segment.length)
+                    .ok_or(MachineProblem::ResourceExhausted)?;
+            storage[offset + segment_length_offset] = segment.length as u8;
+            write_name(&mut storage, offset + dd_name_offset, name);
+            storage[offset + ucb_address_offset + ucb_address.length - 1] = 1;
+        }
+
+        self.write(&psaptr.name, &psa_address)?;
+        self.entry_initials
+            .insert(initial_storage_id, entry_initial);
+        self.bases.push(storage);
+        self.static_base_count = self
+            .static_base_count
+            .checked_add(1)
+            .ok_or(MachineProblem::ResourceExhausted)?;
+        Ok(true)
+    }
+
     #[must_use]
     pub fn variable(&self, name: &str) -> Option<FixedValue> {
         self.read(name).ok().map(FixedValue::new)

@@ -44,8 +44,8 @@ use mainframe_env_racf::{MemorySecretResolver, RacfService, SecretResolver, racf
 use mainframe_env_spool::{SpoolService, spool_providers};
 use mainframe_env_store::{LocalArtifactStore, MemoryStore};
 use mainframe_env_store_api::{
-    ArtifactRecord, ArtifactStore, PlatformStore, ProviderStateRecord, ProviderStateStore,
-    ProviderStateWrite, StoreError, WorkRecord, WorkState,
+    ArtifactRecord, ArtifactStore, CheckpointStore, PlatformStore, ProviderStateRecord,
+    ProviderStateStore, ProviderStateWrite, StoreError, WorkRecord, WorkState,
 };
 use mainframe_env_zosmf::{
     Authentication, GatewayProblem, GatewayRequest, GatewayResponse, ZosmfBackend, ZosmfLimits,
@@ -360,9 +360,11 @@ impl ProductServer {
             Some(cics_provider(cics.clone(), InvocationLimits::default())),
         )?;
         program.bind_runtime(host.clone(), store.clone(), &config.artifact_root)?;
-        let batch = BatchService::open(
+        let checkpoint_store: Arc<dyn CheckpointStore> = store.clone();
+        let batch = BatchService::open_with_checkpoint_store(
             host.clone(),
             provider_store,
+            checkpoint_store,
             Default::default(),
             Default::default(),
         )?;

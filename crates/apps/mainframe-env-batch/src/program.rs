@@ -18,9 +18,17 @@ use common_programs::{
 };
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ProgramExecutionContext {
+    pub job_name: String,
+    pub step_name: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ProgramInput {
     pub parameter: Option<String>,
     pub dds: Vec<DdPlan>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution: Option<ProgramExecutionContext>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -986,6 +994,7 @@ mod tests {
                 source_end_line: 1,
                 parameters: Vec::new(),
             }],
+            execution: None,
         }
     }
 

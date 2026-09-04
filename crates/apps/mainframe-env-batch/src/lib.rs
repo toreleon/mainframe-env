@@ -75,8 +75,8 @@ pub use jes::{
     StepExecution, StepState, StepTermination, UtilityFamily, UtilityHandler, select_job,
 };
 pub use program::{
-    Program, ProgramInput, ProgramOutput, ProgramRegistration, ProgramRouter,
-    RegisteredProgramHandler, SystemServiceProgram, UtilityDisposition,
+    Program, ProgramExecutionContext, ProgramInput, ProgramOutput, ProgramRegistration,
+    ProgramRouter, RegisteredProgramHandler, SystemServiceProgram, UtilityDisposition,
     common_program_catalog_sha256, decode_program_output, resolve_program_registration,
     system_service_program, utility_disposition,
 };

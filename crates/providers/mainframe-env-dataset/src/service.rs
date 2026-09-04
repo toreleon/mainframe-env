@@ -100,9 +100,18 @@ impl DatasetService {
                         lock.expires_at > *now_tick
                             && same_lock_isolation_owner(lock, owner, transaction.as_deref())
                     })
-                    .map(|lock| lock_resource(&lock.dataset, &lock.target))
-                    .max()
-                    .is_some_and(|held| resource < held)
+                    .max_by(|left, right| {
+                        compare_lock_order(
+                            &left.dataset,
+                            &left.target,
+                            &right.dataset,
+                            &right.target,
+                        )
+                    })
+                    .is_some_and(|held| {
+                        compare_lock_order(dataset, target, &held.dataset, &held.target)
+                            == std::cmp::Ordering::Less
+                    })
                 {
                     return Err(condition("LOCKORDER", 16));
                 }
@@ -289,9 +298,18 @@ impl DatasetService {
                     .locks
                     .values()
                     .filter(|lock| lock.transaction.as_deref() == Some(transaction.as_str()))
-                    .map(|lock| lock_resource(&lock.dataset, &lock.target))
-                    .max()
-                    .is_some_and(|held| resource < held)
+                    .max_by(|left, right| {
+                        compare_lock_order(
+                            &left.dataset,
+                            &left.target,
+                            &right.dataset,
+                            &right.target,
+                        )
+                    })
+                    .is_some_and(|held| {
+                        compare_lock_order(dataset, &target, &held.dataset, &held.target)
+                            == std::cmp::Ordering::Less
+                    })
                 {
                     return Err(condition("LOCKORDER", 16));
                 }
@@ -4009,7 +4027,7 @@ impl DatasetService {
                 expected_version,
                 purge,
                 current_date,
-                ..
+                mutation: delete_mutation,
             } => {
                 if member.is_none()
                     && let Some(alias) = state.catalog_aliases.get(dataset.as_str()).cloned()
@@ -4233,7 +4251,10 @@ impl DatasetService {
                         .filter(|lock| lock.dataset == *dataset)
                         .cloned()
                         .collect::<Vec<_>>();
-                    if locks.iter().any(|lock| lock.transaction.is_some()) {
+                    if locks.iter().any(|lock| {
+                        lock.transaction.is_some()
+                            && delete_mutation.transaction.as_deref() != Some(lock.lock_id.as_str())
+                    }) {
                         return Err(condition("LOCKED", 16));
                     }
                     let invalidation = state
@@ -5152,6 +5173,35 @@ fn lock_resource(
             format!("{}|1|{encoded}", dataset.as_str())
         }
     }
+}
+
+fn compare_lock_order(
+    left_dataset: &DatasetName,
+    left_target: &mainframe_env_host_api::DatasetLockTarget,
+    right_dataset: &DatasetName,
+    right_target: &mainframe_env_host_api::DatasetLockTarget,
+) -> std::cmp::Ordering {
+    left_dataset
+        .as_str()
+        .cmp(right_dataset.as_str())
+        .then_with(|| match (left_target, right_target) {
+            (
+                mainframe_env_host_api::DatasetLockTarget::Dataset,
+                mainframe_env_host_api::DatasetLockTarget::Dataset,
+            ) => std::cmp::Ordering::Equal,
+            (
+                mainframe_env_host_api::DatasetLockTarget::Dataset,
+                mainframe_env_host_api::DatasetLockTarget::Record(_),
+            ) => std::cmp::Ordering::Less,
+            (
+                mainframe_env_host_api::DatasetLockTarget::Record(_),
+                mainframe_env_host_api::DatasetLockTarget::Dataset,
+            ) => std::cmp::Ordering::Greater,
+            (
+                mainframe_env_host_api::DatasetLockTarget::Record(left),
+                mainframe_env_host_api::DatasetLockTarget::Record(right),
+            ) => left.cmp(right),
+        })
 }
 
 fn lock_id(seed: &str, resource: &str) -> String {
@@ -7496,6 +7546,7 @@ fn dataset_capabilities() -> mainframe_env_host_api::DatasetProviderCapabilities
     capabilities.sharing = true;
     capabilities.sms_classes = true;
     capabilities.tvs = true;
+    capabilities.vsam_data_options = true;
     capabilities
 }
 
@@ -7558,12 +7609,12 @@ fn unavailable_capability_diagnostics() -> Vec<mainframe_env_host_api::DatasetDi
 fn validate_provider_definition(
     definition: &mainframe_env_host_api::DatasetDefinition,
 ) -> Result<(), HostProblem> {
-    if definition.vsam.share_options.cross_region > 2
-        || definition.vsam.share_options.cross_system != 3
-    {
+    if definition.vsam.share_options.cross_region > 2 {
         Err(HostProblem::UnsupportedCapability {
             capability: "sharing".into(),
-            detail: "this deterministic provider implements SHAREOPTIONS (1,3) and (2,3)".into(),
+            detail:
+                "this deterministic provider implements SHAREOPTIONS cross-region modes 1 and 2"
+                    .into(),
         })
     } else {
         Ok(())
@@ -11123,6 +11174,40 @@ mod tests {
             }),
             Err(HostProblem::Condition { ref name, .. }) if name == "LOCKORDER"
         ));
+    }
+
+    #[test]
+    fn dataset_lock_order_handles_a_dataset_name_that_prefixes_another() {
+        let dataset = service(Arc::new(MemoryStore::new(Default::default())));
+        let parent = DatasetName::new("USER.LOCK.PREFIX", 44).unwrap();
+        let child = DatasetName::new("USER.LOCK.PREFIX.CHILD", 44).unwrap();
+        let definition = mainframe_env_host_api::DatasetDefinition::compatibility(attrs(
+            DatasetOrganization::Sequential,
+        ));
+        for (sequence, name) in [(460, parent.clone()), (461, child.clone())] {
+            dataset
+                .invoke(DatasetRequest::Define {
+                    dataset: name,
+                    definition: Box::new(definition.clone()),
+                    mutation: mutation(sequence),
+                })
+                .unwrap();
+        }
+        let owner = principal("IBMUSER");
+        for (sequence, name) in [(462, parent), (463, child)] {
+            dataset
+                .invoke(DatasetRequest::AcquireLock {
+                    dataset: name,
+                    target: mainframe_env_host_api::DatasetLockTarget::Dataset,
+                    owner: owner.clone(),
+                    mode: mainframe_env_host_api::DatasetLockMode::Shared,
+                    now_tick: sequence,
+                    lease_ticks: 100,
+                    transaction: Some("PREFIX-TX".into()),
+                    mutation: mutation(sequence),
+                })
+                .unwrap();
+        }
     }
 
     #[test]
