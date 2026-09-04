@@ -35,33 +35,41 @@ hashes, or test counts into Project fields.
 The abandoned 0.7.1 proposal is intentionally absent.
 
 Issue and pull request numbers share one sequence. Epics occupy #8–#25,
-pull requests occupy #1–#7 and #26–#31, and review issues occupy #32–#40.
+pull requests occupy #1–#7 and #26–#31 and #41, and review issues occupy
+#32–#40.
 
 ## Pull request history
 
-Every pull request is retained in the Project as a completed implementation,
-release, or infrastructure record. Merge commits are the durable identity;
-branches are deleted after merge.
+Pull requests are not Project items. The board tracks issues, and a pull
+request reaches it through the read-only `Linked pull requests` field on the
+epic it closes. That field is populated only by a closing keyword in the pull
+request description, so a pull request that closes no issue does not appear on
+the board at all. This table is therefore the durable record. Merge commits are
+the permanent identity; branches are deleted after merge.
 
-| PR | Branch | Merged | Merge commit | Result |
-|---|---|---|---|---|
-| [#1](https://github.com/toreleon/mainframe-env/pull/1) | `impl/0.2.0` | 2026-09-01 | `3610140` | 0.2.0 coverage authority |
-| [#2](https://github.com/toreleon/mainframe-env/pull/2) | `impl/0.7.0` | 2026-09-01 | `c6c7589` | 0.7.0 JCL converter and planner |
-| [#3](https://github.com/toreleon/mainframe-env/pull/3) | `impl/0.3.0` | 2026-09-01 | `4b82f55` | 0.3.0 COBOL structure and type system |
-| [#4](https://github.com/toreleon/mainframe-env/pull/4) | `impl/0.5.0` | 2026-09-01 | `b4f8fc7` | 0.5.0 RACF command language and SAF |
-| [#5](https://github.com/toreleon/mainframe-env/pull/5) | `impl/0.6.0` | 2026-09-01 | `d8b1e28` | 0.6.0 dataset, VSAM, and AMS coverage |
-| [#6](https://github.com/toreleon/mainframe-env/pull/6) | `impl/0.4.0` | 2026-09-02 | `c7a07a9` | 0.4.0 COBOL execution semantics |
-| [#7](https://github.com/toreleon/mainframe-env/pull/7) | `codex/official-releases-0.2-0.7` | 2026-09-02 | `7eaabd6` | 0.2.0–0.7.0 release chain |
-| [#26](https://github.com/toreleon/mainframe-env/pull/26) | `codex/github-project-sync` | 2026-09-02 | `00db798` | Roadmap and release status sync |
-| [#27](https://github.com/toreleon/mainframe-env/pull/27) | `codex/ci-budget` | 2026-09-02 | `9ac7935` | Reduced hosted runner usage |
-| [#28](https://github.com/toreleon/mainframe-env/pull/28) | `codex/ci-cache-trust` | 2026-09-02 | `e381e40` | Read-only pull request caches |
-| [#29](https://github.com/toreleon/mainframe-env/pull/29) | `codex/ci-gate-tiers` | 2026-09-02 | `2926c54` | Certification gates on explicit runs |
-| [#30](https://github.com/toreleon/mainframe-env/pull/30) | `impl/0.8.0` | 2026-09-04 | `26cded1` | 0.8.0 JES2 runtime and real utilities |
-| [#31](https://github.com/toreleon/mainframe-env/pull/31) | `release/0.8.0` | open | — | Proposed 0.8.0 release |
+| PR | Branch | Merged | Merge commit | Closes | Result |
+|---|---|---|---|---|---|
+| [#1](https://github.com/toreleon/mainframe-env/pull/1) | `impl/0.2.0` | 2026-09-01 | `3610140` | #8 | 0.2.0 coverage authority |
+| [#2](https://github.com/toreleon/mainframe-env/pull/2) | `impl/0.7.0` | 2026-09-01 | `c6c7589` | #13 | 0.7.0 JCL converter and planner |
+| [#3](https://github.com/toreleon/mainframe-env/pull/3) | `impl/0.3.0` | 2026-09-01 | `4b82f55` | #9 | 0.3.0 COBOL structure and type system |
+| [#4](https://github.com/toreleon/mainframe-env/pull/4) | `impl/0.5.0` | 2026-09-01 | `b4f8fc7` | #11 | 0.5.0 RACF command language and SAF |
+| [#5](https://github.com/toreleon/mainframe-env/pull/5) | `impl/0.6.0` | 2026-09-01 | `d8b1e28` | #12 | 0.6.0 dataset, VSAM, and AMS coverage |
+| [#6](https://github.com/toreleon/mainframe-env/pull/6) | `impl/0.4.0` | 2026-09-02 | `c7a07a9` | #10 | 0.4.0 COBOL execution semantics |
+| [#7](https://github.com/toreleon/mainframe-env/pull/7) | `codex/official-releases-0.2-0.7` | 2026-09-02 | `7eaabd6` | #8–#13 | 0.2.0–0.7.0 release chain |
+| [#26](https://github.com/toreleon/mainframe-env/pull/26) | `codex/github-project-sync` | 2026-09-02 | `00db798` | — | Roadmap and release status sync |
+| [#27](https://github.com/toreleon/mainframe-env/pull/27) | `codex/ci-budget` | 2026-09-02 | `9ac7935` | — | Reduced hosted runner usage |
+| [#28](https://github.com/toreleon/mainframe-env/pull/28) | `codex/ci-cache-trust` | 2026-09-02 | `e381e40` | — | Read-only pull request caches |
+| [#29](https://github.com/toreleon/mainframe-env/pull/29) | `codex/ci-gate-tiers` | 2026-09-02 | `2926c54` | — | Certification gates on explicit runs |
+| [#30](https://github.com/toreleon/mainframe-env/pull/30) | `impl/0.8.0` | 2026-09-04 | `26cded1` | #14 | 0.8.0 JES2 runtime and real utilities |
+| [#31](https://github.com/toreleon/mainframe-env/pull/31) | `release/0.8.0` | open | — | #14 | Proposed 0.8.0 release |
+| [#41](https://github.com/toreleon/mainframe-env/pull/41) | `docs/consolidate-pr-epic-history` | open | — | — | This history consolidation |
 
 `2926c54` from #29 is the integrated candidate that
 [the 0.8.0 status report](status/0.8.0.md) records as the starting point for
 `impl/0.8.0`.
+
+Infrastructure and documentation pull requests — #26 through #29 and #41 —
+close no epic, so this table is their only record.
 
 ## Review issues
 
@@ -90,8 +98,11 @@ Project carries only priority and status.
    coordination. Avoid adding fields without a recurring planning question.
 3. Expand an epic into child issues only when that version becomes active or
    a work package can be assigned and reviewed independently.
-4. Link implementation pull requests to their epic. Pull request checks and
-   merge state determine implementation completion.
+4. Link implementation and release pull requests to their epic with a closing
+   keyword in the pull request description. Do not add pull requests to the
+   board as items; they surface through the epic's `Linked pull requests`
+   field. Pull request checks and merge state determine implementation
+   completion.
 5. Close the epic and milestone only after the release contract is satisfied.
    A local tag is not represented as a published GitHub Release.
 6. Update this mapping when versions are added, removed, or renumbered, and
@@ -106,8 +117,11 @@ of fact, not proposals.
   closed and the 0.8.0 milestone still carries open review issues #32–#40,
   while release [#31](https://github.com/toreleon/mainframe-env/pull/31) is
   unmerged. Rule 5 expects the epic to stay open until the release contract is
-  satisfied. Three of those issues (#32, #33, #34) are confirmed defects
-  against 0.8.0 exit-gate claims.
+  satisfied. The epic was closed automatically by the `Closes #14` keyword in
+  implementation pull request #30, not by a decision that the contract was
+  met — rule 4 linkage and rule 5 closure are in tension whenever an
+  implementation pull request carries the keyword. Three of those issues (#32,
+  #33, #34) are confirmed defects against 0.8.0 exit-gate claims.
 - The licensed z/OS 3.2/JES2 differential stands at 0/16 pending for 0.8.0
   under the approved `pass-with-licensed-differential-pending` disposition. It
   is a hard gate for
