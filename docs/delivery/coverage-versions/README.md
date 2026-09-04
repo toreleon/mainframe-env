@@ -1,6 +1,6 @@
 # IBM coverage release plans
 
-Status: **0.2.0 through 0.7.0 released; 0.8.0 implemented and awaiting release;
+Status: **0.2.0 through 0.7.0 released; 0.8.0 tagged but not published;
 0.9.0 through 1.0.0 planned**
 Applies after: `mainframe-env 0.1.1`
 Planning authority:
@@ -24,7 +24,7 @@ push, or a compatibility claim.
 | 0.5.0 | Released | Complete RACF command language and SAF | [0.5.0](0.5.0.md) |
 | 0.6.0 | Released | Complete dataset, VSAM, catalog, locking, and AMS surface | [0.6.0](0.6.0.md) |
 | 0.7.0 | Released | Complete JCL converter and planner | [0.7.0](0.7.0.md) |
-| 0.8.0 | Implemented | Complete JES2 execution and real utility semantics | [0.8.0](0.8.0.md) |
+| 0.8.0 | Tagged | Complete JES2 execution and real utility semantics | [0.8.0](0.8.0.md) |
 | 0.9.0 | Planned | Complete CICS application API | [0.9.0](0.9.0.md) |
 | 0.10.0 | Planned | Complete CICS SPI and FEPI | [0.10.0](0.10.0.md) |
 | 0.11.0 | Planned | Complete z/OSMF 3.2 REST portfolio | [0.11.0](0.11.0.md) |
@@ -36,13 +36,14 @@ push, or a compatibility claim.
 | 0.17.0 | Planned | Licensed IBM differential certification and 1.0 rehearsal | [0.17.0](0.17.0.md) |
 | 1.0.0 | Planned | Stable pinned programming-surface release | [1.0.0](1.0.0.md) |
 
-`Implemented` means the version's work packages are merged to `main` but the
-release contract is not yet satisfied, so no tag or publication exists. 0.8.0 is
-in that state: the runtime merged in
-[#30](https://github.com/toreleon/mainframe-env/pull/30), the release is
-proposed in [#31](https://github.com/toreleon/mainframe-env/pull/31), and the
+`Tagged` means the release commit and annotated tag exist on `main` but no
+GitHub Release is published, so the version is not offered for use. 0.8.0 is in
+that state: the runtime merged in
+[#30](https://github.com/toreleon/mainframe-env/pull/30), the release commit and
+tag `mainframe-env-v0.8.0` landed in
+[#31](https://github.com/toreleon/mainframe-env/pull/31), and the
 [0.8.0 review](review/0.8.0.md) records outstanding defects against its exit
-gate.
+gate — three of them confirmed.
 
 See [Parallel implementation plan](PARALLEL-IMPLEMENTATION.md) for the work DAG,
 safe concurrency lanes, merge discipline, and critical path.
