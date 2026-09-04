@@ -10,8 +10,10 @@ use crate::program::{
 };
 use crate::{
     BatchControllerGeneration, BatchControllerInstallReceipt, BatchControllerPlan,
-    BatchControllerSelector, Disposition, JclBundle, JclLimits, JobPlan, ProgramInput, StepPlan,
-    decode_program_output, parse_jcl,
+    BatchControllerSelector, Disposition, JES_DURABLE_JOB_CONTRACT, JclBundle, JclLimits,
+    JesSchedulerConfiguration, JobPlan, JobSelectionCandidate, JobState, ProgramInput,
+    StepExecution, StepPlan, StepState, StepTermination, decode_program_output, parse_jcl,
+    select_job,
 };
 use mainframe_env_execution_api::{
     BoundedPayload, IdempotencyKey, Invocation, InvocationLimits, PrincipalId,
@@ -59,17 +61,6 @@ impl Default for BatchLimits {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub enum JobState {
-    Submitted,
-    Held,
-    Queued,
-    Running,
-    Completed,
-    Failed,
-    Cancelled,
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JobSnapshot {
     pub id: String,
@@ -81,12 +72,16 @@ pub struct JobSnapshot {
     pub return_code: Option<i32>,
     pub abend_code: Option<String>,
     pub active_step: Option<String>,
+    pub initiator: Option<String>,
+    pub steps: Vec<StepExecution>,
     pub attempt: u32,
     pub version: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct Job {
+    #[serde(default = "legacy_jes_job_contract")]
+    schema_version: String,
     id: String,
     name: String,
     owner: String,
@@ -97,6 +92,10 @@ struct Job {
     #[serde(default)]
     abend_code: Option<String>,
     active_step: Option<String>,
+    #[serde(default)]
+    initiator: Option<String>,
+    #[serde(default)]
+    steps: Vec<StepExecution>,
     attempt: u32,
     version: u64,
     submit_key: String,
@@ -121,6 +120,7 @@ pub struct BatchService {
     store: Arc<dyn ProviderStateStore>,
     jcl_limits: JclLimits,
     limits: BatchLimits,
+    scheduler: JesSchedulerConfiguration,
     controllers: Mutex<DurableControllers>,
     state: Mutex<State>,
 }
@@ -132,6 +132,23 @@ impl BatchService {
         jcl_limits: JclLimits,
         limits: BatchLimits,
     ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_with_scheduler(
+            host,
+            store,
+            jcl_limits,
+            limits,
+            JesSchedulerConfiguration::single_node(limits.max_active),
+        )
+    }
+
+    pub fn open_with_scheduler(
+        host: Arc<ScopedHostService>,
+        store: Arc<dyn ProviderStateStore>,
+        jcl_limits: JclLimits,
+        limits: BatchLimits,
+        scheduler: JesSchedulerConfiguration,
+    ) -> Result<Arc<Self>, HostProblem> {
+        scheduler.validate()?;
         let mut jobs = BTreeMap::new();
         let mut replay = BTreeMap::new();
         for row in store
@@ -143,8 +160,23 @@ impl BatchService {
             if job.version != row.version {
                 return Err(HostProblem::InfrastructureFailure);
             }
-            if job.state == JobState::Running {
-                let previous = job.version;
+            if !matches!(
+                job.schema_version.as_str(),
+                "mainframe-env.jes-durable-job@1" | JES_DURABLE_JOB_CONTRACT
+            ) {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            let previous = job.version;
+            let mut changed = false;
+            if job.schema_version != JES_DURABLE_JOB_CONTRACT {
+                job.schema_version = JES_DURABLE_JOB_CONTRACT.into();
+                if job.steps.is_empty() {
+                    job.steps = initial_step_executions(&job.plan);
+                }
+                job.events.push("migrated:jes-durable-job@1-to-2".into());
+                changed = true;
+            }
+            if matches!(job.state, JobState::Selected | JobState::Running) {
                 job.version += 1;
                 job.state = if job.attempt >= limits.max_attempts {
                     JobState::Failed
@@ -152,7 +184,25 @@ impl BatchService {
                     JobState::Queued
                 };
                 job.active_step = None;
+                job.initiator = None;
+                for step in &mut job.steps {
+                    if !step.state.terminal() {
+                        step.state = StepState::Pending;
+                        step.termination = None;
+                    }
+                }
                 job.events.push("warm-start-recovered".into());
+                changed = true;
+            } else if job.state == JobState::Output {
+                job.version += 1;
+                job.state = JobState::Completed;
+                job.initiator = None;
+                job.events.push("warm-start-output-completed".into());
+                changed = true;
+            } else if changed {
+                job.version += 1;
+            }
+            if changed {
                 store
                     .put_provider_state(job_record(&job)?, Some(previous))
                     .map_err(store_error)?;
@@ -199,6 +249,7 @@ impl BatchService {
             store,
             jcl_limits,
             limits,
+            scheduler,
             controllers: Mutex::new(DurableControllers {
                 store_version: controller_store_version,
                 registry: controller_registry,
@@ -256,6 +307,21 @@ impl BatchService {
             AccessIntent::Execute,
             1,
         )?;
+        let class =
+            self.scheduler
+                .classes
+                .get(&plan.class)
+                .ok_or(HostProblem::UnsupportedCapability {
+                    capability: "jes.class".into(),
+                    detail: format!("job class {} is not configured", plan.class),
+                })?;
+        if plan.priority < class.priority_floor || plan.priority > class.priority_ceiling {
+            return Err(HostProblem::Condition {
+                name: "PRIORITY_OUT_OF_CLASS_RANGE".into(),
+                response: 400,
+                response2: 0,
+            });
+        }
         let mut state = self.lock()?;
         if let Some(id) = state.replay.get(key.as_str()) {
             let job = state.jobs.get(id).ok_or(HostProblem::UnknownOutcome)?;
@@ -296,12 +362,13 @@ impl BatchService {
         );
         spool.insert("JOBLOG".into(), vec![format!("{id} ADMITTED").into_bytes()]);
         let job = Job {
+            schema_version: JES_DURABLE_JOB_CONTRACT.into(),
             id: id.clone(),
             name: plan.name.clone(),
             owner: invocation.principal.id().as_str().into(),
             class: plan.class,
             priority: plan.priority,
-            state: if hold {
+            state: if hold || class.held_by_default {
                 JobState::Held
             } else {
                 JobState::Queued
@@ -309,6 +376,8 @@ impl BatchService {
             return_code: None,
             abend_code: None,
             active_step: None,
+            initiator: None,
+            steps: initial_step_executions(&plan),
             attempt: 0,
             version: 1,
             submit_key: key.as_str().into(),
@@ -317,7 +386,12 @@ impl BatchService {
             events: vec![
                 "submitted".into(),
                 "admitted".into(),
-                if hold { "held" } else { "queued" }.into(),
+                if hold || class.held_by_default {
+                    "held"
+                } else {
+                    "queued"
+                }
+                .into(),
             ],
         };
         self.persist_job(&job, None)?;
@@ -365,19 +439,50 @@ impl BatchService {
         invocation: &Invocation,
         cancelled: bool,
     ) -> Result<Option<JobSnapshot>, HostProblem> {
+        self.run_next_on(invocation, "INIT0001", cancelled)
+    }
+
+    pub fn run_next_on(
+        &self,
+        invocation: &Invocation,
+        initiator: &str,
+        cancelled: bool,
+    ) -> Result<Option<JobSnapshot>, HostProblem> {
         if self.limits.max_active == 0 {
             return Err(HostProblem::ResourceExhausted);
         }
         let id = {
             let state = self.lock()?;
-            state
+            let mut class_active = BTreeMap::<char, usize>::new();
+            let mut initiator_active = 0usize;
+            for job in state
                 .jobs
                 .values()
-                .filter(|job| {
-                    job.state == JobState::Queued && job.owner == invocation.principal.id().as_str()
-                })
-                .max_by_key(|job| (job.priority, std::cmp::Reverse(job.id.clone())))
-                .map(|job| job.id.clone())
+                .filter(|job| matches!(job.state, JobState::Selected | JobState::Running))
+            {
+                *class_active.entry(job.class).or_default() += 1;
+                if job.initiator.as_deref() == Some(initiator) {
+                    initiator_active += 1;
+                }
+            }
+            let candidates = state
+                .jobs
+                .values()
+                .filter(|job| job.owner == invocation.principal.id().as_str())
+                .map(|job| JobSelectionCandidate {
+                    id: &job.id,
+                    class: job.class,
+                    priority: job.priority,
+                    state: job.state,
+                });
+            select_job(
+                &self.scheduler,
+                initiator,
+                initiator_active,
+                &class_active,
+                candidates,
+            )?
+            .map(str::to_string)
         };
         let Some(id) = id else {
             return Ok(None);
@@ -398,12 +503,20 @@ impl BatchService {
                 AccessIntent::Execute,
                 2,
             )?;
+            let mut selected = current.clone();
+            selected.version += 1;
+            selected.state = JobState::Selected;
+            selected.initiator = Some(initiator.into());
+            selected.events.push(format!("selected:{initiator}"));
+            self.persist_job(&selected, Some(current.version))?;
+            state.jobs.insert(id.clone(), selected.clone());
             let mut running = current.clone();
-            running.version += 1;
+            running.version = selected.version + 1;
             running.attempt += 1;
             running.state = JobState::Running;
+            running.initiator = Some(initiator.into());
             running.events.push("running".into());
-            self.persist_job(&running, Some(current.version))?;
+            self.persist_job(&running, Some(selected.version))?;
             state.jobs.insert(id.clone(), running.clone());
             running
         };
@@ -416,14 +529,25 @@ impl BatchService {
         match outcome {
             Ok(return_code) => {
                 job.return_code = Some(return_code);
-                job.state = JobState::Completed;
-                job.events.push("completed".into());
+                job.state = JobState::Output;
+                job.events.push("output".into());
                 append_spool(
                     &mut job,
                     "JESMSGLG",
                     format!("ENDED RC={return_code:04}").into_bytes(),
                     self.limits,
                 )?;
+                self.persist_job(&job, Some(current.version))?;
+                state.jobs.insert(id.clone(), job.clone());
+                let output_version = job.version;
+                job.version += 1;
+                job.state = JobState::Completed;
+                job.initiator = None;
+                job.events.push("completed".into());
+                self.persist_job(&job, Some(output_version))?;
+                let result = snapshot(&job);
+                state.jobs.insert(id, job);
+                return Ok(Some(result));
             }
             Err(problem) => {
                 if let HostProblem::Condition { name, .. } = &problem
@@ -432,6 +556,7 @@ impl BatchService {
                     job.abend_code = Some(code.to_string());
                 }
                 job.state = JobState::Failed;
+                job.initiator = None;
                 job.events.push(format!("failed:{problem:?}"));
                 if let Some(step) = terminal_step {
                     append_spool(
@@ -475,12 +600,32 @@ impl BatchService {
     fn execute(&self, invocation: &Invocation, job: &mut Job) -> Result<i32, HostProblem> {
         let mut max_rc = 0;
         let mut abended = false;
+        let mut first_abend = None::<String>;
         let steps = job.plan.steps.clone();
         let restart = job.plan.restart_step.clone();
         let mut restart_reached = restart.is_none();
         let mut effect_sequence = 0u64;
         let mut dataset_resolutions = BTreeMap::new();
         for step in &steps {
+            if let Some(previous) = job.steps.iter().find(|current| current.name == step.name)
+                && previous.state.terminal()
+            {
+                if let Some(StepTermination::ReturnCode { code }) = &previous.termination {
+                    max_rc = max_rc.max(*code);
+                }
+                continue;
+            }
+            if let Some(cancellation) = &invocation.cancellation {
+                self.mark_step(
+                    job,
+                    step,
+                    StepState::Cancelled,
+                    Some(StepTermination::Cancelled {
+                        reason: cancellation.reason.clone(),
+                    }),
+                )?;
+                return Err(HostProblem::Cancelled);
+            }
             if !restart_reached {
                 restart_reached = restart.as_deref() == Some(step.name.as_str());
                 if !restart_reached {
@@ -490,6 +635,7 @@ impl BatchService {
                         format!("{} BYPASSED RESTART", step.name).into_bytes(),
                         self.limits,
                     )?;
+                    self.mark_step(job, step, StepState::BypassedRestart, None)?;
                     continue;
                 }
             }
@@ -500,9 +646,11 @@ impl BatchService {
                     format!("{} SKIPPED COND", step.name).into_bytes(),
                     self.limits,
                 )?;
+                self.mark_step(job, step, StepState::SkippedCondition, None)?;
                 continue;
             }
             job.active_step = Some(step.name.clone());
+            self.mark_step(job, step, StepState::Allocating, None)?;
             let step_result = (|| -> Result<crate::ProgramOutput, HostProblem> {
                 self.allocate_dds(
                     invocation,
@@ -519,6 +667,7 @@ impl BatchService {
                     &mut dds,
                     &mut effect_sequence,
                 )?;
+                self.mark_step(job, step, StepState::Running, None)?;
                 for dd in &mut dds {
                     if !is_program_library_dd(dd)
                         && let Some(raw_name) = dd.dataset.clone()
@@ -585,17 +734,60 @@ impl BatchService {
             let output = match step_result {
                 Ok(output) => output,
                 Err(problem) => {
-                    self.dispose_dds(
+                    let disposition = self.dispose_dds(
                         invocation,
                         job,
                         step,
                         &dataset_resolutions,
                         &mut effect_sequence,
                         true,
+                    );
+                    let terminal_problem = disposition.err().unwrap_or(problem);
+                    if let Some(code) = abend_code(&terminal_problem) {
+                        first_abend.get_or_insert_with(|| code.clone());
+                        job.abend_code = Some(code.clone());
+                        self.mark_step(
+                            job,
+                            step,
+                            StepState::Abended,
+                            Some(StepTermination::Abend { code, system: true }),
+                        )?;
+                        abended = true;
+                        continue;
+                    }
+                    let state = if terminal_problem == HostProblem::Cancelled {
+                        StepState::Cancelled
+                    } else {
+                        StepState::Failed
+                    };
+                    self.mark_step(
+                        job,
+                        step,
+                        state,
+                        Some(if state == StepState::Cancelled {
+                            StepTermination::Cancelled {
+                                reason: "execution cancellation observed".into(),
+                            }
+                        } else {
+                            StepTermination::Failed {
+                                category: problem_category(&terminal_problem).into(),
+                            }
+                        }),
                     )?;
-                    return Err(problem);
+                    return Err(terminal_problem);
                 }
             };
+            if !(0..=4_095).contains(&output.return_code) {
+                self.mark_step(
+                    job,
+                    step,
+                    StepState::Failed,
+                    Some(StepTermination::Failed {
+                        category: "invalid-return-code".into(),
+                    }),
+                )?;
+                return Err(HostProblem::ProviderFailure);
+            }
             max_rc = max_rc.max(output.return_code);
             for record in output.records {
                 append_spool(job, "SYSPRINT", record, self.limits)?;
@@ -610,20 +802,91 @@ impl BatchService {
                 .into_bytes(),
                 self.limits,
             )?;
-            abended = output.return_code < 0;
-            self.dispose_dds(
+            self.mark_step(job, step, StepState::Disposing, None)?;
+            if let Err(problem) = self.dispose_dds(
                 invocation,
                 job,
                 step,
                 &dataset_resolutions,
                 &mut effect_sequence,
-                abended,
-            )?;
-            if abended {
-                break;
+                false,
+            ) {
+                self.mark_step(
+                    job,
+                    step,
+                    StepState::Failed,
+                    Some(StepTermination::Failed {
+                        category: problem_category(&problem).into(),
+                    }),
+                )?;
+                return Err(problem);
             }
+            self.mark_step(
+                job,
+                step,
+                StepState::Completed,
+                Some(StepTermination::ReturnCode {
+                    code: output.return_code,
+                }),
+            )?;
         }
-        Ok(max_rc)
+        if let Some(code) = first_abend {
+            Err(HostProblem::Condition {
+                name: format!("ABEND:{code}"),
+                response: 500,
+                response2: 0,
+            })
+        } else {
+            Ok(max_rc)
+        }
+    }
+
+    fn mark_step(
+        &self,
+        job: &mut Job,
+        step: &StepPlan,
+        next: StepState,
+        termination: Option<StepTermination>,
+    ) -> Result<(), HostProblem> {
+        let execution = job
+            .steps
+            .iter_mut()
+            .find(|current| current.name == step.name)
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        if !execution.state.can_transition_to(next)
+            || next.terminal() != termination.is_some()
+                && !matches!(
+                    next,
+                    StepState::BypassedRestart | StepState::SkippedCondition
+                )
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        if next == StepState::Allocating {
+            execution.attempt = execution
+                .attempt
+                .checked_add(1)
+                .ok_or(HostProblem::ResourceExhausted)?;
+        }
+        execution.state = next;
+        execution.termination = termination;
+        if job.events.len() >= self.limits.max_events {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        job.events.push(format!("step:{}:{next:?}", step.name));
+        let expected = job.version;
+        job.version = job
+            .version
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        let mut state = self.lock()?;
+        let current = state.jobs.get(&job.id).ok_or(HostProblem::NotFound)?;
+        if current.version != expected || current.state != JobState::Running {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        self.persist_job(job, Some(expected))?;
+        state.jobs.insert(job.id.clone(), job.clone());
+        Ok(())
     }
 
     fn execute_sdsf(
@@ -3470,6 +3733,38 @@ fn ams_condition_code(problem: &HostProblem) -> u8 {
     }
 }
 
+fn abend_code(problem: &HostProblem) -> Option<String> {
+    match problem {
+        HostProblem::Condition { name, .. } => name.strip_prefix("ABEND:").and_then(|code| {
+            (!code.is_empty()
+                && code.len() <= 16
+                && code
+                    .bytes()
+                    .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit()))
+            .then(|| code.to_string())
+        }),
+        _ => None,
+    }
+}
+
+fn problem_category(problem: &HostProblem) -> &'static str {
+    match problem {
+        HostProblem::Malformed => "malformed",
+        HostProblem::Unsupported | HostProblem::UnsupportedCapability { .. } => "unsupported",
+        HostProblem::NotFound => "not-found",
+        HostProblem::Condition { .. } => "condition",
+        HostProblem::Unauthorized => "unauthorized",
+        HostProblem::Cancelled => "cancelled",
+        HostProblem::TimedOut => "timed-out",
+        HostProblem::ResourceExhausted => "resource-exhausted",
+        HostProblem::ProviderFailure => "provider-failure",
+        HostProblem::InfrastructureFailure => "infrastructure-failure",
+        HostProblem::MissingIdempotency => "missing-idempotency",
+        HostProblem::IdempotencyConflict => "idempotency-conflict",
+        HostProblem::UnknownOutcome => "unknown-outcome",
+    }
+}
+
 fn unimplemented_ams_operand(command: &AmsCommand) -> Option<(&'static str, &'static str)> {
     let terms = ams_top_level_terms(command);
     if terms
@@ -4296,9 +4591,27 @@ fn snapshot(job: &Job) -> JobSnapshot {
         return_code: job.return_code,
         abend_code: job.abend_code.clone(),
         active_step: job.active_step.clone(),
+        initiator: job.initiator.clone(),
+        steps: job.steps.clone(),
         attempt: job.attempt,
         version: job.version,
     }
+}
+
+fn legacy_jes_job_contract() -> String {
+    "mainframe-env.jes-durable-job@1".into()
+}
+
+fn initial_step_executions(plan: &JobPlan) -> Vec<StepExecution> {
+    plan.steps
+        .iter()
+        .map(|step| StepExecution {
+            name: step.name.clone(),
+            state: StepState::Pending,
+            attempt: 0,
+            termination: None,
+        })
+        .collect()
 }
 
 fn job_record(job: &Job) -> Result<ProviderStateRecord, HostProblem> {
@@ -4919,6 +5232,14 @@ mod tests {
         let completed = service.run_next(&invocation, false).unwrap().unwrap();
         assert_eq!(completed.state, JobState::Completed);
         assert_eq!(completed.return_code, Some(0));
+        assert_eq!(completed.initiator, None);
+        assert_eq!(completed.steps.len(), 1);
+        assert_eq!(completed.steps[0].state, StepState::Completed);
+        assert_eq!(completed.steps[0].attempt, 1);
+        assert_eq!(
+            completed.steps[0].termination,
+            Some(StepTermination::ReturnCode { code: 0 })
+        );
         let (records, more) = service.spool(&submitted.id, "SYSPRINT", 0, 10).unwrap();
         assert_eq!(records, vec![b"IEFBR14".to_vec()]);
         assert!(!more);
@@ -6222,6 +6543,18 @@ mod tests {
         calls: Arc<AtomicUsize>,
     }
 
+    struct AbendProgram;
+
+    impl Program for AbendProgram {
+        fn execute(&self, _: &Invocation, _: &ProgramInput) -> Result<ProgramOutput, HostProblem> {
+            Err(HostProblem::Condition {
+                name: "ABEND:S0C7".into(),
+                response: 500,
+                response2: 7,
+            })
+        }
+    }
+
     impl Program for CobolProgram {
         fn execute(&self, _: &Invocation, _: &ProgramInput) -> Result<ProgramOutput, HostProblem> {
             self.calls.fetch_add(1, Ordering::SeqCst);
@@ -6259,6 +6592,154 @@ mod tests {
         let completed = service.run_next(&invocation, false).unwrap().unwrap();
         assert_eq!(completed.return_code, Some(4));
         assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn abend_propagates_after_only_cleanup_and_skips_normal_steps() {
+        let cleanup_calls = Arc::new(AtomicUsize::new(0));
+        let router: Arc<dyn HostProvider> = ProgramRouter::new(
+            BTreeMap::from([
+                ("FAILPGM".into(), Arc::new(AbendProgram) as Arc<dyn Program>),
+                (
+                    "CLEANUP".into(),
+                    Arc::new(CobolProgram {
+                        calls: cleanup_calls.clone(),
+                    }) as Arc<dyn Program>,
+                ),
+            ]),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let service = service(Arc::new(MemoryStore::new(Default::default())), router);
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//ABENDJOB JOB CLASS=A\n//FAIL EXEC PGM=FAILPGM\n//NORMAL EXEC PGM=CLEANUP\n//RECOVER EXEC PGM=CLEANUP,COND=ONLY\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("abend-cleanup", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let failed = service.run_next(&invocation, false).unwrap().unwrap();
+        assert_eq!(failed.state, JobState::Failed);
+        assert_eq!(failed.abend_code.as_deref(), Some("S0C7"));
+        assert_eq!(cleanup_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            failed
+                .steps
+                .iter()
+                .map(|step| step.state)
+                .collect::<Vec<_>>(),
+            vec![
+                StepState::Abended,
+                StepState::SkippedCondition,
+                StepState::Completed
+            ]
+        );
+    }
+
+    #[test]
+    fn configured_initiator_selects_only_eligible_classes() {
+        let mut scheduler = JesSchedulerConfiguration::single_node(1);
+        scheduler.initiators.get_mut("INIT0001").unwrap().classes = BTreeSet::from(['B']);
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = BatchService::open_with_scheduler(
+            host(builtins()),
+            store,
+            Default::default(),
+            Default::default(),
+            scheduler,
+        )
+        .unwrap();
+        let invocation = invocation();
+        let class_a = service
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("class-a", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let class_b = service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//BJOB JOB CLASS=B,PRTY=1\n//STEP1 EXEC PGM=IEFBR14\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("class-b", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service
+                .run_next_on(&invocation, "INIT0001", false)
+                .unwrap()
+                .unwrap()
+                .id,
+            class_b.id
+        );
+        assert_eq!(service.get(&class_a.id).unwrap().state, JobState::Queued);
+    }
+
+    #[test]
+    fn legacy_durable_job_migrates_and_recovers_without_losing_plan() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let invocation = invocation();
+        let first = service(store.clone(), builtins());
+        let id = first
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("legacy-job", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap()
+            .id;
+        let row = store.get_provider_state("jes-job", &id).unwrap().unwrap();
+        let mut value: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        let object = value.as_object_mut().unwrap();
+        object.remove("schema_version");
+        object.remove("initiator");
+        object.remove("steps");
+        object.insert("state".into(), serde_json::Value::String("Running".into()));
+        object.insert("attempt".into(), serde_json::json!(1));
+        object.insert("version".into(), serde_json::json!(2));
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "jes-job".into(),
+                    key: id.clone(),
+                    version: 2,
+                    payload: serde_json::to_vec(&value).unwrap(),
+                },
+                Some(row.version),
+            )
+            .unwrap();
+        drop(first);
+
+        let recovered = service(store.clone(), builtins());
+        let snapshot = recovered.get(&id).unwrap();
+        assert_eq!(snapshot.state, JobState::Queued);
+        assert_eq!(snapshot.steps.len(), 1);
+        assert_eq!(snapshot.steps[0].state, StepState::Pending);
+        let migrated = store.get_provider_state("jes-job", &id).unwrap().unwrap();
+        let migrated: serde_json::Value = serde_json::from_slice(&migrated.payload).unwrap();
+        assert_eq!(migrated["schema_version"], JES_DURABLE_JOB_CONTRACT);
+        assert_eq!(migrated["state"], "queued");
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../conformance/0.8/schemas/jes-durable-job.schema.json"
+        ))
+        .unwrap();
+        jsonschema::draft202012::options()
+            .offline()
+            .build(&schema)
+            .unwrap()
+            .validate(&migrated)
+            .unwrap();
     }
 
     #[test]

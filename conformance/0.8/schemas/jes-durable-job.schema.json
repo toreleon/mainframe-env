@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/jes-durable-job@2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "name", "owner", "class", "priority", "state", "return_code", "abend_code", "active_step", "initiator", "steps", "attempt", "version", "submit_key", "plan", "spool", "events"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.jes-durable-job@2"},
+    "id": {"type": "string", "pattern": "^JOB[0-9]{5,8}$"},
+    "name": {"type": "string", "pattern": "^[A-Z0-9@$#]{1,128}$"},
+    "owner": {"type": "string", "minLength": 1, "maxLength": 128},
+    "class": {"type": "string", "pattern": "^[A-Z0-9]$"},
+    "priority": {"type": "integer", "minimum": 0, "maximum": 255},
+    "state": {"enum": ["submitted", "held", "queued", "selected", "running", "output", "completed", "failed", "cancelled"]},
+    "return_code": {"type": ["integer", "null"], "minimum": 0, "maximum": 4095},
+    "abend_code": {"type": ["string", "null"], "pattern": "^[A-Z0-9]{1,16}$"},
+    "active_step": {"type": ["string", "null"], "maxLength": 128},
+    "initiator": {"type": ["string", "null"], "pattern": "^[A-Z0-9@$#]{1,16}$"},
+    "steps": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "state", "attempt", "termination"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1, "maxLength": 128},
+          "state": {"enum": ["pending", "bypassed-restart", "skipped-condition", "allocating", "running", "disposing", "completed", "abended", "failed", "cancelled"]},
+          "attempt": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+          "termination": {
+            "oneOf": [
+              {"type": "null"},
+              {
+                "type": "object",
+                "required": ["kind"],
+                "properties": {
+                  "kind": {"enum": ["return-code", "abend", "cancelled", "failed"]},
+                  "code": {"type": ["integer", "string"]},
+                  "system": {"type": "boolean"},
+                  "reason": {"type": "string", "maxLength": 4096},
+                  "category": {"type": "string", "maxLength": 128}
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      }
+    },
+    "attempt": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+    "version": {"type": "integer", "minimum": 1},
+    "submit_key": {"type": "string", "minLength": 1, "maxLength": 128},
+    "plan": {"type": "object"},
+    "spool": {
+      "type": "object",
+      "maxProperties": 128,
+      "additionalProperties": {
+        "type": "array",
+        "maxItems": 262144,
+        "items": {
+          "type": "array",
+          "maxItems": 1048576,
+          "items": {"type": "integer", "minimum": 0, "maximum": 255}
+        }
+      }
+    },
+    "events": {"type": "array", "maxItems": 65536, "items": {"type": "string", "minLength": 1, "maxLength": 4096}}
+  }
+}
