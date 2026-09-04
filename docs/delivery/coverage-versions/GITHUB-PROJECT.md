@@ -20,7 +20,7 @@ hashes, or test counts into Project fields.
 | 0.5.0 | `0.5.0` | [#11](https://github.com/toreleon/mainframe-env/issues/11) | [#4](https://github.com/toreleon/mainframe-env/pull/4) | Published; closed |
 | 0.6.0 | `0.6.0` | [#12](https://github.com/toreleon/mainframe-env/issues/12) | [#5](https://github.com/toreleon/mainframe-env/pull/5) | Published; closed |
 | 0.7.0 | `0.7.0` | [#13](https://github.com/toreleon/mainframe-env/issues/13) | [#2](https://github.com/toreleon/mainframe-env/pull/2) | Published; closed |
-| 0.8.0 | `0.8.0` | [#14](https://github.com/toreleon/mainframe-env/issues/14) | [#30](https://github.com/toreleon/mainframe-env/pull/30) | Tagged `mainframe-env-v0.8.0`; GitHub Release not published |
+| 0.8.0 | `0.8.0` | [#14](https://github.com/toreleon/mainframe-env/issues/14) | [#30](https://github.com/toreleon/mainframe-env/pull/30) | Published; closed |
 | 0.9.0 | `0.9.0` | [#15](https://github.com/toreleon/mainframe-env/issues/15) | — | Planned; open |
 | 0.10.0 | `0.10.0` | [#16](https://github.com/toreleon/mainframe-env/issues/16) | — | Planned; open |
 | 0.11.0 | `0.11.0` | [#17](https://github.com/toreleon/mainframe-env/issues/17) | — | Planned; open |
@@ -134,12 +134,12 @@ Project carries only priority and status.
 Recorded so the history stays accurate rather than tidy. These are statements
 of fact, not proposals.
 
-- 0.8.0 was tagged `mainframe-env-v0.8.0` by release
-  [#31](https://github.com/toreleon/mainframe-env/pull/31) on 2026-09-04 while
-  its milestone still carries nine open review issues, three of which (#32,
-  #33, #34) are confirmed defects against 0.8.0 exit-gate claims. No GitHub
-  Release is published for 0.8.0, so rule 6 is satisfied in letter: the tag
-  exists, the published release does not.
+- 0.8.0 published on 2026-09-04 while its milestone still carries nine open
+  review issues, three of which (#32, #33, #34) are confirmed defects against
+  claims the release itself makes. Rule 6 expects the milestone closed only
+  after the release contract is satisfied. The defects are disclosed in the
+  GitHub Release known-limitations section rather than left implicit, and the
+  milestone stays open until they are resolved.
 - Epic [#14](https://github.com/toreleon/mainframe-env/issues/14) (0.8.0) was
   closed automatically by the `Closes #14` keyword in implementation pull
   request #30, not by a decision that the release contract was met. Rule 4

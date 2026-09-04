@@ -1,7 +1,6 @@
 # IBM coverage release plans
 
-Status: **0.2.0 through 0.7.0 released; 0.8.0 tagged but not published;
-0.9.0 through 1.0.0 planned**
+Status: **0.2.0 through 0.8.0 released; 0.9.0 through 1.0.0 planned**
 Applies after: `mainframe-env 0.1.1`
 Planning authority:
 [`IBM-OFFICIAL-COVERAGE-ROADMAP.md`](../../research/IBM-OFFICIAL-COVERAGE-ROADMAP.md)
@@ -24,7 +23,7 @@ push, or a compatibility claim.
 | 0.5.0 | Released | Complete RACF command language and SAF | [0.5.0](0.5.0.md) |
 | 0.6.0 | Released | Complete dataset, VSAM, catalog, locking, and AMS surface | [0.6.0](0.6.0.md) |
 | 0.7.0 | Released | Complete JCL converter and planner | [0.7.0](0.7.0.md) |
-| 0.8.0 | Tagged | Complete JES2 execution and real utility semantics | [0.8.0](0.8.0.md) |
+| 0.8.0 | Released | Complete JES2 execution and real utility semantics | [0.8.0](0.8.0.md) |
 | 0.9.0 | Planned | Complete CICS application API | [0.9.0](0.9.0.md) |
 | 0.10.0 | Planned | Complete CICS SPI and FEPI | [0.10.0](0.10.0.md) |
 | 0.11.0 | Planned | Complete z/OSMF 3.2 REST portfolio | [0.11.0](0.11.0.md) |
@@ -36,14 +35,13 @@ push, or a compatibility claim.
 | 0.17.0 | Planned | Licensed IBM differential certification and 1.0 rehearsal | [0.17.0](0.17.0.md) |
 | 1.0.0 | Planned | Stable pinned programming-surface release | [1.0.0](1.0.0.md) |
 
-`Tagged` means the release commit and annotated tag exist on `main` but no
-GitHub Release is published, so the version is not offered for use. 0.8.0 is in
-that state: the runtime merged in
+0.8.0 published on 2026-09-04: the runtime merged in
 [#30](https://github.com/toreleon/mainframe-env/pull/30), the release commit and
 tag `mainframe-env-v0.8.0` landed in
-[#31](https://github.com/toreleon/mainframe-env/pull/31), and the
-[0.8.0 review](review/0.8.0.md) records outstanding defects against its exit
-gate — three of them confirmed.
+[#31](https://github.com/toreleon/mainframe-env/pull/31), and the GitHub Release
+carries both target evidence archives. It shipped with three confirmed defects
+open against its own claims; they are listed in the release's known-limitations
+section and detailed in the [0.8.0 review](review/0.8.0.md).
 
 See [Parallel implementation plan](PARALLEL-IMPLEMENTATION.md) for the work DAG,
 safe concurrency lanes, merge discipline, and critical path.
