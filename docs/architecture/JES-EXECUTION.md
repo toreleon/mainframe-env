@@ -19,7 +19,10 @@ The public contracts are:
 - `mainframe-env.jes-durable-job@2` for the bounded durable job projection;
 - `mainframe-env.jes-checkpoint@1` for restart-safe step/effect progress;
 - `mainframe-env.jes-spool@1` and `mainframe-env.jes-output@1` for spool files
-  and output groups; and
+  and output groups;
+- `mainframe-env.spool-request@2`, `mainframe-env.spool-result@2`, and
+  `mainframe-env.spool-state@1` for the typed host-provider and its durable
+  authority; and
 - `mainframe-env.jes-utility-registry@1` for typed utility registrations.
 
 ## Lifecycle and scheduling
@@ -95,6 +98,31 @@ metadata remains the durable authority. Output access and every state mutation
 are SAF checked. Purge removes metadata and referenced payloads only after the
 terminal transition succeeds; an indeterminate delete remains visible for
 reconciliation.
+
+The spool provider keeps bounded metadata and replay receipts in
+`ProviderStateStore/jes-spool`. Each append creates an immutable
+`mainframe-env.spool-chunk@1` artifact containing the exact record bytes and
+then CAS-publishes its reference. A failed metadata publication deletes the
+unpublished artifact; if compensation cannot be established it returns
+`unknown-outcome`. Reads validate the artifact identity, media type, digest,
+job, file, sequence, record count, and byte count before returning data.
+
+At job terminal transition every file is sealed. Non-held output enters
+awaiting-selection; held output remains held. Authorized controls provide the
+only held-to-released, released-to-selected, selected-to-complete, reroute, and
+purge transitions, and update the job projection by CAS. The SAF resource is
+the active `JESJOBS` class with `JOB.<job-name>.<stable-spool-or-output-id>` so
+authorization happens before artifact access or mutation. The product grants
+only the matching typed `host.spool.read` or `host.spool.write` capability to
+each request.
+
+Purge first writes a durable `purge_pending` intent, then deletes all referenced
+artifacts, and only then publishes the purged tombstone and removes terminal
+job metadata. An artifact-delete failure leaves the intent visible and retryable
+instead of claiming success. Retention cleanup uses the same authorized purge
+path. Version-2 jobs containing legacy embedded records retain those bytes until
+an authorized, idempotent provider migration completes and the job CAS clears
+the embedded projection.
 
 NJE and MAS are bounded routing and ownership abstractions over these same job,
 work, and spool authorities. They are not a claim of physical JES2 sysplex,

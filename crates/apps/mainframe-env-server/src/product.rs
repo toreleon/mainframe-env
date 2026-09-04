@@ -41,6 +41,7 @@ use mainframe_env_interpreter::{
 use mainframe_env_ir::CodecLimits;
 use mainframe_env_mq::{MqService, mq_providers};
 use mainframe_env_racf::{MemorySecretResolver, RacfService, SecretResolver, racf_providers};
+use mainframe_env_spool::{SpoolService, spool_providers};
 use mainframe_env_store::{LocalArtifactStore, MemoryStore};
 use mainframe_env_store_api::{
     ArtifactRecord, ArtifactStore, PlatformStore, ProviderStateRecord, ProviderStateStore,
@@ -186,7 +187,7 @@ pub struct ProductServer {
     ims: Arc<ImsService>,
     mq: Arc<MqService>,
     batch: Arc<BatchService>,
-    artifacts: LocalArtifactStore,
+    artifacts: Arc<LocalArtifactStore>,
     host: Arc<ScopedHostService>,
     applications: ApplicationInstaller,
     applications_v2: Mutex<DurableApplicationsV2>,
@@ -317,14 +318,21 @@ impl ProductServer {
         package_trust: Arc<dyn PackageSignatureVerifier>,
     ) -> Result<Arc<Self>, HostProblem> {
         config.validate()?;
-        let artifacts = LocalArtifactStore::open(&config.artifact_root, 64 * 1024 * 1024)
-            .map_err(store_error)?;
+        let artifacts = Arc::new(
+            LocalArtifactStore::open(&config.artifact_root, 64 * 1024 * 1024)
+                .map_err(store_error)?,
+        );
         let provider_store: Arc<dyn ProviderStateStore> = store.clone();
         let racf = RacfService::open(provider_store.clone(), secrets.clone(), Default::default())?;
         let dataset = DatasetService::open(provider_store.clone(), Default::default())?;
         let db2 = Db2Service::open(provider_store.clone(), Default::default())?;
         let ims = ImsService::open(provider_store.clone(), Default::default())?;
         let mq = MqService::open(provider_store.clone(), Default::default())?;
+        let spool = SpoolService::open(
+            provider_store.clone(),
+            artifacts.clone(),
+            Default::default(),
+        )?;
         let mut enterprise_providers = db2_providers(db2.clone(), InvocationLimits::default());
         enterprise_providers.extend(ims_providers(ims.clone(), InvocationLimits::default()));
         enterprise_providers.extend(mq_providers(mq.clone(), InvocationLimits::default()));
@@ -342,6 +350,7 @@ impl ProductServer {
         let mut enterprise_providers = db2_providers(db2.clone(), InvocationLimits::default());
         enterprise_providers.extend(ims_providers(ims.clone(), InvocationLimits::default()));
         enterprise_providers.extend(mq_providers(mq.clone(), InvocationLimits::default()));
+        enterprise_providers.extend(spool_providers(spool, InvocationLimits::default()));
         let host = scoped_host(
             &racf,
             &dataset,
@@ -2161,7 +2170,17 @@ impl ProductServer {
                     Ok(_) | Err(StoreError::NotFound) => {}
                     Err(error) => return Err(gateway_problem(store_error(error))),
                 }
-                self.batch.cancel(&jobid).map_err(gateway_problem)?;
+                let invocation = self
+                    .invocation(
+                        &principal,
+                        "zosmf:job-cancel",
+                        ServiceClass::Batch,
+                        &["host.security.authorize", "host.spool.write"],
+                    )
+                    .map_err(gateway_problem)?;
+                self.batch
+                    .cancel(&invocation, &jobid)
+                    .map_err(gateway_problem)?;
                 Ok(GatewayResponse::empty(StatusCode::NO_CONTENT))
             }
             GatewayRequest::JobPurge { jobname, jobid } => {
@@ -2173,7 +2192,17 @@ impl ProductServer {
                     &format!("JOB.{}", job.name),
                     AccessIntent::Alter,
                 )?;
-                self.batch.purge(&jobid).map_err(gateway_problem)?;
+                let invocation = self
+                    .invocation(
+                        &principal,
+                        "zosmf:job-purge",
+                        ServiceClass::Batch,
+                        &["host.security.authorize", "host.spool.write"],
+                    )
+                    .map_err(gateway_problem)?;
+                self.batch
+                    .purge(&invocation, &jobid)
+                    .map_err(gateway_problem)?;
                 Ok(GatewayResponse::empty(StatusCode::NO_CONTENT))
             }
             GatewayRequest::SpoolList { jobname, jobid } => {
@@ -2185,9 +2214,17 @@ impl ProductServer {
                     &format!("JOB.{}", job.name),
                     AccessIntent::Read,
                 )?;
+                let invocation = self
+                    .invocation(
+                        &principal,
+                        "zosmf:spool-list",
+                        ServiceClass::Batch,
+                        &["host.security.authorize", "host.spool.read"],
+                    )
+                    .map_err(gateway_problem)?;
                 let files = self
                     .batch
-                    .spool_files(&jobid)
+                    .spool_files(&invocation, &jobid)
                     .map_err(gateway_problem)?
                     .into_iter()
                     .map(|(id, ddname, records, bytes)| {
@@ -2226,9 +2263,17 @@ impl ProductServer {
                     &format!("JOB.{}", job.name),
                     AccessIntent::Read,
                 )?;
+                let invocation = self
+                    .invocation(
+                        &principal,
+                        "zosmf:spool-read",
+                        ServiceClass::Batch,
+                        &["host.security.authorize", "host.spool.read"],
+                    )
+                    .map_err(gateway_problem)?;
                 let records = self
                     .batch
-                    .spool_by_index(&jobid, file, start, max)
+                    .spool_by_index(&invocation, &jobid, file, start, max)
                     .map_err(gateway_problem)?
                     .0;
                 Ok(GatewayResponse::bytes(
@@ -3812,7 +3857,12 @@ fn wildcard(pattern: &str, value: &str) -> bool {
 
 fn job_capabilities(jcl: &[u8]) -> Vec<&'static str> {
     let source = String::from_utf8_lossy(jcl).to_ascii_uppercase();
-    let mut capabilities = vec!["host.security.authorize", "host.program.invoke"];
+    let mut capabilities = vec![
+        "host.security.authorize",
+        "host.program.invoke",
+        "host.spool.read",
+        "host.spool.write",
+    ];
     if source.contains("DSN=") || source.contains("DISP=") || source.contains("PGM=IDCAMS") {
         capabilities.extend(["host.dataset.read", "host.dataset.write"]);
     }

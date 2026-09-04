@@ -1173,7 +1173,16 @@ fn backward_reference_tokens(value: &str) -> Vec<String> {
             {
                 index += 1;
             }
-            output.push(value[start..index].trim_end_matches('.').to_string());
+            let parameter = value[..start]
+                .rsplit([',', ' '])
+                .next()
+                .unwrap_or_default()
+                .split('=')
+                .next()
+                .unwrap_or_default();
+            if !parameter.eq_ignore_ascii_case("OUTPUT") {
+                output.push(value[start..index].trim_end_matches('.').to_string());
+            }
         } else {
             index += 1;
         }
@@ -1665,6 +1674,26 @@ mod tests {
         assert_ne!(
             reference.use_site().bytes,
             reference.definition_site().bytes
+        );
+    }
+
+    #[test]
+    fn output_reference_is_not_misclassified_as_a_backward_dd_reference() {
+        let expansion = expand(JclBundle {
+            primary:
+                "//J JOB\n//O OUTPUT CLASS=B\n//S EXEC PGM=IEFBR14\n//D DD SYSOUT=*,OUTPUT=*.O\n"
+                    .into(),
+            ..JclBundle::default()
+        });
+        assert!(expansion.is_complete(), "{:?}", expansion.diagnostics());
+        assert!(
+            expansion
+                .statements()
+                .iter()
+                .find(|statement| statement.effective_name() == Some("S.D"))
+                .unwrap()
+                .backward_references()
+                .is_empty()
         );
     }
 

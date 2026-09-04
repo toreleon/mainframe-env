@@ -1,0 +1,16 @@
+{
+  "schema_version": "mainframe-env.jes-spool-migration@1",
+  "target_version": "0.8.0",
+  "from": "mainframe-env.jes-durable-job@2/spool",
+  "to": "mainframe-env.spool-state@1+mainframe-env.jes-durable-job@2/spool_files",
+  "authority": "mainframe-env-store-api.ProviderStateStore+ArtifactStore",
+  "strategy": "authorized-lazy-idempotent-append-then-job-cas",
+  "rollback": "retain-embedded-records-until-job-cas",
+  "invariants": [
+    "record order and bytes remain exact",
+    "the embedded map is cleared only after every provider append succeeds",
+    "a lost job CAS acknowledgement reuses stable append idempotency keys",
+    "SAF denial publishes no artifact or descriptor",
+    "partial cleanup is surfaced as unknown-outcome"
+  ]
+}

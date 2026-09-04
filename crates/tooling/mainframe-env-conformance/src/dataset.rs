@@ -18,6 +18,7 @@ use mainframe_env_host_api::{
     HostProblem, HostProvider, HostRequest, HostResult, Mutation, RecordFormat, RegistrySnapshot,
     ScopedHostService, SecurityDecision,
 };
+use mainframe_env_spool::{ProviderArtifactStore, SpoolService, spool_providers};
 use mainframe_env_store::{MemoryStore, StoreLimits};
 use mainframe_env_store_api::ProviderStateStore;
 use serde_json::Value;
@@ -271,7 +272,10 @@ impl HostProvider for AllowSecurityProvider {
     }
 }
 
-fn ams_host(dataset: Arc<DatasetService>) -> Result<Arc<ScopedHostService>, String> {
+fn ams_host(
+    dataset: Arc<DatasetService>,
+    store: Arc<dyn ProviderStateStore>,
+) -> Result<Arc<ScopedHostService>, String> {
     let limits = InvocationLimits::default();
     let security: Arc<dyn HostProvider> = Arc::new(AllowSecurityProvider {
         descriptor: CapabilityDescriptor {
@@ -289,6 +293,11 @@ fn ams_host(dataset: Arc<DatasetService>) -> Result<Arc<ScopedHostService>, Stri
     let program: Arc<dyn HostProvider> = ProgramRouter::with_builtins(limits);
     let mut providers = vec![security, program];
     providers.extend(dataset_providers(dataset, limits));
+    let artifacts = ProviderArtifactStore::new(store.clone(), 4 * 1024 * 1024)
+        .map_err(|problem| problem.to_string())?;
+    let spool = SpoolService::open(store, artifacts, Default::default())
+        .map_err(|problem| problem.to_string())?;
+    providers.extend(spool_providers(spool, limits));
     Ok(Arc::new(ScopedHostService::new(
         Arc::new(
             RegistrySnapshot::new(1, providers, limits).map_err(|problem| problem.to_string())?,
@@ -304,6 +313,8 @@ fn ams_invocation() -> Result<Invocation, String> {
         "host.program.invoke",
         "host.dataset.read",
         "host.dataset.write",
+        "host.spool.read",
+        "host.spool.write",
     ]
     .into_iter()
     .map(|capability| CapabilityId::new(capability, limits))
@@ -589,8 +600,8 @@ fn execute_ams_command_fixture(
         }
         _ => {}
     }
-    let host = ams_host(dataset.clone())?;
     let batch_store: Arc<dyn ProviderStateStore> = store.clone();
+    let host = ams_host(dataset.clone(), batch_store.clone())?;
     let batch = BatchService::open(host, batch_store, Default::default(), Default::default())
         .map_err(|problem| problem.to_string())?;
     let invocation = ams_invocation()?;
@@ -631,8 +642,8 @@ fn execute_ams_command_fixture(
     let reopened_provider_store: Arc<dyn ProviderStateStore> = store.clone();
     let reopened_dataset = DatasetService::open(reopened_provider_store, DatasetLimits::default())
         .map_err(|problem| problem.to_string())?;
-    let reopened_host = ams_host(reopened_dataset.clone())?;
     let reopened_batch_store: Arc<dyn ProviderStateStore> = store;
+    let reopened_host = ams_host(reopened_dataset.clone(), reopened_batch_store.clone())?;
     let reopened_batch = BatchService::open(
         reopened_host,
         reopened_batch_store,
@@ -649,7 +660,13 @@ fn execute_ams_command_fixture(
             command.id()
         ));
     }
-    verify_ams_command_effect(command, &reopened_batch, &reopened_dataset, &job.id)
+    verify_ams_command_effect(
+        command,
+        &reopened_batch,
+        &reopened_dataset,
+        &invocation,
+        &job.id,
+    )
 }
 
 fn catalog_contains(service: &DatasetService, entry_name: &str) -> Result<bool, String> {
@@ -688,11 +705,12 @@ fn verify_ams_command_effect(
     command: &mainframe_env_batch::AmsCommand,
     batch: &BatchService,
     dataset: &DatasetService,
+    invocation: &Invocation,
     job_id: &str,
 ) -> Result<(), String> {
     if let Some(capability) = command.capability() {
         let (records, _) = batch
-            .spool(job_id, "SYSPRINT", 0, 64)
+            .spool(invocation, job_id, "SYSPRINT", 0, 64)
             .map_err(|problem| problem.to_string())?;
         return records
             .iter()
@@ -749,7 +767,7 @@ fn verify_ams_command_effect(
         ),
         "repro" => dataset_records(dataset, "USER.B")? == [b"AA11".to_vec()],
         "diagnose" | "examine" | "listcat" | "listdata" | "print" | "shcds" => !batch
-            .spool(job_id, "SYSPRINT", 0, 64)
+            .spool(invocation, job_id, "SYSPRINT", 0, 64)
             .map_err(|problem| problem.to_string())?
             .0
             .is_empty(),

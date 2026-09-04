@@ -63,6 +63,56 @@
       "uniqueItems": true,
       "items": {"type": "string", "minLength": 1, "maxLength": 128}
     },
+    "spool_sequence": {"type": "integer", "minimum": 0},
+    "spool_files": {
+      "type": "object",
+      "maxProperties": 128,
+      "propertyNames": {"minLength": 1, "maxLength": 64},
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["schema_version", "id", "job_id", "step_name", "dd_name", "class", "destination", "writer", "forms", "record_count", "byte_count", "created_tick", "retain_until_tick", "state"],
+        "properties": {
+          "schema_version": {"const": "mainframe-env.jes-spool@1"},
+          "id": {"type": "string", "minLength": 1, "maxLength": 64},
+          "job_id": {"type": "string", "pattern": "^JOB[0-9]{5,8}$"},
+          "step_name": {"type": ["string", "null"], "maxLength": 128},
+          "dd_name": {"type": "string", "minLength": 1, "maxLength": 128},
+          "class": {"type": "string", "pattern": "^[A-Z0-9]$"},
+          "destination": {"type": "string", "minLength": 1, "maxLength": 128},
+          "writer": {"type": ["string", "null"], "maxLength": 128},
+          "forms": {"type": ["string", "null"], "maxLength": 128},
+          "record_count": {"type": "integer", "minimum": 0, "maximum": 262144},
+          "byte_count": {"type": "integer", "minimum": 0, "maximum": 268435456},
+          "created_tick": {"type": "integer", "minimum": 0},
+          "retain_until_tick": {"type": "integer", "minimum": 0},
+          "state": {"enum": ["open", "closed", "held", "released", "selected", "complete", "cancelled", "purged"]}
+        }
+      }
+    },
+    "output_groups": {
+      "type": "object",
+      "maxProperties": 128,
+      "propertyNames": {"minLength": 1, "maxLength": 64},
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["schema_version", "id", "job_id", "class", "destination", "writer", "forms", "copies", "retain_until_tick", "state", "spool_files"],
+        "properties": {
+          "schema_version": {"const": "mainframe-env.jes-output@1"},
+          "id": {"type": "string", "minLength": 1, "maxLength": 64},
+          "job_id": {"type": "string", "pattern": "^JOB[0-9]{5,8}$"},
+          "class": {"type": "string", "pattern": "^[A-Z0-9]$"},
+          "destination": {"type": "string", "minLength": 1, "maxLength": 128},
+          "writer": {"type": ["string", "null"], "maxLength": 128},
+          "forms": {"type": ["string", "null"], "maxLength": 128},
+          "copies": {"type": "integer", "minimum": 1, "maximum": 255},
+          "retain_until_tick": {"type": "integer", "minimum": 0},
+          "state": {"enum": ["awaiting-selection", "held", "released", "selected", "printing", "complete", "cancelled", "purged"]},
+          "spool_files": {"type": "array", "maxItems": 128, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 64}}
+        }
+      }
+    },
     "spool": {
       "type": "object",
       "maxProperties": 128,

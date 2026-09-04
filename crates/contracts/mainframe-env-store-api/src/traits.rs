@@ -98,6 +98,7 @@ pub trait SessionStore: Send + Sync {
 pub trait ArtifactStore: Send + Sync {
     fn put_artifact(&self, record: ArtifactRecord) -> Result<(), StoreError>;
     fn get_artifact(&self, id: &ArtifactRef) -> Result<Option<ArtifactRecord>, StoreError>;
+    fn delete_artifact(&self, id: &ArtifactRef) -> Result<(), StoreError>;
 }
 
 pub trait GenerationStore: Send + Sync {

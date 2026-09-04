@@ -102,6 +102,14 @@ impl ArtifactStore for LocalArtifactStore {
         }
         decode(id, &bytes, self.max_artifact_bytes).map(Some)
     }
+
+    fn delete_artifact(&self, id: &ArtifactRef) -> Result<(), StoreError> {
+        match std::fs::remove_file(self.path(id)?) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Err(StoreError::NotFound),
+            Err(error) => Err(StoreError::Infrastructure(error.to_string())),
+        }
+    }
 }
 
 fn encode(record: &ArtifactRecord) -> Result<Vec<u8>, StoreError> {

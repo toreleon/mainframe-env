@@ -664,6 +664,38 @@ pub enum SpoolRequest {
     },
 }
 
+pub const SPOOL_REQUEST_CONTRACT: &str = "mainframe-env.spool-request@2";
+pub const SPOOL_RESULT_CONTRACT: &str = "mainframe-env.spool-result@2";
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SpoolFileSummary {
+    pub file: String,
+    pub record_count: u64,
+    pub byte_count: u64,
+    pub sealed: bool,
+    pub version: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum SpoolResult {
+    Mutated {
+        version: u64,
+        replayed: bool,
+    },
+    Files {
+        files: Vec<SpoolFileSummary>,
+    },
+    Records {
+        records: Vec<Vec<u8>>,
+        more: bool,
+        version: u64,
+    },
+    PurgePending {
+        remaining_artifacts: u64,
+    },
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TerminalField {
     pub name: String,
@@ -1251,14 +1283,30 @@ impl HostRequest {
                 Err(HostProblem::ResourceExhausted)
             }
             Self::Spool(SpoolRequest::Append {
-                records, mutation, ..
+                file,
+                records,
+                mutation,
+                ..
             }) => {
+                validate_spool_file(file, limits)?;
                 validate_records(records, limits)?;
                 mutation.validate(limits)
             }
-            Self::Spool(
-                SpoolRequest::Seal { mutation, .. } | SpoolRequest::Purge { mutation, .. },
-            ) => mutation.validate(limits),
+            Self::Spool(SpoolRequest::Read {
+                file, max_records, ..
+            }) => {
+                validate_spool_file(file, limits)?;
+                if *max_records == 0 || *max_records as usize > limits.max_records {
+                    Err(HostProblem::ResourceExhausted)
+                } else {
+                    Ok(())
+                }
+            }
+            Self::Spool(SpoolRequest::Seal { file, mutation, .. }) => {
+                validate_spool_file(file, limits)?;
+                mutation.validate(limits)
+            }
+            Self::Spool(SpoolRequest::Purge { mutation, .. }) => mutation.validate(limits),
             Self::Terminal(
                 TerminalRequest::Write { fields, .. } | TerminalRequest::Input { fields, .. },
             ) => validate_fields(fields, limits),
@@ -1392,7 +1440,7 @@ impl HostRequest {
 pub enum HostResult {
     Dataset(DatasetResult),
     Program(BoundedPayload),
-    Spool(BoundedPayload),
+    Spool(SpoolResult),
     Terminal(BoundedPayload),
     Security(SecurityDecision),
     Clock(String),
@@ -1606,7 +1654,36 @@ impl HostResult {
             }) if record.is_some() != identity.is_some() || record.is_some() != key.is_some() => {
                 Err(HostProblem::Malformed)
             }
-            Self::Program(payload) | Self::Spool(payload) | Self::Terminal(payload)
+            Self::Spool(SpoolResult::Files { files })
+                if files.len() > limits.max_records
+                    || files.iter().any(|file| {
+                        file.file.is_empty()
+                            || file.file.len() > limits.max_name_bytes
+                            || file.file.chars().any(char::is_control)
+                            || usize::try_from(file.record_count)
+                                .map_or(true, |count| count > limits.max_records)
+                            || file.version == 0
+                    }) =>
+            {
+                Err(HostProblem::ResourceExhausted)
+            }
+            Self::Spool(SpoolResult::Records {
+                records, version, ..
+            }) if *version == 0
+                || records.len() > limits.max_records
+                || records
+                    .iter()
+                    .any(|record| record.len() > limits.max_record_bytes) =>
+            {
+                Err(HostProblem::ResourceExhausted)
+            }
+            Self::Spool(SpoolResult::Mutated { version, .. }) if *version == 0 => {
+                Err(HostProblem::Malformed)
+            }
+            Self::Spool(SpoolResult::PurgePending {
+                remaining_artifacts,
+            }) if *remaining_artifacts == 0 => Err(HostProblem::Malformed),
+            Self::Program(payload) | Self::Terminal(payload)
                 if payload.bytes().len() > limits.max_state_bytes =>
             {
                 Err(HostProblem::ResourceExhausted)
@@ -2124,6 +2201,20 @@ fn validate_records(records: &[Vec<u8>], limits: HostLimits) -> Result<(), HostP
         Ok(())
     }
 }
+
+fn validate_spool_file(file: &str, limits: HostLimits) -> Result<(), HostProblem> {
+    if file.is_empty()
+        || file.len() > limits.max_name_bytes
+        || file
+            .chars()
+            .any(|character| character.is_control() || !character.is_ascii())
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
+}
+
 fn validate_dataset_snapshot(
     snapshot: &DatasetSnapshot,
     limits: HostLimits,

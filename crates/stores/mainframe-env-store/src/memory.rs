@@ -492,6 +492,16 @@ impl ArtifactStore for MemoryStore {
     fn get_artifact(&self, id: &ArtifactRef) -> Result<Option<ArtifactRecord>, StoreError> {
         Ok(self.lock()?.artifacts.get(id).cloned())
     }
+
+    fn delete_artifact(&self, id: &ArtifactRef) -> Result<(), StoreError> {
+        let mut state = self.lock()?;
+        let record = state.artifacts.remove(id).ok_or(StoreError::NotFound)?;
+        state.blob_bytes = state
+            .blob_bytes
+            .checked_sub(record.payload.len())
+            .ok_or(StoreError::IncompatibleVersion)?;
+        Ok(())
+    }
 }
 
 impl GenerationStore for MemoryStore {

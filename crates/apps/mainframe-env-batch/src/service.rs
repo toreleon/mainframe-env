@@ -11,10 +11,11 @@ use crate::program::{
 use crate::{
     BatchControllerGeneration, BatchControllerInstallReceipt, BatchControllerPlan,
     BatchControllerSelector, DdAllocationPlan, DdDispositionPlan, DdSourceKind,
-    DdStatusDisposition, DdTerminalDisposition, JES_DURABLE_JOB_CONTRACT, JclBundle, JclLimits,
-    JesSchedulerConfiguration, JobPlan, JobSelectionCandidate, JobState, ProgramInput,
-    StepExecution, StepPlan, StepState, StepTermination, decode_program_output, parse_jcl,
-    plan_dd_allocations, select_job,
+    DdStatusDisposition, DdTerminalDisposition, JES_DURABLE_JOB_CONTRACT, JES_OUTPUT_CONTRACT,
+    JES_SPOOL_CONTRACT, JclBundle, JclLimits, JesOutputGroup, JesOutputState,
+    JesSchedulerConfiguration, JesSpoolDescriptor, JesSpoolState, JobPlan, JobSelectionCandidate,
+    JobState, ProgramInput, StepExecution, StepPlan, StepState, StepTermination,
+    decode_program_output, parse_jcl, plan_dd_allocations, select_job,
 };
 use mainframe_env_execution_api::{
     BoundedPayload, IdempotencyKey, Invocation, InvocationLimits, PrincipalId,
@@ -24,8 +25,9 @@ use mainframe_env_host_api::{
     DatasetAttributes, DatasetDefinition, DatasetLifecycleState, DatasetLockMode,
     DatasetLockTarget, DatasetName, DatasetOrganization, DatasetRequest, DatasetResult,
     Db2Operation, Db2Request, EffectRequest, HostProblem, HostRequest, HostResult, ImsOperation,
-    ImsQualifier, ImsRequest, MemberName, Mutation, ProgramName, ProgramRequest, RecordFormat,
-    ResourceName, ScopedHostService, SecurityDecision, SecurityRequest,
+    ImsQualifier, ImsRequest, JobName, MemberName, Mutation, ProgramName, ProgramRequest,
+    RecordFormat, ResourceName, ScopedHostService, SecurityDecision, SecurityRequest, SpoolRequest,
+    SpoolResult,
 };
 use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
 use serde::{Deserialize, Serialize};
@@ -44,6 +46,7 @@ pub struct BatchLimits {
     pub max_spool_files: usize,
     pub max_spool_records: usize,
     pub max_spool_bytes: usize,
+    pub spool_retention_ticks: u64,
     pub max_events: usize,
     pub max_attempts: u32,
 }
@@ -57,6 +60,7 @@ impl Default for BatchLimits {
             max_spool_files: 128,
             max_spool_records: 262_144,
             max_spool_bytes: 256 * 1024 * 1024,
+            spool_retention_ticks: 86_400,
             max_events: 65536,
             max_attempts: 3,
         }
@@ -106,6 +110,13 @@ struct Job {
     dataset_resolutions: BTreeMap<String, String>,
     #[serde(default)]
     temporary_datasets: Vec<String>,
+    #[serde(default)]
+    spool_sequence: u64,
+    #[serde(default)]
+    spool_files: BTreeMap<String, JesSpoolDescriptor>,
+    #[serde(default)]
+    output_groups: BTreeMap<String, JesOutputGroup>,
+    #[serde(default)]
     spool: BTreeMap<String, Vec<Vec<u8>>>,
     events: Vec<String>,
 }
@@ -364,20 +375,12 @@ impl BatchService {
             .checked_add(1)
             .ok_or(HostProblem::ResourceExhausted)?;
         self.persist_meta(state.next_id, previous_meta)?;
-        let mut spool = BTreeMap::new();
-        spool.insert(
-            "JESJCL".into(),
-            plan.source
-                .lines()
-                .map(|line| line.as_bytes().to_vec())
-                .collect(),
-        );
-        spool.insert(
-            "JESMSGLG".into(),
-            vec![format!("{id} SUBMITTED").into_bytes()],
-        );
-        spool.insert("JOBLOG".into(), vec![format!("{id} ADMITTED").into_bytes()]);
-        let job = Job {
+        let jcl_records = plan
+            .source
+            .lines()
+            .map(|line| line.as_bytes().to_vec())
+            .collect();
+        let mut job = Job {
             schema_version: JES_DURABLE_JOB_CONTRACT.into(),
             id: id.clone(),
             name: plan.name.clone(),
@@ -400,7 +403,10 @@ impl BatchService {
             plan,
             dataset_resolutions: BTreeMap::new(),
             temporary_datasets: Vec::new(),
-            spool,
+            spool_sequence: 0,
+            spool_files: BTreeMap::new(),
+            output_groups: BTreeMap::new(),
+            spool: BTreeMap::new(),
             events: vec![
                 "submitted".into(),
                 "admitted".into(),
@@ -412,7 +418,35 @@ impl BatchService {
                 .into(),
             ],
         };
-        self.persist_job(&job, None)?;
+        if let Err(problem) = (|| {
+            self.append_spool_records(invocation, &mut job, None, None, "JESJCL", jcl_records)?;
+            self.append_spool_records(
+                invocation,
+                &mut job,
+                None,
+                None,
+                "JESMSGLG",
+                vec![format!("{id} SUBMITTED").into_bytes()],
+            )?;
+            self.append_spool_records(
+                invocation,
+                &mut job,
+                None,
+                None,
+                "JOBLOG",
+                vec![format!("{id} ADMITTED").into_bytes()],
+            )
+        })() {
+            let _ = self.purge_spool_authority(invocation, &mut job);
+            return Err(problem);
+        }
+        if let Err(problem) = self.persist_job(&job, None) {
+            return match self.purge_spool_authority(invocation, &mut job) {
+                Ok(SpoolResult::Mutated { .. }) => Err(problem),
+                Ok(SpoolResult::PurgePending { .. }) | Err(_) => Err(HostProblem::UnknownOutcome),
+                Ok(_) => Err(HostProblem::ProviderFailure),
+            };
+        }
         let result = snapshot(&job);
         state.replay.insert(key.as_str().into(), id.clone());
         state.jobs.insert(id, job);
@@ -427,7 +461,8 @@ impl BatchService {
         self.transition(id, JobState::Held, JobState::Queued, "released")
     }
 
-    pub fn cancel(&self, id: &str) -> Result<JobSnapshot, HostProblem> {
+    pub fn cancel(&self, invocation: &Invocation, id: &str) -> Result<JobSnapshot, HostProblem> {
+        self.ensure_spool_migrated(invocation, id)?;
         let mut state = self.lock()?;
         let current = state.jobs.get(id).cloned().ok_or(HostProblem::NotFound)?;
         if !matches!(
@@ -445,7 +480,15 @@ impl BatchService {
         next.state = JobState::Cancelled;
         next.active_step = None;
         next.events.push("cancelled".into());
-        append_spool(&mut next, "JESMSGLG", b"CANCELLED".to_vec(), self.limits)?;
+        self.append_spool_records(
+            invocation,
+            &mut next,
+            None,
+            None,
+            "JESMSGLG",
+            vec![b"CANCELLED".to_vec()],
+        )?;
+        self.cancel_output(invocation, &mut next)?;
         self.persist_job(&next, Some(current.version))?;
         let result = snapshot(&next);
         state.jobs.insert(id.into(), next);
@@ -505,8 +548,9 @@ impl BatchService {
         let Some(id) = id else {
             return Ok(None);
         };
+        self.ensure_spool_migrated(invocation, &id)?;
         if cancelled {
-            return self.cancel(&id).map(Some);
+            return self.cancel(invocation, &id).map(Some);
         }
         let mut job = {
             let mut state = self.lock()?;
@@ -554,12 +598,15 @@ impl BatchService {
                 job.return_code = Some(return_code);
                 job.state = JobState::Output;
                 job.events.push("output".into());
-                append_spool(
+                self.append_spool_records(
+                    invocation,
                     &mut job,
+                    None,
+                    None,
                     "JESMSGLG",
-                    format!("ENDED RC={return_code:04}").into_bytes(),
-                    self.limits,
+                    vec![format!("ENDED RC={return_code:04}").into_bytes()],
                 )?;
+                self.complete_output(invocation, &mut job)?;
                 self.persist_job(&job, Some(current.version))?;
                 state.jobs.insert(id.clone(), job.clone());
                 let output_version = job.version;
@@ -582,19 +629,24 @@ impl BatchService {
                 job.initiator = None;
                 job.events.push(format!("failed:{problem:?}"));
                 if let Some(step) = terminal_step {
-                    append_spool(
+                    self.append_spool_records(
+                        invocation,
                         &mut job,
+                        Some(&step),
+                        None,
                         "JOBLOG",
-                        format!("{step} FAILED {problem:?}").into_bytes(),
-                        self.limits,
+                        vec![format!("{step} FAILED {problem:?}").into_bytes()],
                     )?;
                 }
-                append_spool(
+                self.append_spool_records(
+                    invocation,
                     &mut job,
+                    None,
+                    None,
                     "JESMSGLG",
-                    format!("FAILED {problem:?}").into_bytes(),
-                    self.limits,
+                    vec![format!("FAILED {problem:?}").into_bytes()],
                 )?;
+                self.complete_output(invocation, &mut job)?;
             }
         }
         self.persist_job(&job, Some(current.version))?;
@@ -651,22 +703,26 @@ impl BatchService {
             if !restart_reached {
                 restart_reached = restart.as_deref() == Some(step.name.as_str());
                 if !restart_reached {
-                    append_spool(
+                    self.append_spool_records(
+                        invocation,
                         job,
+                        Some(&step.name),
+                        None,
                         "JOBLOG",
-                        format!("{} BYPASSED RESTART", step.name).into_bytes(),
-                        self.limits,
+                        vec![format!("{} BYPASSED RESTART", step.name).into_bytes()],
                     )?;
                     self.mark_step(job, step, StepState::BypassedRestart, None)?;
                     continue;
                 }
             }
             if !step.condition.should_run(max_rc, abended) {
-                append_spool(
+                self.append_spool_records(
+                    invocation,
                     job,
+                    Some(&step.name),
+                    None,
                     "JOBLOG",
-                    format!("{} SKIPPED COND", step.name).into_bytes(),
-                    self.limits,
+                    vec![format!("{} SKIPPED COND", step.name).into_bytes()],
                 )?;
                 self.mark_step(job, step, StepState::SkippedCondition, None)?;
                 continue;
@@ -819,18 +875,29 @@ impl BatchService {
                 return Err(HostProblem::ProviderFailure);
             }
             max_rc = max_rc.max(output.return_code);
-            for record in output.records {
-                append_spool(job, "SYSPRINT", record, self.limits)?;
-            }
-            append_spool(
+            self.append_spool_records(
+                invocation,
                 job,
+                Some(&step.name),
+                step.dds
+                    .iter()
+                    .find(|dd| dd.name.eq_ignore_ascii_case("SYSPRINT")),
+                "SYSPRINT",
+                output.records,
+            )?;
+            self.append_spool_records(
+                invocation,
+                job,
+                Some(&step.name),
+                None,
                 "JOBLOG",
-                format!(
-                    "{} {} RC={:04}",
-                    step.name, step.program, output.return_code
-                )
-                .into_bytes(),
-                self.limits,
+                vec![
+                    format!(
+                        "{} {} RC={:04}",
+                        step.name, step.program, output.return_code
+                    )
+                    .into_bytes(),
+                ],
             )?;
             self.mark_step(job, step, StepState::Disposing, None)?;
             if let Err(problem) = self.dispose_dds(
@@ -973,6 +1040,257 @@ impl BatchService {
             }
         }
         Ok(())
+    }
+
+    fn append_spool_records(
+        &self,
+        invocation: &Invocation,
+        job: &mut Job,
+        step_name: Option<&str>,
+        dd: Option<&crate::DdPlan>,
+        file: &str,
+        records: Vec<Vec<u8>>,
+    ) -> Result<(), HostProblem> {
+        if records.is_empty() {
+            return Ok(());
+        }
+        let internal_name = spool_internal_name(step_name, file);
+        let resource = spool_resource(job, &internal_name);
+        let authorize_sequence = next_spool_sequence(invocation, job)?;
+        self.authorize(
+            invocation,
+            "JESJOBS",
+            &resource,
+            AccessIntent::Update,
+            authorize_sequence,
+        )?;
+        let sequence = next_spool_sequence(invocation, job)?;
+        let key = IdempotencyKey::new(
+            format!("jes:{}:spool:{sequence}", job.id),
+            InvocationLimits::default(),
+        )
+        .map_err(|_| HostProblem::ResourceExhausted)?;
+        let record_count = records.len();
+        let byte_count = records
+            .iter()
+            .try_fold(0usize, |total, record| total.checked_add(record.len()))
+            .ok_or(HostProblem::ResourceExhausted)?;
+        let result = self.host.invoke(
+            invocation,
+            invocation.deadline_tick.saturating_sub(1),
+            false,
+            EffectRequest {
+                run_unit: invocation.run_unit_id.clone(),
+                sequence,
+                deadline_tick: invocation.deadline_tick,
+                idempotency_key: Some(key.clone()),
+                request: HostRequest::Spool(SpoolRequest::Append {
+                    job: JobName::new(&job.id, 128).map_err(|_| HostProblem::Malformed)?,
+                    file: internal_name.clone(),
+                    records,
+                    mutation: Mutation {
+                        sequence,
+                        idempotency_key: key,
+                        transaction: Some(job.id.clone()),
+                    },
+                }),
+            },
+        );
+        let HostResult::Spool(SpoolResult::Mutated { version, .. }) = result.effect.outcome? else {
+            return Err(HostProblem::ProviderFailure);
+        };
+        let route = spool_route(job, dd);
+        let output_id = output_group_id(job, &route);
+        let descriptor = job
+            .spool_files
+            .entry(internal_name.clone())
+            .or_insert_with(|| JesSpoolDescriptor {
+                schema_version: JES_SPOOL_CONTRACT.into(),
+                id: spool_descriptor_id(&job.id, &internal_name),
+                job_id: job.id.clone(),
+                step_name: step_name.map(str::to_string),
+                dd_name: file.to_ascii_uppercase(),
+                class: route.class,
+                destination: route.destination.clone(),
+                writer: route.writer.clone(),
+                forms: route.forms.clone(),
+                record_count: 0,
+                byte_count: 0,
+                created_tick: 0,
+                retain_until_tick: self.limits.spool_retention_ticks,
+                state: if route.hold {
+                    JesSpoolState::Held
+                } else {
+                    JesSpoolState::Open
+                },
+            });
+        descriptor.record_count = descriptor
+            .record_count
+            .checked_add(record_count)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        descriptor.byte_count = descriptor
+            .byte_count
+            .checked_add(byte_count)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        let retain_until_tick = descriptor.retain_until_tick;
+        let internal_name_for_group = internal_name.clone();
+        let _ = descriptor;
+        let group = job
+            .output_groups
+            .entry(output_id.clone())
+            .or_insert_with(|| JesOutputGroup {
+                schema_version: JES_OUTPUT_CONTRACT.into(),
+                id: output_id,
+                job_id: job.id.clone(),
+                class: route.class,
+                destination: route.destination,
+                writer: route.writer,
+                forms: route.forms,
+                copies: route.copies,
+                retain_until_tick,
+                state: if route.hold {
+                    JesOutputState::Held
+                } else {
+                    JesOutputState::AwaitingSelection
+                },
+                spool_files: Vec::new(),
+            });
+        if !group
+            .spool_files
+            .iter()
+            .any(|file| file == &internal_name_for_group)
+        {
+            if group.spool_files.len() >= self.limits.max_spool_files {
+                return Err(HostProblem::ResourceExhausted);
+            }
+            group.spool_files.push(internal_name_for_group);
+        }
+        let _ = version;
+        Ok(())
+    }
+
+    fn complete_output(&self, invocation: &Invocation, job: &mut Job) -> Result<(), HostProblem> {
+        self.seal_output(invocation, job, false)
+    }
+
+    fn cancel_output(&self, invocation: &Invocation, job: &mut Job) -> Result<(), HostProblem> {
+        self.seal_output(invocation, job, true)
+    }
+
+    fn seal_output(
+        &self,
+        invocation: &Invocation,
+        job: &mut Job,
+        cancelled: bool,
+    ) -> Result<(), HostProblem> {
+        let files = job.spool_files.keys().cloned().collect::<Vec<_>>();
+        for file in files {
+            let resource = spool_resource(job, &file);
+            let authorize_sequence = next_spool_sequence(invocation, job)?;
+            self.authorize(
+                invocation,
+                "JESJOBS",
+                &resource,
+                AccessIntent::Update,
+                authorize_sequence,
+            )?;
+            let sequence = next_spool_sequence(invocation, job)?;
+            let key = IdempotencyKey::new(
+                format!("jes:{}:spool:{sequence}", job.id),
+                InvocationLimits::default(),
+            )
+            .map_err(|_| HostProblem::ResourceExhausted)?;
+            let result = self.host.invoke(
+                invocation,
+                invocation.deadline_tick.saturating_sub(1),
+                false,
+                EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence,
+                    deadline_tick: invocation.deadline_tick,
+                    idempotency_key: Some(key.clone()),
+                    request: HostRequest::Spool(SpoolRequest::Seal {
+                        job: JobName::new(&job.id, 128).map_err(|_| HostProblem::Malformed)?,
+                        file: file.clone(),
+                        mutation: Mutation {
+                            sequence,
+                            idempotency_key: key,
+                            transaction: Some(job.id.clone()),
+                        },
+                    }),
+                },
+            );
+            let HostResult::Spool(SpoolResult::Mutated { .. }) = result.effect.outcome? else {
+                return Err(HostProblem::ProviderFailure);
+            };
+            let descriptor = job
+                .spool_files
+                .get_mut(&file)
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            descriptor.state = if cancelled {
+                JesSpoolState::Cancelled
+            } else if descriptor.state == JesSpoolState::Held {
+                JesSpoolState::Held
+            } else {
+                JesSpoolState::Closed
+            };
+        }
+        for group in job.output_groups.values_mut() {
+            group.state = if cancelled {
+                JesOutputState::Cancelled
+            } else if group.state == JesOutputState::Held {
+                JesOutputState::Held
+            } else {
+                JesOutputState::AwaitingSelection
+            };
+        }
+        Ok(())
+    }
+
+    fn purge_spool_authority(
+        &self,
+        invocation: &Invocation,
+        job: &mut Job,
+    ) -> Result<SpoolResult, HostProblem> {
+        let resource = format!("JOB.{}", job.name);
+        let authorize_sequence = next_spool_sequence(invocation, job)?;
+        self.authorize(
+            invocation,
+            "JESJOBS",
+            &resource,
+            AccessIntent::Alter,
+            authorize_sequence,
+        )?;
+        let sequence = next_spool_sequence(invocation, job)?;
+        let key = IdempotencyKey::new(
+            format!("jes:{}:spool:{sequence}", job.id),
+            InvocationLimits::default(),
+        )
+        .map_err(|_| HostProblem::ResourceExhausted)?;
+        let outcome = self.host.invoke(
+            invocation,
+            invocation.deadline_tick.saturating_sub(1),
+            false,
+            EffectRequest {
+                run_unit: invocation.run_unit_id.clone(),
+                sequence,
+                deadline_tick: invocation.deadline_tick,
+                idempotency_key: Some(key.clone()),
+                request: HostRequest::Spool(SpoolRequest::Purge {
+                    job: JobName::new(&job.id, 128).map_err(|_| HostProblem::Malformed)?,
+                    mutation: Mutation {
+                        sequence,
+                        idempotency_key: key,
+                        transaction: Some(job.id.clone()),
+                    },
+                }),
+            },
+        );
+        match outcome.effect.outcome? {
+            HostResult::Spool(result @ SpoolResult::Mutated { .. })
+            | HostResult::Spool(result @ SpoolResult::PurgePending { .. }) => Ok(result),
+            _ => Err(HostProblem::ProviderFailure),
+        }
     }
 
     fn execute_sdsf(
@@ -1726,12 +2044,18 @@ impl BatchService {
                     Ok(()) => 0,
                     Err(problem) => {
                         let code = ams_condition_code(&problem);
-                        append_spool(
+                        self.append_spool_records(
+                            invocation,
                             job,
+                            Some(&step.name),
+                            step.dds
+                                .iter()
+                                .find(|dd| dd.name.eq_ignore_ascii_case("SYSPRINT")),
                             "SYSPRINT",
-                            format!("IDCAMS {} CC={code:02} {problem:?}", command.label())
-                                .into_bytes(),
-                            self.limits,
+                            vec![
+                                format!("IDCAMS {} CC={code:02} {problem:?}", command.label())
+                                    .into_bytes(),
+                            ],
                         )?;
                         code
                     }
@@ -1791,7 +2115,9 @@ impl BatchService {
             "delete" => {
                 self.delete_idcams(invocation, job, step, effect_sequence, command.source())
             }
-            "listcat" => self.listcat_idcams(invocation, job, effect_sequence, command.source()),
+            "listcat" => {
+                self.listcat_idcams(invocation, job, step, effect_sequence, command.source())
+            }
             _ => self.execute_ams_typed_command(
                 invocation,
                 job,
@@ -1986,6 +2312,7 @@ impl BatchService {
         &self,
         invocation: &Invocation,
         job: &mut Job,
+        step: &StepPlan,
         effect_sequence: &mut u64,
         statement: &str,
     ) -> Result<(), HostProblem> {
@@ -2003,10 +2330,9 @@ impl BatchService {
         else {
             return Err(HostProblem::ProviderFailure);
         };
-        for entry in entries {
-            append_spool(
-                job,
-                "SYSPRINT",
+        let mut records = entries
+            .into_iter()
+            .map(|entry| {
                 format!(
                     "{} {:?} VERSION={} RELATE={}",
                     entry.name.as_str(),
@@ -2014,18 +2340,22 @@ impl BatchService {
                     entry.version,
                     entry.related.as_ref().map_or("-", DatasetName::as_str)
                 )
-                .into_bytes(),
-                self.limits,
-            )?;
-        }
+                .into_bytes()
+            })
+            .collect::<Vec<_>>();
         if more {
-            append_spool(
-                job,
-                "SYSPRINT",
-                b"IDCAMS LISTCAT MORE".to_vec(),
-                self.limits,
-            )?;
+            records.push(b"IDCAMS LISTCAT MORE".to_vec());
         }
+        self.append_spool_records(
+            invocation,
+            job,
+            Some(&step.name),
+            step.dds
+                .iter()
+                .find(|dd| dd.name.eq_ignore_ascii_case("SYSPRINT")),
+            "SYSPRINT",
+            records,
+        )?;
         Ok(())
     }
 
@@ -2273,11 +2603,15 @@ impl BatchService {
                     effect_sequence,
                     DatasetRequest::Diagnose { dataset: target },
                 )?;
-                append_spool(
+                self.append_spool_records(
+                    invocation,
                     job,
+                    Some(&step.name),
+                    step.dds
+                        .iter()
+                        .find(|dd| dd.name.eq_ignore_ascii_case("SYSPRINT")),
                     "SYSPRINT",
-                    format!("{} {result:?}", command.label()).into_bytes(),
-                    self.limits,
+                    vec![format!("{} {result:?}", command.label()).into_bytes()],
                 )?;
             }
             "export" | "export-disconnect" => self.export_idcams(
@@ -2300,11 +2634,15 @@ impl BatchService {
                         dataset: ams_target(command)?,
                     },
                 )?;
-                append_spool(
+                self.append_spool_records(
+                    invocation,
                     job,
+                    Some(&step.name),
+                    step.dds
+                        .iter()
+                        .find(|dd| dd.name.eq_ignore_ascii_case("SYSPRINT")),
                     "SYSPRINT",
-                    format!("LISTDATA {result:?}").into_bytes(),
-                    self.limits,
+                    vec![format!("LISTDATA {result:?}").into_bytes()],
                 )?;
             }
             "print" => {
@@ -2341,14 +2679,28 @@ impl BatchService {
                 if skip > 4_096 || count > 4_096 {
                     return Err(HostProblem::ResourceExhausted);
                 }
-                for record in records.into_iter().skip(skip).take(count) {
-                    let record = if statement.contains(" HEX") {
-                        hex_bytes(&record).into_bytes()
-                    } else {
-                        record
-                    };
-                    append_spool(job, "SYSPRINT", record, self.limits)?;
-                }
+                let records = records
+                    .into_iter()
+                    .skip(skip)
+                    .take(count)
+                    .map(|record| {
+                        if statement.contains(" HEX") {
+                            hex_bytes(&record).into_bytes()
+                        } else {
+                            record
+                        }
+                    })
+                    .collect();
+                self.append_spool_records(
+                    invocation,
+                    job,
+                    Some(&step.name),
+                    step.dds
+                        .iter()
+                        .find(|dd| dd.name.eq_ignore_ascii_case("SYSPRINT")),
+                    "SYSPRINT",
+                    records,
+                )?;
             }
             "recover" => {
                 self.import_idcams(invocation, job, step, input, effect_sequence, statement)?
@@ -2394,11 +2746,15 @@ impl BatchService {
                         )?
                     }
                 };
-                append_spool(
+                self.append_spool_records(
+                    invocation,
                     job,
+                    Some(&step.name),
+                    step.dds
+                        .iter()
+                        .find(|dd| dd.name.eq_ignore_ascii_case("SYSPRINT")),
                     "SYSPRINT",
-                    format!("SHCDS {result:?}").into_bytes(),
-                    self.limits,
+                    vec![format!("SHCDS {result:?}").into_bytes()],
                 )?;
             }
             "verify" => {
@@ -3318,18 +3674,25 @@ impl BatchService {
                     .map_err(|_| HostProblem::ResourceExhausted)?,
                     false,
                 )?;
-                append_spool(
+                self.append_spool_records(
+                    invocation,
                     job,
+                    Some(&step.name),
+                    Some(dd),
                     &dd.name,
-                    b"INTERNAL READER SUBMITTED".to_vec(),
-                    self.limits,
+                    vec![b"INTERNAL READER SUBMITTED".to_vec()],
                 )?;
                 continue;
             }
             if dd.sysout.is_some() {
-                for record in records {
-                    append_spool(job, &dd.name, record.clone(), self.limits)?;
-                }
+                self.append_spool_records(
+                    invocation,
+                    job,
+                    Some(&step.name),
+                    Some(dd),
+                    &dd.name,
+                    records.clone(),
+                )?;
                 continue;
             }
             let fallback;
@@ -3629,6 +3992,7 @@ impl BatchService {
 
     pub fn spool(
         &self,
+        invocation: &Invocation,
         id: &str,
         file: &str,
         start: usize,
@@ -3637,60 +4001,299 @@ impl BatchService {
         if max == 0 || max > self.limits.max_spool_records {
             return Err(HostProblem::ResourceExhausted);
         }
-        let state = self.lock()?;
-        let records = state
+        self.ensure_spool_migrated(invocation, id)?;
+        let job = self
+            .lock()?
             .jobs
             .get(id)
-            .ok_or(HostProblem::NotFound)?
-            .spool
-            .get(file)
+            .cloned()
             .ok_or(HostProblem::NotFound)?;
-        Ok((
-            records.iter().skip(start).take(max).cloned().collect(),
-            start.saturating_add(max) < records.len(),
-        ))
+        let requested = file.to_ascii_uppercase();
+        let files = if job.spool_files.contains_key(&requested) {
+            vec![requested]
+        } else {
+            job.spool_files
+                .iter()
+                .filter(|(_, descriptor)| descriptor.dd_name == requested)
+                .map(|(name, _)| name.clone())
+                .collect::<Vec<_>>()
+        };
+        if files.is_empty() {
+            return Err(HostProblem::NotFound);
+        }
+        self.read_spool_files(invocation, &job, &files, start, max)
     }
 
-    pub fn spool_files(&self, id: &str) -> Result<Vec<(usize, String, usize, usize)>, HostProblem> {
-        let state = self.lock()?;
-        let job = state.jobs.get(id).ok_or(HostProblem::NotFound)?;
-        Ok(job
-            .spool
-            .iter()
+    pub fn spool_files(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+    ) -> Result<Vec<(usize, String, usize, usize)>, HostProblem> {
+        self.ensure_spool_migrated(invocation, id)?;
+        let job = self
+            .lock()?
+            .jobs
+            .get(id)
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
+        self.authorize(
+            invocation,
+            "JESJOBS",
+            &format!("JOB.{}.*", job.name),
+            AccessIntent::Read,
+            1,
+        )?;
+        let result = self.host.invoke(
+            invocation,
+            invocation.deadline_tick.saturating_sub(1),
+            false,
+            EffectRequest {
+                run_unit: invocation.run_unit_id.clone(),
+                sequence: 2,
+                deadline_tick: invocation.deadline_tick,
+                idempotency_key: None,
+                request: HostRequest::Spool(SpoolRequest::List {
+                    job: JobName::new(&job.id, 128).map_err(|_| HostProblem::Malformed)?,
+                }),
+            },
+        );
+        let HostResult::Spool(SpoolResult::Files { files }) = result.effect.outcome? else {
+            return Err(HostProblem::ProviderFailure);
+        };
+        files
+            .into_iter()
             .enumerate()
-            .map(|(id, (name, records))| {
-                (
-                    id,
-                    name.clone(),
-                    records.len(),
-                    records.iter().map(Vec::len).sum(),
-                )
+            .map(|(index, file)| {
+                if !job.spool_files.contains_key(&file.file) {
+                    return Err(HostProblem::InfrastructureFailure);
+                }
+                Ok((
+                    index,
+                    file.file,
+                    usize::try_from(file.record_count)
+                        .map_err(|_| HostProblem::ResourceExhausted)?,
+                    usize::try_from(file.byte_count).map_err(|_| HostProblem::ResourceExhausted)?,
+                ))
             })
-            .collect())
+            .collect()
     }
 
     pub fn spool_by_index(
         &self,
+        invocation: &Invocation,
         id: &str,
         file: usize,
         start: usize,
         max: usize,
     ) -> Result<(Vec<Vec<u8>>, bool), HostProblem> {
-        let state = self.lock()?;
-        let job = state.jobs.get(id).ok_or(HostProblem::NotFound)?;
-        let records = job.spool.values().nth(file).ok_or(HostProblem::NotFound)?;
         if max == 0 || max > self.limits.max_spool_records {
             return Err(HostProblem::ResourceExhausted);
         }
-        Ok((
-            records.iter().skip(start).take(max).cloned().collect(),
-            start.saturating_add(max) < records.len(),
-        ))
+        self.ensure_spool_migrated(invocation, id)?;
+        let job = self
+            .lock()?
+            .jobs
+            .get(id)
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
+        let name = job
+            .spool_files
+            .keys()
+            .nth(file)
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
+        self.read_spool_files(invocation, &job, &[name], start, max)
     }
 
-    pub fn purge(&self, id: &str) -> Result<(), HostProblem> {
+    pub fn output_groups(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+    ) -> Result<Vec<JesOutputGroup>, HostProblem> {
+        self.ensure_spool_migrated(invocation, id)?;
+        let job = self
+            .lock()?
+            .jobs
+            .get(id)
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
+        self.authorize(
+            invocation,
+            "JESJOBS",
+            &format!("JOB.{}.*", job.name),
+            AccessIntent::Read,
+            1,
+        )?;
+        Ok(job.output_groups.into_values().collect())
+    }
+
+    pub fn hold_output(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+        output_id: &str,
+    ) -> Result<JesOutputGroup, HostProblem> {
+        self.ensure_spool_migrated(invocation, id)?;
+        self.transition_output(
+            invocation,
+            id,
+            output_id,
+            &[JesOutputState::AwaitingSelection, JesOutputState::Released],
+            JesOutputState::Held,
+            JesSpoolState::Held,
+            "output-held",
+        )
+    }
+
+    pub fn release_output(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+        output_id: &str,
+    ) -> Result<JesOutputGroup, HostProblem> {
+        self.ensure_spool_migrated(invocation, id)?;
+        self.transition_output(
+            invocation,
+            id,
+            output_id,
+            &[JesOutputState::Held],
+            JesOutputState::Released,
+            JesSpoolState::Released,
+            "output-released",
+        )
+    }
+
+    pub fn select_output(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+        output_id: &str,
+    ) -> Result<JesOutputGroup, HostProblem> {
+        self.ensure_spool_migrated(invocation, id)?;
+        self.transition_output(
+            invocation,
+            id,
+            output_id,
+            &[JesOutputState::AwaitingSelection, JesOutputState::Released],
+            JesOutputState::Selected,
+            JesSpoolState::Selected,
+            "output-selected",
+        )
+    }
+
+    pub fn complete_selected_output(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+        output_id: &str,
+    ) -> Result<JesOutputGroup, HostProblem> {
+        self.ensure_spool_migrated(invocation, id)?;
+        self.transition_output(
+            invocation,
+            id,
+            output_id,
+            &[JesOutputState::Selected, JesOutputState::Printing],
+            JesOutputState::Complete,
+            JesSpoolState::Complete,
+            "output-complete",
+        )
+    }
+
+    pub fn route_output(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+        output_id: &str,
+        destination: &str,
+        writer: Option<&str>,
+        forms: Option<&str>,
+    ) -> Result<JesOutputGroup, HostProblem> {
+        validate_output_route(destination, writer, forms)?;
+        self.ensure_spool_migrated(invocation, id)?;
         let mut state = self.lock()?;
-        let job = state.jobs.get(id).ok_or(HostProblem::NotFound)?;
+        let current = state.jobs.get(id).cloned().ok_or(HostProblem::NotFound)?;
+        let current_group = current
+            .output_groups
+            .get(output_id)
+            .ok_or(HostProblem::NotFound)?;
+        if !matches!(
+            current_group.state,
+            JesOutputState::AwaitingSelection | JesOutputState::Held | JesOutputState::Released
+        ) {
+            return Err(invalid_state());
+        }
+        self.authorize(
+            invocation,
+            "JESJOBS",
+            &format!("JOB.{}.{}", current.name, output_id),
+            AccessIntent::Control,
+            1,
+        )?;
+        let mut next = current.clone();
+        next.version = next.version.saturating_add(1);
+        let group = next
+            .output_groups
+            .get_mut(output_id)
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        group.destination = destination.to_ascii_uppercase();
+        group.writer = writer.map(str::to_ascii_uppercase);
+        group.forms = forms.map(str::to_ascii_uppercase);
+        for file in &group.spool_files {
+            let descriptor = next
+                .spool_files
+                .get_mut(file)
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            descriptor.destination.clone_from(&group.destination);
+            descriptor.writer.clone_from(&group.writer);
+            descriptor.forms.clone_from(&group.forms);
+        }
+        next.events.push(format!("output-routed:{output_id}"));
+        self.persist_job(&next, Some(current.version))?;
+        let result = next
+            .output_groups
+            .get(output_id)
+            .cloned()
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        state.jobs.insert(id.into(), next);
+        Ok(result)
+    }
+
+    pub fn purge_expired(
+        &self,
+        invocation: &Invocation,
+        now_tick: u64,
+        max: usize,
+    ) -> Result<Vec<String>, HostProblem> {
+        if max == 0 || max > self.limits.max_jobs {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let ids = self
+            .lock()?
+            .jobs
+            .values()
+            .filter(|job| {
+                job.state.terminal()
+                    && !job.output_groups.is_empty()
+                    && job
+                        .output_groups
+                        .values()
+                        .all(|group| group.retain_until_tick <= now_tick)
+            })
+            .take(max)
+            .map(|job| job.id.clone())
+            .collect::<Vec<_>>();
+        let mut purged = Vec::with_capacity(ids.len());
+        for id in ids {
+            self.purge(invocation, &id)?;
+            purged.push(id);
+        }
+        Ok(purged)
+    }
+
+    pub fn purge(&self, invocation: &Invocation, id: &str) -> Result<(), HostProblem> {
+        self.ensure_spool_migrated(invocation, id)?;
+        let mut state = self.lock()?;
+        let mut job = state.jobs.get(id).cloned().ok_or(HostProblem::NotFound)?;
         if !matches!(
             job.state,
             JobState::Completed | JobState::Failed | JobState::Cancelled
@@ -3701,6 +4304,11 @@ impl BatchService {
                 response2: 0,
             });
         }
+        match self.purge_spool_authority(invocation, &mut job)? {
+            SpoolResult::Mutated { .. } => {}
+            SpoolResult::PurgePending { .. } => return Err(HostProblem::UnknownOutcome),
+            _ => return Err(HostProblem::ProviderFailure),
+        }
         self.store
             .delete_provider_state("jes-job", id, job.version)
             .map_err(store_error)?;
@@ -3708,6 +4316,160 @@ impl BatchService {
         state.jobs.remove(id);
         state.replay.remove(&submit_key);
         Ok(())
+    }
+
+    fn ensure_spool_migrated(&self, invocation: &Invocation, id: &str) -> Result<(), HostProblem> {
+        let mut state = self.lock()?;
+        let current = state.jobs.get(id).cloned().ok_or(HostProblem::NotFound)?;
+        if current.spool.is_empty() {
+            return Ok(());
+        }
+        let mut next = current.clone();
+        for (file, records) in current.spool {
+            if !records.is_empty() {
+                self.append_spool_records(invocation, &mut next, None, None, &file, records)?;
+            }
+        }
+        next.spool.clear();
+        next.version = next.version.saturating_add(1);
+        next.events
+            .push("migrated:embedded-spool-to-artifacts".into());
+        self.persist_job(&next, Some(current.version))?;
+        state.jobs.insert(id.into(), next);
+        Ok(())
+    }
+
+    fn read_spool_files(
+        &self,
+        invocation: &Invocation,
+        job: &Job,
+        files: &[String],
+        start: usize,
+        max: usize,
+    ) -> Result<(Vec<Vec<u8>>, bool), HostProblem> {
+        let total_records = files.iter().try_fold(0usize, |total, file| {
+            let descriptor = job
+                .spool_files
+                .get(file)
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            total
+                .checked_add(descriptor.record_count)
+                .ok_or(HostProblem::ResourceExhausted)
+        })?;
+        let mut skip = start;
+        let mut records = Vec::with_capacity(max.min(total_records.saturating_sub(start)));
+        for (index, file) in files.iter().enumerate() {
+            let descriptor = job
+                .spool_files
+                .get(file)
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            if skip >= descriptor.record_count {
+                skip -= descriptor.record_count;
+                continue;
+            }
+            let remaining = max.saturating_sub(records.len());
+            if remaining == 0 {
+                break;
+            }
+            let sequence = u64::try_from(index)
+                .ok()
+                .and_then(|index| index.checked_mul(2))
+                .and_then(|sequence| sequence.checked_add(1))
+                .ok_or(HostProblem::ResourceExhausted)?;
+            self.authorize(
+                invocation,
+                "JESJOBS",
+                &spool_resource(job, file),
+                AccessIntent::Read,
+                sequence,
+            )?;
+            let result = self.host.invoke(
+                invocation,
+                invocation.deadline_tick.saturating_sub(1),
+                false,
+                EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence: sequence.saturating_add(1),
+                    deadline_tick: invocation.deadline_tick,
+                    idempotency_key: None,
+                    request: HostRequest::Spool(SpoolRequest::Read {
+                        job: JobName::new(&job.id, 128).map_err(|_| HostProblem::Malformed)?,
+                        file: file.clone(),
+                        start: u64::try_from(skip).map_err(|_| HostProblem::ResourceExhausted)?,
+                        max_records: u32::try_from(remaining)
+                            .map_err(|_| HostProblem::ResourceExhausted)?,
+                    }),
+                },
+            );
+            let HostResult::Spool(SpoolResult::Records {
+                records: selected, ..
+            }) = result.effect.outcome?
+            else {
+                return Err(HostProblem::ProviderFailure);
+            };
+            records.extend(selected);
+            skip = 0;
+        }
+        let consumed = start.saturating_add(records.len());
+        Ok((records, consumed < total_records))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn transition_output(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+        output_id: &str,
+        from: &[JesOutputState],
+        to: JesOutputState,
+        spool_state: JesSpoolState,
+        event: &str,
+    ) -> Result<JesOutputGroup, HostProblem> {
+        let mut state = self.lock()?;
+        let current = state.jobs.get(id).cloned().ok_or(HostProblem::NotFound)?;
+        let current_group = current
+            .output_groups
+            .get(output_id)
+            .ok_or(HostProblem::NotFound)?;
+        if !from.contains(&current_group.state) || !current_group.state.can_transition_to(to) {
+            return Err(invalid_state());
+        }
+        self.authorize(
+            invocation,
+            "JESJOBS",
+            &format!("JOB.{}.{}", current.name, output_id),
+            AccessIntent::Control,
+            1,
+        )?;
+        let mut next = current.clone();
+        next.version = next.version.saturating_add(1);
+        let files = {
+            let group = next
+                .output_groups
+                .get_mut(output_id)
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            group.state = to;
+            group.spool_files.clone()
+        };
+        for file in files {
+            let descriptor = next
+                .spool_files
+                .get_mut(&file)
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            if !descriptor.state.can_transition_to(spool_state) {
+                return Err(invalid_state());
+            }
+            descriptor.state = spool_state;
+        }
+        next.events.push(format!("{event}:{output_id}"));
+        self.persist_job(&next, Some(current.version))?;
+        let result = next
+            .output_groups
+            .get(output_id)
+            .cloned()
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        state.jobs.insert(id.into(), next);
+        Ok(result)
     }
 
     fn transition(
@@ -4891,26 +5653,153 @@ fn effect_key(job: &Job, step: &StepPlan, sequence: u64) -> Result<IdempotencyKe
     .map_err(|_| HostProblem::ResourceExhausted)
 }
 
-fn append_spool(
-    job: &mut Job,
-    file: &str,
-    record: Vec<u8>,
-    limits: BatchLimits,
+fn next_spool_sequence(invocation: &Invocation, job: &mut Job) -> Result<u64, HostProblem> {
+    job.spool_sequence = job
+        .spool_sequence
+        .checked_add(1)
+        .ok_or(HostProblem::ResourceExhausted)?;
+    if job.spool_sequence > invocation.limits.max_effects {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    Ok(job.spool_sequence)
+}
+
+fn spool_internal_name(step_name: Option<&str>, file: &str) -> String {
+    let candidate = step_name.map_or_else(
+        || file.to_ascii_uppercase(),
+        |step| {
+            format!(
+                "{}:{}",
+                step.to_ascii_uppercase(),
+                file.to_ascii_uppercase()
+            )
+        },
+    );
+    if candidate.len() <= 64 {
+        candidate
+    } else {
+        let mut digest = Sha256::new();
+        digest.update(b"mainframe-env.jes-spool-file@1");
+        digest.update(candidate.as_bytes());
+        let encoded = format!("{:x}", digest.finalize());
+        format!("F-{}", &encoded[..60])
+    }
+}
+
+#[derive(Clone)]
+struct SpoolRoute {
+    class: char,
+    destination: String,
+    writer: Option<String>,
+    forms: Option<String>,
+    copies: u16,
+    hold: bool,
+}
+
+fn spool_route(job: &Job, dd: Option<&crate::DdPlan>) -> SpoolRoute {
+    let dd_parameter = |keyword: &str| {
+        dd.and_then(|dd| {
+            dd.parameters
+                .iter()
+                .find(|parameter| parameter.identity().keyword() == keyword)
+                .map(|parameter| parameter.normalized_value())
+        })
+    };
+    let output = dd_parameter("OUTPUT")
+        .map(|name| name.trim_start_matches("*.").to_ascii_uppercase())
+        .and_then(|name| {
+            job.plan
+                .outputs
+                .iter()
+                .find(|output| output.name.eq_ignore_ascii_case(&name))
+        });
+    let parameter = |keyword: &str| {
+        dd_parameter(keyword).or_else(|| {
+            output.and_then(|output| {
+                output
+                    .parameters
+                    .iter()
+                    .find(|parameter| parameter.identity().keyword() == keyword)
+                    .map(|parameter| parameter.normalized_value())
+            })
+        })
+    };
+    let class = dd
+        .and_then(|dd| dd.sysout.as_deref())
+        .and_then(|value| {
+            value
+                .trim_matches(['(', ')'])
+                .split(',')
+                .next()
+                .filter(|value| *value != "*")
+                .and_then(|value| value.chars().next())
+        })
+        .or_else(|| parameter("CLASS").and_then(|value| value.chars().next()))
+        .unwrap_or(job.class);
+    SpoolRoute {
+        class,
+        destination: parameter("DEST").unwrap_or("LOCAL").to_ascii_uppercase(),
+        writer: parameter("WRITER").map(str::to_ascii_uppercase),
+        forms: parameter("FORMS").map(str::to_ascii_uppercase),
+        copies: parameter("COPIES")
+            .and_then(|value| value.trim_matches(['(', ')']).split(',').next())
+            .and_then(|value| value.parse().ok())
+            .filter(|copies| (1..=255).contains(copies))
+            .unwrap_or(1),
+        hold: parameter("HOLD").is_some_and(|value| value.eq_ignore_ascii_case("YES"))
+            || parameter("OUTDISP").is_some_and(|value| value.eq_ignore_ascii_case("HOLD")),
+    }
+}
+
+fn spool_descriptor_id(job: &str, file: &str) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"mainframe-env.jes-spool-id@1");
+    digest.update(job.as_bytes());
+    digest.update(file.as_bytes());
+    let encoded = format!("{:x}", digest.finalize());
+    format!("SP-{}", &encoded[..60])
+}
+
+fn spool_resource(job: &Job, file: &str) -> String {
+    format!("JOB.{}.{}", job.name, spool_descriptor_id(&job.id, file))
+}
+
+fn output_group_id(job: &Job, route: &SpoolRoute) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"mainframe-env.jes-output-id@1");
+    digest.update(job.id.as_bytes());
+    digest.update([route.class as u8]);
+    digest.update(route.destination.as_bytes());
+    digest.update(route.writer.as_deref().unwrap_or("").as_bytes());
+    digest.update(route.forms.as_deref().unwrap_or("").as_bytes());
+    let encoded = format!("{:x}", digest.finalize());
+    format!("OUT-{}", &encoded[..60])
+}
+
+fn validate_output_route(
+    destination: &str,
+    writer: Option<&str>,
+    forms: Option<&str>,
 ) -> Result<(), HostProblem> {
-    if !job.spool.contains_key(file) && job.spool.len() >= limits.max_spool_files {
-        return Err(HostProblem::ResourceExhausted);
+    for value in [Some(destination), writer, forms].into_iter().flatten() {
+        if value.is_empty()
+            || value.len() > 128
+            || value.chars().any(|character| {
+                character.is_control() || character.is_whitespace() || !character.is_ascii()
+            })
+        {
+            return Err(HostProblem::Malformed);
+        }
     }
-    let records = job.spool.values().map(Vec::len).sum::<usize>();
-    let bytes = job.spool.values().flatten().map(Vec::len).sum::<usize>();
-    if records >= limits.max_spool_records
-        || bytes
-            .checked_add(record.len())
-            .is_none_or(|bytes| bytes > limits.max_spool_bytes)
-    {
-        return Err(HostProblem::ResourceExhausted);
-    }
-    job.spool.entry(file.into()).or_default().push(record);
     Ok(())
+}
+
+fn invalid_state() -> HostProblem {
+    HostProblem::Condition {
+        name: "INVALID_STATE".into(),
+        response: 409,
+        response2: 0,
+    }
 }
 
 fn snapshot(job: &Job) -> JobSnapshot {
@@ -4979,6 +5868,7 @@ mod tests {
         CapabilityDescriptor, CicsDisposition, CicsResponse, DatasetResult, EffectResult,
         HostLimits, HostProvider, RegistrySnapshot,
     };
+    use mainframe_env_spool::{ProviderArtifactStore, SpoolLimits, SpoolService, spool_providers};
     use mainframe_env_store::{MemoryStore, SqliteStateStore};
     use mainframe_env_store_api::{ProviderStateMutation, ProviderStateWrite};
     use std::collections::BTreeSet;
@@ -4986,6 +5876,7 @@ mod tests {
 
     struct SecurityProvider {
         descriptor: CapabilityDescriptor,
+        deny_spool: bool,
     }
 
     struct FailDatasetCommitOnceStore {
@@ -5391,6 +6282,11 @@ mod tests {
 
         fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
             let outcome = match effect.request {
+                HostRequest::Security(SecurityRequest::Authorize { resource, .. })
+                    if self.deny_spool && resource.as_str().contains(".SP-") =>
+                {
+                    Ok(HostResult::Security(SecurityDecision::Deny))
+                }
                 HostRequest::Security(_) => Ok(HostResult::Security(SecurityDecision::Allow)),
                 _ => Err(HostProblem::Malformed),
             };
@@ -5401,13 +6297,17 @@ mod tests {
         }
     }
 
-    fn host(program: Arc<dyn HostProvider>) -> Arc<ScopedHostService> {
-        host_with(program, Vec::new())
-    }
-
     fn host_with(
         program: Arc<dyn HostProvider>,
+        extra: Vec<Arc<dyn HostProvider>>,
+    ) -> Arc<ScopedHostService> {
+        host_with_security(program, extra, false)
+    }
+
+    fn host_with_security(
+        program: Arc<dyn HostProvider>,
         mut extra: Vec<Arc<dyn HostProvider>>,
+        deny_spool: bool,
     ) -> Arc<ScopedHostService> {
         let limits = InvocationLimits::default();
         let security: Arc<dyn HostProvider> = Arc::new(SecurityProvider {
@@ -5425,6 +6325,7 @@ mod tests {
                 max_result_bytes: 65536,
                 ready: true,
             },
+            deny_spool,
         });
         let mut providers = vec![security, program];
         providers.append(&mut extra);
@@ -5441,6 +6342,8 @@ mod tests {
             "host.program.invoke",
             "host.dataset.read",
             "host.dataset.write",
+            "host.spool.read",
+            "host.spool.write",
             "host.cics.execute",
         ]
         .into_iter()
@@ -5478,7 +6381,20 @@ mod tests {
         store: Arc<dyn ProviderStateStore>,
         program: Arc<dyn HostProvider>,
     ) -> Arc<BatchService> {
-        BatchService::open(host(program), store, Default::default(), Default::default()).unwrap()
+        let providers = spool_test_providers(store.clone());
+        BatchService::open(
+            host_with(program, providers),
+            store,
+            Default::default(),
+            Default::default(),
+        )
+        .unwrap()
+    }
+
+    fn spool_test_providers(store: Arc<dyn ProviderStateStore>) -> Vec<Arc<dyn HostProvider>> {
+        let artifacts = ProviderArtifactStore::new(store.clone(), 4 * 1024 * 1024).unwrap();
+        let spool = SpoolService::open(store, artifacts, SpoolLimits::default()).unwrap();
+        spool_providers(spool, InvocationLimits::default())
     }
 
     fn builtins() -> Arc<dyn HostProvider> {
@@ -5509,6 +6425,7 @@ mod tests {
         records: Arc<Mutex<BTreeMap<String, Vec<Vec<u8>>>>>,
     ) -> Arc<BatchService> {
         let limits = InvocationLimits::default();
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
         let generations = Arc::new(Mutex::new(BTreeMap::new()));
         let provider = |capability: &str| {
             Arc::new(DatasetProvider {
@@ -5526,15 +6443,14 @@ mod tests {
                 generations: generations.clone(),
             }) as Arc<dyn HostProvider>
         };
+        let mut providers = vec![
+            provider("host.dataset.read"),
+            provider("host.dataset.write"),
+        ];
+        providers.extend(spool_test_providers(store.clone()));
         BatchService::open(
-            host_with(
-                builtins(),
-                vec![
-                    provider("host.dataset.read"),
-                    provider("host.dataset.write"),
-                ],
-            ),
-            Arc::new(MemoryStore::new(Default::default())),
+            host_with(builtins(), providers),
+            store,
             Default::default(),
             Default::default(),
         )
@@ -5545,8 +6461,9 @@ mod tests {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let dataset_store: Arc<dyn ProviderStateStore> = store.clone();
         let dataset = DatasetService::open(dataset_store, DatasetLimits::default()).unwrap();
-        let providers = dataset_providers(dataset.clone(), InvocationLimits::default());
+        let mut providers = dataset_providers(dataset.clone(), InvocationLimits::default());
         let batch_store: Arc<dyn ProviderStateStore> = store;
+        providers.extend(spool_test_providers(batch_store.clone()));
         let batch = BatchService::open(
             host_with(builtins(), providers),
             batch_store,
@@ -5634,11 +6551,159 @@ mod tests {
             completed.steps[0].termination,
             Some(StepTermination::ReturnCode { code: 0 })
         );
-        let (records, more) = service.spool(&submitted.id, "SYSPRINT", 0, 10).unwrap();
+        let (records, more) = service
+            .spool(&invocation, &submitted.id, "SYSPRINT", 0, 10)
+            .unwrap();
         assert_eq!(records, vec![b"IEFBR14".to_vec()]);
         assert!(!more);
-        service.purge(&submitted.id).unwrap();
+        service.purge(&invocation, &submitted.id).unwrap();
         assert_eq!(service.get(&submitted.id), Err(HostProblem::NotFound));
+    }
+
+    #[test]
+    fn spool_descriptors_preserve_step_ownership_and_output_routing_transitions() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())), builtins());
+        let invocation = invocation();
+        let bundle = JclBundle {
+            primary: "//OUTJOB JOB CLASS=A\n//OUT1 OUTPUT CLASS=B,DEST=REMOTE,OUTDISP=HOLD\n//STEP1 EXEC PGM=IEFBR14\n//SYSPRINT DD SYSOUT=*,OUTPUT=*.OUT1\n"
+                .into(),
+            ..Default::default()
+        };
+        let conversion = crate::convert_jcl(&bundle, Default::default()).unwrap();
+        assert!(conversion.is_valid(), "{:?}", conversion.diagnostics());
+        let submitted = service
+            .submit(
+                &invocation,
+                &bundle,
+                &IdempotencyKey::new("output-routing", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed
+        );
+        let routed = {
+            let state = service.lock().unwrap();
+            let job = state.jobs.get(&submitted.id).unwrap();
+            let descriptor = job
+                .spool_files
+                .values()
+                .find(|descriptor| descriptor.dd_name == "SYSPRINT")
+                .unwrap();
+            assert_eq!(descriptor.step_name.as_deref(), Some("STEP1"));
+            assert_eq!(descriptor.state, JesSpoolState::Held);
+            job.output_groups
+                .values()
+                .find(|group| group.class == 'B')
+                .cloned()
+                .unwrap()
+        };
+        assert_eq!(routed.destination, "REMOTE");
+        assert_eq!(routed.writer, None);
+        assert_eq!(routed.forms, None);
+        assert_eq!(routed.copies, 1);
+        assert_eq!(routed.state, JesOutputState::Held);
+
+        let rerouted = service
+            .route_output(
+                &invocation,
+                &submitted.id,
+                &routed.id,
+                "NODE2",
+                Some("WTR2"),
+                Some("BLUE"),
+            )
+            .unwrap();
+        assert_eq!(rerouted.destination, "NODE2");
+        assert_eq!(
+            service
+                .release_output(&invocation, &submitted.id, &routed.id)
+                .unwrap()
+                .state,
+            JesOutputState::Released
+        );
+        assert_eq!(
+            service
+                .select_output(&invocation, &submitted.id, &routed.id)
+                .unwrap()
+                .state,
+            JesOutputState::Selected
+        );
+        assert_eq!(
+            service
+                .complete_selected_output(&invocation, &submitted.id, &routed.id)
+                .unwrap()
+                .state,
+            JesOutputState::Complete
+        );
+    }
+
+    #[test]
+    fn spool_access_is_denied_before_artifact_mutation() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let providers = spool_test_providers(store.clone());
+        let service = BatchService::open(
+            host_with_security(builtins(), providers, true),
+            store.clone(),
+            Default::default(),
+            Default::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            service.submit(
+                &invocation(),
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("denied-spool", InvocationLimits::default()).unwrap(),
+                false,
+            ),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(
+            store
+                .list_provider_state("spool-artifact", 16)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn artifact_backed_spool_survives_service_restart_and_retention_purge() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let invocation = invocation();
+        let first = service(store.clone(), builtins());
+        let submitted = first
+            .submit(
+                &invocation,
+                &bundle("IEFBR14"),
+                &IdempotencyKey::new("spool-restart", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        first.run_next(&invocation, false).unwrap().unwrap();
+        drop(first);
+
+        let restarted = service(store.clone(), builtins());
+        assert_eq!(
+            restarted
+                .spool(&invocation, &submitted.id, "SYSPRINT", 0, 8)
+                .unwrap()
+                .0,
+            vec![b"IEFBR14".to_vec()]
+        );
+        assert_eq!(
+            restarted
+                .purge_expired(&invocation, BatchLimits::default().spool_retention_ticks, 8)
+                .unwrap(),
+            vec![submitted.id.clone()]
+        );
+        assert_eq!(restarted.get(&submitted.id), Err(HostProblem::NotFound));
+        assert!(
+            store
+                .list_provider_state("spool-artifact", 16)
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]
@@ -5815,7 +6880,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            service.cancel(&queued.id).unwrap().state,
+            service.cancel(&invocation, &queued.id).unwrap().state,
             JobState::Cancelled
         );
         assert_eq!(missing.state, JobState::Queued);
@@ -5844,7 +6909,7 @@ mod tests {
             );
             assert!(
                 service
-                    .spool(&submitted.id, "JESMSGLG", 0, 20)
+                    .spool(&invocation, &submitted.id, "JESMSGLG", 0, 20)
                     .unwrap()
                     .0
                     .iter()
@@ -5870,9 +6935,12 @@ mod tests {
             },
             controls: controls.clone(),
         });
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let mut providers = vec![cics];
+        providers.extend(spool_test_providers(store.clone()));
         let service = BatchService::open(
-            host_with(builtins(), vec![cics]),
-            Arc::new(MemoryStore::new(Default::default())),
+            host_with(builtins(), providers),
+            store,
             Default::default(),
             Default::default(),
         )
@@ -5898,7 +6966,7 @@ mod tests {
         assert!(controls[0].values().all(|value| value.bytes() == b"CLOSED"));
         assert!(
             service
-                .spool(&submitted.id, "CMDOUT", 0, 16)
+                .spool(&invocation, &submitted.id, "CMDOUT", 0, 16)
                 .unwrap()
                 .0
                 .iter()
@@ -5925,11 +6993,17 @@ mod tests {
         let completed = service.run_next(&invocation, false).unwrap().unwrap();
         assert_eq!(completed.state, JobState::Completed);
         assert_eq!(
-            service.spool(&submitted.id, "SYSPRINT", 0, 10).unwrap().0,
+            service
+                .spool(&invocation, &submitted.id, "SYSPRINT", 0, 10)
+                .unwrap()
+                .0,
             vec![b"SYSUT2 RECORDS=2".to_vec()]
         );
         assert_eq!(
-            service.spool(&submitted.id, "SYSUT2", 0, 10).unwrap().0,
+            service
+                .spool(&invocation, &submitted.id, "SYSUT2", 0, 10)
+                .unwrap()
+                .0,
             vec![b"FIRST".to_vec(), b"SECOND".to_vec()]
         );
     }
@@ -6048,7 +7122,7 @@ mod tests {
             JobState::Completed
         );
         assert_eq!(
-            service.spool(&submitted.id, "SYSUT2", 0, 8),
+            service.spool(&invocation, &submitted.id, "SYSUT2", 0, 8),
             Err(HostProblem::NotFound)
         );
     }
@@ -6420,13 +7494,16 @@ mod tests {
         ));
         assert!(
             service
-                .spool(&submitted.id, "SYSPRINT", 0, 64)
+                .spool(&invocation, &submitted.id, "SYSPRINT", 0, 64)
                 .unwrap()
                 .0
                 .iter()
                 .any(|record| String::from_utf8_lossy(record).contains("LISTDATA"))
         );
-        let syprint = service.spool(&submitted.id, "SYSPRINT", 0, 64).unwrap().0;
+        let syprint = service
+            .spool(&invocation, &submitted.id, "SYSPRINT", 0, 64)
+            .unwrap()
+            .0;
         assert!(syprint.iter().any(|record| {
             let record = String::from_utf8_lossy(record);
             record.contains("USER.CAT") && record.contains("UserCatalog")
@@ -6502,8 +7579,9 @@ mod tests {
             ))
         ));
 
-        let providers = dataset_providers(dataset.clone(), InvocationLimits::default());
+        let mut providers = dataset_providers(dataset.clone(), InvocationLimits::default());
         let batch_store: Arc<dyn ProviderStateStore> = store.clone();
+        providers.extend(spool_test_providers(batch_store.clone()));
         let batch = BatchService::open(
             host_with(builtins(), providers),
             batch_store,
@@ -6533,7 +7611,7 @@ mod tests {
         );
         assert!(
             batch
-                .spool(&job.id, "SYSPRINT", 0, 8)
+                .spool(&invocation, &job.id, "SYSPRINT", 0, 8)
                 .unwrap()
                 .0
                 .iter()
@@ -6763,7 +7841,7 @@ mod tests {
         );
         assert!(
             service
-                .spool(&job.id, "SYSPRINT", 0, 8)
+                .spool(&invocation, &job.id, "SYSPRINT", 0, 8)
                 .unwrap()
                 .0
                 .iter()
@@ -6931,7 +8009,10 @@ mod tests {
         let completed = service.run_next(&invocation, false).unwrap().unwrap();
         assert_eq!(completed.state, JobState::Completed);
         assert_eq!(completed.return_code, Some(12));
-        let syprint = service.spool(&submitted.id, "SYSPRINT", 0, 64).unwrap().0;
+        let syprint = service
+            .spool(&invocation, &submitted.id, "SYSPRINT", 0, 64)
+            .unwrap()
+            .0;
         for label in [
             "ALTER LIBRARYENTRY",
             "ALTER VOLUMEENTRY",
@@ -7285,8 +8366,9 @@ mod tests {
         let mut scheduler = JesSchedulerConfiguration::single_node(1);
         scheduler.initiators.get_mut("INIT0001").unwrap().classes = BTreeSet::from(['B']);
         let store = Arc::new(MemoryStore::new(Default::default()));
+        let providers = spool_test_providers(store.clone());
         let service = BatchService::open_with_scheduler(
-            host(builtins()),
+            host_with(builtins(), providers),
             store,
             Default::default(),
             Default::default(),
@@ -7344,6 +8426,13 @@ mod tests {
         object.remove("schema_version");
         object.remove("initiator");
         object.remove("steps");
+        object.remove("spool_sequence");
+        object.remove("spool_files");
+        object.remove("output_groups");
+        object.insert(
+            "spool".into(),
+            serde_json::json!({"LEGACY": [[79, 76, 68]]}),
+        );
         object.insert("state".into(), serde_json::Value::String("Running".into()));
         object.insert("attempt".into(), serde_json::json!(1));
         object.insert("version".into(), serde_json::json!(2));
@@ -7358,6 +8447,13 @@ mod tests {
                 Some(row.version),
             )
             .unwrap();
+        for namespace in ["jes-spool", "spool-artifact"] {
+            for record in store.list_provider_state(namespace, 128).unwrap() {
+                store
+                    .delete_provider_state(namespace, &record.key, record.version)
+                    .unwrap();
+            }
+        }
         drop(first);
 
         let recovered = service(store.clone(), builtins());
@@ -7365,10 +8461,16 @@ mod tests {
         assert_eq!(snapshot.state, JobState::Queued);
         assert_eq!(snapshot.steps.len(), 1);
         assert_eq!(snapshot.steps[0].state, StepState::Pending);
+        assert_eq!(
+            recovered.spool(&invocation, &id, "LEGACY", 0, 8).unwrap().0,
+            vec![b"OLD".to_vec()]
+        );
         let migrated = store.get_provider_state("jes-job", &id).unwrap().unwrap();
         let migrated: serde_json::Value = serde_json::from_slice(&migrated.payload).unwrap();
         assert_eq!(migrated["schema_version"], JES_DURABLE_JOB_CONTRACT);
         assert_eq!(migrated["state"], "queued");
+        assert_eq!(migrated["spool"], serde_json::json!({}));
+        assert!(migrated["spool_files"].get("LEGACY").is_some());
         let schema: serde_json::Value = serde_json::from_str(include_str!(
             "../../../../conformance/0.8/schemas/jes-durable-job.schema.json"
         ))

@@ -150,6 +150,28 @@ pub enum JesSpoolState {
     Purged,
 }
 
+impl JesSpoolState {
+    #[must_use]
+    pub const fn can_transition_to(self, next: Self) -> bool {
+        use JesSpoolState as S;
+        matches!(
+            (self, next),
+            (S::Open, S::Closed | S::Held | S::Cancelled | S::Purged)
+                | (
+                    S::Closed,
+                    S::Held | S::Selected | S::Complete | S::Cancelled | S::Purged
+                )
+                | (S::Held, S::Released | S::Cancelled | S::Purged)
+                | (
+                    S::Released,
+                    S::Held | S::Selected | S::Complete | S::Cancelled | S::Purged
+                )
+                | (S::Selected, S::Complete | S::Cancelled | S::Purged)
+                | (S::Complete | S::Cancelled, S::Purged)
+        )
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct JesSpoolDescriptor {
     pub schema_version: String,
@@ -179,6 +201,30 @@ pub enum JesOutputState {
     Complete,
     Cancelled,
     Purged,
+}
+
+impl JesOutputState {
+    #[must_use]
+    pub const fn can_transition_to(self, next: Self) -> bool {
+        use JesOutputState as S;
+        matches!(
+            (self, next),
+            (
+                S::AwaitingSelection,
+                S::Held | S::Selected | S::Cancelled | S::Purged
+            ) | (S::Held, S::Released | S::Cancelled | S::Purged)
+                | (
+                    S::Released,
+                    S::Held | S::Selected | S::Cancelled | S::Purged
+                )
+                | (
+                    S::Selected,
+                    S::Printing | S::Complete | S::Cancelled | S::Purged
+                )
+                | (S::Printing, S::Complete | S::Cancelled | S::Purged)
+                | (S::Complete | S::Cancelled, S::Purged)
+        )
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

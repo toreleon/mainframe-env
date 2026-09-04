@@ -39,8 +39,9 @@ pub use request::{
     DatasetResult, Db2HostVariable, Db2Operation, Db2Request, Db2Result, Db2Row, EffectRequest,
     EffectResult, HostLimits, HostProblem, HostRequest, HostResult, ImsOperation, ImsQualifier,
     ImsRequest, ImsResult, ImsSegment, KeyRelation, MqOperation, MqRequest, MqResult, Mutation,
-    ProgramRequest, RecordFormat, RuntimeServiceKind, RuntimeServiceSelector, SecretRef,
-    SecurityDecision, SecurityRequest, SpoolRequest, StateRequest, TerminalField, TerminalRequest,
+    ProgramRequest, RecordFormat, RuntimeServiceKind, RuntimeServiceSelector,
+    SPOOL_REQUEST_CONTRACT, SPOOL_RESULT_CONTRACT, SecretRef, SecurityDecision, SecurityRequest,
+    SpoolFileSummary, SpoolRequest, SpoolResult, StateRequest, TerminalField, TerminalRequest,
 };
 pub use runtime_service::{
     RUNTIME_SERVICE_REGISTRY_CONTRACT, RuntimeServiceDescriptor, RuntimeServiceRegistry,
