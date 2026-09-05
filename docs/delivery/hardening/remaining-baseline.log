@@ -1,0 +1,20 @@
+running 2 tests
+BASELINE47 actual linkage values: [[0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 49], [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 49]]; expected retained values: 1 then 2
+test cobol::baseline_remaining::baseline_47_records_fresh_instead_of_retained_state ... ok
+BASELINE55 before=[ProviderStateRecord { namespace: "hardening-49-business", key: "online-call-effect-1:1", version: 1, payload: [99, 111, 109, 109, 105, 116, 116, 101, 100] }], after=[ProviderStateRecord { namespace: "hardening-49-business", key: "online-call-effect-1:1", version: 1, payload: [99, 111, 109, 109, 105, 116, 116, 101, 100] }, ProviderStateRecord { namespace: "hardening-49-business", key: "online-call-effect-98765:1", version: 1, payload: [99, 111, 109, 109, 105, 116, 116, 101, 100] }]; same parent/run/effect occurrence, counter reset to 98765
+test cobol::baseline_remaining::baseline_55_records_duplicate_business_effect_after_counter_reorder ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 27 filtered out; finished in 0.02s
+
+     Running unittests src/bin/certify.rs (/mnt/data/work/target/debug/deps/certify-3e336fef3eaba019)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (/mnt/data/work/target/debug/deps/mainframe_env_server-480540fb858b4e48)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

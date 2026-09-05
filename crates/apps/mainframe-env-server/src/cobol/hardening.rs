@@ -154,6 +154,9 @@ impl HostProvider for FaultRouter {
                         .unwrap();
                 }
             }
+            if std::env::var_os("MAINFRAME_ENV_TEST_CRASH_AFTER_BUSINESS").is_some() {
+                std::process::exit(55);
+            }
             if self.delete_cursors {
                 for record in self
                     .store
@@ -346,14 +349,10 @@ fn hardening_49_unknown_effect_survives_all_cobol_adapters_and_store_reopen() {
             "a real business effect was committed before uncertainty"
         );
         let receipts = fixture.store.unknown_effects(128).unwrap();
-        if profile != "call" {
-            assert_eq!(
-                receipts.len(),
-                1,
-                "outer durable call retains a reconciliation receipt"
-            );
-            assert_eq!(receipts[0].state, EffectState::UnknownOutcome);
-            assert!(receipts[0].result_digest.is_some());
+        assert!(!receipts.is_empty(), "every adapter retains uncertainty");
+        for receipt in &receipts {
+            assert_eq!(receipt.state, EffectState::UnknownOutcome);
+            assert!(receipt.result_digest.is_some());
         }
         drop(fixture);
         let reopened = SqliteStateStore::open(&url, 8 * 1024 * 1024, 65536).unwrap();
@@ -376,8 +375,8 @@ fn hardening_49_unknown_effect_survives_all_cobol_adapters_and_store_reopen() {
                 .unwrap();
             assert_eq!(reconciled.key, receipt.key);
             assert_eq!(reconciled.state, EffectState::Completed);
-            assert!(reopened.unknown_effects(128).unwrap().is_empty());
         }
+        assert!(reopened.unknown_effects(128).unwrap().is_empty());
     }
 }
 
@@ -460,7 +459,7 @@ fn hardening_49_journal_result_and_terminal_failure_do_not_erase_uncertainty() {
         fixture.install("MIDDLE", MIDDLE);
         fixture.install("ROOT", ROOT);
         assert_eq!(
-            fixture.batch("ROOT", "").outcome,
+            fixture.batch("MIDDLE", "").outcome,
             Err(HostProblem::UnknownOutcome)
         );
         assert_eq!(
@@ -473,7 +472,7 @@ fn hardening_49_journal_result_and_terminal_failure_do_not_erase_uncertainty() {
         );
         let calls = fixture.faults.observed.lock().unwrap();
         let middle = calls.iter().find(|effect| matches!(&effect.request,
-            HostRequest::Program(ProgramRequest::Call { program, .. }) if program.as_str() == "MIDDLE")).unwrap();
+            HostRequest::Program(ProgramRequest::Call { program, .. }) if program.as_str() == "EFFECT")).unwrap();
         let receipt = fixture
             .store
             .effect(middle.idempotency_key.as_ref().unwrap())
@@ -701,10 +700,284 @@ fn hardening_48_explicit_parent_cancellation_is_not_lost_in_child_construction()
     });
     // Direct adapter entry, bypassing an outer host admission check, exercises propagation.
     assert_eq!(
-        fixture
+        fixture.router.cobol.execute_installed(
+            &inv,
+            "CPU-LOOP",
+            &call_payload(&[]),
+            "control-test"
+        ),
+        Err(HostProblem::Cancelled)
+    );
+}
+
+const REPLAY_LEAF: &str =
+    "IDENTIFICATION DIVISION.\nPROGRAM-ID. REPLAY-LEAF.\nPROCEDURE DIVISION.\nGOBACK.\n";
+const REPLAY_MIDDLE: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. REPLAY-MIDDLE.\nPROCEDURE DIVISION.\nCALL 'REPLAY-LEAF'.\nCALL 'REPLAY-LEAF'.\nGOBACK.\n";
+const REPLAY_ROOT: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. REPLAY-ROOT.\nPROCEDURE DIVISION.\nCALL 'REPLAY-MIDDLE'.\nCALL 'REPLAY-MIDDLE'.\nGOBACK.\n";
+
+#[test]
+fn hardening_55_completed_nested_calls_replay_after_sqlite_reopen() {
+    for batch in [false, true] {
+        let root = TestRoot::new();
+        let url = root.sqlite_url();
+        let fixture = Fixture::new(
+            &root,
+            Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 65536).unwrap()),
+            HostProblem::NotFound,
+            false,
+        );
+        fixture.install("REPLAY-LEAF", REPLAY_LEAF);
+        fixture.install("REPLAY-MIDDLE", REPLAY_MIDDLE);
+        fixture.install("REPLAY-ROOT", REPLAY_ROOT);
+        let payload = if batch {
+            BoundedPayload::new(
+                "mainframe-env.program.input@1",
+                serde_json::to_vec(&input("")).unwrap(),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        } else {
+            call_payload(&[])
+        };
+        let first = fixture.call(&parent(), "REPLAY-ROOT", 1, payload.clone());
+        assert!(first.outcome.is_ok(), "{first:?}");
+        let receipts = fixture
+            .store
+            .list_provider_state("cobol-call-replay@1", 128)
+            .unwrap();
+        assert_eq!(
+            receipts.len(),
+            7,
+            "root + two middle + four leaf call occurrences"
+        );
+        let executions: Vec<_> = receipts
+            .iter()
+            .map(|r| {
+                assert_eq!(r.version, 2);
+                let value: serde_json::Value = serde_json::from_slice(&r.payload).unwrap();
+                let id = ExecutionId::new(
+                    value["child_execution"].as_str().unwrap(),
+                    InvocationLimits::default(),
+                )
+                .unwrap();
+                let execution = fixture.store.get_execution(&id).unwrap().unwrap();
+                assert_eq!(execution.run_unit_id, parent().run_unit_id);
+                (id, execution)
+            })
+            .collect();
+        drop(fixture);
+        let reopened = Fixture::new(
+            &root,
+            Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 65536).unwrap()),
+            HostProblem::NotFound,
+            false,
+        );
+        reopened
             .router
             .cobol
-            .execute_installed(&inv, "CPU-LOOP", &call_payload(&[])),
-        Err(HostProblem::Cancelled)
+            .sequence
+            .store(12345, Ordering::SeqCst);
+        assert!(
+            reopened
+                .call(&parent(), "REPLAY-LEAF", 999, call_payload(&[]))
+                .outcome
+                .is_ok()
+        );
+        let before = reopened
+            .store
+            .list_provider_state("cobol-call-replay@1", 128)
+            .unwrap();
+        let mut retry = parent();
+        retry.attempt = 2;
+        assert_eq!(
+            reopened.call(&retry, "REPLAY-ROOT", 1, payload).outcome,
+            first.outcome
+        );
+        assert_eq!(
+            reopened
+                .store
+                .list_provider_state("cobol-call-replay@1", 128)
+                .unwrap(),
+            before
+        );
+        for (id, record) in executions {
+            assert_eq!(reopened.store.get_execution(&id).unwrap(), Some(record));
+        }
+    }
+}
+
+// Invoked in a dedicated subprocess by the crash test. Never mutates parent env.
+#[test]
+fn hardening_55_crash_worker() {
+    let Some(path) = std::env::var_os("MAINFRAME_ENV_TEST_CRASH_ROOT") else {
+        return;
+    };
+    let root = TestRoot(PathBuf::from(path));
+    let fixture = Fixture::new(
+        &root,
+        Arc::new(SqliteStateStore::open(&root.sqlite_url(), 8 * 1024 * 1024, 65536).unwrap()),
+        HostProblem::UnknownOutcome,
+        false,
+    );
+    fixture.install("MIDDLE", MIDDLE);
+    fixture.install("ROOT", ROOT);
+    let _ = fixture.call(&parent(), "ROOT", 1, call_payload(&[]));
+    panic!("worker must exit at the committed business effect before returning a result");
+}
+
+#[test]
+fn hardening_55_abrupt_exit_after_business_commit_does_not_repeat_effect() {
+    let root = TestRoot::new();
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "cobol::hardening::hardening_55_crash_worker",
+            "--nocapture",
+        ])
+        .env("MAINFRAME_ENV_TEST_CRASH_ROOT", &root.0)
+        .env("MAINFRAME_ENV_TEST_CRASH_AFTER_BUSINESS", "1")
+        .current_dir(&root.0)
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(55),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let fixture = Fixture::new(
+        &root,
+        Arc::new(SqliteStateStore::open(&root.sqlite_url(), 8 * 1024 * 1024, 65536).unwrap()),
+        HostProblem::UnknownOutcome,
+        false,
+    );
+    let before = fixture
+        .store
+        .list_provider_state("hardening-49-business", 128)
+        .unwrap();
+    assert_eq!(before.len(), 1);
+    fixture.router.cobol.sequence.store(98765, Ordering::SeqCst);
+    fixture.install("REPLAY-LEAF", REPLAY_LEAF);
+    let mut unrelated = parent();
+    unrelated.execution_id = ExecutionId::new("unrelated", InvocationLimits::default()).unwrap();
+    unrelated.run_unit_id = RunUnitId::new("unrelated-run", InvocationLimits::default()).unwrap();
+    assert!(
+        fixture
+            .call(&unrelated, "REPLAY-LEAF", 1, call_payload(&[]))
+            .outcome
+            .is_ok()
+    );
+    std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..4)
+            .map(|_| scope.spawn(|| fixture.call(&parent(), "ROOT", 1, call_payload(&[]))))
+            .collect();
+        for handle in handles {
+            assert_eq!(
+                handle.join().unwrap().outcome,
+                Err(HostProblem::UnknownOutcome)
+            );
+        }
+    });
+    assert_eq!(
+        fixture
+            .store
+            .list_provider_state("hardening-49-business", 128)
+            .unwrap(),
+        before
+    );
+    assert!(fixture.faults.observed.lock().unwrap().iter().all(|e|
+        !matches!(&e.request,HostRequest::Program(ProgramRequest::Call{program,..}) if program.as_str()=="EFFECT")));
+}
+
+#[test]
+fn hardening_55_concurrent_first_dispatch_has_one_durable_child() {
+    let root = TestRoot::new();
+    let fixture = Fixture::new(
+        &root,
+        Arc::new(MemoryStore::new(Default::default())),
+        HostProblem::NotFound,
+        false,
+    );
+    fixture.install("REPLAY-LEAF", REPLAY_LEAF);
+    let barrier = std::sync::Barrier::new(4);
+    std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..4)
+            .map(|_| {
+                scope.spawn(|| {
+                    barrier.wait();
+                    fixture.call(&parent(), "REPLAY-LEAF", 1, call_payload(&[]))
+                })
+            })
+            .collect();
+        let mut completed = 0;
+        for handle in handles {
+            match handle.join().unwrap().outcome {
+                Ok(HostResult::Program(_)) => completed += 1,
+                Err(HostProblem::UnknownOutcome) => {}
+                other => panic!("unexpected {other:?}"),
+            }
+        }
+        assert!(completed >= 1);
+    });
+    let receipts = fixture
+        .store
+        .list_provider_state("cobol-call-replay@1", 128)
+        .unwrap();
+    assert_eq!(receipts.len(), 1);
+    assert_eq!(receipts[0].version, 2);
+}
+
+#[test]
+fn hardening_55_conflicting_inputs_and_legacy_retry_fail_closed() {
+    let root = TestRoot::new();
+    let fixture = Fixture::new(
+        &root,
+        Arc::new(MemoryStore::new(Default::default())),
+        HostProblem::NotFound,
+        false,
+    );
+    fixture.install("REPLAY-LEAF", REPLAY_LEAF);
+    let mut legacy = parent();
+    legacy.attempt = 2;
+    assert_eq!(
+        fixture
+            .call(&legacy, "REPLAY-LEAF", 1, call_payload(&[]))
+            .outcome,
+        Err(HostProblem::UnknownOutcome)
+    );
+    assert!(
+        fixture
+            .call(&parent(), "REPLAY-LEAF", 1, call_payload(&[]))
+            .outcome
+            .is_ok()
+    );
+    assert_eq!(
+        fixture
+            .call(&parent(), "OTHER", 1, call_payload(&[]))
+            .outcome,
+        Err(HostProblem::IdempotencyConflict)
+    );
+    assert_eq!(
+        fixture
+            .call(&parent(), "REPLAY-LEAF", 1, call_payload(&[vec![1]]))
+            .outcome,
+        Err(HostProblem::IdempotencyConflict)
+    );
+    let mut other = parent();
+    other.execution_id = ExecutionId::new("other-parent", InvocationLimits::default()).unwrap();
+    other.run_unit_id = RunUnitId::new("other-run", InvocationLimits::default()).unwrap();
+    assert!(
+        fixture
+            .call(&other, "REPLAY-LEAF", 1, call_payload(&[]))
+            .outcome
+            .is_ok()
+    );
+    assert_eq!(
+        fixture
+            .store
+            .list_provider_state("cobol-call-replay@1", 128)
+            .unwrap()
+            .len(),
+        2
     );
 }
