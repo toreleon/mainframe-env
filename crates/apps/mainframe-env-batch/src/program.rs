@@ -27,6 +27,14 @@ pub struct ProgramExecutionContext {
 pub struct ProgramInput {
     pub parameter: Option<String>,
     pub dds: Vec<DdPlan>,
+    /// Exact records hydrated for each effective DD name.
+    ///
+    /// This is separate from `DdPlan::inline_data`: flattening dataset records
+    /// into delimiter-separated bytes cannot represent empty records or data
+    /// bytes that happen to equal the delimiter. The default preserves wire
+    /// compatibility with callers that still provide inline-only input.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub dd_records: BTreeMap<String, Vec<Vec<u8>>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution: Option<ProgramExecutionContext>,
 }
@@ -381,6 +389,9 @@ impl Program for Builtin {
 }
 
 fn dd_records(input: &ProgramInput, name: &str) -> Result<Vec<Vec<u8>>, HostProblem> {
+    if let Some(records) = input.dd_records.get(&name.to_ascii_uppercase()) {
+        return Ok(records.clone());
+    }
     let dds = input
         .dds
         .iter()
@@ -391,13 +402,22 @@ fn dd_records(input: &ProgramInput, name: &str) -> Result<Vec<Vec<u8>>, HostProb
     }
     Ok(dds
         .into_iter()
-        .flat_map(|dd| {
-            dd.inline_data
-                .split(|byte| *byte == b'\n')
-                .filter(|record| !record.is_empty())
-                .map(<[u8]>::to_vec)
-        })
+        .flat_map(|dd| inline_records(&dd.inline_data))
         .collect())
+}
+
+fn inline_records(bytes: &[u8]) -> Vec<Vec<u8>> {
+    if bytes.is_empty() {
+        return Vec::new();
+    }
+    let mut records = bytes
+        .split(|byte| *byte == b'\n')
+        .map(<[u8]>::to_vec)
+        .collect::<Vec<_>>();
+    if bytes.ends_with(b"\n") {
+        records.pop();
+    }
+    records
 }
 
 fn sort_outrec(input: &ProgramInput, records: Vec<Vec<u8>>) -> Result<Vec<Vec<u8>>, HostProblem> {
@@ -625,7 +645,7 @@ fn project_sort_record(
     Ok(output)
 }
 
-fn dataset_space(ccsid: Option<u16>) -> Result<u8, HostProblem> {
+pub(crate) fn dataset_space(ccsid: Option<u16>) -> Result<u8, HostProblem> {
     match ccsid {
         None | Some(1208) => Ok(b' '),
         Some(37) => Ok(0x40),
@@ -669,7 +689,7 @@ fn edit_zoned(value: &[u8], edit: &str, ccsid: Option<u16>) -> Result<Vec<u8>, H
         })
         .collect::<Result<String, HostProblem>>()?;
     if negative {
-        edited.replace_range(..1, "-");
+        edited.insert(0, '-');
     }
     if source.next().is_some() {
         return Err(HostProblem::Malformed);
@@ -994,6 +1014,7 @@ mod tests {
                 source_end_line: 1,
                 parameters: Vec::new(),
             }],
+            dd_records: BTreeMap::new(),
             execution: None,
         }
     }
@@ -1232,6 +1253,10 @@ mod tests {
             )
             .unwrap(),
             b"EFGHABCD"
+        );
+        assert_eq!(
+            edit_zoned(b"0000011648P", "EDIT=(TTTTTTTTT.TT)", Some(1208)).unwrap(),
+            b"-000001164.87"
         );
     }
 

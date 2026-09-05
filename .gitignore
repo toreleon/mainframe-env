@@ -3,4 +3,6 @@
 /.vscode/
 .DS_Store
 *.tmp
+/screenlog.*
+/crates/apps/mainframe-env-server/examples/carddemo_signon.rs
 conformance/0.1/evidence/raw/

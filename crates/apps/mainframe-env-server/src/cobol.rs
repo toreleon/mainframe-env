@@ -1218,6 +1218,7 @@ mod tests {
                     source_end_line: 1,
                     parameters: Vec::new(),
                 }],
+                dd_records: BTreeMap::new(),
                 execution: None,
             })
             .unwrap();
@@ -1252,6 +1253,7 @@ mod tests {
                         source_end_line: 1,
                         parameters: Vec::new(),
                     }],
+                    dd_records: BTreeMap::new(),
                     execution: Some(mainframe_env_batch::ProgramExecutionContext {
                         job_name: "TIOTJOB".into(),
                         step_name: "STEP1".into(),
@@ -1362,6 +1364,7 @@ mod tests {
                             parameters: Vec::new(),
                         },
                     ],
+                    dd_records: BTreeMap::new(),
                     execution: None,
                 },
             )
@@ -1401,6 +1404,7 @@ mod tests {
                     source_end_line: 1,
                     parameters: Vec::new(),
                 }],
+                dd_records: BTreeMap::new(),
                 execution: None,
             })
             .unwrap();

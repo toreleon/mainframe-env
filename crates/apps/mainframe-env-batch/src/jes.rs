@@ -197,6 +197,17 @@ pub enum JobState {
 
 impl JobState {
     #[must_use]
+    pub const fn queue(self) -> JesQueue {
+        match self {
+            Self::Submitted => JesQueue::Conversion,
+            Self::Held => JesQueue::Held,
+            Self::Queued | Self::Selected | Self::Running => JesQueue::Execution,
+            Self::Output => JesQueue::Output,
+            Self::Completed | Self::Failed | Self::Cancelled => JesQueue::Terminal,
+        }
+    }
+
+    #[must_use]
     pub const fn terminal(self) -> bool {
         matches!(self, Self::Completed | Self::Failed | Self::Cancelled)
     }
@@ -666,7 +677,8 @@ pub fn select_job<'a>(
     Ok(candidates
         .into_iter()
         .filter(|candidate| {
-            candidate.state == JobState::Queued
+            candidate.state.queue() == JesQueue::Execution
+                && candidate.state.can_transition_to(JobState::Selected)
                 && candidate.priority >= initiator.minimum_priority
                 && initiator.classes.contains(&candidate.class)
                 && configuration
@@ -713,6 +725,15 @@ mod tests {
 
     #[test]
     fn lifecycle_rejects_shortcuts_and_terminal_transitions() {
+        assert_eq!(JobState::Submitted.queue(), JesQueue::Conversion);
+        assert_eq!(JobState::Held.queue(), JesQueue::Held);
+        assert_eq!(JobState::Queued.queue(), JesQueue::Execution);
+        assert_eq!(JobState::Selected.queue(), JesQueue::Execution);
+        assert_eq!(JobState::Running.queue(), JesQueue::Execution);
+        assert_eq!(JobState::Output.queue(), JesQueue::Output);
+        assert_eq!(JobState::Completed.queue(), JesQueue::Terminal);
+        assert_eq!(JobState::Failed.queue(), JesQueue::Terminal);
+        assert_eq!(JobState::Cancelled.queue(), JesQueue::Terminal);
         assert!(JobState::Submitted.can_transition_to(JobState::Queued));
         assert!(JobState::Queued.can_transition_to(JobState::Selected));
         assert!(JobState::Selected.can_transition_to(JobState::Running));

@@ -75,20 +75,27 @@ impl DatasetService {
                 transaction,
                 mutation,
             } => {
-                let entry = entry(state, dataset)?;
-                if entry.vsam.access_mode == mainframe_env_host_api::VsamAccessMode::NonRls
-                    && matches!(target, mainframe_env_host_api::DatasetLockTarget::Record(_))
+                let entry = state.entries.get(dataset.as_str());
+                if let Some(entry) = entry {
+                    if entry.vsam.access_mode == mainframe_env_host_api::VsamAccessMode::NonRls
+                        && matches!(target, mainframe_env_host_api::DatasetLockTarget::Record(_))
+                    {
+                        return Err(HostProblem::UnsupportedCapability {
+                            capability: "rls".into(),
+                            detail: "record locks require dataset RLS or TVS mode".into(),
+                        });
+                    }
+                    if entry.vsam.access_mode == mainframe_env_host_api::VsamAccessMode::Tvs {
+                        let transaction = transaction.as_ref().ok_or(HostProblem::Malformed)?;
+                        require_active_tvs(state, transaction, owner.as_str())?;
+                    }
+                    validate_lock_target(entry, target)?;
+                } else if !matches!(target, mainframe_env_host_api::DatasetLockTarget::Dataset)
+                    || *mode != mainframe_env_host_api::DatasetLockMode::Exclusive
+                    || transaction.is_none()
                 {
-                    return Err(HostProblem::UnsupportedCapability {
-                        capability: "rls".into(),
-                        detail: "record locks require dataset RLS or TVS mode".into(),
-                    });
+                    return Err(HostProblem::NotFound);
                 }
-                if entry.vsam.access_mode == mainframe_env_host_api::VsamAccessMode::Tvs {
-                    let transaction = transaction.as_ref().ok_or(HostProblem::Malformed)?;
-                    require_active_tvs(state, transaction, owner.as_str())?;
-                }
-                validate_lock_target(entry, target)?;
                 let expires_at = now_tick
                     .checked_add(*lease_ticks)
                     .ok_or(HostProblem::ResourceExhausted)?;
@@ -183,9 +190,9 @@ impl DatasetService {
                 if lock.dataset != *dataset || lock.owner != *owner {
                     return Err(HostProblem::Unauthorized);
                 }
-                if entry(state, dataset)?.vsam.access_mode
-                    == mainframe_env_host_api::VsamAccessMode::Tvs
-                    && lock.transaction.is_some()
+                if state.entries.get(dataset.as_str()).is_some_and(|entry| {
+                    entry.vsam.access_mode == mainframe_env_host_api::VsamAccessMode::Tvs
+                }) && lock.transaction.is_some()
                 {
                     return Err(condition("INVREQ", 16));
                 }
@@ -285,7 +292,7 @@ impl DatasetService {
                 }) {
                     if lock_conflicts(
                         dataset,
-                        entry,
+                        Some(entry),
                         &target,
                         mainframe_env_host_api::DatasetLockMode::Exclusive,
                         lock,
@@ -858,15 +865,25 @@ impl DatasetService {
             }
         }
         for lock in locks.values() {
-            let entry = entries
-                .get(lock.dataset.as_str())
-                .ok_or(HostProblem::InfrastructureFailure)?;
-            if entry.vsam.access_mode == mainframe_env_host_api::VsamAccessMode::NonRls {
+            if let Some(entry) = entries.get(lock.dataset.as_str()) {
+                if matches!(
+                    lock.target,
+                    mainframe_env_host_api::DatasetLockTarget::Record(_)
+                ) && entry.vsam.access_mode == mainframe_env_host_api::VsamAccessMode::NonRls
+                {
+                    return Err(HostProblem::InfrastructureFailure);
+                }
+                if lock.transaction.is_none() {
+                    validate_lock_target(entry, &lock.target)
+                        .map_err(|_| HostProblem::InfrastructureFailure)?;
+                }
+            } else if !matches!(
+                lock.target,
+                mainframe_env_host_api::DatasetLockTarget::Dataset
+            ) || lock.mode != mainframe_env_host_api::DatasetLockMode::Exclusive
+                || lock.transaction.is_none()
+            {
                 return Err(HostProblem::InfrastructureFailure);
-            }
-            if lock.transaction.is_none() {
-                validate_lock_target(entry, &lock.target)
-                    .map_err(|_| HostProblem::InfrastructureFailure)?;
             }
         }
         for (transaction, unit) in &tvs_units {
@@ -889,6 +906,9 @@ impl DatasetService {
         }
         for lock in locks.values() {
             if let Some(transaction) = &lock.transaction
+                && entries.get(lock.dataset.as_str()).is_some_and(|entry| {
+                    entry.vsam.access_mode == mainframe_env_host_api::VsamAccessMode::Tvs
+                })
                 && !tvs_units.get(transaction).is_some_and(|unit| {
                     unit.owner == lock.owner.as_str()
                         && matches!(
@@ -2118,6 +2138,17 @@ impl DatasetService {
                 mutation,
             } => {
                 validate_dataset_definition(definition, self.limits)?;
+                if state.locks.values().any(|lock| {
+                    lock.dataset == *dataset
+                        && matches!(
+                            lock.target,
+                            mainframe_env_host_api::DatasetLockTarget::Dataset
+                        )
+                        && lock.expires_at > mutation.sequence
+                        && lock.transaction.as_deref() != mutation.transaction.as_deref()
+                }) {
+                    return Err(condition("LOCKED", 16));
+                }
                 if definition.lifecycle.migration_level != 0
                     || definition.lifecycle.backup_generation != 0
                     || !matches!(
@@ -5218,7 +5249,7 @@ fn lock_id(seed: &str, resource: &str) -> String {
 
 fn lock_conflicts(
     dataset: &DatasetName,
-    entry: &Entry,
+    entry: Option<&Entry>,
     requested_target: &mainframe_env_host_api::DatasetLockTarget,
     requested_mode: mainframe_env_host_api::DatasetLockMode,
     existing: &mainframe_env_host_api::DatasetLockReceipt,
@@ -5234,7 +5265,7 @@ fn lock_conflicts(
     if !same_dataset || !overlaps {
         return false;
     }
-    if entry.vsam.share_options.cross_region == 1 {
+    if entry.is_none_or(|entry| entry.vsam.share_options.cross_region == 1) {
         return !matches!(
             (requested_mode, existing.mode),
             (
@@ -11027,6 +11058,77 @@ mod tests {
                 ..
             }) if name == "LENGERR"
         ));
+    }
+
+    #[test]
+    fn exclusive_name_reservation_serializes_concurrent_define() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let dataset = service(store.clone());
+        let name = DatasetName::new("USER.NEW.DATA", 44).unwrap();
+        let owner = principal("OWNER1");
+        let mutation = |sequence: u64, key: &str, transaction: &str| Mutation {
+            sequence,
+            idempotency_key: IdempotencyKey::new(key, InvocationLimits::default()).unwrap(),
+            transaction: Some(transaction.into()),
+        };
+        let DatasetResult::Locks { locks } = dataset
+            .invoke(DatasetRequest::AcquireLock {
+                dataset: name.clone(),
+                target: mainframe_env_host_api::DatasetLockTarget::Dataset,
+                owner: owner.clone(),
+                mode: mainframe_env_host_api::DatasetLockMode::Exclusive,
+                now_tick: 1,
+                lease_ticks: 100,
+                transaction: Some("JOB-A".into()),
+                mutation: mutation(1, "reserve-a", "JOB-A"),
+            })
+            .unwrap()
+        else {
+            panic!("expected name reservation");
+        };
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::AcquireLock {
+                dataset: name.clone(),
+                target: mainframe_env_host_api::DatasetLockTarget::Dataset,
+                owner: principal("OWNER2"),
+                mode: mainframe_env_host_api::DatasetLockMode::Exclusive,
+                now_tick: 2,
+                lease_ticks: 100,
+                transaction: Some("JOB-B".into()),
+                mutation: mutation(2, "reserve-b", "JOB-B"),
+            }),
+            Err(HostProblem::Condition { ref name, .. }) if name == "LOCKED"
+        ));
+        let definition = Box::new(mainframe_env_host_api::DatasetDefinition::compatibility(
+            attrs(DatasetOrganization::Sequential),
+        ));
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Define {
+                dataset: name.clone(),
+                definition: definition.clone(),
+                mutation: mutation(3, "define-b", "JOB-B"),
+            }),
+            Err(HostProblem::Condition { ref name, .. }) if name == "LOCKED"
+        ));
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Define {
+                dataset: name.clone(),
+                definition,
+                mutation: mutation(4, "define-a", "JOB-A"),
+            }),
+            Ok(DatasetResult::Created { version: 1 })
+        ));
+
+        drop(dataset);
+        let restarted = service(store);
+        restarted
+            .invoke(DatasetRequest::ReleaseLock {
+                dataset: name,
+                lock_id: locks[0].lock_id.clone(),
+                owner,
+                mutation: mutation(5, "release-a", "JOB-A"),
+            })
+            .unwrap();
     }
 
     #[test]

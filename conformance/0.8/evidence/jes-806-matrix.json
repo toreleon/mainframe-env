@@ -5,6 +5,8 @@
   "status": "pass-with-licensed-differential-pending",
   "rows": [
     {"id": "restart-running", "result": "pass", "evidence": "service::tests::sqlite_warm_start_recovers_running_job_to_queue"},
+    {"id": "restart-abend-condition-state", "result": "pass", "evidence": "service::tests::warm_restart_reconstructs_abend_state_before_condition_evaluation"},
+    {"id": "restart-multi-step-mod-idempotency", "result": "pass", "evidence": "service::tests::warm_restart_reuses_multi_step_mod_append_idempotency_key"},
     {"id": "restart-committed-step", "result": "pass", "evidence": "service::tests::crash_after_committed_step_checkpoint_gap_restarts_without_duplicate_program_effect"},
     {"id": "attempt-exhaustion", "result": "pass", "evidence": "service::tests::warm_start_exhausts_bounded_attempts_without_reexecuting"},
     {"id": "checkpoint-integrity", "result": "pass", "evidence": "service::tests::corrupted_common_checkpoint_fails_closed_on_restart"},

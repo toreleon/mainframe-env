@@ -21,6 +21,7 @@ hashes, or test counts into Project fields.
 | 0.6.0 | `0.6.0` | [#12](https://github.com/toreleon/mainframe-env/issues/12) | [#5](https://github.com/toreleon/mainframe-env/pull/5) | Published; closed |
 | 0.7.0 | `0.7.0` | [#13](https://github.com/toreleon/mainframe-env/issues/13) | [#2](https://github.com/toreleon/mainframe-env/pull/2) | Published; closed |
 | 0.8.0 | `0.8.0` | [#14](https://github.com/toreleon/mainframe-env/issues/14) | [#30](https://github.com/toreleon/mainframe-env/pull/30) | Published; closed |
+| 0.8.1 | `0.8.1` | [#42](https://github.com/toreleon/mainframe-env/issues/42) | — | Patch in progress; open |
 | 0.9.0 | `0.9.0` | [#15](https://github.com/toreleon/mainframe-env/issues/15) | — | Planned; open |
 | 0.10.0 | `0.10.0` | [#16](https://github.com/toreleon/mainframe-env/issues/16) | — | Planned; open |
 | 0.11.0 | `0.11.0` | [#17](https://github.com/toreleon/mainframe-env/issues/17) | — | Planned; open |
@@ -35,8 +36,8 @@ hashes, or test counts into Project fields.
 The abandoned 0.7.1 proposal is intentionally absent.
 
 Issue and pull request numbers share one sequence. Epics occupy #8–#25,
-pull requests occupy #1–#7 and #26–#31 and #41, and review issues occupy
-#32–#40.
+pull requests occupy #1–#7, #26–#31, and #41, review issues occupy #32–#40,
+and #42 is the 0.8.1 patch epic.
 
 ## Pull request history
 
@@ -62,7 +63,7 @@ the permanent identity; branches are deleted after merge.
 | [#29](https://github.com/toreleon/mainframe-env/pull/29) | `codex/ci-gate-tiers` | 2026-09-02 | `2926c54` | — | Certification gates on explicit runs |
 | [#30](https://github.com/toreleon/mainframe-env/pull/30) | `impl/0.8.0` | 2026-09-04 | `26cded1` | #14 | 0.8.0 JES2 runtime and real utilities |
 | [#31](https://github.com/toreleon/mainframe-env/pull/31) | `release/0.8.0` | 2026-09-04 | `02fcaed` | #14 | 0.8.0 release commit and tag |
-| [#41](https://github.com/toreleon/mainframe-env/pull/41) | `docs/consolidate-pr-epic-history` | open | — | — | This history consolidation |
+| [#41](https://github.com/toreleon/mainframe-env/pull/41) | `docs/consolidate-pr-epic-history` | 2026-09-05 | `c5fd90c` | — | Project and 0.8.0 review history consolidation |
 
 `2926c54` from #29 is the integrated candidate that
 [the 0.8.0 status report](status/0.8.0.md) records as the starting point for
@@ -107,7 +108,9 @@ active. The 0.8.0 review is the first expansion.
 | [#39](https://github.com/toreleon/mainframe-env/issues/39) | P2 | Minor findings: gate scope, spool rollback, dead type, hygiene |
 
 Findings and reproductions stay in [the 0.8.0 review](review/0.8.0.md); the
-Project carries only priority and status.
+Project carries only priority and status. They moved to the `0.8.1` milestone
+when patch epic [#42](https://github.com/toreleon/mainframe-env/issues/42)
+entered implementation.
 
 ## Operating rules
 
@@ -134,12 +137,12 @@ Project carries only priority and status.
 Recorded so the history stays accurate rather than tidy. These are statements
 of fact, not proposals.
 
-- 0.8.0 published on 2026-09-04 while its milestone still carries nine open
-  review issues, three of which (#32, #33, #34) are confirmed defects against
-  claims the release itself makes. Rule 6 expects the milestone closed only
-  after the release contract is satisfied. The defects are disclosed in the
-  GitHub Release known-limitations section rather than left implicit, and the
-  milestone stays open until they are resolved.
+- 0.8.0 published on 2026-09-04 with nine open review issues, three of which
+  (#32, #33, #34) were confirmed defects against claims the release itself
+  makes. The defects were disclosed in the GitHub Release known-limitations
+  section rather than left implicit. On 2026-09-05, the findings moved to the
+  0.8.1 patch milestone so the original milestone and corrective release are
+  distinguishable.
 - Epic [#14](https://github.com/toreleon/mainframe-env/issues/14) (0.8.0) was
   closed automatically by the `Closes #14` keyword in implementation pull
   request #30, not by a decision that the release contract was met. Rule 4

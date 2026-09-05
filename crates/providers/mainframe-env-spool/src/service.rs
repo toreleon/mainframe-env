@@ -272,18 +272,16 @@ impl SpoolService {
                 result: result.clone(),
             },
         );
-        if let Err(problem) = persist_job(
+        // Chunks are content-addressed and may already be referenced by a
+        // committed append. Leave an unreferenced chunk for purge/GC rather
+        // than risk deleting live spool data when this publication fails.
+        persist_job(
             &*self.store,
             job,
             version,
             current.map(|job| job.version),
             &next,
-        ) {
-            if self.artifacts.delete_artifact(&artifact).is_err() {
-                return Err(HostProblem::UnknownOutcome);
-            }
-            return Err(problem);
-        }
+        )?;
         jobs.insert(
             job.into(),
             DurableJob {
@@ -971,6 +969,49 @@ mod tests {
         assert!(matches!(
             spool.invoke(SpoolRequest::List { job }),
             Ok(SpoolResult::Files { files }) if files[0].record_count == 1
+        ));
+    }
+
+    #[test]
+    fn failed_append_persist_never_deletes_an_existing_content_addressed_chunk() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let (spool, _) = service(store.clone());
+        let job = JobName::new("JOB00004", 128).unwrap();
+        spool
+            .invoke(SpoolRequest::Append {
+                job: job.clone(),
+                file: "SYSOUT".into(),
+                records: vec![b"ONE".to_vec()],
+                mutation: mutation(1, "append-live"),
+            })
+            .unwrap();
+
+        // Force the service's next state write to lose its optimistic race.
+        // The second append deliberately addresses the same chunk as the
+        // committed first append (same job, file, sequence, and records).
+        let mut durable = store
+            .get_provider_state(STATE_NAMESPACE, job.as_str())
+            .unwrap()
+            .unwrap();
+        durable.version += 1;
+        store.put_provider_state(durable, Some(1)).unwrap();
+        assert_eq!(
+            spool.invoke(SpoolRequest::Append {
+                job: job.clone(),
+                file: "SYSOUT".into(),
+                records: vec![b"ONE".to_vec()],
+                mutation: mutation(1, "append-raced"),
+            }),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        assert!(matches!(
+            spool.invoke(SpoolRequest::Read {
+                job,
+                file: "SYSOUT".into(),
+                start: 0,
+                max_records: 8,
+            }),
+            Ok(SpoolResult::Records { records, .. }) if records == [b"ONE".to_vec()]
         ));
     }
 
