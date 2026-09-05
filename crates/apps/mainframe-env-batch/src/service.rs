@@ -48,6 +48,8 @@ const CONFIGURATION_STATE_KEY: &str = "configuration";
 const MAX_DURABLE_JOB_EVENTS: usize = 65_536;
 const MAX_JOB_EVENT_BYTES: usize = 4_096;
 const MAX_JOB_NUMBER: u64 = 99_999_999;
+const DCOLLECT_PAGE_SIZE: u32 = 256;
+const MAX_DCOLLECT_DATASETS: usize = 4_096;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BatchLimits {
@@ -3306,21 +3308,20 @@ impl BatchService {
                 })?;
             }
             "dcollect" => {
-                let DatasetResult::Listed { names, .. } = self.ams_dataset_read(
-                    invocation,
-                    effect_sequence,
-                    DatasetRequest::List {
-                        pattern: "**".into(),
-                        start: None,
-                        max_items: 256,
-                    },
-                )?
-                else {
-                    return Err(HostProblem::ProviderFailure);
-                };
+                let names = dcollect_catalog_names(MAX_DCOLLECT_DATASETS, |start| {
+                    self.ams_dataset_read(
+                        invocation,
+                        effect_sequence,
+                        DatasetRequest::List {
+                            pattern: "**".into(),
+                            start,
+                            max_items: DCOLLECT_PAGE_SIZE,
+                        },
+                    )
+                })?;
                 let dd = operand(statement, &["OUTFILE", "OFILE"]).ok_or(HostProblem::Malformed)?;
                 let mut collected = Vec::with_capacity(names.len());
-                for name in names {
+                for name in &names {
                     let record = match self.ams_dataset_read(
                         invocation,
                         effect_sequence,
@@ -3389,7 +3390,29 @@ impl BatchService {
                     );
                 }
                 if more {
-                    collected.push(b"VOLUME|MORE".to_vec());
+                    // Do not present a bounded prefix as a complete inventory.
+                    return Err(HostProblem::ResourceExhausted);
+                }
+                // The provider's list API has no catalog-snapshot token. Detect
+                // observed membership changes before publishing any DD output;
+                // this is a two-scan consistency check, not an atomic snapshot.
+                let after = dcollect_catalog_names(MAX_DCOLLECT_DATASETS, |start| {
+                    self.ams_dataset_read(
+                        invocation,
+                        effect_sequence,
+                        DatasetRequest::List {
+                            pattern: "**".into(),
+                            start,
+                            max_items: DCOLLECT_PAGE_SIZE,
+                        },
+                    )
+                })?;
+                if names != after {
+                    return Err(HostProblem::Condition {
+                        name: "DCOLLECT-CATALOG-CHANGED".into(),
+                        response: 12,
+                        response2: 0,
+                    });
                 }
                 self.write_dd_outputs(
                     invocation,
@@ -7272,6 +7295,56 @@ fn store_error(error: StoreError) -> HostProblem {
     }
 }
 
+/// Enumerate an inclusive-start catalog without duplicating page boundaries.
+/// Each successful continuing page must advance, and total membership is bounded.
+fn dcollect_catalog_names(
+    max_names: usize,
+    mut read_page: impl FnMut(Option<DatasetName>) -> Result<DatasetResult, HostProblem>,
+) -> Result<Vec<DatasetName>, HostProblem> {
+    let mut all = Vec::<DatasetName>::new();
+    loop {
+        let start = all.last().cloned();
+        let DatasetResult::Listed { mut names, more } = read_page(start.clone())? else {
+            return Err(HostProblem::ProviderFailure);
+        };
+        if names.len() > DCOLLECT_PAGE_SIZE as usize
+            || names
+                .windows(2)
+                .any(|pair| pair[0].as_str() >= pair[1].as_str())
+            || start.as_ref().is_some_and(|start| {
+                names
+                    .first()
+                    .is_some_and(|name| name.as_str() < start.as_str())
+            })
+        {
+            return Err(HostProblem::ProviderFailure);
+        }
+        if start
+            .as_ref()
+            .is_some_and(|start| names.first() == Some(start))
+        {
+            names.remove(0);
+        }
+        if more && names.is_empty() {
+            return Err(HostProblem::ProviderFailure);
+        }
+        if all
+            .len()
+            .checked_add(names.len())
+            .is_none_or(|count| count > max_names)
+        {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        all.extend(names);
+        if !more {
+            return Ok(all);
+        }
+        if all.len() == max_names {
+            return Err(HostProblem::ResourceExhausted);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -9448,6 +9521,239 @@ mod tests {
             records.lock().unwrap()["IBMUSER.TARGET"],
             vec![b"SECOND".to_vec()]
         );
+    }
+
+    fn hardening_catalog_page(names: &[DatasetName], start: Option<DatasetName>) -> DatasetResult {
+        let selected: Vec<_> = names
+            .iter()
+            .filter(|name| {
+                start
+                    .as_ref()
+                    .is_none_or(|start| name.as_str() >= start.as_str())
+            })
+            .cloned()
+            .collect();
+        DatasetResult::Listed {
+            more: selected.len() > DCOLLECT_PAGE_SIZE as usize,
+            names: selected
+                .into_iter()
+                .take(DCOLLECT_PAGE_SIZE as usize)
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn hardening_50_catalog_pages_are_complete_and_bounded() {
+        for count in [0, 1, 255, 256, 257, 512, MAX_DCOLLECT_DATASETS] {
+            let expected: Vec<_> = (0..count)
+                .map(|n| dataset_name(&format!("USER.D{n:06}")).unwrap())
+                .collect();
+            let actual = dcollect_catalog_names(MAX_DCOLLECT_DATASETS, |start| {
+                Ok(hardening_catalog_page(&expected, start))
+            })
+            .unwrap();
+            assert_eq!(actual, expected, "catalog size {count}");
+        }
+        let names: Vec<_> = (0..301)
+            .map(|n| dataset_name(&format!("USER.D{n:06}")).unwrap())
+            .collect();
+        assert_eq!(
+            dcollect_catalog_names(300, |start| Ok(hardening_catalog_page(&names, start))),
+            Err(HostProblem::ResourceExhausted)
+        );
+    }
+
+    #[test]
+    fn hardening_50_catalog_rejects_nonprogress_and_preserves_later_page_failures() {
+        assert_eq!(
+            dcollect_catalog_names(512, |_| Ok(DatasetResult::Listed {
+                names: Vec::new(),
+                more: true
+            })),
+            Err(HostProblem::ProviderFailure)
+        );
+        let one = dataset_name("USER.ONE").unwrap();
+        assert_eq!(
+            dcollect_catalog_names(512, |_| Ok(DatasetResult::Listed {
+                names: vec![one.clone()],
+                more: true
+            })),
+            Err(HostProblem::ProviderFailure)
+        );
+        for failure in [
+            HostProblem::ProviderFailure,
+            HostProblem::Cancelled,
+            HostProblem::UnknownOutcome,
+        ] {
+            let actual = dcollect_catalog_names(512, |start| {
+                if start.is_none() {
+                    Ok(DatasetResult::Listed {
+                        names: vec![one.clone()],
+                        more: true,
+                    })
+                } else {
+                    Err(failure.clone())
+                }
+            });
+            assert_eq!(actual, Err(failure));
+        }
+    }
+
+    #[derive(Clone)]
+    enum DcollectFault {
+        LaterPage(HostProblem),
+        MembershipChange,
+        OutputWrite,
+    }
+
+    struct DcollectFaultProvider {
+        inner: Arc<dyn HostProvider>,
+        dataset: Arc<DatasetService>,
+        fault: DcollectFault,
+        first_pages: AtomicUsize,
+    }
+
+    impl HostProvider for DcollectFaultProvider {
+        fn descriptor(&self) -> &CapabilityDescriptor {
+            self.inner.descriptor()
+        }
+
+        fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
+            let failure = match (&self.fault, &effect.request) {
+                (
+                    DcollectFault::LaterPage(problem),
+                    HostRequest::Dataset(DatasetRequest::List { start: Some(_), .. }),
+                ) => Some(problem.clone()),
+                (
+                    DcollectFault::MembershipChange,
+                    HostRequest::Dataset(DatasetRequest::List { start: None, .. }),
+                ) => {
+                    if self.first_pages.fetch_add(1, Ordering::SeqCst) == 1 {
+                        seed_real_dataset(&self.dataset, "USER.LATE", Vec::new(), 90_000);
+                    }
+                    None
+                }
+                (
+                    DcollectFault::OutputWrite,
+                    HostRequest::Dataset(DatasetRequest::Write { dataset, .. }),
+                ) if dataset.as_str() == "USER.COLLECT" => Some(HostProblem::ProviderFailure),
+                _ => None,
+            };
+            if let Some(problem) = failure {
+                EffectResult {
+                    sequence: effect.sequence,
+                    outcome: Err(problem),
+                }
+            } else {
+                self.inner.invoke(invocation, effect)
+            }
+        }
+    }
+
+    #[test]
+    fn hardening_50_failed_or_changed_inventory_never_replaces_existing_output() {
+        for fault in [
+            DcollectFault::LaterPage(HostProblem::ProviderFailure),
+            DcollectFault::LaterPage(HostProblem::Cancelled),
+            DcollectFault::MembershipChange,
+            DcollectFault::OutputWrite,
+        ] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let dataset = DatasetService::open(store.clone(), DatasetLimits::default()).unwrap();
+            let sentinel = vec![b"PREVIOUS COMPLETE INVENTORY".to_vec()];
+            seed_real_dataset(&dataset, "USER.COLLECT", sentinel.clone(), 10_000);
+            for index in 1..257 {
+                seed_real_dataset(
+                    &dataset,
+                    &format!("USER.D{index:06}"),
+                    Vec::new(),
+                    10_000 + index * 2,
+                );
+            }
+            let mut providers: Vec<Arc<dyn HostProvider>> =
+                dataset_providers(dataset.clone(), InvocationLimits::default())
+                    .into_iter()
+                    .map(|inner| {
+                        Arc::new(DcollectFaultProvider {
+                            inner,
+                            dataset: dataset.clone(),
+                            fault: fault.clone(),
+                            first_pages: AtomicUsize::new(0),
+                        }) as Arc<dyn HostProvider>
+                    })
+                    .collect();
+            providers.extend(spool_test_providers(store.clone()));
+            let service = BatchService::open(
+                host_with(builtins(), providers),
+                store,
+                Default::default(),
+                Default::default(),
+            )
+            .unwrap();
+            let invocation = invocation();
+            service.submit(&invocation, &JclBundle {
+                primary: "//COLLECT JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//OUT DD DSN=USER.COLLECT,DISP=OLD\n//SYSIN DD *\n DCOLLECT OUTFILE(OUT)\n/*\n".into(),
+                ..Default::default()
+            }, &IdempotencyKey::new("dcollect-fault", InvocationLimits::default()).unwrap(), false).unwrap();
+            let completed = service.run_next(&invocation, false).unwrap().unwrap();
+            assert_ne!(completed.return_code, Some(0));
+            let DatasetResult::Records { records, .. } = dataset
+                .invoke(DatasetRequest::Read {
+                    dataset: dataset_name("USER.COLLECT").unwrap(),
+                    member: None,
+                    key: None,
+                    max_records: 1_024,
+                    control: Default::default(),
+                })
+                .unwrap()
+            else {
+                panic!("expected inventory records");
+            };
+            assert_eq!(records, sentinel);
+        }
+    }
+
+    #[test]
+    fn hardening_50_real_dcollect_covers_catalog_page_boundaries() {
+        for count in [1, 255, 256, 257, 512] {
+            let (service, dataset) = service_with_real_datasets();
+            seed_real_dataset(&dataset, "USER.COLLECT", Vec::new(), 10_000);
+            let mut expected = BTreeSet::from(["USER.COLLECT".to_string()]);
+            for index in 1..count {
+                let name = format!("USER.D{index:06}");
+                seed_real_dataset(&dataset, &name, Vec::new(), 10_000 + index as u64 * 2);
+                expected.insert(name);
+            }
+            let invocation = invocation();
+            service.submit(&invocation, &JclBundle {
+                primary: "//COLLECT JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//OUT DD DSN=USER.COLLECT,DISP=OLD\n//SYSIN DD *\n DCOLLECT OUTFILE(OUT)\n/*\n".into(),
+                ..Default::default()
+            }, &IdempotencyKey::new(format!("dcollect-{count}"), InvocationLimits::default()).unwrap(), false).unwrap();
+            let completed = service.run_next(&invocation, false).unwrap().unwrap();
+            assert_eq!(completed.state, JobState::Completed, "catalog size {count}");
+            let DatasetResult::Records { records, .. } = dataset
+                .invoke(DatasetRequest::Read {
+                    dataset: dataset_name("USER.COLLECT").unwrap(),
+                    member: None,
+                    key: None,
+                    max_records: 1_024,
+                    control: Default::default(),
+                })
+                .unwrap()
+            else {
+                panic!("expected inventory records");
+            };
+            let actual: Vec<_> = records
+                .iter()
+                .filter(|r| !r.starts_with(b"VOLUME|"))
+                .map(|record| {
+                    String::from_utf8(record.split(|b| *b == b'|').next().unwrap().to_vec())
+                        .unwrap()
+                })
+                .collect();
+            assert_eq!(actual.len(), expected.len(), "no duplicate page boundary");
+            assert_eq!(actual.into_iter().collect::<BTreeSet<_>>(), expected);
+        }
     }
 
     #[test]
