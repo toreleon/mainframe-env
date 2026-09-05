@@ -28,7 +28,9 @@ use mainframe_env_source::{
     SourceLimits, materialize_host_abi_libraries,
 };
 use mainframe_env_store::LocalArtifactStore;
-use mainframe_env_store_api::{ArtifactStore, PlatformStore, ProviderStateRecord};
+use mainframe_env_store_api::{
+    ArtifactStore, PlatformStore, ProviderStateRecord, ProviderStateWrite,
+};
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -105,6 +107,12 @@ impl HostProvider for DefaultProgramRouter {
     }
 
     fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
+        if let HostRequest::Program(ProgramRequest::Cancel { programs }) = &effect.request {
+            return EffectResult {
+                sequence: effect.sequence,
+                outcome: self.cobol.cancel_instances(invocation, &effect, programs),
+            };
+        }
         if let HostRequest::Program(ProgramRequest::Call {
             payload,
             service: Some(service),
@@ -311,6 +319,7 @@ impl CobolProgram {
         program: &str,
         payload: &BoundedPayload,
         identity: &str,
+        writes: &mut Vec<ProviderStateWrite>,
     ) -> Result<BoundedPayload, HostProblem> {
         let store = self.store.get().ok_or(HostProblem::InfrastructureFailure)?;
         let artifacts = self
@@ -405,6 +414,7 @@ impl CobolProgram {
         machine
             .install_dataset_cursors(loaded_cursors)
             .map_err(|_| HostProblem::ResourceExhausted)?;
+        let lease = instance::Lease::acquire(store.as_ref(), &invocation, &name, &mut machine)?;
         let coordinator = ExecutionCoordinator::durable(
             Arc::clone(self.host.get().ok_or(HostProblem::InfrastructureFailure)?),
             Arc::clone(store),
@@ -431,7 +441,10 @@ impl CobolProgram {
                     .linkage_values()
                     .map_err(|_| HostProblem::ProviderFailure)?;
                 values.truncate(call_values.len());
-                encode_cobol_call_result(&values).map_err(|_| HostProblem::ProviderFailure)
+                let result =
+                    encode_cobol_call_result(&values).map_err(|_| HostProblem::UnknownOutcome)?;
+                writes.extend(lease.completed(store.as_ref(), &machine)?);
+                Ok(result)
             }
             ExecutionOutcome::Condition(condition) => Err(HostProblem::Condition {
                 name: condition.name,
@@ -776,17 +789,20 @@ impl Program for CobolProgram {
         match coordinator.execute_with_control(&mut machine, &invocation, || {
             self.observe_execution_control(&invocation)
         }) {
-            ExecutionOutcome::Completed(completion) => Ok(ProgramOutput {
-                return_code: completion.return_code,
-                records: completion
-                    .output
-                    .bytes()
-                    .split(|byte| *byte == b'\n')
-                    .filter(|record| !record.is_empty())
-                    .map(<[u8]>::to_vec)
-                    .collect(),
-                dd_outputs: BTreeMap::new(),
-            }),
+            ExecutionOutcome::Completed(completion) => {
+                self.finish_run_unit(&invocation)?;
+                Ok(ProgramOutput {
+                    return_code: completion.return_code,
+                    records: completion
+                        .output
+                        .bytes()
+                        .split(|byte| *byte == b'\n')
+                        .filter(|record| !record.is_empty())
+                        .map(<[u8]>::to_vec)
+                        .collect(),
+                    dd_outputs: BTreeMap::new(),
+                })
+            }
             ExecutionOutcome::Condition(condition) => Ok(ProgramOutput {
                 return_code: condition.response,
                 records: vec![condition.name.into_bytes()],
@@ -1493,3 +1509,5 @@ mod tests {
 mod hardening;
 
 mod replay;
+
+mod instance;

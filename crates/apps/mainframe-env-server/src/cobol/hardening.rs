@@ -704,7 +704,8 @@ fn hardening_48_explicit_parent_cancellation_is_not_lost_in_child_construction()
             &inv,
             "CPU-LOOP",
             &call_payload(&[]),
-            "control-test"
+            "control-test",
+            &mut Vec::new(),
         ),
         Err(HostProblem::Cancelled)
     );
@@ -777,9 +778,12 @@ fn hardening_55_completed_nested_calls_replay_after_sqlite_reopen() {
             .cobol
             .sequence
             .store(12345, Ordering::SeqCst);
+        let mut unrelated = parent();
+        unrelated.run_unit_id =
+            RunUnitId::new("unrelated-run", InvocationLimits::default()).unwrap();
         assert!(
             reopened
-                .call(&parent(), "REPLAY-LEAF", 999, call_payload(&[]))
+                .call(&unrelated, "REPLAY-LEAF", 999, call_payload(&[]))
                 .outcome
                 .is_ok()
         );
@@ -979,5 +983,404 @@ fn hardening_55_conflicting_inputs_and_legacy_retry_fail_closed() {
             .unwrap()
             .len(),
         2
+    );
+}
+
+const INSTANCE_COUNTER: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. COUNTER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 N PIC 9 VALUE 0.\nLINKAGE SECTION.\n01 OUT-N PIC 9.\nPROCEDURE DIVISION USING OUT-N.\nADD 1 TO N.\nMOVE N TO OUT-N.\nGOBACK.\n";
+
+fn counter_call(fixture: &Fixture, inv: &Invocation, sequence: u64, expected: u8) {
+    assert_eq!(
+        fixture
+            .call(inv, "COUNTER", sequence, call_payload(&[vec![b'0']]))
+            .outcome,
+        Ok(HostResult::Program(
+            encode_cobol_call_result(&[vec![expected]]).unwrap()
+        ))
+    );
+}
+
+#[test]
+fn hardening_47_installed_counter_retains_working_storage_and_resets_local_linkage() {
+    let root = TestRoot::new();
+    let fixture = Fixture::new(
+        &root,
+        Arc::new(MemoryStore::new(Default::default())),
+        HostProblem::NotFound,
+        false,
+    );
+    fixture.install("COUNTER", INSTANCE_COUNTER);
+    counter_call(&fixture, &parent(), 1, b'1');
+    counter_call(&fixture, &parent(), 2, b'2');
+    // Replaying occurrence 1 must not advance or rewind the last-used instance.
+    counter_call(&fixture, &parent(), 1, b'1');
+    counter_call(&fixture, &parent(), 3, b'3');
+    let source = "IDENTIFICATION DIVISION.\nPROGRAM-ID. LOCAL-CHECK.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 W PIC 9 VALUE 0.\nLOCAL-STORAGE SECTION.\n01 L PIC 9 VALUE 0.\nLINKAGE SECTION.\n01 OUT-W PIC 9.\n01 OUT-L PIC 9.\n01 INPUT-N PIC 9.\nPROCEDURE DIVISION USING OUT-W OUT-L INPUT-N.\nADD 1 TO W.\nADD 1 TO L.\nMOVE W TO OUT-W.\nMOVE L TO OUT-L.\nADD 1 TO INPUT-N.\nGOBACK.\n";
+    fixture.install("LOCAL-CHECK", source);
+    for (seq, input, expected) in [(10, b'5', *b"116"), (11, b'8', *b"219")] {
+        assert_eq!(
+            fixture
+                .call(
+                    &parent(),
+                    "LOCAL-CHECK",
+                    seq,
+                    call_payload(&[vec![b'0'], vec![b'0'], vec![input]])
+                )
+                .outcome,
+            Ok(HostResult::Program(
+                encode_cobol_call_result(&expected.map(|v| vec![v])).unwrap()
+            ))
+        );
+    }
+}
+
+#[test]
+fn hardening_47_initial_and_cancel_have_distinct_real_call_lifecycles() {
+    for initial in [false, true] {
+        let root = TestRoot::new();
+        let fixture = Fixture::new(
+            &root,
+            Arc::new(MemoryStore::new(Default::default())),
+            HostProblem::NotFound,
+            false,
+        );
+        fixture.install(
+            "COUNTER",
+            &if initial {
+                INSTANCE_COUNTER.replace(
+                    "PROGRAM-ID. COUNTER.",
+                    "PROGRAM-ID. COUNTER IS INITIAL PROGRAM.",
+                )
+            } else {
+                INSTANCE_COUNTER.into()
+            },
+        );
+        let caller = "IDENTIFICATION DIVISION.\nPROGRAM-ID. CALLER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 R PIC 9.\nPROCEDURE DIVISION.\nCALL 'COUNTER' USING R.\nDISPLAY R.\nCALL 'COUNTER' USING R.\nDISPLAY R.\nCANCEL 'COUNTER'.\nCALL 'COUNTER' USING R.\nDISPLAY R.\nSTOP RUN.\n";
+        let result = fixture.batch("COBOL", caller).outcome.unwrap();
+        let HostResult::Program(payload) = result else {
+            panic!("program output");
+        };
+        let output: ProgramOutput = serde_json::from_slice(payload.bytes()).unwrap();
+        assert_eq!(
+            output.records,
+            if initial {
+                vec![b"1".to_vec(), b"1".to_vec(), b"1".to_vec()]
+            } else {
+                vec![b"1".to_vec(), b"2".to_vec(), b"1".to_vec()]
+            }
+        );
+    }
+}
+
+#[test]
+fn hardening_47_cancel_replay_does_not_reset_a_later_call_and_run_end_is_terminal() {
+    let root = TestRoot::new();
+    let fixture = Fixture::new(
+        &root,
+        Arc::new(MemoryStore::new(Default::default())),
+        HostProblem::NotFound,
+        false,
+    );
+    fixture.install("COUNTER", INSTANCE_COUNTER);
+    counter_call(&fixture, &parent(), 1, b'1');
+    let effect = EffectRequest {
+        run_unit: parent().run_unit_id,
+        sequence: 2,
+        deadline_tick: u64::MAX,
+        idempotency_key: Some(
+            IdempotencyKey::new("cancel-counter", InvocationLimits::default()).unwrap(),
+        ),
+        request: HostRequest::Program(ProgramRequest::Cancel {
+            programs: vec![ProgramName::new("COUNTER", 128).unwrap()],
+        }),
+    };
+    assert!(
+        fixture
+            .router
+            .invoke(&parent(), effect.clone())
+            .outcome
+            .is_ok()
+    );
+    counter_call(&fixture, &parent(), 3, b'1');
+    assert!(fixture.router.invoke(&parent(), effect).outcome.is_ok());
+    counter_call(&fixture, &parent(), 4, b'2');
+    fixture.router.finish_run_unit(&parent()).unwrap();
+    fixture.router.finish_run_unit(&parent()).unwrap();
+    assert!(
+        matches!(fixture.call(&parent(), "COUNTER", 5, call_payload(&[vec![b'0']])).outcome,
+        Err(HostProblem::Condition { name, .. }) if name == "COBOL-RUN-ENDED")
+    );
+    // A terminal boundary frees last-used storage, not the response receipts.
+    counter_call(&fixture, &parent(), 4, b'2');
+}
+
+#[test]
+fn hardening_47_nested_calls_and_concurrent_run_units_are_isolated() {
+    let root = TestRoot::new();
+    let fixture = Fixture::new(
+        &root,
+        Arc::new(MemoryStore::new(Default::default())),
+        HostProblem::NotFound,
+        false,
+    );
+    fixture.install("COUNTER", INSTANCE_COUNTER);
+    fixture.install("WRAPPER", "IDENTIFICATION DIVISION.\nPROGRAM-ID. WRAPPER.\nDATA DIVISION.\nLINKAGE SECTION.\n01 R PIC 9.\nPROCEDURE DIVISION USING R.\nCALL 'COUNTER' USING R.\nGOBACK.\n");
+    std::thread::scope(|scope| {
+        for n in 0..4 {
+            let fixture = &fixture;
+            scope.spawn(move || {
+                let mut inv = parent();
+                inv.execution_id =
+                    ExecutionId::new(format!("concurrent-{n}"), InvocationLimits::default())
+                        .unwrap();
+                inv.run_unit_id =
+                    RunUnitId::new(format!("concurrent-run-{n}"), InvocationLimits::default())
+                        .unwrap();
+                for seq in 1..=2 {
+                    assert_eq!(
+                        fixture
+                            .call(&inv, "WRAPPER", seq, call_payload(&[vec![b'0']]))
+                            .outcome,
+                        Ok(HostResult::Program(
+                            encode_cobol_call_result(&[vec![b'0' + seq as u8]]).unwrap()
+                        ))
+                    );
+                }
+                fixture.router.finish_run_unit(&inv).unwrap();
+            });
+        }
+    });
+    counter_call(&fixture, &parent(), 1, b'1');
+}
+
+#[test]
+fn hardening_47_last_used_state_and_cancel_survive_sqlite_reopen() {
+    let root = TestRoot::new();
+    let url = root.sqlite_url();
+    let fixture = Fixture::new(
+        &root,
+        Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 65536).unwrap()),
+        HostProblem::NotFound,
+        false,
+    );
+    fixture.install("COUNTER", INSTANCE_COUNTER);
+    counter_call(&fixture, &parent(), 1, b'1');
+    drop(fixture);
+    let fixture = Fixture::new(
+        &root,
+        Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 65536).unwrap()),
+        HostProblem::NotFound,
+        false,
+    );
+    counter_call(&fixture, &parent(), 1, b'1');
+    counter_call(&fixture, &parent(), 2, b'2');
+    fixture.router.finish_run_unit(&parent()).unwrap();
+}
+
+#[test]
+fn hardening_47_unsupported_lifecycles_fail_closed_and_active_instance_cannot_be_cancelled() {
+    for declaration in [
+        "PROGRAM-ID. COUNTER IS RECURSIVE PROGRAM.",
+        "PROGRAM-ID. COUNTER IS COMMON PROGRAM.",
+    ] {
+        let root = TestRoot::new();
+        let fixture = Fixture::new(
+            &root,
+            Arc::new(MemoryStore::new(Default::default())),
+            HostProblem::NotFound,
+            false,
+        );
+        fixture.install(
+            "COUNTER",
+            &INSTANCE_COUNTER.replace("PROGRAM-ID. COUNTER.", declaration),
+        );
+        assert_eq!(
+            fixture
+                .call(&parent(), "COUNTER", 1, call_payload(&[vec![b'0']]))
+                .outcome,
+            Err(HostProblem::Unsupported)
+        );
+    }
+    let root = TestRoot::new();
+    let fixture = Fixture::new(
+        &root,
+        Arc::new(MemoryStore::new(Default::default())),
+        HostProblem::UnknownOutcome,
+        false,
+    );
+    fixture.install("MIDDLE", MIDDLE);
+    assert_eq!(
+        fixture
+            .call(&parent(), "MIDDLE", 1, call_payload(&[]))
+            .outcome,
+        Err(HostProblem::UnknownOutcome)
+    );
+    let cancel = EffectRequest {
+        run_unit: parent().run_unit_id,
+        sequence: 2,
+        deadline_tick: u64::MAX,
+        idempotency_key: Some(
+            IdempotencyKey::new("cancel-active", InvocationLimits::default()).unwrap(),
+        ),
+        request: HostRequest::Program(ProgramRequest::Cancel {
+            programs: vec![ProgramName::new("MIDDLE", 128).unwrap()],
+        }),
+    };
+    assert_eq!(
+        fixture.router.invoke(&parent(), cancel).outcome,
+        Err(HostProblem::Unsupported)
+    );
+    assert_eq!(
+        fixture.router.finish_run_unit(&parent()),
+        Err(HostProblem::UnknownOutcome)
+    );
+    assert_eq!(
+        fixture
+            .call(&parent(), "MIDDLE", 3, call_payload(&[]))
+            .outcome,
+        Err(HostProblem::UnknownOutcome)
+    );
+    assert_eq!(
+        fixture
+            .store
+            .list_provider_state("hardening-49-business", 128)
+            .unwrap()
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn hardening_47_reply_and_ready_state_cannot_partially_commit() {
+    let root = TestRoot::new();
+    let store = Arc::new(MemoryStore::new(StoreLimits {
+        max_blob_bytes: 1024,
+        ..Default::default()
+    }));
+    let fixture = Fixture::new(&root, store, HostProblem::NotFound, false);
+    let source = INSTANCE_COUNTER.replace(
+        "01 N PIC 9 VALUE 0.",
+        "01 N PIC 9 VALUE 0.\n01 BIG-STATE PIC X(2048) VALUE SPACES.",
+    );
+    fixture.install("COUNTER", &source);
+    // Reservation fits, retained state cannot fit. The atomic ready+reply write
+    // must publish neither. A retry must not reconstruct a fresh ordinary N.
+    assert_eq!(
+        fixture
+            .call(&parent(), "COUNTER", 1, call_payload(&[vec![b'0']]))
+            .outcome,
+        Err(HostProblem::UnknownOutcome)
+    );
+    let receipts = fixture
+        .store
+        .list_provider_state("cobol-call-replay@1", 128)
+        .unwrap();
+    assert_eq!(receipts.len(), 1);
+    assert_eq!(receipts[0].version, 1);
+    assert_eq!(
+        fixture
+            .call(&parent(), "COUNTER", 1, call_payload(&[vec![b'0']]))
+            .outcome,
+        Err(HostProblem::UnknownOutcome)
+    );
+    assert_eq!(
+        fixture
+            .call(&parent(), "COUNTER", 2, call_payload(&[vec![b'0']]))
+            .outcome,
+        Err(HostProblem::UnknownOutcome)
+    );
+    assert_eq!(
+        fixture.router.finish_run_unit(&parent()),
+        Err(HostProblem::UnknownOutcome)
+    );
+}
+
+#[test]
+fn hardening_47_artifact_replacement_requires_cancel_and_never_reinterprets_old_state() {
+    let root = TestRoot::new();
+    let fixture = Fixture::new(
+        &root,
+        Arc::new(MemoryStore::new(Default::default())),
+        HostProblem::NotFound,
+        false,
+    );
+    fixture.install("COUNTER", INSTANCE_COUNTER);
+    fixture.install(
+        "COUNTER-NEW",
+        &INSTANCE_COUNTER.replace("ADD 1 TO N", "ADD 2 TO N"),
+    );
+    counter_call(&fixture, &parent(), 1, b'1');
+    let new = fixture
+        .store
+        .get_provider_state("batch-program", "COUNTER-NEW")
+        .unwrap()
+        .unwrap();
+    fixture
+        .store
+        .put_provider_state(
+            ProviderStateRecord {
+                namespace: "batch-program".into(),
+                key: "COUNTER".into(),
+                version: 2,
+                payload: new.payload,
+            },
+            Some(1),
+        )
+        .unwrap();
+    assert_eq!(
+        fixture
+            .call(&parent(), "COUNTER", 2, call_payload(&[vec![b'0']]))
+            .outcome,
+        Err(HostProblem::IdempotencyConflict)
+    );
+    let effect = EffectRequest {
+        run_unit: parent().run_unit_id,
+        sequence: 3,
+        deadline_tick: u64::MAX,
+        idempotency_key: Some(
+            IdempotencyKey::new("cancel-replaced", InvocationLimits::default()).unwrap(),
+        ),
+        request: HostRequest::Program(ProgramRequest::Cancel {
+            programs: vec![ProgramName::new("COUNTER", 128).unwrap()],
+        }),
+    };
+    assert!(fixture.router.invoke(&parent(), effect).outcome.is_ok());
+    counter_call(&fixture, &parent(), 4, b'2');
+}
+
+#[test]
+fn hardening_47_counter_era_and_replay_only_runs_require_drain_before_upgrade() {
+    let root = TestRoot::new();
+    let fixture = Fixture::new(
+        &root,
+        Arc::new(MemoryStore::new(Default::default())),
+        HostProblem::NotFound,
+        false,
+    );
+    fixture.install("COUNTER", INSTANCE_COUNTER);
+    let key = super::replay::digest(&[b"run-protocol", parent().run_unit_id.as_str().as_bytes()]);
+    fixture
+        .store
+        .put_provider_state(
+            ProviderStateRecord {
+                namespace: "cobol-call-protocol@1".into(),
+                key,
+                version: 1,
+                payload: b"installed-call@1".to_vec(),
+            },
+            None,
+        )
+        .unwrap();
+    assert_eq!(
+        fixture
+            .call(&parent(), "COUNTER", 1, call_payload(&[vec![b'0']]))
+            .outcome,
+        Err(HostProblem::UnknownOutcome)
+    );
+    assert!(
+        fixture
+            .store
+            .list_provider_state("cobol-call-replay@1", 128)
+            .unwrap()
+            .is_empty()
     );
 }

@@ -2090,7 +2090,7 @@ fn lex(text: &str, limits: SyntaxLimits) -> Result<LosslessSyntax, SyntaxProblem
     })
 }
 
-fn next_token(text: &str) -> (CobolSyntaxKind, usize) {
+pub(crate) fn next_token(text: &str) -> (CobolSyntaxKind, usize) {
     let bytes = text.as_bytes();
     if bytes[0] == b'\n' || bytes[0] == b'\r' {
         return (

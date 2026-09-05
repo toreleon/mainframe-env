@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 const NAMESPACE: &str = "cobol-call-replay@1";
-const RUN_NAMESPACE: &str = "cobol-call-protocol@1";
+const RUN_NAMESPACE: &str = "cobol-call-protocol@2";
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -106,22 +106,32 @@ fn previous(record: ProviderStateRecord, expected: &str) -> Result<BoundedPayloa
 }
 
 impl CobolProgram {
-    fn ensure_call_protocol(&self, parent: &Invocation) -> Result<(), HostProblem> {
+    pub(super) fn ensure_call_protocol(&self, parent: &Invocation) -> Result<(), HostProblem> {
         let store = self.store.get().ok_or(HostProblem::InfrastructureFailure)?;
         let key = digest(&[b"run-protocol", parent.run_unit_id.as_str().as_bytes()]);
         match store
             .get_provider_state(RUN_NAMESPACE, &key)
             .map_err(|_| HostProblem::InfrastructureFailure)?
         {
-            Some(record) if record.version == 1 && record.payload == b"installed-call@1" => Ok(()),
+            Some(record) if record.version == 1 && record.payload == b"installed-call@2" => Ok(()),
             Some(_) => Err(HostProblem::UnknownOutcome),
             None if parent.attempt != 1 => Err(HostProblem::UnknownOutcome),
             None => {
+                // Version-1 calls never persisted ordinary program state. Their
+                // active run units cannot be continued by pretending this is the
+                // first invocation under the new last-used-state protocol.
+                if store
+                    .get_provider_state("cobol-call-protocol@1", &key)
+                    .map_err(|_| HostProblem::InfrastructureFailure)?
+                    .is_some()
+                {
+                    return Err(HostProblem::UnknownOutcome);
+                }
                 let record = ProviderStateRecord {
                     namespace: RUN_NAMESPACE.into(),
                     key: key.clone(),
                     version: 1,
-                    payload: b"installed-call@1".to_vec(),
+                    payload: b"installed-call@2".to_vec(),
                 };
                 match store.put_provider_state(record, None) {
                     Ok(()) => Ok(()),
@@ -130,7 +140,7 @@ impl CobolProgram {
                         | mainframe_env_store_api::StoreError::AlreadyExists,
                     ) => match store.get_provider_state(RUN_NAMESPACE, &key) {
                         Ok(Some(record))
-                            if record.version == 1 && record.payload == b"installed-call@1" =>
+                            if record.version == 1 && record.payload == b"installed-call@2" =>
                         {
                             Ok(())
                         }
@@ -163,7 +173,11 @@ impl CobolProgram {
             .get_provider_state(NAMESPACE, &key)
             .map_err(|_| HostProblem::InfrastructureFailure)?
         {
-            return previous(record, &fingerprint);
+            let result = previous(record, &fingerprint)?;
+            if payload.schema() == "mainframe-env.program.input@1" {
+                self.finish_run_unit(parent)?;
+            }
+            return Ok(result);
         }
         let prefix = if payload.schema() == "mainframe-env.cobol.call@1" {
             "online-call-execution"
@@ -190,15 +204,22 @@ impl CobolProgram {
                     | mainframe_env_store_api::StoreError::AlreadyExists
             ) {
                 return match store.get_provider_state(NAMESPACE, &key) {
-                    Ok(Some(record)) => previous(record, &receipt.fingerprint),
+                    Ok(Some(record)) => {
+                        let result = previous(record, &receipt.fingerprint)?;
+                        if payload.schema() == "mainframe-env.program.input@1" {
+                            self.finish_run_unit(parent)?;
+                        }
+                        Ok(result)
+                    }
                     _ => Err(HostProblem::UnknownOutcome),
                 };
             }
             return Err(HostProblem::InfrastructureFailure);
         }
         // No call can dispatch without winning the durable reservation.
+        let mut writes = Vec::new();
         let result = if payload.schema() == "mainframe-env.cobol.call@1" {
-            self.execute_installed(parent, program, payload, &key)
+            self.execute_installed(parent, program, payload, &key, &mut writes)
         } else {
             self.execute_installed_batch(parent, program, payload, &key)
                 .and_then(|output| {
@@ -218,17 +239,21 @@ impl CobolProgram {
             bytes: result.bytes().to_vec(),
         });
         let payload = serde_json::to_vec(&receipt).map_err(|_| HostProblem::UnknownOutcome)?;
+        writes.push(ProviderStateWrite {
+            record: ProviderStateRecord {
+                namespace: NAMESPACE.into(),
+                key,
+                version: 2,
+                payload,
+            },
+            expected_version: Some(1),
+        });
         store
-            .put_provider_state(
-                ProviderStateRecord {
-                    namespace: NAMESPACE.into(),
-                    key,
-                    version: 2,
-                    payload,
-                },
-                Some(1),
-            )
+            .put_provider_states_atomic(writes)
             .map_err(|_| HostProblem::UnknownOutcome)?;
+        if result.schema() == "mainframe-env.program.output@1" {
+            self.finish_run_unit(parent)?;
+        }
         Ok(result)
     }
 }
