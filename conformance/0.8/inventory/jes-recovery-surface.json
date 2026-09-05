@@ -54,7 +54,7 @@
     "strategy": "read-old-write-new-cas"
   },
   "state_migration_digests": {
-    "conformance/0.8/schemas/jes-durable-job.schema.json": "sha256:2ade5ea25c6591ddd2b0a25ddace82a4bc7fcb1ca79a629f3fc2b5213aa80dc2",
+    "conformance/0.8/schemas/jes-durable-job.schema.json": "sha256:a36242ee73cef37ef4f320dd7c12790ca9540705f360a4a16e644737c9b81cf8",
     "conformance/0.8/schemas/jes-runtime.schema.json": "sha256:a4e539d88c3c62cc40cb828af63e857ffd80199019542bd5ce36b899f2c02156",
     "conformance/0.8/schemas/spool-state.schema.json": "sha256:872994c8d68152ae7c41c686c75ceb89bb5f42d09ac39b2a3d7a505a2eb54f6a",
     "conformance/0.8/migrations/jes-durable-job-v1-to-v2.json": "sha256:e5a5047cafd976487f03d17eb0ebe2c3752238105bac69059dfe8c420f059bf8",

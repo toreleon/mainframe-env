@@ -10,10 +10,11 @@ The design goal is a stable, robust platform built around a deterministic
 compiler and execution kernel, with asynchronous infrastructure and external
 frameworks isolated behind owned ports.
 
-The current product version prepared for official release is **0.8.0** on the
-0.8 release line. The [0.8 release notes](docs/releases/0.8.md) define its
-claims and limitations. No tag, package publication, or deployment is
-performed by this release-preparation branch.
+The latest official GitHub Release is
+[**0.8.1**](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v0.8.1)
+on the 0.8 release line. The [0.8 release notes](docs/releases/0.8.md) define
+its claims, patch corrections, and limitations. No production deployment is
+implied by publication.
 
 Start with [the documentation index](docs/README.md).
 
@@ -27,9 +28,11 @@ Version progress is coordinated in the
 
 ## Current status
 
-- The 0.8 product identity is internally consistent and retains reproducible,
-  unpublished release receipts for the advertised macOS ARM64 and Linux x86-64
-  targets.
+- The 0.8.1 product identity is internally consistent and retains reproducible
+  release receipts for the advertised macOS ARM64 and Linux x86-64 targets.
+- All findings from the post-publication 0.8.0 JES2 review are corrected in
+  0.8.1 with focused restart, record-framing, allocation, disposition, encoding,
+  spool, and tooling regressions.
 - The 0.3 through 0.7 subsystem work was integrated in parallel before product
   promotion. The 0.7 source baseline truthfully preserves that integrated
   history rather than reconstructing alternate product trees.
@@ -48,8 +51,8 @@ Version progress is coordinated in the
 - Licensed z/OS 3.2/JES2 differential credit remains 0/16 pending and is
   deferred to the 0.17 certification hard gate. Hercules, MVS 3.8J, modeled
   behavior, and local product output receive zero licensed equivalence credit.
-- Remote GitHub publication has occurred for 0.2.0 through 0.7.0; this 0.8
-  preparation does not itself publish or deploy the product.
+- Remote GitHub publication has occurred for 0.2.0 through 0.8.1; no production
+  deployment is implied.
 - No old implementation may be imported by mainframe-env production crates.
 - Existing fixtures, schemas, behavioral tests, and evidence may be reused as
   compatibility inputs.

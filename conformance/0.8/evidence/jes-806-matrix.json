@@ -22,6 +22,6 @@
     {"id": "purge-unknown-outcome", "result": "pass", "evidence": "service::tests::purge_checkpoint_delete_failure_retains_retryable_job_intent; mainframe-env-spool::service::tests::purge_intent_survives_artifact_delete_failure_and_reconciles_after_restart"},
     {"id": "sqlite-backup-restore", "result": "pass", "evidence": "service::tests::sqlite_backup_restores_jobs_spool_checkpoint_scheduler_and_topology"},
     {"id": "durable-job-migration", "result": "pass", "evidence": "service::tests::legacy_durable_job_migrates_and_recovers_without_losing_plan"},
-    {"id": "licensed-zos-3.2-jes2", "result": "pending", "evidence": "approved 2026-09-04 pass-with-licensed-differential-pending policy; conformance/0.8/oracles/jes-licensed-differential.json; Hercules/MVS/local results grant zero credit; candidate sha256:2733803af3a110d6fc752d8ec9695f824ffc23f87554eaa026eb1fd3402bcd4d; MAINFRAME_ENV_JES_LICENSED_ORACLE_RECEIPT is absent; hard gate deferred to 0.17 CER-1702"}
+    {"id": "licensed-zos-3.2-jes2", "result": "pending", "evidence": "approved 2026-09-04 pass-with-licensed-differential-pending policy; conformance/0.8/oracles/jes-licensed-differential.json; Hercules/MVS/local results grant zero credit; 0.8.1 candidate sha256:3b48d6d36dbac89e3d5193c85c86e3b49fcea52ac62b770ee18f078ed7aa3f46; MAINFRAME_ENV_JES_LICENSED_ORACLE_RECEIPT is absent; hard gate deferred to 0.17 CER-1702"}
   ]
 }

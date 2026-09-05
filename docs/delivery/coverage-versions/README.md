@@ -1,6 +1,6 @@
 # IBM coverage release plans
 
-Status: **0.2.0 through 0.8.0 released; 0.9.0 through 1.0.0 planned**
+Status: **0.2.0 through 0.8.1 released; 0.9.0 through 1.0.0 planned**
 Applies after: `mainframe-env 0.1.1`
 Planning authority:
 [`IBM-OFFICIAL-COVERAGE-ROADMAP.md`](../../research/IBM-OFFICIAL-COVERAGE-ROADMAP.md)
@@ -42,6 +42,11 @@ tag `mainframe-env-v0.8.0` landed in
 carries both target evidence archives. It shipped with three confirmed defects
 open against its own claims; they are listed in the release's known-limitations
 section and detailed in the [0.8.0 review](review/0.8.0.md).
+
+Patch 0.8.1 published on 2026-09-05 after
+[#43](https://github.com/toreleon/mainframe-env/pull/43) resolved all nine
+review findings. It preserves the approved licensed-differential-pending
+disposition without assigning Hercules or modeled results equivalence credit.
 
 See [Parallel implementation plan](PARALLEL-IMPLEMENTATION.md) for the work DAG,
 safe concurrency lanes, merge discipline, and critical path.
