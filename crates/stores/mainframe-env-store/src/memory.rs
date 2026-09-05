@@ -1292,3 +1292,6 @@ mod tests {
         assert_eq!(store.get_execution(&ids.execution).unwrap(), None);
     }
 }
+
+#[cfg(test)]
+mod hardening_bench;
