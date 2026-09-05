@@ -4,6 +4,38 @@ All notable changes to mainframe-env are documented here.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-09-05
+
+### Fixed
+
+- Preserved durable abend state and stable per-step effect identities across
+  warm restart, preventing inverted `COND` handling and duplicate `DISP=MOD`
+  appends in multi-step jobs.
+- Preserved exact utility record boundaries, including empty records and data
+  containing `0x0A`, without delimiter-based reconstruction.
+- Serialized absent-dataset probe/create under a durable name reservation and
+  retained the original abend when terminal DD cleanup also fails.
+- Corrected omitted abnormal `DISP` defaults, CCSID-aware fixed-record padding,
+  negative zoned edit signs, content-addressed spool rollback, JES queue use,
+  de-hardcoding scan scope, and local artifact hygiene.
+
+### Compatibility
+
+- The program-input wire contract gains only an optional typed record map.
+- 0.8.1 accepts 0.8.0 checkpoint identities. Queued and terminal durable jobs
+  migrate through defaults; an in-flight legacy step without a replay base
+  fails closed and can be resubmitted instead of risking a duplicate effect.
+
+### Known limitations
+
+- The licensed z/OS 3.2/JES2 differential remains exactly 0/16 pending under
+  the approved `pass-with-licensed-differential-pending` policy. Hercules,
+  MVS 3.8J, modeled behavior, local output, and generated or historical
+  evidence receive zero licensed equivalence credit.
+- The authentic licensed campaign remains a hard gate for 0.17 release
+  certification and 1.0, while the standalone receipt adapter remains
+  fail-closed.
+
 ## [0.8.0] - 2026-09-04
 
 ### Added
