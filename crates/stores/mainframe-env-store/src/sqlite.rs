@@ -228,15 +228,7 @@ impl ProviderStateStore for SqliteStateStore {
         old_key: &str,
         expected_version: u64,
     ) -> Result<(), StoreError> {
-        if record.payload.len() > self.max_payload_bytes
-            || record.key == old_key
-            || record.version
-                != expected_version
-                    .checked_add(1)
-                    .ok_or(StoreError::Conflict)?
-        {
-            return Err(StoreError::Conflict);
-        }
+        record.validate_move(old_key, expected_version, self.max_payload_bytes)?;
         block_on(&self.runtime, async {
             let mut transaction = self
                 .pool
@@ -429,15 +421,7 @@ impl ProviderStateStore for SqliteStateStore {
                         old_key,
                         expected_version,
                     } => {
-                        if record.payload.len() > self.max_payload_bytes
-                            || record.key == old_key
-                            || record.version
-                                != expected_version
-                                    .checked_add(1)
-                                    .ok_or(StoreError::Conflict)?
-                        {
-                            return Err(StoreError::Conflict);
-                        }
+                        record.validate_move(&old_key, expected_version, self.max_payload_bytes)?;
                         let inserted = sqlx::query(
                             "INSERT OR IGNORE INTO provider_state(namespace,key,version,payload) VALUES(?,?,?,?)",
                         )
