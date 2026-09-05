@@ -1,3 +1,4 @@
+use crate::service::VerifiedCobolHir;
 use crate::{CobolHir, ControlEdgeKind, ControlRole, ControlScope, DataCategory, StatementKind};
 use mainframe_env_ir::{
     Attribute, Effect, IrLimits, LegalityProfile, Module, ModuleBuilder, OperationCatalog,
@@ -36,12 +37,13 @@ pub const PUBLISHABLE_LAYOUT_CATEGORIES: &[&str] = &[
 ];
 
 pub(crate) fn lower_to_core(
-    hir: &CobolHir,
+    verified: &VerifiedCobolHir<'_>,
     arithmetic_mode: &str,
     display_sign: &str,
     declaratives: &[(String, Vec<String>)],
     limits: IrLimits,
 ) -> Result<Module, LowerProblem> {
+    let hir = verified.hir();
     let mut unsupported = hir.unsupported();
     let structured = hir.control_nodes.iter().any(|node| {
         matches!(
