@@ -7325,7 +7325,11 @@ fn dcollect_catalog_names(
         {
             names.remove(0);
         }
-        if more && names.is_empty() {
+        // An inclusive continuation must return at least one new name after
+        // its echoed boundary. A provider that previously promised `more`
+        // cannot end with an empty/non-advancing continuation page, even if
+        // that malformed page clears its `more` flag.
+        if names.is_empty() && (more || start.is_some()) {
             return Err(HostProblem::ProviderFailure);
         }
         if all
@@ -9580,6 +9584,25 @@ mod tests {
             })),
             Err(HostProblem::ProviderFailure)
         );
+        let mut pages = 0;
+        assert_eq!(
+            dcollect_catalog_names(512, |_| {
+                pages += 1;
+                Ok(if pages == 1 {
+                    DatasetResult::Listed {
+                        names: vec![one.clone()],
+                        more: true,
+                    }
+                } else {
+                    DatasetResult::Listed {
+                        names: Vec::new(),
+                        more: false,
+                    }
+                })
+            }),
+            Err(HostProblem::ProviderFailure)
+        );
+        assert_eq!(pages, 2);
         for failure in [
             HostProblem::ProviderFailure,
             HostProblem::Cancelled,
