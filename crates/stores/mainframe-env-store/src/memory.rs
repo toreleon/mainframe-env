@@ -847,23 +847,14 @@ impl ProviderStateStore for MemoryStore {
         old_key: &str,
         expected_version: u64,
     ) -> Result<(), StoreError> {
-        if record.namespace.is_empty()
-            || record.key.is_empty()
-            || record.key == old_key
-            || record.version
-                != expected_version
-                    .checked_add(1)
-                    .ok_or(StoreError::Conflict)?
-        {
-            return Err(StoreError::Conflict);
-        }
+        record.validate_move(old_key, expected_version, self.limits.max_blob_bytes)?;
         let mut state = self.lock()?;
         let old_map_key = (record.namespace.clone(), old_key.to_string());
         let new_map_key = (record.namespace.clone(), record.key.clone());
         let old = state
             .provider_state
             .get(&old_map_key)
-            .ok_or(StoreError::NotFound)?;
+            .ok_or(StoreError::Conflict)?;
         if old.version != expected_version || state.provider_state.contains_key(&new_map_key) {
             return Err(StoreError::Conflict);
         }
@@ -925,22 +916,13 @@ impl ProviderStateStore for MemoryStore {
                     old_key,
                     expected_version,
                 } => {
-                    if record.namespace.is_empty()
-                        || record.key.is_empty()
-                        || record.key == old_key
-                        || record.version
-                            != expected_version
-                                .checked_add(1)
-                                .ok_or(StoreError::Conflict)?
-                    {
-                        return Err(StoreError::Conflict);
-                    }
+                    record.validate_move(&old_key, expected_version, self.limits.max_blob_bytes)?;
                     let old_map_key = (record.namespace.clone(), old_key);
                     let new_map_key = (record.namespace.clone(), record.key.clone());
                     let old = staged
                         .provider_state
                         .get(&old_map_key)
-                        .ok_or(StoreError::NotFound)?;
+                        .ok_or(StoreError::Conflict)?;
                     if old.version != expected_version
                         || staged.provider_state.contains_key(&new_map_key)
                     {
