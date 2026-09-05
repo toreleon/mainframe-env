@@ -203,6 +203,12 @@ impl ExecutionCoordinator {
                     )
                     .is_err()
                     {
+                        if matches!(&result.outcome, Err(HostProblem::UnknownOutcome)) {
+                            return failed_outcome(problem(
+                                FailureCategory::UnknownOutcome,
+                                "host outcome unknown; result persistence also failed",
+                            ));
+                        }
                         return infrastructure_failure("effect result persistence failed");
                     }
                     resume = MachineResume::HostResult(result);
@@ -296,6 +302,9 @@ impl ExecutionCoordinator {
                         _ => (ExecutionState::Failed, LifecycleEventKind::Failed),
                     };
                     if record_step(&mut journal, Some(state), event, None, None).is_err() {
+                        if problem.has_unknown_outcome() {
+                            return failed_outcome(problem);
+                        }
                         return infrastructure_failure("failure persistence failed");
                     }
                     return failed_outcome(problem);
@@ -489,6 +498,9 @@ fn infrastructure_failure(message: &str) -> ExecutionOutcome {
 }
 
 fn failed_outcome(problem: ExecutionProblem) -> ExecutionOutcome {
+    if problem.has_unknown_outcome() {
+        return ExecutionOutcome::ProviderFailure(problem);
+    }
     match problem.category {
         FailureCategory::Cancelled => ExecutionOutcome::Cancelled,
         FailureCategory::TimedOut => ExecutionOutcome::TimedOut,

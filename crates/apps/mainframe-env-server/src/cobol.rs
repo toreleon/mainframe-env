@@ -338,12 +338,18 @@ impl CobolProgram {
             CoordinatorLimits::default(),
         );
         let outcome = coordinator.execute(&mut machine, &invocation, ExecutionControl::default());
-        persist_batch_file_cursors(
+        let cursor_result = persist_batch_file_cursors(
             store.as_ref(),
             &cursor_key,
             machine.dataset_cursors(),
             cursor_version,
-        )?;
+        );
+        // A secondary persistence failure must not erase an in-doubt effect.
+        if matches!(&outcome, ExecutionOutcome::ProviderFailure(problem) if problem.has_unknown_outcome())
+        {
+            return Err(HostProblem::UnknownOutcome);
+        }
+        cursor_result?;
         match outcome {
             ExecutionOutcome::Completed(_) => {
                 let mut values = machine
@@ -360,6 +366,9 @@ impl CobolProgram {
             ExecutionOutcome::Cancelled => Err(HostProblem::Cancelled),
             ExecutionOutcome::TimedOut => Err(HostProblem::TimedOut),
             ExecutionOutcome::ResourceExhausted(_) => Err(HostProblem::ResourceExhausted),
+            ExecutionOutcome::ProviderFailure(problem) if problem.has_unknown_outcome() => {
+                Err(HostProblem::UnknownOutcome)
+            }
             ExecutionOutcome::ProviderFailure(problem) => Err(HostProblem::Condition {
                 name: format!("BATCH-PROVIDER:{}", problem.public_message),
                 response: -6,
@@ -575,6 +584,9 @@ impl CobolProgram {
             ExecutionOutcome::Cancelled => Err(HostProblem::Cancelled),
             ExecutionOutcome::TimedOut => Err(HostProblem::TimedOut),
             ExecutionOutcome::ResourceExhausted(_) => Err(HostProblem::ResourceExhausted),
+            ExecutionOutcome::ProviderFailure(problem) if problem.has_unknown_outcome() => {
+                Err(HostProblem::UnknownOutcome)
+            }
             ExecutionOutcome::ProviderFailure(problem) => Err(HostProblem::Condition {
                 name: format!("BATCH-PROVIDER:{}", problem.public_message),
                 response: -6,
@@ -737,6 +749,9 @@ impl Program for CobolProgram {
             ExecutionOutcome::Cancelled => Err(HostProblem::Cancelled),
             ExecutionOutcome::TimedOut => Err(HostProblem::TimedOut),
             ExecutionOutcome::ResourceExhausted(_) => Err(HostProblem::ResourceExhausted),
+            ExecutionOutcome::ProviderFailure(problem) if problem.has_unknown_outcome() => {
+                Err(HostProblem::UnknownOutcome)
+            }
             ExecutionOutcome::ProviderFailure(_) => Err(HostProblem::ProviderFailure),
             ExecutionOutcome::InfrastructureFailure(_) => Err(HostProblem::InfrastructureFailure),
             ExecutionOutcome::Rejected(_)
@@ -1422,3 +1437,6 @@ mod tests {
         assert_eq!(store.pending_notifications(16).unwrap().len(), 5);
     }
 }
+
+#[cfg(test)]
+mod hardening;

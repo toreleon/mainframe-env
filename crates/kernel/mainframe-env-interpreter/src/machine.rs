@@ -1552,6 +1552,12 @@ impl ReferenceMachine {
         result
             .validate(pending.sequence, HostLimits::default())
             .map_err(MachineProblem::Host)?;
+        // An in-doubt effect is not a language-level exception. CALL/ACCEPT
+        // handlers, declaratives and subsystem error translation must not
+        // turn uncertainty about committed work into ordinary control flow.
+        if matches!(&result.outcome, Err(HostProblem::UnknownOutcome)) {
+            return Err(MachineProblem::Host(HostProblem::UnknownOutcome));
+        }
         if let Err(HostProblem::Condition { name, response, .. }) = &result.outcome
             && let Some(status_target) = match &pending.kind {
                 PendingKind::DatasetRead { status, .. }
