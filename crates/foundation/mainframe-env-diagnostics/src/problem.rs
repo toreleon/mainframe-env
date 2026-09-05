@@ -198,6 +198,13 @@ pub struct ExecutionProblem {
 }
 
 impl ExecutionProblem {
+    /// Uncertainty is safety-critical across adapters. Honor either typed
+    /// representation, including diagnostics constructed by older callers.
+    #[must_use]
+    pub fn has_unknown_outcome(&self) -> bool {
+        self.unknown_outcome || self.category == FailureCategory::UnknownOutcome
+    }
+
     pub fn new(
         code: DiagnosticCode,
         category: FailureCategory,
@@ -312,6 +319,25 @@ mod tests {
             diagnostic.add_related(related, limits),
             Err(DiagnosticProblem::TooManyRelatedSpans)
         );
+    }
+
+    #[test]
+    fn hardening_49_uncertainty_is_detected_from_category_or_flag() {
+        let mut problem = ExecutionProblem::new(
+            DiagnosticCode::new("MEEXEC0049").unwrap(),
+            FailureCategory::UnknownOutcome,
+            Phase::Execute,
+            "uncertain effect",
+            false,
+            false,
+            DiagnosticLimits::default(),
+        )
+        .unwrap();
+        assert!(problem.has_unknown_outcome());
+        problem.category = FailureCategory::ProviderFailure;
+        assert!(!problem.has_unknown_outcome());
+        problem.unknown_outcome = true;
+        assert!(problem.has_unknown_outcome());
     }
 
     #[test]

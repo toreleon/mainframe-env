@@ -41,7 +41,7 @@ pub struct DatasetReferenceSimulationReport {
     pub organization_rows: usize,
     pub command_rows: usize,
     pub property_cases: usize,
-    pub mutants_killed: usize,
+    pub observation_perturbations_rejected: usize,
     pub differential_credit: usize,
     pub digest: String,
 }
@@ -1252,17 +1252,21 @@ pub fn run_dataset_reference_simulation() -> Result<DatasetReferenceSimulationRe
     for property in &properties {
         transcript.push_str(property);
     }
-    let mutants_killed = kill_representative_mutants()?;
-    if mutants_killed != 8 {
-        return Err("reference mutation suite did not kill all eight mutants".into());
+    let observation_perturbations_rejected = reject_observation_perturbations()?;
+    if observation_perturbations_rejected != 8 {
+        return Err(
+            "reference comparator did not reject all eight observation perturbations".into(),
+        );
     }
-    transcript.push_str(&format!("MUTANTS={mutants_killed};DIFFERENTIAL=0;"));
+    transcript.push_str(&format!(
+        "OBSERVATION_PERTURBATIONS={observation_perturbations_rejected};DIFFERENTIAL=0;"
+    ));
     Ok(DatasetReferenceSimulationReport {
         official_rows,
         organization_rows: 5,
         command_rows: COMMANDS.len(),
         property_cases: properties.len(),
-        mutants_killed,
+        observation_perturbations_rejected,
         differential_credit: 0,
         digest: digest_text(&transcript),
     })
@@ -1513,7 +1517,7 @@ fn run_properties() -> Result<Vec<String>, String> {
     Ok(observations)
 }
 
-fn kill_representative_mutants() -> Result<usize, String> {
+fn reject_observation_perturbations() -> Result<usize, String> {
     let state = seeded_state()?;
     let expected = ExpectedObservation {
         source: ExpectationSource::IndependentReference,
@@ -1523,7 +1527,7 @@ fn kill_representative_mutants() -> Result<usize, String> {
         state_digest: digest_text(&state.canonical()),
         records: vec![b"AA11".to_vec(), b"BB22".to_vec()],
     };
-    let mutants = [
+    let perturbations = [
         (
             "generic-success",
             ExpectedObservation {
@@ -1585,7 +1589,7 @@ fn kill_representative_mutants() -> Result<usize, String> {
             },
         ),
     ];
-    if mutants
+    if perturbations
         .iter()
         .map(|(name, _)| *name)
         .collect::<BTreeSet<_>>()
@@ -1600,13 +1604,13 @@ fn kill_representative_mutants() -> Result<usize, String> {
             "wrong-organization-access",
         ])
     {
-        return Err("reference mutant identities drifted".into());
+        return Err("reference observation-perturbation identities drifted".into());
     }
-    let killed = mutants
+    let rejected = perturbations
         .iter()
-        .filter(|(_, mutant)| !verify_observation(&expected, mutant))
+        .filter(|(_, perturbation)| !verify_observation(&expected, perturbation))
         .count();
-    Ok(killed)
+    Ok(rejected)
 }
 
 fn parse_json(source: &str, label: &str) -> Result<Value, String> {
@@ -1659,7 +1663,7 @@ mod tests {
         assert_eq!(report.organization_rows, 5);
         assert_eq!(report.command_rows, 31);
         assert_eq!(report.property_cases, 13);
-        assert_eq!(report.mutants_killed, 8);
+        assert_eq!(report.observation_perturbations_rejected, 8);
         assert_eq!(report.differential_credit, 0);
         assert!(report.digest.starts_with("sha256:"));
     }
@@ -1675,9 +1679,9 @@ mod tests {
     }
 
     #[test]
-    fn reference_properties_and_mutants_are_exact_and_repeatable() {
+    fn reference_properties_and_perturbations_are_exact_and_repeatable() {
         assert_eq!(run_properties().unwrap().len(), 13);
-        assert_eq!(kill_representative_mutants().unwrap(), 8);
+        assert_eq!(reject_observation_perturbations().unwrap(), 8);
         assert_eq!(
             run_dataset_reference_simulation().unwrap(),
             run_dataset_reference_simulation().unwrap()
