@@ -1,0 +1,46 @@
+name: CICS development inputs
+
+on:
+  push:
+    branches:
+      - impl/0.9.0-cics-handler-closure
+    paths:
+      - .github/workflows/cics-development-bootstrap.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inputs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    container: rust:1.98.0-bookworm@sha256:82150a52ec202c1b14d7817e14516c392bb7f5cfebd88f1ed531cb37ebd39922
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+      - name: Export reproducible development inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          output="$RUNNER_TEMP/cics-development-inputs"
+          mkdir -p "$output"
+          git bundle create "$output/source.bundle" HEAD refs/remotes/origin/main --tags
+          git rev-parse HEAD refs/remotes/origin/main > "$output/source-identity.txt"
+          rustc -Vv > "$output/toolchain.txt"
+          cargo -V >> "$output/toolchain.txt"
+          cargo vendor --locked --versioned-dirs "$output/vendor" > "$output/vendor-config.toml"
+          tar -C "$output" -czf "$output/vendor.tar.gz" vendor
+          rm -rf "$output/vendor"
+          tar -C "$(rustc --print sysroot)" -czf "$output/toolchain.tar.gz" bin lib
+          (cd "$output" && sha256sum source.bundle vendor.tar.gz toolchain.tar.gz > SHA256SUMS)
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cics-development-inputs-${{ github.run_id }}
+          path: ${{ runner.temp }}/cics-development-inputs/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
