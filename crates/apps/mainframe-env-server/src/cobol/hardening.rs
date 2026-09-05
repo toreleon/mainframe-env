@@ -57,7 +57,7 @@ pub(super) fn parent() -> Invocation {
         .unwrap(),
         ServiceClass::Batch,
         0,
-        1000,
+        u64::MAX,
         TraceId::new("parent-trace", limits).unwrap(),
         IdempotencyKey::new("parent-key", limits).unwrap(),
         1,
@@ -488,4 +488,223 @@ fn hardening_49_journal_result_and_terminal_failure_do_not_erase_uncertainty() {
             }
         );
     }
+}
+
+const CPU_LOOP: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. CPU-LOOP.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 COUNTER PIC 9(8) VALUE ZERO.\nPROCEDURE DIVISION.\nPERFORM UNTIL COUNTER = 99999999\n  ADD 1 TO COUNTER\nEND-PERFORM.\nGOBACK.\n";
+
+#[test]
+fn hardening_48_cpu_only_installed_inline_and_nested_programs_observe_live_controls() {
+    for profile in ["call", "installed-batch", "inline", "nested"] {
+        for cancel in [true, false] {
+            let root = TestRoot::new();
+            let store: Arc<dyn PlatformStore> = Arc::new(MemoryStore::new(StoreLimits::default()));
+            let fixture = Fixture::new(&root, store, HostProblem::NotFound, false);
+            fixture.install("CPU-LOOP", CPU_LOOP);
+            let nested = "IDENTIFICATION DIVISION.\nPROGRAM-ID. OUTER.\nPROCEDURE DIVISION.\nCALL 'CPU-LOOP'.\nSTOP RUN.\n";
+            fixture.install("OUTER", nested);
+            let observations = Arc::new(AtomicU64::new(0));
+            let observed = observations.clone();
+            fixture
+                .router
+                .bind_execution_control(Arc::new(move |inv: &Invocation| {
+                    if inv.selector.as_str() == "program:CPU-LOOP"
+                        || inv.selector.as_str() == "program:COBOL"
+                    {
+                        let n = observed.fetch_add(1, Ordering::SeqCst);
+                        Ok(ExecutionControl {
+                            now_tick: if n == 0 { 0 } else { inv.deadline_tick },
+                            cancellation_requested: cancel && n > 0,
+                        })
+                    } else {
+                        Ok(ExecutionControl::default())
+                    }
+                }))
+                .unwrap();
+            let mut inv = parent();
+            inv.deadline_tick = 100;
+            let payload = if matches!(profile, "call" | "nested") {
+                call_payload(&[])
+            } else {
+                BoundedPayload::new(
+                    "mainframe-env.program.input@1",
+                    serde_json::to_vec(&input(if profile == "inline" { CPU_LOOP } else { "" }))
+                        .unwrap(),
+                    InvocationLimits::default(),
+                )
+                .unwrap()
+            };
+            let name = match profile {
+                "nested" => "OUTER",
+                "inline" => "COBOL",
+                _ => "CPU-LOOP",
+            };
+            let result = fixture.call(&inv, name, 1, payload);
+            assert_eq!(
+                result.outcome,
+                Err(if cancel {
+                    HostProblem::Cancelled
+                } else {
+                    HostProblem::TimedOut
+                }),
+                "{profile}"
+            );
+            assert_eq!(
+                observations.load(Ordering::SeqCst),
+                2,
+                "stop after first CPU quantum: {profile}"
+            );
+            assert!(fixture.faults.observed.lock().unwrap().iter().all(|effect|
+                !matches!(&effect.request, HostRequest::Program(ProgramRequest::Call { program, .. }) if program.as_str() == "EFFECT")));
+        }
+    }
+}
+
+fn queued_control_work(inv: &Invocation, id: &str) -> mainframe_env_store_api::WorkRecord {
+    mainframe_env_store_api::WorkRecord {
+        work_id: id.into(),
+        execution_id: inv.execution_id.clone(),
+        required_selector: inv.selector.clone(),
+        required_generation: "test-control@1".into(),
+        artifact: inv.artifact.clone(),
+        state: mainframe_env_store_api::WorkState::Queued,
+        attempt: 0,
+        max_attempts: 3,
+        available_tick: 0,
+        deadline_tick: u64::MAX,
+        cancellation_requested: false,
+        worker_id: None,
+        lease_id: None,
+        lease_expiry_tick: None,
+        heartbeat_tick: None,
+        checkpoint_id: None,
+        effect_sequence: 0,
+        payload: vec![],
+    }
+}
+
+#[test]
+fn hardening_48_durable_job_cancel_is_observed_inside_cpu_only_cobol_and_is_scoped() {
+    for sqlite in [false, true] {
+        let root = TestRoot::new();
+        let store: Arc<dyn PlatformStore> = if sqlite {
+            Arc::new(SqliteStateStore::open(&root.sqlite_url(), 8 * 1024 * 1024, 65536).unwrap())
+        } else {
+            Arc::new(MemoryStore::new(StoreLimits::default()))
+        };
+        let fixture = Fixture::new(&root, store.clone(), HostProblem::NotFound, false);
+        fixture.install("CPU-LOOP", CPU_LOOP);
+        let mut inv = parent();
+        let id = "jes:CONTROL-JOB";
+        store.enqueue(queued_control_work(&inv, id)).unwrap();
+        store
+            .enqueue(queued_control_work(&inv, "jes:OTHER-JOB"))
+            .unwrap();
+        inv.bindings.insert(
+            "jes.work-id".into(),
+            BoundedPayload::new(
+                "mainframe-env.jes-work@1",
+                id.as_bytes().to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        let observations = Arc::new(AtomicU64::new(0));
+        let observed = observations.clone();
+        let observed_store = store.clone();
+        fixture
+            .router
+            .bind_execution_control(Arc::new(move |_: &Invocation| {
+                if observed.fetch_add(1, Ordering::SeqCst) == 1 {
+                    // This is the same durable operation used by ProductServer JobCancel.
+                    observed_store.request_cancellation(id).unwrap();
+                }
+                Ok(ExecutionControl::default())
+            }))
+            .unwrap();
+        assert_eq!(
+            fixture.call(&inv, "CPU-LOOP", 1, call_payload(&[])).outcome,
+            Err(HostProblem::Cancelled)
+        );
+        assert_eq!(observations.load(Ordering::SeqCst), 2);
+        assert!(store.get_work(id).unwrap().unwrap().cancellation_requested);
+        assert!(
+            !store
+                .get_work("jes:OTHER-JOB")
+                .unwrap()
+                .unwrap()
+                .cancellation_requested
+        );
+        inv.bindings.insert(
+            "jes.work-id".into(),
+            BoundedPayload::new(
+                "mainframe-env.jes-work@1",
+                b"jes:OTHER-JOB".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        assert!(
+            !fixture
+                .router
+                .observe_execution_control(&inv)
+                .unwrap()
+                .cancellation_requested
+        );
+    }
+}
+
+#[test]
+fn hardening_48_unknown_host_outcome_wins_over_new_cancellation() {
+    let root = TestRoot::new();
+    let store: Arc<dyn PlatformStore> = Arc::new(MemoryStore::new(StoreLimits::default()));
+    let fixture = Fixture::new(&root, store.clone(), HostProblem::UnknownOutcome, false);
+    fixture.install("MIDDLE", MIDDLE);
+    fixture.install("ROOT", ROOT);
+    let observed_store = store.clone();
+    fixture
+        .router
+        .bind_execution_control(Arc::new(move |_: &Invocation| {
+            Ok(ExecutionControl {
+                now_tick: 0,
+                cancellation_requested: !observed_store
+                    .list_provider_state("hardening-49-business", 10)
+                    .unwrap()
+                    .is_empty(),
+            })
+        }))
+        .unwrap();
+    assert_eq!(
+        fixture.batch("ROOT", "").outcome,
+        Err(HostProblem::UnknownOutcome)
+    );
+    assert_eq!(
+        store
+            .list_provider_state("hardening-49-business", 10)
+            .unwrap()
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn hardening_48_explicit_parent_cancellation_is_not_lost_in_child_construction() {
+    let root = TestRoot::new();
+    let store: Arc<dyn PlatformStore> = Arc::new(MemoryStore::new(StoreLimits::default()));
+    let fixture = Fixture::new(&root, store, HostProblem::NotFound, false);
+    fixture.install("CPU-LOOP", CPU_LOOP);
+    let mut inv = parent();
+    inv.cancellation = Some(mainframe_env_execution_api::Cancellation {
+        id: mainframe_env_execution_api::CancellationId::new("cancel", InvocationLimits::default())
+            .unwrap(),
+        reason: "requested".into(),
+        requested_at_tick: 1,
+    });
+    // Direct adapter entry, bypassing an outer host admission check, exercises propagation.
+    assert_eq!(
+        fixture
+            .router
+            .cobol
+            .execute_installed(&inv, "CPU-LOOP", &call_payload(&[])),
+        Err(HostProblem::Cancelled)
+    );
 }

@@ -2341,8 +2341,26 @@ impl BatchService {
         .map_err(|_| HostProblem::ResourceExhausted)?;
         let sequence = next_effect_sequence(invocation, effect_sequence)?;
         let key = effect_key(job, step, sequence)?;
+        let mut program_invocation = invocation.clone();
+        let limits = InvocationLimits::default();
+        let binding = BoundedPayload::new(
+            "mainframe-env.jes-work@1",
+            format!("jes:{}", job.id).into_bytes(),
+            limits,
+        )
+        .map_err(|_| HostProblem::ResourceExhausted)?;
+        if let Some(existing) = program_invocation.bindings.get("jes.work-id") {
+            if existing != &binding {
+                return Err(HostProblem::Malformed);
+            }
+        } else if program_invocation.bindings.len() >= limits.max_bindings {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        program_invocation
+            .bindings
+            .insert("jes.work-id".into(), binding);
         let result = self.host.invoke(
-            invocation,
+            &program_invocation,
             invocation.deadline_tick.saturating_sub(1),
             false,
             EffectRequest {

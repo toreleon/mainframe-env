@@ -35,9 +35,7 @@ use mainframe_env_host_api::{
     SessionId, TerminalRequest,
 };
 use mainframe_env_ims::{ImsService, ims_providers};
-use mainframe_env_interpreter::{
-    CoordinatorLimits, ExecutionControl, ExecutionCoordinator, ReferenceMachine,
-};
+use mainframe_env_interpreter::{CoordinatorLimits, ExecutionCoordinator, ReferenceMachine};
 use mainframe_env_ir::CodecLimits;
 use mainframe_env_mq::{MqService, mq_providers};
 use mainframe_env_racf::{MemorySecretResolver, RacfService, SecretResolver, racf_providers};
@@ -189,6 +187,7 @@ pub struct ProductServer {
     batch: Arc<BatchService>,
     artifacts: Arc<LocalArtifactStore>,
     host: Arc<ScopedHostService>,
+    program: Arc<DefaultProgramRouter>,
     applications: ApplicationInstaller,
     applications_v2: Mutex<DurableApplicationsV2>,
     application_publication: Mutex<()>,
@@ -512,6 +511,7 @@ impl ProductServer {
             batch,
             artifacts,
             host,
+            program,
             applications: ApplicationInstaller::new("0.1.1"),
             applications_v2: Mutex::new(DurableApplicationsV2 {
                 installer: applications_v2,
@@ -1505,7 +1505,9 @@ impl ProductServer {
                     ..CoordinatorLimits::default()
                 },
             );
-            match coordinator.execute(&mut machine, &invocation, ExecutionControl::default()) {
+            match coordinator.execute_with_control(&mut machine, &invocation, || {
+                self.program.observe_execution_control(&invocation)
+            }) {
                 ExecutionOutcome::Completed(_) => {
                     self.clear_online_machine_continuation(session, saved_version)?;
                     self.finish_online_machine_run(session, principal, now_tick)?;
