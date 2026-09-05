@@ -50,6 +50,21 @@ pub struct CobolAnalysis {
     pub completeness: Completeness,
 }
 
+/// An immutable COBOL analysis paired with verification of its exact HIR module.
+///
+/// Only `verify_hir` constructs this token. Lowering cannot accept raw metadata
+/// or combine a verification result with a different mutable analysis.
+pub(crate) struct VerifiedCobolHir<'a> {
+    hir: &'a CobolHir,
+    stage: VerifiedHir,
+}
+
+impl VerifiedCobolHir<'_> {
+    pub(crate) fn hir(&self) -> &CobolHir {
+        self.hir
+    }
+}
+
 pub struct CobolCompiler {
     limits: CobolCompilerLimits,
 }
@@ -180,11 +195,11 @@ impl CobolCompiler {
         }
     }
 
-    fn verify_hir(
+    fn verify_hir<'a>(
         &self,
         source: &SourceBundle,
-        analysis: &CobolAnalysis,
-    ) -> Result<VerifiedHir, CompilerProblem> {
+        analysis: &'a CobolAnalysis,
+    ) -> Result<VerifiedCobolHir<'a>, CompilerProblem> {
         if analysis.completeness != Completeness::Complete {
             return Err(CompilerProblem::IncompleteStage);
         }
@@ -205,7 +220,9 @@ impl CobolCompiler {
             .hir
             .as_ref()
             .ok_or(CompilerProblem::IncompleteStage)?;
-        VerifiedHir::verify(&semantic, hir.module.clone(), &crate::cobol_hir_catalog())
+        let stage =
+            VerifiedHir::verify(&semantic, hir.module.clone(), &crate::cobol_hir_catalog())?;
+        Ok(VerifiedCobolHir { hir, stage })
     }
 }
 
@@ -218,10 +235,37 @@ impl Default for CobolCompiler {
 impl CompilerService for CobolCompiler {
     fn compile(&self, request: CompilerRequest) -> Result<CompilerResult, CompilerProblem> {
         let analysis = self.analyze(&request.source);
-        let verified = self.verify_hir(&request.source, &analysis).ok();
+        self.compile_analyzed(request, analysis)
+    }
+}
+
+impl CobolCompiler {
+    fn compile_analyzed(
+        &self,
+        request: CompilerRequest,
+        mut analysis: CobolAnalysis,
+    ) -> Result<CompilerResult, CompilerProblem> {
         if request.mode == CompilationMode::Analyze {
+            let hir = match self.verify_hir(&request.source, &analysis) {
+                Ok(verified) => Some(verified.stage),
+                Err(CompilerProblem::IncompleteStage)
+                    if analysis.completeness != Completeness::Complete =>
+                {
+                    None
+                }
+                Err(problem) => {
+                    analysis.diagnostics.push(diagnostic(
+                        "MECOB0300",
+                        Phase::Verify,
+                        FailureCategory::MalformedInput,
+                        problem.to_string(),
+                    ));
+                    analysis.completeness = Completeness::Failed;
+                    None
+                }
+            };
             return Ok(CompilerResult::Analysis {
-                hir: verified,
+                hir,
                 diagnostics: analysis.diagnostics,
                 completeness: analysis.completeness,
             });
@@ -232,10 +276,9 @@ impl CompilerService for CobolCompiler {
                 completeness: analysis.completeness,
             });
         }
-        let hir = analysis
-            .hir
-            .as_ref()
-            .ok_or(CompilerProblem::IncompleteStage)?;
+        // Verification failure is terminal: no lowering, legalization or
+        // artifact publication may happen without the associated proof.
+        let verified = self.verify_hir(&request.source, &analysis)?;
         let syntax = analysis
             .syntax
             .as_ref()
@@ -256,7 +299,7 @@ impl CompilerService for CobolCompiler {
             })
             .collect::<Result<Vec<_>, CompilerProblem>>()?;
         let mir = lower_to_core(
-            hir,
+            &verified,
             effective_options.arithmetic_mode().as_str(),
             effective_options.display_sign().as_str(),
             &declaratives,
@@ -412,6 +455,75 @@ mod tests {
         }
     }
     const HELLO: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. HELLO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MSG PIC X(5) VALUE 'HELLO'.\nPROCEDURE DIVISION.\nDISPLAY MSG.\nSTOP RUN.\n";
+
+    fn analysis_with_unknown_hir_operation(
+        compiler: &CobolCompiler,
+        source: &SourceBundle,
+    ) -> CobolAnalysis {
+        use mainframe_env_ir::{IrLimits, ModuleBuilder, OperationIdentity};
+        let mut analysis = compiler.analyze(source);
+        assert_eq!(analysis.completeness, Completeness::Complete);
+        let mut builder = ModuleBuilder::new(IrLimits::default());
+        let region = builder.add_region().unwrap();
+        let block = builder.add_block(region).unwrap();
+        builder
+            .add_operation(
+                block,
+                OperationIdentity::new("hardening.invalid", "unregistered", 1).unwrap(),
+                Vec::new(),
+                0,
+                BTreeMap::new(),
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .unwrap();
+        analysis.hir.as_mut().unwrap().module = builder.finish().unwrap();
+        analysis
+    }
+
+    #[test]
+    fn hardening_52_failed_hir_verification_cannot_publish_an_executable() {
+        let compiler = CobolCompiler::default();
+        let request = request(HELLO, CompilationMode::Executable);
+        let analysis = analysis_with_unknown_hir_operation(&compiler, &request.source);
+        assert!(matches!(
+            compiler.compile_analyzed(request, analysis),
+            Err(CompilerProblem::Verification(_))
+        ));
+    }
+
+    #[test]
+    fn hardening_52_analysis_reports_failed_verification_instead_of_complete_without_hir() {
+        let compiler = CobolCompiler::default();
+        let request = request(HELLO, CompilationMode::Analyze);
+        let analysis = analysis_with_unknown_hir_operation(&compiler, &request.source);
+        let CompilerResult::Analysis {
+            hir,
+            diagnostics,
+            completeness,
+        } = compiler.compile_analyzed(request, analysis).unwrap()
+        else {
+            panic!("analysis must not publish an executable");
+        };
+        assert!(hir.is_none());
+        assert_eq!(completeness, Completeness::Failed);
+        assert!(diagnostics.iter().any(|d| d.code().as_str() == "MECOB0300"));
+    }
+
+    #[test]
+    fn hardening_52_valid_analysis_retains_its_verified_hir() {
+        let CompilerResult::Analysis {
+            hir, completeness, ..
+        } = CobolCompiler::default()
+            .compile(request(HELLO, CompilationMode::Analyze))
+            .unwrap()
+        else {
+            panic!("expected analysis result");
+        };
+        assert!(hir.is_some());
+        assert_eq!(completeness, Completeness::Complete);
+    }
     #[test]
     fn hello_publishes_legal_mir() {
         let result = CobolCompiler::default()
