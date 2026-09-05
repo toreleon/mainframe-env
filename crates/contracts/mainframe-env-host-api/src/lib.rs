@@ -4,6 +4,7 @@
 
 mod dataset;
 mod names;
+mod official_handler_unit;
 mod registry;
 mod request;
 mod runtime_service;
@@ -27,6 +28,7 @@ pub use names::{
     ClassName, DatasetName, HostNameProblem, JobName, MemberName, MethodName, ProgramName,
     ResourceName, RuntimeServiceName, SessionId,
 };
+pub use official_handler_unit::{OfficialHandlerClosureProblem, OfficialHandlerUnit};
 pub use registry::{
     CapabilityDescriptor, HostProvider, RegistryProblem, RegistryPublisher, RegistrySnapshot,
     SUBSYSTEM_HANDLER_REGISTRY_CONTRACT, SubsystemHandler, SubsystemHandlerDescriptor,
