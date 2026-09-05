@@ -249,6 +249,13 @@ impl EventStore for MemoryStore {
 }
 
 impl WorkStore for MemoryStore {
+    fn get_work(&self, work_id: &str) -> Result<Option<WorkRecord>, StoreError> {
+        if work_id.is_empty() {
+            return Err(StoreError::InvalidTransition);
+        }
+        Ok(self.lock()?.work.get(work_id).cloned())
+    }
+
     fn enqueue(&self, work: WorkRecord) -> Result<(), StoreError> {
         if work.work_id.is_empty()
             || work.attempt != 0

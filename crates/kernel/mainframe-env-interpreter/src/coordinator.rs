@@ -35,6 +35,12 @@ pub struct ExecutionControl {
     pub cancellation_requested: bool,
 }
 
+/// Failure to observe live execution controls is fail-closed, not permission to run.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ExecutionControlError {
+    Unavailable,
+}
+
 /// The one 0.1 machine-driving authority used by CLI, batch, and server paths.
 ///
 /// It owns drive ordering, cancellation/deadline observation, typed host-result
@@ -86,6 +92,26 @@ impl ExecutionCoordinator {
     where
         M: Machine<Effect = EffectRequest, EffectResult = EffectResult>,
     {
+        self.execute_with_control(machine, invocation, || Ok(control))
+    }
+
+    /// Sample controls at admission, after every bounded machine quantum, and
+    /// immediately before dispatching an effect. The callback owns the clock
+    /// domain; observations must be monotonic. No wall clock enters the machine.
+    pub fn execute_with_control<M, F>(
+        &self,
+        machine: &mut M,
+        invocation: &Invocation,
+        mut observe: F,
+    ) -> ExecutionOutcome
+    where
+        M: Machine<Effect = EffectRequest, EffectResult = EffectResult>,
+        F: FnMut() -> Result<ExecutionControl, ExecutionControlError>,
+    {
+        let mut control = match observe() {
+            Ok(control) => control,
+            Err(_) => return infrastructure_failure("execution controls unavailable at admission"),
+        };
         let mut journal = match self
             .store
             .as_ref()
@@ -95,33 +121,14 @@ impl ExecutionCoordinator {
             Ok(journal) => journal,
             Err(_) => return infrastructure_failure("execution admission persistence failed"),
         };
-        if control.cancellation_requested {
-            if record_step(
-                &mut journal,
-                Some(ExecutionState::Cancelled),
-                LifecycleEventKind::Cancelled,
-                None,
-                None,
-            )
-            .is_err()
-            {
-                return infrastructure_failure("cancellation persistence failed");
-            }
-            return ExecutionOutcome::Cancelled;
-        }
-        if control.now_tick >= invocation.deadline_tick {
-            if record_step(
-                &mut journal,
-                Some(ExecutionState::TimedOut),
-                LifecycleEventKind::TimedOut,
-                None,
-                None,
-            )
-            .is_err()
-            {
-                return infrastructure_failure("timeout persistence failed");
-            }
-            return ExecutionOutcome::TimedOut;
+        if let Err(outcome) = check_control(
+            control,
+            None,
+            invocation,
+            invocation.deadline_tick,
+            &mut journal,
+        ) {
+            return outcome;
         }
         for (state, event) in [
             (ExecutionState::Queued, LifecycleEventKind::Queued),
@@ -133,7 +140,22 @@ impl ExecutionCoordinator {
         }
         let mut resume = MachineResume::Start;
         for _ in 0..self.limits.max_quanta {
-            match machine.drive(resume, self.limits.quantum) {
+            let drive = machine.drive(resume, self.limits.quantum);
+            // Uncertainty from work already performed outranks newly observed
+            // cancellation/deadlines (and control-source failures).
+            if !matches!(&drive, MachineDrive::Failed(p) if p.has_unknown_outcome()) {
+                control = match observe_checked(
+                    &mut observe,
+                    control,
+                    invocation,
+                    invocation.deadline_tick,
+                    &mut journal,
+                ) {
+                    Ok(control) => control,
+                    Err(outcome) => return outcome,
+                };
+            }
+            match drive {
                 MachineDrive::Continue => resume = MachineResume::Start,
                 MachineDrive::HostCall(effect) => {
                     let Some(host) = &self.host else {
@@ -174,6 +196,16 @@ impl ExecutionCoordinator {
                     {
                         return infrastructure_failure("effect intent persistence failed");
                     }
+                    control = match observe_checked(
+                        &mut observe,
+                        control,
+                        invocation,
+                        invocation.deadline_tick.min(effect.deadline_tick),
+                        &mut journal,
+                    ) {
+                        Ok(control) => control,
+                        Err(outcome) => return outcome,
+                    };
                     let result = host
                         .invoke(
                             invocation,
@@ -210,6 +242,21 @@ impl ExecutionCoordinator {
                             ));
                         }
                         return infrastructure_failure("effect result persistence failed");
+                    }
+                    if matches!(&result.outcome, Err(HostProblem::UnknownOutcome)) {
+                        // Never poll again or resume an ordinary exception handler
+                        // before preserving this already-observed uncertainty.
+                        let _ = record_step(
+                            &mut journal,
+                            Some(ExecutionState::Failed),
+                            LifecycleEventKind::Failed,
+                            None,
+                            None,
+                        );
+                        return failed_outcome(problem(
+                            FailureCategory::UnknownOutcome,
+                            "host outcome unknown",
+                        ));
                     }
                     resume = MachineResume::HostResult(result);
                 }
@@ -328,6 +375,74 @@ impl ExecutionCoordinator {
         }
         outcome
     }
+}
+
+fn observe_checked<F>(
+    observe: &mut F,
+    previous: ExecutionControl,
+    invocation: &Invocation,
+    deadline: u64,
+    journal: &mut Option<JournalCursor>,
+) -> Result<ExecutionControl, ExecutionOutcome>
+where
+    F: FnMut() -> Result<ExecutionControl, ExecutionControlError>,
+{
+    let control = observe().map_err(|_| {
+        let _ = record_step(
+            journal,
+            Some(ExecutionState::Failed),
+            LifecycleEventKind::Failed,
+            None,
+            None,
+        );
+        infrastructure_failure("live execution controls unavailable")
+    })?;
+    check_control(control, Some(previous), invocation, deadline, journal)?;
+    Ok(control)
+}
+
+fn check_control(
+    control: ExecutionControl,
+    previous: Option<ExecutionControl>,
+    invocation: &Invocation,
+    deadline: u64,
+    journal: &mut Option<JournalCursor>,
+) -> Result<(), ExecutionOutcome> {
+    if previous.is_some_and(|previous| control.now_tick < previous.now_tick) {
+        let _ = record_step(
+            journal,
+            Some(ExecutionState::Failed),
+            LifecycleEventKind::Failed,
+            None,
+            None,
+        );
+        return Err(infrastructure_failure("execution clock regressed"));
+    }
+    if let Some(journal) = journal.as_mut() {
+        journal.tick = control.now_tick;
+    }
+    let terminal = if control.cancellation_requested || invocation.cancellation.is_some() {
+        Some((
+            ExecutionState::Cancelled,
+            LifecycleEventKind::Cancelled,
+            ExecutionOutcome::Cancelled,
+        ))
+    } else if control.now_tick >= deadline {
+        Some((
+            ExecutionState::TimedOut,
+            LifecycleEventKind::TimedOut,
+            ExecutionOutcome::TimedOut,
+        ))
+    } else {
+        None
+    };
+    if let Some((state, event, outcome)) = terminal {
+        record_step(journal, Some(state), event, None, None).map_err(|_| {
+            infrastructure_failure("execution control termination persistence failed")
+        })?;
+        return Err(outcome);
+    }
+    Ok(())
 }
 
 struct JournalCursor {
@@ -624,5 +739,159 @@ mod tests {
             ),
             ExecutionOutcome::TimedOut
         );
+    }
+    struct CpuMachine {
+        drives: usize,
+    }
+    impl Machine for CpuMachine {
+        type Effect = EffectRequest;
+        type EffectResult = EffectResult;
+        fn drive(
+            &mut self,
+            _: MachineResume<EffectResult>,
+            _: Quantum,
+        ) -> MachineDrive<EffectRequest> {
+            self.drives += 1;
+            MachineDrive::Continue
+        }
+    }
+
+    #[test]
+    fn live_cpu_controls_are_observed_after_one_quantum_before_budget_exhaustion() {
+        for cancel in [true, false] {
+            let coordinator = ExecutionCoordinator::local(CoordinatorLimits {
+                max_quanta: 1,
+                ..CoordinatorLimits::default()
+            });
+            let mut machine = CpuMachine { drives: 0 };
+            let mut observations = 0;
+            let result = coordinator.execute_with_control(&mut machine, &invocation(), || {
+                observations += 1;
+                Ok(ExecutionControl {
+                    now_tick: if observations == 1 { 0 } else { 100 },
+                    cancellation_requested: cancel && observations > 1,
+                })
+            });
+            assert_eq!(
+                result,
+                if cancel {
+                    ExecutionOutcome::Cancelled
+                } else {
+                    ExecutionOutcome::TimedOut
+                }
+            );
+            assert_eq!(machine.drives, 1);
+            assert_eq!(observations, 2);
+        }
+    }
+
+    #[test]
+    fn completion_cannot_hide_a_deadline_crossed_during_its_quantum() {
+        let coordinator = ExecutionCoordinator::local(CoordinatorLimits::default());
+        let mut observations = 0;
+        let result = coordinator.execute_with_control(&mut CompleteMachine, &invocation(), || {
+            observations += 1;
+            Ok(ExecutionControl {
+                now_tick: if observations == 1 { 1 } else { 100 },
+                cancellation_requested: false,
+            })
+        });
+        assert_eq!(result, ExecutionOutcome::TimedOut);
+    }
+
+    #[test]
+    fn clock_regression_and_control_failure_stop_before_a_second_quantum() {
+        for unavailable in [true, false] {
+            let mut machine = CpuMachine { drives: 0 };
+            let mut observations = 0;
+            let result = ExecutionCoordinator::local(CoordinatorLimits::default())
+                .execute_with_control(&mut machine, &invocation(), || {
+                    observations += 1;
+                    if unavailable && observations > 1 {
+                        return Err(ExecutionControlError::Unavailable);
+                    }
+                    Ok(ExecutionControl {
+                        now_tick: if observations == 1 { 50 } else { 49 },
+                        cancellation_requested: false,
+                    })
+                });
+            assert!(matches!(result, ExecutionOutcome::InfrastructureFailure(_)));
+            assert_eq!(machine.drives, 1);
+        }
+    }
+
+    #[test]
+    fn observed_uncertainty_is_not_overwritten_by_a_new_stop_observation() {
+        struct Uncertain;
+        impl Machine for Uncertain {
+            type Effect = EffectRequest;
+            type EffectResult = EffectResult;
+            fn drive(
+                &mut self,
+                _: MachineResume<EffectResult>,
+                _: Quantum,
+            ) -> MachineDrive<EffectRequest> {
+                MachineDrive::Failed(problem(
+                    FailureCategory::UnknownOutcome,
+                    "already performed uncertain work",
+                ))
+            }
+        }
+        let mut observations = 0;
+        let result = ExecutionCoordinator::local(CoordinatorLimits::default())
+            .execute_with_control(&mut Uncertain, &invocation(), || {
+                observations += 1;
+                assert_eq!(
+                    observations, 1,
+                    "uncertainty must be preserved before any new observation"
+                );
+                Ok(ExecutionControl::default())
+            });
+        assert!(matches!(result, ExecutionOutcome::ProviderFailure(p) if p.has_unknown_outcome()));
+    }
+
+    #[test]
+    fn observed_stop_prevents_new_host_dispatch() {
+        struct Calling;
+        impl Machine for Calling {
+            type Effect = EffectRequest;
+            type EffectResult = EffectResult;
+            fn drive(
+                &mut self,
+                _: MachineResume<EffectResult>,
+                _: Quantum,
+            ) -> MachineDrive<EffectRequest> {
+                MachineDrive::HostCall(EffectRequest {
+                    run_unit: invocation().run_unit_id,
+                    sequence: 1,
+                    deadline_tick: 100,
+                    idempotency_key: None,
+                    request: mainframe_env_host_api::HostRequest::Program(
+                        mainframe_env_host_api::ProgramRequest::Call {
+                            program: mainframe_env_host_api::ProgramName::new("NEVER", 128)
+                                .unwrap(),
+                            payload: mainframe_env_execution_api::BoundedPayload::new(
+                                "test@1",
+                                vec![],
+                                InvocationLimits::default(),
+                            )
+                            .unwrap(),
+                            service: None,
+                        },
+                    ),
+                })
+            }
+        }
+        let mut observations = 0;
+        let result = ExecutionCoordinator::local(CoordinatorLimits::default())
+            .execute_with_control(&mut Calling, &invocation(), || {
+                observations += 1;
+                Ok(ExecutionControl {
+                    now_tick: 0,
+                    cancellation_requested: observations > 1,
+                })
+            });
+        // A host lookup would fail in this local-only coordinator. The stop wins first.
+        assert_eq!(result, ExecutionOutcome::Cancelled);
     }
 }

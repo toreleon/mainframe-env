@@ -130,6 +130,15 @@ macro_rules! durable_implementations {
         }
 
         impl WorkStore for $store {
+            fn get_work(&self, work_id: &str) -> Result<Option<WorkRecord>, StoreError> {
+                if work_id.is_empty() {
+                    return Err(StoreError::InvalidTransition);
+                }
+                self.get_provider_state("durable-work", work_id)?
+                    .map(|row| decode_work(&row.payload))
+                    .transpose()
+            }
+
             fn enqueue(&self, work: WorkRecord) -> Result<(), StoreError> {
                 if work.work_id.is_empty()
                     || work.state != WorkState::Queued

@@ -7,7 +7,9 @@ mod machine;
 mod runtime;
 mod value;
 
-pub use coordinator::{CoordinatorLimits, ExecutionControl, ExecutionCoordinator};
+pub use coordinator::{
+    CoordinatorLimits, ExecutionControl, ExecutionControlError, ExecutionCoordinator,
+};
 pub use machine::{
     MachineProblem, MachineSnapshot, ReferenceMachine, SUPPORTED_LAYOUT_CATEGORIES,
     encode_cobol_call_result, supported_operations,

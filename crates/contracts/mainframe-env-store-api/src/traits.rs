@@ -27,6 +27,8 @@ pub trait EventStore: Send + Sync {
 }
 
 pub trait WorkStore: Send + Sync {
+    /// Observe durable cancellation without claiming, leasing, or mutating work.
+    fn get_work(&self, work_id: &str) -> Result<Option<WorkRecord>, StoreError>;
     fn enqueue(&self, work: WorkRecord) -> Result<(), StoreError>;
     fn claim(
         &self,

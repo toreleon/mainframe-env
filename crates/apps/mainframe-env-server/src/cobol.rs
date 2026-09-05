@@ -18,8 +18,8 @@ use mainframe_env_host_api::{
     HostResult, ProgramRequest, RuntimeServiceKind, RuntimeServiceSelector, ScopedHostService,
 };
 use mainframe_env_interpreter::{
-    CoordinatorLimits, ExecutionControl, ExecutionCoordinator, ReferenceMachine,
-    encode_cobol_call_result,
+    CoordinatorLimits, ExecutionControl, ExecutionControlError, ExecutionCoordinator,
+    ReferenceMachine, encode_cobol_call_result,
 };
 use mainframe_env_ir::CodecLimits;
 use mainframe_env_mq::mq_abi_library;
@@ -33,6 +33,23 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
+
+/// An embedding can supply a logical clock and a run-scoped cancellation source.
+/// All nested invocations use the same source and inherited deadline/scope.
+/// Default production ticks are Unix milliseconds advanced by a monotonic clock.
+pub trait ProgramExecutionControl: Send + Sync {
+    fn observe(&self, invocation: &Invocation) -> Result<ExecutionControl, ExecutionControlError>;
+}
+
+impl<F> ProgramExecutionControl for F
+where
+    F: Fn(&Invocation) -> Result<ExecutionControl, ExecutionControlError> + Send + Sync,
+{
+    fn observe(&self, invocation: &Invocation) -> Result<ExecutionControl, ExecutionControlError> {
+        self(invocation)
+    }
+}
 
 pub struct DefaultProgramRouter {
     router: Arc<ProgramRouter>,
@@ -40,6 +57,24 @@ pub struct DefaultProgramRouter {
 }
 
 impl DefaultProgramRouter {
+    /// Bind at setup, before dispatch. Rebinding cannot change an active clock domain.
+    pub fn bind_execution_control(
+        &self,
+        source: Arc<dyn ProgramExecutionControl>,
+    ) -> Result<(), HostProblem> {
+        self.cobol
+            .control
+            .set(source)
+            .map_err(|_| HostProblem::IdempotencyConflict)
+    }
+
+    pub(crate) fn observe_execution_control(
+        &self,
+        invocation: &Invocation,
+    ) -> Result<ExecutionControl, ExecutionControlError> {
+        self.cobol.observe_execution_control(invocation)
+    }
+
     pub(crate) fn bind_runtime(
         &self,
         host: Arc<ScopedHostService>,
@@ -222,16 +257,63 @@ struct CobolProgram {
     store: OnceLock<Arc<dyn PlatformStore>>,
     artifacts: OnceLock<LocalArtifactStore>,
     sequence: AtomicU64,
+    control: OnceLock<Arc<dyn ProgramExecutionControl>>,
+    clock_start: Instant,
+    clock_epoch: Option<u64>,
 }
 
 impl CobolProgram {
-    const fn new() -> Self {
+    fn new() -> Self {
         Self {
             host: OnceLock::new(),
             store: OnceLock::new(),
             artifacts: OnceLock::new(),
             sequence: AtomicU64::new(1),
+            control: OnceLock::new(),
+            clock_start: Instant::now(),
+            clock_epoch: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .ok()
+                .and_then(|duration| u64::try_from(duration.as_millis()).ok()),
         }
+    }
+
+    fn observe_execution_control(
+        &self,
+        invocation: &Invocation,
+    ) -> Result<ExecutionControl, ExecutionControlError> {
+        let mut observation = if let Some(source) = self.control.get() {
+            source.observe(invocation)?
+        } else {
+            let elapsed = u64::try_from(self.clock_start.elapsed().as_millis())
+                .map_err(|_| ExecutionControlError::Unavailable)?;
+            ExecutionControl {
+                now_tick: self
+                    .clock_epoch
+                    .and_then(|epoch| epoch.checked_add(elapsed))
+                    .ok_or(ExecutionControlError::Unavailable)?,
+                cancellation_requested: false,
+            }
+        };
+        observation.cancellation_requested |= invocation.cancellation.is_some();
+        if let Some(binding) = invocation.bindings.get("jes.work-id") {
+            if binding.schema() != "mainframe-env.jes-work@1" {
+                return Err(ExecutionControlError::Unavailable);
+            }
+            let id = std::str::from_utf8(binding.bytes())
+                .map_err(|_| ExecutionControlError::Unavailable)?;
+            let store = self.store.get().ok_or(ExecutionControlError::Unavailable)?;
+            let work = store
+                .get_work(id)
+                .map_err(|_| ExecutionControlError::Unavailable)?;
+            // Offline batch execution need not own a scheduler row. If a row is
+            // present, its cancellation state is authoritative, including nested CALLs.
+            observation.cancellation_requested |= work.is_some_and(|work| {
+                work.cancellation_requested
+                    || work.state == mainframe_env_store_api::WorkState::Cancelled
+            });
+        }
+        Ok(observation)
     }
 
     fn execute_installed(
@@ -311,7 +393,8 @@ impl CobolProgram {
             invocation.with_provider_generations(parent.provider_generations.clone(), limits)
         })
         .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let invocation = with_compatible_runtime_services(invocation)?;
+        let mut invocation = with_compatible_runtime_services(invocation)?;
+        invocation.cancellation = parent.cancellation.clone();
         let mut machine = ReferenceMachine::from_binary(
             &record.payload,
             invocation.clone(),
@@ -337,7 +420,9 @@ impl CobolProgram {
             Arc::clone(self.host.get().ok_or(HostProblem::InfrastructureFailure)?),
             CoordinatorLimits::default(),
         );
-        let outcome = coordinator.execute(&mut machine, &invocation, ExecutionControl::default());
+        let outcome = coordinator.execute_with_control(&mut machine, &invocation, || {
+            self.observe_execution_control(&invocation)
+        });
         let cursor_result = persist_batch_file_cursors(
             store.as_ref(),
             &cursor_key,
@@ -546,7 +631,8 @@ impl CobolProgram {
             invocation.with_provider_generations(parent.provider_generations.clone(), limits)
         })
         .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let invocation = with_compatible_runtime_services(invocation)?;
+        let mut invocation = with_compatible_runtime_services(invocation)?;
+        invocation.cancellation = parent.cancellation.clone();
         let mut machine = ReferenceMachine::from_binary(
             &record.payload,
             invocation.clone(),
@@ -559,7 +645,9 @@ impl CobolProgram {
             Arc::clone(self.store.get().ok_or(HostProblem::InfrastructureFailure)?),
             CoordinatorLimits::default(),
         );
-        match coordinator.execute(&mut machine, &invocation, ExecutionControl::default()) {
+        match coordinator.execute_with_control(&mut machine, &invocation, || {
+            self.observe_execution_control(&invocation)
+        }) {
             ExecutionOutcome::Completed(completion) => Ok(ProgramOutput {
                 return_code: completion.return_code,
                 records: completion
@@ -705,7 +793,8 @@ impl Program for CobolProgram {
             invocation.with_provider_generations(parent.provider_generations.clone(), limits)
         })
         .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let invocation = with_compatible_runtime_services(invocation)?;
+        let mut invocation = with_compatible_runtime_services(invocation)?;
+        invocation.cancellation = parent.cancellation.clone();
         let mut machine = ReferenceMachine::from_binary(
             artifact.payload(),
             invocation.clone(),
@@ -724,7 +813,9 @@ impl Program for CobolProgram {
             }
             (None, _) => ExecutionCoordinator::local(CoordinatorLimits::default()),
         };
-        match coordinator.execute(&mut machine, &invocation, ExecutionControl::default()) {
+        match coordinator.execute_with_control(&mut machine, &invocation, || {
+            self.observe_execution_control(&invocation)
+        }) {
             ExecutionOutcome::Completed(completion) => Ok(ProgramOutput {
                 return_code: completion.return_code,
                 records: completion
@@ -1094,7 +1185,7 @@ mod tests {
             .unwrap(),
             ServiceClass::Batch,
             0,
-            1000,
+            u64::MAX,
             TraceId::new("parent-trace", limits).unwrap(),
             IdempotencyKey::new("parent-key", limits).unwrap(),
             1,
