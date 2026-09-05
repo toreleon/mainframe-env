@@ -296,12 +296,9 @@ mod tests {
     #[test]
     fn complete_registration_is_not_execution() {
         let calls = Arc::new(AtomicUsize::new(0));
-        let registry = SubsystemHandlerRegistry::new(
-            1,
-            application_handlers(None, None, &calls),
-            limits(),
-        )
-        .unwrap();
+        let registry =
+            SubsystemHandlerRegistry::new(1, application_handlers(None, None, &calls), limits())
+                .unwrap();
         assert_eq!(application_unit().validate(&registry), Ok(()));
         assert_eq!(calls.load(Ordering::SeqCst), 0);
     }
