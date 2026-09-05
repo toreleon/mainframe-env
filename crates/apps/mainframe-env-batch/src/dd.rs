@@ -156,7 +156,13 @@ fn disposition_plan(dd: &DdPlan) -> Result<DdDispositionPlan, HostProblem> {
         .get(2)
         .map(terminal_disposition)
         .transpose()?
-        .unwrap_or(default_terminal);
+        .unwrap_or_else(|| {
+            if normal == DdTerminalDisposition::Pass {
+                default_terminal
+            } else {
+                normal
+            }
+        });
     if abnormal == DdTerminalDisposition::Pass {
         return Err(HostProblem::Malformed);
     }
@@ -240,5 +246,31 @@ mod tests {
         .remove(0);
         dd.disposition = vec![Disposition::Keep];
         assert_eq!(plan_dd_allocations(&[dd]), Err(HostProblem::Malformed));
+    }
+
+    #[test]
+    fn abnormal_disposition_defaults_to_normal_except_pass() {
+        let plan = parse_jcl(
+            &JclBundle {
+                primary: "//J JOB CLASS=A\n//S EXEC PGM=IEFBR14\n//OLD DD DSN=USER.OLD,DISP=(OLD,DELETE)\n//NEW DD DSN=USER.NEW,DISP=(NEW,CATLG)\n//PASS DD DSN=USER.PASS,DISP=(NEW,PASS)\n"
+                    .into(),
+                ..Default::default()
+            },
+            Default::default(),
+        )
+        .unwrap();
+        let allocations = plan_dd_allocations(&plan.steps[0].dds).unwrap();
+        assert_eq!(
+            allocations[0].disposition.unwrap().abnormal,
+            DdTerminalDisposition::Delete
+        );
+        assert_eq!(
+            allocations[1].disposition.unwrap().abnormal,
+            DdTerminalDisposition::Catalog
+        );
+        assert_eq!(
+            allocations[2].disposition.unwrap().abnormal,
+            DdTerminalDisposition::Delete
+        );
     }
 }

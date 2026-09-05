@@ -70,6 +70,12 @@
     },
     "purge_pending": {"type": "boolean"},
     "effect_sequence": {"type": "integer", "minimum": 0},
+    "step_effect_starts": {
+      "type": "object",
+      "maxProperties": 4096,
+      "propertyNames": {"minLength": 1, "maxLength": 128},
+      "additionalProperties": {"type": "integer", "minimum": 0}
+    },
     "class": {"type": "string", "pattern": "^[A-Z0-9]$"},
     "priority": {"type": "integer", "minimum": 0, "maximum": 255},
     "state": {"enum": ["submitted", "held", "queued", "selected", "running", "output", "completed", "failed", "cancelled"]},

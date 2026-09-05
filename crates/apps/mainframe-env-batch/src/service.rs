@@ -122,6 +122,11 @@ struct Job {
     purge_pending: bool,
     #[serde(default)]
     effect_sequence: u64,
+    /// First-attempt global effect bases keyed by step name. These remain
+    /// private durable execution metadata so the public `StepExecution`
+    /// contract stays source-compatible across the patch release.
+    #[serde(default)]
+    step_effect_starts: BTreeMap<String, u64>,
     class: char,
     priority: u8,
     state: JobState,
@@ -321,7 +326,12 @@ impl BatchService {
             validate_durable_job_shape(&job, jcl_limits, limits)?;
             if matches!(job.state, JobState::Selected | JobState::Running) {
                 job.version = next_job_version(job.version)?;
-                job.state = if job.attempt >= limits.max_attempts {
+                let missing_replay_base = job.steps.iter().any(|step| {
+                    !step.state.terminal()
+                        && step.attempt > 0
+                        && !job.step_effect_starts.contains_key(&step.name)
+                });
+                job.state = if job.attempt >= limits.max_attempts || missing_replay_base {
                     JobState::Failed
                 } else {
                     JobState::Queued
@@ -330,11 +340,26 @@ impl BatchService {
                 job.initiator = None;
                 for step in &mut job.steps {
                     if !step.state.terminal() {
-                        step.state = StepState::Pending;
-                        step.termination = None;
+                        if missing_replay_base && step.attempt > 0 {
+                            step.state = StepState::Failed;
+                            step.termination = Some(StepTermination::Failed {
+                                category: "missing-effect-replay-base".into(),
+                            });
+                        } else {
+                            step.state = StepState::Pending;
+                            step.termination = None;
+                        }
                     }
                 }
-                push_job_event(&mut job, limits.max_events, "warm-start-recovered")?;
+                push_job_event(
+                    &mut job,
+                    limits.max_events,
+                    if missing_replay_base {
+                        "warm-start-failed:missing-effect-replay-base"
+                    } else {
+                        "warm-start-recovered"
+                    },
+                )?;
                 changed = true;
             } else if job.state == JobState::Output {
                 job.version = next_job_version(job.version)?;
@@ -672,6 +697,7 @@ impl BatchService {
             cancellation: None,
             purge_pending: false,
             effect_sequence: 0,
+            step_effect_starts: BTreeMap::new(),
             class: plan.class,
             priority: plan.priority,
             state: if hold || class.held_by_default {
@@ -1371,13 +1397,24 @@ impl BatchService {
         let steps = job.plan.steps.clone();
         let restart = job.plan.restart_step.clone();
         let mut restart_reached = restart.is_none();
-        let mut effect_sequence = 0u64;
+        // Continue after already-terminal steps from the durable global
+        // sequence. If the active step is being replayed, its persisted base
+        // below rewinds this cursor to the original idempotency-key range.
+        let mut effect_sequence = job.effect_sequence;
         for step in &steps {
             if let Some(previous) = job.steps.iter().find(|current| current.name == step.name)
                 && previous.state.terminal()
             {
-                if let Some(StepTermination::ReturnCode { code }) = &previous.termination {
-                    max_rc = max_rc.max(*code);
+                match &previous.termination {
+                    Some(StepTermination::ReturnCode { code }) => {
+                        max_rc = max_rc.max(*code);
+                    }
+                    Some(StepTermination::Abend { code, .. }) => {
+                        abended = true;
+                        first_abend.get_or_insert_with(|| code.clone());
+                        job.abend_code.get_or_insert_with(|| code.clone());
+                    }
+                    _ => {}
                 }
                 continue;
             }
@@ -1433,6 +1470,12 @@ impl BatchService {
                 )?;
                 continue;
             }
+            if let Some(start) = job.step_effect_starts.get(&step.name) {
+                effect_sequence = *start;
+            } else {
+                job.step_effect_starts
+                    .insert(step.name.clone(), effect_sequence);
+            }
             job.active_step = Some(step.name.clone());
             self.mark_step(job, step, StepState::Allocating, None, effect_sequence)?;
             let allocation_plans = plan_dd_allocations(&step.dds)?;
@@ -1446,7 +1489,7 @@ impl BatchService {
                     &mut effect_sequence,
                 )?;
                 let mut dds = step.dds.clone();
-                self.hydrate_dds(
+                let dd_records = self.hydrate_dds(
                     invocation,
                     job,
                     &allocations,
@@ -1469,6 +1512,7 @@ impl BatchService {
                 let input = ProgramInput {
                     parameter: step.parameter.clone(),
                     dds,
+                    dd_records,
                     execution: Some(ProgramExecutionContext {
                         job_name: job.name.clone(),
                         step_name: step.name.clone(),
@@ -1545,7 +1589,18 @@ impl BatchService {
                         &mut effect_sequence,
                         true,
                     );
-                    let terminal_problem = disposition.err().unwrap_or(problem);
+                    if let Err(disposition_problem) = disposition {
+                        push_job_event(
+                            job,
+                            self.limits.max_events,
+                            format!(
+                                "step:{}:disposition-failed:{}",
+                                step.name,
+                                problem_category(&disposition_problem)
+                            ),
+                        )?;
+                    }
+                    let terminal_problem = problem;
                     if let Some(code) = abend_code(&terminal_problem) {
                         first_abend.get_or_insert_with(|| code.clone());
                         job.abend_code = Some(code.clone());
@@ -4037,6 +4092,7 @@ impl BatchService {
         }
         let lock_owner = invocation.principal.id().clone();
         let mut allocations = Vec::new();
+        let mut actual_dispositions = Vec::new();
         let mut lock_modes = BTreeMap::<String, DatasetLockMode>::new();
         let allocation_result = (|| -> Result<(), HostProblem> {
             for (dd, plan) in step.dds.iter().zip(plans) {
@@ -4117,100 +4173,21 @@ impl BatchService {
                     128,
                 )
                 .map_err(|_| HostProblem::Malformed)?;
-                let mut existing = false;
                 if disposition.status != DdStatusDisposition::New {
-                    match self.dataset_attributes(invocation, &resolved, effect_sequence) {
-                        Ok(_) => {
-                            existing = true;
-                            match self.resolve_dd_access_path(
+                    match self.resolve_dd_access_path(invocation, &resolved, effect_sequence) {
+                        Ok(target) => {
+                            self.authorize(
                                 invocation,
-                                &resolved,
-                                effect_sequence,
-                            ) {
-                                Ok(target) => {
-                                    self.authorize(
-                                        invocation,
-                                        "DATASET",
-                                        target.as_str(),
-                                        access_intent,
-                                        next_effect_sequence(invocation, effect_sequence)?,
-                                    )?;
-                                    resolved = target;
-                                }
-                                Err(HostProblem::NotFound) => {}
-                                Err(problem) => return Err(problem),
-                            }
+                                "DATASET",
+                                target.as_str(),
+                                access_intent,
+                                next_effect_sequence(invocation, effect_sequence)?,
+                            )?;
+                            resolved = target;
                         }
-                        Err(HostProblem::NotFound) => {
-                            match self.resolve_dd_access_path(
-                                invocation,
-                                &resolved,
-                                effect_sequence,
-                            ) {
-                                Ok(target) => {
-                                    self.authorize(
-                                        invocation,
-                                        "DATASET",
-                                        target.as_str(),
-                                        access_intent,
-                                        next_effect_sequence(invocation, effect_sequence)?,
-                                    )?;
-                                    resolved = target;
-                                    existing = true;
-                                }
-                                Err(HostProblem::NotFound)
-                                    if disposition.status == DdStatusDisposition::Modify
-                                        && dd.member.is_none() => {}
-                                Err(problem) => return Err(problem),
-                            }
-                        }
+                        Err(HostProblem::NotFound) => {}
                         Err(problem) => return Err(problem),
                     }
-                }
-                let mut create = disposition.status == DdStatusDisposition::New
-                    && dd.generation.is_none()
-                    && dd.member.is_none();
-                if disposition.status == DdStatusDisposition::Modify && dd.member.is_none() {
-                    create = !existing;
-                }
-                if create {
-                    let sequence = next_effect_sequence(invocation, effect_sequence)?;
-                    let key = effect_key(job, step, sequence)?;
-                    let mut definition =
-                        DatasetDefinition::compatibility(dataset_attributes_for_dd(dd)?);
-                    definition.lifecycle.state = DatasetLifecycleState::Allocated;
-                    let result = self.host.invoke(
-                        invocation,
-                        invocation.deadline_tick.saturating_sub(1),
-                        false,
-                        EffectRequest {
-                            run_unit: invocation.run_unit_id.clone(),
-                            sequence,
-                            deadline_tick: invocation.deadline_tick,
-                            idempotency_key: Some(key.clone()),
-                            request: HostRequest::Dataset(DatasetRequest::Define {
-                                dataset: resolved.clone(),
-                                definition: Box::new(definition),
-                                mutation: Mutation {
-                                    sequence,
-                                    idempotency_key: key,
-                                    transaction: Some(job.id.clone()),
-                                },
-                            }),
-                        },
-                    );
-                    match result.effect.outcome? {
-                        HostResult::Dataset(_) => {}
-                        _ => return Err(HostProblem::ProviderFailure),
-                    }
-                }
-                if dd.temporary
-                    && !job
-                        .temporary_datasets
-                        .iter()
-                        .any(|dataset| dataset == resolved.as_str())
-                {
-                    job.temporary_datasets.push(resolved.as_str().to_string());
                 }
                 let requested_mode = if disposition.status == DdStatusDisposition::Shared {
                     DatasetLockMode::Shared
@@ -4225,6 +4202,10 @@ impl BatchService {
                         }
                     })
                     .or_insert(requested_mode);
+                // Until its probe/create phase succeeds, an allocation owns
+                // only a name reservation. Cleanup must release that lock but
+                // must not apply the requested terminal disposition to data it
+                // did not allocate.
                 allocations.push(DdRuntimeAllocation {
                     ordinal: plan.ordinal,
                     dataset: resolved,
@@ -4235,10 +4216,15 @@ impl BatchService {
                             MemberName::new(member, 8).map_err(|_| HostProblem::Malformed)
                         })
                         .transpose()?,
-                    disposition,
+                    disposition: DdDispositionPlan {
+                        status: disposition.status,
+                        normal: DdTerminalDisposition::Keep,
+                        abnormal: DdTerminalDisposition::Keep,
+                    },
                     lock_id: None,
                     lock_owner: lock_owner.clone(),
                 });
+                actual_dispositions.push(disposition);
             }
             for (dataset, mode) in lock_modes {
                 let sequence = next_effect_sequence(invocation, effect_sequence)?;
@@ -4278,6 +4264,76 @@ impl BatchService {
                     if allocation.dataset.as_str() == dataset {
                         allocation.lock_id = Some(lock.lock_id.clone());
                     }
+                }
+            }
+            for (allocation, disposition) in allocations.iter_mut().zip(&actual_dispositions) {
+                let dd = step
+                    .dds
+                    .get(allocation.ordinal)
+                    .ok_or(HostProblem::InfrastructureFailure)?;
+                let existing = if disposition.status == DdStatusDisposition::New {
+                    false
+                } else {
+                    match self.dataset_attributes(invocation, &allocation.dataset, effect_sequence)
+                    {
+                        Ok(_) => true,
+                        Err(HostProblem::NotFound)
+                            if disposition.status == DdStatusDisposition::Modify
+                                && dd.member.is_none() =>
+                        {
+                            false
+                        }
+                        Err(problem) => return Err(problem),
+                    }
+                };
+                let create = (disposition.status == DdStatusDisposition::New
+                    && dd.generation.is_none()
+                    && dd.member.is_none())
+                    || (disposition.status == DdStatusDisposition::Modify
+                        && dd.member.is_none()
+                        && !existing);
+                if create {
+                    let sequence = next_effect_sequence(invocation, effect_sequence)?;
+                    let key = effect_key(job, step, sequence)?;
+                    let mut definition =
+                        DatasetDefinition::compatibility(dataset_attributes_for_dd(dd)?);
+                    definition.lifecycle.state = DatasetLifecycleState::Allocated;
+                    let result = self.host.invoke(
+                        invocation,
+                        invocation.deadline_tick.saturating_sub(1),
+                        false,
+                        EffectRequest {
+                            run_unit: invocation.run_unit_id.clone(),
+                            sequence,
+                            deadline_tick: invocation.deadline_tick,
+                            idempotency_key: Some(key.clone()),
+                            request: HostRequest::Dataset(DatasetRequest::Define {
+                                dataset: allocation.dataset.clone(),
+                                definition: Box::new(definition),
+                                mutation: Mutation {
+                                    sequence,
+                                    idempotency_key: key,
+                                    transaction: Some(job.id.clone()),
+                                },
+                            }),
+                        },
+                    );
+                    if !matches!(
+                        result.effect.outcome?,
+                        HostResult::Dataset(DatasetResult::Created { .. })
+                    ) {
+                        return Err(HostProblem::ProviderFailure);
+                    }
+                }
+                allocation.disposition = *disposition;
+                if dd.temporary
+                    && !job
+                        .temporary_datasets
+                        .iter()
+                        .any(|dataset| dataset == allocation.dataset.as_str())
+                {
+                    job.temporary_datasets
+                        .push(allocation.dataset.as_str().to_string());
                 }
             }
             Ok(())
@@ -4394,8 +4450,9 @@ impl BatchService {
         allocations: &[DdRuntimeAllocation],
         dds: &mut [crate::DdPlan],
         effect_sequence: &mut u64,
-    ) -> Result<(), HostProblem> {
+    ) -> Result<BTreeMap<String, Vec<Vec<u8>>>, HostProblem> {
         let _ = job;
+        let mut hydrated = BTreeMap::<String, Vec<Vec<u8>>>::new();
         let mut start = 0usize;
         while start < dds.len() {
             let name = dds[start].name.clone();
@@ -4411,6 +4468,7 @@ impl BatchService {
                 continue;
             }
             let mut payload = Vec::new();
+            let mut records = Vec::new();
             let group_allocations = allocations
                 .iter()
                 .filter(|allocation| (start..end).contains(&allocation.ordinal))
@@ -4451,12 +4509,15 @@ impl BatchService {
                         }),
                     },
                 );
-                let HostResult::Dataset(DatasetResult::Records { records, .. }) =
-                    result.effect.outcome?
+                let HostResult::Dataset(DatasetResult::Records {
+                    records: dataset_records,
+                    ..
+                }) = result.effect.outcome?
                 else {
                     return Err(HostProblem::ProviderFailure);
                 };
-                append_inline_records(&mut payload, records);
+                append_inline_records(&mut payload, &dataset_records);
+                records.extend(dataset_records);
             } else {
                 for (ordinal, dd) in dds.iter().enumerate().take(end).skip(start) {
                     if let Some(allocation) = allocations
@@ -4464,15 +4525,21 @@ impl BatchService {
                         .find(|allocation| allocation.ordinal == ordinal)
                     {
                         if allocation.disposition.status != DdStatusDisposition::New {
-                            let records =
+                            let dataset_records =
                                 self.read_dataset_records(invocation, allocation, effect_sequence)?;
-                            append_inline_records(&mut payload, records);
+                            append_inline_records(&mut payload, &dataset_records);
+                            records.extend(dataset_records);
                         }
                     } else {
                         payload.extend_from_slice(&dd.inline_data);
+                        records.extend(inline_records(&dd.inline_data));
                     }
                 }
             }
+            hydrated
+                .entry(name.to_ascii_uppercase())
+                .or_default()
+                .extend(records);
             dds[start].inline_data = payload;
             dds[start].ccsid = ccsid.or(dds[start].ccsid);
             for dd in &mut dds[start + 1..end] {
@@ -4481,7 +4548,7 @@ impl BatchService {
             }
             start = end;
         }
-        Ok(())
+        Ok(hydrated)
     }
 
     fn write_dd_outputs(
@@ -5598,7 +5665,7 @@ impl BatchService {
                 schema_version: 1,
                 machine_schema_version: 2,
                 artifact: ArtifactRef::new(
-                    "mainframe-env-batch@0.8.0",
+                    format!("mainframe-env-batch@{}", env!("CARGO_PKG_VERSION")),
                     InvocationLimits::default(),
                 )
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
@@ -5690,11 +5757,25 @@ fn dd_lock_owner(job: &Job) -> Result<PrincipalId, HostProblem> {
         .map_err(|_| HostProblem::ResourceExhausted)
 }
 
-fn append_inline_records(target: &mut Vec<u8>, records: Vec<Vec<u8>>) {
+fn append_inline_records(target: &mut Vec<u8>, records: &[Vec<u8>]) {
     for record in records {
-        target.extend_from_slice(&record);
+        target.extend_from_slice(record);
         target.push(b'\n');
     }
+}
+
+fn inline_records(bytes: &[u8]) -> Vec<Vec<u8>> {
+    if bytes.is_empty() {
+        return Vec::new();
+    }
+    let mut records = bytes
+        .split(|byte| *byte == b'\n')
+        .map(<[u8]>::to_vec)
+        .collect::<Vec<_>>();
+    if bytes.ends_with(b"\n") {
+        records.pop();
+    }
+    records
 }
 
 fn is_program_library_dd(dd: &crate::DdPlan) -> bool {
@@ -5728,7 +5809,10 @@ fn normalize_records(
                 attributes.record_format,
                 RecordFormat::Fixed | RecordFormat::FixedBlocked
             ) {
-                record.resize(attributes.logical_record_length as usize, b' ');
+                record.resize(
+                    attributes.logical_record_length as usize,
+                    crate::program::dataset_space(attributes.ccsid)?,
+                );
             }
             Ok(record)
         })
@@ -5757,6 +5841,9 @@ fn resolved_dataset(
 }
 
 fn input_dd_records(input: &ProgramInput, name: &str) -> Result<Vec<Vec<u8>>, HostProblem> {
+    if let Some(records) = input.dd_records.get(&name.to_ascii_uppercase()) {
+        return Ok(records.clone());
+    }
     let dds = input
         .dds
         .iter()
@@ -5767,12 +5854,7 @@ fn input_dd_records(input: &ProgramInput, name: &str) -> Result<Vec<Vec<u8>>, Ho
     }
     Ok(dds
         .into_iter()
-        .flat_map(|dd| {
-            dd.inline_data
-                .split(|byte| *byte == b'\n')
-                .filter(|record| !record.is_empty())
-                .map(<[u8]>::to_vec)
-        })
+        .flat_map(|dd| inline_records(&dd.inline_data))
         .collect())
 }
 
@@ -6950,6 +7032,10 @@ fn validate_durable_job_shape(
         || job.name != job.plan.name
         || job.plan.steps.len() > jcl_limits.max_steps
         || job.steps.len() != job.plan.steps.len()
+        || job.step_effect_starts.len() > job.plan.steps.len()
+        || job.step_effect_starts.iter().any(|(name, start)| {
+            *start > job.effect_sequence || !job.plan.steps.iter().any(|step| step.name == *name)
+        })
         || job
             .steps
             .iter()
@@ -7120,7 +7206,9 @@ fn validate_checkpoint_record(job: &Job, record: &CheckpointRecord) -> Result<()
         || record.run_unit_id.as_str() != format!("jes-run-{}", job.id)
         || record.schema_version != 1
         || record.machine_schema_version != 2
-        || record.artifact.as_str() != "mainframe-env-batch@0.8.0"
+        || !matches!(record.artifact.as_str(), "mainframe-env-batch@0.8.0")
+            && record.artifact.as_str()
+                != format!("mainframe-env-batch@{}", env!("CARGO_PKG_VERSION"))
         || record.provider_generation != "1"
         || record.transaction.as_deref() != Some(job.id.as_str())
         || record.principal.as_str() != job.owner
@@ -7349,6 +7437,7 @@ mod tests {
         descriptor: CapabilityDescriptor,
         records: Arc<Mutex<BTreeMap<String, Vec<Vec<u8>>>>>,
         generations: Arc<Mutex<BTreeMap<String, Vec<String>>>>,
+        fail_delete: bool,
     }
 
     struct CicsFileControlProvider {
@@ -7561,16 +7650,23 @@ mod tests {
                         state.insert(dataset.as_str().into(), Vec::new());
                         Ok(HostResult::Dataset(DatasetResult::Created { version: 1 }))
                     }),
-                HostRequest::Dataset(DatasetRequest::Delete { dataset, .. }) => self
-                    .records
-                    .lock()
-                    .map_err(|_| HostProblem::InfrastructureFailure)
-                    .and_then(|mut state| {
-                        state
-                            .remove(dataset.as_str())
-                            .map(|_| HostResult::Dataset(DatasetResult::Mutated { version: 2 }))
-                            .ok_or(HostProblem::NotFound)
-                    }),
+                HostRequest::Dataset(DatasetRequest::Delete { dataset, .. }) => {
+                    if self.fail_delete {
+                        Err(HostProblem::ProviderFailure)
+                    } else {
+                        self.records
+                            .lock()
+                            .map_err(|_| HostProblem::InfrastructureFailure)
+                            .and_then(|mut state| {
+                                state
+                                    .remove(dataset.as_str())
+                                    .map(|_| {
+                                        HostResult::Dataset(DatasetResult::Mutated { version: 2 })
+                                    })
+                                    .ok_or(HostProblem::NotFound)
+                            })
+                    }
+                }
                 HostRequest::Dataset(DatasetRequest::DefineGenerationGroup { base, .. }) => self
                     .generations
                     .lock()
@@ -7927,6 +8023,14 @@ mod tests {
     fn service_with_datasets(
         records: Arc<Mutex<BTreeMap<String, Vec<Vec<u8>>>>>,
     ) -> Arc<BatchService> {
+        service_with_datasets_and_program(records, builtins(), false)
+    }
+
+    fn service_with_datasets_and_program(
+        records: Arc<Mutex<BTreeMap<String, Vec<Vec<u8>>>>>,
+        program: Arc<dyn HostProvider>,
+        fail_delete: bool,
+    ) -> Arc<BatchService> {
         let limits = InvocationLimits::default();
         let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
         let generations = Arc::new(Mutex::new(BTreeMap::new()));
@@ -7944,6 +8048,7 @@ mod tests {
                 },
                 records: records.clone(),
                 generations: generations.clone(),
+                fail_delete,
             }) as Arc<dyn HostProvider>
         };
         let mut providers = vec![
@@ -7952,7 +8057,7 @@ mod tests {
         ];
         providers.extend(spool_test_providers(store.clone()));
         BatchService::open(
-            host_with(builtins(), providers),
+            host_with(program, providers),
             store,
             Default::default(),
             Default::default(),
@@ -7975,6 +8080,23 @@ mod tests {
         )
         .unwrap();
         (batch, dataset)
+    }
+
+    fn service_with_real_datasets_and_checkpoint(
+        store: Arc<MemoryStore>,
+        checkpoint_store: Arc<dyn CheckpointStore>,
+        dataset: Arc<DatasetService>,
+    ) -> Result<Arc<BatchService>, HostProblem> {
+        let mut providers = dataset_providers(dataset, InvocationLimits::default());
+        let batch_store: Arc<dyn ProviderStateStore> = store;
+        providers.extend(spool_test_providers(batch_store.clone()));
+        BatchService::open_with_checkpoint_store(
+            host_with(builtins(), providers),
+            batch_store,
+            checkpoint_store,
+            Default::default(),
+            Default::default(),
+        )
     }
 
     fn dataset_test_mutation(sequence: u64) -> Mutation {
@@ -8852,6 +8974,54 @@ mod tests {
         assert_eq!(
             records.lock().unwrap()["IBMUSER.OUTPUT"],
             vec![b"FIRST".to_vec(), b"SECOND".to_vec()]
+        );
+    }
+
+    #[test]
+    fn utility_hydration_preserves_empty_records_and_embedded_newline_bytes() {
+        let expected = vec![b"A".to_vec(), Vec::new(), b"B".to_vec(), b"X\nY".to_vec()];
+        let records = Arc::new(Mutex::new(BTreeMap::from([
+            ("IBMUSER.INPUT".into(), expected.clone()),
+            ("IBMUSER.OUTPUT".into(), Vec::new()),
+        ])));
+        let service = service_with_datasets(records.clone());
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//RECORDS JOB CLASS=A\n//COPY EXEC PGM=IEBGENER\n//SYSUT1 DD DSN=IBMUSER.INPUT,DISP=SHR\n//SYSUT2 DD DSN=IBMUSER.OUTPUT,DISP=OLD\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("exact-record-framing", InvocationLimits::default())
+                    .unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed
+        );
+        assert_eq!(records.lock().unwrap()["IBMUSER.OUTPUT"], expected);
+    }
+
+    #[test]
+    fn fixed_ebcdic_records_use_the_dataset_space_byte() {
+        assert_eq!(
+            normalize_records(
+                &[b"A".to_vec()],
+                &DatasetAttributes {
+                    organization: DatasetOrganization::Sequential,
+                    record_format: RecordFormat::Fixed,
+                    logical_record_length: 4,
+                    key_offset: None,
+                    key_length: None,
+                    ccsid: Some(37),
+                },
+            )
+            .unwrap(),
+            [vec![b'A', 0x40, 0x40, 0x40]]
         );
     }
 
@@ -10305,6 +10475,41 @@ mod tests {
     }
 
     #[test]
+    fn disposition_failure_does_not_reclassify_the_original_abend() {
+        let records = Arc::new(Mutex::new(BTreeMap::new()));
+        let router: Arc<dyn HostProvider> = ProgramRouter::new(
+            BTreeMap::from([("FAILPGM".into(), Arc::new(AbendProgram) as Arc<dyn Program>)]),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let service = service_with_datasets_and_program(records, router, true);
+        let invocation = invocation();
+        let submitted = service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//ABDISP JOB CLASS=A\n//FAIL EXEC PGM=FAILPGM\n//DATA DD DSN=IBMUSER.ABDISP,DISP=(NEW,KEEP,DELETE)\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("abend-disposition-failure", InvocationLimits::default())
+                    .unwrap(),
+                false,
+            )
+            .unwrap();
+        let failed = service.run_next(&invocation, false).unwrap().unwrap();
+        assert_eq!(failed.state, JobState::Failed);
+        assert_eq!(failed.abend_code.as_deref(), Some("S0C7"));
+        assert_eq!(failed.steps[0].state, StepState::Abended);
+        let events = &service.lock().unwrap().jobs[&submitted.id].events;
+        assert!(
+            events
+                .iter()
+                .any(|event| event == "step:FAIL:disposition-failed:provider-failure")
+        );
+    }
+
+    #[test]
     fn configured_initiator_selects_only_eligible_classes() {
         let mut scheduler = JesSchedulerConfiguration::single_node(1);
         scheduler.initiators.get_mut("INIT0001").unwrap().classes = BTreeSet::from(['B']);
@@ -10767,6 +10972,148 @@ mod tests {
                 .0,
             vec![b"COBOL OUTPUT".to_vec()]
         );
+    }
+
+    #[test]
+    fn warm_restart_reconstructs_abend_state_before_condition_evaluation() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let failing_checkpoints: Arc<dyn CheckpointStore> = Arc::new(FailNthCheckpointStore {
+            inner: store.clone(),
+            writes: AtomicUsize::new(0),
+            fail_at: 3,
+        });
+        let cleanup_calls = Arc::new(AtomicUsize::new(0));
+        let router: Arc<dyn HostProvider> = ProgramRouter::new(
+            BTreeMap::from([
+                ("FAILPGM".into(), Arc::new(AbendProgram) as Arc<dyn Program>),
+                (
+                    "CLEANUP".into(),
+                    Arc::new(CobolProgram {
+                        calls: cleanup_calls.clone(),
+                    }) as Arc<dyn Program>,
+                ),
+            ]),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let first =
+            service_with_checkpoint_store(store.clone(), failing_checkpoints, router.clone())
+                .unwrap();
+        let invocation = invocation();
+        let submitted = first
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//ABRESTRT JOB CLASS=A\n//FAIL EXEC PGM=FAILPGM\n//NORMAL EXEC PGM=CLEANUP\n//RECOVER EXEC PGM=CLEANUP,COND=ONLY\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("abend-warm-restart", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            first.run_next(&invocation, false),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(
+            first.get(&submitted.id).unwrap().steps[0].state,
+            StepState::Abended
+        );
+        drop(first);
+
+        let checkpoint_store: Arc<dyn CheckpointStore> = store.clone();
+        let restarted = service_with_checkpoint_store(store, checkpoint_store, router).unwrap();
+        let failed = restarted.run_next(&invocation, false).unwrap().unwrap();
+        assert_eq!(failed.state, JobState::Failed);
+        assert_eq!(failed.abend_code.as_deref(), Some("S0C7"));
+        assert_eq!(cleanup_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            failed
+                .steps
+                .iter()
+                .map(|step| step.state)
+                .collect::<Vec<_>>(),
+            vec![
+                StepState::Abended,
+                StepState::SkippedCondition,
+                StepState::Completed,
+            ]
+        );
+    }
+
+    #[test]
+    fn warm_restart_reuses_multi_step_mod_append_idempotency_key() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let dataset_store: Arc<dyn ProviderStateStore> = store.clone();
+        let dataset = DatasetService::open(dataset_store, DatasetLimits::default()).unwrap();
+        seed_real_dataset(&dataset, "IBMUSER.OUTPUT", vec![b"OLD".to_vec()], 1_200);
+        let failing_checkpoints: Arc<dyn CheckpointStore> = Arc::new(FailNthCheckpointStore {
+            inner: store.clone(),
+            writes: AtomicUsize::new(0),
+            fail_at: 7,
+        });
+        let first = service_with_real_datasets_and_checkpoint(
+            store.clone(),
+            failing_checkpoints,
+            dataset.clone(),
+        )
+        .unwrap();
+        let invocation = invocation();
+        let submitted = first
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//MODRETRY JOB CLASS=A\n//FIRST EXEC PGM=IEFBR14\n//COPY EXEC PGM=IEBGENER\n//SYSUT1 DD *\nNEW\n/*\n//SYSUT2 DD DSN=IBMUSER.OUTPUT,DISP=MOD\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("multi-step-mod-restart", InvocationLimits::default())
+                    .unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            first.run_next(&invocation, false),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Read {
+                dataset: DatasetName::new("IBMUSER.OUTPUT", 128).unwrap(),
+                member: None,
+                key: None,
+                max_records: 8,
+                control: Default::default(),
+            }),
+            Ok(DatasetResult::Records { records, .. })
+                if records == [b"OLD".to_vec(), b"NEW".to_vec()]
+        ));
+        drop(first);
+
+        let checkpoint_store: Arc<dyn CheckpointStore> = store.clone();
+        let restarted =
+            service_with_real_datasets_and_checkpoint(store, checkpoint_store, dataset.clone())
+                .unwrap();
+        assert_eq!(
+            restarted
+                .run_next(&invocation, false)
+                .unwrap()
+                .unwrap()
+                .state,
+            JobState::Completed
+        );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Read {
+                dataset: DatasetName::new("IBMUSER.OUTPUT", 128).unwrap(),
+                member: None,
+                key: None,
+                max_records: 8,
+                control: Default::default(),
+            }),
+            Ok(DatasetResult::Records { records, .. })
+                if records == [b"OLD".to_vec(), b"NEW".to_vec()]
+        ));
+        assert_eq!(restarted.get(&submitted.id).unwrap().attempt, 2);
     }
 
     #[test]

@@ -8243,14 +8243,8 @@ pub(super) fn register(router: Router<super::GatewayState>) -> Router<super::Gat
 }
 
 fn check_dehardcoding(root: &Path) -> TaskResult {
-    // Conformance is tied to the candidate index/commit. Untracked developer
-    // files are neither shipped product code nor safe for a gate to inspect.
-    let tracked = command_text(root, "git", &["ls-files", "--cached", "--", "crates"])?;
-    let mut rust_files = tracked
-        .lines()
-        .filter(|path| Path::new(path).extension() == Some(OsStr::new("rs")))
-        .map(|path| root.join(path))
-        .collect::<Vec<_>>();
+    let mut rust_files = Vec::new();
+    collect_extension(&root.join("crates"), OsStr::new("rs"), &mut rust_files)?;
     rust_files.sort();
     let conformance = root.join("crates/tooling/mainframe-env-conformance");
     let forbidden_application_identities = [
