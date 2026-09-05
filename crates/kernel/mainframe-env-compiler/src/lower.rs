@@ -129,6 +129,10 @@ pub(crate) fn lower_to_core(
                 ),
                 ("display_sign".into(), Attribute::Text(display_sign.into())),
                 (
+                    "program_lifecycle".into(),
+                    Attribute::Text(hir.program_lifecycle.clone()),
+                ),
+                (
                     "declaratives".into(),
                     Attribute::Text(
                         declaratives

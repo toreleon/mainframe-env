@@ -1509,6 +1509,7 @@ impl ProductServer {
                 self.program.observe_execution_control(&invocation)
             }) {
                 ExecutionOutcome::Completed(_) => {
+                    self.program.finish_run_unit(&invocation)?;
                     self.clear_online_machine_continuation(session, saved_version)?;
                     self.finish_online_machine_run(session, principal, now_tick)?;
                     return Ok(());
