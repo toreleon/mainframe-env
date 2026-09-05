@@ -1,5 +1,5 @@
 {
-  "schema_version": "mainframe-env.dataset-certification@1",
+  "schema_version": "mainframe-env.dataset-certification@2",
   "target_version": "0.6.0",
   "baseline_id": "ibm-zos-3.2-dfsms-ams-2026-06",
   "completion_policy": {
@@ -40,7 +40,7 @@
     "organizations": 5,
     "commands": 31,
     "properties": 13,
-    "mutants_killed": 8,
+    "observation_perturbations_rejected": 8,
     "differential_credit": 0
   },
   "matrices": {
