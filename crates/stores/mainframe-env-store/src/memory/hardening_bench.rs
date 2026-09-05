@@ -96,7 +96,9 @@ fn seeded(dimension: &str, count: usize) -> MemoryStore {
 }
 fn stats(mut values: Vec<u64>) -> serde_json::Value {
     values.sort_unstable();
-    let at = |p: usize| values[(values.len() - 1) * p / 100];
+    // Nearest-rank percentiles keep high percentiles honest for the deliberately
+    // small bounded sample: with 12 observations, p95 and p99 are the maximum.
+    let at = |p: usize| values[(values.len() * p).div_ceil(100).saturating_sub(1)];
     serde_json::json!({"samples":values.len(),"min_ns":values[0],"p50_ns":at(50),"p95_ns":at(95),"p99_ns":at(99),"max_ns":values[values.len()-1]})
 }
 fn elapsed_ns(start: Instant) -> u64 {
@@ -271,7 +273,7 @@ fn memory_store_scaling() {
             .stdout,
     )
     .unwrap();
-    let report = serde_json::json!({"schema":"mainframe-env.memory-scaling@1","candidate":git(&["rev-parse","HEAD"]),"tree":git(&["rev-parse","HEAD^{tree}"]),"profile":if cfg!(debug_assertions){"debug"}else{"release"},"toolchain":rustc,"os":std::env::consts::OS,"architecture":std::env::consts::ARCH,"available_parallelism":std::thread::available_parallelism().map(|v|v.get()).unwrap_or(1),"cpuinfo":std::fs::read_to_string("/proc/cpuinfo").ok().and_then(|s|s.lines().find(|line|line.starts_with("model name")).map(str::to_owned)),"process_status_after_campaign":std::fs::read_to_string("/proc/self/status").ok(),"allocation_count":null,"allocation_count_note":"not instrumented; process VmHWM is cumulative, not a per-case allocation or peak measurement","results":results});
+    let report = serde_json::json!({"schema":"mainframe-env.memory-scaling@1","candidate":git(&["rev-parse","HEAD"]),"tree":git(&["rev-parse","HEAD^{tree}"]),"working_tree_dirty":!git(&["status","--porcelain"]).is_empty(),"profile":if cfg!(debug_assertions){"debug"}else{"release"},"toolchain":rustc,"os":std::env::consts::OS,"architecture":std::env::consts::ARCH,"available_parallelism":std::thread::available_parallelism().map(|v|v.get()).unwrap_or(1),"operations_per_worker":OPERATIONS,"percentile_method":"nearest-rank","cpuinfo":std::fs::read_to_string("/proc/cpuinfo").ok().and_then(|s|s.lines().find(|line|line.starts_with("model name")).map(str::to_owned)),"process_status_after_campaign":std::fs::read_to_string("/proc/self/status").ok(),"allocation_count":null,"allocation_count_note":"not instrumented; process VmHWM is cumulative, not a per-case allocation or peak measurement","results":results});
     let output = std::env::var("MAINFRAME_ENV_MEMORY_BENCH_OUTPUT")
         .unwrap_or_else(|_| "/tmp/mainframe-memory-scaling.json".into());
     if let Some(parent) = std::path::Path::new(&output).parent() {
@@ -289,4 +291,12 @@ fn memory_store_scaling() {
     println!(
         "BENCH_REPORT {output}; 216 cases, 3 repeats, correctness postconditions passed; allocation count not measured"
     );
+}
+
+#[test]
+fn latency_stats_use_nearest_rank_percentiles() {
+    let summary = stats((1..=12).collect());
+    assert_eq!(summary["p50_ns"], 6);
+    assert_eq!(summary["p95_ns"], 12);
+    assert_eq!(summary["p99_ns"], 12);
 }

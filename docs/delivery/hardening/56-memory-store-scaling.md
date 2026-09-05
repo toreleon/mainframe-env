@@ -21,10 +21,12 @@ Latency distributions measure the journal call itself. Throughput includes
 thread startup and postcondition checks and must not be treated as a service
 capacity ceiling. The separate mutex-wait and clone-hold probes clone the same
 State under its actual mutex, but are not instrumentation of the journal method.
-The report records hardware/toolchain, workload dimensions, p50/p95/p99/range,
-throughput, and process status. VmHWM is process-cumulative, **not per-case peak**;
-allocation count is explicitly unmeasured rather than invented. A dedicated
-allocator/RSS-per-process campaign is needed for allocation attribution.
+The report records hardware/toolchain, workload dimensions, nearest-rank
+p50/p95/p99/range, throughput, process status, and whether the measured working
+tree differed from the recorded candidate. VmHWM is process-cumulative, **not
+per-case peak**; allocation count is explicitly unmeasured rather than invented.
+A dedicated allocator/RSS-per-process campaign is needed for allocation
+attribution.
 
 ## Disposition and optimization gate
 
