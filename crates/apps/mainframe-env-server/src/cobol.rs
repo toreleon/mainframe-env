@@ -131,7 +131,7 @@ impl HostProvider for DefaultProgramRouter {
                 sequence: effect.sequence,
                 outcome: self
                     .cobol
-                    .execute_installed(invocation, program.as_str(), payload)
+                    .execute_installed_effect(invocation, &effect, program.as_str(), payload)
                     .map(HostResult::Program),
             };
         }
@@ -150,18 +150,7 @@ impl HostProvider for DefaultProgramRouter {
                 sequence: effect.sequence,
                 outcome: self
                     .cobol
-                    .execute_installed_batch(invocation, program.as_str(), payload)
-                    .and_then(|output| {
-                        serde_json::to_vec(&output).map_err(|_| HostProblem::ProviderFailure)
-                    })
-                    .and_then(|bytes| {
-                        BoundedPayload::new(
-                            "mainframe-env.program.output@1",
-                            bytes,
-                            InvocationLimits::default(),
-                        )
-                        .map_err(|_| HostProblem::ResourceExhausted)
-                    })
+                    .execute_installed_effect(invocation, &effect, program.as_str(), payload)
                     .map(HostResult::Program),
             };
         }
@@ -321,6 +310,7 @@ impl CobolProgram {
         parent: &Invocation,
         program: &str,
         payload: &BoundedPayload,
+        identity: &str,
     ) -> Result<BoundedPayload, HostProblem> {
         let store = self.store.get().ok_or(HostProblem::InfrastructureFailure)?;
         let artifacts = self
@@ -357,7 +347,7 @@ impl CobolProgram {
             })?;
         let call_values = decode_cobol_call_values(payload)?;
         let limits = InvocationLimits::default();
-        let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
+        let sequence = identity;
         let mut bindings = parent.bindings.clone();
         bindings.insert("cobol.call.arguments".into(), payload.clone());
         let invocation = Invocation::new(
@@ -365,8 +355,7 @@ impl CobolProgram {
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
             ExecutionId::new(format!("online-call-execution-{sequence}"), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
-            RunUnitId::new(format!("online-call-run-{sequence}"), limits)
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            parent.run_unit_id.clone(),
             Some(parent.execution_id.clone()),
             Selector::new(format!("program:{}", program.to_ascii_uppercase()), limits)
                 .map_err(|_| HostProblem::Malformed)?,
@@ -416,8 +405,9 @@ impl CobolProgram {
         machine
             .install_dataset_cursors(loaded_cursors)
             .map_err(|_| HostProblem::ResourceExhausted)?;
-        let coordinator = ExecutionCoordinator::with_host(
+        let coordinator = ExecutionCoordinator::durable(
             Arc::clone(self.host.get().ok_or(HostProblem::InfrastructureFailure)?),
+            Arc::clone(store),
             CoordinatorLimits::default(),
         );
         let outcome = coordinator.execute_with_control(&mut machine, &invocation, || {
@@ -509,6 +499,7 @@ impl CobolProgram {
         parent: &Invocation,
         program: &str,
         payload: &BoundedPayload,
+        identity: &str,
     ) -> Result<ProgramOutput, HostProblem> {
         let input: ProgramInput =
             serde_json::from_slice(payload.bytes()).map_err(|_| HostProblem::Malformed)?;
@@ -531,7 +522,7 @@ impl CobolProgram {
             .map_err(|_| HostProblem::InfrastructureFailure)?
             .ok_or(HostProblem::NotFound)?;
         let limits = InvocationLimits::default();
-        let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
+        let sequence = identity;
         let mut bindings = parent.bindings.clone();
         for dd in &input.dds {
             if let Some(dataset) = &dd.dataset {
@@ -569,30 +560,11 @@ impl CobolProgram {
             }
         }
         let invocation = Invocation::new(
-            RequestId::new(
-                format!(
-                    "batch-installed-request-{}-{sequence}",
-                    parent.execution_id.as_str()
-                ),
-                limits,
-            )
-            .map_err(|_| HostProblem::InfrastructureFailure)?,
-            ExecutionId::new(
-                format!(
-                    "batch-installed-execution-{}-{sequence}",
-                    parent.execution_id.as_str()
-                ),
-                limits,
-            )
-            .map_err(|_| HostProblem::InfrastructureFailure)?,
-            RunUnitId::new(
-                format!(
-                    "batch-installed-run-{}-{sequence}",
-                    parent.execution_id.as_str()
-                ),
-                limits,
-            )
-            .map_err(|_| HostProblem::InfrastructureFailure)?,
+            RequestId::new(format!("batch-installed-request-{sequence}"), limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            ExecutionId::new(format!("batch-installed-execution-{sequence}"), limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            parent.run_unit_id.clone(),
             Some(parent.execution_id.clone()),
             Selector::new(format!("program:{}", program.to_ascii_uppercase()), limits)
                 .map_err(|_| HostProblem::Malformed)?,
@@ -606,22 +578,10 @@ impl CobolProgram {
             parent.service_class,
             parent.priority,
             parent.deadline_tick,
-            TraceId::new(
-                format!(
-                    "batch-installed-trace-{}-{sequence}",
-                    parent.execution_id.as_str()
-                ),
-                limits,
-            )
-            .map_err(|_| HostProblem::InfrastructureFailure)?,
-            IdempotencyKey::new(
-                format!(
-                    "batch-installed-effect-{}-{sequence}",
-                    parent.execution_id.as_str()
-                ),
-                limits,
-            )
-            .map_err(|_| HostProblem::InfrastructureFailure)?,
+            TraceId::new(format!("batch-installed-trace-{sequence}"), limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            IdempotencyKey::new(format!("batch-installed-effect-{sequence}"), limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
             parent.attempt,
             parent.limits,
             bindings,
@@ -1531,3 +1491,5 @@ mod tests {
 
 #[cfg(test)]
 mod hardening;
+
+mod replay;

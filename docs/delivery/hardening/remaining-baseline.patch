@@ -1,0 +1,366 @@
+diff --git a/crates/apps/mainframe-env-server/src/cobol.rs b/crates/apps/mainframe-env-server/src/cobol.rs
+index 0e245bd..f1b2619 100644
+--- a/crates/apps/mainframe-env-server/src/cobol.rs
++++ b/crates/apps/mainframe-env-server/src/cobol.rs
+@@ -1422,3 +1422,6 @@ mod tests {
+         assert_eq!(store.pending_notifications(16).unwrap().len(), 5);
+     }
+ }
++
++#[cfg(test)]
++mod baseline_remaining;
+diff --git a/crates/apps/mainframe-env-server/src/cobol/baseline_remaining.rs b/crates/apps/mainframe-env-server/src/cobol/baseline_remaining.rs
+new file mode 100644
+index 0000000..b8e7a85
+--- /dev/null
++++ b/crates/apps/mainframe-env-server/src/cobol/baseline_remaining.rs
+@@ -0,0 +1,349 @@
++//! Installed-program regressions. The fake effect provider commits real store
++//! state; compiler, installation, host dispatch, interpreter and journal are real.
++use super::*;
++use mainframe_env_batch::DdPlan;
++use mainframe_env_execution_api::{CapabilityId, PrincipalId, ResourceLimits, ServiceClass};
++use mainframe_env_host_api::{HostLimits, ProgramName, RegistrySnapshot};
++use mainframe_env_store::{MemoryStore, SqliteStateStore, StoreLimits};
++use mainframe_env_store_api::{ArtifactRecord, EffectState};
++use sha2::{Digest, Sha256};
++use std::collections::BTreeSet;
++use std::path::PathBuf;
++use std::sync::{Mutex, Weak};
++
++const MIDDLE: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. MIDDLE.\nPROCEDURE DIVISION.\nCALL 'EFFECT' ON EXCEPTION DISPLAY 'CAUGHT' END-CALL.\nGOBACK.\n";
++const ROOT: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. ROOT.\nPROCEDURE DIVISION.\nCALL 'MIDDLE' ON EXCEPTION DISPLAY 'WRONG-PARENT-SUCCESS' END-CALL.\nSTOP RUN.\n";
++static NEXT_ROOT: AtomicU64 = AtomicU64::new(1);
++
++pub(super) struct TestRoot(pub PathBuf);
++impl TestRoot {
++    pub(super) fn new() -> Self {
++        let path = std::env::temp_dir().join(format!(
++            "mainframe-hardening-{}-{}-{}",
++            std::process::id(),
++            NEXT_ROOT.fetch_add(1, Ordering::Relaxed),
++            std::time::SystemTime::now()
++                .duration_since(std::time::UNIX_EPOCH)
++                .unwrap()
++                .as_nanos()
++        ));
++        std::fs::create_dir_all(&path).unwrap();
++        Self(path)
++    }
++    fn sqlite_url(&self) -> String {
++        format!("sqlite://{}?mode=rwc", self.0.join("state.db").display())
++    }
++}
++impl Drop for TestRoot {
++    fn drop(&mut self) {
++        let _ = std::fs::remove_dir_all(&self.0);
++    }
++}
++
++pub(super) fn parent() -> Invocation {
++    let limits = InvocationLimits::default();
++    Invocation::new(
++        RequestId::new("parent-request", limits).unwrap(),
++        ExecutionId::new("parent-execution", limits).unwrap(),
++        RunUnitId::new("parent-run", limits).unwrap(),
++        None,
++        Selector::new("program:test", limits).unwrap(),
++        ArtifactRef::new("artifact", limits).unwrap(),
++        Principal::new(
++            PrincipalId::new("BATCH", limits).unwrap(),
++            BTreeSet::from([CapabilityId::new("host.program.invoke", limits).unwrap()]),
++            limits,
++        )
++        .unwrap(),
++        ServiceClass::Batch,
++        0,
++        u64::MAX,
++        TraceId::new("parent-trace", limits).unwrap(),
++        IdempotencyKey::new("parent-key", limits).unwrap(),
++        1,
++        ResourceLimits::default(),
++        BTreeMap::new(),
++        limits,
++    )
++    .unwrap()
++}
++
++pub(super) fn input(source: &str) -> ProgramInput {
++    ProgramInput {
++        parameter: None,
++        execution: None,
++        dd_records: BTreeMap::new(),
++        dds: vec![DdPlan {
++            name: "SYSIN".into(),
++            dataset: None,
++            member: None,
++            generation: None,
++            organization: None,
++            record_format: None,
++            logical_record_length: None,
++            ccsid: None,
++            temporary: false,
++            sysout: None,
++            disposition: Vec::new(),
++            inline_data: source.as_bytes().to_vec(),
++            concatenation: false,
++            source_line: 1,
++            source_end_line: 1,
++            parameters: Vec::new(),
++        }],
++    }
++}
++
++pub(super) fn call_payload(values: &[Vec<u8>]) -> BoundedPayload {
++    let mut bytes = u32::try_from(values.len()).unwrap().to_be_bytes().to_vec();
++    for (index, value) in values.iter().enumerate() {
++        let name = format!("ARG{}", index + 1);
++        bytes.extend_from_slice(&(name.len() as u64).to_be_bytes());
++        bytes.extend_from_slice(name.as_bytes());
++        bytes.push(1);
++        bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
++        bytes.extend_from_slice(value);
++    }
++    BoundedPayload::new(
++        "mainframe-env.cobol.call@1",
++        bytes,
++        InvocationLimits::default(),
++    )
++    .unwrap()
++}
++
++struct FaultRouter {
++    descriptor: CapabilityDescriptor,
++    router: Weak<DefaultProgramRouter>,
++    store: Arc<dyn PlatformStore>,
++    problem: HostProblem,
++    delete_cursors: bool,
++    observed: Mutex<Vec<EffectRequest>>,
++}
++
++impl HostProvider for FaultRouter {
++    fn descriptor(&self) -> &CapabilityDescriptor {
++        &self.descriptor
++    }
++    fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
++        self.observed.lock().unwrap().push(effect.clone());
++        if matches!(&effect.request, HostRequest::Program(ProgramRequest::Call { program, .. }) if program.as_str() == "EFFECT")
++        {
++            if self.problem == HostProblem::UnknownOutcome {
++                let key = effect
++                    .idempotency_key
++                    .as_ref()
++                    .expect("effect identity")
++                    .as_str();
++                if self
++                    .store
++                    .get_provider_state("hardening-49-business", key)
++                    .unwrap()
++                    .is_none()
++                {
++                    self.store
++                        .put_provider_state(
++                            ProviderStateRecord {
++                                namespace: "hardening-49-business".into(),
++                                key: key.into(),
++                                version: 1,
++                                payload: b"committed".to_vec(),
++                            },
++                            None,
++                        )
++                        .unwrap();
++                }
++            }
++            if self.delete_cursors {
++                for record in self
++                    .store
++                    .list_provider_state("batch-file-cursor", 128)
++                    .unwrap()
++                {
++                    self.store
++                        .delete_provider_state(&record.namespace, &record.key, record.version)
++                        .unwrap();
++                }
++            }
++            return EffectResult {
++                sequence: effect.sequence,
++                outcome: Err(self.problem.clone()),
++            };
++        }
++        self.router
++            .upgrade()
++            .expect("live installed-program router")
++            .invoke(invocation, effect)
++    }
++}
++
++pub(super) struct Fixture {
++    pub(super) store: Arc<dyn PlatformStore>,
++    pub(super) host: Arc<ScopedHostService>,
++    pub(super) router: Arc<DefaultProgramRouter>,
++    root: PathBuf,
++    faults: Arc<FaultRouter>,
++}
++
++impl Fixture {
++    pub(super) fn new(
++        root: &TestRoot,
++        store: Arc<dyn PlatformStore>,
++        problem: HostProblem,
++        delete_cursors: bool,
++    ) -> Self {
++        let router = default_program_router();
++        let faults = Arc::new(FaultRouter {
++            descriptor: router.descriptor().clone(),
++            router: Arc::downgrade(&router),
++            store: store.clone(),
++            problem,
++            delete_cursors,
++            observed: Mutex::new(Vec::new()),
++        });
++        let host = Arc::new(ScopedHostService::new(
++            Arc::new(
++                RegistrySnapshot::new(
++                    1,
++                    vec![faults.clone() as Arc<dyn HostProvider>],
++                    InvocationLimits::default(),
++                )
++                .unwrap(),
++            ),
++            HostLimits::default(),
++        ));
++        router
++            .bind_runtime(host.clone(), store.clone(), &root.0)
++            .unwrap();
++        Self {
++            store,
++            host,
++            router,
++            root: root.0.clone(),
++            faults,
++        }
++    }
++
++    pub(super) fn install(&self, name: &str, source: &str) {
++        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
++            .compile(CompilerRequest {
++                source: source_bundle(&input(source)).unwrap(),
++                mode: CompilationMode::Executable,
++                target: CompileTarget::new("reference").unwrap(),
++                options: CompileOptions::new(BTreeMap::new()).unwrap(),
++            })
++            .unwrap()
++        else {
++            panic!("executable artifact required");
++        };
++        let payload = artifact.payload().to_vec();
++        let digest: [u8; 32] = Sha256::digest(&payload).into();
++        let id = ArtifactRef::new(
++            format!("sha256:{:x}", Sha256::digest(&payload)),
++            InvocationLimits::default(),
++        )
++        .unwrap();
++        LocalArtifactStore::open(&self.root, 64 * 1024 * 1024)
++            .unwrap()
++            .put_artifact(ArtifactRecord {
++                artifact: id.clone(),
++                media_type: "application/vnd.mainframe-env.core-mir".into(),
++                payload_digest: digest,
++                payload,
++            })
++            .unwrap();
++        self.store
++            .put_provider_state(
++                ProviderStateRecord {
++                    namespace: "batch-program".into(),
++                    key: name.into(),
++                    version: 1,
++                    payload: id.as_str().as_bytes().to_vec(),
++                },
++                None,
++            )
++            .unwrap();
++    }
++
++    pub(super) fn call(
++        &self,
++        parent: &Invocation,
++        program: &str,
++        sequence: u64,
++        payload: BoundedPayload,
++    ) -> EffectResult {
++        // Keep the router alive without a router -> host -> router Arc cycle.
++        assert!(Arc::strong_count(&self.router) >= 1);
++        self.host
++            .invoke(
++                parent,
++                0,
++                false,
++                EffectRequest {
++                    run_unit: parent.run_unit_id.clone(),
++                    sequence,
++                    deadline_tick: parent.deadline_tick,
++                    idempotency_key: Some(
++                        IdempotencyKey::new(
++                            format!("{}:{sequence}", parent.idempotency_key),
++                            InvocationLimits::default(),
++                        )
++                        .unwrap(),
++                    ),
++                    request: HostRequest::Program(ProgramRequest::Call {
++                        program: ProgramName::new(program, 128).unwrap(),
++                        payload,
++                        service: None,
++                    }),
++                },
++            )
++            .effect
++    }
++
++    fn batch(&self, program: &str, source: &str) -> EffectResult {
++        self.call(
++            &parent(),
++            program,
++            1,
++            BoundedPayload::new(
++                "mainframe-env.program.input@1",
++                serde_json::to_vec(&input(source)).unwrap(),
++                InvocationLimits::default(),
++            )
++            .unwrap(),
++        )
++    }
++}
++
++
++const COUNTER_SOURCE: &str = "IDENTIFICATION DIVISION.\nPROGRAM-ID. COUNTER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 N PIC 9 VALUE 0.\nLINKAGE SECTION.\n01 ARG PIC 9.\nPROCEDURE DIVISION USING ARG.\nADD 1 TO N.\nMOVE N TO ARG.\nGOBACK.\n";
++
++#[test]
++fn baseline_47_records_fresh_instead_of_retained_state() {
++    let root=TestRoot::new();
++    let fixture=Fixture::new(&root,Arc::new(MemoryStore::new(Default::default())),HostProblem::NotFound,false);
++    fixture.install("COUNTER",COUNTER_SOURCE);
++    let values:Vec<_>=(1..=2).map(|sequence|{
++        let HostResult::Program(payload)=fixture.call(&parent(),"COUNTER",sequence,call_payload(&[b"0".to_vec()])).outcome.unwrap() else {panic!("program result")};
++        payload.bytes().to_vec()
++    }).collect();
++    println!("BASELINE47 actual linkage values: {values:?}; expected retained values: 1 then 2");
++    assert_eq!(values,vec![encode_cobol_call_result(&[b"1".to_vec()]).unwrap().bytes().to_vec();2]);
++}
++
++#[test]
++fn baseline_55_records_duplicate_business_effect_after_counter_reorder() {
++    let root=TestRoot::new();let url=root.sqlite_url();
++    let fixture=Fixture::new(&root,Arc::new(SqliteStateStore::open(&url,8*1024*1024,65536).unwrap()),HostProblem::UnknownOutcome,false);
++    fixture.install("LEAF","IDENTIFICATION DIVISION.\nPROGRAM-ID. LEAF.\nPROCEDURE DIVISION.\nCALL 'EFFECT'.\nGOBACK.\n");
++    let _=fixture.call(&parent(),"LEAF",1,call_payload(&[]));
++    let before=fixture.store.list_provider_state("hardening-49-business",128).unwrap();
++    assert_eq!(before.len(),1);
++    drop(fixture);
++    let fixture=Fixture::new(&root,Arc::new(SqliteStateStore::open(&url,8*1024*1024,65536).unwrap()),HostProblem::UnknownOutcome,false);
++    fixture.router.cobol.sequence.store(98765,Ordering::SeqCst);
++    let _=fixture.call(&parent(),"LEAF",1,call_payload(&[]));
++    let after=fixture.store.list_provider_state("hardening-49-business",128).unwrap();
++    println!("BASELINE55 before={before:?}, after={after:?}; same parent/run/effect occurrence, counter reset to 98765");
++    assert_eq!(after.len(),2);
++}
