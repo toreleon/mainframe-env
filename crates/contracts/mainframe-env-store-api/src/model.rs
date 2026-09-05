@@ -177,6 +177,38 @@ pub struct ProviderStateRecord {
     pub payload: Vec<u8>,
 }
 
+impl ProviderStateRecord {
+    /// Validate the backend-independent compare-and-swap move contract.
+    ///
+    /// Identifiers must be nonempty, source and destination must differ, and
+    /// the new positive version must be the successor of `expected_version`.
+    /// Versions share the signed 64-bit range used by durable SQL adapters.
+    /// Shape/version failures take precedence over the payload bound. Missing
+    /// or stale source state and an occupied destination are CAS conflicts;
+    /// implementations must reject them without modifying either record.
+    pub fn validate_move(
+        &self,
+        old_key: &str,
+        expected_version: u64,
+        max_payload_bytes: usize,
+    ) -> Result<(), StoreError> {
+        if self.namespace.is_empty()
+            || self.key.is_empty()
+            || old_key.is_empty()
+            || self.key == old_key
+            || expected_version == 0
+            || self.version > i64::MAX as u64
+            || expected_version.checked_add(1) != Some(self.version)
+        {
+            return Err(StoreError::Conflict);
+        }
+        if self.payload.len() > max_payload_bytes {
+            return Err(StoreError::PayloadTooLarge);
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProviderStateWrite {
     pub record: ProviderStateRecord,

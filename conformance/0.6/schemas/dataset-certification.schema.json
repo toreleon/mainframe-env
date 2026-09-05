@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": ["schema_version", "target_version", "baseline_id", "completion_policy", "surface", "state", "reference_simulation", "matrices", "validation", "oracle"],
   "properties": {
-    "schema_version": { "const": "mainframe-env.dataset-certification@1" },
+    "schema_version": { "const": "mainframe-env.dataset-certification@2" },
     "target_version": { "const": "0.6.0" },
     "baseline_id": { "const": "ibm-zos-3.2-dfsms-ams-2026-06" },
     "completion_policy": {
@@ -63,14 +63,14 @@
     },
     "reference_simulation": {
       "type": "object", "additionalProperties": false,
-      "required": ["status", "model_kind", "organizations", "commands", "properties", "mutants_killed", "differential_credit"],
+      "required": ["status", "model_kind", "organizations", "commands", "properties", "observation_perturbations_rejected", "differential_credit"],
       "properties": {
         "status": { "const": "pass" },
         "model_kind": { "const": "independent-bounded-pure-state" },
         "organizations": { "const": 5 },
         "commands": { "const": 31 },
         "properties": { "const": 13 },
-        "mutants_killed": { "const": 8 },
+        "observation_perturbations_rejected": { "const": 8 },
         "differential_credit": { "const": 0 }
       }
     },

@@ -3845,12 +3845,12 @@ fn check_focused_dataset_or_jcl_conformance_interface(
             .map(|batch| batch.events.len())
             .sum::<usize>();
         println!(
-            "dataset-conformance bindings={selected} events={events} batches={} reference-organizations={} reference-commands={} reference-properties={} mutants-killed={} differential-credit={}",
+            "dataset-conformance bindings={selected} events={events} batches={} reference-organizations={} reference-commands={} reference-properties={} observation-perturbations-rejected={} differential-credit={}",
             report.batches.len(),
             simulation.organization_rows,
             simulation.command_rows,
             simulation.property_cases,
-            simulation.mutants_killed,
+            simulation.observation_perturbations_rejected,
             simulation.differential_credit,
         );
         return Ok(());
