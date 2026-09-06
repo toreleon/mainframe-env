@@ -6,16 +6,12 @@ on:
       - main
     tags:
       - "mainframe-env-v*"
-    paths-ignore:
-      - "**/*.md"
-      - "docs/**"
   pull_request:
     branches:
       - main
-    paths-ignore:
-      - "**/*.md"
-      - "docs/**"
   workflow_dispatch:
+  schedule:
+    - cron: "30 20 * * 0"
 
 permissions:
   contents: read
@@ -25,7 +21,34 @@ concurrency:
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/mainframe-env-v') }}
 
 jobs:
+  select-assurance:
+    runs-on: ubuntu-24.04
+    outputs:
+      candidate: ${{ steps.plan.outputs.candidate }}
+      build: ${{ steps.plan.outputs.build }}
+      full: ${{ steps.plan.outputs.full }}
+      msrv: ${{ steps.plan.outputs.msrv }}
+      store: ${{ steps.plan.outputs.store }}
+      mutation: ${{ steps.plan.outputs.mutation }}
+      architecture: ${{ steps.plan.outputs.architecture }}
+      evidence: ${{ steps.plan.outputs.evidence }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: python3 -B -m unittest discover -s tools/tests -p test_ci_assurance.py
+      - id: plan
+        run: python3 -B tools/ci_assurance.py plan --output target/ci-plan.json --github-output "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ci-plan-${{ github.run_id }}
+          path: target/ci-plan.json
+          if-no-files-found: error
+
   v0-foundation:
+    needs: select-assurance
+    if: needs.select-assurance.outputs.build == 'true'
     runs-on: ubuntu-24.04
     container:
       image: rust:1.98.0-bookworm@sha256:82150a52ec202c1b14d7817e14516c392bb7f5cfebd88f1ed531cb37ebd39922
@@ -54,14 +77,15 @@ jobs:
           df -h /
       - uses: actions/checkout@v7
         with:
-          # Conformance verifies the accepted release tag and historical
-          # phase/remediation commit trailers. The default one-commit checkout
-          # omits both the required history and tags.
+          ref: ${{ needs.select-assurance.outputs.candidate }}
           fetch-depth: 0
           fetch-tags: true
-      # checkout's container-safe setting is written under a temporary HOME;
-      # conformance invokes Git later from the job shell's persistent HOME.
+          persist-credentials: false
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Ensure receipt tooling is available
+        run: command -v python3 || (apt-get update && apt-get install -y --no-install-recommends python3)
+      - name: Record exact candidate selection
+        run: python3 -B tools/ci_assurance.py plan --output target/ci-plan.json
       - name: Restore Rust build cache
         id: rust-cache
         if: >-
@@ -73,41 +97,56 @@ jobs:
           key: ${{ runner.os }}-rust-1.98.0-${{ hashFiles('Cargo.lock', '**/Cargo.toml') }}
           restore-keys: |
             ${{ runner.os }}-rust-1.98.0-
-      - run: cargo fmt --all -- --check
-      - run: cargo xtask spec --check
-      - run: cargo xtask cobol-exit --check
-      - run: cargo test --workspace --all-features --locked --no-fail-fast
-      - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - run: python3 -B tools/ci_assurance.py record --output target/ci-receipts --gate fmt -- cargo fmt --all -- --check
+      - run: python3 -B tools/ci_assurance.py record --output target/ci-receipts --gate spec -- cargo xtask spec --check
+      - run: python3 -B tools/ci_assurance.py record --output target/ci-receipts --gate cobol -- cargo xtask cobol-exit --check
+      - run: python3 -B tools/ci_assurance.py record --output target/ci-receipts --gate tests --expect-tests -- cargo test --workspace --all-features --locked --no-fail-fast
+      - run: python3 -B tools/ci_assurance.py record --output target/ci-receipts --gate clippy -- cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - name: Fast architecture obligations
+        if: needs.select-assurance.outputs.architecture == 'true' && needs.select-assurance.outputs.full != 'true'
+        run: python3 -B tools/ci_assurance.py record --output target/ci-receipts --gate architecture-fast -- cargo xtask architecture-fast --check
+      - name: Fast evidence consistency
+        if: needs.select-assurance.outputs.evidence == 'true' && needs.select-assurance.outputs.full != 'true'
+        run: python3 -B tools/ci_assurance.py record --output target/ci-receipts --gate evidence-fast -- cargo xtask evidence-fast --check
+      - name: Selected reference-source mutation campaign
+        if: needs.select-assurance.outputs.mutation == 'true'
+        run: python3 -B tools/ci_assurance.py record --output target/ci-receipts --gate mutation -- python3 -B tools/dataset_mutations.py --output target/ci-mutations --timeout 300
       - name: Check every workspace target
-        if: ${{ github.event_name != 'pull_request' }}
-        run: cargo check --workspace --all-targets --all-features --locked
+        if: github.event_name != 'pull_request'
+        run: python3 -B tools/ci_assurance.py record --output target/ci-receipts --gate targets -- cargo check --workspace --all-targets --all-features --locked
       - name: Build workspace documentation
-        if: ${{ github.event_name != 'pull_request' }}
-        run: RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --locked
+        if: github.event_name != 'pull_request'
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: python3 -B tools/ci_assurance.py record --output target/ci-receipts --gate documentation -- cargo doc --workspace --all-features --no-deps --locked
       - name: Check complete conformance
-        if: >-
-          github.event_name == 'workflow_dispatch' ||
-          startsWith(github.ref, 'refs/tags/mainframe-env-v')
-        run: cargo xtask conformance --check
+        if: needs.select-assurance.outputs.full == 'true'
+        run: python3 -B tools/ci_assurance.py record --output target/ci-receipts --gate conformance -- cargo xtask conformance --check
       - name: Check evidence seal
-        if: >-
-          github.event_name == 'workflow_dispatch' ||
-          startsWith(github.ref, 'refs/tags/mainframe-env-v')
-        run: cargo xtask evidence seal --check
+        if: needs.select-assurance.outputs.full == 'true'
+        run: python3 -B tools/ci_assurance.py record --output target/ci-receipts --gate evidence-seal -- cargo xtask evidence seal --check
       - name: Check runtime architecture
-        if: >-
-          github.event_name == 'workflow_dispatch' ||
-          startsWith(github.ref, 'refs/tags/mainframe-env-v')
-        run: cargo xtask runtime-architecture --check
+        if: needs.select-assurance.outputs.full == 'true'
+        run: python3 -B tools/ci_assurance.py record --output target/ci-receipts --gate runtime-architecture -- cargo xtask runtime-architecture --check
       - name: Save trusted Rust build cache
-        if: >-
-          github.event_name != 'pull_request' &&
-          !startsWith(github.ref, 'refs/tags/mainframe-env-v') &&
-          steps.rust-cache.outputs.cache-hit != 'true'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.rust-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
         with:
           path: target/debug
           key: ${{ steps.rust-cache.outputs.cache-primary-key }}
+      - name: Summarize actual selected commands
+        if: always()
+        run: python3 -B tools/ci_assurance.py summary --plan target/ci-plan.json --directory target/ci-receipts --output target/ci-summary.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ci-foundation-${{ github.run_id }}
+          path: |
+            target/ci-plan.json
+            target/ci-summary.json
+            target/ci-receipts/
+            target/ci-mutations/
+          if-no-files-found: error
       - id: linux-release-path
         if: ${{ startsWith(github.ref, 'refs/tags/mainframe-env-v') }}
         shell: bash
@@ -133,18 +172,19 @@ jobs:
         run: cargo xtask release --check --target x86_64-unknown-linux-gnu
 
   contract-msrv:
-    if: >-
-      github.event_name != 'push' ||
-      startsWith(github.ref, 'refs/tags/mainframe-env-v') ||
-      !startsWith(github.event.head_commit.message, 'Merge pull request #')
+    needs: select-assurance
+    if: needs.select-assurance.outputs.msrv == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.select-assurance.outputs.candidate }}
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.95.0
       - run: >-
-          cargo check --locked
+          cargo +1.95.0 check --locked
           -p mainframe-env-source
           -p mainframe-env-diagnostics
           -p mainframe-env-encoding
@@ -153,3 +193,85 @@ jobs:
           -p mainframe-env-execution-api
           -p mainframe-env-host-api
           -p mainframe-env-store-api
+
+  backend-parity:
+    needs: select-assurance
+    if: needs.select-assurance.outputs.store == 'true'
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: disposable-ci-only
+          POSTGRES_DB: mainframe_env
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d mainframe_env"
+          --health-interval=5s --health-timeout=5s --health-retries=10
+    env:
+      CARGO_INCREMENTAL: "0"
+      MAINFRAME_ENV_POSTGRES_TEST_URL: postgres://ci:disposable-ci-only@localhost:5432/mainframe_env
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.select-assurance.outputs.candidate }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.0
+      - name: Record exact backend candidate
+        run: python3 -B tools/ci_assurance.py plan --output target/ci-plan.json
+      - name: Restore trusted cache read-only
+        if: ${{ !startsWith(github.ref, 'refs/tags/mainframe-env-v') }}
+        uses: actions/cache/restore@v6
+        with:
+          path: target/debug
+          key: ${{ runner.os }}-rust-1.98.0-${{ hashFiles('Cargo.lock', '**/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-rust-1.98.0-
+      - name: Execute PostgreSQL Move contract, not an ignored green test
+        run: python3 -B tools/ci_assurance.py record --output target/ci-backend --gate postgres-move --expect-tests -- cargo test --locked -p mainframe-env-store --test provider_move_contract postgres_move_contract -- --ignored --exact
+      - name: Execute canonical effect contract when present
+        if: hashFiles('crates/stores/mainframe-env-store/tests/effect_encoding_contract.rs') != ''
+        run: python3 -B tools/ci_assurance.py record --output target/ci-backend --gate postgres-effect --expect-tests -- cargo test --locked -p mainframe-env-store --test effect_encoding_contract postgres_effect_domains_cannot_be_mixed -- --ignored --exact
+      - name: Summarize selected backend contracts
+        if: always()
+        shell: bash
+        run: |
+          gates=(postgres-move)
+          if test -f crates/stores/mainframe-env-store/tests/effect_encoding_contract.rs; then gates+=(postgres-effect); fi
+          python3 -B tools/ci_assurance.py summary --plan target/ci-plan.json --directory target/ci-backend --output target/ci-backend-summary.json --gates "${gates[@]}"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ci-backend-${{ github.run_id }}
+          path: |
+            target/ci-plan.json
+            target/ci-backend-summary.json
+            target/ci-backend/
+          if-no-files-found: error
+
+  assurance-status:
+    needs: [select-assurance, v0-foundation, contract-msrv, backend-parity]
+    if: always()
+    runs-on: ubuntu-24.04
+    env:
+      NEEDS_JSON: ${{ toJSON(needs) }}
+    steps:
+      - name: Require every selected job and distinguish skipped jobs
+        run: |
+          python3 - <<'PY'
+          import json, os
+          needs=json.loads(os.environ['NEEDS_JSON'])
+          selection=needs['select-assurance']
+          assert selection['result']=='success', 'assurance selection did not succeed'
+          outputs=selection['outputs']
+          for job, flag in [('v0-foundation','build'),('contract-msrv','msrv'),('backend-parity','store')]:
+              expected='success' if outputs[flag]=='true' else 'skipped'
+              assert needs[job]['result']==expected, f'{job}: expected {expected}, observed {needs[job]["result"]}'
+          print('All selected jobs passed; skipped jobs grant no assurance credit.')
+          print('Tier:', 'full commands' if outputs['full']=='true' else 'PR/selected commands; full release gates not credited')
+          PY
