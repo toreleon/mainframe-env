@@ -223,6 +223,23 @@ jobs:
       MAINFRAME_ENV_TEST_POSTGRES_URL: postgres://hardening:disposable-ci-only@localhost:5432/mainframe_env
       MAINFRAME_ENV_POSTGRES_TEST_URL: postgres://hardening:disposable-ci-only@localhost:5432/mainframe_env
     steps:
+      # This job restores the same debug cache and builds against it, so it
+      # needs the same headroom as v0-foundation. It runs directly on the
+      # runner, so the unused toolchains are removable without bind mounts.
+      - name: Reclaim runner image disk space
+        shell: bash
+        run: |
+          set -euo pipefail
+          df -h /
+          sudo rm -rf \
+            /usr/local/lib/android \
+            /opt/hostedtoolcache \
+            /usr/local/.ghcup \
+            /usr/share/swift \
+            /usr/share/dotnet \
+            /usr/local/share/powershell \
+            /usr/lib/google-cloud-sdk || true
+          df -h /
       - uses: actions/checkout@v7
         with:
           ref: ${{ needs.select-assurance.outputs.candidate }}
