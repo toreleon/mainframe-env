@@ -4,6 +4,17 @@ All notable changes to mainframe-env are documented here.
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-09-06
+
+### Changed
+
+- Added a release-time offline Cargo vendor bundle so the exact locked dependency graph can be used in network-restricted build environments.
+- Added SHA-256 checksums for the offline vendor bundle and verified the vendored workspace builds with `--locked --offline` before publication.
+
+### Compatibility
+
+- No supported runtime or contract surface changes from 0.8.1; this patch is release-tooling and distribution focused.
+
 ## [0.8.1] - 2026-09-05
 
 ### Fixed

@@ -43,7 +43,9 @@ jobs:
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Restore Rust build cache
         id: rust-cache
-        if: ${{ !startsWith(github.ref, 'refs/tags/mainframe-env-v') }}
+        if: >-
+          github.event_name != 'pull_request' &&
+          !startsWith(github.ref, 'refs/tags/mainframe-env-v')
         uses: actions/cache/restore@v6
         with:
           path: target/debug
