@@ -2,6 +2,12 @@
 
 #![forbid(unsafe_code)]
 
+mod canonical;
+pub use canonical::{
+    EFFECT_CANONICAL_SCHEMA, MAX_CANONICAL_EFFECT_BYTES, canonical_request_digest,
+    canonical_request_size, canonical_result_digest, canonical_result_size,
+};
+
 mod dataset;
 mod names;
 mod registry;

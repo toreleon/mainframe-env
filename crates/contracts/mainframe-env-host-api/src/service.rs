@@ -1,4 +1,7 @@
-use crate::{AuditEvent, EffectRequest, EffectResult, HostLimits, HostProblem, RegistrySnapshot};
+use crate::{
+    AuditEvent, EffectRequest, EffectResult, HostLimits, HostProblem, MAX_CANONICAL_EFFECT_BYTES,
+    RegistrySnapshot, canonical_request_size, canonical_result_size,
+};
 use mainframe_env_execution_api::Invocation;
 use std::collections::BTreeMap;
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -53,22 +56,49 @@ impl ScopedHostService {
                     Err(HostProblem::ProviderFailure)
                 }
                 Ok(provider)
-                    if format!("{:?}", request.request).len()
-                        > provider.descriptor().max_request_bytes =>
+                    if canonical_request_size(
+                        &request.request,
+                        provider
+                            .descriptor()
+                            .max_request_bytes
+                            .min(MAX_CANONICAL_EFFECT_BYTES),
+                    )
+                    .is_err() =>
                 {
                     Err(HostProblem::ResourceExhausted)
                 }
                 Ok(provider) => {
+                    let mutating = request.request.is_mutating();
                     match catch_unwind(AssertUnwindSafe(|| provider.invoke(invocation, request))) {
-                        Ok(effect) => effect.validate(sequence, self.limits).and_then(|()| {
-                            if format!("{:?}", effect.outcome).len()
-                                > provider.descriptor().max_result_bytes
-                            {
-                                Err(HostProblem::ResourceExhausted)
-                            } else {
-                                effect.outcome
+                        // Uncertainty is a control outcome, not an oversized success payload.
+                        // Never erase it, even when an untrusted provider also corrupts the envelope.
+                        Ok(effect)
+                            if matches!(&effect.outcome, Err(HostProblem::UnknownOutcome)) =>
+                        {
+                            Err(HostProblem::UnknownOutcome)
+                        }
+                        Ok(effect) => {
+                            let validation =
+                                effect.validate(sequence, self.limits).and_then(|()| {
+                                    canonical_result_size(
+                                        &effect.outcome,
+                                        provider
+                                            .descriptor()
+                                            .max_result_bytes
+                                            .min(MAX_CANONICAL_EFFECT_BYTES),
+                                    )
+                                    .map(|_| ())
+                                });
+                            match validation {
+                                Ok(()) => effect.outcome,
+                                // The provider has reported a committed success. Losing its
+                                // usable reply is not a known rejection that permits retry.
+                                Err(_) if mutating && effect.outcome.is_ok() => {
+                                    Err(HostProblem::UnknownOutcome)
+                                }
+                                Err(problem) => Err(problem),
                             }
-                        }),
+                        }
                         Err(_) => Err(HostProblem::InfrastructureFailure),
                     }
                 }
@@ -284,5 +314,136 @@ mod tests {
                 .outcome,
             Err(HostProblem::Cancelled)
         );
+    }
+    struct BudgetProvider {
+        descriptor: CapabilityDescriptor,
+        calls: Arc<std::sync::atomic::AtomicUsize>,
+        outcome: Result<crate::HostResult, HostProblem>,
+        bad_sequence: bool,
+    }
+    impl HostProvider for BudgetProvider {
+        fn descriptor(&self) -> &CapabilityDescriptor {
+            &self.descriptor
+        }
+        fn invoke(&self, _: &Invocation, request: EffectRequest) -> EffectResult {
+            self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            EffectResult {
+                sequence: if self.bad_sequence {
+                    0
+                } else {
+                    request.sequence
+                },
+                outcome: self.outcome.clone(),
+            }
+        }
+    }
+    fn budget_service(
+        capability: &str,
+        request_limit: usize,
+        result_limit: usize,
+        outcome: Result<crate::HostResult, HostProblem>,
+        bad_sequence: bool,
+    ) -> (ScopedHostService, Arc<std::sync::atomic::AtomicUsize>) {
+        let l = InvocationLimits::default();
+        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let provider = BudgetProvider {
+            descriptor: CapabilityDescriptor {
+                capability: CapabilityId::new(capability, l).unwrap(),
+                provider_id: "budget".into(),
+                generation: "1".into(),
+                request_schema: "request@1".into(),
+                result_schema: "result@1".into(),
+                max_request_bytes: request_limit,
+                max_result_bytes: result_limit,
+                ready: true,
+            },
+            calls: calls.clone(),
+            outcome,
+            bad_sequence,
+        };
+        let service = ScopedHostService::new(
+            Arc::new(RegistrySnapshot::new(1, vec![Arc::new(provider)], l).unwrap()),
+            HostLimits::default(),
+        );
+        (service, calls)
+    }
+    #[test]
+    fn canonical_provider_budgets_accept_exact_bytes_and_reject_before_dispatch() {
+        let inv = invocation(true);
+        let req = request(&inv.run_unit_id);
+        let reply = Ok(crate::HostResult::State {
+            value: Some(vec![255; 4096]),
+            version: 1,
+        });
+        let n = canonical_request_size(&req.request, usize::MAX).unwrap();
+        let m = canonical_result_size(&reply, usize::MAX).unwrap();
+        let (host, calls) = budget_service("host.state.read", n, m, reply.clone(), false);
+        assert_eq!(
+            host.invoke(&inv, 1, false, req.clone()).effect.outcome,
+            reply
+        );
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+        let (host, calls) = budget_service("host.state.read", n - 1, m, reply.clone(), false);
+        assert_eq!(
+            host.invoke(&inv, 1, false, req.clone()).effect.outcome,
+            Err(HostProblem::ResourceExhausted)
+        );
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+        let (host, calls) = budget_service("host.state.read", n, m - 1, reply, false);
+        assert_eq!(
+            host.invoke(&inv, 1, false, req).effect.outcome,
+            Err(HostProblem::ResourceExhausted)
+        );
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+    #[test]
+    fn uncertainty_is_not_erased_by_result_budget_or_bad_envelope() {
+        let inv = invocation(true);
+        let req = request(&inv.run_unit_id);
+        let (host, _) = budget_service(
+            "host.state.read",
+            1024,
+            1,
+            Err(HostProblem::UnknownOutcome),
+            true,
+        );
+        assert_eq!(
+            host.invoke(&inv, 1, false, req).effect.outcome,
+            Err(HostProblem::UnknownOutcome)
+        );
+    }
+    #[test]
+    fn unusable_successful_mutation_reply_requires_reconciliation() {
+        let mut inv = invocation(true);
+        let limits = InvocationLimits::default();
+        inv.principal = Principal::new(
+            inv.principal.id().clone(),
+            BTreeSet::from([CapabilityId::new("host.state.write", limits).unwrap()]),
+            limits,
+        )
+        .unwrap();
+        let mut req = request(&inv.run_unit_id);
+        let key = IdempotencyKey::new("budget-effect", limits).unwrap();
+        req.idempotency_key = Some(key.clone());
+        req.request = HostRequest::State(StateRequest::Put {
+            key: "x".into(),
+            value: vec![1],
+            expected_version: None,
+            mutation: crate::Mutation {
+                sequence: 1,
+                idempotency_key: key,
+                transaction: None,
+            },
+        });
+        let reply = Ok(crate::HostResult::State {
+            value: Some(vec![255; 4096]),
+            version: 1,
+        });
+        let (host, calls) = budget_service("host.state.write", 4096, 1, reply, false);
+        assert_eq!(
+            host.invoke(&inv, 1, false, req).effect.outcome,
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
 }

@@ -1311,6 +1311,7 @@ version = "0.8.1"
 dependencies = [
  "mainframe-env-execution-api",
  "serde",
+ "sha2 0.10.9",
 ]
 
 [[package]]

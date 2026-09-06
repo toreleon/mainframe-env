@@ -5,11 +5,11 @@ use mainframe_env_execution_api::{
     PrincipalId, RunUnitId, Selector,
 };
 use mainframe_env_store_api::{
-    ArtifactRecord, ArtifactStore, CheckpointRecord, CheckpointStore, EffectRecord, EffectState,
-    EventStore, ExecutionRecord, ExecutionState, ExecutionStore, GenerationRecord, GenerationStore,
-    IdempotencyStore, JournalStore, OutboxRecord, OutboxStore, ProviderStateRecord,
-    ProviderStateStore, ProviderStateWrite, SessionRecord, SessionStore, StoreError, WorkRecord,
-    WorkState, WorkStore,
+    ArtifactRecord, ArtifactStore, CheckpointRecord, CheckpointStore, EffectDigestFormat,
+    EffectRecord, EffectState, EventStore, ExecutionRecord, ExecutionState, ExecutionStore,
+    GenerationRecord, GenerationStore, IdempotencyStore, JournalStore, OutboxRecord, OutboxStore,
+    ProviderStateRecord, ProviderStateStore, ProviderStateWrite, SessionRecord, SessionStore,
+    StoreError, WorkRecord, WorkState, WorkStore,
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -543,6 +543,7 @@ macro_rules! durable_implementations {
                 if intent.execution_id != record.execution_id
                     || intent.run_unit_id != record.run_unit_id
                     || intent.sequence != record.sequence
+                    || intent.digest_format != record.digest_format
                     || intent.request_digest != record.request_digest
                     || intent.state != EffectState::Intent
                 {
@@ -1255,12 +1256,53 @@ fn decode_generation(
 }
 
 fn encode_effect(record: &EffectRecord) -> Result<Vec<u8>, StoreError> {
-    encode(
-        json!({"schema":1,"execution":record.execution_id.as_str(),"run":record.run_unit_id.as_str(),"sequence":record.sequence,"request":hex(&record.request_digest),"state":effect_state(record.state),"result":record.result_digest.map(|value|hex(&value))}),
-    )
+    let mut value = json!({"execution":record.execution_id.as_str(),"run":record.run_unit_id.as_str(),"sequence":record.sequence,"state":effect_state(record.state)});
+    match record.digest_format {
+        EffectDigestFormat::LegacyDebug => {
+            value["schema"] = json!(1);
+            value["digest_format"] = json!("legacy-debug@0");
+            value["request"] = json!(hex(&record.request_digest));
+            value["result"] = json!(record.result_digest.map(|value| hex(&value)));
+        }
+        EffectDigestFormat::CanonicalHostV1 => {
+            value["schema"] = json!(2);
+            value["digest_format"] = json!("mainframe-env.effect-canonical@1");
+            // Counter-era readers ignore schema numbers. Do not expose the old
+            // required field names: their effect decoder must fail on downgrade.
+            value["request_canonical_v1"] = json!(hex(&record.request_digest));
+            value["result_canonical_v1"] = json!(record.result_digest.map(|value| hex(&value)));
+        }
+    }
+    encode(value)
 }
 fn decode_effect(key: &IdempotencyKey, bytes: &[u8]) -> Result<EffectRecord, StoreError> {
-    let value = decode(bytes)?;
+    let value: Value =
+        serde_json::from_slice(bytes).map_err(|_| StoreError::IncompatibleVersion)?;
+    let format = value.get("digest_format");
+    let digest_format = match (number(&value, "schema")?, format) {
+        (1, None) => EffectDigestFormat::LegacyDebug,
+        (1, Some(Value::String(v))) if v == "legacy-debug@0" => EffectDigestFormat::LegacyDebug,
+        (2, Some(Value::String(v))) if v == "mainframe-env.effect-canonical@1" => {
+            EffectDigestFormat::CanonicalHostV1
+        }
+        _ => return Err(StoreError::IncompatibleVersion),
+    };
+    let (request_field, result_field) = match digest_format {
+        EffectDigestFormat::LegacyDebug => {
+            if value.get("request_canonical_v1").is_some()
+                || value.get("result_canonical_v1").is_some()
+            {
+                return Err(StoreError::IncompatibleVersion);
+            }
+            ("request", "result")
+        }
+        EffectDigestFormat::CanonicalHostV1 => {
+            if value.get("request").is_some() || value.get("result").is_some() {
+                return Err(StoreError::IncompatibleVersion);
+            }
+            ("request_canonical_v1", "result_canonical_v1")
+        }
+    };
     let limits = InvocationLimits::default();
     Ok(EffectRecord {
         execution_id: ExecutionId::new(string(&value, "execution")?, limits)
@@ -1269,9 +1311,10 @@ fn decode_effect(key: &IdempotencyKey, bytes: &[u8]) -> Result<EffectRecord, Sto
             .map_err(|_| StoreError::IncompatibleVersion)?,
         sequence: number(&value, "sequence")?,
         key: key.clone(),
-        request_digest: digest_back(string(&value, "request")?)?,
+        digest_format,
+        request_digest: digest_back(string(&value, request_field)?)?,
         state: effect_state_back(string(&value, "state")?)?,
-        result_digest: match value.get("result") {
+        result_digest: match value.get(result_field) {
             Some(Value::String(value)) => Some(digest_back(value)?),
             Some(Value::Null) | None => None,
             _ => return Err(StoreError::IncompatibleVersion),
@@ -1526,5 +1569,71 @@ mod tests {
                 .payload,
             b"postgres-18"
         );
+    }
+}
+
+#[cfg(test)]
+mod effect_encoding_tests {
+    use super::*;
+    fn record() -> EffectRecord {
+        let limits = InvocationLimits::default();
+        EffectRecord {
+            execution_id: ExecutionId::new("canonical-exec", limits).unwrap(),
+            run_unit_id: RunUnitId::new("canonical-run", limits).unwrap(),
+            key: IdempotencyKey::new("canonical-key", limits).unwrap(),
+            sequence: 1,
+            digest_format: EffectDigestFormat::CanonicalHostV1,
+            request_digest: [1; 32],
+            state: EffectState::UnknownOutcome,
+            result_digest: Some([2; 32]),
+        }
+    }
+    #[test]
+    fn persisted_canonical_format_round_trips_and_legacy_remains_distinct() {
+        let canonical = record();
+        let encoded = encode_effect(&canonical).unwrap();
+        assert_eq!(decode_effect(&canonical.key, &encoded).unwrap(), canonical);
+        let mut legacy_value: Value = serde_json::from_slice(&encoded).unwrap();
+        legacy_value["schema"] = json!(1);
+        legacy_value
+            .as_object_mut()
+            .unwrap()
+            .remove("digest_format");
+        let object = legacy_value.as_object_mut().unwrap();
+        let request = object.remove("request_canonical_v1").unwrap();
+        let result = object.remove("result_canonical_v1").unwrap();
+        object.insert("request".into(), request);
+        object.insert("result".into(), result);
+        let old_bytes = serde_json::to_vec(&legacy_value).unwrap();
+        let old = decode_effect(&canonical.key, &old_bytes).unwrap();
+        assert_eq!(old.digest_format, EffectDigestFormat::LegacyDebug);
+        assert_eq!(old.request_digest, canonical.request_digest);
+        assert_eq!(old.result_digest, canonical.result_digest);
+        assert_eq!(
+            decode_effect(&old.key, &encode_effect(&old).unwrap()).unwrap(),
+            old
+        );
+        // The old effect reader requires this field and therefore rejects the new encoding.
+        assert!(string(&decode(&encoded).unwrap(), "request").is_err());
+    }
+    #[test]
+    fn unknown_or_inconsistent_digest_formats_fail_closed() {
+        let record = record();
+        let value: Value = serde_json::from_slice(&encode_effect(&record).unwrap()).unwrap();
+        for (schema, format) in [
+            (1, json!("mainframe-env.effect-canonical@1")),
+            (2, Value::Null),
+            (2, json!("legacy-debug@0")),
+            (2, json!("future@9")),
+            (3, json!("mainframe-env.effect-canonical@1")),
+        ] {
+            let mut bad = value.clone();
+            bad["schema"] = json!(schema);
+            bad["digest_format"] = format;
+            assert_eq!(
+                decode_effect(&record.key, &serde_json::to_vec(&bad).unwrap()),
+                Err(StoreError::IncompatibleVersion)
+            );
+        }
     }
 }

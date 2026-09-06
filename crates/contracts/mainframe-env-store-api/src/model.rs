@@ -158,12 +158,22 @@ pub enum EffectState {
     UnknownOutcome,
 }
 
+/// Identity of the persisted digest algorithm/domain. Never compare across formats.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EffectDigestFormat {
+    /// Pre-hardening diagnostic encoding. Read/reconcile only; do not recompute.
+    LegacyDebug,
+    /// Explicit host canonical bytes, domain/version 1, SHA-256.
+    CanonicalHostV1,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EffectRecord {
     pub execution_id: ExecutionId,
     pub run_unit_id: RunUnitId,
     pub sequence: u64,
     pub key: IdempotencyKey,
+    pub digest_format: EffectDigestFormat,
     pub request_digest: [u8; 32],
     pub state: EffectState,
     pub result_digest: Option<[u8; 32]>,

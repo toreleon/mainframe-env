@@ -5,10 +5,13 @@ use mainframe_env_execution_api::{
     ExecutionOutcome, Invocation, LifecycleEvent, LifecycleEventKind, Machine, MachineDrive,
     MachineResume, Quantum,
 };
-use mainframe_env_host_api::{EffectRequest, EffectResult, HostProblem, ScopedHostService};
+use mainframe_env_host_api::{
+    EffectRequest, EffectResult, HostProblem, ScopedHostService, canonical_request_digest,
+    canonical_result_digest,
+};
 use mainframe_env_store_api::{
-    CheckpointRecord, EffectRecord, EffectState, ExecutionRecord, ExecutionState, OutboxRecord,
-    PlatformStore, StoreError,
+    CheckpointRecord, EffectDigestFormat, EffectRecord, EffectState, ExecutionRecord,
+    ExecutionState, OutboxRecord, PlatformStore, StoreError,
 };
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -172,13 +175,21 @@ impl ExecutionCoordinator {
                         );
                         return outcome;
                     };
-                    let request_digest: [u8; 32] =
-                        Sha256::digest(format!("{:?}", effect.request).as_bytes()).into();
+                    let request_digest = match canonical_request_digest(&effect.request) {
+                        Ok(digest) => digest,
+                        Err(_) => {
+                            return failed_outcome(problem(
+                                FailureCategory::ResourceExhausted,
+                                "canonical host request exceeds the journal encoding budget",
+                            ));
+                        }
+                    };
                     let intent = effect.idempotency_key.as_ref().map(|key| EffectRecord {
                         execution_id: invocation.execution_id.clone(),
                         run_unit_id: invocation.run_unit_id.clone(),
                         sequence: effect.sequence,
                         key: key.clone(),
+                        digest_format: EffectDigestFormat::CanonicalHostV1,
                         request_digest,
                         state: EffectState::Intent,
                         result_digest: None,
@@ -214,14 +225,23 @@ impl ExecutionCoordinator {
                             effect,
                         )
                         .effect;
+                    let result_digest = match canonical_result_digest(&result.outcome) {
+                        Ok(digest) => digest,
+                        // Dispatch already happened; leave the durable intent for reconciliation.
+                        Err(_) => {
+                            return failed_outcome(problem(
+                                FailureCategory::UnknownOutcome,
+                                "host result cannot be encoded after dispatch; reconcile the intent",
+                            ));
+                        }
+                    };
                     let result_record = intent.map(|mut record| {
                         record.state = match &result.outcome {
                             Ok(_) => EffectState::Completed,
                             Err(HostProblem::UnknownOutcome) => EffectState::UnknownOutcome,
                             Err(_) => EffectState::Failed,
                         };
-                        record.result_digest =
-                            Some(Sha256::digest(format!("{:?}", result.outcome).as_bytes()).into());
+                        record.result_digest = Some(result_digest);
                         record
                     });
                     if record_step(
