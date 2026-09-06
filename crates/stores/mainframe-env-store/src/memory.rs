@@ -579,6 +579,7 @@ impl IdempotencyStore for MemoryStore {
         if intent.execution_id != record.execution_id
             || intent.run_unit_id != record.run_unit_id
             || intent.sequence != record.sequence
+            || intent.digest_format != record.digest_format
             || intent.request_digest != record.request_digest
             || intent.state != EffectState::Intent
         {
@@ -754,6 +755,7 @@ impl JournalStore for MemoryStore {
                     if intent.execution_id != effect.execution_id
                         || intent.run_unit_id != effect.run_unit_id
                         || intent.sequence != effect.sequence
+                        || intent.digest_format != effect.digest_format
                         || intent.request_digest != effect.request_digest
                         || intent.state != EffectState::Intent
                     {
@@ -1243,6 +1245,7 @@ mod tests {
             run_unit_id: ids.run,
             sequence: 1,
             key: ids.idem.clone(),
+            digest_format: mainframe_env_store_api::EffectDigestFormat::LegacyDebug,
             request_digest: [1; 32],
             state: EffectState::Intent,
             result_digest: None,

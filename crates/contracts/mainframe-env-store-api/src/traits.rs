@@ -120,6 +120,21 @@ pub trait IdempotencyStore: Send + Sync {
         final_state: crate::EffectState,
         result_digest: [u8; 32],
     ) -> Result<EffectRecord, StoreError>;
+    /// Reconcile only within the explicitly observed encoding domain.
+    /// Stored identities and domains are immutable across result transitions.
+    fn reconcile_unknown_versioned(
+        &self,
+        key: &IdempotencyKey,
+        final_state: crate::EffectState,
+        format: crate::EffectDigestFormat,
+        result_digest: [u8; 32],
+    ) -> Result<EffectRecord, StoreError> {
+        let current = self.effect(key)?.ok_or(StoreError::NotFound)?;
+        if current.digest_format != format {
+            return Err(StoreError::Conflict);
+        }
+        self.reconcile_unknown(key, final_state, result_digest)
+    }
 }
 
 pub trait ProviderStateStore: Send + Sync {

@@ -352,7 +352,19 @@ fn hardening_49_unknown_effect_survives_all_cobol_adapters_and_store_reopen() {
         assert!(!receipts.is_empty(), "every adapter retains uncertainty");
         for receipt in &receipts {
             assert_eq!(receipt.state, EffectState::UnknownOutcome);
-            assert!(receipt.result_digest.is_some());
+            assert_eq!(
+                receipt.digest_format,
+                mainframe_env_store_api::EffectDigestFormat::CanonicalHostV1
+            );
+            assert_eq!(
+                receipt.result_digest,
+                Some(
+                    mainframe_env_host_api::canonical_result_digest(&Err(
+                        HostProblem::UnknownOutcome
+                    ))
+                    .unwrap()
+                )
+            );
         }
         drop(fixture);
         let reopened = SqliteStateStore::open(&url, 8 * 1024 * 1024, 65536).unwrap();
@@ -371,7 +383,12 @@ fn hardening_49_unknown_effect_survives_all_cobol_adapters_and_store_reopen() {
         for receipt in receipts {
             // Explicit operator reconciliation, not an implicit retry of work.
             let reconciled = reopened
-                .reconcile_unknown(&receipt.key, EffectState::Completed, [49; 32])
+                .reconcile_unknown_versioned(
+                    &receipt.key,
+                    EffectState::Completed,
+                    receipt.digest_format,
+                    [49; 32],
+                )
                 .unwrap();
             assert_eq!(reconciled.key, receipt.key);
             assert_eq!(reconciled.state, EffectState::Completed);
