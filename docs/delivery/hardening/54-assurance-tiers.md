@@ -96,3 +96,24 @@ and corrupts an actual evidence schema. It requires the real checker to reject
 both mutations for the intended reason, not merely any process failure. Original
 source and historical evidence are restored; raw receipts stay outside tracked
 source. These are checker-regression tests, not product behavioral mutants.
+
+### Recorded run
+
+Candidate `9da098b`, local aarch64-apple-darwin, Rust 1.98.0, warm build.
+Twelve selector tests passed. Both mutations were rejected for the intended
+reason rather than by incidental failure:
+
+| Gate | Purpose | Exit | Detected as expected | Seconds |
+|---|---|---|---|---|
+| architecture-fast | baseline | 0 | yes | 1.54 |
+| architecture | baseline | 0 | yes | 34.65 |
+| evidence-fast | baseline | 0 | yes | 6.96 |
+| architecture-fast | forbidden `tokio` contract dependency | 1 | `depends on infrastructure tokio` | 0.01 |
+| evidence-fast | corrupted evidence schema | 1 | `must describe an object` | 0.00 |
+
+Architecture-fast costs 1.54 s against 34.65 s for the broader architecture gate
+on the same warm tree, so selected PR runs pay roughly 8.5 s of added command
+time for both fast gates instead of the ~34.7 s the broad gate alone would cost.
+These are warm single-machine command seconds on a developer host, not runner
+provisioning, billing units, or a claim about total PR wall-clock. The full
+tier still runs the broad gates; the fast gates do not replace them.
