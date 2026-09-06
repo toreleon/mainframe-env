@@ -1,0 +1,27 @@
+name: dispatch-offline-mainframe-env-0.8.2
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/dispatch-offline-0.8.2.yml
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Dispatch offline release bundle workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run offline-release-bundle.yml \
+            --ref main \
+            -f tag=mainframe-env-v0.8.2
