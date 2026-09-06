@@ -138,6 +138,8 @@ enum EvidenceCommand {
 enum XtaskCommand {
     Versions(CheckArgs),
     Architecture(CheckArgs),
+    ArchitectureFast(CheckArgs),
+    EvidenceFast(CheckArgs),
     RuntimeArchitecture(CheckArgs),
     Profiles(CheckArgs),
     Schemas(CheckArgs),
@@ -246,6 +248,12 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
     }
     match command {
         XtaskCommand::Versions(args) => checked!("versions", args, check_versions(root)),
+        XtaskCommand::ArchitectureFast(args) => {
+            checked!("architecture-fast", args, check_architecture_fast(root))
+        }
+        XtaskCommand::EvidenceFast(args) => {
+            checked!("evidence-fast", args, check_evidence_fast(root))
+        }
         XtaskCommand::Architecture(args) => {
             checked!("architecture", args, check_architecture(root))
         }
@@ -5496,6 +5504,12 @@ fn check_versions(root: &Path) -> TaskResult {
 }
 
 fn check_architecture(root: &Path) -> TaskResult {
+    check_architecture_fast(root)?;
+    check_runtime_unit_gates(root)
+}
+
+/// Static dependency/ownership/route checks; no release build or runtime campaign.
+fn check_architecture_fast(root: &Path) -> TaskResult {
     let mut manifests = Vec::new();
     collect_named(root, OsStr::new("Cargo.toml"), &mut manifests)?;
     let excluded = excluded_names(root)?;
@@ -5525,7 +5539,26 @@ fn check_architecture(root: &Path) -> TaskResult {
     check_declared_dependency_graph(root)?;
     check_common_execution_route(root)?;
     check_dehardcoding(root)?;
-    check_runtime_unit_gates(root)?;
+    if root
+        .join("crates/contracts/mainframe-env-host-api/src/canonical.rs")
+        .is_file()
+    {
+        let guard = root.join("tools/check_effect_encoding.py");
+        require(
+            guard.is_file(),
+            "canonical effect encoding architecture guard is missing",
+        )?;
+        let status = Command::new("python3")
+            .arg("-B")
+            .arg(&guard)
+            .current_dir(root)
+            .status()
+            .map_err(|error| format!("effect encoding guard: {error}"))?;
+        require(
+            status.success(),
+            "canonical effect encoding architecture guard failed",
+        )?;
+    }
     Ok(())
 }
 
@@ -10190,6 +10223,13 @@ fn check_evidence(root: &Path) -> TaskResult {
         )?;
     }
     Ok(())
+}
+
+/// Schema/instance consistency and historical sealed-input verification, not
+/// a new full conformance campaign or licensed-equivalence result.
+fn check_evidence_fast(root: &Path) -> TaskResult {
+    check_schemas(root)?;
+    evidence_seal::check(root)
 }
 
 fn check_runtime_architecture(root: &Path) -> TaskResult {
