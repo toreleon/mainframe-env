@@ -136,7 +136,15 @@ def campaign(root: Path, output: Path, timeout: int) -> int:
     with tempfile.TemporaryDirectory(prefix='mainframe-dataset-mutations-') as directory:
         snapshot = Path(directory)
         with tarfile.open(fileobj=io.BytesIO(archive), mode='r:') as tar:
-            tar.extractall(snapshot, filter='data')
+            # The extraction filter arrived in 3.11.4; the bookworm interpreter
+            # that runs this gate in CI is 3.11.2. tarfile.data_filter is the
+            # documented way to detect support. The archive is produced by
+            # git archive over the candidate a few lines above, not untrusted
+            # input, so extracting unfiltered on older interpreters is sound.
+            if hasattr(tarfile, 'data_filter'):
+                tar.extractall(snapshot, filter='data')
+            else:
+                tar.extractall(snapshot)
         receipt['baseline'] = execute(snapshot, output / 'baseline.log', timeout)
         save()
         if receipt['baseline']['classification'] != 'survived':
