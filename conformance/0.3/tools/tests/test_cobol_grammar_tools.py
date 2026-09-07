@@ -129,9 +129,31 @@ class DocumentTests(unittest.TestCase):
 
 
 class TopicTests(unittest.TestCase):
-    def test_the_catalog_locator_supplies_the_publication_heading(self) -> None:
-        row = {"id": "add", "source_locator": "pdf-page:343;outline:ADD statement"}
+    LOCATOR = (
+        "topic:SS6SG3_6.5/lr/ref/rlpsadd.html"
+        ";topic-id:statements-add-statement;heading:ADD statement"
+    )
+
+    def test_the_catalog_locator_supplies_the_topic_and_the_heading(self) -> None:
+        row = {"id": "add", "source_locator": self.LOCATOR}
+        self.assertEqual(FETCH.topic_path(row), "SS6SG3_6.5/lr/ref/rlpsadd.html")
         self.assertEqual(FETCH.heading(row), "ADD statement")
+
+    def test_a_retired_page_locator_is_refused_rather_than_guessed(self) -> None:
+        row = {"id": "add", "source_locator": "pdf-page:343;outline:ADD statement"}
+        with self.assertRaises(ValueError):
+            FETCH.topic_path(row)
+
+    def test_the_table_of_contents_is_keyed_by_path_not_by_heading(self) -> None:
+        toc = {"toc": {"label": "book", "href": "b.html", "topics": [
+            {"label": "DELETE statement", "href": "SS6SG3_6.5/lr/ref/rlpsdele.html"},
+            {"label": "DELETE statement", "href": "SS6SG3_6.5/lr/ref/rlcdsdel.html"},
+        ]}}
+        nodes = FETCH.locate(toc)
+        row = {"id": "delete", "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdsdel.html"
+               ";topic-id:statements-delete;heading:DELETE statement"}
+        self.assertEqual(nodes[FETCH.topic_path(row)]["href"],
+                         "SS6SG3_6.5/lr/ref/rlcdsdel.html")
 
     def test_a_statement_subtree_includes_its_format_topics(self) -> None:
         node = {

@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """Fetch the COBOL Language Reference topics a catalog unit cites.
 
-The reference is published twice: as the PDF the baseline pins, and as web
-topics carrying DITA syntax markup. The topics are the better machine source —
+The reference is published as web topics carrying DITA syntax markup:
 `groupseq`, `groupchoice`, `boxed syntaxkwd` and `boxed syntaxvar` state the
-diagram structure that the PDF only draws — so this fetches them for the
-grammar reader.
+diagram structure the drawn diagram only pictures, so this fetches them for
+the grammar reader.
 
 Topic bodies come from IBM Documentation's content endpoint rather than the
-rendered page, because the rendered page is an application shell. The table of
-contents supplies each topic's path, keyed by the same heading the catalog
-records in its `pdf-page;outline` locator.
+rendered page, because the rendered page is an application shell. The catalog
+locator names the topic path outright, so the table of contents is consulted
+by href and never by heading text — a heading repeats inside its own book, a
+path does not.
 
 Topics land outside the repository; IBM publication bytes are never written
 into the tree. Requires websocket-client and a Chrome on a debugging port.
@@ -40,13 +40,17 @@ def digest(data: bytes) -> str:
 
 
 def locate(toc: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Map every table-of-contents heading to its node."""
+    """Map every table-of-contents topic path to its node.
+
+    Keyed by href, not by label: 72 of the reviewed headings repeat inside
+    their own book, so a heading-keyed map silently hands back the wrong node.
+    """
     found: dict[str, dict[str, Any]] = {}
 
     def walk(node: dict[str, Any]) -> None:
-        label = (node.get("label") or "").strip()
-        if label and node.get("href"):
-            found.setdefault(label, node)
+        href = node.get("href")
+        if href:
+            found.setdefault(href.split("?", 1)[0], node)
         for child in node.get("topics") or []:
             walk(child)
 
@@ -76,14 +80,23 @@ def subtree(node: dict[str, Any]) -> list[tuple[str, str]]:
     return found
 
 
-def heading(row: dict[str, Any]) -> str:
-    """The catalog locator carries the publication's own heading."""
+def component(row: dict[str, Any], marker: str) -> str:
+    """One `name:value` component of a `topic;topic-id;heading` locator."""
     locator = row["source_locator"]
-    marker = "outline:"
-    index = locator.find(marker)
-    if index < 0:
-        raise ValueError(f"row {row['id']} has no outline locator: {locator}")
-    return locator[index + len(marker) :].strip()
+    for field in locator.split(";"):
+        if field.startswith(marker):
+            return field[len(marker) :].strip()
+    raise ValueError(f"row {row['id']} has no {marker} component: {locator}")
+
+
+def topic_path(row: dict[str, Any]) -> str:
+    """The topic the catalog row was reviewed against."""
+    return component(row, "topic:")
+
+
+def heading(row: dict[str, Any]) -> str:
+    """The heading the catalog reviewed, carried for reporting only."""
+    return component(row, "heading:")
 
 
 def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
@@ -113,7 +126,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         nodes = locate(json.loads(body.decode("utf-8")))
         for row in rows:
             title = heading(row)
-            node = nodes.get(title)
+            node = nodes.get(topic_path(row))
             if node is None:
                 entries.append({"id": row["id"], "title": title, "located": False,
                                 "topics": []})

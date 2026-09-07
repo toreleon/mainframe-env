@@ -1,7 +1,7 @@
 {
   "schema_version": "mainframe-env.racroute-catalog@1",
   "baseline_id": "ibm-zos-3.2-racf-saf-2026",
-  "supporting_source_sha256": "sha256:83e6eed67f5631268e03ad9459c5ac5fde03bd9d78152eb07403b70af3c4cf78",
+  "supporting_source_sha256": "sha256:acebd6ebc34ffd70843db61620351ae35df699c8e29bd3da486a409d9854db3a",
   "requests": [
     {"row_id":"ibm-zos-3.2-racf-saf-2026:racroute-request-types:0001","variant":"Audit","keyword":"AUDIT","mutating":true,"requires_acee":false,"uses_cache":false},
     {"row_id":"ibm-zos-3.2-racf-saf-2026:racroute-request-types:0002","variant":"Auth","keyword":"AUTH","mutating":false,"requires_acee":false,"uses_cache":true},

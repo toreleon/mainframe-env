@@ -609,7 +609,7 @@ pub static COMPILER_DIRECTING_STATEMENTS: &[CompilerDirectingDescriptor] = &[
         id: "basis",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0001",
         label: "BASIS statement",
-        source_locator: "pdf-page:723;outline:BASIS statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlcdsbas.html;topic-id:statements-basis-statement;heading:BASIS statement",
         forms: &["BASIS basis-name"],
         placement: "control-deck",
         effect: "extended-source-basis",
@@ -619,7 +619,7 @@ pub static COMPILER_DIRECTING_STATEMENTS: &[CompilerDirectingDescriptor] = &[
         id: "process",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0002",
         label: "PROCESS(CBL) statement",
-        source_locator: "pdf-page:724;outline:PROCESS(CBL) statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlcdscbl.html;topic-id:statements-processcbl-statement;heading:PROCESS(CBL) statement",
         forms: &["PROCESS options-list", "CBL options-list"],
         placement: "before-outermost-identification",
         effect: "compiler-options",
@@ -629,7 +629,7 @@ pub static COMPILER_DIRECTING_STATEMENTS: &[CompilerDirectingDescriptor] = &[
         id: "control",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0003",
         label: "*CONTROL (*CBL) statement",
-        source_locator: "pdf-page:724;outline:*CONTROL (*CBL) statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlcdscon.html;topic-id:statements-control-cbl-statement;heading:*CONTROL (*CBL) statement",
         forms: &["*CONTROL listing-options", "*CBL listing-options"],
         placement: "embedded-line-only",
         effect: "listing-control",
@@ -639,7 +639,7 @@ pub static COMPILER_DIRECTING_STATEMENTS: &[CompilerDirectingDescriptor] = &[
         id: "copy",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0004",
         label: "COPY statement",
-        source_locator: "pdf-page:726;outline:COPY statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlcdscop.html;topic-id:statements-copy-statement;heading:COPY statement",
         forms: &["COPY text-name [OF library-name] [SUPPRESS] [REPLACING operands] ."],
         placement: "character-string-boundary",
         effect: "source-expansion",
@@ -649,7 +649,7 @@ pub static COMPILER_DIRECTING_STATEMENTS: &[CompilerDirectingDescriptor] = &[
         id: "delete",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0005",
         label: "DELETE statement",
-        source_locator: "pdf-page:735;outline:DELETE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlcdsdel.html;topic-id:cds-delete-statement;heading:DELETE statement",
         forms: &["DELETE sequence-number-field"],
         placement: "basis-control-deck",
         effect: "extended-source-delete",
@@ -659,7 +659,7 @@ pub static COMPILER_DIRECTING_STATEMENTS: &[CompilerDirectingDescriptor] = &[
         id: "eject",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0006",
         label: "EJECT statement",
-        source_locator: "pdf-page:736;outline:EJECT statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlcdseje.html;topic-id:statements-eject-statement;heading:EJECT statement",
         forms: &["EJECT [.]"],
         placement: "embedded-line-only",
         effect: "listing-control",
@@ -669,7 +669,7 @@ pub static COMPILER_DIRECTING_STATEMENTS: &[CompilerDirectingDescriptor] = &[
         id: "enter",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0007",
         label: "ENTER statement",
-        source_locator: "pdf-page:736;outline:ENTER statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlcdsent.html;topic-id:statements-enter-statement;heading:ENTER statement",
         forms: &["ENTER language-name [routine-name] ."],
         placement: "procedure-division",
         effect: "syntax-only",
@@ -679,7 +679,7 @@ pub static COMPILER_DIRECTING_STATEMENTS: &[CompilerDirectingDescriptor] = &[
         id: "insert",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0008",
         label: "INSERT statement",
-        source_locator: "pdf-page:737;outline:INSERT statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlcdsins.html;topic-id:statements-insert-statement;heading:INSERT statement",
         forms: &["INSERT sequence-number"],
         placement: "basis-control-deck",
         effect: "extended-source-insert",
@@ -689,7 +689,7 @@ pub static COMPILER_DIRECTING_STATEMENTS: &[CompilerDirectingDescriptor] = &[
         id: "trace",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0009",
         label: "READY or RESET TRACE statement",
-        source_locator: "pdf-page:737;outline:READY or RESET TRACE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlcdsrea.html;topic-id:statements-ready-reset-trace-statement;heading:READY or RESET TRACE statement",
         forms: &["READY TRACE .", "RESET TRACE ."],
         placement: "procedure-division",
         effect: "syntax-only",
@@ -699,7 +699,7 @@ pub static COMPILER_DIRECTING_STATEMENTS: &[CompilerDirectingDescriptor] = &[
         id: "replace",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0010",
         label: "REPLACE statement",
-        source_locator: "pdf-page:738;outline:REPLACE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlcdsrps.html;topic-id:statements-replace-statement;heading:REPLACE statement",
         forms: &["REPLACE replacement-pairs .", "REPLACE OFF ."],
         placement: "character-string-boundary",
         effect: "source-replacement",
@@ -709,7 +709,7 @@ pub static COMPILER_DIRECTING_STATEMENTS: &[CompilerDirectingDescriptor] = &[
         id: "service-label",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0011",
         label: "SERVICE LABEL statement",
-        source_locator: "pdf-page:741;outline:SERVICE LABEL statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlcdssvc.html;topic-id:statements-service-label-statement;heading:SERVICE LABEL statement",
         forms: &["SERVICE LABEL"],
         placement: "procedure-division-nondeclarative",
         effect: "control-flow-marker",
@@ -719,7 +719,7 @@ pub static COMPILER_DIRECTING_STATEMENTS: &[CompilerDirectingDescriptor] = &[
         id: "service-reload",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0012",
         label: "SERVICE RELOAD statement",
-        source_locator: "pdf-page:742;outline:SERVICE RELOAD statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlcdsser.html;topic-id:statements-service-reload-statement;heading:SERVICE RELOAD statement",
         forms: &["SERVICE RELOAD identifier"],
         placement: "procedure-division",
         effect: "syntax-only",
@@ -729,7 +729,7 @@ pub static COMPILER_DIRECTING_STATEMENTS: &[CompilerDirectingDescriptor] = &[
         id: "skip",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0013",
         label: "SKIP statements",
-        source_locator: "pdf-page:742;outline:SKIP statements",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlcdsski.html;topic-id:statements-skip;heading:SKIP statements",
         forms: &["SKIP1 [.]", "SKIP2 [.]", "SKIP3 [.]"],
         placement: "embedded-line-only",
         effect: "listing-control",
@@ -739,7 +739,7 @@ pub static COMPILER_DIRECTING_STATEMENTS: &[CompilerDirectingDescriptor] = &[
         id: "title",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0014",
         label: "TITLE statement",
-        source_locator: "pdf-page:742;outline:TITLE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlcdstit.html;topic-id:statements-title-statement;heading:TITLE statement",
         forms: &["TITLE literal [.]"],
         placement: "embedded-line-only",
         effect: "listing-control",
@@ -749,7 +749,7 @@ pub static COMPILER_DIRECTING_STATEMENTS: &[CompilerDirectingDescriptor] = &[
         id: "use",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0015",
         label: "USE statement",
-        source_locator: "pdf-page:743;outline:USE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlcdsuse.html;topic-id:statements-use-statement;heading:USE statement",
         forms: &[
             "USE [GLOBAL] AFTER [STANDARD] EXCEPTION|ERROR PROCEDURE ON targets",
             "USE FOR DEBUGGING ON procedures",
@@ -765,7 +765,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "accept",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0001",
         label: "ACCEPT statement",
-        source_locator: "pdf-page:339;outline:ACCEPT statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsacce.html;topic-id:statements-accept-statement;heading:ACCEPT statement",
         forms: &[
             "ACCEPT identifier [FROM source] [ON EXCEPTION statements] [NOT ON EXCEPTION statements] [END-ACCEPT]",
         ],
@@ -776,7 +776,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "add",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0002",
         label: "ADD statement",
-        source_locator: "pdf-page:343;outline:ADD statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsadd.html;topic-id:statements-add-statement;heading:ADD statement",
         forms: &[
             "ADD operands TO targets [GIVING targets] [ROUNDED] [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-ADD]",
             "ADD operands GIVING targets [ROUNDED] [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-ADD]",
@@ -800,7 +800,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "allocate",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0003",
         label: "ALLOCATE statement",
-        source_locator: "pdf-page:345;outline:ALLOCATE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsallo.html;topic-id:statements-allocate-statement;heading:ALLOCATE statement",
         forms: &["ALLOCATE target [CHARACTERS] [INITIALIZED] [RETURNING pointer]"],
         grammar_keywords: &["ALLOCATE", "CHARACTERS", "INITIALIZED", "RETURNING"],
     },
@@ -809,7 +809,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "alter",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0004",
         label: "ALTER statement",
-        source_locator: "pdf-page:350;outline:ALTER statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsalte.html;topic-id:statements-alter-statement;heading:ALTER statement",
         forms: &["ALTER procedure TO [PROCEED TO] procedure"],
         grammar_keywords: &["ALTER", "PROCEED", "TO"],
     },
@@ -818,7 +818,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "call",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0005",
         label: "CALL statement",
-        source_locator: "pdf-page:351;outline:CALL statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpscall.html;topic-id:statements-call-statement;heading:CALL statement",
         forms: &[
             "CALL target [USING arguments] [RETURNING item] [ON EXCEPTION statements] [END-CALL]",
         ],
@@ -829,7 +829,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "cancel",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0006",
         label: "CANCEL statement",
-        source_locator: "pdf-page:359;outline:CANCEL statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpscanc.html;topic-id:statements-cancel-statement;heading:CANCEL statement",
         forms: &["CANCEL target..."],
         grammar_keywords: &["CANCEL"],
     },
@@ -838,7 +838,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "close",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0007",
         label: "CLOSE statement",
-        source_locator: "pdf-page:360;outline:CLOSE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsclos.html;topic-id:statements-close-statement;heading:CLOSE statement",
         forms: &[
             "CLOSE file-name [REEL|UNIT] [WITH NO REWIND|FOR REMOVAL] ...",
             "CLOSE file-name [WITH LOCK] ...",
@@ -852,7 +852,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "compute",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0008",
         label: "COMPUTE statement",
-        source_locator: "pdf-page:363;outline:COMPUTE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpscomp.html;topic-id:statements-compute-statement;heading:COMPUTE statement",
         forms: &["COMPUTE target [ROUNDED] = expression [ON SIZE ERROR statements] [END-COMPUTE]"],
         grammar_keywords: &["COMPUTE", "END-COMPUTE", "ERROR", "ON", "ROUNDED", "SIZE"],
     },
@@ -861,7 +861,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "continue",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0009",
         label: "CONTINUE statement",
-        source_locator: "pdf-page:364;outline:CONTINUE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpscont.html;topic-id:statements-continue-statement;heading:CONTINUE statement",
         forms: &["CONTINUE"],
         grammar_keywords: &["CONTINUE"],
     },
@@ -870,7 +870,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "delete",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0010",
         label: "DELETE statement",
-        source_locator: "pdf-page:364;outline:DELETE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsdele.html;topic-id:statements-delete-statement;heading:DELETE statement",
         forms: &["DELETE file-name RECORD [INVALID KEY statements] [END-DELETE]"],
         grammar_keywords: &["DELETE", "END-DELETE", "INVALID", "KEY", "RECORD"],
     },
@@ -879,7 +879,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "display",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0011",
         label: "DISPLAY statement",
-        source_locator: "pdf-page:366;outline:DISPLAY statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsdisp.html;topic-id:statements-display-statement;heading:DISPLAY statement",
         forms: &["DISPLAY operands [UPON target] [WITH NO ADVANCING]"],
         grammar_keywords: &["ADVANCING", "DISPLAY", "NO", "UPON", "WITH"],
     },
@@ -888,7 +888,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "divide",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0012",
         label: "DIVIDE statement",
-        source_locator: "pdf-page:368;outline:DIVIDE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsdivi.html;topic-id:statements-divide-statement;heading:DIVIDE statement",
         forms: &[
             "DIVIDE operand INTO|BY target [GIVING target] [REMAINDER target] [ROUNDED] [ON SIZE ERROR statements] [END-DIVIDE]",
         ],
@@ -910,7 +910,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "entry",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0013",
         label: "ENTRY statement",
-        source_locator: "pdf-page:371;outline:ENTRY statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsentr.html;topic-id:statements-entry-statement;heading:ENTRY statement",
         forms: &["ENTRY literal [USING arguments]"],
         grammar_keywords: &["ENTRY", "USING"],
     },
@@ -919,7 +919,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "evaluate",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0014",
         label: "EVALUATE statement",
-        source_locator: "pdf-page:372;outline:EVALUATE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpseval.html;topic-id:statements-evaluate-statement;heading:EVALUATE statement",
         forms: &["EVALUATE subjects WHEN objects statements [WHEN OTHER statements] END-EVALUATE"],
         grammar_keywords: &["END-EVALUATE", "EVALUATE", "OTHER", "WHEN"],
     },
@@ -928,7 +928,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "exit",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0015",
         label: "EXIT statement",
-        source_locator: "pdf-page:375;outline:EXIT statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsexit.html;topic-id:statements-exit-statement;heading:EXIT statement",
         forms: &["EXIT [PROGRAM|METHOD|FUNCTION|PERFORM|PARAGRAPH|SECTION]"],
         grammar_keywords: &[
             "EXIT",
@@ -945,7 +945,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "free",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0016",
         label: "FREE statement",
-        source_locator: "pdf-page:378;outline:FREE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsfree.html;topic-id:statements-free-statement;heading:FREE statement",
         forms: &["FREE pointer..."],
         grammar_keywords: &["FREE"],
     },
@@ -954,7 +954,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "goback",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0017",
         label: "GOBACK statement",
-        source_locator: "pdf-page:378;outline:GOBACK statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsgoba.html;topic-id:statements-goback-statement;heading:GOBACK statement",
         forms: &["GOBACK"],
         grammar_keywords: &["GOBACK"],
     },
@@ -963,7 +963,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "go-to",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0018",
         label: "GO TO statement",
-        source_locator: "pdf-page:379;outline:GO TO statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsgoto.html;topic-id:statements-go-statement;heading:GO TO statement",
         forms: &["GO TO procedure [DEPENDING ON identifier]"],
         grammar_keywords: &["DEPENDING", "GO", "ON", "TO"],
     },
@@ -972,7 +972,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "if",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0019",
         label: "IF statement",
-        source_locator: "pdf-page:381;outline:IF statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsif.html;topic-id:statements-if-statement;heading:IF statement",
         forms: &["IF condition statements [ELSE statements] [END-IF]"],
         grammar_keywords: &["ELSE", "END-IF", "IF"],
     },
@@ -981,7 +981,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "initialize",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0020",
         label: "INITIALIZE statement",
-        source_locator: "pdf-page:383;outline:INITIALIZE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsinit.html;topic-id:statements-initialize-statement;heading:INITIALIZE statement",
         forms: &[
             "INITIALIZE targets [WITH FILLER] [REPLACING categories BY values] [THEN TO DEFAULT]",
         ],
@@ -1001,7 +1001,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "inspect",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0021",
         label: "INSPECT statement",
-        source_locator: "pdf-page:386;outline:INSPECT statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsinsp.html;topic-id:statements-inspect-statement;heading:INSPECT statement",
         forms: &["INSPECT identifier TALLYING|REPLACING|CONVERTING operands"],
         grammar_keywords: &["CONVERTING", "INSPECT", "REPLACING", "TALLYING"],
     },
@@ -1010,7 +1010,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "invoke",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0022",
         label: "INVOKE statement",
-        source_locator: "pdf-page:395;outline:INVOKE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsinvo.html;topic-id:statements-invoke-statement;heading:INVOKE statement",
         forms: &["INVOKE target method [USING arguments] [RETURNING item] [END-INVOKE]"],
         grammar_keywords: &["END-INVOKE", "INVOKE", "RETURNING", "USING"],
     },
@@ -1019,7 +1019,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "json-generate",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0023",
         label: "JSON GENERATE statement",
-        source_locator: "pdf-page:402;outline:JSON GENERATE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsjsog.html;topic-id:statements-json-generate-statement;heading:JSON GENERATE statement",
         forms: &[
             "JSON GENERATE receiver FROM source [COUNT IN item] [ON EXCEPTION statements] [END-JSON]",
         ],
@@ -1039,7 +1039,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "json-parse",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
         label: "JSON PARSE statement",
-        source_locator: "pdf-page:416;outline:JSON PARSE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsjsop.html;topic-id:statements-json-parse-statement;heading:JSON PARSE statement",
         forms: &[
             "JSON PARSE source INTO target [WITH DETAIL] [ON EXCEPTION statements] [END-JSON]",
         ],
@@ -1059,7 +1059,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "merge",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0025",
         label: "MERGE statement",
-        source_locator: "pdf-page:433;outline:MERGE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsmerg.html;topic-id:statements-merge-statement;heading:MERGE statement",
         forms: &["MERGE file ON keys USING files GIVING files"],
         grammar_keywords: &["GIVING", "MERGE", "ON", "USING"],
     },
@@ -1068,7 +1068,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "move",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0026",
         label: "MOVE statement",
-        source_locator: "pdf-page:437;outline:MOVE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsmove.html;topic-id:statements-move-statement;heading:MOVE statement",
         forms: &["MOVE [CORRESPONDING] source TO targets"],
         grammar_keywords: &["CORRESPONDING", "MOVE", "TO"],
     },
@@ -1077,7 +1077,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "multiply",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0027",
         label: "MULTIPLY statement",
-        source_locator: "pdf-page:443;outline:MULTIPLY statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsmult.html;topic-id:statements-multiply-statement;heading:MULTIPLY statement",
         forms: &[
             "MULTIPLY operand BY target [GIVING target] [ROUNDED] [ON SIZE ERROR statements] [END-MULTIPLY]",
         ],
@@ -1097,7 +1097,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "open",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0028",
         label: "OPEN statement",
-        source_locator: "pdf-page:445;outline:OPEN statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsopen.html;topic-id:statements-open-statement;heading:OPEN statement",
         forms: &["OPEN INPUT|OUTPUT|I-O|EXTEND file..."],
         grammar_keywords: &["EXTEND", "I-O", "INPUT", "OPEN", "OUTPUT"],
     },
@@ -1106,7 +1106,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "perform",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0029",
         label: "PERFORM statement",
-        source_locator: "pdf-page:449;outline:PERFORM statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsperf.html;topic-id:statements-perform-statement;heading:PERFORM statement",
         forms: &[
             "PERFORM procedure [THROUGH procedure] [TIMES|UNTIL|VARYING]",
             "PERFORM [WITH TEST] UNTIL|VARYING statements END-PERFORM",
@@ -1127,7 +1127,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "read",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0030",
         label: "READ statement",
-        source_locator: "pdf-page:461;outline:READ statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsread.html;topic-id:statements-read-statement;heading:READ statement",
         forms: &[
             "READ file [NEXT|PREVIOUS RECORD] [INTO item] [WITH LOCK|WITH KEPT LOCK|WITH NO LOCK|IGNORE LOCK] [WAIT|NO WAIT] [AT END statements] [NOT AT END statements] [END-READ]",
             "READ file [RECORD] [INTO item] [KEY IS data] [WITH LOCK|WITH KEPT LOCK|WITH NO LOCK|IGNORE LOCK] [WAIT|NO WAIT] [INVALID KEY statements] [NOT INVALID KEY statements] [END-READ]",
@@ -1142,7 +1142,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "release",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0031",
         label: "RELEASE statement",
-        source_locator: "pdf-page:466;outline:RELEASE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsrele.html;topic-id:statements-release-statement;heading:RELEASE statement",
         forms: &["RELEASE record [FROM identifier]"],
         grammar_keywords: &["FROM", "RELEASE"],
     },
@@ -1151,7 +1151,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "return",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0032",
         label: "RETURN statement",
-        source_locator: "pdf-page:467;outline:RETURN statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsretu.html;topic-id:statements-return-statement;heading:RETURN statement",
         forms: &["RETURN sort-file RECORD [INTO item] [AT END statements] [END-RETURN]"],
         grammar_keywords: &["AT", "END", "END-RETURN", "INTO", "RECORD", "RETURN"],
     },
@@ -1160,7 +1160,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "rewrite",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0033",
         label: "REWRITE statement",
-        source_locator: "pdf-page:469;outline:REWRITE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsrewr.html;topic-id:statements-rewrite-statement;heading:REWRITE statement",
         forms: &["REWRITE record [FROM identifier] [INVALID KEY statements] [END-REWRITE]"],
         grammar_keywords: &["END-REWRITE", "FROM", "INVALID", "KEY", "REWRITE"],
     },
@@ -1169,7 +1169,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "search",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0034",
         label: "SEARCH statement",
-        source_locator: "pdf-page:471;outline:SEARCH statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpssear.html;topic-id:statements-search-statement;heading:SEARCH statement",
         forms: &[
             "SEARCH [ALL] table [VARYING index] [AT END statements] WHEN condition statements END-SEARCH",
         ],
@@ -1188,7 +1188,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "set",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0035",
         label: "SET statement",
-        source_locator: "pdf-page:477;outline:SET statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsset.html;topic-id:statements-set-statement;heading:SET statement",
         forms: &["SET targets TO|UP BY|DOWN BY value"],
         grammar_keywords: &["BY", "DOWN", "SET", "TO", "UP"],
     },
@@ -1197,7 +1197,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "sort",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0036",
         label: "SORT statement",
-        source_locator: "pdf-page:484;outline:SORT statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpssort.html;topic-id:statements-sort-statement;heading:SORT statement",
         forms: &["SORT file ON keys USING|INPUT PROCEDURE GIVING|OUTPUT PROCEDURE files"],
         grammar_keywords: &[
             "GIVING",
@@ -1214,7 +1214,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "start",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0037",
         label: "START statement",
-        source_locator: "pdf-page:492;outline:START statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsstar.html;topic-id:statements-start-statement;heading:START statement",
         forms: &["START file [KEY IS relation data] [INVALID KEY statements] [END-START]"],
         grammar_keywords: &["END-START", "INVALID", "IS", "KEY", "START"],
     },
@@ -1223,7 +1223,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "stop",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0038",
         label: "STOP statement",
-        source_locator: "pdf-page:494;outline:STOP statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsstop.html;topic-id:statements-stop-statement;heading:STOP statement",
         forms: &["STOP RUN [RETURNING value]"],
         grammar_keywords: &["RETURNING", "RUN", "STOP"],
     },
@@ -1232,7 +1232,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "string",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0039",
         label: "STRING statement",
-        source_locator: "pdf-page:494;outline:STRING statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsstri.html;topic-id:statements-string-statement;heading:STRING statement",
         forms: &[
             "STRING senders DELIMITED BY values INTO target [WITH POINTER item] [ON OVERFLOW statements] [END-STRING]",
         ],
@@ -1253,7 +1253,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "subtract",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0040",
         label: "SUBTRACT statement",
-        source_locator: "pdf-page:499;outline:SUBTRACT statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpssubt.html;topic-id:statements-subtract-statement;heading:SUBTRACT statement",
         forms: &[
             "SUBTRACT operands FROM target [GIVING target] [ROUNDED] [ON SIZE ERROR statements] [END-SUBTRACT]",
         ],
@@ -1273,7 +1273,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "unstring",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0041",
         label: "UNSTRING statement",
-        source_locator: "pdf-page:502;outline:UNSTRING statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsunst.html;topic-id:statements-unstring-statement;heading:UNSTRING statement",
         forms: &[
             "UNSTRING source DELIMITED BY values INTO targets [WITH POINTER item] [TALLYING IN item] [ON OVERFLOW statements] [END-UNSTRING]",
         ],
@@ -1296,7 +1296,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "write",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0042",
         label: "WRITE statement",
-        source_locator: "pdf-page:508;outline:WRITE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpswrit.html;topic-id:statements-write-statement;heading:WRITE statement",
         forms: &[
             "WRITE record [FROM identifier] [AFTER|BEFORE ADVANCING] [AT END-OF-PAGE statements] [INVALID KEY statements] [END-WRITE]",
         ],
@@ -1318,7 +1318,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "xml-generate",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0043",
         label: "XML GENERATE statement",
-        source_locator: "pdf-page:516;outline:XML GENERATE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsxmlg.html;topic-id:statements-xml-generate-statement;heading:XML GENERATE statement",
         forms: &[
             "XML GENERATE receiver FROM source [COUNT IN item] [ON EXCEPTION statements] [END-XML]",
         ],
@@ -1338,7 +1338,7 @@ pub static PROCEDURE_STATEMENTS: &[ProcedureStatementDescriptor] = &[
         id: "xml-parse",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044",
         label: "XML PARSE statement",
-        source_locator: "pdf-page:526;outline:XML PARSE statement",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlpsxmlp.html;topic-id:statements-xml-parse-statement;heading:XML PARSE statement",
         forms: &[
             "XML PARSE source PROCESSING PROCEDURE procedure [THROUGH procedure] [ON EXCEPTION statements] [END-XML]",
         ],
@@ -1361,7 +1361,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "abs",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0001",
         name: "ABS",
-        source_locator: "pdf-page:555;outline:Chapter 31. ABS",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfabs.html;topic-id:functions-abs;heading:Chapter 31. ABS",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Numeric]],
             variadic: false,
@@ -1377,7 +1377,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "acos",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0002",
         name: "ACOS",
-        source_locator: "pdf-page:557;outline:Chapter 32. ACOS",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfaco.html;topic-id:functions-acos;heading:Chapter 32. ACOS",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Numeric]],
             variadic: false,
@@ -1393,7 +1393,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "annuity",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0003",
         name: "ANNUITY",
-        source_locator: "pdf-page:559;outline:Chapter 33. ANNUITY",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfann.html;topic-id:functions-annuity;heading:Chapter 33. ANNUITY",
         signatures: &[IntrinsicSignature {
             arguments: &[
                 &[IntrinsicArgumentClass::Numeric],
@@ -1412,7 +1412,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "asin",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0004",
         name: "ASIN",
-        source_locator: "pdf-page:561;outline:Chapter 34. ASIN",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfasi.html;topic-id:functions-asin;heading:Chapter 34. ASIN",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Numeric]],
             variadic: false,
@@ -1428,7 +1428,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "atan",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0005",
         name: "ATAN",
-        source_locator: "pdf-page:563;outline:Chapter 35. ATAN",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfata.html;topic-id:functions-atan;heading:Chapter 35. ATAN",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Numeric]],
             variadic: false,
@@ -1444,7 +1444,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "bit-of",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0006",
         name: "BIT-OF",
-        source_locator: "pdf-page:565;outline:Chapter 36. BIT-OF",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfbit.html;topic-id:functions-bit;heading:Chapter 36. BIT-OF",
         signatures: &[IntrinsicSignature {
             arguments: &[&[
                 IntrinsicArgumentClass::Alphabetic,
@@ -1469,7 +1469,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "bit-to-char",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0007",
         name: "BIT-TO-CHAR",
-        source_locator: "pdf-page:567;outline:Chapter 37. BIT-TO-CHAR",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfbitc.html;topic-id:functions-bit-char;heading:Chapter 37. BIT-TO-CHAR",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Alphanumeric]],
             variadic: false,
@@ -1485,7 +1485,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "byte-length",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0008",
         name: "BYTE-LENGTH",
-        source_locator: "pdf-page:569;outline:Chapter 38. BYTE-LENGTH",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfbyte.html;topic-id:functions-byte-length;heading:Chapter 38. BYTE-LENGTH",
         signatures: &[IntrinsicSignature {
             arguments: &[&[
                 IntrinsicArgumentClass::Alphabetic,
@@ -1509,7 +1509,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "char",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0009",
         name: "CHAR",
-        source_locator: "pdf-page:571;outline:Chapter 39. CHAR",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfcha.html;topic-id:functions-char;heading:Chapter 39. CHAR",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Integer]],
             variadic: false,
@@ -1525,7 +1525,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "combined-datetime",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0010",
         name: "COMBINED-DATETIME",
-        source_locator: "pdf-page:573;outline:Chapter 40. COMBINED-DATETIME",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfcdt.html;topic-id:functions-combined-datetime;heading:Chapter 40. COMBINED-DATETIME",
         signatures: &[IntrinsicSignature {
             arguments: &[
                 &[IntrinsicArgumentClass::Integer],
@@ -1544,7 +1544,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "content-of",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0011",
         name: "CONTENT-OF",
-        source_locator: "pdf-page:575;outline:Chapter 41. CONTENT-OF",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfcont.html;topic-id:functions-content;heading:Chapter 41. CONTENT-OF",
         signatures: &[IntrinsicSignature {
             arguments: &[&[
                 IntrinsicArgumentClass::Alphabetic,
@@ -1567,7 +1567,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "cos",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0012",
         name: "COS",
-        source_locator: "pdf-page:577;outline:Chapter 42. COS",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfcos.html;topic-id:functions-cos;heading:Chapter 42. COS",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Numeric]],
             variadic: false,
@@ -1583,7 +1583,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "current-date",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0013",
         name: "CURRENT-DATE",
-        source_locator: "pdf-page:579;outline:Chapter 43. CURRENT-DATE",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfcur.html;topic-id:functions-current-date;heading:Chapter 43. CURRENT-DATE",
         signatures: &[IntrinsicSignature {
             arguments: &[],
             variadic: false,
@@ -1599,7 +1599,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "date-of-integer",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0014",
         name: "DATE-OF-INTEGER",
-        source_locator: "pdf-page:581;outline:Chapter 44. DATE-OF-INTEGER",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfdi.html;topic-id:functions-date-integer;heading:Chapter 44. DATE-OF-INTEGER",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Integer]],
             variadic: false,
@@ -1615,7 +1615,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "date-to-yyyymmdd",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0015",
         name: "DATE-TO-YYYYMMDD",
-        source_locator: "pdf-page:583;outline:Chapter 45. DATE-TO-YYYYMMDD",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfdy.html;topic-id:functions-date-yyyymmdd;heading:Chapter 45. DATE-TO-YYYYMMDD",
         signatures: &[
             IntrinsicSignature {
                 arguments: &[&[IntrinsicArgumentClass::Integer]],
@@ -1642,7 +1642,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "day-of-integer",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0016",
         name: "DAY-OF-INTEGER",
-        source_locator: "pdf-page:585;outline:Chapter 46. DAY-OF-INTEGER",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfdai.html;topic-id:functions-day-integer;heading:Chapter 46. DAY-OF-INTEGER",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Integer]],
             variadic: false,
@@ -1658,7 +1658,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "day-to-yyyyddd",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0017",
         name: "DAY-TO-YYYYDDD",
-        source_locator: "pdf-page:587;outline:Chapter 47. DAY-TO-YYYYDDD",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfdad.html;topic-id:functions-day-yyyyddd;heading:Chapter 47. DAY-TO-YYYYDDD",
         signatures: &[
             IntrinsicSignature {
                 arguments: &[&[IntrinsicArgumentClass::Integer]],
@@ -1685,7 +1685,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "display-of",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0018",
         name: "DISPLAY-OF",
-        source_locator: "pdf-page:589;outline:Chapter 48. DISPLAY-OF",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfdis.html;topic-id:functions-display;heading:Chapter 48. DISPLAY-OF",
         signatures: &[
             IntrinsicSignature {
                 arguments: &[&[
@@ -1718,7 +1718,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "e",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0019",
         name: "E",
-        source_locator: "pdf-page:591;outline:Chapter 49. E",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfe.html;topic-id:functions-e;heading:Chapter 49. E",
         signatures: &[IntrinsicSignature {
             arguments: &[],
             variadic: false,
@@ -1734,7 +1734,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "exp",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0020",
         name: "EXP",
-        source_locator: "pdf-page:593;outline:Chapter 50. EXP",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfexp.html;topic-id:functions-exp;heading:Chapter 50. EXP",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Numeric]],
             variadic: false,
@@ -1750,7 +1750,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "exp10",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0021",
         name: "EXP10",
-        source_locator: "pdf-page:595;outline:Chapter 51. EXP10",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfexp10.html;topic-id:functions-exp10;heading:Chapter 51. EXP10",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Numeric]],
             variadic: false,
@@ -1766,7 +1766,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "factorial",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0022",
         name: "FACTORIAL",
-        source_locator: "pdf-page:597;outline:Chapter 52. FACTORIAL",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinffac.html;topic-id:functions-factorial;heading:Chapter 52. FACTORIAL",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Integer]],
             variadic: false,
@@ -1782,7 +1782,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "formatted-current-date",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0023",
         name: "FORMATTED-CURRENT-DATE",
-        source_locator: "pdf-page:599;outline:Chapter 53. FORMATTED-CURRENT-DATE",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinffcd.html;topic-id:functions-formatted-current-date;heading:Chapter 53. FORMATTED-CURRENT-DATE",
         signatures: &[IntrinsicSignature {
             arguments: &[&[
                 IntrinsicArgumentClass::Alphanumeric,
@@ -1802,7 +1802,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "formatted-date",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0024",
         name: "FORMATTED-DATE",
-        source_locator: "pdf-page:601;outline:Chapter 54. FORMATTED-DATE",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinffdt.html;topic-id:functions-formatted-date;heading:Chapter 54. FORMATTED-DATE",
         signatures: &[IntrinsicSignature {
             arguments: &[
                 &[
@@ -1825,7 +1825,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "formatted-datetime",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0025",
         name: "FORMATTED-DATETIME",
-        source_locator: "pdf-page:603;outline:Chapter 55. FORMATTED-DATETIME",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinffdtt.html;topic-id:functions-formatted-datetime;heading:Chapter 55. FORMATTED-DATETIME",
         signatures: &[
             IntrinsicSignature {
                 arguments: &[
@@ -1866,7 +1866,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "formatted-time",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0026",
         name: "FORMATTED-TIME",
-        source_locator: "pdf-page:605;outline:Chapter 56. FORMATTED-TIME",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfftime.html;topic-id:functions-formatted-time;heading:Chapter 56. FORMATTED-TIME",
         signatures: &[
             IntrinsicSignature {
                 arguments: &[
@@ -1905,7 +1905,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "hex-of",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0027",
         name: "HEX-OF",
-        source_locator: "pdf-page:607;outline:Chapter 57. HEX-OF",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfhex.html;topic-id:functions-hex;heading:Chapter 57. HEX-OF",
         signatures: &[IntrinsicSignature {
             arguments: &[&[
                 IntrinsicArgumentClass::Alphabetic,
@@ -1930,7 +1930,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "hex-to-char",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0028",
         name: "HEX-TO-CHAR",
-        source_locator: "pdf-page:609;outline:Chapter 58. HEX-TO-CHAR",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfhextc.html;topic-id:functions-hex-char;heading:Chapter 58. HEX-TO-CHAR",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Alphanumeric]],
             variadic: false,
@@ -1946,7 +1946,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "integer",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0029",
         name: "INTEGER",
-        source_locator: "pdf-page:611;outline:Chapter 59. INTEGER",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfint.html;topic-id:functions-integer;heading:Chapter 59. INTEGER",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Numeric]],
             variadic: false,
@@ -1962,7 +1962,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "integer-of-date",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0030",
         name: "INTEGER-OF-DATE",
-        source_locator: "pdf-page:613;outline:Chapter 60. INTEGER-OF-DATE",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfidt.html;topic-id:functions-integer-date;heading:Chapter 60. INTEGER-OF-DATE",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Integer]],
             variadic: false,
@@ -1978,7 +1978,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "integer-of-day",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0031",
         name: "INTEGER-OF-DAY",
-        source_locator: "pdf-page:615;outline:Chapter 61. INTEGER-OF-DAY",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfida.html;topic-id:functions-integer-day;heading:Chapter 61. INTEGER-OF-DAY",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Integer]],
             variadic: false,
@@ -1994,7 +1994,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "integer-of-formatted-date",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0032",
         name: "INTEGER-OF-FORMATTED-DATE",
-        source_locator: "pdf-page:617;outline:Chapter 62. INTEGER-OF-FORMATTED-DATE",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfiformatted.html;topic-id:functions-integer-formatted-date;heading:Chapter 62. INTEGER-OF-FORMATTED-DATE",
         signatures: &[IntrinsicSignature {
             arguments: &[
                 &[
@@ -2021,7 +2021,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "integer-part",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0033",
         name: "INTEGER-PART",
-        source_locator: "pdf-page:619;outline:Chapter 63. INTEGER-PART",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfipa.html;topic-id:functions-integer-part;heading:Chapter 63. INTEGER-PART",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Numeric]],
             variadic: false,
@@ -2037,7 +2037,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "length",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0034",
         name: "LENGTH",
-        source_locator: "pdf-page:621;outline:Chapter 64. LENGTH",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinflen.html;topic-id:functions-length;heading:Chapter 64. LENGTH",
         signatures: &[IntrinsicSignature {
             arguments: &[&[
                 IntrinsicArgumentClass::Alphabetic,
@@ -2060,7 +2060,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "log",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0035",
         name: "LOG",
-        source_locator: "pdf-page:623;outline:Chapter 65. LOG",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinflog.html;topic-id:functions-log;heading:Chapter 65. LOG",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Numeric]],
             variadic: false,
@@ -2076,7 +2076,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "log10",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0036",
         name: "LOG10",
-        source_locator: "pdf-page:625;outline:Chapter 66. LOG10",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfl10.html;topic-id:functions-log10;heading:Chapter 66. LOG10",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Numeric]],
             variadic: false,
@@ -2092,7 +2092,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "lower-case",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0037",
         name: "LOWER-CASE",
-        source_locator: "pdf-page:627;outline:Chapter 67. LOWER-CASE",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinflow.html;topic-id:functions-lower-case;heading:Chapter 67. LOWER-CASE",
         signatures: &[IntrinsicSignature {
             arguments: &[&[
                 IntrinsicArgumentClass::Alphabetic,
@@ -2113,7 +2113,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "max",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0038",
         name: "MAX",
-        source_locator: "pdf-page:629;outline:Chapter 68. MAX",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfmax.html;topic-id:functions-max;heading:Chapter 68. MAX",
         signatures: &[IntrinsicSignature {
             arguments: &[&[
                 IntrinsicArgumentClass::Alphabetic,
@@ -2135,7 +2135,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "mean",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0039",
         name: "MEAN",
-        source_locator: "pdf-page:631;outline:Chapter 69. MEAN",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfmea.html;topic-id:functions-mean;heading:Chapter 69. MEAN",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Numeric]],
             variadic: true,
@@ -2151,7 +2151,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "median",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0040",
         name: "MEDIAN",
-        source_locator: "pdf-page:633;outline:Chapter 70. MEDIAN",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfmed.html;topic-id:functions-median;heading:Chapter 70. MEDIAN",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Numeric]],
             variadic: true,
@@ -2167,7 +2167,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "midrange",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0041",
         name: "MIDRANGE",
-        source_locator: "pdf-page:635;outline:Chapter 71. MIDRANGE",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfmid.html;topic-id:functions-midrange;heading:Chapter 71. MIDRANGE",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Numeric]],
             variadic: true,
@@ -2183,7 +2183,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "min",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0042",
         name: "MIN",
-        source_locator: "pdf-page:637;outline:Chapter 72. MIN",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfmin.html;topic-id:functions-min;heading:Chapter 72. MIN",
         signatures: &[IntrinsicSignature {
             arguments: &[&[
                 IntrinsicArgumentClass::Alphabetic,
@@ -2205,7 +2205,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "mod",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0043",
         name: "MOD",
-        source_locator: "pdf-page:639;outline:Chapter 73. MOD",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfmod.html;topic-id:functions-mod;heading:Chapter 73. MOD",
         signatures: &[IntrinsicSignature {
             arguments: &[
                 &[IntrinsicArgumentClass::Integer],
@@ -2224,7 +2224,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "national-of",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0044",
         name: "NATIONAL-OF",
-        source_locator: "pdf-page:641;outline:Chapter 74. NATIONAL-OF",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfnat.html;topic-id:functions-national;heading:Chapter 74. NATIONAL-OF",
         signatures: &[
             IntrinsicSignature {
                 arguments: &[&[
@@ -2261,7 +2261,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "numval",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0045",
         name: "NUMVAL",
-        source_locator: "pdf-page:643;outline:Chapter 75. NUMVAL",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfnv.html;topic-id:functions-numval;heading:Chapter 75. NUMVAL",
         signatures: &[IntrinsicSignature {
             arguments: &[&[
                 IntrinsicArgumentClass::Alphanumeric,
@@ -2280,7 +2280,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "numval-c",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0046",
         name: "NUMVAL-C",
-        source_locator: "pdf-page:645;outline:Chapter 76. NUMVAL-C",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfnvc.html;topic-id:functions-numval-c;heading:Chapter 76. NUMVAL-C",
         signatures: &[
             IntrinsicSignature {
                 arguments: &[&[
@@ -2316,7 +2316,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "numval-f",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0047",
         name: "NUMVAL-F",
-        source_locator: "pdf-page:647;outline:Chapter 77. NUMVAL-F",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfnumvalf.html;topic-id:functions-numval-f;heading:Chapter 77. NUMVAL-F",
         signatures: &[IntrinsicSignature {
             arguments: &[&[
                 IntrinsicArgumentClass::Alphanumeric,
@@ -2335,7 +2335,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "ord",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0048",
         name: "ORD",
-        source_locator: "pdf-page:649;outline:Chapter 78. ORD",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinford.html;topic-id:functions-ord;heading:Chapter 78. ORD",
         signatures: &[IntrinsicSignature {
             arguments: &[&[
                 IntrinsicArgumentClass::Alphabetic,
@@ -2354,7 +2354,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "ord-max",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0049",
         name: "ORD-MAX",
-        source_locator: "pdf-page:651;outline:Chapter 79. ORD-MAX",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfoma.html;topic-id:functions-ord-max;heading:Chapter 79. ORD-MAX",
         signatures: &[IntrinsicSignature {
             arguments: &[&[
                 IntrinsicArgumentClass::Alphabetic,
@@ -2375,7 +2375,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "ord-min",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0050",
         name: "ORD-MIN",
-        source_locator: "pdf-page:653;outline:Chapter 80. ORD-MIN",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfomi.html;topic-id:functions-ord-min;heading:Chapter 80. ORD-MIN",
         signatures: &[IntrinsicSignature {
             arguments: &[&[
                 IntrinsicArgumentClass::Alphabetic,
@@ -2396,7 +2396,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "pi",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0051",
         name: "PI",
-        source_locator: "pdf-page:655;outline:Chapter 81. PI",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfpi.html;topic-id:functions-pi;heading:Chapter 81. PI",
         signatures: &[IntrinsicSignature {
             arguments: &[],
             variadic: false,
@@ -2412,7 +2412,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "present-value",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0052",
         name: "PRESENT-VALUE",
-        source_locator: "pdf-page:657;outline:Chapter 82. PRESENT-VALUE",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfpre.html;topic-id:functions-present-value;heading:Chapter 82. PRESENT-VALUE",
         signatures: &[IntrinsicSignature {
             arguments: &[
                 &[IntrinsicArgumentClass::Numeric],
@@ -2431,7 +2431,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "random",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0053",
         name: "RANDOM",
-        source_locator: "pdf-page:659;outline:Chapter 83. RANDOM",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfrnd.html;topic-id:functions-random;heading:Chapter 83. RANDOM",
         signatures: &[
             IntrinsicSignature {
                 arguments: &[],
@@ -2455,7 +2455,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "range",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0054",
         name: "RANGE",
-        source_locator: "pdf-page:661;outline:Chapter 84. RANGE",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfran.html;topic-id:functions-range;heading:Chapter 84. RANGE",
         signatures: &[IntrinsicSignature {
             arguments: &[&[
                 IntrinsicArgumentClass::Integer,
@@ -2474,7 +2474,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "rem",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0055",
         name: "REM",
-        source_locator: "pdf-page:663;outline:Chapter 85. REM",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfrem.html;topic-id:functions-rem;heading:Chapter 85. REM",
         signatures: &[IntrinsicSignature {
             arguments: &[
                 &[IntrinsicArgumentClass::Numeric],
@@ -2493,7 +2493,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "reverse",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0056",
         name: "REVERSE",
-        source_locator: "pdf-page:665;outline:Chapter 86. REVERSE",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfrev.html;topic-id:functions-reverse;heading:Chapter 86. REVERSE",
         signatures: &[IntrinsicSignature {
             arguments: &[&[
                 IntrinsicArgumentClass::Alphabetic,
@@ -2513,7 +2513,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "seconds-from-formatted-time",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0057",
         name: "SECONDS-FROM-FORMATTED-TIME",
-        source_locator: "pdf-page:667;outline:Chapter 87. SECONDS-FROM-FORMATTED-TIME",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfsecfrom.html;topic-id:functions-seconds-from-formatted-time;heading:Chapter 87. SECONDS-FROM-FORMATTED-TIME",
         signatures: &[IntrinsicSignature {
             arguments: &[
                 &[
@@ -2540,7 +2540,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "seconds-past-midnight",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0058",
         name: "SECONDS-PAST-MIDNIGHT",
-        source_locator: "pdf-page:669;outline:Chapter 88. SECONDS-PAST-MIDNIGHT",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfsecpstmn.html;topic-id:functions-seconds-past-midnight;heading:Chapter 88. SECONDS-PAST-MIDNIGHT",
         signatures: &[IntrinsicSignature {
             arguments: &[],
             variadic: false,
@@ -2556,7 +2556,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "sign",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0059",
         name: "SIGN",
-        source_locator: "pdf-page:671;outline:Chapter 89. SIGN",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfsign.html;topic-id:functions-sign;heading:Chapter 89. SIGN",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Numeric]],
             variadic: false,
@@ -2572,7 +2572,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "sin",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0060",
         name: "SIN",
-        source_locator: "pdf-page:673;outline:Chapter 90. SIN",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfsin.html;topic-id:functions-sin;heading:Chapter 90. SIN",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Numeric]],
             variadic: false,
@@ -2588,7 +2588,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "sqrt",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0061",
         name: "SQRT",
-        source_locator: "pdf-page:675;outline:Chapter 91. SQRT",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfsqr.html;topic-id:functions-sqrt;heading:Chapter 91. SQRT",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Numeric]],
             variadic: false,
@@ -2604,7 +2604,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "standard-deviation",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0062",
         name: "STANDARD-DEVIATION",
-        source_locator: "pdf-page:677;outline:Chapter 92. STANDARD-DEVIATION",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfsta.html;topic-id:functions-standard-deviation;heading:Chapter 92. STANDARD-DEVIATION",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Numeric]],
             variadic: true,
@@ -2620,7 +2620,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "sum",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0063",
         name: "SUM",
-        source_locator: "pdf-page:679;outline:Chapter 93. SUM",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfsum.html;topic-id:functions-sum;heading:Chapter 93. SUM",
         signatures: &[IntrinsicSignature {
             arguments: &[&[
                 IntrinsicArgumentClass::Integer,
@@ -2639,7 +2639,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "tan",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0064",
         name: "TAN",
-        source_locator: "pdf-page:681;outline:Chapter 94. TAN",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinftan.html;topic-id:functions-tan;heading:Chapter 94. TAN",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Numeric]],
             variadic: false,
@@ -2655,7 +2655,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "test-date-yyyymmdd",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0065",
         name: "TEST-DATE-YYYYMMDD",
-        source_locator: "pdf-page:683;outline:Chapter 95. TEST-DATE-YYYYMMDD",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinftestdate.html;topic-id:functions-test-date-yyyymmdd;heading:Chapter 95. TEST-DATE-YYYYMMDD",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Integer]],
             variadic: false,
@@ -2671,7 +2671,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "test-day-yyyyddd",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0066",
         name: "TEST-DAY-YYYYDDD",
-        source_locator: "pdf-page:685;outline:Chapter 96. TEST-DAY-YYYYDDD",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinftestday.html;topic-id:functions-test-day-yyyyddd;heading:Chapter 96. TEST-DAY-YYYYDDD",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Integer]],
             variadic: false,
@@ -2687,7 +2687,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "test-formatted-datetime",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0067",
         name: "TEST-FORMATTED-DATETIME",
-        source_locator: "pdf-page:687;outline:Chapter 97. TEST-FORMATTED-DATETIME",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinftestformatted.html;topic-id:functions-test-formatted-datetime;heading:Chapter 97. TEST-FORMATTED-DATETIME",
         signatures: &[IntrinsicSignature {
             arguments: &[
                 &[
@@ -2714,7 +2714,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "test-numval",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0068",
         name: "TEST-NUMVAL",
-        source_locator: "pdf-page:689;outline:Chapter 98. TEST-NUMVAL",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinftestnumval.html;topic-id:functions-test-numval;heading:Chapter 98. TEST-NUMVAL",
         signatures: &[IntrinsicSignature {
             arguments: &[&[
                 IntrinsicArgumentClass::Alphanumeric,
@@ -2733,7 +2733,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "test-numval-c",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0069",
         name: "TEST-NUMVAL-C",
-        source_locator: "pdf-page:691;outline:Chapter 99. TEST-NUMVAL-C",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinftestnumvalc.html;topic-id:functions-test-numval-c;heading:Chapter 99. TEST-NUMVAL-C",
         signatures: &[
             IntrinsicSignature {
                 arguments: &[&[
@@ -2769,7 +2769,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "test-numval-f",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0070",
         name: "TEST-NUMVAL-F",
-        source_locator: "pdf-page:693;outline:Chapter 100. TEST-NUMVAL-F",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinftestnumvalf.html;topic-id:functions-test-numval-f;heading:Chapter 100. TEST-NUMVAL-F",
         signatures: &[IntrinsicSignature {
             arguments: &[&[
                 IntrinsicArgumentClass::Alphanumeric,
@@ -2788,7 +2788,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "trim",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0071",
         name: "TRIM",
-        source_locator: "pdf-page:695;outline:Chapter 101. TRIM",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinftrim.html;topic-id:functions-trim;heading:Chapter 101. TRIM",
         signatures: &[
             IntrinsicSignature {
                 arguments: &[&[
@@ -2825,7 +2825,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "ulength",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0072",
         name: "ULENGTH",
-        source_locator: "pdf-page:697;outline:Chapter 102. ULENGTH",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfule.html;topic-id:functions-ulength;heading:Chapter 102. ULENGTH",
         signatures: &[
             IntrinsicSignature {
                 arguments: &[&[
@@ -2877,7 +2877,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "upos",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0073",
         name: "UPOS",
-        source_locator: "pdf-page:699;outline:Chapter 103. UPOS",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfupo.html;topic-id:functions-upos;heading:Chapter 103. UPOS",
         signatures: &[IntrinsicSignature {
             arguments: &[
                 &[
@@ -2901,7 +2901,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "upper-case",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0074",
         name: "UPPER-CASE",
-        source_locator: "pdf-page:701;outline:Chapter 104. UPPER-CASE",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfupp.html;topic-id:functions-upper-case;heading:Chapter 104. UPPER-CASE",
         signatures: &[IntrinsicSignature {
             arguments: &[&[
                 IntrinsicArgumentClass::Alphabetic,
@@ -2922,7 +2922,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "usubstr",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0075",
         name: "USUBSTR",
-        source_locator: "pdf-page:703;outline:Chapter 105. USUBSTR",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfusu.html;topic-id:functions-usubstr;heading:Chapter 105. USUBSTR",
         signatures: &[IntrinsicSignature {
             arguments: &[
                 &[
@@ -2947,7 +2947,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "usupplementary",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0076",
         name: "USUPPLEMENTARY",
-        source_locator: "pdf-page:705;outline:Chapter 106. USUPPLEMENTARY",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfusup.html;topic-id:functions-usupplementary;heading:Chapter 106. USUPPLEMENTARY",
         signatures: &[IntrinsicSignature {
             arguments: &[&[
                 IntrinsicArgumentClass::Alphabetic,
@@ -2968,7 +2968,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "uuid4",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0077",
         name: "UUID4",
-        source_locator: "pdf-page:707;outline:Chapter 107. UUID4",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfuuid4.html;topic-id:functions-uuid4;heading:Chapter 107. UUID4",
         signatures: &[IntrinsicSignature {
             arguments: &[],
             variadic: false,
@@ -2984,7 +2984,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "uvalid",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0078",
         name: "UVALID",
-        source_locator: "pdf-page:709;outline:Chapter 108. UVALID",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfuva.html;topic-id:functions-uvalid;heading:Chapter 108. UVALID",
         signatures: &[IntrinsicSignature {
             arguments: &[&[
                 IntrinsicArgumentClass::Alphabetic,
@@ -3005,7 +3005,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "uwidth",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0079",
         name: "UWIDTH",
-        source_locator: "pdf-page:713;outline:Chapter 109. UWIDTH",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfuwi.html;topic-id:functions-uwidth;heading:Chapter 109. UWIDTH",
         signatures: &[IntrinsicSignature {
             arguments: &[
                 &[
@@ -3029,7 +3029,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "variance",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0080",
         name: "VARIANCE",
-        source_locator: "pdf-page:715;outline:Chapter 110. VARIANCE",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfvar.html;topic-id:functions-variance;heading:Chapter 110. VARIANCE",
         signatures: &[IntrinsicSignature {
             arguments: &[&[IntrinsicArgumentClass::Numeric]],
             variadic: true,
@@ -3045,7 +3045,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "when-compiled",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0081",
         name: "WHEN-COMPILED",
-        source_locator: "pdf-page:717;outline:Chapter 111. WHEN-COMPILED",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfwhe.html;topic-id:functions-when-compiled;heading:Chapter 111. WHEN-COMPILED",
         signatures: &[IntrinsicSignature {
             arguments: &[],
             variadic: false,
@@ -3061,7 +3061,7 @@ pub static INTRINSIC_FUNCTIONS: &[IntrinsicFunctionDescriptor] = &[
         id: "year-to-yyyy",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0082",
         name: "YEAR-TO-YYYY",
-        source_locator: "pdf-page:719;outline:Chapter 112. YEAR-TO-YYYY",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlinfyy.html;topic-id:functions-year-yyyy;heading:Chapter 112. YEAR-TO-YYYY",
         signatures: &[
             IntrinsicSignature {
                 arguments: &[&[IntrinsicArgumentClass::Integer]],
@@ -3090,7 +3090,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::AddressOf,
         id: "address-of",
         name: "ADDRESS OF",
-        source_locator: "pdf-page:19;outline:ADDRESS OF",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllanadd.html;topic-id:registers-address;heading:ADDRESS OF",
         value_type: SpecialRegisterValueType::Other,
         usage: SpecialRegisterUsage::Pointer,
         length_kind: SpecialRegisterLengthKind::Lp,
@@ -3103,7 +3103,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::DebugItem,
         id: "debug-item",
         name: "DEBUG-ITEM",
-        source_locator: "pdf-page:19;outline:DEBUG-ITEM",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllandeb.html;topic-id:registers-debug-item;heading:DEBUG-ITEM",
         value_type: SpecialRegisterValueType::Group,
         usage: SpecialRegisterUsage::Group,
         length_kind: SpecialRegisterLengthKind::Dependent,
@@ -3116,7 +3116,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::IgyJavaiopCallException,
         id: "igy-javaiop-call-exception",
         name: "IGY-JAVAIOP-CALL-EXCEPTION",
-        source_locator: "pdf-page:20;outline:IGY-JAVAIOP-CALL-EXCEPTION",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllanigy.html;topic-id:registers-igy-javaiop-call-exception;heading:IGY-JAVAIOP-CALL-EXCEPTION",
         value_type: SpecialRegisterValueType::Integer,
         usage: SpecialRegisterUsage::NativeBinary,
         length_kind: SpecialRegisterLengthKind::Lp,
@@ -3129,7 +3129,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::Jnienvptr,
         id: "jnienvptr",
         name: "JNIENVPTR",
-        source_locator: "pdf-page:21;outline:JNIENVPTR",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllanjni.html;topic-id:registers-jnienvptr;heading:JNIENVPTR",
         value_type: SpecialRegisterValueType::Other,
         usage: SpecialRegisterUsage::Pointer,
         length_kind: SpecialRegisterLengthKind::Lp,
@@ -3142,7 +3142,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::JsonCode,
         id: "json-code",
         name: "JSON-CODE",
-        source_locator: "pdf-page:21;outline:JSON-CODE",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllanjco.html;topic-id:registers-json-code;heading:JSON-CODE",
         value_type: SpecialRegisterValueType::Integer,
         usage: SpecialRegisterUsage::Binary,
         length_kind: SpecialRegisterLengthKind::Fixed,
@@ -3155,7 +3155,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::JsonStatus,
         id: "json-status",
         name: "JSON-STATUS",
-        source_locator: "pdf-page:22;outline:JSON-STATUS",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllanjst.html;topic-id:registers-json-status;heading:JSON-STATUS",
         value_type: SpecialRegisterValueType::Integer,
         usage: SpecialRegisterUsage::Binary,
         length_kind: SpecialRegisterLengthKind::Fixed,
@@ -3168,7 +3168,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::LengthOf,
         id: "length-of",
         name: "LENGTH OF",
-        source_locator: "pdf-page:22;outline:LENGTH OF",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllanlen.html;topic-id:registers-length;heading:LENGTH OF",
         value_type: SpecialRegisterValueType::Integer,
         usage: SpecialRegisterUsage::Binary,
         length_kind: SpecialRegisterLengthKind::Lp,
@@ -3181,7 +3181,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::LinageCounter,
         id: "linage-counter",
         name: "LINAGE-COUNTER",
-        source_locator: "pdf-page:23;outline:LINAGE-COUNTER",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllanlin.html;topic-id:registers-linage-counter;heading:LINAGE-COUNTER",
         value_type: SpecialRegisterValueType::Integer,
         usage: SpecialRegisterUsage::Binary,
         length_kind: SpecialRegisterLengthKind::Dependent,
@@ -3194,7 +3194,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::ReturnCode,
         id: "return-code",
         name: "RETURN-CODE",
-        source_locator: "pdf-page:24;outline:RETURN-CODE",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllanret.html;topic-id:registers-return-code;heading:RETURN-CODE",
         value_type: SpecialRegisterValueType::Integer,
         usage: SpecialRegisterUsage::Binary,
         length_kind: SpecialRegisterLengthKind::Fixed,
@@ -3207,7 +3207,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::ShiftOut,
         id: "shift-out",
         name: "SHIFT-OUT",
-        source_locator: "pdf-page:25;outline:SHIFT-OUT",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllanshi.html;topic-id:registers-shift-out-shift-in;heading:SHIFT-OUT",
         value_type: SpecialRegisterValueType::Alphanumeric,
         usage: SpecialRegisterUsage::Display,
         length_kind: SpecialRegisterLengthKind::Fixed,
@@ -3220,7 +3220,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::ShiftIn,
         id: "shift-in",
         name: "SHIFT-IN",
-        source_locator: "pdf-page:25;outline:SHIFT-IN",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllanshi.html;topic-id:registers-shift-out-shift-in;heading:SHIFT-IN",
         value_type: SpecialRegisterValueType::Alphanumeric,
         usage: SpecialRegisterUsage::Display,
         length_kind: SpecialRegisterLengthKind::Fixed,
@@ -3233,7 +3233,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::SortControl,
         id: "sort-control",
         name: "SORT-CONTROL",
-        source_locator: "pdf-page:25;outline:SORT-CONTROL",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllansc.html;topic-id:registers-sort-control;heading:SORT-CONTROL",
         value_type: SpecialRegisterValueType::Alphanumeric,
         usage: SpecialRegisterUsage::Display,
         length_kind: SpecialRegisterLengthKind::Fixed,
@@ -3246,7 +3246,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::SortCoreSize,
         id: "sort-core-size",
         name: "SORT-CORE-SIZE",
-        source_locator: "pdf-page:26;outline:SORT-CORE-SIZE",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllanscs.html;topic-id:registers-sort-core-size;heading:SORT-CORE-SIZE",
         value_type: SpecialRegisterValueType::Integer,
         usage: SpecialRegisterUsage::Binary,
         length_kind: SpecialRegisterLengthKind::Fixed,
@@ -3259,7 +3259,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::SortFileSize,
         id: "sort-file-size",
         name: "SORT-FILE-SIZE",
-        source_locator: "pdf-page:26;outline:SORT-FILE-SIZE",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllansfs.html;topic-id:registers-sort-file-size;heading:SORT-FILE-SIZE",
         value_type: SpecialRegisterValueType::Integer,
         usage: SpecialRegisterUsage::Binary,
         length_kind: SpecialRegisterLengthKind::Fixed,
@@ -3272,7 +3272,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::SortMessage,
         id: "sort-message",
         name: "SORT-MESSAGE",
-        source_locator: "pdf-page:26;outline:SORT-MESSAGE",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllansm.html;topic-id:registers-sort-message;heading:SORT-MESSAGE",
         value_type: SpecialRegisterValueType::Alphanumeric,
         usage: SpecialRegisterUsage::Display,
         length_kind: SpecialRegisterLengthKind::Fixed,
@@ -3285,7 +3285,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::SortModeSize,
         id: "sort-mode-size",
         name: "SORT-MODE-SIZE",
-        source_locator: "pdf-page:27;outline:SORT-MODE-SIZE",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllansms.html;topic-id:registers-sort-mode-size;heading:SORT-MODE-SIZE",
         value_type: SpecialRegisterValueType::Integer,
         usage: SpecialRegisterUsage::Binary,
         length_kind: SpecialRegisterLengthKind::Fixed,
@@ -3298,7 +3298,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::SortReturn,
         id: "sort-return",
         name: "SORT-RETURN",
-        source_locator: "pdf-page:27;outline:SORT-RETURN",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllansr.html;topic-id:registers-sort-return;heading:SORT-RETURN",
         value_type: SpecialRegisterValueType::Integer,
         usage: SpecialRegisterUsage::Binary,
         length_kind: SpecialRegisterLengthKind::Fixed,
@@ -3311,7 +3311,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::Tally,
         id: "tally",
         name: "TALLY",
-        source_locator: "pdf-page:28;outline:TALLY",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllantal.html;topic-id:registers-tally;heading:TALLY",
         value_type: SpecialRegisterValueType::Integer,
         usage: SpecialRegisterUsage::Binary,
         length_kind: SpecialRegisterLengthKind::Fixed,
@@ -3324,7 +3324,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::WhenCompiled,
         id: "when-compiled",
         name: "WHEN-COMPILED",
-        source_locator: "pdf-page:28;outline:WHEN-COMPILED",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllanwhe.html;topic-id:registers-when-compiled;heading:WHEN-COMPILED",
         value_type: SpecialRegisterValueType::Alphanumeric,
         usage: SpecialRegisterUsage::Display,
         length_kind: SpecialRegisterLengthKind::Fixed,
@@ -3337,7 +3337,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::XmlCode,
         id: "xml-code",
         name: "XML-CODE",
-        source_locator: "pdf-page:28;outline:XML-CODE",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllanxco.html;topic-id:registers-xml-code;heading:XML-CODE",
         value_type: SpecialRegisterValueType::Integer,
         usage: SpecialRegisterUsage::Binary,
         length_kind: SpecialRegisterLengthKind::Fixed,
@@ -3350,7 +3350,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::XmlEvent,
         id: "xml-event",
         name: "XML-EVENT",
-        source_locator: "pdf-page:29;outline:XML-EVENT",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllanxev.html;topic-id:registers-xml-event;heading:XML-EVENT",
         value_type: SpecialRegisterValueType::Alphanumeric,
         usage: SpecialRegisterUsage::Display,
         length_kind: SpecialRegisterLengthKind::Fixed,
@@ -3363,7 +3363,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::XmlInformation,
         id: "xml-information",
         name: "XML-INFORMATION",
-        source_locator: "pdf-page:34;outline:XML-INFORMATION",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllanxif.html;topic-id:registers-xml-information;heading:XML-INFORMATION",
         value_type: SpecialRegisterValueType::Integer,
         usage: SpecialRegisterUsage::Binary,
         length_kind: SpecialRegisterLengthKind::Fixed,
@@ -3376,7 +3376,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::XmlNamespace,
         id: "xml-namespace",
         name: "XML-NAMESPACE",
-        source_locator: "pdf-page:34;outline:XML-NAMESPACE",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllanxna.html;topic-id:registers-xml-namespace;heading:XML-NAMESPACE",
         value_type: SpecialRegisterValueType::Alphanumeric,
         usage: SpecialRegisterUsage::Display,
         length_kind: SpecialRegisterLengthKind::Dynamic,
@@ -3389,7 +3389,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::XmlNnamespace,
         id: "xml-nnamespace",
         name: "XML-NNAMESPACE",
-        source_locator: "pdf-page:35;outline:XML-NNAMESPACE",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllanxnn.html;topic-id:registers-xml-nnamespace;heading:XML-NNAMESPACE",
         value_type: SpecialRegisterValueType::National,
         usage: SpecialRegisterUsage::National,
         length_kind: SpecialRegisterLengthKind::Dynamic,
@@ -3402,7 +3402,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::XmlNamespacePrefix,
         id: "xml-namespace-prefix",
         name: "XML-NAMESPACE-PREFIX",
-        source_locator: "pdf-page:36;outline:XML-NAMESPACE-PREFIX",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllanxpa.html;topic-id:registers-xml-namespace-prefix;heading:XML-NAMESPACE-PREFIX",
         value_type: SpecialRegisterValueType::Alphanumeric,
         usage: SpecialRegisterUsage::Display,
         length_kind: SpecialRegisterLengthKind::Dynamic,
@@ -3415,7 +3415,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::XmlNnamespacePrefix,
         id: "xml-nnamespace-prefix",
         name: "XML-NNAMESPACE-PREFIX",
-        source_locator: "pdf-page:36;outline:XML-NNAMESPACE-PREFIX",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllanxpn.html;topic-id:registers-xml-nnamespace-prefix;heading:XML-NNAMESPACE-PREFIX",
         value_type: SpecialRegisterValueType::National,
         usage: SpecialRegisterUsage::National,
         length_kind: SpecialRegisterLengthKind::Dynamic,
@@ -3428,7 +3428,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::XmlNtext,
         id: "xml-ntext",
         name: "XML-NTEXT",
-        source_locator: "pdf-page:37;outline:XML-NTEXT",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllanxnt.html;topic-id:registers-xml-ntext;heading:XML-NTEXT",
         value_type: SpecialRegisterValueType::National,
         usage: SpecialRegisterUsage::National,
         length_kind: SpecialRegisterLengthKind::Dynamic,
@@ -3441,7 +3441,7 @@ pub static SPECIAL_REGISTERS: &[SpecialRegisterDescriptor] = &[
         kind: SpecialRegisterKind::XmlText,
         id: "xml-text",
         name: "XML-TEXT",
-        source_locator: "pdf-page:37;outline:XML-TEXT",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rllanxte.html;topic-id:registers-xml-text;heading:XML-TEXT",
         value_type: SpecialRegisterValueType::Alphanumeric,
         usage: SpecialRegisterUsage::Display,
         length_kind: SpecialRegisterLengthKind::Dynamic,
@@ -3458,7 +3458,7 @@ pub static FILE_DESCRIPTION_CLAUSES: &[ClauseDescriptor<FileDescriptionClauseKin
         id: "external",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0001",
         label: "EXTERNAL clause",
-        source_locator: "pdf-page:214;outline:EXTERNAL clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlfdeext.html;topic-id:entries-external-clause;heading:EXTERNAL clause",
         forms: &["EXTERNAL"],
         placement: "fd-entry",
     },
@@ -3467,7 +3467,7 @@ pub static FILE_DESCRIPTION_CLAUSES: &[ClauseDescriptor<FileDescriptionClauseKin
         id: "global",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0002",
         label: "GLOBAL clause",
-        source_locator: "pdf-page:215;outline:GLOBAL clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlfdeglo.html;topic-id:entries-global-clause;heading:GLOBAL clause",
         forms: &["GLOBAL"],
         placement: "fd-entry",
     },
@@ -3476,7 +3476,7 @@ pub static FILE_DESCRIPTION_CLAUSES: &[ClauseDescriptor<FileDescriptionClauseKin
         id: "block-contains",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0003",
         label: "BLOCK CONTAINS clause",
-        source_locator: "pdf-page:215;outline:BLOCK CONTAINS clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlfdeblo.html;topic-id:entries-block-contains-clause;heading:BLOCK CONTAINS clause",
         forms: &["BLOCK CONTAINS [integer-1 TO] integer-2 [CHARACTERS|RECORDS]"],
         placement: "fd-or-sd-entry",
     },
@@ -3485,7 +3485,7 @@ pub static FILE_DESCRIPTION_CLAUSES: &[ClauseDescriptor<FileDescriptionClauseKin
         id: "record",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0004",
         label: "RECORD clause",
-        source_locator: "pdf-page:216;outline:RECORD clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlfderec.html;topic-id:entries-record-clause;heading:RECORD clause",
         forms: &[
             "RECORD CONTAINS integer-3 CHARACTERS",
             "RECORD CONTAINS integer-4 TO integer-5 CHARACTERS",
@@ -3498,7 +3498,7 @@ pub static FILE_DESCRIPTION_CLAUSES: &[ClauseDescriptor<FileDescriptionClauseKin
         id: "label-records",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0005",
         label: "LABEL RECORDS clause",
-        source_locator: "pdf-page:218;outline:LABEL RECORDS clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlfdelab.html;topic-id:entries-label-records-clause;heading:LABEL RECORDS clause",
         forms: &["LABEL RECORDS [ARE] STANDARD|OMITTED|data-name"],
         placement: "fd-or-sd-entry",
     },
@@ -3507,7 +3507,7 @@ pub static FILE_DESCRIPTION_CLAUSES: &[ClauseDescriptor<FileDescriptionClauseKin
         id: "value-of",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0006",
         label: "VALUE OF clause",
-        source_locator: "pdf-page:219;outline:VALUE OF clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlfdeval.html;topic-id:entries-value-clause;heading:VALUE OF clause",
         forms: &["VALUE OF data-name IS literal"],
         placement: "fd-or-sd-entry",
     },
@@ -3516,7 +3516,7 @@ pub static FILE_DESCRIPTION_CLAUSES: &[ClauseDescriptor<FileDescriptionClauseKin
         id: "data-records",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0007",
         label: "DATA RECORDS clause",
-        source_locator: "pdf-page:219;outline:DATA RECORDS clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlfdedat.html;topic-id:entries-data-records-clause;heading:DATA RECORDS clause",
         forms: &["DATA RECORDS [ARE] data-name..."],
         placement: "fd-or-sd-entry",
     },
@@ -3525,7 +3525,7 @@ pub static FILE_DESCRIPTION_CLAUSES: &[ClauseDescriptor<FileDescriptionClauseKin
         id: "linage",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0008",
         label: "LINAGE clause",
-        source_locator: "pdf-page:219;outline:LINAGE clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlfdelin.html;topic-id:entries-linage-clause;heading:LINAGE clause",
         forms: &[
             "LINAGE [IS] integer|data-name LINES [WITH FOOTING AT integer|data-name] [LINES AT TOP integer|data-name] [LINES AT BOTTOM integer|data-name]",
         ],
@@ -3536,7 +3536,7 @@ pub static FILE_DESCRIPTION_CLAUSES: &[ClauseDescriptor<FileDescriptionClauseKin
         id: "recording-mode",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0009",
         label: "RECORDING MODE clause",
-        source_locator: "pdf-page:221;outline:RECORDING MODE clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlfdermc.html;topic-id:entries-recording-mode-clause;heading:RECORDING MODE clause",
         forms: &["RECORDING MODE [IS] F|V|U|S"],
         placement: "fd-or-sd-entry",
     },
@@ -3545,7 +3545,7 @@ pub static FILE_DESCRIPTION_CLAUSES: &[ClauseDescriptor<FileDescriptionClauseKin
         id: "code-set",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0010",
         label: "CODE-SET clause",
-        source_locator: "pdf-page:222;outline:CODE-SET clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlfdecsc.html;topic-id:entries-code-set-clause;heading:CODE-SET clause",
         forms: &["CODE-SET [IS] alphabet-name"],
         placement: "fd-or-sd-entry",
     },
@@ -3557,7 +3557,7 @@ pub static DATA_DESCRIPTION_CLAUSES: &[ClauseDescriptor<DataDescriptionClauseKin
         id: "blank-when-zero",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0001",
         label: "BLANK WHEN ZERO clause",
-        source_locator: "pdf-page:226;outline:BLANK WHEN ZERO clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlddebwz.html;topic-id:entry-blank-when-zero-clause;heading:BLANK WHEN ZERO clause",
         forms: &["BLANK WHEN ZERO|ZEROS|ZEROES"],
         placement: "elementary-data-entry",
     },
@@ -3566,7 +3566,7 @@ pub static DATA_DESCRIPTION_CLAUSES: &[ClauseDescriptor<DataDescriptionClauseKin
         id: "dynamic-length",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0002",
         label: "DYNAMIC LENGTH clause",
-        source_locator: "pdf-page:226;outline:DYNAMIC LENGTH clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlddedylen.html;topic-id:entry-dynamic-length-clause;heading:DYNAMIC LENGTH clause",
         forms: &["DYNAMIC [LENGTH] [LIMIT [IS] integer]"],
         placement: "elementary-data-entry",
     },
@@ -3575,7 +3575,7 @@ pub static DATA_DESCRIPTION_CLAUSES: &[ClauseDescriptor<DataDescriptionClauseKin
         id: "external",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0003",
         label: "EXTERNAL clause",
-        source_locator: "pdf-page:227;outline:EXTERNAL clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlddeext.html;topic-id:entry-external-clause;heading:EXTERNAL clause",
         forms: &["EXTERNAL [AS literal]"],
         placement: "working-storage-level-01",
     },
@@ -3584,7 +3584,7 @@ pub static DATA_DESCRIPTION_CLAUSES: &[ClauseDescriptor<DataDescriptionClauseKin
         id: "global",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0004",
         label: "GLOBAL clause",
-        source_locator: "pdf-page:228;outline:GLOBAL clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlddeglo.html;topic-id:entry-global-clause;heading:GLOBAL clause",
         forms: &["GLOBAL"],
         placement: "level-01",
     },
@@ -3593,7 +3593,7 @@ pub static DATA_DESCRIPTION_CLAUSES: &[ClauseDescriptor<DataDescriptionClauseKin
         id: "justified",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0005",
         label: "JUSTIFIED clause",
-        source_locator: "pdf-page:228;outline:JUSTIFIED clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlddejus.html;topic-id:entry-justified-clause;heading:JUSTIFIED clause",
         forms: &["JUSTIFIED|JUST RIGHT"],
         placement: "elementary-data-entry",
     },
@@ -3602,7 +3602,7 @@ pub static DATA_DESCRIPTION_CLAUSES: &[ClauseDescriptor<DataDescriptionClauseKin
         id: "group-usage",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0006",
         label: "GROUP-USAGE clause",
-        source_locator: "pdf-page:229;outline:GROUP-USAGE clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlddegrn.html;topic-id:entry-group-usage-clause;heading:GROUP-USAGE clause",
         forms: &["GROUP-USAGE [IS] NATIONAL|UTF-8"],
         placement: "group-data-entry",
     },
@@ -3611,7 +3611,7 @@ pub static DATA_DESCRIPTION_CLAUSES: &[ClauseDescriptor<DataDescriptionClauseKin
         id: "occurs",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0007",
         label: "OCCURS clause",
-        source_locator: "pdf-page:231;outline:OCCURS clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlddeoc1.html;topic-id:entry-occurs-clause;heading:OCCURS clause",
         forms: &[
             "OCCURS integer TIMES",
             "OCCURS integer-1 TO integer-2 TIMES [DEPENDING ON data-name] [KEY IS data-name] [INDEXED BY index-name...]",
@@ -3623,7 +3623,7 @@ pub static DATA_DESCRIPTION_CLAUSES: &[ClauseDescriptor<DataDescriptionClauseKin
         id: "picture",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0008",
         label: "PICTURE clause",
-        source_locator: "pdf-page:237;outline:PICTURE clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlddepic.html;topic-id:entry-picture-clause;heading:PICTURE clause",
         forms: &["PIC|PICTURE [IS] character-string [BYTE-LENGTH integer]"],
         placement: "elementary-data-entry",
     },
@@ -3632,7 +3632,7 @@ pub static DATA_DESCRIPTION_CLAUSES: &[ClauseDescriptor<DataDescriptionClauseKin
         id: "redefines",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0009",
         label: "REDEFINES clause",
-        source_locator: "pdf-page:255;outline:REDEFINES clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlddered.html;topic-id:entry-redefines-clause;heading:REDEFINES clause",
         forms: &["REDEFINES data-name"],
         placement: "immediately-after-data-name",
     },
@@ -3641,7 +3641,7 @@ pub static DATA_DESCRIPTION_CLAUSES: &[ClauseDescriptor<DataDescriptionClauseKin
         id: "renames",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0010",
         label: "RENAMES clause",
-        source_locator: "pdf-page:258;outline:RENAMES clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rldderen.html;topic-id:entry-renames-clause;heading:RENAMES clause",
         forms: &["RENAMES data-name-1 [THROUGH|THRU data-name-2]"],
         placement: "level-66",
     },
@@ -3650,7 +3650,7 @@ pub static DATA_DESCRIPTION_CLAUSES: &[ClauseDescriptor<DataDescriptionClauseKin
         id: "sign",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0011",
         label: "SIGN clause",
-        source_locator: "pdf-page:260;outline:SIGN clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlddesig.html;topic-id:entry-sign-clause;heading:SIGN clause",
         forms: &["SIGN [IS] LEADING|TRAILING [SEPARATE [CHARACTER]]"],
         placement: "signed-numeric-entry",
     },
@@ -3659,7 +3659,7 @@ pub static DATA_DESCRIPTION_CLAUSES: &[ClauseDescriptor<DataDescriptionClauseKin
         id: "synchronized",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0012",
         label: "SYNCHRONIZED clause",
-        source_locator: "pdf-page:261;outline:SYNCHRONIZED clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlddesyn.html;topic-id:entry-synchronized-clause;heading:SYNCHRONIZED clause",
         forms: &["SYNCHRONIZED|SYNC [LEFT|RIGHT]"],
         placement: "elementary-or-level-01-group",
     },
@@ -3668,7 +3668,7 @@ pub static DATA_DESCRIPTION_CLAUSES: &[ClauseDescriptor<DataDescriptionClauseKin
         id: "typedef",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0013",
         label: "TYPEDEF clause",
-        source_locator: "pdf-page:266;outline:TYPEDEF clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/typedef.html;topic-id:entry-typedef-clause;heading:TYPEDEF clause",
         forms: &["[IS] TYPEDEF"],
         placement: "level-01-type-declaration",
     },
@@ -3677,7 +3677,7 @@ pub static DATA_DESCRIPTION_CLAUSES: &[ClauseDescriptor<DataDescriptionClauseKin
         id: "type",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0014",
         label: "TYPE clause",
-        source_locator: "pdf-page:267;outline:TYPE clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/type.html;topic-id:entry-type-clause;heading:TYPE clause",
         forms: &["TYPE [TO] type-name"],
         placement: "data-entry",
     },
@@ -3686,7 +3686,7 @@ pub static DATA_DESCRIPTION_CLAUSES: &[ClauseDescriptor<DataDescriptionClauseKin
         id: "usage",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0015",
         label: "USAGE clause",
-        source_locator: "pdf-page:269;outline:USAGE clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlddeusa.html;topic-id:entry-usage-clause;heading:USAGE clause",
         forms: &["[USAGE [IS]] representation"],
         placement: "data-entry",
     },
@@ -3695,7 +3695,7 @@ pub static DATA_DESCRIPTION_CLAUSES: &[ClauseDescriptor<DataDescriptionClauseKin
         id: "value",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0016",
         label: "VALUE clause",
-        source_locator: "pdf-page:277;outline:VALUE clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlddeval.html;topic-id:entry-value-clause;heading:VALUE clause",
         forms: &[
             "VALUE [IS] literal|figurative-constant",
             "VALUES [ARE] literal [THROUGH literal]...",
@@ -3708,7 +3708,7 @@ pub static DATA_DESCRIPTION_CLAUSES: &[ClauseDescriptor<DataDescriptionClauseKin
         id: "volatile",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0017",
         label: "VOLATILE clause",
-        source_locator: "pdf-page:284;outline:VOLATILE clause",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rlddevol.html;topic-id:entry-volatile-clause;heading:VOLATILE clause",
         forms: &["VOLATILE"],
         placement: "data-entry-except-level-66-88",
     },
@@ -3720,7 +3720,7 @@ pub static COMPILER_DIRECTIVE_GROUPS: &[CompilerDirectiveGroupDescriptor] = &[
         id: "callinterface",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0001",
         label: "CALLINTERFACE",
-        source_locator: "pdf-page:747;outline:CALLINTERFACE",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rldircal.html;topic-id:directives-callinterface;heading:CALLINTERFACE",
         placement: "procedure-division",
         effect: "call-interface-selection",
     },
@@ -3729,7 +3729,7 @@ pub static COMPILER_DIRECTIVE_GROUPS: &[CompilerDirectiveGroupDescriptor] = &[
         id: "data",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0002",
         label: "DATA",
-        source_locator: "pdf-page:748;outline:DATA",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rldirdata.html;topic-id:directives-data;heading:DATA",
         placement: "working-storage-lp64",
         effect: "data-location-selection",
     },
@@ -3738,7 +3738,7 @@ pub static COMPILER_DIRECTIVE_GROUPS: &[CompilerDirectiveGroupDescriptor] = &[
         id: "inline",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0003",
         label: "INLINE",
-        source_locator: "pdf-page:748;outline:INLINE",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rldirinl.html;topic-id:directives-inline;heading:INLINE",
         placement: "compilation-unit-line",
         effect: "inline-eligibility",
     },
@@ -3747,7 +3747,7 @@ pub static COMPILER_DIRECTIVE_GROUPS: &[CompilerDirectiveGroupDescriptor] = &[
         id: "conditional",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0004",
         label: "Conditional compilation",
-        source_locator: "pdf-page:750;outline:Conditional compilation",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rldircon.html;topic-id:directives-conditional-compilation;heading:Conditional compilation",
         placement: "compilation-group-line",
         effect: "conditional-source-selection",
     },
@@ -3756,7 +3756,7 @@ pub static COMPILER_DIRECTIVE_GROUPS: &[CompilerDirectiveGroupDescriptor] = &[
         id: "java-interop",
         row_id: "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0005",
         label: "COBOL/Java interoperability",
-        source_locator: "pdf-page:759;outline:COBOL/Java interoperability",
+        source_locator: "topic:SS6SG3_6.5/lr/ref/rldirintop.html;topic-id:directives-coboljava-interoperability;heading:COBOL/Java interoperability",
         placement: "java-interop-context",
         effect: "java-interop-metadata",
     },

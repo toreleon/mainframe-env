@@ -11,7 +11,7 @@ const MAX_CAMPAIGN_BYTES: usize = 8 * 1024 * 1024;
 const MAX_OBSERVATION_BYTES: usize = 65_536;
 const BASELINE_ID: &str = "ibm-zos-3.2-racf-saf-2026";
 const SOURCE_SHA256: &str =
-    "sha256:f4c8860aeb4d00b78f9257b28b2d880bd7571d74e2e00b2b1424b203801d5a46";
+    "sha256:8ebad84cd96572fe1c0612798a6b3a4be4752742d2496505ee3f7fcaec7d952f";
 const PRODUCT_IDENTITY: &str = "IBM z/OS 3.2 RACF/SAF";
 const EVIDENCE_ORIGIN: &str = "external-licensed-zos-execution";
 const CAMPAIGN_MODE: &str = "fresh-release-certify-campaign";

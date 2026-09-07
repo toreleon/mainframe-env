@@ -72,8 +72,14 @@
       "source": {
         "publication": "SC27-8713-04",
         "edition_date": "2026-05-31",
-        "url": "https://www.ibm.com/docs/en/SS6SG3_6.5/pdf/lrmvs.pdf",
-        "sha256": "8b86cbd2d838d8f460dcbe8d1e74d2266799ce1534f4cfdbc08469c36748e85e"
+        "kind": "documentation-topics",
+        "url": "https://www.ibm.com/docs/api/v1/toc/SS6SG3_6.5?lang=en",
+        "product": "SS6SG3_6.5",
+        "book_href": "SS6SG3_6.5/lr/language_reference.html",
+        "toc_sha256": "c3527d5e084e9749bef54ddf7bfdb1ecbbed94dd686c724417a4a3b669f671ce",
+        "manifest": "conformance/0.2/manifests/cobol-topics.json",
+        "topic_count": 622,
+        "sha256": "9b0291045414ca38d0e8138c7cc78d7321887a3fad6c27a433efd9e9ca7fd1ad"
       },
       "units": [
         {"name": "procedure-statements", "total": 44, "current_recognized": 42, "current_executed": 37},
@@ -94,8 +100,14 @@
       "version": "6.x documentation snapshot",
       "source": {
         "edition_date": "2026-08-31",
-        "url": "https://www.ibm.com/docs/en/cics-ts/6.x?topic=codes-function-exec-cics-commands",
-        "sha256": "cab6321d495098e133f92adeac154d643b022696967559d6c4485cad48fcb4b2"
+        "kind": "documentation-topics",
+        "url": "https://www.ibm.com/docs/api/v1/toc/cics-ts/6.x?lang=en",
+        "product": "SSJL4D_6.x",
+        "book_href": "SSJL4D_6.x/reference-diagnostics/eib/dfha8mf.html",
+        "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a",
+        "manifest": "conformance/0.2/manifests/cics-topics.json",
+        "topic_count": 1,
+        "sha256": "8fad1a7085e08a7d9726d25c3a9c98681e20f677616f518214c4c4f3cac7d716"
       },
       "units": [
         {"name": "api-commands", "total": 263, "current_typed_internal": 25, "current_official_mapping_estimate": 24},
@@ -114,8 +126,14 @@
       "source": {
         "publication": "SA23-1385-70",
         "edition_date": "2026-06",
-        "url": "https://www.ibm.com/docs/en/SSLTBW_3.2.0/pdf/ieab600_v3r2.pdf",
-        "sha256": "8bc97add9d69609f303ee96a1fa094d755c8bca254fcf574c15c3380fe877c9b"
+        "kind": "documentation-topics",
+        "url": "https://www.ibm.com/docs/api/v1/toc/SSLTBW_3.2.0?lang=en",
+        "product": "SSLTBW_3.2.0",
+        "book_href": "SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/abstract.htm",
+        "toc_sha256": "477a3de1989e3cb185f2dacdc7cea9bab8304ef148e7c9e5e8be55fe3f77dc2b",
+        "manifest": "conformance/0.2/manifests/jcl-jes2-topics.json",
+        "topic_count": 1985,
+        "sha256": "84cb6bd003c34eeae3398e2e04b7a915bb9194715484009e1da8e20fa347bc1b"
       },
       "units": [
         {"name": "jcl-statements", "total": 20, "current_recognized": 14, "current_semantic_estimate": 10},
@@ -137,8 +155,14 @@
       "source": {
         "publication": "SC23-6846-70",
         "edition_date": "2026-06",
-        "url": "https://www.ibm.com/docs/en/SSLTBW_3.2.0/pdf/idai200_v3r2.pdf",
-        "sha256": "2d0c6bb05bc9ead70575a41bdd786f1ea7ad3f0ed1855ba9a2ec041eaec83c67"
+        "kind": "documentation-topics",
+        "url": "https://www.ibm.com/docs/api/v1/toc/SSLTBW_3.2.0?lang=en",
+        "product": "SSLTBW_3.2.0",
+        "book_href": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/abstract.htm",
+        "toc_sha256": "477a3de1989e3cb185f2dacdc7cea9bab8304ef148e7c9e5e8be55fe3f77dc2b",
+        "manifest": "conformance/0.2/manifests/dataset-vsam-ams-topics.json",
+        "topic_count": 516,
+        "sha256": "a1798761a230fbcdf0c772900c28f3656bb04b6a9210bc4b782c2aeeffafbdc1"
       },
       "units": [
         {"name": "ams-functional-commands", "total": 31, "current_recognized_estimate": 8, "current_executed_estimate": 8},
@@ -155,9 +179,16 @@
       "version": "3.2",
       "source": {
         "edition_date": "2026",
-        "url": "https://www.ibm.com/docs/en/SSLTBW_3.2.0/pdf/icha400_v3r2.pdf",
-        "sha256": "f4c8860aeb4d00b78f9257b28b2d880bd7571d74e2e00b2b1424b203801d5a46",
-        "racroute_url": "https://www.ibm.com/docs/en/zos/3.2.0?topic=macros-racroute-router-interface"
+        "kind": "documentation-topics",
+        "url": "https://www.ibm.com/docs/api/v1/toc/SSLTBW_3.2.0?lang=en",
+        "product": "SSLTBW_3.2.0",
+        "book_href": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/abstract.htm",
+        "toc_sha256": "477a3de1989e3cb185f2dacdc7cea9bab8304ef148e7c9e5e8be55fe3f77dc2b",
+        "manifest": "conformance/0.2/manifests/racf-saf-topics.json",
+        "topic_count": 109,
+        "sha256": "8ebad84cd96572fe1c0612798a6b3a4be4752742d2496505ee3f7fcaec7d952f",
+        "racroute_topic": "SSLTBW_3.2.0/com.ibm.zos.v3r2.ichc600/racri.htm",
+        "racroute_sha256": "acebd6ebc34ffd70843db61620351ae35df699c8e29bd3da486a409d9854db3a"
       },
       "units": [
         {"name": "racf-command-families", "total": 34, "current_equivalent_estimate": 6},
@@ -174,8 +205,14 @@
       "version": "3.2",
       "source": {
         "edition_date": "2026-07-27",
-        "url": "https://www.ibm.com/docs/en/SSLTBW_3.2.0/pdf/izua700_v3r2.pdf",
-        "sha256": "2c3dde7bd5f4f7e43b58b6be34997d336af26f9f82975bc8573f26ab723e1ebd"
+        "kind": "documentation-topics",
+        "url": "https://www.ibm.com/docs/api/v1/toc/SSLTBW_3.2.0?lang=en",
+        "product": "SSLTBW_3.2.0",
+        "book_href": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/abstract.htm",
+        "toc_sha256": "477a3de1989e3cb185f2dacdc7cea9bab8304ef148e7c9e5e8be55fe3f77dc2b",
+        "manifest": "conformance/0.2/manifests/zosmf-topics.json",
+        "topic_count": 395,
+        "sha256": "146cb3faaebd146c6396cc57b04ad6e48b49533b37dfa34f1eca2411518cea9b"
       },
       "units": [
         {"name": "rest-service-families", "total": 27, "current_recognized": 5, "current_executed": 5},
@@ -192,8 +229,14 @@
       "version": "13",
       "source": {
         "edition_date": "2026-08-13",
-        "url": "https://www.ibm.com/docs/en/SSEPEK_13.0.0/pdf/db2z_13_sqlrefbook.pdf",
-        "sha256": "34c575200ec4fcbe389364a375ef1ee2161ffdceb8a2dc6de90df0fe9377b212"
+        "kind": "documentation-topics",
+        "url": "https://www.ibm.com/docs/api/v1/toc/SSEPEK_13.0.0?lang=en",
+        "product": "SSEPEK_13.0.0",
+        "book_href": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_structuredquerylanguage.html",
+        "toc_sha256": "b083904697db57a7e746e79491f73c22c7e58c267dd83ea6e4ce39eb401071fb",
+        "manifest": "conformance/0.2/manifests/db2-topics.json",
+        "topic_count": 832,
+        "sha256": "6fd51d84b9d5c365d2017f1037f4edefb8d9af71de9277556cd50cf3e2f13757"
       },
       "units": [
         {"name": "sql-statements", "total": 158, "current_internal_operations": 14, "current_statement_equivalent_estimate": 12, "comparable": false},
@@ -211,8 +254,14 @@
       "version": "15.6",
       "source": {
         "edition_date": "2026-08-31",
-        "url": "https://www.ibm.com/docs/en/ims/15.6.0?topic=programs-comparing-exec-dli-commands-dli-calls",
-        "sha256": "3a843a493ee4676fe8b0bbf4cf7e9b255ab56ea3dc3e1a7c269c90bd00f9b12e"
+        "kind": "documentation-topics",
+        "url": "https://www.ibm.com/docs/api/v1/toc/ims/15.6.0?lang=en",
+        "product": "SSEPH2_15.6.0",
+        "book_href": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+        "toc_sha256": "aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618",
+        "manifest": "conformance/0.2/manifests/ims-topics.json",
+        "topic_count": 1,
+        "sha256": "7748d88614c92c7261c9ae430027ef8954a48f3edf921ac2283b88cfb9a6f07d"
       },
       "units": [
         {"name": "dli-call-families", "total": 25, "current_equivalent_estimate": 9}
@@ -228,8 +277,14 @@
       "version": "9.4",
       "source": {
         "edition_date": "2026-08-31",
-        "url": "https://www.ibm.com/docs/en/ibm-mq/9.4.x?topic=calls-call-descriptions",
-        "sha256": "6b04a5194766eb9da79ddd33d57510db15baf7c085fe686ebdb6e372568bb9dc"
+        "kind": "documentation-topics",
+        "url": "https://www.ibm.com/docs/api/v1/toc/SSFKSJ_9.4.0?lang=en",
+        "product": "SSFKSJ_9.4.0",
+        "book_href": "SSFKSJ_9.4.0/refdev/q101650_.html",
+        "toc_sha256": "5b23147424db490f5292bd56afe1a0dd2a6ccdde3a08388a79d599998e002bd4",
+        "manifest": "conformance/0.2/manifests/mq-topics.json",
+        "topic_count": 27,
+        "sha256": "c26cd43339ee07dea20b4efd8d2acc84f0762e44ed1e62afef524b99f5dacae3"
       },
       "units": [
         {"name": "mqi-calls-unique", "total": 26, "documentation_rows": 27, "current_recognized": 7, "current_executed": 7}

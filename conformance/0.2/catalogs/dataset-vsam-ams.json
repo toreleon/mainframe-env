@@ -12,187 +12,187 @@
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0001",
           "label": "Chapter 4. ALLOCATE",
-          "source_locator": "pdf-page:63;outline:Chapter 4. ALLOCATE",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/dalloc.htm;topic-id:commands-allocate;heading:Chapter 4. ALLOCATE",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0002",
           "label": "Chapter 5. ALTER",
-          "source_locator": "pdf-page:87;outline:Chapter 5. ALTER",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2052.htm;topic-id:commands-alter;heading:Chapter 5. ALTER",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0003",
           "label": "Chapter 6. ALTER LIBRARYENTRY",
-          "source_locator": "pdf-page:111;outline:Chapter 6. ALTER LIBRARYENTRY",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2065.htm;topic-id:commands-alter-libraryentry;heading:Chapter 6. ALTER LIBRARYENTRY",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0004",
           "label": "Chapter 7. ALTER VOLUMEENTRY",
-          "source_locator": "pdf-page:117;outline:Chapter 7. ALTER VOLUMEENTRY",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2072.htm;topic-id:commands-alter-volumeentry;heading:Chapter 7. ALTER VOLUMEENTRY",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0005",
           "label": "Chapter 8. BLDINDEX",
-          "source_locator": "pdf-page:125;outline:Chapter 8. BLDINDEX",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/bldix.htm;topic-id:commands-bldindex;heading:Chapter 8. BLDINDEX",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0006",
           "label": "Chapter 9. CREATE LIBRARYENTRY",
-          "source_locator": "pdf-page:133;outline:Chapter 9. CREATE LIBRARYENTRY",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2085.htm;topic-id:commands-create-libraryentry;heading:Chapter 9. CREATE LIBRARYENTRY",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0007",
           "label": "Chapter 10. CREATE VOLUMEENTRY",
-          "source_locator": "pdf-page:139;outline:Chapter 10. CREATE VOLUMEENTRY",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2091.htm;topic-id:commands-create-volumeentry;heading:Chapter 10. CREATE VOLUMEENTRY",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0008",
           "label": "Chapter 11. DCOLLECT",
-          "source_locator": "pdf-page:147;outline:Chapter 11. DCOLLECT",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/dcoll.htm;topic-id:commands-dcollect;heading:Chapter 11. DCOLLECT",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0009",
           "label": "Chapter 12. DEFINE ALIAS",
-          "source_locator": "pdf-page:157;outline:Chapter 12. DEFINE ALIAS",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2100.htm;topic-id:commands-define-alias;heading:Chapter 12. DEFINE ALIAS",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0010",
           "label": "Chapter 13. DEFINE ALTERNATEINDEX",
-          "source_locator": "pdf-page:161;outline:Chapter 13. DEFINE ALTERNATEINDEX",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/altix.htm;topic-id:commands-define-alternateindex;heading:Chapter 13. DEFINE ALTERNATEINDEX",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0011",
           "label": "Chapter 14. DEFINE CLUSTER",
-          "source_locator": "pdf-page:179;outline:Chapter 14. DEFINE CLUSTER",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/defclu.htm;topic-id:commands-define-cluster;heading:Chapter 14. DEFINE CLUSTER",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0012",
           "label": "Chapter 15. DEFINE GENERATIONDATAGROUP",
-          "source_locator": "pdf-page:211;outline:Chapter 15. DEFINE GENERATIONDATAGROUP",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2gen.htm;topic-id:commands-define-generationdatagroup;heading:Chapter 15. DEFINE GENERATIONDATAGROUP",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0013",
           "label": "Chapter 16. DEFINE NONVSAM",
-          "source_locator": "pdf-page:217;outline:Chapter 16. DEFINE NONVSAM",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/defnon.htm;topic-id:commands-define-nonvsam;heading:Chapter 16. DEFINE NONVSAM",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0014",
           "label": "Chapter 17. DEFINE PAGESPACE",
-          "source_locator": "pdf-page:223;outline:Chapter 17. DEFINE PAGESPACE",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2pag.htm;topic-id:commands-define-pagespace;heading:Chapter 17. DEFINE PAGESPACE",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0015",
           "label": "Chapter 18. DEFINE PATH",
-          "source_locator": "pdf-page:229;outline:Chapter 18. DEFINE PATH",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2pt.htm;topic-id:commands-define-path;heading:Chapter 18. DEFINE PATH",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0016",
           "label": "Chapter 19. DEFINE USERCATALOG",
-          "source_locator": "pdf-page:233;outline:Chapter 19. DEFINE USERCATALOG",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2use.htm;topic-id:commands-define-usercatalog;heading:Chapter 19. DEFINE USERCATALOG",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0017",
           "label": "Chapter 20. DELETE",
-          "source_locator": "pdf-page:249;outline:Chapter 20. DELETE",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/delet.htm;topic-id:commands-delete;heading:Chapter 20. DELETE",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0018",
           "label": "Chapter 21. DIAGNOSE",
-          "source_locator": "pdf-page:273;outline:Chapter 21. DIAGNOSE",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/diag.htm;topic-id:commands-diagnose;heading:Chapter 21. DIAGNOSE",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0019",
           "label": "Chapter 22. EXAMINE",
-          "source_locator": "pdf-page:281;outline:Chapter 22. EXAMINE",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/xmn.htm;topic-id:commands-examine;heading:Chapter 22. EXAMINE",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0020",
           "label": "Chapter 23. EXPORT",
-          "source_locator": "pdf-page:285;outline:Chapter 23. EXPORT",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/export.htm;topic-id:commands-export;heading:Chapter 23. EXPORT",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0021",
           "label": "Chapter 24. EXPORT DISCONNECT",
-          "source_locator": "pdf-page:293;outline:Chapter 24. EXPORT DISCONNECT",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2dis.htm;topic-id:commands-export-disconnect;heading:Chapter 24. EXPORT DISCONNECT",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0022",
           "label": "Chapter 25. IMPORT",
-          "source_locator": "pdf-page:295;outline:Chapter 25. IMPORT",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/import.htm;topic-id:commands-import;heading:Chapter 25. IMPORT",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0023",
           "label": "Chapter 26. IMPORT CONNECT",
-          "source_locator": "pdf-page:307;outline:Chapter 26. IMPORT CONNECT",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2con.htm;topic-id:commands-import-connect;heading:Chapter 26. IMPORT CONNECT",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0024",
           "label": "Chapter 27. LISTCAT",
-          "source_locator": "pdf-page:311;outline:Chapter 27. LISTCAT",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2cat.htm;topic-id:commands-listcat;heading:Chapter 27. LISTCAT",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0025",
           "label": "Chapter 28. LISTDATA",
-          "source_locator": "pdf-page:323;outline:Chapter 28. LISTDATA",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2dat.htm;topic-id:commands-listdata;heading:Chapter 28. LISTDATA",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0026",
           "label": "Chapter 29. PRINT",
-          "source_locator": "pdf-page:337;outline:Chapter 29. PRINT",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/print.htm;topic-id:zdamsc-print;heading:Chapter 29. PRINT",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0027",
           "label": "Chapter 30. REPRO",
-          "source_locator": "pdf-page:347;outline:Chapter 30. REPRO",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/repro.htm;topic-id:commands-repro;heading:Chapter 30. REPRO",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0028",
           "label": "Chapter 31. RECOVER",
-          "source_locator": "pdf-page:369;outline:Chapter 31. RECOVER",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/recover.htm;topic-id:commands-recover;heading:Chapter 31. RECOVER",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0029",
           "label": "Chapter 32. SETCACHE",
-          "source_locator": "pdf-page:373;outline:Chapter 32. SETCACHE",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2set.htm;topic-id:commands-setcache;heading:Chapter 32. SETCACHE",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0030",
           "label": "Chapter 33. SHCDS",
-          "source_locator": "pdf-page:385;outline:Chapter 33. SHCDS",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/shcds.htm;topic-id:commands-shcds;heading:Chapter 33. SHCDS",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-dfsms-ams-2026-06:ams-functional-commands:0031",
           "label": "Chapter 34. VERIFY",
-          "source_locator": "pdf-page:395;outline:Chapter 34. VERIFY",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2ver.htm;topic-id:commands-verify;heading:Chapter 34. VERIFY",
           "mandatory": true
         }
       ]

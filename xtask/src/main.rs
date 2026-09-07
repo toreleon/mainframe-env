@@ -6505,6 +6505,7 @@ fn schema_for_0_2_artifact(version: &str) -> Option<&'static str> {
     match version {
         "mainframe-env.official-source-receipts@1" => Some("official-source-receipts.schema.json"),
         "mainframe-env.official-catalog@1" => Some("official-catalog.schema.json"),
+        "mainframe-env.topic-manifest@1" => Some("topic-manifest.schema.json"),
         "mainframe-env.coverage-ledger@1" => Some("coverage-ledger.schema.json"),
         "mainframe-env.coverage-program-status@1" => Some("program-status.schema.json"),
         "mainframe-env.coverage-work-package-evidence@1" => {
@@ -8584,14 +8585,15 @@ fn check_coverage(root: &Path) -> TaskResult {
         "official catalog global denominator must remain 1506",
     )?;
     check_coverage_ledger(root, &index)?;
-    for entry in fs::read_dir(root.join("conformance/0.2"))
-        .map_err(|error| format!("conformance/0.2: {error}"))?
-    {
-        let path = entry.map_err(|error| error.to_string())?.path();
+    // Recursive: the manifests name every topic a baseline was read from, so a
+    // stray fragment is far likelier to land in a subdirectory than at the root.
+    let mut published = Vec::new();
+    collect_files(&root.join("conformance/0.2"), &mut published)?;
+    for path in published {
         require(
             !matches!(
                 path.extension().and_then(OsStr::to_str),
-                Some("pdf" | "html")
+                Some("pdf" | "html" | "htm")
             ),
             "official publication bytes must not be checked into conformance/0.2",
         )?;

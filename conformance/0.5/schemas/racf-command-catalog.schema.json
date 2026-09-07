@@ -8,7 +8,7 @@
   "properties": {
     "schema_version": {"const": "mainframe-env.racf-command-catalog@1"},
     "baseline_id": {"const": "ibm-zos-3.2-racf-saf-2026"},
-    "source_sha256": {"const": "sha256:f4c8860aeb4d00b78f9257b28b2d880bd7571d74e2e00b2b1424b203801d5a46"},
+    "source_sha256": {"const": "sha256:8ebad84cd96572fe1c0612798a6b3a4be4752742d2496505ee3f7fcaec7d952f"},
     "families": {
       "type": "array",
       "minItems": 34,

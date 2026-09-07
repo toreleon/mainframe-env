@@ -8068,6 +8068,6 @@
     }
   ],
   "schema_version": "mainframe-env.jcl-conformance-fixtures@1",
-  "source_catalog_sha256": "sha256:640b6bf949b6feefa6ba2d762286500798d3157794c728c360f4a46fc260fba4",
+  "source_catalog_sha256": "sha256:e46b8f5de846c0ba667ac0bcdf17d0d655286f851d440e858ffd465210c485d9",
   "target_version": "0.7.0"
 }

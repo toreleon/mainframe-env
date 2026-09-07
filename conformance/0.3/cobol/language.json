@@ -10,7 +10,7 @@
       "label": "BASIS statement",
       "placement": "control-deck",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0001",
-      "source_locator": "pdf-page:723;outline:BASIS statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdsbas.html;topic-id:statements-basis-statement;heading:BASIS statement"
     },
     {
       "effect": "compiler-options",
@@ -22,7 +22,7 @@
       "label": "PROCESS(CBL) statement",
       "placement": "before-outermost-identification",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0002",
-      "source_locator": "pdf-page:724;outline:PROCESS(CBL) statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdscbl.html;topic-id:statements-processcbl-statement;heading:PROCESS(CBL) statement"
     },
     {
       "effect": "listing-control",
@@ -34,7 +34,7 @@
       "label": "*CONTROL (*CBL) statement",
       "placement": "embedded-line-only",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0003",
-      "source_locator": "pdf-page:724;outline:*CONTROL (*CBL) statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdscon.html;topic-id:statements-control-cbl-statement;heading:*CONTROL (*CBL) statement"
     },
     {
       "effect": "source-expansion",
@@ -45,7 +45,7 @@
       "label": "COPY statement",
       "placement": "character-string-boundary",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0004",
-      "source_locator": "pdf-page:726;outline:COPY statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdscop.html;topic-id:statements-copy-statement;heading:COPY statement"
     },
     {
       "effect": "extended-source-delete",
@@ -56,7 +56,7 @@
       "label": "DELETE statement",
       "placement": "basis-control-deck",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0005",
-      "source_locator": "pdf-page:735;outline:DELETE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdsdel.html;topic-id:cds-delete-statement;heading:DELETE statement"
     },
     {
       "effect": "listing-control",
@@ -67,7 +67,7 @@
       "label": "EJECT statement",
       "placement": "embedded-line-only",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0006",
-      "source_locator": "pdf-page:736;outline:EJECT statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdseje.html;topic-id:statements-eject-statement;heading:EJECT statement"
     },
     {
       "effect": "syntax-only",
@@ -78,7 +78,7 @@
       "label": "ENTER statement",
       "placement": "procedure-division",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0007",
-      "source_locator": "pdf-page:736;outline:ENTER statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdsent.html;topic-id:statements-enter-statement;heading:ENTER statement"
     },
     {
       "effect": "extended-source-insert",
@@ -89,7 +89,7 @@
       "label": "INSERT statement",
       "placement": "basis-control-deck",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0008",
-      "source_locator": "pdf-page:737;outline:INSERT statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdsins.html;topic-id:statements-insert-statement;heading:INSERT statement"
     },
     {
       "effect": "syntax-only",
@@ -101,7 +101,7 @@
       "label": "READY or RESET TRACE statement",
       "placement": "procedure-division",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0009",
-      "source_locator": "pdf-page:737;outline:READY or RESET TRACE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdsrea.html;topic-id:statements-ready-reset-trace-statement;heading:READY or RESET TRACE statement"
     },
     {
       "effect": "source-replacement",
@@ -113,7 +113,7 @@
       "label": "REPLACE statement",
       "placement": "character-string-boundary",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0010",
-      "source_locator": "pdf-page:738;outline:REPLACE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdsrps.html;topic-id:statements-replace-statement;heading:REPLACE statement"
     },
     {
       "effect": "control-flow-marker",
@@ -124,7 +124,7 @@
       "label": "SERVICE LABEL statement",
       "placement": "procedure-division-nondeclarative",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0011",
-      "source_locator": "pdf-page:741;outline:SERVICE LABEL statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdssvc.html;topic-id:statements-service-label-statement;heading:SERVICE LABEL statement"
     },
     {
       "effect": "syntax-only",
@@ -135,7 +135,7 @@
       "label": "SERVICE RELOAD statement",
       "placement": "procedure-division",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0012",
-      "source_locator": "pdf-page:742;outline:SERVICE RELOAD statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdsser.html;topic-id:statements-service-reload-statement;heading:SERVICE RELOAD statement"
     },
     {
       "effect": "listing-control",
@@ -148,7 +148,7 @@
       "label": "SKIP statements",
       "placement": "embedded-line-only",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0013",
-      "source_locator": "pdf-page:742;outline:SKIP statements"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdsski.html;topic-id:statements-skip;heading:SKIP statements"
     },
     {
       "effect": "listing-control",
@@ -159,7 +159,7 @@
       "label": "TITLE statement",
       "placement": "embedded-line-only",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0014",
-      "source_locator": "pdf-page:742;outline:TITLE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdstit.html;topic-id:statements-title-statement;heading:TITLE statement"
     },
     {
       "effect": "declarative-registration",
@@ -171,7 +171,7 @@
       "label": "USE statement",
       "placement": "procedure-declaratives",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0015",
-      "source_locator": "pdf-page:743;outline:USE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdsuse.html;topic-id:statements-use-statement;heading:USE statement"
     }
   ],
   "compiler_directive_groups": [
@@ -185,7 +185,7 @@
       "label": "CALLINTERFACE",
       "placement": "procedure-division",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0001",
-      "source_locator": "pdf-page:747;outline:CALLINTERFACE"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rldircal.html;topic-id:directives-callinterface;heading:CALLINTERFACE"
     },
     {
       "directives": [
@@ -196,7 +196,7 @@
       "label": "DATA",
       "placement": "working-storage-lp64",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0002",
-      "source_locator": "pdf-page:748;outline:DATA"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rldirdata.html;topic-id:directives-data;heading:DATA"
     },
     {
       "directives": [
@@ -207,7 +207,7 @@
       "label": "INLINE",
       "placement": "compilation-unit-line",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0003",
-      "source_locator": "pdf-page:748;outline:INLINE"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rldirinl.html;topic-id:directives-inline;heading:INLINE"
     },
     {
       "directives": [
@@ -225,7 +225,7 @@
       "label": "Conditional compilation",
       "placement": "compilation-group-line",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0004",
-      "source_locator": "pdf-page:750;outline:Conditional compilation"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rldircon.html;topic-id:directives-conditional-compilation;heading:Conditional compilation"
     },
     {
       "directives": [
@@ -237,7 +237,7 @@
       "label": "COBOL/Java interoperability",
       "placement": "java-interop-context",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0005",
-      "source_locator": "pdf-page:759;outline:COBOL/Java interoperability"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rldirintop.html;topic-id:directives-coboljava-interoperability;heading:COBOL/Java interoperability"
     }
   ],
   "data_description_clauses": [
@@ -249,7 +249,7 @@
       "label": "BLANK WHEN ZERO clause",
       "placement": "elementary-data-entry",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0001",
-      "source_locator": "pdf-page:226;outline:BLANK WHEN ZERO clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddebwz.html;topic-id:entry-blank-when-zero-clause;heading:BLANK WHEN ZERO clause"
     },
     {
       "forms": [
@@ -259,7 +259,7 @@
       "label": "DYNAMIC LENGTH clause",
       "placement": "elementary-data-entry",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0002",
-      "source_locator": "pdf-page:226;outline:DYNAMIC LENGTH clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddedylen.html;topic-id:entry-dynamic-length-clause;heading:DYNAMIC LENGTH clause"
     },
     {
       "forms": [
@@ -269,7 +269,7 @@
       "label": "EXTERNAL clause",
       "placement": "working-storage-level-01",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0003",
-      "source_locator": "pdf-page:227;outline:EXTERNAL clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddeext.html;topic-id:entry-external-clause;heading:EXTERNAL clause"
     },
     {
       "forms": [
@@ -279,7 +279,7 @@
       "label": "GLOBAL clause",
       "placement": "level-01",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0004",
-      "source_locator": "pdf-page:228;outline:GLOBAL clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddeglo.html;topic-id:entry-global-clause;heading:GLOBAL clause"
     },
     {
       "forms": [
@@ -289,7 +289,7 @@
       "label": "JUSTIFIED clause",
       "placement": "elementary-data-entry",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0005",
-      "source_locator": "pdf-page:228;outline:JUSTIFIED clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddejus.html;topic-id:entry-justified-clause;heading:JUSTIFIED clause"
     },
     {
       "forms": [
@@ -299,7 +299,7 @@
       "label": "GROUP-USAGE clause",
       "placement": "group-data-entry",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0006",
-      "source_locator": "pdf-page:229;outline:GROUP-USAGE clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddegrn.html;topic-id:entry-group-usage-clause;heading:GROUP-USAGE clause"
     },
     {
       "forms": [
@@ -310,7 +310,7 @@
       "label": "OCCURS clause",
       "placement": "data-entry",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0007",
-      "source_locator": "pdf-page:231;outline:OCCURS clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddeoc1.html;topic-id:entry-occurs-clause;heading:OCCURS clause"
     },
     {
       "forms": [
@@ -320,7 +320,7 @@
       "label": "PICTURE clause",
       "placement": "elementary-data-entry",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0008",
-      "source_locator": "pdf-page:237;outline:PICTURE clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddepic.html;topic-id:entry-picture-clause;heading:PICTURE clause"
     },
     {
       "forms": [
@@ -330,7 +330,7 @@
       "label": "REDEFINES clause",
       "placement": "immediately-after-data-name",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0009",
-      "source_locator": "pdf-page:255;outline:REDEFINES clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddered.html;topic-id:entry-redefines-clause;heading:REDEFINES clause"
     },
     {
       "forms": [
@@ -340,7 +340,7 @@
       "label": "RENAMES clause",
       "placement": "level-66",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0010",
-      "source_locator": "pdf-page:258;outline:RENAMES clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rldderen.html;topic-id:entry-renames-clause;heading:RENAMES clause"
     },
     {
       "forms": [
@@ -350,7 +350,7 @@
       "label": "SIGN clause",
       "placement": "signed-numeric-entry",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0011",
-      "source_locator": "pdf-page:260;outline:SIGN clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddesig.html;topic-id:entry-sign-clause;heading:SIGN clause"
     },
     {
       "forms": [
@@ -360,7 +360,7 @@
       "label": "SYNCHRONIZED clause",
       "placement": "elementary-or-level-01-group",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0012",
-      "source_locator": "pdf-page:261;outline:SYNCHRONIZED clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddesyn.html;topic-id:entry-synchronized-clause;heading:SYNCHRONIZED clause"
     },
     {
       "forms": [
@@ -370,7 +370,7 @@
       "label": "TYPEDEF clause",
       "placement": "level-01-type-declaration",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0013",
-      "source_locator": "pdf-page:266;outline:TYPEDEF clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/typedef.html;topic-id:entry-typedef-clause;heading:TYPEDEF clause"
     },
     {
       "forms": [
@@ -380,7 +380,7 @@
       "label": "TYPE clause",
       "placement": "data-entry",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0014",
-      "source_locator": "pdf-page:267;outline:TYPE clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/type.html;topic-id:entry-type-clause;heading:TYPE clause"
     },
     {
       "forms": [
@@ -390,7 +390,7 @@
       "label": "USAGE clause",
       "placement": "data-entry",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0015",
-      "source_locator": "pdf-page:269;outline:USAGE clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddeusa.html;topic-id:entry-usage-clause;heading:USAGE clause"
     },
     {
       "forms": [
@@ -402,7 +402,7 @@
       "label": "VALUE clause",
       "placement": "data-or-condition-entry",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0016",
-      "source_locator": "pdf-page:277;outline:VALUE clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddeval.html;topic-id:entry-value-clause;heading:VALUE clause"
     },
     {
       "forms": [
@@ -412,7 +412,7 @@
       "label": "VOLATILE clause",
       "placement": "data-entry-except-level-66-88",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0017",
-      "source_locator": "pdf-page:284;outline:VOLATILE clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddevol.html;topic-id:entry-volatile-clause;heading:VOLATILE clause"
     }
   ],
   "file_description_clauses": [
@@ -424,7 +424,7 @@
       "label": "EXTERNAL clause",
       "placement": "fd-entry",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0001",
-      "source_locator": "pdf-page:214;outline:EXTERNAL clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlfdeext.html;topic-id:entries-external-clause;heading:EXTERNAL clause"
     },
     {
       "forms": [
@@ -434,7 +434,7 @@
       "label": "GLOBAL clause",
       "placement": "fd-entry",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0002",
-      "source_locator": "pdf-page:215;outline:GLOBAL clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlfdeglo.html;topic-id:entries-global-clause;heading:GLOBAL clause"
     },
     {
       "forms": [
@@ -444,7 +444,7 @@
       "label": "BLOCK CONTAINS clause",
       "placement": "fd-or-sd-entry",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0003",
-      "source_locator": "pdf-page:215;outline:BLOCK CONTAINS clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlfdeblo.html;topic-id:entries-block-contains-clause;heading:BLOCK CONTAINS clause"
     },
     {
       "forms": [
@@ -456,7 +456,7 @@
       "label": "RECORD clause",
       "placement": "fd-or-sd-entry",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0004",
-      "source_locator": "pdf-page:216;outline:RECORD clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlfderec.html;topic-id:entries-record-clause;heading:RECORD clause"
     },
     {
       "forms": [
@@ -466,7 +466,7 @@
       "label": "LABEL RECORDS clause",
       "placement": "fd-or-sd-entry",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0005",
-      "source_locator": "pdf-page:218;outline:LABEL RECORDS clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlfdelab.html;topic-id:entries-label-records-clause;heading:LABEL RECORDS clause"
     },
     {
       "forms": [
@@ -476,7 +476,7 @@
       "label": "VALUE OF clause",
       "placement": "fd-or-sd-entry",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0006",
-      "source_locator": "pdf-page:219;outline:VALUE OF clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlfdeval.html;topic-id:entries-value-clause;heading:VALUE OF clause"
     },
     {
       "forms": [
@@ -486,7 +486,7 @@
       "label": "DATA RECORDS clause",
       "placement": "fd-or-sd-entry",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0007",
-      "source_locator": "pdf-page:219;outline:DATA RECORDS clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlfdedat.html;topic-id:entries-data-records-clause;heading:DATA RECORDS clause"
     },
     {
       "forms": [
@@ -496,7 +496,7 @@
       "label": "LINAGE clause",
       "placement": "fd-or-sd-entry",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0008",
-      "source_locator": "pdf-page:219;outline:LINAGE clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlfdelin.html;topic-id:entries-linage-clause;heading:LINAGE clause"
     },
     {
       "forms": [
@@ -506,7 +506,7 @@
       "label": "RECORDING MODE clause",
       "placement": "fd-or-sd-entry",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0009",
-      "source_locator": "pdf-page:221;outline:RECORDING MODE clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlfdermc.html;topic-id:entries-recording-mode-clause;heading:RECORDING MODE clause"
     },
     {
       "forms": [
@@ -516,7 +516,7 @@
       "label": "CODE-SET clause",
       "placement": "fd-or-sd-entry",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0010",
-      "source_locator": "pdf-page:222;outline:CODE-SET clause"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlfdecsc.html;topic-id:entries-code-set-clause;heading:CODE-SET clause"
     }
   ],
   "intrinsic_functions": [
@@ -539,7 +539,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:555;outline:Chapter 31. ABS"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfabs.html;topic-id:functions-abs;heading:Chapter 31. ABS"
     },
     {
       "fixed_length": null,
@@ -560,7 +560,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:557;outline:Chapter 32. ACOS"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfaco.html;topic-id:functions-acos;heading:Chapter 32. ACOS"
     },
     {
       "fixed_length": null,
@@ -584,7 +584,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:559;outline:Chapter 33. ANNUITY"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfann.html;topic-id:functions-annuity;heading:Chapter 33. ANNUITY"
     },
     {
       "fixed_length": null,
@@ -605,7 +605,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:561;outline:Chapter 34. ASIN"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfasi.html;topic-id:functions-asin;heading:Chapter 34. ASIN"
     },
     {
       "fixed_length": null,
@@ -626,7 +626,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:563;outline:Chapter 35. ATAN"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfata.html;topic-id:functions-atan;heading:Chapter 35. ATAN"
     },
     {
       "fixed_length": null,
@@ -654,7 +654,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:565;outline:Chapter 36. BIT-OF"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfbit.html;topic-id:functions-bit;heading:Chapter 36. BIT-OF"
     },
     {
       "fixed_length": null,
@@ -675,7 +675,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:567;outline:Chapter 37. BIT-TO-CHAR"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfbitc.html;topic-id:functions-bit-char;heading:Chapter 37. BIT-TO-CHAR"
     },
     {
       "fixed_length": null,
@@ -702,7 +702,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:569;outline:Chapter 38. BYTE-LENGTH"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfbyte.html;topic-id:functions-byte-length;heading:Chapter 38. BYTE-LENGTH"
     },
     {
       "fixed_length": 1,
@@ -723,7 +723,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:571;outline:Chapter 39. CHAR"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfcha.html;topic-id:functions-char;heading:Chapter 39. CHAR"
     },
     {
       "fixed_length": null,
@@ -747,7 +747,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:573;outline:Chapter 40. COMBINED-DATETIME"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfcdt.html;topic-id:functions-combined-datetime;heading:Chapter 40. COMBINED-DATETIME"
     },
     {
       "fixed_length": null,
@@ -773,7 +773,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:575;outline:Chapter 41. CONTENT-OF"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfcont.html;topic-id:functions-content;heading:Chapter 41. CONTENT-OF"
     },
     {
       "fixed_length": null,
@@ -794,7 +794,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:577;outline:Chapter 42. COS"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfcos.html;topic-id:functions-cos;heading:Chapter 42. COS"
     },
     {
       "fixed_length": 21,
@@ -811,7 +811,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:579;outline:Chapter 43. CURRENT-DATE"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfcur.html;topic-id:functions-current-date;heading:Chapter 43. CURRENT-DATE"
     },
     {
       "fixed_length": null,
@@ -832,7 +832,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:581;outline:Chapter 44. DATE-OF-INTEGER"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfdi.html;topic-id:functions-date-integer;heading:Chapter 44. DATE-OF-INTEGER"
     },
     {
       "fixed_length": null,
@@ -866,7 +866,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:583;outline:Chapter 45. DATE-TO-YYYYMMDD"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfdy.html;topic-id:functions-date-yyyymmdd;heading:Chapter 45. DATE-TO-YYYYMMDD"
     },
     {
       "fixed_length": null,
@@ -887,7 +887,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:585;outline:Chapter 46. DAY-OF-INTEGER"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfdai.html;topic-id:functions-day-integer;heading:Chapter 46. DAY-OF-INTEGER"
     },
     {
       "fixed_length": null,
@@ -921,7 +921,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:587;outline:Chapter 47. DAY-TO-YYYYDDD"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfdad.html;topic-id:functions-day-yyyyddd;heading:Chapter 47. DAY-TO-YYYYDDD"
     },
     {
       "fixed_length": null,
@@ -957,7 +957,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:589;outline:Chapter 48. DISPLAY-OF"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfdis.html;topic-id:functions-display;heading:Chapter 48. DISPLAY-OF"
     },
     {
       "fixed_length": null,
@@ -974,7 +974,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:591;outline:Chapter 49. E"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfe.html;topic-id:functions-e;heading:Chapter 49. E"
     },
     {
       "fixed_length": null,
@@ -995,7 +995,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:593;outline:Chapter 50. EXP"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfexp.html;topic-id:functions-exp;heading:Chapter 50. EXP"
     },
     {
       "fixed_length": null,
@@ -1016,7 +1016,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:595;outline:Chapter 51. EXP10"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfexp10.html;topic-id:functions-exp10;heading:Chapter 51. EXP10"
     },
     {
       "fixed_length": null,
@@ -1037,7 +1037,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:597;outline:Chapter 52. FACTORIAL"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinffac.html;topic-id:functions-factorial;heading:Chapter 52. FACTORIAL"
     },
     {
       "fixed_length": null,
@@ -1062,7 +1062,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:599;outline:Chapter 53. FORMATTED-CURRENT-DATE"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinffcd.html;topic-id:functions-formatted-current-date;heading:Chapter 53. FORMATTED-CURRENT-DATE"
     },
     {
       "fixed_length": null,
@@ -1090,7 +1090,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:601;outline:Chapter 54. FORMATTED-DATE"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinffdt.html;topic-id:functions-formatted-date;heading:Chapter 54. FORMATTED-DATE"
     },
     {
       "fixed_length": null,
@@ -1142,7 +1142,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:603;outline:Chapter 55. FORMATTED-DATETIME"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinffdtt.html;topic-id:functions-formatted-datetime;heading:Chapter 55. FORMATTED-DATETIME"
     },
     {
       "fixed_length": null,
@@ -1188,7 +1188,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:605;outline:Chapter 56. FORMATTED-TIME"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfftime.html;topic-id:functions-formatted-time;heading:Chapter 56. FORMATTED-TIME"
     },
     {
       "fixed_length": null,
@@ -1216,7 +1216,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:607;outline:Chapter 57. HEX-OF"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfhex.html;topic-id:functions-hex;heading:Chapter 57. HEX-OF"
     },
     {
       "fixed_length": null,
@@ -1237,7 +1237,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:609;outline:Chapter 58. HEX-TO-CHAR"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfhextc.html;topic-id:functions-hex-char;heading:Chapter 58. HEX-TO-CHAR"
     },
     {
       "fixed_length": null,
@@ -1258,7 +1258,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:611;outline:Chapter 59. INTEGER"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfint.html;topic-id:functions-integer;heading:Chapter 59. INTEGER"
     },
     {
       "fixed_length": null,
@@ -1279,7 +1279,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:613;outline:Chapter 60. INTEGER-OF-DATE"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfidt.html;topic-id:functions-integer-date;heading:Chapter 60. INTEGER-OF-DATE"
     },
     {
       "fixed_length": null,
@@ -1300,7 +1300,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:615;outline:Chapter 61. INTEGER-OF-DAY"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfida.html;topic-id:functions-integer-day;heading:Chapter 61. INTEGER-OF-DAY"
     },
     {
       "fixed_length": null,
@@ -1330,7 +1330,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:617;outline:Chapter 62. INTEGER-OF-FORMATTED-DATE"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfiformatted.html;topic-id:functions-integer-formatted-date;heading:Chapter 62. INTEGER-OF-FORMATTED-DATE"
     },
     {
       "fixed_length": null,
@@ -1351,7 +1351,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:619;outline:Chapter 63. INTEGER-PART"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfipa.html;topic-id:functions-integer-part;heading:Chapter 63. INTEGER-PART"
     },
     {
       "fixed_length": null,
@@ -1377,7 +1377,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:621;outline:Chapter 64. LENGTH"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinflen.html;topic-id:functions-length;heading:Chapter 64. LENGTH"
     },
     {
       "fixed_length": null,
@@ -1398,7 +1398,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:623;outline:Chapter 65. LOG"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinflog.html;topic-id:functions-log;heading:Chapter 65. LOG"
     },
     {
       "fixed_length": null,
@@ -1419,7 +1419,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:625;outline:Chapter 66. LOG10"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfl10.html;topic-id:functions-log10;heading:Chapter 66. LOG10"
     },
     {
       "fixed_length": null,
@@ -1443,7 +1443,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:627;outline:Chapter 67. LOWER-CASE"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinflow.html;topic-id:functions-lower-case;heading:Chapter 67. LOWER-CASE"
     },
     {
       "fixed_length": null,
@@ -1468,7 +1468,7 @@
           "variadic": true
         }
       ],
-      "source_locator": "pdf-page:629;outline:Chapter 68. MAX"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfmax.html;topic-id:functions-max;heading:Chapter 68. MAX"
     },
     {
       "fixed_length": null,
@@ -1489,7 +1489,7 @@
           "variadic": true
         }
       ],
-      "source_locator": "pdf-page:631;outline:Chapter 69. MEAN"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfmea.html;topic-id:functions-mean;heading:Chapter 69. MEAN"
     },
     {
       "fixed_length": null,
@@ -1510,7 +1510,7 @@
           "variadic": true
         }
       ],
-      "source_locator": "pdf-page:633;outline:Chapter 70. MEDIAN"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfmed.html;topic-id:functions-median;heading:Chapter 70. MEDIAN"
     },
     {
       "fixed_length": null,
@@ -1531,7 +1531,7 @@
           "variadic": true
         }
       ],
-      "source_locator": "pdf-page:635;outline:Chapter 71. MIDRANGE"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfmid.html;topic-id:functions-midrange;heading:Chapter 71. MIDRANGE"
     },
     {
       "fixed_length": null,
@@ -1556,7 +1556,7 @@
           "variadic": true
         }
       ],
-      "source_locator": "pdf-page:637;outline:Chapter 72. MIN"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfmin.html;topic-id:functions-min;heading:Chapter 72. MIN"
     },
     {
       "fixed_length": null,
@@ -1580,7 +1580,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:639;outline:Chapter 73. MOD"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfmod.html;topic-id:functions-mod;heading:Chapter 73. MOD"
     },
     {
       "fixed_length": null,
@@ -1620,7 +1620,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:641;outline:Chapter 74. NATIONAL-OF"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfnat.html;topic-id:functions-national;heading:Chapter 74. NATIONAL-OF"
     },
     {
       "fixed_length": null,
@@ -1642,7 +1642,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:643;outline:Chapter 75. NUMVAL"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfnv.html;topic-id:functions-numval;heading:Chapter 75. NUMVAL"
     },
     {
       "fixed_length": null,
@@ -1679,7 +1679,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:645;outline:Chapter 76. NUMVAL-C"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfnvc.html;topic-id:functions-numval-c;heading:Chapter 76. NUMVAL-C"
     },
     {
       "fixed_length": null,
@@ -1701,7 +1701,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:647;outline:Chapter 77. NUMVAL-F"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfnumvalf.html;topic-id:functions-numval-f;heading:Chapter 77. NUMVAL-F"
     },
     {
       "fixed_length": null,
@@ -1723,7 +1723,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:649;outline:Chapter 78. ORD"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinford.html;topic-id:functions-ord;heading:Chapter 78. ORD"
     },
     {
       "fixed_length": null,
@@ -1747,7 +1747,7 @@
           "variadic": true
         }
       ],
-      "source_locator": "pdf-page:651;outline:Chapter 79. ORD-MAX"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfoma.html;topic-id:functions-ord-max;heading:Chapter 79. ORD-MAX"
     },
     {
       "fixed_length": null,
@@ -1771,7 +1771,7 @@
           "variadic": true
         }
       ],
-      "source_locator": "pdf-page:653;outline:Chapter 80. ORD-MIN"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfomi.html;topic-id:functions-ord-min;heading:Chapter 80. ORD-MIN"
     },
     {
       "fixed_length": null,
@@ -1788,7 +1788,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:655;outline:Chapter 81. PI"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfpi.html;topic-id:functions-pi;heading:Chapter 81. PI"
     },
     {
       "fixed_length": null,
@@ -1812,7 +1812,7 @@
           "variadic": true
         }
       ],
-      "source_locator": "pdf-page:657;outline:Chapter 82. PRESENT-VALUE"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfpre.html;topic-id:functions-present-value;heading:Chapter 82. PRESENT-VALUE"
     },
     {
       "fixed_length": null,
@@ -1839,7 +1839,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:659;outline:Chapter 83. RANDOM"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfrnd.html;topic-id:functions-random;heading:Chapter 83. RANDOM"
     },
     {
       "fixed_length": null,
@@ -1861,7 +1861,7 @@
           "variadic": true
         }
       ],
-      "source_locator": "pdf-page:661;outline:Chapter 84. RANGE"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfran.html;topic-id:functions-range;heading:Chapter 84. RANGE"
     },
     {
       "fixed_length": null,
@@ -1885,7 +1885,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:663;outline:Chapter 85. REM"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfrem.html;topic-id:functions-rem;heading:Chapter 85. REM"
     },
     {
       "fixed_length": null,
@@ -1908,7 +1908,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:665;outline:Chapter 86. REVERSE"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfrev.html;topic-id:functions-reverse;heading:Chapter 86. REVERSE"
     },
     {
       "fixed_length": null,
@@ -1938,7 +1938,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:667;outline:Chapter 87. SECONDS-FROM-FORMATTED-TIME"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfsecfrom.html;topic-id:functions-seconds-from-formatted-time;heading:Chapter 87. SECONDS-FROM-FORMATTED-TIME"
     },
     {
       "fixed_length": null,
@@ -1955,7 +1955,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:669;outline:Chapter 88. SECONDS-PAST-MIDNIGHT"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfsecpstmn.html;topic-id:functions-seconds-past-midnight;heading:Chapter 88. SECONDS-PAST-MIDNIGHT"
     },
     {
       "fixed_length": null,
@@ -1976,7 +1976,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:671;outline:Chapter 89. SIGN"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfsign.html;topic-id:functions-sign;heading:Chapter 89. SIGN"
     },
     {
       "fixed_length": null,
@@ -1997,7 +1997,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:673;outline:Chapter 90. SIN"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfsin.html;topic-id:functions-sin;heading:Chapter 90. SIN"
     },
     {
       "fixed_length": null,
@@ -2018,7 +2018,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:675;outline:Chapter 91. SQRT"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfsqr.html;topic-id:functions-sqrt;heading:Chapter 91. SQRT"
     },
     {
       "fixed_length": null,
@@ -2039,7 +2039,7 @@
           "variadic": true
         }
       ],
-      "source_locator": "pdf-page:677;outline:Chapter 92. STANDARD-DEVIATION"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfsta.html;topic-id:functions-standard-deviation;heading:Chapter 92. STANDARD-DEVIATION"
     },
     {
       "fixed_length": null,
@@ -2061,7 +2061,7 @@
           "variadic": true
         }
       ],
-      "source_locator": "pdf-page:679;outline:Chapter 93. SUM"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfsum.html;topic-id:functions-sum;heading:Chapter 93. SUM"
     },
     {
       "fixed_length": null,
@@ -2082,7 +2082,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:681;outline:Chapter 94. TAN"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinftan.html;topic-id:functions-tan;heading:Chapter 94. TAN"
     },
     {
       "fixed_length": null,
@@ -2103,7 +2103,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:683;outline:Chapter 95. TEST-DATE-YYYYMMDD"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinftestdate.html;topic-id:functions-test-date-yyyymmdd;heading:Chapter 95. TEST-DATE-YYYYMMDD"
     },
     {
       "fixed_length": null,
@@ -2124,7 +2124,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:685;outline:Chapter 96. TEST-DAY-YYYYDDD"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinftestday.html;topic-id:functions-test-day-yyyyddd;heading:Chapter 96. TEST-DAY-YYYYDDD"
     },
     {
       "fixed_length": null,
@@ -2154,7 +2154,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:687;outline:Chapter 97. TEST-FORMATTED-DATETIME"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinftestformatted.html;topic-id:functions-test-formatted-datetime;heading:Chapter 97. TEST-FORMATTED-DATETIME"
     },
     {
       "fixed_length": null,
@@ -2176,7 +2176,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:689;outline:Chapter 98. TEST-NUMVAL"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinftestnumval.html;topic-id:functions-test-numval;heading:Chapter 98. TEST-NUMVAL"
     },
     {
       "fixed_length": null,
@@ -2213,7 +2213,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:691;outline:Chapter 99. TEST-NUMVAL-C"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinftestnumvalc.html;topic-id:functions-test-numval-c;heading:Chapter 99. TEST-NUMVAL-C"
     },
     {
       "fixed_length": null,
@@ -2235,7 +2235,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:693;outline:Chapter 100. TEST-NUMVAL-F"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinftestnumvalf.html;topic-id:functions-test-numval-f;heading:Chapter 100. TEST-NUMVAL-F"
     },
     {
       "fixed_length": null,
@@ -2275,7 +2275,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:695;outline:Chapter 101. TRIM"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinftrim.html;topic-id:functions-trim;heading:Chapter 101. TRIM"
     },
     {
       "fixed_length": null,
@@ -2334,7 +2334,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:697;outline:Chapter 102. ULENGTH"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfule.html;topic-id:functions-ulength;heading:Chapter 102. ULENGTH"
     },
     {
       "fixed_length": null,
@@ -2361,7 +2361,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:699;outline:Chapter 103. UPOS"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfupo.html;topic-id:functions-upos;heading:Chapter 103. UPOS"
     },
     {
       "fixed_length": null,
@@ -2385,7 +2385,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:701;outline:Chapter 104. UPPER-CASE"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfupp.html;topic-id:functions-upper-case;heading:Chapter 104. UPPER-CASE"
     },
     {
       "fixed_length": null,
@@ -2415,7 +2415,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:703;outline:Chapter 105. USUBSTR"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfusu.html;topic-id:functions-usubstr;heading:Chapter 105. USUBSTR"
     },
     {
       "fixed_length": null,
@@ -2439,7 +2439,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:705;outline:Chapter 106. USUPPLEMENTARY"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfusup.html;topic-id:functions-usupplementary;heading:Chapter 106. USUPPLEMENTARY"
     },
     {
       "fixed_length": 36,
@@ -2456,7 +2456,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:707;outline:Chapter 107. UUID4"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfuuid4.html;topic-id:functions-uuid4;heading:Chapter 107. UUID4"
     },
     {
       "fixed_length": null,
@@ -2480,7 +2480,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:709;outline:Chapter 108. UVALID"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfuva.html;topic-id:functions-uvalid;heading:Chapter 108. UVALID"
     },
     {
       "fixed_length": null,
@@ -2507,7 +2507,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:713;outline:Chapter 109. UWIDTH"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfuwi.html;topic-id:functions-uwidth;heading:Chapter 109. UWIDTH"
     },
     {
       "fixed_length": null,
@@ -2528,7 +2528,7 @@
           "variadic": true
         }
       ],
-      "source_locator": "pdf-page:715;outline:Chapter 110. VARIANCE"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfvar.html;topic-id:functions-variance;heading:Chapter 110. VARIANCE"
     },
     {
       "fixed_length": 21,
@@ -2545,7 +2545,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:717;outline:Chapter 111. WHEN-COMPILED"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfwhe.html;topic-id:functions-when-compiled;heading:Chapter 111. WHEN-COMPILED"
     },
     {
       "fixed_length": null,
@@ -2579,7 +2579,7 @@
           "variadic": false
         }
       ],
-      "source_locator": "pdf-page:719;outline:Chapter 112. YEAR-TO-YYYY"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfyy.html;topic-id:functions-year-yyyy;heading:Chapter 112. YEAR-TO-YYYY"
     }
   ],
   "procedure_statements": [
@@ -2590,7 +2590,7 @@
       "id": "accept",
       "label": "ACCEPT statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0001",
-      "source_locator": "pdf-page:339;outline:ACCEPT statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsacce.html;topic-id:statements-accept-statement;heading:ACCEPT statement"
     },
     {
       "forms": [
@@ -2601,7 +2601,7 @@
       "id": "add",
       "label": "ADD statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0002",
-      "source_locator": "pdf-page:343;outline:ADD statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsadd.html;topic-id:statements-add-statement;heading:ADD statement"
     },
     {
       "forms": [
@@ -2610,7 +2610,7 @@
       "id": "allocate",
       "label": "ALLOCATE statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0003",
-      "source_locator": "pdf-page:345;outline:ALLOCATE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsallo.html;topic-id:statements-allocate-statement;heading:ALLOCATE statement"
     },
     {
       "forms": [
@@ -2619,7 +2619,7 @@
       "id": "alter",
       "label": "ALTER statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0004",
-      "source_locator": "pdf-page:350;outline:ALTER statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsalte.html;topic-id:statements-alter-statement;heading:ALTER statement"
     },
     {
       "forms": [
@@ -2628,7 +2628,7 @@
       "id": "call",
       "label": "CALL statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0005",
-      "source_locator": "pdf-page:351;outline:CALL statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpscall.html;topic-id:statements-call-statement;heading:CALL statement"
     },
     {
       "forms": [
@@ -2637,7 +2637,7 @@
       "id": "cancel",
       "label": "CANCEL statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0006",
-      "source_locator": "pdf-page:359;outline:CANCEL statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpscanc.html;topic-id:statements-cancel-statement;heading:CANCEL statement"
     },
     {
       "forms": [
@@ -2647,7 +2647,7 @@
       "id": "close",
       "label": "CLOSE statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0007",
-      "source_locator": "pdf-page:360;outline:CLOSE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsclos.html;topic-id:statements-close-statement;heading:CLOSE statement"
     },
     {
       "forms": [
@@ -2656,7 +2656,7 @@
       "id": "compute",
       "label": "COMPUTE statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0008",
-      "source_locator": "pdf-page:363;outline:COMPUTE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpscomp.html;topic-id:statements-compute-statement;heading:COMPUTE statement"
     },
     {
       "forms": [
@@ -2665,7 +2665,7 @@
       "id": "continue",
       "label": "CONTINUE statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0009",
-      "source_locator": "pdf-page:364;outline:CONTINUE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpscont.html;topic-id:statements-continue-statement;heading:CONTINUE statement"
     },
     {
       "forms": [
@@ -2674,7 +2674,7 @@
       "id": "delete",
       "label": "DELETE statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0010",
-      "source_locator": "pdf-page:364;outline:DELETE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsdele.html;topic-id:statements-delete-statement;heading:DELETE statement"
     },
     {
       "forms": [
@@ -2683,7 +2683,7 @@
       "id": "display",
       "label": "DISPLAY statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0011",
-      "source_locator": "pdf-page:366;outline:DISPLAY statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsdisp.html;topic-id:statements-display-statement;heading:DISPLAY statement"
     },
     {
       "forms": [
@@ -2692,7 +2692,7 @@
       "id": "divide",
       "label": "DIVIDE statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0012",
-      "source_locator": "pdf-page:368;outline:DIVIDE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsdivi.html;topic-id:statements-divide-statement;heading:DIVIDE statement"
     },
     {
       "forms": [
@@ -2701,7 +2701,7 @@
       "id": "entry",
       "label": "ENTRY statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0013",
-      "source_locator": "pdf-page:371;outline:ENTRY statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsentr.html;topic-id:statements-entry-statement;heading:ENTRY statement"
     },
     {
       "forms": [
@@ -2710,7 +2710,7 @@
       "id": "evaluate",
       "label": "EVALUATE statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0014",
-      "source_locator": "pdf-page:372;outline:EVALUATE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpseval.html;topic-id:statements-evaluate-statement;heading:EVALUATE statement"
     },
     {
       "forms": [
@@ -2719,7 +2719,7 @@
       "id": "exit",
       "label": "EXIT statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0015",
-      "source_locator": "pdf-page:375;outline:EXIT statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsexit.html;topic-id:statements-exit-statement;heading:EXIT statement"
     },
     {
       "forms": [
@@ -2728,7 +2728,7 @@
       "id": "free",
       "label": "FREE statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0016",
-      "source_locator": "pdf-page:378;outline:FREE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsfree.html;topic-id:statements-free-statement;heading:FREE statement"
     },
     {
       "forms": [
@@ -2737,7 +2737,7 @@
       "id": "goback",
       "label": "GOBACK statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0017",
-      "source_locator": "pdf-page:378;outline:GOBACK statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsgoba.html;topic-id:statements-goback-statement;heading:GOBACK statement"
     },
     {
       "forms": [
@@ -2746,7 +2746,7 @@
       "id": "go-to",
       "label": "GO TO statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0018",
-      "source_locator": "pdf-page:379;outline:GO TO statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsgoto.html;topic-id:statements-go-statement;heading:GO TO statement"
     },
     {
       "forms": [
@@ -2755,7 +2755,7 @@
       "id": "if",
       "label": "IF statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0019",
-      "source_locator": "pdf-page:381;outline:IF statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsif.html;topic-id:statements-if-statement;heading:IF statement"
     },
     {
       "forms": [
@@ -2764,7 +2764,7 @@
       "id": "initialize",
       "label": "INITIALIZE statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0020",
-      "source_locator": "pdf-page:383;outline:INITIALIZE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsinit.html;topic-id:statements-initialize-statement;heading:INITIALIZE statement"
     },
     {
       "forms": [
@@ -2773,7 +2773,7 @@
       "id": "inspect",
       "label": "INSPECT statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0021",
-      "source_locator": "pdf-page:386;outline:INSPECT statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsinsp.html;topic-id:statements-inspect-statement;heading:INSPECT statement"
     },
     {
       "forms": [
@@ -2782,7 +2782,7 @@
       "id": "invoke",
       "label": "INVOKE statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0022",
-      "source_locator": "pdf-page:395;outline:INVOKE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsinvo.html;topic-id:statements-invoke-statement;heading:INVOKE statement"
     },
     {
       "forms": [
@@ -2791,7 +2791,7 @@
       "id": "json-generate",
       "label": "JSON GENERATE statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0023",
-      "source_locator": "pdf-page:402;outline:JSON GENERATE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsjsog.html;topic-id:statements-json-generate-statement;heading:JSON GENERATE statement"
     },
     {
       "forms": [
@@ -2800,7 +2800,7 @@
       "id": "json-parse",
       "label": "JSON PARSE statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
-      "source_locator": "pdf-page:416;outline:JSON PARSE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsjsop.html;topic-id:statements-json-parse-statement;heading:JSON PARSE statement"
     },
     {
       "forms": [
@@ -2809,7 +2809,7 @@
       "id": "merge",
       "label": "MERGE statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0025",
-      "source_locator": "pdf-page:433;outline:MERGE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsmerg.html;topic-id:statements-merge-statement;heading:MERGE statement"
     },
     {
       "forms": [
@@ -2818,7 +2818,7 @@
       "id": "move",
       "label": "MOVE statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0026",
-      "source_locator": "pdf-page:437;outline:MOVE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsmove.html;topic-id:statements-move-statement;heading:MOVE statement"
     },
     {
       "forms": [
@@ -2827,7 +2827,7 @@
       "id": "multiply",
       "label": "MULTIPLY statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0027",
-      "source_locator": "pdf-page:443;outline:MULTIPLY statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsmult.html;topic-id:statements-multiply-statement;heading:MULTIPLY statement"
     },
     {
       "forms": [
@@ -2836,7 +2836,7 @@
       "id": "open",
       "label": "OPEN statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0028",
-      "source_locator": "pdf-page:445;outline:OPEN statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsopen.html;topic-id:statements-open-statement;heading:OPEN statement"
     },
     {
       "forms": [
@@ -2846,7 +2846,7 @@
       "id": "perform",
       "label": "PERFORM statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0029",
-      "source_locator": "pdf-page:449;outline:PERFORM statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsperf.html;topic-id:statements-perform-statement;heading:PERFORM statement"
     },
     {
       "forms": [
@@ -2856,7 +2856,7 @@
       "id": "read",
       "label": "READ statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0030",
-      "source_locator": "pdf-page:461;outline:READ statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsread.html;topic-id:statements-read-statement;heading:READ statement"
     },
     {
       "forms": [
@@ -2865,7 +2865,7 @@
       "id": "release",
       "label": "RELEASE statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0031",
-      "source_locator": "pdf-page:466;outline:RELEASE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsrele.html;topic-id:statements-release-statement;heading:RELEASE statement"
     },
     {
       "forms": [
@@ -2874,7 +2874,7 @@
       "id": "return",
       "label": "RETURN statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0032",
-      "source_locator": "pdf-page:467;outline:RETURN statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsretu.html;topic-id:statements-return-statement;heading:RETURN statement"
     },
     {
       "forms": [
@@ -2883,7 +2883,7 @@
       "id": "rewrite",
       "label": "REWRITE statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0033",
-      "source_locator": "pdf-page:469;outline:REWRITE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsrewr.html;topic-id:statements-rewrite-statement;heading:REWRITE statement"
     },
     {
       "forms": [
@@ -2892,7 +2892,7 @@
       "id": "search",
       "label": "SEARCH statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0034",
-      "source_locator": "pdf-page:471;outline:SEARCH statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpssear.html;topic-id:statements-search-statement;heading:SEARCH statement"
     },
     {
       "forms": [
@@ -2901,7 +2901,7 @@
       "id": "set",
       "label": "SET statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0035",
-      "source_locator": "pdf-page:477;outline:SET statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsset.html;topic-id:statements-set-statement;heading:SET statement"
     },
     {
       "forms": [
@@ -2910,7 +2910,7 @@
       "id": "sort",
       "label": "SORT statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0036",
-      "source_locator": "pdf-page:484;outline:SORT statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpssort.html;topic-id:statements-sort-statement;heading:SORT statement"
     },
     {
       "forms": [
@@ -2919,7 +2919,7 @@
       "id": "start",
       "label": "START statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0037",
-      "source_locator": "pdf-page:492;outline:START statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsstar.html;topic-id:statements-start-statement;heading:START statement"
     },
     {
       "forms": [
@@ -2928,7 +2928,7 @@
       "id": "stop",
       "label": "STOP statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0038",
-      "source_locator": "pdf-page:494;outline:STOP statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsstop.html;topic-id:statements-stop-statement;heading:STOP statement"
     },
     {
       "forms": [
@@ -2937,7 +2937,7 @@
       "id": "string",
       "label": "STRING statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0039",
-      "source_locator": "pdf-page:494;outline:STRING statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsstri.html;topic-id:statements-string-statement;heading:STRING statement"
     },
     {
       "forms": [
@@ -2946,7 +2946,7 @@
       "id": "subtract",
       "label": "SUBTRACT statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0040",
-      "source_locator": "pdf-page:499;outline:SUBTRACT statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpssubt.html;topic-id:statements-subtract-statement;heading:SUBTRACT statement"
     },
     {
       "forms": [
@@ -2955,7 +2955,7 @@
       "id": "unstring",
       "label": "UNSTRING statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0041",
-      "source_locator": "pdf-page:502;outline:UNSTRING statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsunst.html;topic-id:statements-unstring-statement;heading:UNSTRING statement"
     },
     {
       "forms": [
@@ -2964,7 +2964,7 @@
       "id": "write",
       "label": "WRITE statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0042",
-      "source_locator": "pdf-page:508;outline:WRITE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpswrit.html;topic-id:statements-write-statement;heading:WRITE statement"
     },
     {
       "forms": [
@@ -2973,7 +2973,7 @@
       "id": "xml-generate",
       "label": "XML GENERATE statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0043",
-      "source_locator": "pdf-page:516;outline:XML GENERATE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsxmlg.html;topic-id:statements-xml-generate-statement;heading:XML GENERATE statement"
     },
     {
       "forms": [
@@ -2982,13 +2982,14 @@
       "id": "xml-parse",
       "label": "XML PARSE statement",
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044",
-      "source_locator": "pdf-page:526;outline:XML PARSE statement"
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsxmlp.html;topic-id:statements-xml-parse-statement;heading:XML PARSE statement"
     }
   ],
   "schema_version": "mainframe-env.cobol-language@1",
   "source": {
+    "manifest": "conformance/0.2/manifests/cobol-topics.json",
     "publication": "SC27-8713-04",
-    "sha256": "sha256:8b86cbd2d838d8f460dcbe8d1e74d2266799ce1534f4cfdbc08469c36748e85e"
+    "sha256": "sha256:9b0291045414ca38d0e8138c7cc78d7321887a3fad6c27a433efd9e9ca7fd1ad"
   },
   "special_registers": [
     {
@@ -2997,7 +2998,7 @@
       "name": "ADDRESS OF",
       "operand": "data-item",
       "runtime_supported": true,
-      "source_locator": "pdf-page:19;outline:ADDRESS OF",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanadd.html;topic-id:registers-address;heading:ADDRESS OF",
       "usage": "pointer",
       "value_type": "other",
       "writable": true
@@ -3008,7 +3009,7 @@
       "name": "DEBUG-ITEM",
       "operand": "debug-context",
       "runtime_supported": true,
-      "source_locator": "pdf-page:19;outline:DEBUG-ITEM",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllandeb.html;topic-id:registers-debug-item;heading:DEBUG-ITEM",
       "usage": "group",
       "value_type": "group",
       "writable": false
@@ -3019,7 +3020,7 @@
       "name": "IGY-JAVAIOP-CALL-EXCEPTION",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:20;outline:IGY-JAVAIOP-CALL-EXCEPTION",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanigy.html;topic-id:registers-igy-javaiop-call-exception;heading:IGY-JAVAIOP-CALL-EXCEPTION",
       "usage": "native-binary",
       "value_type": "integer",
       "writable": false
@@ -3030,7 +3031,7 @@
       "name": "JNIENVPTR",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:21;outline:JNIENVPTR",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanjni.html;topic-id:registers-jnienvptr;heading:JNIENVPTR",
       "usage": "pointer",
       "value_type": "other",
       "writable": false
@@ -3042,7 +3043,7 @@
       "name": "JSON-CODE",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:21;outline:JSON-CODE",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanjco.html;topic-id:registers-json-code;heading:JSON-CODE",
       "usage": "binary",
       "value_type": "integer",
       "writable": true
@@ -3054,7 +3055,7 @@
       "name": "JSON-STATUS",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:22;outline:JSON-STATUS",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanjst.html;topic-id:registers-json-status;heading:JSON-STATUS",
       "usage": "binary",
       "value_type": "integer",
       "writable": false
@@ -3065,7 +3066,7 @@
       "name": "LENGTH OF",
       "operand": "data-item",
       "runtime_supported": true,
-      "source_locator": "pdf-page:22;outline:LENGTH OF",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanlen.html;topic-id:registers-length;heading:LENGTH OF",
       "usage": "binary",
       "value_type": "integer",
       "writable": false
@@ -3076,7 +3077,7 @@
       "name": "LINAGE-COUNTER",
       "operand": "file",
       "runtime_supported": true,
-      "source_locator": "pdf-page:23;outline:LINAGE-COUNTER",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanlin.html;topic-id:registers-linage-counter;heading:LINAGE-COUNTER",
       "usage": "binary",
       "value_type": "integer",
       "writable": false
@@ -3088,7 +3089,7 @@
       "name": "RETURN-CODE",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:24;outline:RETURN-CODE",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanret.html;topic-id:registers-return-code;heading:RETURN-CODE",
       "usage": "binary",
       "value_type": "integer",
       "writable": true
@@ -3100,7 +3101,7 @@
       "name": "SHIFT-OUT",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:25;outline:SHIFT-OUT",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanshi.html;topic-id:registers-shift-out-shift-in;heading:SHIFT-OUT",
       "usage": "display",
       "value_type": "alphanumeric",
       "writable": false
@@ -3112,7 +3113,7 @@
       "name": "SHIFT-IN",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:25;outline:SHIFT-IN",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanshi.html;topic-id:registers-shift-out-shift-in;heading:SHIFT-IN",
       "usage": "display",
       "value_type": "alphanumeric",
       "writable": false
@@ -3124,7 +3125,7 @@
       "name": "SORT-CONTROL",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:25;outline:SORT-CONTROL",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllansc.html;topic-id:registers-sort-control;heading:SORT-CONTROL",
       "usage": "display",
       "value_type": "alphanumeric",
       "writable": true
@@ -3136,7 +3137,7 @@
       "name": "SORT-CORE-SIZE",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:26;outline:SORT-CORE-SIZE",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanscs.html;topic-id:registers-sort-core-size;heading:SORT-CORE-SIZE",
       "usage": "binary",
       "value_type": "integer",
       "writable": true
@@ -3148,7 +3149,7 @@
       "name": "SORT-FILE-SIZE",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:26;outline:SORT-FILE-SIZE",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllansfs.html;topic-id:registers-sort-file-size;heading:SORT-FILE-SIZE",
       "usage": "binary",
       "value_type": "integer",
       "writable": true
@@ -3160,7 +3161,7 @@
       "name": "SORT-MESSAGE",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:26;outline:SORT-MESSAGE",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllansm.html;topic-id:registers-sort-message;heading:SORT-MESSAGE",
       "usage": "display",
       "value_type": "alphanumeric",
       "writable": true
@@ -3172,7 +3173,7 @@
       "name": "SORT-MODE-SIZE",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:27;outline:SORT-MODE-SIZE",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllansms.html;topic-id:registers-sort-mode-size;heading:SORT-MODE-SIZE",
       "usage": "binary",
       "value_type": "integer",
       "writable": true
@@ -3184,7 +3185,7 @@
       "name": "SORT-RETURN",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:27;outline:SORT-RETURN",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllansr.html;topic-id:registers-sort-return;heading:SORT-RETURN",
       "usage": "binary",
       "value_type": "integer",
       "writable": true
@@ -3196,7 +3197,7 @@
       "name": "TALLY",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:28;outline:TALLY",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllantal.html;topic-id:registers-tally;heading:TALLY",
       "usage": "binary",
       "value_type": "integer",
       "writable": true
@@ -3208,7 +3209,7 @@
       "name": "WHEN-COMPILED",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:28;outline:WHEN-COMPILED",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanwhe.html;topic-id:registers-when-compiled;heading:WHEN-COMPILED",
       "usage": "display",
       "value_type": "alphanumeric",
       "writable": false
@@ -3220,7 +3221,7 @@
       "name": "XML-CODE",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:28;outline:XML-CODE",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanxco.html;topic-id:registers-xml-code;heading:XML-CODE",
       "usage": "binary",
       "value_type": "integer",
       "writable": true
@@ -3232,7 +3233,7 @@
       "name": "XML-EVENT",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:29;outline:XML-EVENT",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanxev.html;topic-id:registers-xml-event;heading:XML-EVENT",
       "usage": "display",
       "value_type": "alphanumeric",
       "writable": false
@@ -3244,7 +3245,7 @@
       "name": "XML-INFORMATION",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:34;outline:XML-INFORMATION",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanxif.html;topic-id:registers-xml-information;heading:XML-INFORMATION",
       "usage": "binary",
       "value_type": "integer",
       "writable": false
@@ -3255,7 +3256,7 @@
       "name": "XML-NAMESPACE",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:34;outline:XML-NAMESPACE",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanxna.html;topic-id:registers-xml-namespace;heading:XML-NAMESPACE",
       "usage": "display",
       "value_type": "alphanumeric",
       "writable": false
@@ -3266,7 +3267,7 @@
       "name": "XML-NNAMESPACE",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:35;outline:XML-NNAMESPACE",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanxnn.html;topic-id:registers-xml-nnamespace;heading:XML-NNAMESPACE",
       "usage": "national",
       "value_type": "national",
       "writable": false
@@ -3277,7 +3278,7 @@
       "name": "XML-NAMESPACE-PREFIX",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:36;outline:XML-NAMESPACE-PREFIX",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanxpa.html;topic-id:registers-xml-namespace-prefix;heading:XML-NAMESPACE-PREFIX",
       "usage": "display",
       "value_type": "alphanumeric",
       "writable": false
@@ -3288,7 +3289,7 @@
       "name": "XML-NNAMESPACE-PREFIX",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:36;outline:XML-NNAMESPACE-PREFIX",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanxpn.html;topic-id:registers-xml-nnamespace-prefix;heading:XML-NNAMESPACE-PREFIX",
       "usage": "national",
       "value_type": "national",
       "writable": false
@@ -3299,7 +3300,7 @@
       "name": "XML-NTEXT",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:37;outline:XML-NTEXT",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanxnt.html;topic-id:registers-xml-ntext;heading:XML-NTEXT",
       "usage": "national",
       "value_type": "national",
       "writable": false
@@ -3310,7 +3311,7 @@
       "name": "XML-TEXT",
       "operand": "none",
       "runtime_supported": true,
-      "source_locator": "pdf-page:37;outline:XML-TEXT",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanxte.html;topic-id:registers-xml-text;heading:XML-TEXT",
       "usage": "display",
       "value_type": "alphanumeric",
       "writable": false

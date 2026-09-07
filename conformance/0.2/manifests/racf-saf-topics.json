@@ -1,0 +1,675 @@
+{
+  "baseline_id": "ibm-zos-3.2-racf-saf-2026",
+  "book_href": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/abstract.htm",
+  "book_label": "z/OS Security Server RACF Command Language Reference",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "coverage_credit": 0,
+  "product": "SSLTBW_3.2.0",
+  "retained_in_repository": false,
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "snapshot_date": "2026",
+  "subsystem": "racf-saf",
+  "target_version": "0.2.0",
+  "toc_sha256": "477a3de1989e3cb185f2dacdc7cea9bab8304ef148e7c9e5e8be55fe3f77dc2b",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/SSLTBW_3.2.0?lang=en",
+  "topic_count": 109,
+  "topic_manifest_digest": "8ebad84cd96572fe1c0612798a6b3a4be4752742d2496505ee3f7fcaec7d952f",
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topics": [
+    {
+      "bytes": 1920,
+      "last_modified": "2026-01-28",
+      "sha256": "0c1008c709e8d022c527fc558994e7df7db00eef8fa8972014e09985e148382a",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/abstract.htm"
+    },
+    {
+      "bytes": 46367,
+      "last_modified": "2026-01-28",
+      "sha256": "619c334f903b00691c2f95ff2bcec51a84330a9ec98c0f08385fe1d3153f131a",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/addgroup.htm"
+    },
+    {
+      "bytes": 86644,
+      "last_modified": "2026-06-24",
+      "sha256": "13b73dc257bddd6460fa18a4bf92bd4da3e8ec7955adfa4a3901ac1172ad1600",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/addsd.htm"
+    },
+    {
+      "bytes": 255147,
+      "last_modified": "2026-02-25",
+      "sha256": "12c201c5a7fb21ced7d84ef23606d2eb0442cdff870dc2180a0809372cd1d977",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/adduser.htm"
+    },
+    {
+      "bytes": 82266,
+      "last_modified": "2026-06-24",
+      "sha256": "e3beb3c94c424803da656a9993e95aa903ad64a16b7a8b4b5548c9cdca8446d6",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/altdsd.htm"
+    },
+    {
+      "bytes": 55442,
+      "last_modified": "2026-01-28",
+      "sha256": "9f42b9dd856a399d6de652f5a34619cdc3e88f7f8be022bb79cee5267cf58cac",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/altgrp.htm"
+    },
+    {
+      "bytes": 341788,
+      "last_modified": "2026-04-29",
+      "sha256": "5cddb1c4163683719a619bbb8fed87c9e71f9e3191ec6615f257ce1a7d61d7ac",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/altuser.htm"
+    },
+    {
+      "bytes": 1662,
+      "last_modified": "2026-01-28",
+      "sha256": "9f0fdb46fc9875be8456753aecbb3781f06e4ba05bdcc28d01528d4acdf0b7a9",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/attaut.htm"
+    },
+    {
+      "bytes": 1884,
+      "last_modified": "2026-01-28",
+      "sha256": "45f4836239005df18fe8ab4ac596541a5c66edd94bc42a94da8e3861397b3557",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/bifirc.htm"
+    },
+    {
+      "bytes": 6163,
+      "last_modified": "2026-01-28",
+      "sha256": "b5d0b5cb59c1ae2f93acf49474520ed035423d506f27ae7f3cdececbb4c99212",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/ch4.htm"
+    },
+    {
+      "bytes": 5117,
+      "last_modified": "2026-01-28",
+      "sha256": "1843a4194bb2247afc396b0942d70214c1b7cf46bc2f8f38f4a3846b1636f86f",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/chcoprevised.htm"
+    },
+    {
+      "bytes": 5598,
+      "last_modified": "2026-01-28",
+      "sha256": "05d0fe260cda5faee665e44960aa0d956c0dc2b77a891b617d38449a842afbf6",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/cmdrule.htm"
+    },
+    {
+      "bytes": 8850,
+      "last_modified": "2026-04-29",
+      "sha256": "8126dcc5eb0d046e35d044ff896cfb314eb3b02f8835ce2da28b55b99a9f1b0b",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/cmdsyn.htm"
+    },
+    {
+      "bytes": 41336,
+      "last_modified": "2026-01-28",
+      "sha256": "6685247afa8b710fd67ebfe412bcb15127b542c249ba94b02a5c959b680c68c1",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/connect.htm"
+    },
+    {
+      "bytes": 26910,
+      "last_modified": "2026-01-28",
+      "sha256": "96161e7e4f072280fa40c224a94341d28bd0f7a320eca74c281a76717252242c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/deldsd.htm"
+    },
+    {
+      "bytes": 14901,
+      "last_modified": "2026-01-28",
+      "sha256": "22a91c6812a3424fc83a0eee91dcdb8d1bf256fd431cf0dda3410be89ade109c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/delgrp.htm"
+    },
+    {
+      "bytes": 21031,
+      "last_modified": "2026-01-28",
+      "sha256": "99d22370a9071a3ba08b2079470f61e640fa49c9480f73da5ba2b34d03993799",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/deluser.htm"
+    },
+    {
+      "bytes": 28476,
+      "last_modified": "2026-01-28",
+      "sha256": "a5b964ddb860114bda5a05972ffbdfd877f4996171a97d0b208d9f4f27f52be4",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/display.htm"
+    },
+    {
+      "bytes": 5790,
+      "last_modified": "2026-01-28",
+      "sha256": "a3359df1beff1bec8d8692671ef6f77f2f4ed7d2e6cb14d96b443943acdb6d0c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/dsinfo.htm"
+    },
+    {
+      "bytes": 2667,
+      "last_modified": "2026-01-28",
+      "sha256": "ffb5b55b5ca2c7dad248ade408b985f482abe6889c57fb48be1904ab5362b259",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/enter.htm"
+    },
+    {
+      "bytes": 2348,
+      "last_modified": "2026-01-28",
+      "sha256": "4c75c209c1dba2823287d90b084bf3e296d0cd8347bd1fa01f6ef5e4e1020fbe",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/enterrc.htm"
+    },
+    {
+      "bytes": 29024,
+      "last_modified": "2026-01-28",
+      "sha256": "d973bd2526b48f5e50947f3aa170bfafa4e067bb3b39babf53456f4c1390be89",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/frcsum.htm"
+    },
+    {
+      "bytes": 8217,
+      "last_modified": "2026-01-28",
+      "sha256": "247e21761023f427bf68a352ae33f03f46251b0268faa953bceca73b93e39e61",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/genown.htm"
+    },
+    {
+      "bytes": 1918,
+      "last_modified": "2026-01-28",
+      "sha256": "b2a551a420fda15d3819f8623e37ca94bff6be5ecaa56236c87f508d90f3908d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/groupa.htm"
+    },
+    {
+      "bytes": 1464,
+      "last_modified": "2026-01-28",
+      "sha256": "9460ed2ac220e0d31e948140141c229a45b45bbdcbf61f94d6062ead1792129d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/ich2a40013.htm"
+    },
+    {
+      "bytes": 1489,
+      "last_modified": "2026-01-28",
+      "sha256": "f3c4b9bf65cb9fb6edaee508c638bdd409185ec16a52ae0cfcadfbcc7d7a8b57",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/ich2a40014.htm"
+    },
+    {
+      "bytes": 3672,
+      "last_modified": "2026-01-28",
+      "sha256": "34255586ec6faf0f94548fbaa7c277f6f553ee7c1fd86d90188d32f2b9cc0c09",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/ich2a40015.htm"
+    },
+    {
+      "bytes": 2649,
+      "last_modified": "2026-01-28",
+      "sha256": "40ba720f952542c024b54c0db4e6c8155dcd7bf9aa5233f802a6a579675c22a7",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/ich2a40016.htm"
+    },
+    {
+      "bytes": 1362,
+      "last_modified": "2026-01-28",
+      "sha256": "3ed1af34e1b0ed20aaf7f51c3aa3b8228342cabe4f6450816baf5d9e6ffb505e",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/ich2a40017.htm"
+    },
+    {
+      "bytes": 28981,
+      "last_modified": "2026-01-28",
+      "sha256": "d976e0e91799d30c7428b1b9552a2fc86c73afd43937fe9db0d97a65cc6c9bfd",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/ich2a40018.htm"
+    },
+    {
+      "bytes": 2916,
+      "last_modified": "2026-01-28",
+      "sha256": "8f35cbb622b7be53c58b5c71bf9e4da0f9f85974d2a3a86506264ecd06165cc5",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/ich2a40019.htm"
+    },
+    {
+      "bytes": 3239,
+      "last_modified": "2026-01-28",
+      "sha256": "a93e5c9dd226e684e1b655aa38ce84c7609a8fda7f25527a53c8bb948bd218c7",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/ich2a40020.htm"
+    },
+    {
+      "bytes": 3357,
+      "last_modified": "2026-01-28",
+      "sha256": "4fb1c7004654d3bf04e2d64af9d8ec318e4d895e9a6644950ac5f706cf01b692",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/ich2a40021.htm"
+    },
+    {
+      "bytes": 2483,
+      "last_modified": "2026-01-28",
+      "sha256": "ea9b63a9125dedb91b63e5c751e4453fea3fcd4ffb807d7b94b39ede56231df4",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/ich2a40022.htm"
+    },
+    {
+      "bytes": 2719,
+      "last_modified": "2026-01-28",
+      "sha256": "426f78a8d91f3db15972f40259eb80a8f3d2cc9be18bae69b52c92ad7a534c9e",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/ich2a40023.htm"
+    },
+    {
+      "bytes": 1537,
+      "last_modified": "2026-01-28",
+      "sha256": "e153ef7db79bc73d7119f9820ec3985f21a510d086704a2f04e61569df1ce42c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/ich2a40024.htm"
+    },
+    {
+      "bytes": 3582,
+      "last_modified": "2026-01-28",
+      "sha256": "a4b58e4f54e12d43f2fb4f1991293d96d7a3456af08b99aa5274c0f298f7408e",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/ich2a40025.htm"
+    },
+    {
+      "bytes": 1502,
+      "last_modified": "2026-01-28",
+      "sha256": "6f289240e1f3d2124b98ef6b630f1513f2c5d047002dd8d59b180e111f6931ab",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/ich2a40026.htm"
+    },
+    {
+      "bytes": 3359,
+      "last_modified": "2026-01-28",
+      "sha256": "e4ab011558d0f92bdbeb84e0bf922fa1c6b8743bf741399118378d78f45ba572",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/ich2a40027.htm"
+    },
+    {
+      "bytes": 1398,
+      "last_modified": "2026-01-28",
+      "sha256": "cd51c3b53b3afad9c8b5c7574b3cb833d04132d2079738ead562d8f8b3c985b2",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/ich2a40028.htm"
+    },
+    {
+      "bytes": 10055,
+      "last_modified": "2026-01-28",
+      "sha256": "f1d1d6850dca73a11295e514902fac554a425b2d57d75fdfd4897201f00aa680",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/ich2a40029.htm"
+    },
+    {
+      "bytes": 21233,
+      "last_modified": "2026-01-28",
+      "sha256": "6bce9e8014595fa8dad9a9015fa2c210ff2a5312201d627d74999fad11607f14",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/ich2a40030.htm"
+    },
+    {
+      "bytes": 2823,
+      "last_modified": "2026-01-28",
+      "sha256": "eaced38da89a2ad3fb0cc09cd20e7757b3688b2e19b25ecee9da07b7ad33f4a0",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/ich2a40031.htm"
+    },
+    {
+      "bytes": 12279,
+      "last_modified": "2026-01-28",
+      "sha256": "00a47555f19ff1f43e068ebe0fba3ba895299622d5e08ab1a7eabb00efc20ba8",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/icha400soc-v3r1.htm"
+    },
+    {
+      "bytes": 12255,
+      "last_modified": "2026-08-26",
+      "sha256": "cdde7566c794f19b7654f21e73928727aa3a9b8e9354fe1baa314f43ac35c258",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/icha400soc-v3r2.htm"
+    },
+    {
+      "bytes": 4050,
+      "last_modified": "2026-01-28",
+      "sha256": "a52e23f8394bf21509067ba38f66b86bd73dd22390e4a093ca6b8273d71f4406",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/intr.htm"
+    },
+    {
+      "bytes": 47052,
+      "last_modified": "2026-06-24",
+      "sha256": "f6677400844ab41b5547299aa3c5ce4e93e60ed6be038e31799b1312200330a4",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/irrsadmin_utility.htm"
+    },
+    {
+      "bytes": 58816,
+      "last_modified": "2026-01-28",
+      "sha256": "c0f5816905112b3ad29f19f6a09f3b44fda7609924374662e2ec382f4277d21f",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-add.htm"
+    },
+    {
+      "bytes": 15723,
+      "last_modified": "2026-01-28",
+      "sha256": "838d35a700ada119cc8e986d3d1ce6671c2e8cb537b3bc5eaa4cbbe9e1377b80",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-addring.htm"
+    },
+    {
+      "bytes": 11571,
+      "last_modified": "2026-01-28",
+      "sha256": "393d1e5375f245a5034fdd26aabdbddd4f4d30bbf941c9abc5850b34aff1b10e",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-addtoken.htm"
+    },
+    {
+      "bytes": 19358,
+      "last_modified": "2026-01-28",
+      "sha256": "a0a74925964b56dc5366ebca509e3fb8f420a123e449aef3d544d7272b6a5d8a",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-alter.htm"
+    },
+    {
+      "bytes": 14713,
+      "last_modified": "2026-01-28",
+      "sha256": "d7f30b88037ceb3b2531b5ee7b0784fdce9e28777e37676a6ddb91b2b0033d44",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-altmap.htm"
+    },
+    {
+      "bytes": 23688,
+      "last_modified": "2026-01-28",
+      "sha256": "d1cba7e584dc59a12f454f768f21bc00a58ef402c9fb0750bb294e1064505707",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-bind.htm"
+    },
+    {
+      "bytes": 32899,
+      "last_modified": "2026-01-28",
+      "sha256": "13f8063754d415202790513d2951030dc01f953101f0636d978b11cadded6720",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-checkcert.htm"
+    },
+    {
+      "bytes": 27311,
+      "last_modified": "2026-04-29",
+      "sha256": "a8e6f7d4f64e2fe4c84d52e055782759ece003dd87b3ea62769d47dcf8149e0b",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-connect.htm"
+    },
+    {
+      "bytes": 23286,
+      "last_modified": "2026-01-28",
+      "sha256": "3588b773b5ab615215d250645355e681d626499200a1d3833716cb5366e3e0d0",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-delete.htm"
+    },
+    {
+      "bytes": 13693,
+      "last_modified": "2026-01-28",
+      "sha256": "016571b51f28043d8336ee7431045b0636d373a0988f09f312c7b59619c916a0",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-delmap.htm"
+    },
+    {
+      "bytes": 13790,
+      "last_modified": "2026-01-28",
+      "sha256": "0c93a6aeaedc86f8080a1dcb46e654e568f35577dd7d4267bbc143f3e8ede1ec",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-delring.htm"
+    },
+    {
+      "bytes": 11693,
+      "last_modified": "2026-01-28",
+      "sha256": "f34d31eb2df3a131adcd6e64193fdd83b37a18ee0d8b229f8a914319911c9d86",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-deltoken.htm"
+    },
+    {
+      "bytes": 26561,
+      "last_modified": "2026-01-28",
+      "sha256": "42292aea921a78423183661fd8ba24d29d2f6da239f4c9e7f715e1d2fef06073",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-export.htm"
+    },
+    {
+      "bytes": 114600,
+      "last_modified": "2026-06-24",
+      "sha256": "af243b9cf068b0464116a86d2007740ec477695953ef240060535f12bf16f7ac",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-gencert.htm"
+    },
+    {
+      "bytes": 18660,
+      "last_modified": "2026-01-28",
+      "sha256": "7b84cd5b7bab2b7b4c129062245428489669d507440b0fdbda05f28c776b32f5",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-genreq.htm"
+    },
+    {
+      "bytes": 29171,
+      "last_modified": "2026-01-28",
+      "sha256": "457863fc441ba7f4f615f79dc03f25169332d70f073e625243ec187986b3d4b8",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-import.htm"
+    },
+    {
+      "bytes": 43720,
+      "last_modified": "2026-01-28",
+      "sha256": "48dd5f192b42a556842e8302d18ea32a82ccf78b67275b88aed29123f0a85c4e",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-list.htm"
+    },
+    {
+      "bytes": 21965,
+      "last_modified": "2026-01-28",
+      "sha256": "6595e8a42625c5034281d8c3c48734b70ef8603c35bdda21e964f22280a17700",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-listch.htm"
+    },
+    {
+      "bytes": 16137,
+      "last_modified": "2026-01-28",
+      "sha256": "7d5c97bcf5e022fd9d90ad741e7a43a63a83c58a5d8442e67b5c856c261c56d1",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-listmap.htm"
+    },
+    {
+      "bytes": 13637,
+      "last_modified": "2026-01-28",
+      "sha256": "5852132373c2d4f0b7d5b08fb75e9df17a08a56e6af55034b1c55c21cce1e802",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-listring.htm"
+    },
+    {
+      "bytes": 14771,
+      "last_modified": "2026-01-28",
+      "sha256": "289c75b7721dc7b57df2e11bf1329f99d6a50cf6147dcffdaef9bafdb014c42b",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-listtoken.htm"
+    },
+    {
+      "bytes": 41540,
+      "last_modified": "2026-01-28",
+      "sha256": "ed2e8702c12c24809db3bb4dabf7941450f1654c84fd109783249cc952f1b16e",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-map.htm"
+    },
+    {
+      "bytes": 47772,
+      "last_modified": "2026-06-24",
+      "sha256": "d2ec6bdf01eab10ebc5df0c9ebfae2d596951e63a29bc4d115b503a116f76f93",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-rekey.htm"
+    },
+    {
+      "bytes": 17205,
+      "last_modified": "2026-01-28",
+      "sha256": "db7cd8a2c3c324c384003a643855a1ec47e468d0a8fee5656a93546b311bf39d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-remove.htm"
+    },
+    {
+      "bytes": 19837,
+      "last_modified": "2026-01-28",
+      "sha256": "818e04c6c1cfe71af4d9d9d98c0285db19d5578e2ff3e4e3746fd78d84f79b98",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-rollover.htm"
+    },
+    {
+      "bytes": 16169,
+      "last_modified": "2026-01-28",
+      "sha256": "b8d3ad5069f26523ef244c05206f1dd3589c11d811221e328c2b7076ab41c150",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-unbind.htm"
+    },
+    {
+      "bytes": 60137,
+      "last_modified": "2026-01-28",
+      "sha256": "337e7409b7b6a4b6a3da82e89df16f0373739350da0a650c7c00d7120da5a680",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/listdsd.htm"
+    },
+    {
+      "bytes": 40068,
+      "last_modified": "2026-01-28",
+      "sha256": "75278370261ab3f3ffa716b8b7036dac909eff836aedfa1cbe69f64568faa1a0",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/listgrp.htm"
+    },
+    {
+      "bytes": 97232,
+      "last_modified": "2026-01-28",
+      "sha256": "07f23c1154625ab787a650ef6a987bb572dd67c6a4a154589ef1f16c886f1d05",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/listusr.htm"
+    },
+    {
+      "bytes": 65543,
+      "last_modified": "2026-06-24",
+      "sha256": "154e63e2497901a38041c9392815f03873ccb5ec0e4733b55d9c9f66d09bda2c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/mclass.htm"
+    },
+    {
+      "bytes": 4190,
+      "last_modified": "2026-01-28",
+      "sha256": "52ae71ef4ca5e96e26580e5ee15db6601fc037eeca07ef2c1afacbb6fdac8ff7",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/mvs7.htm"
+    },
+    {
+      "bytes": 5319,
+      "last_modified": "2026-01-28",
+      "sha256": "381769e2ffd2365b8945e5c668557342d51b70fa519e6785da210a936a912c03",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/mvsds.htm"
+    },
+    {
+      "bytes": 1183,
+      "last_modified": "2026-01-28",
+      "sha256": "40ce1f61da46dc1d0558c9858ff745e208c9d9a283a9bd2ad5c440ac5cf41649",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/names.htm"
+    },
+    {
+      "bytes": 35953,
+      "last_modified": "2026-06-24",
+      "sha256": "b7940459cae77ce2999e368f7e091a192b80aee0acd69e1ba292f7811b1d0c6b",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/passwrd.htm"
+    },
+    {
+      "bytes": 69793,
+      "last_modified": "2026-04-29",
+      "sha256": "326675f94e39261700ec1d2c42c955036a9df50bb2e7b43f592dab011bea9cd4",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/permit.htm"
+    },
+    {
+      "bytes": 38025,
+      "last_modified": "2026-01-28",
+      "sha256": "a33911f17b0a708fbbbc22f5835f0d5c5196d38eafb77b0e2902ee87ea345493",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/raclnk.htm"
+    },
+    {
+      "bytes": 58180,
+      "last_modified": "2026-01-28",
+      "sha256": "48e9fd9c9ca33806943d3729cd1fcc0ef74fbd4876c8f984c2abf6e8db66f2b7",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/racmap.htm"
+    },
+    {
+      "bytes": 11097,
+      "last_modified": "2026-01-28",
+      "sha256": "41a4c74bb76018eb1721a96f7f430045f98bc00f027935092ff2aa0ddb37c4db",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/racpriv.htm"
+    },
+    {
+      "bytes": 6428,
+      "last_modified": "2026-01-28",
+      "sha256": "418afeaa82887133457c04ac4fa36a168a25ac3eb8114c8b1be9e22b09cb0fa8",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/racprmck.htm"
+    },
+    {
+      "bytes": 38064,
+      "last_modified": "2026-01-28",
+      "sha256": "79aa1d7b451785f67c3f67b4a37ba6a6b893eadca1b289094d368679dbac11b1",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/radcertg.htm"
+    },
+    {
+      "bytes": 340603,
+      "last_modified": "2026-06-24",
+      "sha256": "804a48ec4b963087ecdf83d94ba5936d118b8f24c6735648ecbc30c384e1fcd3",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/ralter.htm"
+    },
+    {
+      "bytes": 1243,
+      "last_modified": "2026-04-29",
+      "sha256": "b162877c22330515a2ed7e05f200d948f364a06768e53e5618496b80e6fba8d9",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/rclass.htm"
+    },
+    {
+      "bytes": 353701,
+      "last_modified": "2026-06-24",
+      "sha256": "8f9ac17531b95ab3e6cf28f132f30abf9454169586367bc105cf4d77a27b4dfb",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/rdefine.htm"
+    },
+    {
+      "bytes": 25800,
+      "last_modified": "2026-01-28",
+      "sha256": "7ec7e7d95bd1e242c9936a69e22c2aa0d0e509cf683b577020a5e07e683d0f2b",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/rdelete.htm"
+    },
+    {
+      "bytes": 18386,
+      "last_modified": "2026-01-28",
+      "sha256": "7a0dc8bc0f8e7fcaca9d6574400113a0437608b1aa089fbc334a620a0f3b6057",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/remove.htm"
+    },
+    {
+      "bytes": 23035,
+      "last_modified": "2026-08-26",
+      "sha256": "b4abc2ed4e5eb4dba8ebd0e568e7b2d060ac3309c66c9bc2b8f89ac7026b936b",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/resour.htm"
+    },
+    {
+      "bytes": 20394,
+      "last_modified": "2026-01-28",
+      "sha256": "73602299f11475308ea6a81683b0b5d7d828064c1e2ef7bddd1b2477cd435e95",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/restart.htm"
+    },
+    {
+      "bytes": 3011,
+      "last_modified": "2026-01-28",
+      "sha256": "e382289182eec61eea74808bc0bfea8e44ff5b03f550c7e234718f4a4eaa6117",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/retcdes.htm"
+    },
+    {
+      "bytes": 112960,
+      "last_modified": "2026-01-28",
+      "sha256": "c3482a1c50f130416dfd135b73563eaf8728917a9279047c487788454066a488",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/rlist.htm"
+    },
+    {
+      "bytes": 72343,
+      "last_modified": "2026-01-28",
+      "sha256": "03237277681e9504c79e2f5ed8b89d70d2c8b95366f748911d040caf6ea34464",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/search.htm"
+    },
+    {
+      "bytes": 3140,
+      "last_modified": "2026-01-28",
+      "sha256": "aff0d90edb48e0ac0d26c515f809924e8e8aca44ae1a6a88a66575f3b46a5fcf",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/segrest.htm"
+    },
+    {
+      "bytes": 99016,
+      "last_modified": "2026-01-28",
+      "sha256": "b33f2fd51ee8ef9d095df47a2cbe8b11b38e189b2e82b74a7a983252104125d4",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/set.htm"
+    },
+    {
+      "bytes": 240434,
+      "last_modified": "2026-06-24",
+      "sha256": "9190c0472b8e0c19aba79a4bdc1ab8a7745c2aa5dffecaab05c3f0332d54fe5c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/setropts.htm"
+    },
+    {
+      "bytes": 20179,
+      "last_modified": "2026-01-28",
+      "sha256": "e22782d97188b41f1b9cf661294364c02248c971376be678360043fd451ebb38",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/signoff.htm"
+    },
+    {
+      "bytes": 9312,
+      "last_modified": "2026-01-28",
+      "sha256": "0c0ddee88bfb7836e2d89338695a73285ea06d8d095ea86435d6757264f675b8",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/stop.htm"
+    },
+    {
+      "bytes": 93962,
+      "last_modified": "2026-01-28",
+      "sha256": "7be100bf59d6f02be2ad631757cd630e4ff2433860d65402350578178d77d848",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/target.htm"
+    },
+    {
+      "bytes": 5914,
+      "last_modified": "2026-01-28",
+      "sha256": "dc3fa7367176fb1646454543ef395a889bd1d42a3a247657d6307c1506fa7869",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/trc.htm"
+    },
+    {
+      "bytes": 5850,
+      "last_modified": "2026-06-24",
+      "sha256": "86f81673daf6e3ed932009297ed7327451490f3c1787e06a1325b82b2eb93b68",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/xconracdfc.htm"
+    },
+    {
+      "bytes": 4734,
+      "last_modified": "2026-04-29",
+      "sha256": "e8e514016baf69bdbcd56b1a9a3809692da214169adb31a18389aad092d98c73",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/xconracdrd.htm"
+    },
+    {
+      "bytes": 49149,
+      "last_modified": "2026-04-29",
+      "sha256": "0f1a85dcc8b5deb7d0d22428f4f704cb2b5bf4faf104403f4b209dd67744dfda",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/xrvary1.htm"
+    },
+    {
+      "bytes": 9657,
+      "last_modified": "2026-01-28",
+      "sha256": "4b27bb37a78b764cc14d6bc9248ad5f18bed9739d3415a0d2f2008a4af70626c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/xsyntax.htm"
+    },
+    {
+      "bytes": 2406,
+      "last_modified": "2026-01-28",
+      "sha256": "bebe198d25aed389a8abe0b2f0b6e94dbc7bc22286848ba31ec5cc99cfc3e038",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/zossoc_main.htm"
+    }
+  ],
+  "total_bytes": 4011649
+}

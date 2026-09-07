@@ -12,163 +12,163 @@
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0001",
           "label": "Application Linking Manager interface services",
-          "source_locator": "pdf-page:76;outline:Application Linking Manager interface services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_AppLinkingMgr.htm;topic-id:services-application-linking-manager-interface;heading:Application Linking Manager interface services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0002",
           "label": "Application server routing services",
-          "source_locator": "pdf-page:103;outline:Application server routing services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_AppServerRoutingServices.htm;topic-id:services-application-server-routing;heading:Application server routing services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0003",
           "label": "Cloud provisioning services",
-          "source_locator": "pdf-page:116;outline:Cloud provisioning services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_CloudProvisioning.htm;topic-id:services-cloud-provisioning;heading:Cloud provisioning services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0004",
           "label": "Data persistence services",
-          "source_locator": "pdf-page:470;outline:Data persistence services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_PersistenceServices.htm;topic-id:services-data-persistence;heading:Data persistence services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0005",
           "label": "Get Runtime Diagnostics REST interface",
-          "source_locator": "pdf-page:478;outline:Get Runtime Diagnostics REST interface",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetRuntimeDiagnostics.htm;topic-id:services-get-runtime-diagnostics-rest-interface;heading:Get Runtime Diagnostics REST interface",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0006",
           "label": "Multisystem routing services",
-          "source_locator": "pdf-page:480;outline:Multisystem routing services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SysRoutingServices.htm;topic-id:services-multisystem-routing;heading:Multisystem routing services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0007",
           "label": "MVS subsystem services",
-          "source_locator": "pdf-page:507;outline:MVS subsystem services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_MvsSubsystemServices.htm;topic-id:services-mvs-subsystem;heading:MVS subsystem services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0008",
           "label": "Notification services",
-          "source_locator": "pdf-page:510;outline:Notification services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_NOTIFICATIONS.htm;topic-id:services-notification;heading:Notification services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0009",
           "label": "Security Configuration Assistant services",
-          "source_locator": "pdf-page:518;outline:Security Configuration Assistant services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SecurityConfigurationAssistantServices.htm;topic-id:services-security-configuration-assistant;heading:Security Configuration Assistant services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0010",
           "label": "Software management services",
-          "source_locator": "pdf-page:533;outline:Software management services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareMgmtServices.htm;topic-id:services-software-management;heading:Software management services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0011",
           "label": "Storage management services",
-          "source_locator": "pdf-page:648;outline:Storage management services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgt.htm;topic-id:services-storage-management;heading:Storage management services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0012",
           "label": "Sysplex management services",
-          "source_locator": "pdf-page:804;outline:Sysplex management services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SysplexMgmt.htm;topic-id:services-sysplex-management;heading:Sysplex management services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0013",
           "label": "Topology services",
-          "source_locator": "pdf-page:833;outline:Topology services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_TopologyServices.htm;topic-id:services-topology;heading:Topology services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0014",
           "label": "TSO/E address space services",
-          "source_locator": "pdf-page:860;outline:TSO/E address space services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_TSOServices.htm;topic-id:services-tsoe-address-space;heading:TSO/E address space services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0015",
           "label": "WLM resource pooling services",
-          "source_locator": "pdf-page:892;outline:WLM resource pooling services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_WRP.htm;topic-id:services-wlm-resource-pooling;heading:WLM resource pooling services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0016",
           "label": "RMF metering services",
-          "source_locator": "pdf-page:900;outline:RMF metering services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ResourceUsage.htm;topic-id:services-rmf-metering;heading:RMF metering services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0017",
           "label": "Parmlib Management Services",
-          "source_locator": "pdf-page:906;outline:Parmlib Management Services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_ParmlibManagementServices.htm;topic-id:services-parmlib-management;heading:Parmlib Management Services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0018",
           "label": "z/OS Compliance REST Interface",
-          "source_locator": "pdf-page:919;outline:z/OS Compliance REST Interface",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ComplianceRESTInterface.htm;topic-id:services-zos-compliance-rest-interface;heading:z/OS Compliance REST Interface",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0019",
           "label": "z/OS console services",
-          "source_locator": "pdf-page:921;outline:z/OS console services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_RESTCONSOLE.htm;topic-id:services-zos-console;heading:z/OS console services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0020",
           "label": "z/OS system variable services",
-          "source_locator": "pdf-page:960;outline:z/OS system variable services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SystemVariableServices.htm;topic-id:services-zos-system-variable;heading:z/OS system variable services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0021",
           "label": "z/OS data set and file REST interface",
-          "source_locator": "pdf-page:970;outline:z/OS data set and file REST interface",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_RESTFILES.htm;topic-id:services-zos-data-set-file-rest-interface;heading:z/OS data set and file REST interface",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0022",
           "label": "z/OS jobs REST interface",
-          "source_locator": "pdf-page:1058;outline:z/OS jobs REST interface",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_RESTJOBS.htm;topic-id:services-zos-jobs-rest-interface;heading:z/OS jobs REST interface",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0023",
           "label": "z/OS Management Services Catalog services",
-          "source_locator": "pdf-page:1110;outline:z/OS Management Services Catalog services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ManagementServicesCatalog.htm;topic-id:services-zos-management-catalog;heading:z/OS Management Services Catalog services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0024",
           "label": "z/OSMF information retrieval service",
-          "source_locator": "pdf-page:1159;outline:z/OSMF information retrieval service",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_QueryService.htm;topic-id:services-zosmf-information-retrieval-service;heading:z/OSMF information retrieval service",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0025",
           "label": "z/OSMF settings services",
-          "source_locator": "pdf-page:1163;outline:z/OSMF settings services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SettingsServices.htm;topic-id:services-zosmf-settings;heading:z/OSMF settings services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0026",
           "label": "z/OSMF authentication services",
-          "source_locator": "pdf-page:1170;outline:z/OSMF authentication services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WebTokenAuthServices.htm;topic-id:services-zosmf-authentication;heading:z/OSMF authentication services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:rest-service-families:0027",
           "label": "z/OSMF workflow services",
-          "source_locator": "pdf-page:1177;outline:z/OSMF workflow services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowServices.htm;topic-id:services-zosmf-workflow;heading:z/OSMF workflow services",
           "mandatory": true
         }
       ]
@@ -181,1135 +181,1135 @@
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0001",
           "label": "Event types, requestors, and handlers shipped with z/OSMF",
-          "source_locator": "pdf-page:78;outline:Event types, requestors, and handlers shipped with z/OSMF",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_EventTypes.htm;topic-id:services-event-types-requestors-handlers-shipped-zosmf;heading:Event types, requestors, and handlers shipped with z/OSMF",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0002",
           "label": "Register an event type",
-          "source_locator": "pdf-page:94;outline:Register an event type",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_RegisterEventType.htm;topic-id:services-register-event-type;heading:Register an event type",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0003",
           "label": "Register an event handler",
-          "source_locator": "pdf-page:96;outline:Register an event handler",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_RegisterHandler.htm;topic-id:services-register-event-handler;heading:Register an event handler",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0004",
           "label": "Obtain a list of all tasks that are eligible to be handlers",
-          "source_locator": "pdf-page:99;outline:Obtain a list of all tasks that are eligible to be handlers",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetListOfEligibleHandlers.htm;topic-id:almis-obtain-list-all-tasks-that-are-eligible-be-handlers;heading:Obtain a list of all tasks that are eligible to be handlers",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0005",
           "label": "Obtain a list of handlers for an event type",
-          "source_locator": "pdf-page:100;outline:Obtain a list of handlers for an event type",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetListOfHandlers.htm;topic-id:services-obtain-list-handlers-event-type;heading:Obtain a list of handlers for an event type",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0006",
           "label": "Unregister an event handler",
-          "source_locator": "pdf-page:101;outline:Unregister an event handler",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_UnregisterHandler.htm;topic-id:services-unregister-event-handler;heading:Unregister an event handler",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0007",
           "label": "Unregister an event type",
-          "source_locator": "pdf-page:102;outline:Unregister an event type",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_UnregisterEventType.htm;topic-id:services-unregister-event-type;heading:Unregister an event type",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0008",
           "label": "Retrieve data from an application server",
-          "source_locator": "pdf-page:106;outline:Retrieve data from an application server",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_RetrieveDataServer.htm;topic-id:services-retrieve-data-from-application-server;heading:Retrieve data from an application server",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0009",
           "label": "Update data for an application server",
-          "source_locator": "pdf-page:110;outline:Update data for an application server",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_UpdateDataServer.htm;topic-id:services-update-data-application-server;heading:Update data for an application server",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0010",
           "label": "Delete data from an application server",
-          "source_locator": "pdf-page:113;outline:Delete data from an application server",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_DeleteDataServer.htm;topic-id:services-delete-data-from-application-server;heading:Delete data from an application server",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0011",
           "label": "Resource pool services",
-          "source_locator": "pdf-page:120;outline:Resource pool services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_CloudResourcePoolServices.htm;topic-id:services-resource-pool;heading:Resource pool services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0012",
           "label": "Resource management services",
-          "source_locator": "pdf-page:172;outline:Resource management services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_CloudResourceManagementServices.htm;topic-id:services-resource-management;heading:Resource management services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0013",
           "label": "Software services template services",
-          "source_locator": "pdf-page:266;outline:Software services template services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareCatalogServices.htm;topic-id:services-software-template;heading:Software services template services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0014",
           "label": "Published software service template services",
-          "source_locator": "pdf-page:353;outline:Published software service template services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_PublishedSoftwareCatalogServices.htm;topic-id:services-published-software-service-template;heading:Published software service template services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0015",
           "label": "Software services instance services",
-          "source_locator": "pdf-page:389;outline:Software services instance services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareProvisioningServices.htm;topic-id:services-software-instance;heading:Software services instance services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0016",
           "label": "Software service instance name services",
-          "source_locator": "pdf-page:460;outline:Software service instance name services",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SSINServices.htm;topic-id:services-software-service-instance-name;heading:Software service instance name services",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0017",
           "label": "Persist user or application data",
-          "source_locator": "pdf-page:471;outline:Persist user or application data",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_PersistData.htm;topic-id:services-persist-user-application-data;heading:Persist user or application data",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0018",
           "label": "Retrieve persisted user or application data",
-          "source_locator": "pdf-page:473;outline:Retrieve persisted user or application data",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_RetrievePersistData.htm;topic-id:services-retrieve-persisted-user-application-data;heading:Retrieve persisted user or application data",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0019",
           "label": "Delete persisted user or application data",
-          "source_locator": "pdf-page:476;outline:Delete persisted user or application data",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_DeletePersistData.htm;topic-id:services-delete-persisted-user-application-data;heading:Delete persisted user or application data",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0020",
           "label": "Retrieve data from one or more systems",
-          "source_locator": "pdf-page:485;outline:Retrieve data from one or more systems",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_RetrieveDataOneSys.htm;topic-id:services-retrieve-data-from-one-more-systems;heading:Retrieve data from one or more systems",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0021",
           "label": "Update data for one or more systems",
-          "source_locator": "pdf-page:492;outline:Update data for one or more systems",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_UpdateDataMultiSys.htm;topic-id:services-update-data-one-more-systems;heading:Update data for one or more systems",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0022",
           "label": "Delete data from one or more systems",
-          "source_locator": "pdf-page:498;outline:Delete data from one or more systems",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_DeleteDataMultiSys.htm;topic-id:services-delete-data-from-one-more-systems;heading:Delete data from one or more systems",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0023",
           "label": "Authenticate with a secondary z/OSMF instance",
-          "source_locator": "pdf-page:504;outline:Authenticate with a secondary z/OSMF instance",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_AuthenticateMultiSys.htm;topic-id:services-authenticate-secondary-zosmf-instance;heading:Authenticate with a secondary z/OSMF instance",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0024",
           "label": "Authenticate with an HTTP proxy server",
-          "source_locator": "pdf-page:506;outline:Authenticate with an HTTP proxy server",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_AuthenticateProxy.htm;topic-id:services-authenticate-http-proxy-server;heading:Authenticate with an HTTP proxy server",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0025",
           "label": "List MVS subsystems",
-          "source_locator": "pdf-page:508;outline:List MVS subsystems",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GETListMVSSubsystems.htm;topic-id:services-list-mvs-subsystems;heading:List MVS subsystems",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0026",
           "label": "Get all of the notifications received by the current user",
-          "source_locator": "pdf-page:511;outline:Get all of the notifications received by the current user",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetNotificationsFromUser.htm;topic-id:services-get-all-notifications-received-by-current-user;heading:Get all of the notifications received by the current user",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0027",
           "label": "Send a notification from a z/OSMF task, when the content is the message from the bundle file",
-          "source_locator": "pdf-page:513;outline:Send a notification from a z/OSMF task, when the content is the message from the bundle file",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PostNotificationFromTask.htm;topic-id:ns-send-notification-from-zosmf-task-when-content-is-message-from-bundle-file;heading:Send a notification from a z/OSMF task, when the content is the message from the bundle file",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0028",
           "label": "Send a notification and mail from a z/OSMF task or z/OSMF user",
-          "source_locator": "pdf-page:515;outline:Send a notification and mail from a z/OSMF task or z/OSMF user",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PostNotificationFromTaskOrUser.htm;topic-id:ns-send-notification-mail-from-zosmf-task-zosmf-user;heading:Send a notification and mail from a z/OSMF task or z/OSMF user",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0029",
           "label": "Validate security resources defined in an HTTP request body",
-          "source_locator": "pdf-page:519;outline:Validate security resources defined in an HTTP request body",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SCAValidateSecurityResourcesPostBody.htm;topic-id:scas-validate-security-resources-defined-in-http-request-body;heading:Validate security resources defined in an HTTP request body",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0030",
           "label": "Validate security resources defined in a security descriptor file",
-          "source_locator": "pdf-page:523;outline:Validate security resources defined in a security descriptor file",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SCAValidateSecurityResourcesJSONFile.htm;topic-id:scas-validate-security-resources-defined-in-security-descriptor-file;heading:Validate security resources defined in a security descriptor file",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0031",
           "label": "Provision security resources defined in an HTTP request body",
-          "source_locator": "pdf-page:527;outline:Provision security resources defined in an HTTP request body",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SCAValidateSecurityResourcesProvision.htm;topic-id:scas-provision-security-resources-defined-in-http-request-body;heading:Provision security resources defined in an HTTP request body",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0032",
           "label": "Provision security resources defined in a security descriptor file",
-          "source_locator": "pdf-page:530;outline:Provision security resources defined in a security descriptor file",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SCAProvisionSecurityResourcesJSONFile.htm;topic-id:scas-provision-security-resources-defined-in-security-descriptor-file;heading:Provision security resources defined in a security descriptor file",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0033",
           "label": "List the software instances defined to z/OSMF",
-          "source_locator": "pdf-page:537;outline:List the software instances defined to z/OSMF",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListSoftwareInstances.htm;topic-id:services-list-software-instances-defined-zosmf;heading:List the software instances defined to z/OSMF",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0034",
           "label": "Retrieve the properties of a software instance",
-          "source_locator": "pdf-page:540;outline:Retrieve the properties of a software instance",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ViewPropSoftwareInstance.htm;topic-id:services-retrieve-properties-software-instance;heading:Retrieve the properties of a software instance",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0035",
           "label": "List the data sets included in a software instance",
-          "source_locator": "pdf-page:546;outline:List the data sets included in a software instance",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListSIDataSets.htm;topic-id:services-list-data-sets-included-in-software-instance;heading:List the data sets included in a software instance",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0036",
           "label": "Add a new software instance",
-          "source_locator": "pdf-page:552;outline:Add a new software instance",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_AddSoftwareInstance.htm;topic-id:services-add-new-software-instance;heading:Add a new software instance",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0037",
           "label": "Export a defined software instance",
-          "source_locator": "pdf-page:558;outline:Export a defined software instance",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_POSTExportDefinedSWInstance.htm;topic-id:services-export-defined-software-instance;heading:Export a defined software instance",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0038",
           "label": "Modify the properties of a software instance",
-          "source_locator": "pdf-page:565;outline:Modify the properties of a software instance",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ModifySoftwareInstance.htm;topic-id:services-modify-properties-software-instance;heading:Modify the properties of a software instance",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0039",
           "label": "Load the products, features, and FMIDs for a software instance",
-          "source_locator": "pdf-page:571;outline:Load the products, features, and FMIDs for a software instance",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_AddProdFeatFMID.htm;topic-id:services-load-products-features-fmids-software-instance;heading:Load the products, features, and FMIDs for a software instance",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0040",
           "label": "Delete a software instance",
-          "source_locator": "pdf-page:577;outline:Delete a software instance",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_DeleteSoftwareInstance.htm;topic-id:sms-delete-software-instance;heading:Delete a software instance",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0041",
           "label": "Deleting the Temporary Catalog Aliases",
-          "source_locator": "pdf-page:578;outline:Deleting the Temporary Catalog Aliases",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_DeleteTempCatAliases.htm;topic-id:services-deleting-temporary-catalog-aliases;heading:Deleting the Temporary Catalog Aliases",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0042",
           "label": "List the portable software instances defined to z/OSMF",
-          "source_locator": "pdf-page:583;outline:List the portable software instances defined to z/OSMF",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListPortableSoftwareInstances.htm;topic-id:services-list-portable-software-instances-defined-zosmf;heading:List the portable software instances defined to z/OSMF",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0043",
           "label": "Deploy a software instance",
-          "source_locator": "pdf-page:585;outline:Deploy a software instance",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_DeploySoftwareInstances.htm;topic-id:services-deploy-software-instance;heading:Deploy a software instance",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0044",
           "label": "Delete a Deployment",
-          "source_locator": "pdf-page:595;outline:Delete a Deployment",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_DeleteDeployment.htm;topic-id:services-delete-deployment;heading:Delete a Deployment",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0045",
           "label": "Retrieve the properties of a portable software instance",
-          "source_locator": "pdf-page:596;outline:Retrieve the properties of a portable software instance",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ViewPropPortableSoftwareInstance.htm;topic-id:services-retrieve-properties-portable-software-instance;heading:Retrieve the properties of a portable software instance",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0046",
           "label": "Add a new portable software instance",
-          "source_locator": "pdf-page:601;outline:Add a new portable software instance",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_AddPortableSoftwareInstance.htm;topic-id:services-add-new-portable-software-instance;heading:Add a new portable software instance",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0047",
           "label": "Delete a portable software instance",
-          "source_locator": "pdf-page:606;outline:Delete a portable software instance",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_DeletePortableSoftwareInstance.htm;topic-id:services-delete-portable-software-instance;heading:Delete a portable software instance",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0048",
           "label": "Missing Critical Updates",
-          "source_locator": "pdf-page:607;outline:Missing Critical Updates",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_MissingCriticalUpdates.htm;topic-id:services-missing-critical-updates;heading:Missing Critical Updates",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0049",
           "label": "Missing FIXCAT Updates",
-          "source_locator": "pdf-page:612;outline:Missing FIXCAT Updates",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_MissingFIXCATUpdates.htm;topic-id:services-missing-fixcat-updates;heading:Missing FIXCAT Updates",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0050",
           "label": "Software Update Search",
-          "source_locator": "pdf-page:616;outline:Software Update Search",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareUpdateSearch.htm;topic-id:services-software-update-search;heading:Software Update Search",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0051",
           "label": "Retrieve the z/OS system UUID",
-          "source_locator": "pdf-page:620;outline:Retrieve the z/OS system UUID",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_Retrieve_zOSsystemUUID.htm;topic-id:services-retrieve-zos-system-uuid;heading:Retrieve the z/OS system UUID",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0052",
           "label": "Query an SMP/E CSI",
-          "source_locator": "pdf-page:623;outline:Query an SMP/E CSI",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SMPE_CSI_Query_REST.htm;topic-id:services-query-smpe-csi;heading:Query an SMP/E CSI",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0053",
           "label": "Start a Software Update process",
-          "source_locator": "pdf-page:627;outline:Start a Software Update process",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_Start_SU_REST_API.htm;topic-id:services-start-software-update-process;heading:Start a Software Update process",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0054",
           "label": "Retrieve the status of a Software Update process",
-          "source_locator": "pdf-page:632;outline:Retrieve the status of a Software Update process",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_Retrieve_status_SU_REST_API.htm;topic-id:services-retrieve-status-software-update-process;heading:Retrieve the status of a Software Update process",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0055",
           "label": "Resume a Software Update process",
-          "source_locator": "pdf-page:640;outline:Resume a Software Update process",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_Resume_SU_REST_API.htm;topic-id:services-resume-software-update-process;heading:Resume a Software Update process",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0056",
           "label": "Cancel a Software Update process",
-          "source_locator": "pdf-page:644;outline:Cancel a Software Update process",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_Cancel_SU_REST_API.htm;topic-id:services-cancel-software-update-process;heading:Cancel a Software Update process",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0057",
           "label": "Copy the output for a Software Update process",
-          "source_locator": "pdf-page:646;outline:Copy the output for a Software Update process",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_Copy_SU_Output_REST_API.htm;topic-id:services-copy-output-software-update-process;heading:Copy the output for a Software Update process",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0058",
           "label": "Get a list of ACS routines",
-          "source_locator": "pdf-page:651;outline:Get a list of ACS routines",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtACSGetList.htm;topic-id:services-get-list-acs-routines;heading:Get a list of ACS routines",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0059",
           "label": "Get an ACS routine",
-          "source_locator": "pdf-page:653;outline:Get an ACS routine",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGetACSroutine.htm;topic-id:services-get-acs-routine;heading:Get an ACS routine",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0060",
           "label": "Get base configuration properties",
-          "source_locator": "pdf-page:655;outline:Get base configuration properties",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGetBaseConfig.htm;topic-id:services-get-base-configuration-properties;heading:Get base configuration properties",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0061",
           "label": "Get a list of storage groups",
-          "source_locator": "pdf-page:658;outline:Get a list of storage groups",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGroupGetList.htm;topic-id:services-get-list-storage-groups;heading:Get a list of storage groups",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0062",
           "label": "Get a storage group definition",
-          "source_locator": "pdf-page:672;outline:Get a storage group definition",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGroupGetDefinition.htm;topic-id:services-get-storage-group-definition;heading:Get a storage group definition",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0063",
           "label": "Get a list of volumes",
-          "source_locator": "pdf-page:683;outline:Get a list of volumes",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtVolumeGetList.htm;topic-id:services-get-list-volumes;heading:Get a list of volumes",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0064",
           "label": "Get a volume definition",
-          "source_locator": "pdf-page:689;outline:Get a volume definition",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtVolumeGetDefinition.htm;topic-id:services-get-volume-definition;heading:Get a volume definition",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0065",
           "label": "Get a list of data classes",
-          "source_locator": "pdf-page:693;outline:Get a list of data classes",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGetDataClasses.htm;topic-id:services-get-list-data-classes;heading:Get a list of data classes",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0066",
           "label": "Get a data class definition",
-          "source_locator": "pdf-page:715;outline:Get a data class definition",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGetDataClassDefinition.htm;topic-id:services-get-data-class-definition;heading:Get a data class definition",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0067",
           "label": "Get a list of storage classes",
-          "source_locator": "pdf-page:737;outline:Get a list of storage classes",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGetStorageClasses.htm;topic-id:services-get-list-storage-classes;heading:Get a list of storage classes",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0068",
           "label": "Get a storage class definition",
-          "source_locator": "pdf-page:747;outline:Get a storage class definition",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGetStorageClassDefinition.htm;topic-id:services-get-storage-class-definition;heading:Get a storage class definition",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0069",
           "label": "Get a list of management classes",
-          "source_locator": "pdf-page:756;outline:Get a list of management classes",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtMgtClassGetList.htm;topic-id:services-get-list-management-classes;heading:Get a list of management classes",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0070",
           "label": "Get a management class definition",
-          "source_locator": "pdf-page:766;outline:Get a management class definition",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGetMgtClassDefinition.htm;topic-id:services-get-management-class-definition;heading:Get a management class definition",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0071",
           "label": "Define a volume list to a storage group",
-          "source_locator": "pdf-page:775;outline:Define a volume list to a storage group",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGroupDefineList.htm;topic-id:services-define-volume-list-storage-group;heading:Define a volume list to a storage group",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0072",
           "label": "Validate an SCDS",
-          "source_locator": "pdf-page:782;outline:Validate an SCDS",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGroupValidateSCDS.htm;topic-id:services-validate-scds;heading:Validate an SCDS",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0073",
           "label": "Activate an SCDS",
-          "source_locator": "pdf-page:783;outline:Activate an SCDS",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGroupActivateSCDS.htm;topic-id:services-activate-scds;heading:Activate an SCDS",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0074",
           "label": "Get an SCDS activation result",
-          "source_locator": "pdf-page:785;outline:Get an SCDS activation result",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGroupGetActivationResult.htm;topic-id:services-get-scds-activation-result;heading:Get an SCDS activation result",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0075",
           "label": "Error reporting categories",
-          "source_locator": "pdf-page:786;outline:Error reporting categories",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgt_Error_Categories.htm;topic-id:services-error-reporting-categories;heading:Error reporting categories",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0076",
           "label": "Get a list of CFRM policies",
-          "source_locator": "pdf-page:805;outline:Get a list of CFRM policies",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SysplexMgmtGetCFRMPolicies.htm;topic-id:services-get-list-cfrm-policies;heading:Get a list of CFRM policies",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0077",
           "label": "Get CFRM policy properties",
-          "source_locator": "pdf-page:807;outline:Get CFRM policy properties",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SysplexMgmtGetCFRMPolicyProperties.htm;topic-id:services-get-cfrm-policy-properties;heading:Get CFRM policy properties",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0078",
           "label": "Activate CFRM policy",
-          "source_locator": "pdf-page:813;outline:Activate CFRM policy",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SysplexMgmtActivateCFRMPolicy.htm;topic-id:services-activate-cfrm-policy;heading:Activate CFRM policy",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0079",
           "label": "Rename existing CFRM policy",
-          "source_locator": "pdf-page:814;outline:Rename existing CFRM policy",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SysplexMgmtRenameCFRMPolicy.htm;topic-id:services-rename-existing-cfrm-policy;heading:Rename existing CFRM policy",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0080",
           "label": "Modify CFRM policy properties",
-          "source_locator": "pdf-page:816;outline:Modify CFRM policy properties",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SysplexMgmtModifyCFRMPolicy.htm;topic-id:services-modify-cfrm-policy-properties;heading:Modify CFRM policy properties",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0081",
           "label": "Add CFRM policies to administrative policy",
-          "source_locator": "pdf-page:822;outline:Add CFRM policies to administrative policy",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SysplexMgmtAddCFRMPolicies.htm;topic-id:services-add-cfrm-policies-administrative-policy;heading:Add CFRM policies to administrative policy",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0082",
           "label": "Copy existing CFRM policy with a new name",
-          "source_locator": "pdf-page:830;outline:Copy existing CFRM policy with a new name",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SysplexMgmtCopyExistingCFRMPolicy.htm;topic-id:services-copy-existing-cfrm-policy-new-name;heading:Copy existing CFRM policy with a new name",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0083",
           "label": "Delete multiple CFRM policies from an administrative policy",
-          "source_locator": "pdf-page:831;outline:Delete multiple CFRM policies from an administrative policy",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SysplexMgmtDeleteMultipleCFRMPolicies.htm;topic-id:services-delete-multiple-cfrm-policies-from-administrative-policy;heading:Delete multiple CFRM policies from an administrative policy",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0084",
           "label": "Error report",
-          "source_locator": "pdf-page:832;outline:Error report",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SysplexMgmt_ErrorReport.htm;topic-id:services-error-report;heading:Error report",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0085",
           "label": "List the systems defined to z/OSMF",
-          "source_locator": "pdf-page:835;outline:List the systems defined to z/OSMF",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListSystems.htm;topic-id:services-list-systems-defined-zosmf;heading:List the systems defined to z/OSMF",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0086",
           "label": "List the groups defined to z/OSMF",
-          "source_locator": "pdf-page:838;outline:List the groups defined to z/OSMF",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListGroups.htm;topic-id:services-list-groups-defined-zosmf;heading:List the groups defined to z/OSMF",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0087",
           "label": "List the systems included in a group",
-          "source_locator": "pdf-page:840;outline:List the systems included in a group",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListSystemsInGroup.htm;topic-id:services-list-systems-included-in-group;heading:List the systems included in a group",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0088",
           "label": "List the sysplexes defined to z/OSMF",
-          "source_locator": "pdf-page:843;outline:List the sysplexes defined to z/OSMF",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListSysplexes.htm;topic-id:services-list-sysplexes-defined-zosmf;heading:List the sysplexes defined to z/OSMF",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0089",
           "label": "List the systems included in a sysplex",
-          "source_locator": "pdf-page:844;outline:List the systems included in a sysplex",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListSystemsInSysplex.htm;topic-id:services-list-systems-included-in-sysplex;heading:List the systems included in a sysplex",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0090",
           "label": "List the systems included in a CPC",
-          "source_locator": "pdf-page:847;outline:List the systems included in a CPC",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListSystemsInCPC.htm;topic-id:services-list-systems-included-in-cpc;heading:List the systems included in a CPC",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0091",
           "label": "Validate the status of the selected system",
-          "source_locator": "pdf-page:849;outline:Validate the status of the selected system",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ValidateStatusSystem.htm;topic-id:services-validate-status-selected-system;heading:Validate the status of the selected system",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0092",
           "label": "Check all MVS systems in the local plex",
-          "source_locator": "pdf-page:855;outline:Check all MVS systems in the local plex",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_CheckMVSSystems.htm;topic-id:services-check-all-mvs-systems-in-local-plex;heading:Check all MVS systems in the local plex",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0093",
           "label": "Start or reconnect to a TSO/E address space",
-          "source_locator": "pdf-page:864;outline:Start or reconnect to a TSO/E address space",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StartTSOAS.htm;topic-id:services-start-reconnect-tsoe-address-space;heading:Start or reconnect to a TSO/E address space",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0094",
           "label": "Start an application in a TSO/E address space",
-          "source_locator": "pdf-page:869;outline:Start an application in a TSO/E address space",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StartApp.htm;topic-id:services-start-application-in-tsoe-address-space;heading:Start an application in a TSO/E address space",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0095",
           "label": "Issue a TSO/E command with z/OSMF REST API",
-          "source_locator": "pdf-page:872;outline:Issue a TSO/E command with z/OSMF REST API",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_issueTSOcommand.htm;topic-id:services-issue-tsoe-command-zosmf-rest-api;heading:Issue a TSO/E command with z/OSMF REST API",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0096",
           "label": "Get the response to a command that was issued with the TSO/E REST API",
-          "source_locator": "pdf-page:880;outline:Get the response to a command that was issued with the TSO/E REST API",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_getResponseTSO.htm;topic-id:tass-get-response-command-that-was-issued-tsoe-rest-api;heading:Get the response to a command that was issued with the TSO/E REST API",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0097",
           "label": "Send messages to a TSO/E address space",
-          "source_locator": "pdf-page:883;outline:Send messages to a TSO/E address space",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SendMsgTSOAS.htm;topic-id:services-send-messages-tsoe-address-space;heading:Send messages to a TSO/E address space",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0098",
           "label": "Send messages to an application",
-          "source_locator": "pdf-page:885;outline:Send messages to an application",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SendMsgTSOApp.htm;topic-id:services-send-messages-application;heading:Send messages to an application",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0099",
           "label": "Ping a TSO/E address space",
-          "source_locator": "pdf-page:886;outline:Ping a TSO/E address space",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_PingTSOAS.htm;topic-id:services-ping-tsoe-address-space;heading:Ping a TSO/E address space",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0100",
           "label": "Receive messages from a TSO/E address space",
-          "source_locator": "pdf-page:888;outline:Receive messages from a TSO/E address space",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ReceiveMsgTSOAS.htm;topic-id:services-receive-messages-from-tsoe-address-space;heading:Receive messages from a TSO/E address space",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0101",
           "label": "Receive messages from an application",
-          "source_locator": "pdf-page:889;outline:Receive messages from an application",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ReceiveMsgTSOApp.htm;topic-id:services-receive-messages-from-application;heading:Receive messages from an application",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0102",
           "label": "End a TSO/E address space",
-          "source_locator": "pdf-page:890;outline:End a TSO/E address space",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_EndTSOAS.htm;topic-id:services-end-tsoe-address-space;heading:End a TSO/E address space",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0103",
           "label": "Prime a WLM resource pool",
-          "source_locator": "pdf-page:893;outline:Prime a WLM resource pool",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PrimeWRP.htm;topic-id:services-prime-wlm-resource-pool;heading:Prime a WLM resource pool",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0104",
           "label": "Delete a WLM resource pool",
-          "source_locator": "pdf-page:895;outline:Delete a WLM resource pool",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_DeleteWRP.htm;topic-id:services-delete-wlm-resource-pool;heading:Delete a WLM resource pool",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0105",
           "label": "Construct a WLM service definition",
-          "source_locator": "pdf-page:897;outline:Construct a WLM service definition",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_servicedefWRP.htm;topic-id:services-construct-wlm-service-definition;heading:Construct a WLM service definition",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0106",
           "label": "Construct a WLM service definition with remove and install",
-          "source_locator": "pdf-page:899;outline:Construct a WLM service definition with remove and install",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_servicedefWRPdep.htm;topic-id:services-construct-wlm-service-definition-remove-install;heading:Construct a WLM service definition with remove and install",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0107",
           "label": "Get metered data",
-          "source_locator": "pdf-page:901;outline:Get metered data",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_GetMeterData.htm;topic-id:services-get-metered-data;heading:Get metered data",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0108",
           "label": "Get DDS server time data",
-          "source_locator": "pdf-page:904;outline:Get DDS server time data",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_GetDDS.htm;topic-id:services-get-dds-server-time-data;heading:Get DDS server time data",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0109",
           "label": "Validate Parmlib Syntax",
-          "source_locator": "pdf-page:907;outline:Validate Parmlib Syntax",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_ValidateParmLibSyntaxUpdates.htm;topic-id:services-validate-parmlib-syntax;heading:Validate Parmlib Syntax",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0110",
           "label": "POST the request for compliance facts",
-          "source_locator": "pdf-page:920;outline:POST the request for compliance facts",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_PostRequestComplianceFacts.htm;topic-id:interface-post-request-compliance-facts;heading:POST the request for compliance facts",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0111",
           "label": "Issue a command from a system console",
-          "source_locator": "pdf-page:923;outline:Issue a command from a system console",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_IssueCommand.htm;topic-id:services-issue-command-from-system-console;heading:Issue a command from a system console",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0112",
           "label": "Get a command response",
-          "source_locator": "pdf-page:941;outline:Get a command response",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetCommandResponse.htm;topic-id:services-get-command-response;heading:Get a command response",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0113",
           "label": "Get the detect result for unsolicited messages",
-          "source_locator": "pdf-page:947;outline:Get the detect result for unsolicited messages",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetUnsolicitedMsgs.htm;topic-id:services-get-detect-result-unsolicited-messages;heading:Get the detect result for unsolicited messages",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0114",
           "label": "Get messages from a hardcopy log",
-          "source_locator": "pdf-page:953;outline:Get messages from a hardcopy log",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetMessagesandLogs.htm;topic-id:services-get-messages-from-hardcopy-log;heading:Get messages from a hardcopy log",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0115",
           "label": "Create or update system variables",
-          "source_locator": "pdf-page:961;outline:Create or update system variables",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SystemVariablesCreate.htm;topic-id:services-create-update-system-variables;heading:Create or update system variables",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0116",
           "label": "Get system variables",
-          "source_locator": "pdf-page:963;outline:Get system variables",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SystemVariablesGetAll.htm;topic-id:services-get-system-variables;heading:Get system variables",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0117",
           "label": "Import system variables",
-          "source_locator": "pdf-page:966;outline:Import system variables",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SystemVariablesImport.htm;topic-id:services-import-system-variables;heading:Import system variables",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0118",
           "label": "Export system variables",
-          "source_locator": "pdf-page:967;outline:Export system variables",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SystemVariablesExport.htm;topic-id:services-export-system-variables;heading:Export system variables",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0119",
           "label": "Delete system variables",
-          "source_locator": "pdf-page:969;outline:Delete system variables",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SystemVariablesDelete.htm;topic-id:services-delete-system-variables;heading:Delete system variables",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0120",
           "label": "List the z/OS data sets on a system",
-          "source_locator": "pdf-page:977;outline:List the z/OS data sets on a system",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetListDataSets.htm;topic-id:interface-list-zos-data-sets-system;heading:List the z/OS data sets on a system",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0121",
           "label": "List the members of a z/OS data set",
-          "source_locator": "pdf-page:980;outline:List the members of a z/OS data set",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetListDataSetMembers.htm;topic-id:interface-list-members-zos-data-set;heading:List the members of a z/OS data set",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0122",
           "label": "Retrieve the contents of a z/OS data set or member",
-          "source_locator": "pdf-page:983;outline:Retrieve the contents of a z/OS data set or member",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetReadDataSet.htm;topic-id:interface-retrieve-contents-zos-data-set-member;heading:Retrieve the contents of a z/OS data set or member",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0123",
           "label": "Write data to a z/OS data set or member",
-          "source_locator": "pdf-page:989;outline:Write data to a z/OS data set or member",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PutWriteDataSet.htm;topic-id:interface-write-data-zos-data-set-member;heading:Write data to a z/OS data set or member",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0124",
           "label": "Create a sequential or partitioned data set",
-          "source_locator": "pdf-page:995;outline:Create a sequential or partitioned data set",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_CreateDataSet.htm;topic-id:interface-create-sequential-partitioned-data-set;heading:Create a sequential or partitioned data set",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0125",
           "label": "Delete a sequential and partitioned data set",
-          "source_locator": "pdf-page:998;outline:Delete a sequential and partitioned data set",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_DeleteDataSet.htm;topic-id:interface-delete-sequential-partitioned-data-set;heading:Delete a sequential and partitioned data set",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0126",
           "label": "Delete a partitioned data set member",
-          "source_locator": "pdf-page:1000;outline:Delete a partitioned data set member",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_DeletePartitionedDataSet.htm;topic-id:interface-delete-partitioned-data-set-member;heading:Delete a partitioned data set member",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0127",
           "label": "z/OS data set and member utilities",
-          "source_locator": "pdf-page:1002;outline:z/OS data set and member utilities",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PutDataSetMemberUtilities.htm;topic-id:interface-zos-data-set-member-utilities;heading:z/OS data set and member utilities",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0128",
           "label": "Access Method Services Interface",
-          "source_locator": "pdf-page:1006;outline:Access Method Services Interface",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PUTIDCAMSAccessMethodsServices.htm;topic-id:interface-access-method-services;heading:Access Method Services Interface",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0129",
           "label": "List the files and directories of a UNIX file path",
-          "source_locator": "pdf-page:1008;outline:List the files and directories of a UNIX file path",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetListUNIXfiles.htm;topic-id:interface-list-files-directories-unix-file-path;heading:List the files and directories of a UNIX file path",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0130",
           "label": "Retrieve the contents of a z/OS UNIX file",
-          "source_locator": "pdf-page:1013;outline:Retrieve the contents of a z/OS UNIX file",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetReadUnixFile.htm;topic-id:interface-retrieve-contents-zos-unix-file;heading:Retrieve the contents of a z/OS UNIX file",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0131",
           "label": "Write data to a z/OS UNIX file",
-          "source_locator": "pdf-page:1017;outline:Write data to a z/OS UNIX file",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PutWriteUnixFile.htm;topic-id:interface-write-data-zos-unix-file;heading:Write data to a z/OS UNIX file",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0132",
           "label": "Create a UNIX file or directory",
-          "source_locator": "pdf-page:1020;outline:Create a UNIX file or directory",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_CreateUnixFile.htm;topic-id:interface-create-unix-file-directory;heading:Create a UNIX file or directory",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0133",
           "label": "Delete a UNIX file or directory",
-          "source_locator": "pdf-page:1023;outline:Delete a UNIX file or directory",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_DeleteUnixFile.htm;topic-id:interface-delete-unix-file-directory;heading:Delete a UNIX file or directory",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0134",
           "label": "z/OS UNIX file utilities",
-          "source_locator": "pdf-page:1025;outline:z/OS UNIX file utilities",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PutUnixFileUtilities.htm;topic-id:interface-zos-unix-file-utilities;heading:z/OS UNIX file utilities",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0135",
           "label": "List z/OS UNIX Filesystems",
-          "source_locator": "pdf-page:1032;outline:List z/OS UNIX Filesystems",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetListUnixFilesystems.htm;topic-id:interface-list-zos-unix-filesystems;heading:List z/OS UNIX Filesystems",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0136",
           "label": "Create a z/OS UNIX zFS filesystem",
-          "source_locator": "pdf-page:1034;outline:Create a z/OS UNIX zFS filesystem",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PostCreateUnixzFsFilesystem.htm;topic-id:interface-create-zos-unix-zfs-filesystem;heading:Create a z/OS UNIX zFS filesystem",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0137",
           "label": "Delete z/OS UNIX zFS Filesystem",
-          "source_locator": "pdf-page:1036;outline:Delete z/OS UNIX zFS Filesystem",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_DeleteUnixzFsFilesystem.htm;topic-id:interface-delete-zos-unix-zfs-filesystem;heading:Delete z/OS UNIX zFS Filesystem",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0138",
           "label": "Mount a z/OS UNIX file system",
-          "source_locator": "pdf-page:1037;outline:Mount a z/OS UNIX file system",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_MountUnixFile.htm;topic-id:interface-mount-zos-unix-file-system;heading:Mount a z/OS UNIX file system",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0139",
           "label": "Unmount a UNIX file system",
-          "source_locator": "pdf-page:1039;outline:Unmount a UNIX file system",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_UnmountUnixFile.htm;topic-id:interface-unmount-unix-file-system;heading:Unmount a UNIX file system",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0140",
           "label": "JSON document specifications for z/OS data set and file REST interface requests",
-          "source_locator": "pdf-page:1041;outline:JSON document specifications for z/OS data set and file REST interface requests",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_RESTFILES_JSON_Documents.htm;topic-id:zdsfri-json-document-specifications-zos-data-set-file-rest-interface-requests;heading:JSON document specifications for z/OS data set and file REST interface requests",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0141",
           "label": "Error reporting categories",
-          "source_locator": "pdf-page:1051;outline:Error reporting categories",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_RESTFILES_Error_Categories.htm;topic-id:interface-error-reporting-categories;heading:Error reporting categories",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0142",
           "label": "Obtain the status of a job",
-          "source_locator": "pdf-page:1063;outline:Obtain the status of a job",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetJobStatus.htm;topic-id:interface-obtain-status-job;heading:Obtain the status of a job",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0143",
           "label": "List the jobs for an owner, prefix, or job ID",
-          "source_locator": "pdf-page:1066;outline:List the jobs for an owner, prefix, or job ID",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetListJobs.htm;topic-id:interface-list-jobs-owner-prefix-job-id;heading:List the jobs for an owner, prefix, or job ID",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0144",
           "label": "List the spool files for a job",
-          "source_locator": "pdf-page:1070;outline:List the spool files for a job",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetListSpoolFiles.htm;topic-id:interface-list-spool-files-job;heading:List the spool files for a job",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0145",
           "label": "Retrieve the contents of a job spool file",
-          "source_locator": "pdf-page:1072;outline:Retrieve the contents of a job spool file",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_RetrieveSpoolFileContents.htm;topic-id:interface-retrieve-contents-job-spool-file;heading:Retrieve the contents of a job spool file",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0146",
           "label": "Submit a job",
-          "source_locator": "pdf-page:1076;outline:Submit a job",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PutSubmitJob.htm;topic-id:interface-submit-job;heading:Submit a job",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0147",
           "label": "Hold a job",
-          "source_locator": "pdf-page:1081;outline:Hold a job",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PutHoldJob.htm;topic-id:interface-hold-job;heading:Hold a job",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0148",
           "label": "Release a job",
-          "source_locator": "pdf-page:1083;outline:Release a job",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PutReleaseJob.htm;topic-id:interface-release-job;heading:Release a job",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0149",
           "label": "Change the job class",
-          "source_locator": "pdf-page:1086;outline:Change the job class",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PutChangeJobClass.htm;topic-id:interface-change-job-class;heading:Change the job class",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0150",
           "label": "Cancel a job",
-          "source_locator": "pdf-page:1088;outline:Cancel a job",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PutCancelJob.htm;topic-id:interface-cancel-job;heading:Cancel a job",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0151",
           "label": "Cancel a job and purge its output",
-          "source_locator": "pdf-page:1091;outline:Cancel a job and purge its output",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_DeletePurgeJob.htm;topic-id:interface-cancel-job-purge-its-output;heading:Cancel a job and purge its output",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0152",
           "label": "JSON document specifications for z/OS jobs REST interface requests",
-          "source_locator": "pdf-page:1093;outline:JSON document specifications for z/OS jobs REST interface requests",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_JSON_Documents.htm;topic-id:zjri-json-document-specifications-zos-jobs-rest-interface-requests;heading:JSON document specifications for z/OS jobs REST interface requests",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0153",
           "label": "Error reporting categories",
-          "source_locator": "pdf-page:1100;outline:Error reporting categories",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_Error_Categories.htm;topic-id:zjri-error-reporting-categories;heading:Error reporting categories",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0154",
           "label": "List the services in the catalog",
-          "source_locator": "pdf-page:1113;outline:List the services in the catalog",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_GetCatalogServiceList.htm;topic-id:services-list-in-catalog;heading:List the services in the catalog",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0155",
           "label": "Get the details of a service from the catalog",
-          "source_locator": "pdf-page:1119;outline:Get the details of a service from the catalog",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_GetCatalogServiceDetails.htm;topic-id:services-get-details-service-from-catalog;heading:Get the details of a service from the catalog",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0156",
           "label": "Get the list of categories",
-          "source_locator": "pdf-page:1132;outline:Get the list of categories",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_GetCategoryList.htm;topic-id:services-get-list-categories;heading:Get the list of categories",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0157",
           "label": "Get category details",
-          "source_locator": "pdf-page:1135;outline:Get category details",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_GetCategoryDetails.htm;topic-id:services-get-category-details;heading:Get category details",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0158",
           "label": "List the service submissions",
-          "source_locator": "pdf-page:1136;outline:List the service submissions",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_GetServiceInstanceList.htm;topic-id:services-list-service-submissions;heading:List the service submissions",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0159",
           "label": "Create a new service submission",
-          "source_locator": "pdf-page:1139;outline:Create a new service submission",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_CreateServiceInstance.htm;topic-id:services-create-new-service-submission;heading:Create a new service submission",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0160",
           "label": "Delete a service submission",
-          "source_locator": "pdf-page:1146;outline:Delete a service submission",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_DeleteServiceInstance.htm;topic-id:services-delete-service-submission;heading:Delete a service submission",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0161",
           "label": "Get the details of a service submission",
-          "source_locator": "pdf-page:1147;outline:Get the details of a service submission",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_GetServiceInstanceDetails.htm;topic-id:services-get-details-service-submission;heading:Get the details of a service submission",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0162",
           "label": "Modify an existing service submission",
-          "source_locator": "pdf-page:1152;outline:Modify an existing service submission",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_ModifyServiceInstance.htm;topic-id:services-modify-existing-service-submission;heading:Modify an existing service submission",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0163",
           "label": "Perform an action on a service submission",
-          "source_locator": "pdf-page:1154;outline:Perform an action on a service submission",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_PerformActionOnServiceInstance.htm;topic-id:services-perform-action-service-submission;heading:Perform an action on a service submission",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0164",
           "label": "Get the list of JCL JOB statements",
-          "source_locator": "pdf-page:1156;outline:Get the list of JCL JOB statements",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_SettingsGetJobStatements.htm;topic-id:services-get-list-jcl-job-statements;heading:Get the list of JCL JOB statements",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0165",
           "label": "Get the list of target systems",
-          "source_locator": "pdf-page:1158;outline:Get the list of target systems",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_SettingsGetTargetSystems.htm;topic-id:services-get-list-target-systems;heading:Get the list of target systems",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0166",
           "label": "Retrieve z/OSMF information",
-          "source_locator": "pdf-page:1160;outline:Retrieve z/OSMF information",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_GetRetrieveVersionInfo.htm;topic-id:service-retrieve-zosmf-information;heading:Retrieve z/OSMF information",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0167",
           "label": "Persist z/OSMF settings for a user or plug-in",
-          "source_locator": "pdf-page:1165;outline:Persist z/OSMF settings for a user or plug-in",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SettingsPersistData.htm;topic-id:services-persist-zosmf-settings-user-plug-in;heading:Persist z/OSMF settings for a user or plug-in",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0168",
           "label": "Retrieve z/OSMF settings data",
-          "source_locator": "pdf-page:1166;outline:Retrieve z/OSMF settings data",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SettingsRetrievePersistData.htm;topic-id:services-retrieve-zosmf-settings-data;heading:Retrieve z/OSMF settings data",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0169",
           "label": "Delete z/OSMF settings data",
-          "source_locator": "pdf-page:1168;outline:Delete z/OSMF settings data",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SettingsDeletePersistData.htm;topic-id:services-delete-zosmf-settings-data;heading:Delete z/OSMF settings data",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0170",
           "label": "Log in to the z/OSMF server",
-          "source_locator": "pdf-page:1171;outline:Log in to the z/OSMF server",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_POSTWebTokenAuthService.htm;topic-id:services-log-in-zosmf-server;heading:Log in to the z/OSMF server",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0171",
           "label": "Change the user password or passphrase",
-          "source_locator": "pdf-page:1173;outline:Change the user password or passphrase",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_PUTWebTokenChangePWService.htm;topic-id:services-change-user-password-passphrase;heading:Change the user password or passphrase",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0172",
           "label": "Log out of the z/OSMF server",
-          "source_locator": "pdf-page:1176;outline:Log out of the z/OSMF server",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_DELETEWebTokenAuthService.htm;topic-id:services-log-out-zosmf-server;heading:Log out of the z/OSMF server",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0173",
           "label": "Create a workflow",
-          "source_locator": "pdf-page:1180;outline:Create a workflow",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowCreateNew.htm;topic-id:services-create-workflow;heading:Create a workflow",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0174",
           "label": "Get the properties of a workflow",
-          "source_locator": "pdf-page:1188;outline:Get the properties of a workflow",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowRetrieveInfo.htm;topic-id:services-get-properties-workflow;heading:Get the properties of a workflow",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0175",
           "label": "List the workflows for a system or sysplex",
-          "source_locator": "pdf-page:1211;outline:List the workflows for a system or sysplex",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowListWorkflows.htm;topic-id:services-list-workflows-system-sysplex;heading:List the workflows for a system or sysplex",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0176",
           "label": "Start a workflow",
-          "source_locator": "pdf-page:1213;outline:Start a workflow",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowStart.htm;topic-id:services-start-workflow;heading:Start a workflow",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0177",
           "label": "Cancel a workflow",
-          "source_locator": "pdf-page:1218;outline:Cancel a workflow",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowCancel.htm;topic-id:services-cancel-workflow;heading:Cancel a workflow",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0178",
           "label": "Delete a workflow",
-          "source_locator": "pdf-page:1220;outline:Delete a workflow",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowDelete.htm;topic-id:services-delete-workflow;heading:Delete a workflow",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0179",
           "label": "Retrieve a workflow definition",
-          "source_locator": "pdf-page:1222;outline:Retrieve a workflow definition",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowRetrieveDefinition.htm;topic-id:services-retrieve-workflow-definition;heading:Retrieve a workflow definition",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0180",
           "label": "Archive a workflow instance",
-          "source_locator": "pdf-page:1235;outline:Archive a workflow instance",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowArchiveNew.htm;topic-id:services-archive-workflow-instance;heading:Archive a workflow instance",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0181",
           "label": "List the archived workflows for a system",
-          "source_locator": "pdf-page:1237;outline:List the archived workflows for a system",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowArchiveList.htm;topic-id:services-list-archived-workflows-system;heading:List the archived workflows for a system",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0182",
           "label": "Get the properties of an archived workflow",
-          "source_locator": "pdf-page:1239;outline:Get the properties of an archived workflow",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowArchiveRetrieveInfo.htm;topic-id:services-get-properties-archived-workflow;heading:Get the properties of an archived workflow",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0183",
           "label": "Delete an archived workflow",
-          "source_locator": "pdf-page:1253;outline:Delete an archived workflow",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowArchiveDelete.htm;topic-id:services-delete-archived-workflow;heading:Delete an archived workflow",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0184",
           "label": "Obtain an IP address",
-          "source_locator": "pdf-page:122;outline:Obtain an IP address",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_RPObtainIP.htm;topic-id:services-obtain-ip-address;heading:Obtain an IP address",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0185",
           "label": "Release an IP address",
-          "source_locator": "pdf-page:128;outline:Release an IP address",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_RPReleaseIP.htm;topic-id:services-release-ip-address;heading:Release an IP address",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0186",
           "label": "Obtain a port",
-          "source_locator": "pdf-page:131;outline:Obtain a port",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_RPObtainPort.htm;topic-id:services-obtain-port;heading:Obtain a port",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0187",
           "label": "Release a port",
-          "source_locator": "pdf-page:135;outline:Release a port",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_RPReleasePort.htm;topic-id:services-release-port;heading:Release a port",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0188",
           "label": "Obtain a SNA application name",
-          "source_locator": "pdf-page:137;outline:Obtain a SNA application name",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_RPObtainSNAAppl.htm;topic-id:services-obtain-sna-application-name;heading:Obtain a SNA application name",
           "mandatory": true
         },
         {
           "id": "ibm-zosmf-3.2-2026-07-27:direct-guide-operation-headings:0189",
           "label": "Release a SNA application name",
-          "source_locator": "pdf-page:140;outline:Release a SNA application name",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_RPReleaseSNAAppl.htm;topic-id:services-release-sna-application-name;heading:Release a SNA application name",
           "mandatory": true
         }
       ]
