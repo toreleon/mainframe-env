@@ -33,7 +33,9 @@ logging.disable(logging.WARNING)
 
 from pypdf import PdfReader
 
-HEADER = re.compile(r"^\s*(?:\d+\s+)?z/OS Security Server RACF|^\s*Chapter \d+\.")
+HEADER = re.compile(
+    r"^\s*(?:\d+\s+)?z/OS[:\s].*RACF Command Language Reference|^\s*Chapter \d+\."
+)
 OPERAND = re.compile(r"^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*$")
 BLOCK_LINE = re.compile(r"^\s*[\[\])(|{}]")
 def is_prose(line: str) -> bool:

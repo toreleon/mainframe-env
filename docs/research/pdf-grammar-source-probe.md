@@ -7,20 +7,29 @@ checks a catalog against the publication it names. These probes build an
 independent machine projection from the published PDF and diff it against the
 committed catalog.
 
-`www.ibm.com/docs` returns 403 to this environment for every path under
-`/docs`, including the URLs recorded in the 0.9 CICS manifest. The legacy
-`publib*.boulder.ibm.com/epubs/pdf/` hosts are reachable and serve the same
-publications at older editions, so every probe below carries a version skew
-against its catalog. A reported difference may be an edition delta rather than
-a catalog omission; each row keeps its evidence so a reviewer can tell them
-apart. IBM publication bytes are not retained in the repository.
+`www.ibm.com/docs` returns 403 to every scripted HTTP client here, including
+the URLs recorded in the 0.9 CICS manifest, so the first probes read older
+editions from the legacy `publib*.boulder.ibm.com/epubs/pdf/` hosts and carried
+a version skew against their catalogs.
+
+A real browser is not blocked. `conformance/tools/browser_fetch.py` attaches to
+a Chrome listening on a debugging port and issues same-origin `fetch` calls
+from inside the page, which reaches the current editions. The RACF reference
+retrieved that way hashes to
+`sha256:f4c8860aeb4d00b78f9257b28b2d880bd7571d74e2e00b2b1424b203801d5a46` —
+byte-for-byte the digest already pinned in `conformance/0.2/tools/
+extract_official_catalogs.py` and in `command-language.json`. The pinned
+sources are therefore reproducible, and probes can drop the skew caveat as
+each one is moved onto the pinned edition.
+
+IBM publication bytes are not retained in the repository.
 
 ## Sources
 
 | Subsystem | Publication | Digest | Catalog compared |
 |---|---|---|---|
 | COBOL | Enterprise COBOL for z/OS 6.4 Language Reference, `igy6lr40.pdf`, 906 pages | `sha256:eef69c81ab8bcd569eaa2a47f430ff70c5518d4929cff26e7ab1ed6170f5c0bc` | `conformance/0.3/cobol/language.json` (6.5) |
-| RACF | z/OS V2R2 Security Server RACF Command Language Reference, `ich2a411.pdf`, 790 pages | `sha256:901e79febbac0625f48d6ba5ded4afe36e0864b805dab50995e1a3cd0d8cf3de` | `conformance/0.5/racf/command-language.json` (z/OS 3.2) |
+| RACF | z/OS 3.2 Security Server RACF Command Language Reference, `icha400_v3r2.pdf`, 746 pages — the pinned edition, fetched through Chrome | `sha256:f4c8860aeb4d00b78f9257b28b2d880bd7571d74e2e00b2b1424b203801d5a46` | `conformance/0.5/racf/command-language.json` (z/OS 3.2) |
 | JCL | z/OS V2R2 MVS JCL Reference, `iea3b611.pdf`, 756 pages | `sha256:54c9a37d1a3a7cc3832cf95079e595ae532a12b98b60da5d38515846bb1908d3` | `conformance/0.2/catalogs/jcl-jes2.json` (z/OS 3.2) |
 
 ## Each publication needs its own reader
@@ -28,10 +37,18 @@ apart. IBM publication bytes are not retained in the repository.
 The three books present syntax in three different ways, so one extractor does
 not carry over:
 
-- **COBOL** draws railroad diagrams as inline vector art. The reader replays
-  the page content stream for coordinates, decodes subset fonts through their
-  `/ToUnicode` CMaps, separates keywords from operands by font style, and uses
-  stroked rails to tell diagrams from equally sized code samples.
+- **COBOL** draws railroad diagrams as inline vector art in the PDF. The reader
+  replays the page content stream for coordinates, decodes subset fonts through
+  their `/ToUnicode` CMaps, separates keywords from operands by font style, and
+  uses stroked rails to tell diagrams from equally sized code samples.
+
+  The PDF is not the only option. The 6.5 web topic, fetched through the
+  browser, carries the same DITA markup CICS uses — `class="syntaxdiagram"`,
+  `boxed syntaxkwd`, `boxed syntaxvar`, `groupchoice`, `groupseq` — so the
+  structure is available without any geometry work. The `c.gif` image on that
+  page is a fallback beside the SVG, not the diagram itself. The CICS reader
+  still does not transfer unchanged: it requires every operand to appear as
+  `OPTION(kind)` and rejects the bare `syntaxvar` operands COBOL uses.
 - **RACF** has no diagrams. Each command carries a bracket-notation block
   (`[ AT([node].userid ...) | ONLYAT(...)]`). The reader locates the block by
   the reference's own introduction line, tolerates kerning that splits command
@@ -60,11 +77,19 @@ against four, `DIVIDE` one against five.
 
 ### RACF — 34 command families
 
-23 of 34 commands were located. Across those, the catalog records 319 operands
-and the source 504, sharing 228: 276 appear only in the source and 91 only in
-the catalog. Every located command carries a source alias (`AD`, `AU`, `ALU`,
-`PE`, `RDEF`) that the catalog does not record — `aliases` is empty on all but
-`PASSWORD`. Five catalog rows carry no operands at all.
+Against the pinned edition, 23 of 34 commands were located. The catalog records
+319 operands and the projection 323, sharing 177.
+
+One finding is already firm: **every located command carries a source alias**
+(`AD`, `AU`, `ALU`, `PE`, `RDEF`) that the catalog does not record. `aliases`
+is empty on every row except `PASSWORD`. Five catalog rows carry no operands at
+all.
+
+The operand counts are **not yet a clean audit**. The reader was tuned against
+the V2R2 layout; on the pinned edition it still truncates some blocks, so part
+of the 142 names reported as catalog-only (`ADDSD`'s `AUDIT`, `DATA`, `FROM`,
+`GENERIC`) are present in the publication and missed by the reader. Those
+counts need the reader retuned before any of them is read as a catalog gap.
 
 ### JCL — 204 statement parameters
 
