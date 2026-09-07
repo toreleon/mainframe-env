@@ -11976,6 +11976,17 @@ fn collect_files(root: &Path, files: &mut Vec<PathBuf>) -> TaskResult {
     collect_files_below(root, &not_the_tree, files)
 }
 
+/// `__pycache__` is skipped by name at any depth, and it is the one exception to
+/// matching by path. It is gitignored, so nothing inside it can be checked into
+/// the repository, which is the only thing this walk exists to prevent -- and a
+/// `.pyc` marshals its source's string constants adjacent to one another, so a
+/// test that deliberately holds `</h1>` and `lastModifiedDate` apart compiles to
+/// bytecode that reads as a served topic body. Running the Python suites once
+/// turned `cargo xtask coverage --check` red on a file git will never see.
+fn ignored_build_output(path: &Path) -> bool {
+    path.file_name().is_some_and(|name| name == "__pycache__")
+}
+
 fn collect_files_below(
     directory: &Path,
     not_the_tree: &[PathBuf; 2],
@@ -11986,7 +11997,7 @@ fn collect_files_below(
     {
         let path = entry.map_err(|error| error.to_string())?.path();
         if path.is_dir() {
-            if not_the_tree.contains(&path) {
+            if not_the_tree.contains(&path) || ignored_build_output(&path) {
                 continue;
             }
             collect_files_below(&path, not_the_tree, files)?;
