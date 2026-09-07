@@ -3,6 +3,55 @@
 The command, RACROUTE, and supplied-class catalogs in this directory project
 into the shared Conformance IR. They do not define a second RACF authority.
 
+## Reading the publication
+
+`command-language.json` is reviewed row content and is never written by a tool.
+What a tool produces is the evidence beside it: `../tools/fetch_racf_topics.py`
+selects the 60 topics the RACF Command Language Reference publishes the command
+syntax in, and `../tools/extract_racf_html_syntax.py` projects what they say
+into `../generated/racf-html-syntax-projection.json`.
+
+Both read documentation topics, never the PDF. The reference draws no railroad
+diagrams: a command's syntax is a `role="presentation"` table under a
+`<h2 class="sectiontitle">Syntax</h2>`, and its operands are a `<dl class="parml">`
+under `Parameters`, where an operand is a top-level `dt` and everything it
+accepts or contains is a `dt` of a `dl` nested inside its `dd`. Reading the
+typeset page instead meant recovering that nesting from indentation, which
+reached 25 of the 34 families and promoted a segment's members to top level
+whenever the segment opened inline.
+
+Selection is by href and the predicate is written out in the fetcher's module
+docstring, because a reviewer has to be able to arrive at the same 60 topics
+without running anything. 34 command families is an immutable denominator, so a
+tree that does not publish exactly 34 stops the tool rather than producing a
+short manifest.
+
+To reproduce, writing publication bytes outside the repository:
+
+```text
+python3 conformance/0.5/tools/fetch_racf_topics.py \
+  --destination "$TMPDIR/racf/topics" \
+  --manifest conformance/0.5/generated/racf-topic-manifest.json
+python3 conformance/0.5/tools/extract_racf_html_syntax.py \
+  --topics "$TMPDIR/racf/topics" \
+  --manifest conformance/0.5/generated/racf-topic-manifest.json \
+  --catalog conformance/0.5/racf/command-language.json \
+  --output conformance/0.5/generated/racf-html-syntax-projection.json
+python3 -m unittest discover -s conformance/0.5/tools/tests \
+  -t conformance/0.5/tools/tests
+```
+
+The manifest records each topic's digest against
+`conformance/0.2/manifests/racf-saf-topics.json`, so the projection states which
+pinned bytes it rests on rather than asking a reviewer to take it on trust.
+
+The projection is a review input. It carries `coverage_credit: 0`, it is not a
+normative catalog, and its `catalog_only` and `syntax_only` lists are questions
+for review — a name the catalog carries that the Parameters tree does not reach,
+and a keyword the syntax table draws that the Parameters tree does not define.
+Neither is a defect claim, and neither may be applied to `command-language.json`
+without a reviewed disposition per name.
+
 The 0.5 development gate also runs a bounded, table-driven, pure-state
 reference simulation over the same 34 command and 14 RACROUTE row identities.
 It is intentionally independent of the production provider and has explicit
