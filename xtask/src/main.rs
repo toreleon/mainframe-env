@@ -11880,16 +11880,54 @@ fn collect_extension(root: &Path, extension: &OsStr, files: &mut Vec<PathBuf>) -
     Ok(())
 }
 
+/// Every file in the tree, minus the two directories at the workspace root that
+/// are not the tree: Cargo's build directory and git's object store.
+///
+/// The skip used to read `file_name() == "target" || file_name() == ".git"`, and
+/// it was evaluated at every level of the recursion, so it said "the build
+/// directory" and meant "anything anyone named `target`". That is enough to walk
+/// straight past the guard 8389f98 widened to the whole tree:
+/// `cp <an IBM topic body> docs/target/leak.md && cargo xtask coverage --check`
+/// printed `coverage: pass`, and so did the same body at
+/// `conformance/0.6/target/`, at `crates/<crate>/target/deep/` and at
+/// `docs/.git/`. A leak into a nested `target` is worse than one anywhere else,
+/// not better: `.gitignore` reads `/target/`, anchored at the root, so
+/// `docs/target/leak.md` is untracked, `git add -A` stages it, and the one check
+/// that exists to stop it was looking the other way. The `docs/.git/` twin is
+/// the same evasion with a different ending -- git refuses to track any path
+/// under a `.git` component, so those bytes cannot be committed, but they still
+/// sit in the tree with nothing reporting them.
+///
+/// Anchoring both names to `root` costs nothing measurable, because the
+/// directory that has to stay skipped is the build directory at the workspace
+/// root -- 338,191 files and 49 GB here -- and that one is still matched, by
+/// path now rather than by name. Three runs of `cargo xtask coverage --check`
+/// each way, with that directory present at the root for both, spend 2.5-3.0s
+/// user and 2.0-3.0s system before and 2.6s user and 2.1-2.3s system after; the
+/// wall clock is 7.7-19.7s against 7.2-7.9s and is the machine's load rather
+/// than the walk. Walking that directory instead would not be a rounding error:
+/// enumerating it alone is 7.1s warm, and `check_publication_bytes` reads every
+/// file it is handed, which a 2,023-file random sample puts at about ten
+/// minutes and 49 GB through `fs::read`.
 fn collect_files(root: &Path, files: &mut Vec<PathBuf>) -> TaskResult {
-    if root.file_name() == Some(OsStr::new(".git"))
-        || root.file_name() == Some(OsStr::new("target"))
+    let not_the_tree = [root.join("target"), root.join(".git")];
+    collect_files_below(root, &not_the_tree, files)
+}
+
+fn collect_files_below(
+    directory: &Path,
+    not_the_tree: &[PathBuf; 2],
+    files: &mut Vec<PathBuf>,
+) -> TaskResult {
+    for entry in
+        fs::read_dir(directory).map_err(|error| format!("{}: {error}", directory.display()))?
     {
-        return Ok(());
-    }
-    for entry in fs::read_dir(root).map_err(|error| format!("{}: {error}", root.display()))? {
         let path = entry.map_err(|error| error.to_string())?.path();
         if path.is_dir() {
-            collect_files(&path, files)?;
+            if not_the_tree.contains(&path) {
+                continue;
+            }
+            collect_files_below(&path, not_the_tree, files)?;
         } else {
             files.push(path);
         }
@@ -11966,6 +12004,54 @@ mod tests {
         // And the tree this test runs in holds none.
         check_publication_bytes(&repository_root().expect("repository root"))
             .expect("the repository holds no publication bytes");
+    }
+
+    /// The guard reads bytes; this is about which bytes it is ever given.
+    ///
+    /// `collect_files` skipped by directory name at every depth, so the whole
+    /// content check above was one `mkdir` from being unreachable. Each of these
+    /// five paths was verified against the real tree before the skip was
+    /// anchored: `coverage: pass` for all five at HEAD, and the same five
+    /// refused afterwards.
+    #[test]
+    fn only_the_build_directory_at_the_root_is_outside_the_tree() {
+        let root = std::env::temp_dir().join(format!(
+            "xtask-collect-files-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        let body = b"<div><h1 class=\"topictitle1\">ALTER</h1>\
+                     <div id=\"lastModifiedDate\">Last Updated: 2026-09-03</div></div>";
+        let plant = |relative: &str| {
+            let path = root.join(relative);
+            fs::create_dir_all(path.parent().expect("parent")).expect("create");
+            fs::write(&path, body).expect("write");
+            path
+        };
+
+        // Cargo's build directory and git's object store, both at the root.
+        plant("target/leak.md");
+        plant(".git/leak.md");
+        check_publication_bytes(&root).expect("the root build directory is not the tree");
+
+        // Everything else, at every depth, is.
+        for relative in [
+            "docs/target/leak.md",
+            "docs/.git/leak.html",
+            "conformance/0.6/target/leak.html",
+            "crates/mainframe-env-cobol/target/deep/leak.htm",
+            "conformance/0.7/tools/target/a/b/c/leak.json",
+        ] {
+            let path = plant(relative);
+            let error =
+                check_publication_bytes(&root).expect_err("a planted topic body must be refused");
+            assert!(error.contains(relative), "{error} does not name {relative}");
+            fs::remove_file(&path).expect("remove");
+        }
+
+        check_publication_bytes(&root).expect("nothing is left planted");
+        fs::remove_dir_all(&root).expect("clean up");
     }
 
     #[test]

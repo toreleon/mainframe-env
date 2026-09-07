@@ -81,6 +81,14 @@ def outside_repository(path: Path) -> Path:
     The 0.2 gate now covers the whole `conformance/` subtree, so that is caught,
     but a gate that fails after the bytes are already written is a worse place to
     learn it than the tool that is about to write them.
+
+    `--toc` is held to the same rule for the same reason, which is the stronger
+    half. It caches the served table of contents -- 45,016,664 bytes of IBM
+    navigation JSON, measured against `SSLTBW_3.2.0` -- and that is a
+    publication body that happens not to be markup, so `--toc
+    conformance/0.6/tools/toc.json` is the one write here the content-shaped
+    backstop in `cargo xtask coverage` would not recognise on its way in or
+    afterwards. Nothing else in the tree would have caught it either.
     """
     resolved = path.resolve()
     if resolved == REPOSITORY or REPOSITORY in resolved.parents:
@@ -103,6 +111,8 @@ def main(argv: Iterable[str] | None = None) -> int:
     catalog = json.loads(args.catalog.read_text(encoding="utf-8"))
     args.destination = outside_repository(args.destination)
     args.destination.mkdir(parents=True, exist_ok=True)
+    if args.toc:
+        args.toc = outside_repository(args.toc)
 
     tab = open_tab(args.port)
     entries: list[dict[str, Any]] = []
