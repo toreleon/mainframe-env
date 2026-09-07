@@ -60,33 +60,117 @@ TOC = {
 }
 
 
-#: The first three body rows of `idg6175__cjsts` in `iea3b6_JCL_statements.htm`,
-#: plus the two the finding turns on, transcribed from what IBM serves: a header
-#: row of `th`, a Statement column carrying the statement as the book prints it,
-#: a Name column, and a Purpose column of prose. The 20 JCL statement rows all
-#: cite this one table.
-JCL_STATEMENTS_TABLE = """
-<table summary="" id="idg6175__cjsts"><thead>
-<tr><th><strong>Statement</strong></th><th><strong>Name</strong></th>
-<th><strong>Purpose</strong></th></tr>
-</thead><tbody>
-<tr><td>//&nbsp;&nbsp;command</td><td>JCL command</td>
-<td>Enters an MVS system operator command through the input stream.</td></tr>
-<tr><td>//&nbsp;&nbsp;COMMAND</td><td>command</td>
-<td>Specifies an MVS or JES command that the system issues.</td></tr>
-<tr><td>//*&nbsp;&nbsp;comment</td><td>comment</td><td>Contains comments.</td></tr>
-<tr><td>//&nbsp;&nbsp;SCHEDULE</td><td>schedule</td>
-<td>Specifies scheduling attributes for a job such as the job group it is
-associated with.</td></tr>
-<tr><td>//&nbsp;&nbsp;SET</td><td>set</td>
-<td>Defines and assigns initial values to symbolic parameters.</td></tr>
-</tbody></table>
-"""
+#: `idg6175__cjsts` in `iea3b6_JCL_statements.htm`, transcribed cell for cell
+#: from what IBM serves: a Statement column carrying the statement as the book
+#: prints it, a Name column, and a Purpose column of prose. The 20 JCL statement
+#: rows all cite this one table, one row each, in this order.
+#:
+#: All 20 rows are here rather than the few the finding turns on, because the
+#: property under test is about the whole table at once — no label may name a
+#: second row — and a subset cannot show it. The Purpose column is transcribed
+#: whole for the same reason: it is where four of the five ambiguities the old
+#: comparison admitted came from, and trimming it would have made the fixture
+#: agree with the fix by omission.
+JCL_STATEMENTS = [
+    ('// command', 'JCL command',
+     'Enters an MVS system operator command through the input stream. The '
+     'command statement is used primarily by the operator. Use the COMMAND '
+     'statement instead of the JCL command statement.'),
+    ('// COMMAND', 'command',
+     'Specifies an MVS or JES command that the system issues when the JCL '
+     'is converted. Use the COMMAND statement instead of the JCL command '
+     'statement.'),
+    ('//* comment', 'comment',
+     'Contains comments. The comment statement is used primarily to '
+     'document a program and its resource requirements.'),
+    ('// CNTL', 'control',
+     'Marks the beginning of one or more program control statements.'),
+    ('// DD', 'data definition',
+     'Identifies and describes a data set.'),
+    ('/*', 'delimiter',
+     'Indicates the end of data placed in the input stream. Note: A user '
+     'can designate any two characters to be the delimiter.'),
+    ('// ENDCNTL', 'end control',
+     'Marks the end of one or more program control statements.'),
+    ('// EXEC', 'execute',
+     'Marks the beginning of a job step; assigns a name to the step; '
+     'identifies the program or the cataloged or in-stream procedure to be '
+     'executed in this step.'),
+    ('// EXPORT', 'export',
+     'Makes specific JCL symbols available to the job step program.'),
+    ('// IF/THEN/ELSE/ENDIF', 'IF/THEN/ELSE/ ENDIF statement construct',
+     'Specifies conditional execution of job steps within a job.'),
+    ('// INCLUDE', 'include',
+     'Identifies a member of a partitioned data set (PDS) or partitioned '
+     'data set extended (PDSE) that contains JCL statements to include in '
+     'the job stream.'),
+    ('// JCLLIB', 'JCL library',
+     'Identifies the libraries that the system searches for: INCLUDE '
+     'groups Procedures named in EXEC statements.'),
+    ('// JOB', 'job',
+     'Marks the beginning of a job; assigns a name to the job.'),
+    ('//', 'null',
+     'Marks the end of a job.'),
+    ('// OUTPUT', 'output JCL',
+     'Specifies the processing options that the job entry subsystem is to '
+     'use for printing a sysout data set.'),
+    ('// PEND', 'procedure end',
+     'Marks the end of an in-stream or cataloged procedure.'),
+    ('// PROC', 'procedure',
+     'Marks the beginning of an in-stream procedure and may mark the '
+     'beginning of a cataloged procedure; assigns default values to '
+     'parameters defined in the procedure.'),
+    ('// SCHEDULE', 'schedule',
+     'Specifies scheduling attributes for a job such as the job group it '
+     'is associated with and whether the job should be held for a time '
+     'before execution.'),
+    ('// SET', 'set',
+     'Defines and assigns initial values to symbolic parameters used when '
+     'processing JCL statements. Changes or nullifies the values assigned '
+     'to symbolic parameters.'),
+    ('// XMIT', 'transmit',
+     'Transmits input stream records from one node to another.'),
+]
 
-#: The ordinals those five rows carry in the served table. SCHEDULE and SET sit
-#: at 18 and 19 in the real book; the fixture keeps them adjacent and keeps the
-#: swap available, which is the whole point of the pair.
-SCHEDULE_ROW, SET_ROW = 4, 5
+#: The reviewed label the catalog gives each of those rows, in the same order.
+#: Read from the tree as well, by `test_the_fixture_carries_the_labels_the_
+#: catalog_actually_cites`, so this list cannot drift away from the catalog and
+#: leave the uniqueness assertion testing a table nothing cites.
+JCL_STATEMENT_LABELS = [
+    "JCL command", "COMMAND", "comment", "CNTL", "DD", "delimiter", "ENDCNTL",
+    "EXEC", "EXPORT", "IF/THEN/ELSE/ENDIF", "INCLUDE", "JCLLIB", "JOB", "null",
+    "OUTPUT JCL", "PEND", "PROC", "SCHEDULE", "SET", "XMIT",
+]
+
+#: The ordinals the rows the tests swap carry in the served table.
+JCL_COMMAND_ROW, COMMAND_ROW = 1, 2
+SCHEDULE_ROW, SET_ROW = 18, 19
+
+
+def statements_table(rows: list[tuple[str, str, str]] | None = None) -> str:
+    """The table as markup: a `thead` of `th`, then one `tr` of `td` per row.
+
+    The Statement column's double space is written `&nbsp;&nbsp;` where IBM
+    serves two plain spaces, so the entity path through `strip_markup` stays
+    exercised; both collapse to one space under `normalize`.
+
+    `rows` is open so a test can serve a doctored table — one row duplicated,
+    say — and see what the verifier does with a publication that has stopped
+    telling its own rows apart.
+    """
+    cells = "".join(
+        "<tr>"
+        + "".join(f"<td>{text.replace(' ', '&nbsp;&nbsp;', 1) if i == 0 else text}</td>"
+                  for i, text in enumerate(row))
+        + "</tr>\n"
+        for row in (JCL_STATEMENTS if rows is None else rows)
+    )
+    return (
+        '<table summary="" id="idg6175__cjsts"><thead>\n'
+        "<tr><th><strong>Statement</strong></th><th><strong>Name</strong></th>"
+        "<th><strong>Purpose</strong></th></tr>\n"
+        f"</thead><tbody>\n{cells}</tbody></table>\n"
+    )
 
 
 def body(heading: str, extra: str = "", updated: str = "2026-01-28") -> bytes:
@@ -98,8 +182,10 @@ def body(heading: str, extra: str = "", updated: str = "2026-01-28") -> bytes:
     ).encode("utf-8")
 
 
-def statements(heading: str = "JCL statements") -> bytes:
-    return body(heading, JCL_STATEMENTS_TABLE)
+def statements(
+    heading: str = "JCL statements", rows: list[tuple[str, str, str]] | None = None
+) -> bytes:
+    return body(heading, statements_table(rows))
 
 
 def jcl_locator(heading: str, ordinal: int | str | None, table: str = "idg6175__cjsts") -> str:
@@ -223,24 +309,105 @@ class TableRowTests(unittest.TestCase):
     def test_the_header_row_is_not_row_one(self) -> None:
         # Row 1 of the locator is the first row of DATA. Counting the header
         # would shift all 20 JCL statement rows by one and read as 20 findings.
-        self.assertEqual(self.rows[0], ["// command", "JCL command",
-                                        "Enters an MVS system operator command through the "
-                                        "input stream."])
+        self.assertEqual(len(self.rows), 20)
+        self.assertEqual(self.rows[0][:2], ["// command", "JCL command"])
 
     def test_each_row_keeps_its_own_cells(self) -> None:
         self.assertEqual(self.rows[SCHEDULE_ROW - 1][:2], ["// SCHEDULE", "schedule"])
         self.assertEqual(self.rows[SET_ROW - 1][:2], ["// SET", "set"])
 
-    def test_a_statement_printed_with_its_slashes_still_names_its_row(self) -> None:
-        # The Statement column reads `//  SCHEDULE`, so a whole-cell comparison
-        # would reject every one of the 20 labels.
-        self.assertTrue(DOCS.heading_in_cells("SCHEDULE", self.rows[SCHEDULE_ROW - 1]))
-
-    def test_a_row_does_not_name_a_statement_it_merely_mentions(self) -> None:
-        self.assertFalse(DOCS.heading_in_cells("SET", self.rows[SCHEDULE_ROW - 1]))
-
     def test_an_absent_table_is_none_rather_than_no_rows(self) -> None:
         self.assertIsNone(DOCS.table_rows(body("JCL statements").decode(), "idg6175__cjsts"))
+
+
+class CellComparisonTests(unittest.TestCase):
+    """How a reviewed label is matched against a cell, and why not more loosely.
+
+    A row ordinal only discriminates if the comparison does. Two waves gave the
+    20 JCL rows an ordinal and read it, and the comparison underneath stayed
+    token containment — is the label one of the cell's words — which the Purpose
+    column of prose makes almost free to satisfy.
+    """
+
+    def setUp(self) -> None:
+        self.rows = DOCS.table_rows(statements().decode(), "idg6175__cjsts")
+
+    def ordinals(self, heading: str, match) -> list[int]:
+        return [i + 1 for i, cells in enumerate(self.rows) if match(heading, cells)]
+
+    def test_every_label_names_its_own_row_and_no_other(self) -> None:
+        # THE property. Not "each label matches the row it cites", which token
+        # containment also satisfied, but that no OTHER ordinal would have
+        # accepted it — which is the only thing that makes a swap detectable
+        # from either side.
+        self.assertEqual(len(JCL_STATEMENT_LABELS), len(self.rows))
+        for ordinal, heading in enumerate(JCL_STATEMENT_LABELS, 1):
+            with self.subTest(row=ordinal, heading=heading):
+                self.assertEqual(LOCATORS.rows_naming_heading(heading, self.rows), [ordinal])
+
+    def test_token_containment_accepted_a_quarter_of_them_at_several_ordinals(self) -> None:
+        # The defect, pinned to the helper that carried it, so that reverting to
+        # it fails here rather than somewhere downstream. `JOB` is a word of
+        # seven Purpose sentences; `SET` is one of `data set (PDS)` in INCLUDE's;
+        # `COMMAND` is a word of row 1's `//  command` as well as row 2's.
+        loose = {
+            heading: self.ordinals(heading, DOCS.heading_in_cells)
+            for heading in JCL_STATEMENT_LABELS
+        }
+        self.assertEqual(
+            {heading: found for heading, found in loose.items() if len(found) > 1},
+            {
+                "COMMAND": [1, 2],
+                "EXEC": [8, 12],
+                "INCLUDE": [11, 12],
+                "JOB": [8, 9, 10, 11, 13, 15, 18],
+                "SET": [11, 19],
+            },
+        )
+
+    def test_a_statement_printed_with_its_slashes_still_names_its_row(self) -> None:
+        # The relaxation the coded column needs, and all it needs: the marker
+        # comes off, the rest must be the label entire.
+        self.assertTrue(LOCATORS.cell_names_heading("SCHEDULE", "//  SCHEDULE"))
+        self.assertTrue(LOCATORS.cell_names_heading("comment", "//*  comment"))
+        self.assertFalse(LOCATORS.cell_names_heading("SCHED", "//  SCHEDULE"))
+
+    def test_the_coded_column_is_compared_with_its_letter_case(self) -> None:
+        # The book distinguishes these two statements by case and by nothing
+        # else. Folding it is what put `COMMAND` at two ordinals, and it is what
+        # let half of a swap of rows 1 and 2 pass unreported.
+        self.assertTrue(LOCATORS.cell_names_heading("COMMAND", "//  COMMAND"))
+        self.assertFalse(LOCATORS.cell_names_heading("COMMAND", "//  command"))
+
+    def test_the_prose_column_is_not(self) -> None:
+        # `output JCL` against the label `OUTPUT JCL` is sentence-style
+        # capitalization, not a distinction the book is drawing, and there is no
+        # second Name cell for the fold to collide with.
+        self.assertTrue(LOCATORS.cell_names_heading("OUTPUT JCL", "output JCL"))
+        self.assertTrue(LOCATORS.cell_names_heading("JOB", "job"))
+
+    def test_a_label_is_never_a_word_of_a_sentence(self) -> None:
+        # Whole-cell equality is what excludes the Purpose column. Nothing in
+        # the rule knows that Purpose is the third column.
+        self.assertFalse(
+            LOCATORS.cell_names_heading("JOB", "Marks the beginning of a job; assigns a "
+                                               "name to the job.")
+        )
+
+    def test_a_marker_with_nothing_after_it_names_nothing(self) -> None:
+        # The null statement is `//` and the delimiter is `/*`; both are named
+        # by their Name cell, and neither coded cell may match an empty label or
+        # fall through to a case-insensitive read of itself.
+        for cell in ("//", "/*"):
+            with self.subTest(cell=cell):
+                self.assertFalse(LOCATORS.cell_names_heading("null", cell))
+                self.assertFalse(LOCATORS.cell_names_heading("", cell))
+
+    def test_prose_that_merely_begins_with_a_slash_is_not_read_as_coded(self) -> None:
+        # The marker has to stand as its own token, or a cell like `/*ff` would
+        # be stripped to `ff` and compared as though the book had coded it.
+        self.assertTrue(LOCATORS.cell_names_heading("/*ff", "/*ff"))
+        self.assertFalse(LOCATORS.cell_names_heading("ff", "/*ff"))
 
 
 class TocTests(unittest.TestCase):
@@ -382,14 +549,77 @@ class CheckTests(unittest.TestCase):
                 self.assertEqual(result["row"], cited)
                 self.assertEqual(result["heading_found_in_rows"], [truly])
 
-    def test_the_unswapped_pair_is_exact_against_the_same_table(self) -> None:
-        # The control for the test above: the fixture is not one that fails
+    def test_swapping_the_two_command_statements_is_caught_on_both_halves(self) -> None:
+        # The pair the ordinal could not tell apart. `JCL command` at row 2 was
+        # already caught; `COMMAND` at row 1 was not, because `command` is a word
+        # of row 1's `//  command` cell, so a reviewer saw one anomaly and would
+        # have corrected the wrong row. Both halves now report, and each names
+        # the ordinal its label really sits at.
+        for heading, cited, truly in (
+            ("JCL command", COMMAND_ROW, JCL_COMMAND_ROW),
+            ("COMMAND", JCL_COMMAND_ROW, COMMAND_ROW),
+        ):
+            with self.subTest(heading=heading):
+                result = self.check(jcl_locator(heading, cited), statements())
+                self.assertEqual(result["verdict"], "retitled")
+                self.assertEqual(result["matched_on"], "table-row")
+                self.assertEqual(result["row"], cited)
+                self.assertEqual(result["heading_found_in_rows"], [truly])
+
+    def test_the_unswapped_pairs_are_exact_against_the_same_table(self) -> None:
+        # The control for the two tests above: the fixture is not one that fails
         # whatever ordinal it is given.
-        for heading, cited in (("SCHEDULE", SCHEDULE_ROW), ("SET", SET_ROW)):
+        for heading, cited in (
+            ("SCHEDULE", SCHEDULE_ROW),
+            ("SET", SET_ROW),
+            ("JCL command", JCL_COMMAND_ROW),
+            ("COMMAND", COMMAND_ROW),
+        ):
             with self.subTest(heading=heading):
                 self.assertEqual(
                     self.check(jcl_locator(heading, cited), statements())["verdict"], "exact"
                 )
+
+    def test_no_label_of_the_twenty_survives_being_moved_to_another_ordinal(self) -> None:
+        # The swap tests generalized: every one of the 380 wrong pairings is
+        # reported. This is what "the ordinal discriminates" means, and it is
+        # cheap enough to assert exhaustively rather than on the two pairs
+        # somebody happened to think of.
+        for truly, heading in enumerate(JCL_STATEMENT_LABELS, 1):
+            for cited in range(1, len(JCL_STATEMENT_LABELS) + 1):
+                if cited == truly:
+                    continue
+                with self.subTest(heading=heading, cited=cited):
+                    result = self.check(jcl_locator(heading, cited), statements())
+                    self.assertEqual(result["verdict"], "retitled")
+                    self.assertEqual(result["heading_found_in_rows"], [truly])
+
+    def test_a_label_that_two_rows_answer_to_is_not_credited_to_either(self) -> None:
+        # A publication that stops telling its own rows apart takes the
+        # discriminator with it. Reporting `exact` because the cited row is one
+        # of the two would credit the citation with a choice nothing made.
+        doubled = list(JCL_STATEMENTS)
+        doubled.append(("// SET", "set, superseded spelling", "See the SET statement."))
+        result = self.check(jcl_locator("SET", SET_ROW), statements(rows=doubled))
+        self.assertEqual(result["verdict"], "retitled")
+        self.assertEqual(result["matched_on"], "table-row-ambiguous")
+        self.assertEqual(result["heading_found_in_rows"], [SET_ROW, len(doubled)])
+
+    def test_every_committed_jcl_statement_locator_resolves_against_the_table(self) -> None:
+        # End to end, on the locators the tree actually carries rather than on
+        # ones the test wrote for itself: all 20 read `exact` on `table-row`.
+        catalog = json.loads(
+            (REPOSITORY / "conformance/0.2/catalogs/jcl-jes2.json").read_text(encoding="utf-8")
+        )
+        unit = next(u for u in catalog["units"] if u["id"] == "jcl-statements")
+        self.assertEqual(len(unit["rows"]), 20)
+        for entry in unit["rows"]:
+            with self.subTest(row=entry["id"]):
+                result = LOCATORS.check(
+                    entry, self.nodes, self.labels, self.tails, statements()
+                )
+                self.assertEqual(result["verdict"], "exact", result)
+                self.assertEqual(result["matched_on"], "table-row")
 
     def test_a_table_citation_with_no_row_ordinal_is_not_resolved(self) -> None:
         # Dropping the discriminator must not read as a pass. Without it the 20
@@ -404,7 +634,7 @@ class CheckTests(unittest.TestCase):
         result = self.check(jcl_locator("SCHEDULE", 99), statements())
         self.assertEqual(result["verdict"], "retitled")
         self.assertEqual(result["matched_on"], "table-row-absent")
-        self.assertEqual(result["table_body_rows"], 5)
+        self.assertEqual(result["table_body_rows"], 20)
 
     def test_a_row_ordinal_that_is_not_a_row_number_is_refused(self) -> None:
         for ordinal in ("0", "-1", "SCHEDULE"):
@@ -506,6 +736,17 @@ class CatalogLocatorTests(unittest.TestCase):
         ]
         self.assertEqual(sorted(cited), list(range(1, 21)))
         self.assertEqual(cited, sorted(cited))
+
+    def test_the_fixture_carries_the_labels_the_catalog_actually_cites(self) -> None:
+        # Without this, JCL_STATEMENT_LABELS could be edited into agreement with
+        # the table and the uniqueness assertion would go on passing over labels
+        # nothing in the tree cites. The list is the catalog's, in row order.
+        cited = [
+            parts["heading"]
+            for subsystem, unit, parts in self.locators()
+            if subsystem == "jcl-jes2" and unit == "jcl-statements"
+        ]
+        self.assertEqual(cited, JCL_STATEMENT_LABELS)
 
 
 class DestinationTests(unittest.TestCase):

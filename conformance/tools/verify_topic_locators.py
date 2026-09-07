@@ -32,6 +32,10 @@ statement and call it a check that the row cites the right one. When a table is
 cited the table decides: the served heading and the tree label are the topic's,
 and the topic is shared by all 20.
 
+Citing a row only discriminates if the comparison does. See `cell_names_heading`
+for the rule and `table_verdict` for what happens when it cannot tell two rows
+apart.
+
 Rows located some other way (`html-table:`, `html-link:`,
 `roadmap-normalization:`) are reported as skipped with a reason rather than
 silently ignored, and so is a row whose topic could not be retrieved. An
@@ -58,6 +62,13 @@ import docs_api
 REPOSITORY = Path(__file__).resolve().parents[2]
 COMPONENT = re.compile(r"^[a-z][a-z0-9-]*:")
 DEFAULT_CACHE = Path(tempfile.gettempdir()) / "cobolgrammar" / "topic-cache"
+
+#: The three prefixes the JCL Statement column prints a statement behind, and
+#: the whole vocabulary of that column: `// DD`, `//* comment`, `/*`, `//`. The
+#: prefix must stand as its own token — it either ends the cell or a space
+#: follows — so a prose cell that merely opens with a slash is not mistaken for
+#: a coded one.
+STATEMENT_MARKER = re.compile(r"^(?://\*|//|/\*)(?=\s|$)")
 
 
 def components(locator: str) -> dict[str, str]:
@@ -98,6 +109,68 @@ def tail_index(nodes: dict[str, list[dict[str, Any]]]) -> dict[str, list[str]]:
     return found
 
 
+def cell_names_heading(heading: str, cell: str) -> bool:
+    """Whether ONE table cell names this reviewed label.
+
+    The reviewed labels are normalizations, not transcriptions, so raw equality
+    would reject correct rows: the Statement column prints `// DD` for `DD` and
+    `//* comment` for `comment`, and the Name column prints `output JCL` where
+    the label reads `OUTPUT JCL`. But token containment — is the label one of the
+    cell's words — is far too loose, because the third column is a paragraph of
+    prose. Against the served table it accepts 5 of the 20 labels at more than
+    one ordinal, `JOB` at seven of them, and a discriminator that admits seven
+    answers discriminates nothing.
+
+    So the rule is whole-cell equality under one stated relaxation each, chosen
+    by what the cell IS rather than by which column it sits in:
+
+      a coded cell — one opening with `//`, `//*` or `/*`, which is how the book
+      spells a JCL statement — matches when the label is EXACTLY the rest of the
+      cell, letter case included
+
+      any other cell matches when the label is EXACTLY the whole cell, ignoring
+      letter case
+
+    Whole-cell equality is what excludes the Purpose column: no label is equal to
+    a sentence. Nothing needs to know that Purpose is column three.
+
+    Case is the load-bearing asymmetry, and it is the publication's own. The book
+    distinguishes two statements by case and nothing else — row 1 prints
+    `// command` and is named `JCL command`, row 2 prints `// COMMAND` and is
+    named `command` — so a case-insensitive read of the coded column puts the
+    label `COMMAND` at both ordinals, which is precisely the swap the ordinal
+    exists to catch. Case in the Name column carries no such freight: `output
+    JCL`, `job` and `set` are sentence-style prose capitalization, and folding it
+    creates no collision the coded column does not already resolve.
+
+    An empty label names nothing, and neither does a bare marker: `//` and `/*`
+    are whole cells with nothing after the prefix, and both those rows are named
+    by their Name cell instead.
+
+    Measured against the served table, all 20 labels resolve to exactly one
+    ordinal each, and it is their own. `docs_api.heading_in_cells` is the
+    containment rule this replaces; nothing calls it now, and the tests keep hold
+    of it only to pin the shape of the defect.
+    """
+    heading = docs_api.normalize(heading)
+    if not heading:
+        return False
+    cell = docs_api.normalize(cell)
+    marker = STATEMENT_MARKER.match(cell)
+    if marker:
+        return cell[marker.end() :].strip() == heading
+    return cell.casefold() == heading.casefold()
+
+
+def rows_naming_heading(heading: str, rows: list[list[str]]) -> list[int]:
+    """The 1-based ordinals of every row of the table that names this label."""
+    return [
+        ordinal
+        for ordinal, cells in enumerate(rows, 1)
+        if any(cell_names_heading(heading, cell) for cell in cells)
+    ]
+
+
 def table_verdict(
     heading: str, table: str, ordinal: str | None, body: str
 ) -> tuple[bool, str, dict[str, Any]]:
@@ -109,6 +182,15 @@ def table_verdict(
     `table:` with no `row:` is not resolved at all — it reads `table-row-uncited`
     and fails, because a citation this tool cannot check should not read as one
     it checked.
+
+    A label that names two rows is the same failure wearing different clothes,
+    and gets the same answer. `table-row-ambiguous` fails even when one of those
+    rows is the cited one, because a label satisfied at two ordinals does not
+    establish which one the catalog meant, and reporting it `exact` would credit
+    the citation with a discrimination nothing performed. That makes the property
+    `cell_names_heading` is built for — one label, one ordinal — checked on every
+    run against whatever the publication currently serves, rather than a
+    measurement taken once and assumed to hold.
 
     A row ordinal past the end of the table is `table-row-absent`, which is drift
     in the publication rather than in the locator, and is reported separately for
@@ -128,15 +210,14 @@ def table_verdict(
         return False, "table-absent", detail
     if wanted > len(rows):
         return False, "table-row-absent", {**detail, "table_body_rows": len(rows)}
-    cited = rows[wanted - 1]
-    if docs_api.heading_in_cells(heading, cited):
+    naming = rows_naming_heading(heading, rows)
+    if len(naming) > 1:
+        return False, "table-row-ambiguous", {**detail, "heading_found_in_rows": naming}
+    if naming == [wanted]:
         return True, "table-row", detail
-    detail["row_cells"] = cited
-    elsewhere = [
-        i + 1 for i, cells in enumerate(rows) if docs_api.heading_in_cells(heading, cells)
-    ]
-    if elsewhere:
-        detail["heading_found_in_rows"] = elsewhere
+    detail["row_cells"] = rows[wanted - 1]
+    if naming:
+        detail["heading_found_in_rows"] = naming
     return False, "table-row", detail
 
 
