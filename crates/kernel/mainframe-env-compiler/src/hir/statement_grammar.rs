@@ -1793,49 +1793,130 @@ fn validate_initialize(tokens: &[Token<'_>]) -> Result<(), &'static str> {
     cursor.finish()
 }
 
+/// The three words the INSPECT row's forms use to open an operation.
+///
+/// Each is in that row's `grammar_keywords`, which
+/// `an_inspect_phrase_word_is_a_keyword_of_the_inspect_row` holds. The words are
+/// written out rather than read back from the descriptor because the reader
+/// needs to know where each may stand, which the descriptor does not say.
+const INSPECT_OPERATIONS: &[&str] = &["TALLYING", "REPLACING", "CONVERTING"];
+
 fn validate_inspect(tokens: &[Token<'_>]) -> Result<(), &'static str> {
     let mut cursor = Cursor::new(tokens, 1);
     cursor.operand()?;
-    let alternatives = ["TALLYING", "REPLACING", "CONVERTING"];
-    let operation = alternatives.iter().find(|word| cursor.eat(word)).copied();
-    let matched = usize::from(operation.is_some());
-    if matched != 1 || cursor.done() || !validate_expression(&tokens[cursor.position..]) {
+    let operation = INSPECT_OPERATIONS
+        .iter()
+        .find(|word| cursor.eat(word))
+        .copied()
+        .ok_or("INSPECT requires one operation and operands")?;
+    if cursor.done() {
         return Err("INSPECT requires one operation and operands");
     }
-    if tokens[cursor.position..]
-        .iter()
-        .any(|token| alternatives.iter().any(|word| token.is(word)))
-    {
+    match operation {
+        "TALLYING" => validate_inspect_tallying(&mut cursor)?,
+        "REPLACING" => validate_inspect_replacing(&mut cursor)?,
+        _ => {
+            cursor.operand()?;
+            cursor.expect("TO")?;
+            cursor.operand()?;
+            validate_inspect_positions(&mut cursor)?;
+        }
+    }
+    // Format 3 draws TALLYING and REPLACING in one statement, and no reader
+    // here has ever read it: the operation that follows is reported as the
+    // duplicate the other three formats would make it. That is where this
+    // reader stood before this commit and it is where it stands after.
+    if cursor.at_any(INSPECT_OPERATIONS) {
         return Err("INSPECT operation is duplicated or mutually exclusive");
     }
-    let allowed = match operation {
-        Some("TALLYING") => &[
-            "FOR",
-            "ALL",
-            "LEADING",
-            "CHARACTERS",
-            "BEFORE",
-            "AFTER",
-            "INITIAL",
-        ][..],
-        Some("REPLACING") => &[
-            "ALL",
-            "LEADING",
-            "FIRST",
-            "CHARACTERS",
-            "BY",
-            "BEFORE",
-            "AFTER",
-            "INITIAL",
-        ][..],
-        Some("CONVERTING") => &["TO", "BEFORE", "AFTER", "INITIAL"][..],
-        _ => &[],
-    };
-    if tokens[cursor.position..]
-        .iter()
-        .any(|token| is_grammar_keyword(token) && !allowed.iter().any(|word| token.is(word)))
-    {
-        return Err("INSPECT contains an unknown or misplaced phrase");
+    cursor.finish()
+}
+
+/// The three words the TALLYING operation uses to open a count.
+const INSPECT_TALLY_COUNTS: &[&str] = &["CHARACTERS", "ALL", "LEADING"];
+
+/// `TALLYING {identifier-2 FOR {CHARACTERS [position]... | {ALL|LEADING} {{identifier-3|literal-1} [position]...}...}...}...`
+///
+/// Three lists nest here and each needs to know where the next one starts.
+/// `ALL` and `LEADING` carry as many operands as follow them -- CardDemo's
+/// `TALLYING WS-NO-ACTIONS-SELECTED FOR ALL SPACES LOW-VALUES` counts two
+/// characters into one field -- so an operand ends that list only when a word
+/// that opens another count follows it, or when the operand turns out to be the
+/// `identifier-2` of another `FOR` group. `FOR` is reserved, so looking one
+/// operand ahead for it separates those two cases outright.
+fn validate_inspect_tallying(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
+    loop {
+        cursor.operand()?;
+        cursor.expect("FOR")?;
+        let mut counts = 0usize;
+        while cursor.at_any(INSPECT_TALLY_COUNTS) {
+            if cursor.eat("CHARACTERS") {
+                validate_inspect_positions(cursor)?;
+                counts += 1;
+                continue;
+            }
+            let _ = cursor.eat("ALL") || cursor.eat("LEADING");
+            loop {
+                cursor.operand()?;
+                validate_inspect_positions(cursor)?;
+                counts += 1;
+                if cursor.done()
+                    || cursor.at_any(INSPECT_TALLY_COUNTS)
+                    || cursor.at_any(INSPECT_OPERATIONS)
+                    || cursor.at_operand_before("FOR")
+                {
+                    break;
+                }
+            }
+        }
+        if counts == 0 {
+            return Err("INSPECT TALLYING requires CHARACTERS, ALL, or LEADING");
+        }
+        if cursor.done() || cursor.at_any(INSPECT_OPERATIONS) {
+            return Ok(());
+        }
+    }
+}
+
+/// `REPLACING {CHARACTERS BY x [position]... | {ALL|LEADING|FIRST} {y BY x [position]...}...}...`
+///
+/// One qualifier carries as many `y BY x` pairs as follow it, so the inner loop
+/// runs until a word that starts another qualifier -- or another operation,
+/// which is reported as the duplicate it is rather than as a bad operand.
+fn validate_inspect_replacing(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
+    const QUALIFIERS: &[&str] = &["CHARACTERS", "ALL", "LEADING", "FIRST"];
+    let mut items = 0usize;
+    while cursor.at_any(QUALIFIERS) {
+        if cursor.eat("CHARACTERS") {
+            cursor.expect("BY")?;
+            cursor.operand()?;
+            validate_inspect_positions(cursor)?;
+            items += 1;
+            continue;
+        }
+        let _ = cursor.eat("ALL") || cursor.eat("LEADING") || cursor.eat("FIRST");
+        loop {
+            cursor.operand()?;
+            cursor.expect("BY")?;
+            cursor.operand()?;
+            validate_inspect_positions(cursor)?;
+            items += 1;
+            if cursor.done() || cursor.at_any(QUALIFIERS) || cursor.at_any(INSPECT_OPERATIONS) {
+                break;
+            }
+        }
+    }
+    if items == 0 {
+        return Err("INSPECT REPLACING requires CHARACTERS, ALL, LEADING, or FIRST");
+    }
+    Ok(())
+}
+
+/// `[{BEFORE|AFTER} [INITIAL] {identifier-4|literal-2}]...`
+fn validate_inspect_positions(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
+    while cursor.eat("BEFORE") || cursor.eat("AFTER") {
+        cursor.eat("INITIAL");
+        cursor.operand()?;
     }
     Ok(())
 }
@@ -1930,12 +2011,41 @@ fn validate_json_ignoring(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
     Ok(())
 }
 
+/// The words that open a phrase of the statement `validate_generate` and
+/// `validate_json_parse` read, in the order those rows' forms draw them.
+///
+/// A repeating phrase has to know where the next phrase starts, and the answer
+/// is a fact about this statement, not about the language. So the list is tied
+/// to the `json-generate` and `json-parse` rows' `forms`, which
+/// `a_json_phrase_word_is_drawn_by_the_json_rows` holds, and not to the union
+/// of every row's `grammar_keywords`, which is the reserved-word list and says
+/// nothing about where a word may stand.
+///
+/// The tie is only to the forms, and it costs something. `COUNT`, `SUPPRESS`,
+/// `WITH` and `CONVERTING` are reserved, but `NAME` and `IGNORING` are merely
+/// context-sensitive and `ENCODING` and `INDICATING` are in neither list in
+/// `conformance/0.3/cobol/reserved-words.json` -- they are published only in
+/// these rows' syntax. Treating all eight as phrase openers means a data item
+/// named `ENCODING`, `IGNORING`, `INDICATING` or `NAME` can no longer be an
+/// operand of this statement's own `NAME` or `SUPPRESS` list, which
+/// `a_json_phrase_opener_is_not_an_operand_of_the_same_statement` records.
+const JSON_PHRASES: &[&str] = &[
+    "WITH",
+    "COUNT",
+    "IGNORING",
+    "INDICATING",
+    "ENCODING",
+    "NAME",
+    "SUPPRESS",
+    "CONVERTING",
+];
+
 fn validate_json_names(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
     if !cursor.eat("NAME") {
         return Ok(());
     }
     let mut count = 0usize;
-    while !cursor.done() && !cursor.at("SUPPRESS") && !cursor.at("CONVERTING") {
+    while !cursor.done() && !cursor.at_any(JSON_PHRASES) {
         cursor.eat("OF");
         cursor.operand()?;
         cursor.expect("IS")?;
@@ -1954,7 +2064,7 @@ fn validate_json_suppress(cursor: &mut Cursor<'_>, parsing: bool) -> Result<(), 
         return Ok(());
     }
     let mut count = 0usize;
-    while !cursor.done() && !cursor.at("CONVERTING") {
+    while !cursor.done() && !cursor.at_any(JSON_PHRASES) {
         let generic = cursor.eat("EVERY");
         if generic {
             if parsing {
@@ -2443,17 +2553,40 @@ fn validate_expression(tokens: &[Token<'_>]) -> bool {
     })
 }
 
+/// An `arithmetic-expression-1`: operands joined by arithmetic operators.
+///
+/// The one caller is `validate_compute`, over the tokens right of the equals.
+/// COMPUTE's own phrase words -- `ROUNDED`, `ON SIZE ERROR`, `END-COMPUTE` --
+/// are stripped or split off before the slice is cut, so the whole of what is
+/// left has to be the expression: every operand is an operand, and no two
+/// operands stand next to each other.
 fn validate_arithmetic_expression(tokens: &[Token<'_>]) -> bool {
-    validate_expression(tokens)
-        && !tokens.iter().any(|token| {
-            !token.is("FUNCTION")
-                && PROCEDURE_STATEMENTS.iter().any(|descriptor| {
-                    descriptor
-                        .grammar_keywords
-                        .iter()
-                        .any(|keyword| token.is(keyword))
-                })
-        })
+    validate_expression(tokens) && consume_arithmetic(tokens, 0) == Some(tokens.len())
+}
+
+fn consume_arithmetic(tokens: &[Token<'_>], start: usize) -> Option<usize> {
+    let mut position = consume_arithmetic_term(tokens, start)?;
+    while tokens.get(position).is_some_and(|token| {
+        token.kind == TokenKind::Punctuation && matches!(token.text, "+" | "-" | "*" | "/" | "**")
+    }) {
+        position = consume_arithmetic_term(tokens, position + 1)?;
+    }
+    Some(position)
+}
+
+fn consume_arithmetic_term(tokens: &[Token<'_>], start: usize) -> Option<usize> {
+    let mut position = start;
+    while tokens
+        .get(position)
+        .is_some_and(|token| matches!(token.text, "+" | "-"))
+    {
+        position += 1;
+    }
+    if tokens.get(position)?.text == "(" {
+        let close = matching_parenthesis(tokens, position)?;
+        return (consume_arithmetic(tokens, position + 1)? == close).then_some(close + 1);
+    }
+    consume_operand(tokens, position)
 }
 
 fn validate_operand_list(tokens: &[Token<'_>], minimum: usize) -> Result<(), &'static str> {
@@ -2664,6 +2797,20 @@ impl<'a> Cursor<'a> {
     fn at(&self, word: &str) -> bool {
         self.tokens
             .get(self.position)
+            .is_some_and(|token| token.is(word))
+    }
+
+    fn at_any(&self, words: &[&str]) -> bool {
+        words.iter().any(|word| self.at(word))
+    }
+
+    /// Whether an operand stands here and `word` stands right after it.
+    ///
+    /// One operand of lookahead, for the reader that has to tell an operand of
+    /// the list it is already in from the first operand of the next group.
+    fn at_operand_before(&self, word: &str) -> bool {
+        consume_operand(self.tokens, self.position)
+            .and_then(|end| self.tokens.get(end))
             .is_some_and(|token| token.is(word))
     }
 
@@ -3008,6 +3155,415 @@ mod reserved_word_scope {
             assert!(
                 parse(statement, 32).is_err(),
                 "{statement} parses now, so this test no longer records a gap"
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod statement_scoped_phrases {
+    //! Which statement's vocabulary a misplaced-phrase guard is allowed to read.
+    //!
+    //! `is_grammar_keyword` unions all 44 rows, and `is_operand_atom` reads that
+    //! union as the one thing it is -- the reserved-word list, a prohibition on
+    //! data-names. Three readers used to read it as something else: as the set
+    //! of words that cannot stand at this point in *this* statement. That is a
+    //! different claim, and the union never supported it in either direction.
+    //! It over-claimed, because `NAME` is not a phrase of INSPECT; and it
+    //! under-claimed, because an invented word like `ZZTOP` is in no row's
+    //! keywords and so slipped past every one of the three. These tests hold
+    //! each reader to the statement it is validating, and hold `ZZTOP` to the
+    //! same verdict as any other word that does not belong there.
+    //!
+    //! Reading each row's own diagram also settles which of the words the union
+    //! used to catch were misplaced at all. After `FOR ALL literal-1` the
+    //! INSPECT row draws another operand, so a word there is a second counted
+    //! item and this reader takes it, `ZZTOP` included.
+
+    use super::{INSPECT_OPERATIONS, JSON_PHRASES, PROCEDURE_STATEMENTS, parse};
+
+    /// The words `cf1f8a2` took out of the union because the `Reserved words`
+    /// appendix does not publish them. They are data-names now, which is why
+    /// they can no longer serve as a misplaced-phrase guard.
+    const OMITTED_FROM_THE_APPENDIX: &[&str] = &[
+        "ATTRIBUTE",
+        "ATTRIBUTES",
+        "BYTES",
+        "CODEPAGE",
+        "CYCLE",
+        "ELEMENT",
+        "ENCODING",
+        "IGNORE",
+        "IGNORING",
+        "INDICATING",
+        "INITIALIZED",
+        "KEPT",
+        "LOC",
+        "NAME",
+        "NAMESPACE",
+        "NAMESPACE-PREFIX",
+        "NONNUMERIC",
+        "PARAGRAPH",
+        "PARSE",
+        "PARTIAL",
+        "PREVIOUS",
+        "VALIDATING",
+        "WAIT",
+        "XML-DECLARATION",
+    ];
+
+    fn row(id: &str) -> &'static super::super::super::ProcedureStatementDescriptor {
+        PROCEDURE_STATEMENTS
+            .iter()
+            .find(|descriptor| descriptor.id == id)
+            .expect("catalog row")
+    }
+
+    #[test]
+    fn the_words_the_appendix_omits_are_the_words_the_union_lost() {
+        // The list above is a claim about the catalog, so the catalog checks
+        // it. Twenty-four words left `grammar_keywords` in `cf1f8a2` and the
+        // union is 170 words after it; if a later regeneration puts one of
+        // these back, every test below is measuring something else.
+        let union: Vec<&str> = PROCEDURE_STATEMENTS
+            .iter()
+            .flat_map(|descriptor| descriptor.grammar_keywords.iter().copied())
+            .collect();
+        assert_eq!(OMITTED_FROM_THE_APPENDIX.len(), 24);
+        for word in OMITTED_FROM_THE_APPENDIX {
+            assert!(
+                !union
+                    .iter()
+                    .any(|keyword| keyword.eq_ignore_ascii_case(word)),
+                "{word} is back in the union, so it is a reserved word again"
+            );
+        }
+    }
+
+    #[test]
+    fn an_inspect_phrase_word_is_a_keyword_of_the_inspect_row() {
+        // The reader spells these; the catalog row has to agree they are
+        // INSPECT's, or the reader is describing some other statement.
+        let inspect = row("inspect");
+        for word in INSPECT_OPERATIONS.iter().chain(
+            [
+                "FOR",
+                "CHARACTERS",
+                "ALL",
+                "LEADING",
+                "FIRST",
+                "BY",
+                "BEFORE",
+                "AFTER",
+                "INITIAL",
+                "TO",
+            ]
+            .iter(),
+        ) {
+            assert!(
+                inspect
+                    .grammar_keywords
+                    .iter()
+                    .any(|keyword| keyword.eq_ignore_ascii_case(word)),
+                "validate_inspect spells {word}, which the inspect row does not claim"
+            );
+        }
+    }
+
+    #[test]
+    fn a_json_phrase_word_is_drawn_by_the_json_rows() {
+        // `NAME`, `ENCODING`, `INDICATING` and `IGNORING` are not reserved
+        // words and are absent from these rows' `grammar_keywords`, so the tie
+        // to the catalog is through `forms`, which is where the syntax lives.
+        let forms: String = ["json-generate", "json-parse"]
+            .iter()
+            .flat_map(|id| row(id).forms.iter().copied())
+            .collect::<Vec<_>>()
+            .join(" ");
+        for word in JSON_PHRASES {
+            assert!(
+                forms.contains(word),
+                "{word} terminates a JSON phrase loop and no JSON form draws it"
+            );
+        }
+    }
+
+    #[test]
+    fn a_misplaced_inspect_phrase_is_refused_whatever_the_word_is() {
+        // These were refused before `cf1f8a2` and accepted after it, and not
+        // one of them was ever refused for being malformed -- they were refused
+        // for spelling a word that some other row's syntax diagram draws.
+        // `ZZTOP` spells no such word and was accepted on both sides, which is
+        // the proof that the guard was never reading INSPECT.
+        for word in OMITTED_FROM_THE_APPENDIX.iter().chain(["ZZTOP"].iter()) {
+            for statement in [
+                format!("INSPECT C TALLYING B FOR {word} ALL \"A\"."),
+                format!("INSPECT C TALLYING B {word} FOR ALL \"A\"."),
+                format!("INSPECT C TALLYING B FOR ALL \"A\" BEFORE {word} INITIAL \"X\"."),
+                format!("INSPECT C REPLACING ALL \"A\" BY \"B\" {word} AFTER \"X\"."),
+                format!("INSPECT C CONVERTING \"A\" TO \"B\" {word} BEFORE \"X\"."),
+            ] {
+                assert!(
+                    parse(&statement, 32).is_err(),
+                    "{statement} is not an INSPECT the reference draws"
+                );
+            }
+        }
+        // Not every word that trails an INSPECT is misplaced. After
+        // `FOR ALL literal-1` the reference draws another `identifier-3 |
+        // literal-1` under the same `ALL`, so the word is a second counted
+        // item and is read as one. The old guard refused these for 24 of the
+        // 25 words below and took the 25th, which is the shape of a guard that
+        // is reading a word list rather than a syntax diagram.
+        for word in OMITTED_FROM_THE_APPENDIX.iter().chain(["ZZTOP"].iter()) {
+            let statement = format!("INSPECT C TALLYING B FOR ALL \"A\" {word}.");
+            assert!(
+                parse(&statement, 32).is_ok(),
+                "{statement} counts {word} as well as \"A\", which the reference draws"
+            );
+        }
+    }
+
+    #[test]
+    fn a_malformed_arithmetic_expression_is_refused_whatever_the_word_is() {
+        // `validate_arithmetic_expression` banned every row's keywords, so it
+        // refused `ADD` and `CONVERTING` inside a COMPUTE and accepted `ZZTOP`.
+        // What it was reaching for is that an expression is operands joined by
+        // operators, which is a fact about the expression and not about any
+        // vocabulary.
+        for word in OMITTED_FROM_THE_APPENDIX.iter().chain(["ZZTOP"].iter()) {
+            for statement in [
+                format!("COMPUTE NUM = B + 1 {word}."),
+                format!("COMPUTE NUM = B {word} + 1."),
+                format!("COMPUTE NUM ROUNDED = B * ( C - 1 {word} )."),
+            ] {
+                assert!(
+                    parse(&statement, 32).is_err(),
+                    "{statement} is not an arithmetic expression"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_json_phrase_out_of_its_published_order_is_refused() {
+        // The `SUPPRESS` and `NAME` loops repeat until the next phrase begins,
+        // and they used to recognise only `CONVERTING` as a next phrase. With
+        // `ENCODING`, `NAME` and `INDICATING` out of the union they stopped
+        // recognising an out-of-order phrase at all and swallowed it as another
+        // operand. Inside these two statements those words are the statement's
+        // own, because these two rows' forms are where the reference draws
+        // them; three of the eight below were accepted before this commit.
+        for statement in [
+            "JSON GENERATE OUT FROM SRC SUPPRESS A ENCODING CP.",
+            "JSON GENERATE OUT FROM SRC SUPPRESS A INDICATING B.",
+            "JSON GENERATE OUT FROM SRC SUPPRESS A NAME B IS 'x'.",
+            "JSON GENERATE OUT FROM SRC NAME A IS 'x' ENCODING CP.",
+            "JSON GENERATE OUT FROM SRC NAME A IS 'x' INDICATING B.",
+            "JSON PARSE SRCJ INTO OUT SUPPRESS A ENCODING CP.",
+            "JSON PARSE SRCJ INTO OUT SUPPRESS A IGNORING JSON NULL FOR ALL.",
+            "JSON PARSE SRCJ INTO OUT NAME A IS 'x' ENCODING CP.",
+        ] {
+            assert!(
+                parse(statement, 32).is_err(),
+                "{statement} orders its phrases as no JSON form draws them"
+            );
+        }
+        // The repeated operand the same loops are there to read is untouched,
+        // and an invented word is a legal data-name in it.
+        for statement in [
+            "JSON GENERATE OUT FROM SRC SUPPRESS A B ZZTOP.",
+            "JSON GENERATE OUT FROM SRC NAME A IS 'x' B IS 'y'.",
+            "JSON PARSE SRCJ INTO OUT SUPPRESS A ZZTOP.",
+        ] {
+            assert!(parse(statement, 32).is_ok(), "{statement} should parse");
+        }
+    }
+
+    #[test]
+    fn a_json_phrase_opener_is_not_an_operand_of_the_same_statement() {
+        // What the fix above costs, written down rather than left to be found.
+        // Four of the eight words in `JSON_PHRASES` are not reserved -- `NAME`
+        // and `IGNORING` are context-sensitive, `ENCODING` and `INDICATING` are
+        // in neither list -- so outside these statements they are data-names,
+        // and the test below still passes them through INSPECT and COMPUTE.
+        // Inside a JSON GENERATE, JSON PARSE or XML GENERATE they now end the
+        // `NAME` and `SUPPRESS` lists wherever they stand, which means they can
+        // no longer be operands of those lists. Twenty such statements were
+        // accepted before this commit. The alternative is to keep swallowing an
+        // out-of-order phrase, and the reference draws the phrase.
+        for word in ["ENCODING", "IGNORING", "INDICATING", "NAME"] {
+            for statement in [
+                format!("JSON GENERATE OUT FROM SRC SUPPRESS {word}."),
+                format!("JSON GENERATE OUT FROM SRC SUPPRESS A {word}."),
+                format!("JSON GENERATE OUT FROM SRC NAME {word} IS 'x'."),
+                format!("JSON PARSE SRCJ INTO OUT SUPPRESS {word}."),
+                format!("XML GENERATE OUT FROM SRC SUPPRESS {word}."),
+            ] {
+                assert!(
+                    parse(&statement, 32).is_err(),
+                    "{statement} reads {word} as an operand of the phrase it opens"
+                );
+            }
+        }
+        // The other twenty words the appendix omits are unaffected here.
+        for word in OMITTED_FROM_THE_APPENDIX
+            .iter()
+            .filter(|word| !["ENCODING", "IGNORING", "INDICATING", "NAME"].contains(word))
+        {
+            for statement in [
+                format!("JSON GENERATE OUT FROM SRC SUPPRESS {word}."),
+                format!("JSON GENERATE OUT FROM SRC NAME {word} IS 'x'."),
+                format!("JSON PARSE SRCJ INTO OUT SUPPRESS {word}."),
+            ] {
+                assert!(
+                    parse(&statement, 32).is_ok(),
+                    "{statement} names a word no JSON phrase opens"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_words_the_appendix_omits_still_reach_the_operands_of_these_readers() {
+        // The point of narrowing the union was that these words are ordinary
+        // data-names. Every operand position the three repaired readers own is
+        // exercised with each of them, so a scoping fix cannot quietly restore
+        // the prohibition it was written to keep out.
+        for word in OMITTED_FROM_THE_APPENDIX {
+            for statement in [
+                format!("INSPECT {word} TALLYING B FOR ALL \"A\"."),
+                format!("INSPECT C TALLYING {word} FOR ALL \"A\"."),
+                format!("INSPECT C TALLYING B FOR ALL {word}."),
+                format!("INSPECT C TALLYING B FOR ALL \"A\" BEFORE INITIAL {word}."),
+                format!("INSPECT C REPLACING ALL {word} BY \"B\" AFTER \"X\"."),
+                format!("INSPECT C CONVERTING {word} TO \"B\" BEFORE \"X\"."),
+                format!("COMPUTE NUM = {word} + 1."),
+                format!("COMPUTE {word} = B + 1."),
+                format!("COMPUTE NUM ROUNDED = ( {word} - 1 ) * B."),
+                format!("COMPUTE NUM = FUNCTION MAX ( {word} B )."),
+            ] {
+                assert!(
+                    parse(&statement, 32).is_ok(),
+                    "{statement} names a word the reserved-word appendix omits"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_forms_these_readers_implement_still_parse() {
+        // Formats 1, 2 and 4 of INSPECT, and the arithmetic expressions COMPUTE
+        // takes, so that a structural reader is not mistaken for a stricter
+        // one. The four statements marked CardDemo are the corpus shapes a
+        // reader that made every operand end its list would refuse.
+        for statement in [
+            "INSPECT C TALLYING B FOR CHARACTERS.",
+            "INSPECT C TALLYING B FOR ALL \"A\".",
+            "INSPECT C TALLYING B FOR LEADING \"A\".",
+            "INSPECT C TALLYING B FOR ALL \"A\" BEFORE \"X\".",
+            "INSPECT C TALLYING B FOR ALL \"A\" BEFORE INITIAL \"X\".",
+            "INSPECT C TALLYING B FOR ALL \"A\" AFTER INITIAL \"X\" BEFORE INITIAL \"Y\".",
+            // CardDemo COCRDLIC.cbl:1079.
+            "INSPECT C TALLYING B FOR ALL \"A\" ALL \"B\".",
+            // CardDemo COTRTLIC.cbl:997 -- two characters into one count, then
+            // two more `identifier-2 FOR` groups.
+            "INSPECT C TALLYING B FOR ALL SPACES LOW-VALUES D FOR ALL \"A\" E FOR ALL \"B\".",
+            "INSPECT C TALLYING B FOR ALL SPACES LOW-VALUES AFTER INITIAL \"X\".",
+            "INSPECT C TALLYING B FOR CHARACTERS D FOR ALL \"A\".",
+            "INSPECT C(1:4) TALLYING B FOR ALL D OF E.",
+            "INSPECT C REPLACING CHARACTERS BY \"B\".",
+            "INSPECT C REPLACING CHARACTERS BY \"B\" AFTER INITIAL \"X\".",
+            "INSPECT C REPLACING ALL \"A\" BY \"B\".",
+            "INSPECT C REPLACING FIRST \"A\" BY \"B\" AFTER \"X\".",
+            "INSPECT C REPLACING ALL \"A\" BY \"B\" \"C\" BY \"D\".",
+            "INSPECT C REPLACING ALL \"A\" BY \"B\" LEADING \"C\" BY \"D\".",
+            // CardDemo COCRDLIC.cbl:1090.
+            "INSPECT C REPLACING ALL \"S\" BY \"1\" ALL \"U\" BY \"1\" CHARACTERS BY \"0\".",
+            "INSPECT C CONVERTING \"A\" TO \"B\".",
+            "INSPECT C CONVERTING \"A\" TO \"B\" BEFORE INITIAL \"X\".",
+            // CardDemo COCRDUPC.cbl:824.
+            "INSPECT C CONVERTING LIT-ALL-ALPHA-FROM TO LIT-ALL-SPACES-TO.",
+            "COMPUTE NUM = 1.",
+            "COMPUTE NUM = -1.",
+            "COMPUTE NUM ROUNDED = B + C * D / E - 1.",
+            "COMPUTE NUM = B ** 2.",
+            "COMPUTE NUM = ( ( B + C ) * ( D - E ) ) / 2.",
+            "COMPUTE NUM = FUNCTION MAX ( B C ).",
+            "COMPUTE NUM = LENGTH OF B + 1.",
+            "COMPUTE NUM = B OF C + D IN E.",
+            "COMPUTE NUM = B (1) + C (I).",
+            "COMPUTE NUM = B (1:4).",
+            "COMPUTE NUM = B + 1 ON SIZE ERROR CONTINUE END-COMPUTE.",
+            "COMPUTE NUM = B + 1 NOT ON SIZE ERROR CONTINUE END-COMPUTE.",
+            "IF NUM > 1 CONTINUE END-IF.",
+            "PERFORM VARYING I FROM 1 BY 1 UNTIL I > 10 CONTINUE END-PERFORM.",
+            "EVALUATE TRUE WHEN A = B CONTINUE WHEN OTHER CONTINUE END-EVALUATE.",
+            "ADD 1 TO B.",
+            "ADD 1 B GIVING NUM ROUNDED.",
+            "SUBTRACT 1 FROM B.",
+            "MULTIPLY 2 BY B.",
+            "DIVIDE 2 INTO B REMAINDER NUM.",
+        ] {
+            assert!(parse(statement, 32).is_ok(), "{statement} should parse");
+        }
+    }
+
+    #[test]
+    fn xml_generate_is_still_read_with_json_generates_phrases() {
+        // Not a defect this commit repairs, and not one any wave moved:
+        // `classify` sends both JSON GENERATE and XML GENERATE to
+        // `validate_generate` (`statement_grammar.rs`, the `StatementKind::
+        // JsonGenerate | StatementKind::XmlGenerate` arm), which implements
+        // JSON GENERATE's form. So XML GENERATE accepts JSON's bare `ENCODING`
+        // -- the XML row draws `WITH ENCODING` -- and JSON's `INDICATING` and
+        // `CONVERTING`, which the XML row does not draw at all, while none of
+        // XML GENERATE's own `WITH XML-DECLARATION`, `WITH ATTRIBUTES`,
+        // `NAMESPACE` or `TYPE ... IS ATTRIBUTE` phrases is implemented.
+        // Scoping a keyword read cannot reach that; it needs XML GENERATE to
+        // get a validator of its own, against its own row. This test is the
+        // record, and the day that validator is written it is what has to be
+        // deleted.
+        for statement in [
+            "XML GENERATE OUT FROM SRC ENCODING CP.",
+            "XML GENERATE OUT FROM SRC INDICATING A IS JSON NULL USING X IN B.",
+            "XML GENERATE OUT FROM SRC CONVERTING A TO JSON NULL USING SPACE.",
+        ] {
+            assert!(
+                parse(statement, 32).is_ok(),
+                "{statement} is refused now, so XML GENERATE has stopped borrowing JSON's form"
+            );
+        }
+        for statement in [
+            "XML GENERATE OUT FROM SRC WITH ENCODING CP.",
+            "XML GENERATE OUT FROM SRC WITH XML-DECLARATION.",
+            "XML GENERATE OUT FROM SRC WITH ATTRIBUTES.",
+            "XML GENERATE OUT FROM SRC NAMESPACE IS NSP.",
+            "XML GENERATE OUT FROM SRC TYPE T IS ATTRIBUTE.",
+        ] {
+            assert!(
+                parse(statement, 32).is_err(),
+                "{statement} parses now, so XML GENERATE has gained its own phrases"
+            );
+        }
+    }
+
+    #[test]
+    fn inspect_format_3_is_still_refused_as_a_duplicate_operation() {
+        // The inspect row publishes four forms and the reader implements three.
+        // Format 3 draws TALLYING and REPLACING in one statement, and both the
+        // reader before this commit and the reader after it call the second
+        // operation a duplicate. Nothing in the CardDemo corpus writes it, and
+        // widening the reader to take it would be a new acceptance rather than
+        // the scoping repair this commit makes. Recorded so the gap is not
+        // mistaken for a form the three-format reader covers.
+        for statement in [
+            "INSPECT C TALLYING B FOR ALL \"A\" REPLACING ALL \"A\" BY \"B\".",
+            "INSPECT C TALLYING B FOR CHARACTERS REPLACING CHARACTERS BY \"B\".",
+        ] {
+            assert!(
+                parse(statement, 32).is_err(),
+                "{statement} parses now, so INSPECT has gained its third format"
             );
         }
     }
