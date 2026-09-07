@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""Diff the reviewed COBOL language catalog against a PDF grammar projection.
+"""Diff the reviewed COBOL language catalog against a grammar projection.
 
 The catalog forms in `conformance/0.3/cobol/language.json` are reviewed prose
 sketches.  This tool reports where the source diagrams carry structure the
 sketch does not: extra formats, keywords absent from the sketch, and operands
 the sketch folds into an undefined placeholder.
+
+It reads the projection schema rather than any particular publication format,
+so it is indifferent to how the diagrams were recovered.
 
 Diagnostic only.  It grants no coverage credit and proposes no catalog rows.
 """
