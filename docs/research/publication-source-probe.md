@@ -129,11 +129,19 @@ before recording anything, and classifies by `lastModifiedDate` against the pin:
 - served date **earlier** than pinned → `stale-read`, the origin served an older build;
 - served date **later** than pinned → **`republished`**, which *does* fail the run
   and is the case a reviewer must actually look at;
-- same date, different bytes → its own verdict, and the alarming one.
+- same date, different bytes → **`same-date-different-bytes`**, which *does* fail
+  the run: it is the verdict nothing here explains and the alarming one;
+- no pair of dates to compare → **`undated-difference`**, which *does* fail the
+  run, because a difference that cannot be classified must not be excused.
 
-So a red Db2 run is still possible and still worth reading — but only
-`republished` means the publication moved. Nothing is re-pinned on the strength
-of any of this; the `Db2 pin — not re-pinned` entry below stands as written.
+So three of the four resolutions fail and one does not. `UNEXPLAINED` at
+`conformance/tools/fetch_pinned_sources.py:76` is the list, and a baseline reads
+`differs` when any topic lands in it — or when the manifest digest moves with no
+topic reporting a mismatch at all, which is the manifest disagreeing with itself
+rather than the origin being slow. A red Db2 run is still possible and still
+worth reading, and only `republished` among the three means the publication
+moved. Nothing is re-pinned on the strength of any of this; the `Db2 pin — not
+re-pinned` entry below stands as written.
 
 An unreachable endpoint reports `skipped` and a partial run reports `sampled`;
 neither can be mistaken for a match.
@@ -411,8 +419,18 @@ not define for that statement. It is **6, across 10 rows**:
 against only 59 titles. The totals were close by coincidence: the geometry reader
 over-split `INSPECT` into nine diagrams where the publication has four and `SORT`
 into four where it has two, missed `START`, `UNSTRING` and `GOBACK` entirely, and
-double-counted `SET` titles (16 against the true 7). Per row the two disagreed in
-16 of 44 cases.
+read 16 `SET` titles where the publication titles **8**. Per row the two
+disagreed in 16 of 44 cases.
+
+The `SET` figure has to be stated that way, because this paragraph exists to say
+which reader to believe and the two numbers it used to compare were not
+measuring the same thing. `format_titles` for `set` in
+`cobol-html-grammar-projection.json` is 8 — Format 1 through Format 7 plus
+`SET for length of dynamic-length elementary items`. The 7 is
+`len(catalog_forms)`: what `language.json` records, which is a fact about this
+repository and not about the publication. Against the publication the PDF reader
+doubled 8 into 16; against the publication the markup reader reads 8, and the
+catalog is one short of it — the `set` disposition says why.
 
 ### RACF — 34 command families, all located
 
@@ -437,11 +455,13 @@ publication gaps, and every one of them is now read.
 | In the syntax line but never defined under Parameters | 76 |
 | Max nesting depth | 6 |
 
-The tree is as deep as the publication's list is: six levels for `ALTUSER` and
-`ALTGROUP`, five for four more topics. Commit ff50ae5 fixed a collapse that had
-been flattening it. `syntax_only` — 76 uppercase tokens the `Syntax` table shows
-that the `Parameters` tree never reaches — is a reviewer's question, not a defect
-claim.
+The tree is as deep as the publication's list is. Counting
+`source_nesting_depth` over the projection's 34 rows gives 2 at six levels —
+`ALTGROUP` and `ALTUSER` — and **five at five**: `ADDGROUP`, `ADDUSER`, `RALTER`,
+`SET` and `SETROPTS`. The rest are 4 at four, 3 at three, 16 at two and 4 at one.
+Commit ff50ae5 fixed a collapse that had been flattening it. `syntax_only` — 76
+uppercase tokens the `Syntax` table shows that the `Parameters` tree never
+reaches — is a reviewer's question, not a defect claim.
 
 The alias finding is closed. **All 34 catalog alias lists reproduce exactly**,
 including `SET`, which correctly returns `[]`: 22 families carry their documented
@@ -695,8 +715,17 @@ gone.
   the seven reported-changed topics reproduce the pin, every stale body is
   smaller than its pin and carries an earlier `Last Updated`, and republication
   moves that date forward. The pin is correct and the origin is intermittently
-  stale. `fetch_pinned_sources.py` now classifies accordingly (commit 16829f8) and
-  only `republished` fails a run. Nothing is re-pinned.
+  stale. `fetch_pinned_sources.py` now classifies accordingly (commit 16829f8).
+  **Three of its four resolutions fail a run, not one.**
+  `UNEXPLAINED = (REPUBLISHED, SAME_DATE, UNDATED)` at
+  `conformance/tools/fetch_pinned_sources.py:76` is what `topics_unexplained`
+  counts and what decides `differs`: `republished`, `same-date-different-bytes`
+  and `undated-difference` each fail; only `stale-read` does not. The
+  db2-staleness finding recommended failing on `republished` alone, and the code
+  went further on purpose — a same date over different bytes is the case neither
+  story explains and the one a reviewer most needs to see, so saying it is
+  benign is the opposite of what it is. A `differs` also stands when the manifest
+  digest moves with no topic reporting a mismatch. Nothing is re-pinned.
 - **What did not move.** No coverage claim. Every projection named here carries
   `coverage_credit: 0`; `conformance/0.2/evidence/coverage-ledger.json` still
   reads `official_compatibility_numerator: 0` and `generated_catalog_credit: 0`;
