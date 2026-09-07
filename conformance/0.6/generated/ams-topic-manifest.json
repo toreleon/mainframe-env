@@ -1,0 +1,938 @@
+{
+  "book": "z/OS DFSMS Access Method Services Commands",
+  "commands": [
+    {
+      "id": "allocate",
+      "label": "ALLOCATE",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 29808,
+          "file": "allocate-00.html",
+          "label": "Syntax for ALLOCATE Parameters",
+          "sha256": "sha256:ede0d52b7589d47933d5a85a2a623bff21cb94053c6bcbccdd8f07c56ef22a51",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2044.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2044.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 5344,
+          "file": "allocate-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:40eb2f7cbc09817898be2e12639687e9830656044fb6b81e78fbe2b198415e09",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2045.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2045.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 67180,
+          "file": "allocate-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:7e882b6e2f2c02c2113bb62ad4ecc580e2a832e0452da5e9a363760f5f22626f",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2046.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2046.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "alter",
+      "label": "ALTER",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1443,
+          "file": "alter-00.html",
+          "label": "ALTER Parameters",
+          "sha256": "sha256:419d4926fe14bfce0d6203fbefe9336b76277a599f8fd47ca107e8a0c6b34f88",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2054.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2054.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2301,
+          "file": "alter-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:8ef17b7518b1847841845b0922f3ece1cbc1c9015f22924f22507ca93af5c878",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2055.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2055.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 81042,
+          "file": "alter-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:b6fa5cf28c7be108bdae0b206d8ccc8199b47098181d51433159143de17a729b",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2056.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2056.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "alter-libraryentry",
+      "label": "ALTER LIBRARYENTRY",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1459,
+          "file": "alter-libraryentry-00.html",
+          "label": "ALTER LIBRARYENTRY Parameters",
+          "sha256": "sha256:d7cf7f1bc7f8ceb949f8f316d63d272b449238ccd2cb16711d1e37036f4790f2",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2066.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2066.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 1680,
+          "file": "alter-libraryentry-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:73ae5a0a015514004610fc9423e8f2b282ba48429279a462d539813221c28d45",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2067.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2067.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 22222,
+          "file": "alter-libraryentry-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:cfd55e1e5c195a7de407db67eea076113268c0fed46c467c8b248f3eaea53143",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2068.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2068.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "alter-volumeentry",
+      "label": "ALTER VOLUMEENTRY",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1349,
+          "file": "alter-volumeentry-00.html",
+          "label": "ALTER VOLUMEENTRY Parameters",
+          "sha256": "sha256:c1ec8cf15d18851f080fc90cab6cd71637a1053d217b95e182ae8be95c5ab041",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2073.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2073.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 1737,
+          "file": "alter-volumeentry-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:1ff2ff1bb3573d5d6b033e7ac060fbc32dfa34893124488dd4bd13f785ceeaed",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2074.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2074.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 25369,
+          "file": "alter-volumeentry-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:c1b7bad91461f404593a650c66ffca7356c28c07aaf14ac13c277381539f850f",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2075.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2075.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "bldindex",
+      "label": "BLDINDEX",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1328,
+          "file": "bldindex-00.html",
+          "label": "BLDINDEX Parameters",
+          "sha256": "sha256:38db98ad465198c6f05bd71d81fbf7fc4e60c70f21d111d56c1a28be6a782b72",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2079.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2079.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 5657,
+          "file": "bldindex-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:ac071352defdc7084f0444ce94d65139aed06683c7b25b19755dfc319a51516e",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2080.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2080.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 9549,
+          "file": "bldindex-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:53e708bb5f4f999f6c82501e40e3b772dac021cf542682da5c270ace467e8e03",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2081.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2081.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "create-libraryentry",
+      "label": "CREATE LIBRARYENTRY",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 2795,
+          "file": "create-libraryentry-00.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:8a97c3c120c67b3ee5aa5c46bb9762b746ec5e4c183b4b7e3a533d8e361d459f",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2086.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2086.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 19281,
+          "file": "create-libraryentry-01.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:844ab0bb68df06b93eeba2c4ab4b6c8a82721efa573adb25e8263c52b5e269df",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2087.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2087.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "create-volumeentry",
+      "label": "CREATE VOLUMEENTRY",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1978,
+          "file": "create-volumeentry-00.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:af3bfd7106c04078e4640645e0dd35f7ec0b8f2c3228bbd316bdacc1162c0b49",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/crvp.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fcrvp.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 25802,
+          "file": "create-volumeentry-01.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:52e8000ec066a5d687514722640c7fbb05c7a154081965653cae86efda2bc846",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2092.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2092.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "dcollect",
+      "label": "DCOLLECT",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1413,
+          "file": "dcollect-00.html",
+          "label": "DCOLLECT Parameters",
+          "sha256": "sha256:9016cb23833847dd0cdcf5e627cb8fc835fe93709fd5ecf2075c288b493a0409",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2096.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2096.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2316,
+          "file": "dcollect-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:49f95162370a109692ecec09dc346bebb05599ae4a52b86c8db89989078e0edf",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2097.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2097.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 18865,
+          "file": "dcollect-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:e2cfdc427eabefec1487e4e96f4b8a398e4c673d2f7e97ed0c46c192379857c0",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2098.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2098.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "define-alias",
+      "label": "DEFINE ALIAS",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1430,
+          "file": "define-alias-00.html",
+          "label": "DEFINE ALIAS Parameters",
+          "sha256": "sha256:03ad4589994d8c0d8ab9d1bd140bfe5db5a940f538f5199953cca123d95f6b9c",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2101.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2101.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 4591,
+          "file": "define-alias-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:1167657edd0022b8f35cb06e585705b2854104b976842a9f951f0f29f606c5cf",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2102.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2102.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2138,
+          "file": "define-alias-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:c82aa17579a12a2c5248332e7880e4ab26ad8a9ddab2e9e395909b1ba0d8c987",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2103.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2103.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "define-alternateindex",
+      "label": "DEFINE ALTERNATEINDEX",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1356,
+          "file": "define-alternateindex-00.html",
+          "label": "DEFINE ALTERNATEINDEX Parameters",
+          "sha256": "sha256:5ab9e2f119de3ae5399462b788a28b2ef199d504bdfc12567294a22c81b815ed",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2107.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2107.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 12290,
+          "file": "define-alternateindex-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:ca4fdb488d884ec75e0fdffd71895ad408903dd3355b2fd50e694a6fcf7534fe",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2108.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2108.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 49277,
+          "file": "define-alternateindex-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:2807080b6205490e1f4cad3e26c738f91ae3ee2aa20046c036982848ceaade70",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2109.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2109.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "define-cluster",
+      "label": "DEFINE CLUSTER",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1445,
+          "file": "define-cluster-00.html",
+          "label": "DEFINE CLUSTER Parameters",
+          "sha256": "sha256:a535fbadd6f77495331677f9cfc06d8fd608875073ee710d3974c9ce99e81775",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2116.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2116.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 23952,
+          "file": "define-cluster-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:1a286c458dfd03a79eff6a604855b4c956e8bd77185c8a66a7b58c6b8042a9ff",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2117.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2117.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 76362,
+          "file": "define-cluster-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:f31c4ecf09df6783d66ddcbcc574249e1616ca3c273536f712ff6f900f81d865",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2118.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2118.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "define-generationdatagroup",
+      "label": "DEFINE GENERATIONDATAGROUP",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1369,
+          "file": "define-generationdatagroup-00.html",
+          "label": "DEFINE GENERATIONDATAGROUP Parameters",
+          "sha256": "sha256:363edee53f470bacfcb227b5a1ea040b9a781dbcdfdae7910c5ba561dea7bfc7",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2133.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2133.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2674,
+          "file": "define-generationdatagroup-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:cafd9e3084d2b3de5bf2fb130b9daf05e338212ac879bfaab96a518657f8dbec",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2134.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2134.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 8224,
+          "file": "define-generationdatagroup-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:976f7c2dc1c5973f776fa29930096a30e6d58bba40dd3475510b0bc4fb5324e4",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2135.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2135.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "define-nonvsam",
+      "label": "DEFINE NONVSAM",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1432,
+          "file": "define-nonvsam-00.html",
+          "label": "DEFINE NONVSAM Parameters",
+          "sha256": "sha256:eddb3b6f711c4267fc924336dfb746138c571605caffde362e5eadfd826be788",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2139.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2139.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 8051,
+          "file": "define-nonvsam-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:3ee29ed7b55f97ad0e03d77677e7c1e8d866d47d44b47bc79aef2d5f7c036f85",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2140.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2140.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 13304,
+          "file": "define-nonvsam-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:383d68795a7485ba13e0e9103f0bf13c7e37f587b4484ab4ce054e8be6103bc6",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2141.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2141.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "define-pagespace",
+      "label": "DEFINE PAGESPACE",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 32322,
+          "file": "define-pagespace-00.html",
+          "label": "DEFINE PAGESPACE Parameters",
+          "sha256": "sha256:77876d31f7930a305c79731fd300fbe25e18b81bb4d8fccd84f5fb641ad52c1f",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2145.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2145.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "define-path",
+      "label": "DEFINE PATH",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1426,
+          "file": "define-path-00.html",
+          "label": "DEFINE PATH Parameters",
+          "sha256": "sha256:7cb10b0083c66ffa7e818fc1c5719e48ae877f03c7cf495cba3c6b2efdd4fc3b",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2151.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2151.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2638,
+          "file": "define-path-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:5a028391306ada955ad088898bdebd91bfe2990e4e40a04647aa75a4583964bd",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2152.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2152.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 12436,
+          "file": "define-path-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:22acbc513bf1694df8c6d7e93e9103798d97a2806fb3cd4c3ee84ad971c90e7b",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2153.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2153.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "define-usercatalog",
+      "label": "DEFINE USERCATALOG",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1457,
+          "file": "define-usercatalog-00.html",
+          "label": "DEFINE USERCATALOG Parameters",
+          "sha256": "sha256:ce87ddf389f659ee8786bb503de921613ae99c9f68f533c5e811004fd6e2fe90",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2157.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2157.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 9850,
+          "file": "define-usercatalog-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:18c2f3c0d144d61c8744138575ef44a03e2aa0a0dcc3c7b6d22d6e5c92ef64a0",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2158.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2158.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 36399,
+          "file": "define-usercatalog-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:b4f9367cd4f3d41dfa53ff49b4d4d9fe4f0c152ca3d48de1358fa58a63610d87",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2159.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2159.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "delete",
+      "label": "DELETE",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1409,
+          "file": "delete-00.html",
+          "label": "DELETE Parameters",
+          "sha256": "sha256:6b3ff49cfdd9cfcdf8563adb2185134cc1c2470cf660526e6c780d8ff43ef92e",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2170.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2170.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 5027,
+          "file": "delete-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:f4a1897fcb09cf4ae0a5782671ce43902aae9eafaa1e6ff0a002bdd04bfa8c84",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2171.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2171.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 46495,
+          "file": "delete-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:9bcfe5519ff73ac64033bc23017d1114c92bf0d74137a2a0894756fad2662f96",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2172.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2172.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "diagnose",
+      "label": "DIAGNOSE",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1414,
+          "file": "diagnose-00.html",
+          "label": "DIAGNOSE Parameters",
+          "sha256": "sha256:7f62a4be020ebfb2a91f68f978439669ac4b6f2bd418cb251cfb66cc33c36158",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2191.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2191.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 3246,
+          "file": "diagnose-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:6526c0f0ff542e2270826c415df08d8b26f1ee80b2408833aab5b431fb13b1d6",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2192.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2192.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 14021,
+          "file": "diagnose-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:93af34ee462844eace373785a2ff59b37c8eff9ad526e8fd424b28e149962728",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2193.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2193.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "examine",
+      "label": "EXAMINE",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1408,
+          "file": "examine-00.html",
+          "label": "EXAMINE Parameters",
+          "sha256": "sha256:4b163de53edf9dbbad0c7a8368d89a7d5187ef4a454a9b3d6e7c448d2db86320",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2202.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2202.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 1505,
+          "file": "examine-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:138f31105a3f99e87e5515671cce62f1ea41c9dfbb8bc35af08e687bf7e726d8",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2203.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2203.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 3044,
+          "file": "examine-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:e2dbd23d1af402d7a3f22d173251ed19abdba78c21678b76411c8434d81af772",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2204.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2204.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "export",
+      "label": "EXPORT",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1324,
+          "file": "export-00.html",
+          "label": "EXPORT Parameters",
+          "sha256": "sha256:8bf12a99c7a1d2305145d1d73e68052d876a6b10abf9f9b815d21501926905e7",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2209.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2209.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 4241,
+          "file": "export-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:f0d1fe50adbcb328058e1ecb6c3432b873bf9b3392a0f62ac9d75de779773034",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2210.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2210.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 13578,
+          "file": "export-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:341ef37f905376de13c3e9c39f4bad89b36f5816e309e2bf688fd79f70284d3a",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i211.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i211.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "export-disconnect",
+      "label": "EXPORT DISCONNECT",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1188,
+          "file": "export-disconnect-00.html",
+          "label": "EXPORT DISCONNECT Parameters",
+          "sha256": "sha256:e07ae808ec3eae8f1e12c7be39910a1540594c7738f09b3b68df1eb5b60ec5b3",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2215.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2215.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 3892,
+          "file": "export-disconnect-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:23e3fb90a06cefdae91eff8dfccdaa96ce44c476a92fd684efd39ea2bbb448da",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2216.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2216.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "import",
+      "label": "IMPORT",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1408,
+          "file": "import-00.html",
+          "label": "IMPORT Parameters",
+          "sha256": "sha256:e862436a80b118b445dc4dc7f04cb192c13d0871a103f801f8f046be657dd3d9",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2220.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2220.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 7611,
+          "file": "import-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:b51832bc777e692b898ec5532ceed47425dafa4903c35f0781b020bb8b8c0234",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2221.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2221.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 23611,
+          "file": "import-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:a86dc873c35a5f7eff812adccfaa312addc23fa33b1f6a60467d334b81344cca",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2222.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2222.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "import-connect",
+      "label": "IMPORT CONNECT",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1434,
+          "file": "import-connect-00.html",
+          "label": "IMPORT CONNECT Parameters",
+          "sha256": "sha256:62571fc6bfdec886fdfe7e81f757c249bffdbf5167ea7458d42aeef3dcc5581d",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2227.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2227.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 4225,
+          "file": "import-connect-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:bf339abeab74ebc3a421e6981b58b26ec5550f9ea636950d3aeba402390f344b",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2228.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2228.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 3091,
+          "file": "import-connect-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:9164fdcfd42df86141f431a7b91765a19009cddd7116644642ea582508926ce6",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2229.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2229.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "listcat",
+      "label": "LISTCAT",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1415,
+          "file": "listcat-00.html",
+          "label": "LISTCAT Parameters",
+          "sha256": "sha256:ff877e9f81ffed215d273c0d11e6bd9f21bcd2b56e4441791fcc14d9515b77f5",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2232.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2232.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2853,
+          "file": "listcat-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:d75175dc0d7722ddbd4bc1d6bb0df49e13c5a3c4515460a13869de4a73c7662a",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2233.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2233.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 26244,
+          "file": "listcat-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:e97c28bc87784a8cfe7cc53adb602a834b49fbdf73a4684298ef8a2db1bc6a17",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2234.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2234.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "listdata",
+      "label": "LISTDATA",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1639,
+          "file": "listdata-00.html",
+          "label": "LISTDATA Parameters",
+          "sha256": "sha256:53e7b6aca701f8b0be06eccf2ac987c848b7e6133e5a30b458ac47d5adbc6b19",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2432.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2432.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 4760,
+          "file": "listdata-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:80b0bf0c33e20723c5ed980437ea557ce96bce728ad85015b5b1c7be9c63bc6f",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2433.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2433.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 25943,
+          "file": "listdata-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:d1f53b1e9bf257d436e587ecef42748ccec761d668c1df0b5c61ed853ee16190",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2434.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2434.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "print",
+      "label": "PRINT",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1322,
+          "file": "print-00.html",
+          "label": "PRINT Parameters",
+          "sha256": "sha256:bffcbb9cf2c0a0b231fb9a5f9d586b670b58b56d6f043272f5017b84553069cf",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2243.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2243.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 3416,
+          "file": "print-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:6ef0cca5523dc9fe581f03b033687b8c03d3400b9f2da4b1e156498640a47149",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2244.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2244.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 24233,
+          "file": "print-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:368b9cb1bd439b340fb4b3b65f5257516a12a2c9c7c2971b396d4238a2be63ef",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2245.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2245.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "repro",
+      "label": "REPRO",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 6987,
+          "file": "repro-00.html",
+          "label": "REPRO Parameters",
+          "sha256": "sha256:745c81c422620737720f70fe1fd1160e7b84d8f4fcaab7708183fdf5341a08a1",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2252.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2252.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 6804,
+          "file": "repro-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:2a6e24a9eaf4d26227da4d6a6223ae82eb848ec16746c1dabcf09b63f99f5308",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2253.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2253.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 42050,
+          "file": "repro-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:960176584279693e6fd9c77d722c39afb6766d4402cf8235d2ed9a16ffeeb2dc",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2254.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2254.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 18373,
+          "file": "repro-03.html",
+          "label": "Cryptographic Parameters",
+          "sha256": "sha256:6950f1bded64d0c10cd20b33155b4c5eb763f4458dd321303f15fc78e5550386",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2255.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2255.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "recover",
+      "label": "RECOVER",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1360,
+          "file": "recover-00.html",
+          "label": "RECOVER Parameters",
+          "sha256": "sha256:861e900cceda839c9274846724fbfef206aa16106bbedb1fa31ce96f9dd3e02b",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6irecover.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6irecover.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 4913,
+          "file": "recover-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:082abe9eb4eedb9fda0dac6eaff50a59e01772be90f4c7c26c842b122283d96d",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6irecoverrequired.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6irecoverrequired.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 1698,
+          "file": "recover-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:1158b50da2c874e1e1ca16c7eedea3d6cc28631f31e508c9f475fc2255b7e790",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6irecoveroptional.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6irecoveroptional.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "setcache",
+      "label": "SETCACHE",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1520,
+          "file": "setcache-00.html",
+          "label": "SETCACHE Parameters",
+          "sha256": "sha256:0fd73a036b4410023dcabfbdb58146275325857de30eae6617ea3b6eb3f823c5",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/dgt3i242.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fdgt3i242.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 4076,
+          "file": "setcache-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:47eb4f4c4c285619a5134020077bb4600a43c7bdaab84a52e312a5bc345f7ba3",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/dgt3i243.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fdgt3i243.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 13437,
+          "file": "setcache-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:1ae7002c2b7bac613add13bb8834bf06d1238707a6feae1248b96a2311e4114b",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/dgt3i244.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fdgt3i244.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 21120,
+          "file": "setcache-03.html",
+          "label": "Special Purpose Optional Parameters",
+          "sha256": "sha256:544b8918c8ac6d448450c59f23d28752a679f95a89302f715bb354fa141c4987",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/dgt3i245.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fdgt3i245.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "shcds",
+      "label": "SHCDS",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 4405,
+          "file": "shcds-00.html",
+          "label": "SHCDS Parameters",
+          "sha256": "sha256:c799383ea7c1b1434713ad1802ef7d1f5bf68e76db983b7e3abadcd5ea93f866",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2271.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2271.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 1144,
+          "file": "shcds-01.html",
+          "label": "Required Parameters",
+          "sha256": "sha256:da724973cb61eb150ab456a609e700591b66f82f841e65236bb938d75114d510",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2272.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2272.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 30416,
+          "file": "shcds-02.html",
+          "label": "Optional Parameters",
+          "sha256": "sha256:d80d95a334212bc528ac756becf010cc2ba507763860ee1d03635a9de271d144",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2273.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2273.htm?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "verify",
+      "label": "VERIFY",
+      "located": true,
+      "topics": [
+        {
+          "bytes": 1445,
+          "file": "verify-00.html",
+          "label": "VERIFY Parameters",
+          "sha256": "sha256:c9db667853085d2e47fc8e0b99a8b504ae49ed185a8b0a24e553d5ad42a8b428",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2276.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2276.htm?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2605,
+          "file": "verify-01.html",
+          "label": "Required Parameter",
+          "sha256": "sha256:b9bb5b56ffc4cbc20f8cf3931d962bb1239edcc579500cf72a62c35d4309b9bb",
+          "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2277.htm",
+          "url": "https://www.ibm.com/docs/api/v1/content/SSLTBW_3.2.0%2Fcom.ibm.zos.v3r2.idai200%2Fda6i2277.htm?parsebody=true&lang=en"
+        }
+      ]
+    }
+  ],
+  "coverage_credit": 0,
+  "product": "SSLTBW_3.2.0",
+  "retained_in_repository": false,
+  "schema_version": "mainframe-env.ams-topic-manifest@1"
+}

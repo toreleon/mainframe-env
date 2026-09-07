@@ -1,0 +1,62 @@
+{
+  "baseline_id": "ibm-enterprise-cobol-6.5-2026-05-31",
+  "coverage_credit": 0,
+  "schema_version": "mainframe-env.outline-locator-audit@1",
+  "source": {
+    "outline_titles": 642,
+    "pages": 916,
+    "path": "cobol.pdf",
+    "retained_in_repository": false,
+    "sha256": "sha256:8b86cbd2d838d8f460dcbe8d1e74d2266799ce1534f4cfdbc08469c36748e85e"
+  },
+  "units": [
+    {
+      "counts": {
+        "exact": 44
+      },
+      "rows": 44,
+      "unit": "procedure-statements",
+      "unresolved": []
+    },
+    {
+      "counts": {
+        "exact": 82
+      },
+      "rows": 82,
+      "unit": "intrinsic-functions",
+      "unresolved": []
+    },
+    {
+      "counts": {
+        "exact": 15
+      },
+      "rows": 15,
+      "unit": "compiler-directing-statements",
+      "unresolved": []
+    },
+    {
+      "counts": {
+        "exact": 5
+      },
+      "rows": 5,
+      "unit": "compiler-directive-groups",
+      "unresolved": []
+    },
+    {
+      "counts": {
+        "exact": 10
+      },
+      "rows": 10,
+      "unit": "file-description-clauses",
+      "unresolved": []
+    },
+    {
+      "counts": {
+        "exact": 17
+      },
+      "rows": 17,
+      "unit": "data-description-clauses",
+      "unresolved": []
+    }
+  ]
+}
