@@ -216,6 +216,67 @@ OPERPARM = """
 </section>
 """
 
+#: ALTUSER's NETVIEW segment, the same publication fact as NETVIEW above with
+#: the alternation spelled into the terms. `CTL (GENERAL | GLOBAL | SPECIFIC)`
+#: and `LOGCMDRESP(SYSTEM | NO)` say in one topic what ADDUSER's bare `CTL` and
+#: bare `LOGCMDRESP` leave to the nesting. The pair is the fixture for the
+#: divergence: read a page at a time, GENERAL is a value here and a member
+#: there for markup that means the same thing.
+ALTUSER_NETVIEW = """
+<section class="section"><h2 class="sectiontitle">Parameters</h2>
+<dl class="parml">
+<dt class="pt dlterm">NETVIEW</dt>
+<dd class="pd">specifies the NETVIEW segment.
+  <dl class="parml">
+  <dt class="pt dlterm">CTL | NOCTL</dt>
+  <dd class="pd">whether a security check is performed.
+    <dl class="parml">
+    <dt class="pt dlterm">CTL (GENERAL | GLOBAL | SPECIFIC)</dt>
+    <dd class="pd">specifies it.
+      <dl class="parml">
+      <dt class="pt dlterm">GENERAL</dt><dd class="pd">as for SPECIFIC, and more.</dd>
+      <dt class="pt dlterm">GLOBAL</dt><dd class="pd">no checking is done.</dd>
+      <dt class="pt dlterm">SPECIFIC</dt><dd class="pd">only started spans.</dd>
+      </dl>
+    </dd>
+    <dt class="pt dlterm">NOCTL</dt><dd class="pd">removes it.</dd>
+    </dl>
+  </dd>
+  <dt class="pt dlterm">LOGCMDRESP(SYSTEM | NO)</dt>
+  <dd class="pd">the command-response logging.
+    <dl class="parml">
+    <dt class="pt dlterm">SYSTEM</dt><dd class="pd">logged.</dd>
+    <dt class="pt dlterm">NO</dt><dd class="pd">not logged.</dd>
+    </dl>
+  </dd>
+  </dl>
+</dd>
+</dl>
+</section>
+"""
+
+#: ADDUSER's LOGCMDRESP, written bare over the two terms ALTUSER restates. Kept
+#: apart from NETVIEW so a test can build a book out of exactly the topics it
+#: means to.
+ADDUSER_LOGCMDRESP = """
+<section class="section"><h2 class="sectiontitle">Parameters</h2>
+<dl class="parml">
+<dt class="pt dlterm">NETVIEW</dt>
+<dd class="pd">specifies the NETVIEW segment.
+  <dl class="parml">
+  <dt class="pt dlterm">LOGCMDRESP</dt>
+  <dd class="pd">the command-response logging.
+    <dl class="parml">
+    <dt class="pt dlterm">SYSTEM</dt><dd class="pd">logged.</dd>
+    <dt class="pt dlterm">NO</dt><dd class="pd">not logged.</dd>
+    </dl>
+  </dd>
+  </dl>
+</dd>
+</dl>
+</section>
+"""
+
 #: RACDCERT IMPORT opens with three operands in a single term.
 IMPORT = """
 <section class="section refsyn"><h2 class="sectiontitle">Syntax</h2>
@@ -417,8 +478,10 @@ class NestingTests(unittest.TestCase):
         )
 
     def test_an_argument_that_states_its_alternatives_makes_them_values(self) -> None:
-        # ALTUSER writes `CTL(GENERAL | GLOBAL | SPECIFIC)` for the same three
-        # terms ADDUSER hangs under a bare `CTL`, so the argument is read too.
+        # A term that spells its alternatives out is read as saying so. What it
+        # does NOT do on its own is settle the term that leaves them to the
+        # nesting — see RestatementTests, where the bare `CTL` is resolved from
+        # the topic that spells it, not from this rule.
         msgrecvr = find(self.netview, "MSGRECVR(NO | YES)")
         self.assertEqual(msgrecvr["values"], ["NO", "YES"])
         self.assertEqual(msgrecvr["members"], [])
@@ -455,6 +518,261 @@ class NestingTests(unittest.TestCase):
         )
         with self.assertRaises(ValueError):
             RACF.operand_tree(skipped)
+
+
+def book(*topics: tuple[str, str]) -> dict[str, dict[str, object]]:
+    """The restatement map a reader of these topics, and only these, would hold."""
+    return RACF.restatements(
+        (keyword, term)
+        for keyword, body in topics
+        for term in RACF.parameter_terms(body)
+    )
+
+
+class RestatementTests(unittest.TestCase):
+    """One publication fact, read the same way in both topics that state it."""
+
+    def setUp(self) -> None:
+        self.whole = book(
+            ("ADDUSER", NETVIEW),
+            ("ALTUSER", ALTUSER_NETVIEW),
+            ("ALTUSER", OPERPARM),
+        )
+
+    def bare(self, restated: dict[str, dict[str, object]] | None) -> dict[str, object]:
+        return find(
+            RACF.operands(RACF.section_named(NETVIEW, "Parameters"), restated), "CTL"
+        )
+
+    def spelled(
+        self, restated: dict[str, dict[str, object]] | None
+    ) -> dict[str, object]:
+        return find(
+            RACF.operands(RACF.section_named(ALTUSER_NETVIEW, "Parameters"), restated),
+            "CTL (GENERAL | GLOBAL | SPECIFIC)",
+        )
+
+    def test_one_page_at_a_time_the_same_fact_reads_two_ways(self) -> None:
+        # The divergence, stated as a test rather than as a claim. ADDUSER hangs
+        # GENERAL, GLOBAL and SPECIFIC under a bare `CTL`; ALTUSER writes the
+        # three into the term over the same three nested terms. Reading each
+        # page alone makes them members in one topic and values in the other,
+        # and nothing about the reference distinguishes the two.
+        self.assertEqual(self.bare(None)["members"], ["GENERAL", "GLOBAL", "SPECIFIC"])
+        self.assertEqual(self.bare(None)["values"], [])
+        self.assertEqual(
+            self.spelled(None)["values"], ["GENERAL", "GLOBAL", "SPECIFIC"]
+        )
+        self.assertEqual(self.spelled(None)["members"], [])
+
+    def test_the_book_settles_it_toward_the_topic_that_spells_it_out(self) -> None:
+        # The reading the publication states somewhere wins, so the two topics
+        # agree and the more informative answer is the one kept.
+        self.assertEqual(
+            self.bare(self.whole)["values"], ["GENERAL", "GLOBAL", "SPECIFIC"]
+        )
+        self.assertEqual(self.bare(self.whole)["members"], [])
+        self.assertEqual(
+            self.bare(self.whole)["values"], self.spelled(self.whole)["values"]
+        )
+        self.assertEqual(
+            self.bare(self.whole)["members"], self.spelled(self.whole)["members"]
+        )
+
+    def test_the_order_the_topics_are_read_in_changes_nothing(self) -> None:
+        # `main` builds the map over all 60 topics before classifying any of
+        # them, so a row cannot depend on where its command sits in the catalog.
+        reversed_book = book(
+            ("ALTUSER", OPERPARM),
+            ("ALTUSER", ALTUSER_NETVIEW),
+            ("ADDUSER", NETVIEW),
+        )
+        self.assertEqual(
+            self.bare(reversed_book)["values"], self.bare(self.whole)["values"]
+        )
+
+    def test_a_topic_no_other_topic_speaks_for_is_left_alone(self) -> None:
+        # The map is a restatement, not a guess. Read without ALTUSER in the
+        # book, ADDUSER's bare `LOGCMDRESP` keeps SYSTEM and NO as members,
+        # because no topic in that book says what it accepts.
+        alone = book(("ADDUSER", ADDUSER_LOGCMDRESP))
+        entry = find(
+            RACF.operands(
+                RACF.section_named(ADDUSER_LOGCMDRESP, "Parameters"), alone
+            ),
+            "LOGCMDRESP",
+        )
+        self.assertEqual(entry["members"], ["SYSTEM", "NO"])
+        with_altuser = book(
+            ("ADDUSER", ADDUSER_LOGCMDRESP), ("ALTUSER", ALTUSER_NETVIEW)
+        )
+        entry = find(
+            RACF.operands(
+                RACF.section_named(ADDUSER_LOGCMDRESP, "Parameters"), with_altuser
+            ),
+            "LOGCMDRESP",
+        )
+        self.assertEqual(entry["values"], ["SYSTEM", "NO"])
+
+    def test_a_placeholder_argument_states_nothing_for_any_topic(self) -> None:
+        # `LEVEL(message-level)` and `OPCLASS(operator-class ...)` name no
+        # alternatives, so they never enter the map and AUTH's enumeration stays
+        # a member wherever it is read. This is the guard on the extension: it
+        # carries a restatement across topics and nothing else.
+        self.assertNotIn("OPCLASS", self.whole)
+        self.assertNotIn("AUTH", self.whole)
+        operparm = RACF.operands(
+            RACF.section_named(OPERPARM, "Parameters"), self.whole
+        )
+        self.assertEqual(find(operparm, "AUTH")["members"], ["MASTER", "ALL"])
+
+    def test_the_borrowed_value_is_recorded_against_the_topic_it_came_from(
+        self,
+    ) -> None:
+        # A value that cannot be found on the page it is reported against has to
+        # be traceable to the page it did come from, or the projection asserts
+        # something a reviewer cannot check.
+        rows = [
+            {
+                "keyword": "ADDUSER",
+                "operand_terms": RACF.operands(
+                    RACF.section_named(NETVIEW, "Parameters"), self.whole
+                ),
+            },
+            {
+                "keyword": "ALTUSER",
+                "operand_terms": RACF.operands(
+                    RACF.section_named(ALTUSER_NETVIEW, "Parameters"), self.whole
+                ),
+            },
+        ]
+        recorded = RACF.cross_topic_restatements(rows, self.whole)
+        self.assertEqual([entry["operand"] for entry in recorded], ["CTL"])
+        self.assertEqual(
+            recorded[0]["applied_to"],
+            [
+                {
+                    "keyword": "ADDUSER",
+                    "term": "CTL",
+                    "names": ["GENERAL", "GLOBAL", "SPECIFIC"],
+                }
+            ],
+        )
+        self.assertEqual(
+            recorded[0]["stated_by"],
+            [{"keyword": "ALTUSER", "term": "CTL (GENERAL | GLOBAL | SPECIFIC)"}],
+        )
+
+    def test_the_topic_that_spells_it_out_borrows_nothing(self) -> None:
+        # ALTUSER's own term supplies its own values, so it must not appear in
+        # the record. Without this the list would grow every name the map
+        # touches and stop being a list of what the extension cost.
+        rows = [
+            {
+                "keyword": "ALTUSER",
+                "operand_terms": RACF.operands(
+                    RACF.section_named(ALTUSER_NETVIEW, "Parameters"), self.whole
+                ),
+            }
+        ]
+        self.assertEqual(RACF.cross_topic_restatements(rows, self.whole), [])
+
+    def test_parameter_terms_reads_the_terms_and_not_the_examples(self) -> None:
+        self.assertEqual(
+            RACF.parameter_terms(ADDGROUP),
+            [
+                "group-name",
+                "AT([node].userid) | ONLYAT([node].userid)",
+                "AT([node].userid ...)",
+                "ONLYAT([node].userid ...)",
+                "CICS",
+                "OPCLASS(operator-class ...)",
+                "XRFSOFF(FORCE | NOFORCE)",
+                "UNIVERSAL",
+            ],
+        )
+        self.assertEqual(RACF.parameter_terms(UMBRELLA), [])
+
+
+#: A name restated under one segment and written bare under another: ADDGROUP
+#: hangs `AUTOGID | GID` under OMVS and a bare `GID` under OVM. It is the case
+#: that separates the two ways of splitting the overlap.
+TWO_SEGMENTS = """
+<section class="section"><h2 class="sectiontitle">Parameters</h2>
+<dl class="parml">
+<dt class="pt dlterm">OMVS</dt>
+<dd class="pd">the OMVS segment.
+  <dl class="parml">
+  <dt class="pt dlterm">AUTOGID | GID</dt>
+  <dd class="pd">the identifier.
+    <dl class="parml">
+    <dt class="pt dlterm">AUTOGID</dt><dd class="pd">assigned.</dd>
+    <dt class="pt dlterm">GID(group-identifier)</dt><dd class="pd">given.</dd>
+    </dl>
+  </dd>
+  </dl>
+</dd>
+<dt class="pt dlterm">OVM</dt>
+<dd class="pd">the OVM segment.
+  <dl class="parml">
+  <dt class="pt dlterm">GID(group-identifier)</dt><dd class="pd">given.</dd>
+  </dl>
+</dd>
+</dl>
+</section>
+"""
+
+
+class OverlapTests(unittest.TestCase):
+    """The two populations the one `both_value_and_member` total conflated."""
+
+    def test_a_name_the_list_restates_one_level_down_is_not_a_finding(self) -> None:
+        # `OPERPARM` > `AUTH | NOAUTH` > `AUTH`. AUTH is a member of OPERPARM
+        # because it is genuinely an operand of that segment, and a value of the
+        # alternation term between them because that term names it. Both are
+        # true, neither is about the reference, and 384 of the 405 names the
+        # conflated total reported are exactly this.
+        terms = RACF.operands(RACF.section_named(OPERPARM, "Parameters"))
+        restated, elsewhere = RACF.overlap(terms)
+        self.assertEqual(restated, ["AUTH", "DOM", "NOAUTH"])
+        self.assertEqual(elsewhere, ["ALL"])
+
+    def test_the_second_list_is_the_reference_using_one_word_twice(self) -> None:
+        # ALL is a member of AUTH, which does not restate it, and a value of
+        # `DOM(NORMAL | ALL | NONE)`, which does. Nothing in the typesetting
+        # explains that, so it is a question a reviewer can act on.
+        terms = RACF.operands(RACF.section_named(OPERPARM, "Parameters"))
+        self.assertEqual(find(terms, "AUTH")["members"], ["MASTER", "ALL"])
+        self.assertIn("ALL", find(terms, "DOM(NORMAL | ALL | NONE)")["values"])
+        self.assertIn("ALL", RACF.overlap(terms)[1])
+
+    def test_one_unrestated_occurrence_is_enough_to_be_worth_reading(self) -> None:
+        # The split is by occurrence, not by name. GID is restated under OMVS
+        # and bare under OVM; asking only whether SOME occurrence is restated
+        # files it as typesetting and loses the OVM one. Over the 60 topics that
+        # rule reports 394 and 11 where this one reports 384 and 21.
+        terms = RACF.operands(RACF.section_named(TWO_SEGMENTS, "Parameters"))
+        self.assertIn("GID", find(terms, "OMVS")["members"])
+        self.assertIn("GID", find(terms, "OVM")["members"])
+        self.assertIn("GID", find(terms, "AUTOGID | GID")["values"])
+        restated, elsewhere = RACF.overlap(terms)
+        self.assertEqual(elsewhere, ["GID"])
+        # AUTOGID has only the restated occurrence, and stays where it belongs.
+        self.assertEqual(restated, ["AUTOGID"])
+
+    def test_the_two_lists_partition_the_overlap(self) -> None:
+        # Which is why the conflated total is dropped rather than kept beside
+        # them: it is their sum, and their sum is the only thing it ever was.
+        for fixture in (NETVIEW, OPERPARM, TWO_SEGMENTS, ALTUSER_NETVIEW):
+            terms = RACF.operands(RACF.section_named(fixture, "Parameters"))
+            values: set[str] = set()
+            members: set[str] = set()
+            for term in RACF.descendants(terms):
+                values.update(term["values"])
+                members.update(term["members"])
+            restated, elsewhere = RACF.overlap(terms)
+            self.assertEqual(sorted(values & members), sorted(restated + elsewhere))
+            self.assertEqual(set(restated) & set(elsewhere), set())
 
 
 DELUSER = """

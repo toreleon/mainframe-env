@@ -1,11 +1,128 @@
 {
   "coverage_credit": 0,
+  "cross_topic_restatements": [
+    {
+      "alternatives": [
+        "YES",
+        "NO"
+      ],
+      "applied_to": [
+        {
+          "keyword": "RALTER",
+          "names": [
+            "YES",
+            "NO"
+          ],
+          "term": "ACEE"
+        }
+      ],
+      "operand": "ACEE",
+      "stated_by": [
+        {
+          "keyword": "RDEFINE",
+          "term": "ACEE( YES | NO )"
+        }
+      ]
+    },
+    {
+      "alternatives": [
+        "GENERAL",
+        "GLOBAL",
+        "SPECIFIC"
+      ],
+      "applied_to": [
+        {
+          "keyword": "ADDUSER",
+          "names": [
+            "GENERAL",
+            "GLOBAL",
+            "SPECIFIC"
+          ],
+          "term": "CTL"
+        }
+      ],
+      "operand": "CTL",
+      "stated_by": [
+        {
+          "keyword": "ALTUSER",
+          "term": "CTL (GENERAL | GLOBAL | SPECIFIC)"
+        }
+      ]
+    },
+    {
+      "alternatives": [
+        "NORMAL",
+        "ALL",
+        "NONE"
+      ],
+      "applied_to": [
+        {
+          "keyword": "ADDUSER",
+          "names": [
+            "NORMAL",
+            "ALL",
+            "NONE"
+          ],
+          "term": "DOM"
+        }
+      ],
+      "operand": "DOM",
+      "stated_by": [
+        {
+          "keyword": "ALTUSER",
+          "term": "DOM(NORMAL | ALL | NONE)"
+        }
+      ]
+    },
+    {
+      "alternatives": [
+        "SYSTEM",
+        "NO"
+      ],
+      "applied_to": [
+        {
+          "keyword": "ADDUSER",
+          "names": [
+            "SYSTEM",
+            "NO"
+          ],
+          "term": "LOGCMDRESP"
+        }
+      ],
+      "operand": "LOGCMDRESP",
+      "stated_by": [
+        {
+          "keyword": "ALTUSER",
+          "term": "LOGCMDRESP(SYSTEM | NO)"
+        }
+      ]
+    },
+    {
+      "alternatives": [
+        "YES",
+        "NO"
+      ],
+      "applied_to": [
+        {
+          "keyword": "RALTER",
+          "names": [
+            "YES",
+            "NO"
+          ],
+          "term": "MIXED"
+        }
+      ],
+      "operand": "MIXED",
+      "stated_by": [
+        {
+          "keyword": "RDEFINE",
+          "term": "MIXED( YES | NO )"
+        }
+      ]
+    }
+  ],
   "rows": [
     {
-      "both_value_and_member": [
-        "AUTOGID",
-        "GID"
-      ],
       "catalog_aliases": [
         "AG"
       ],
@@ -332,6 +449,9 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [
+        "AUTOGID"
+      ],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0001",
       "source_aliases": [
         "AG"
@@ -388,10 +508,12 @@
           "topic_id": "syntax-addgroup-add-group-profile",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/addgroup.htm"
         }
+      ],
+      "value_and_member_of_different_terms": [
+        "GID"
       ]
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [
         "AD"
       ],
@@ -1018,6 +1140,7 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0002",
       "source_aliases": [
         "AD"
@@ -1119,20 +1242,10 @@
           "topic_id": "syntax-addsd-add-data-set-profile",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/addsd.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [
-        "ALL",
-        "AUTOUID",
-        "MEMLIMIT",
-        "NO",
-        "NOMEMLIMIT",
-        "NONE",
-        "NOSHMEMMAX",
-        "SHMEMMAX",
-        "UID"
-      ],
       "catalog_aliases": [
         "AU"
       ],
@@ -1890,16 +2003,16 @@
                   "values": []
                 }
               ],
-              "members": [
-                "GENERAL",
-                "GLOBAL",
-                "SPECIFIC"
-              ],
+              "members": [],
               "names": [
                 "CTL"
               ],
               "term": "CTL",
-              "values": []
+              "values": [
+                "GENERAL",
+                "GLOBAL",
+                "SPECIFIC"
+              ]
             },
             {
               "children": [],
@@ -2439,16 +2552,16 @@
                   "values": []
                 }
               ],
-              "members": [
-                "NORMAL",
-                "ALL",
-                "NONE"
-              ],
+              "members": [],
               "names": [
                 "DOM"
               ],
               "term": "DOM",
-              "values": []
+              "values": [
+                "NORMAL",
+                "ALL",
+                "NONE"
+              ]
             },
             {
               "children": [],
@@ -2570,15 +2683,15 @@
                   "values": []
                 }
               ],
-              "members": [
-                "SYSTEM",
-                "NO"
-              ],
+              "members": [],
               "names": [
                 "LOGCMDRESP"
               ],
               "term": "LOGCMDRESP",
-              "values": []
+              "values": [
+                "SYSTEM",
+                "NO"
+              ]
             },
             {
               "children": [
@@ -3366,6 +3479,13 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [
+        "AUTOUID",
+        "MEMLIMIT",
+        "NOMEMLIMIT",
+        "NOSHMEMMAX",
+        "SHMEMMAX"
+      ],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0003",
       "source_aliases": [
         "AU"
@@ -3416,9 +3536,6 @@
         "MSGRECVR",
         "NGMFADMN",
         "NGMFVSPN",
-        "GENERAL",
-        "GLOBAL",
-        "SPECIFIC",
         "ASSIZEMAX",
         "AUTOUID",
         "UID",
@@ -3458,13 +3575,9 @@
         "CONS",
         "IO",
         "SYS",
-        "NORMAL",
-        "NONE",
         "NB",
         "CE",
         "IN",
-        "SYSTEM",
-        "NO",
         "JOBNAMES",
         "JOBNAMEST",
         "SESS",
@@ -3577,6 +3690,9 @@
         "NOCLAUTH",
         "GRPACC",
         "NOGRPACC",
+        "GENERAL",
+        "GLOBAL",
+        "SPECIFIC",
         "NO",
         "YES",
         "OIDCARD",
@@ -3589,8 +3705,10 @@
         "NOSHMEMMAX",
         "OPERATIONS",
         "NOOPERATIONS",
+        "NORMAL",
         "ALL",
         "NONE",
+        "SYSTEM",
         "PASSWORD",
         "NOPASSWORD",
         "RESTRICTED",
@@ -3623,10 +3741,13 @@
           "topic_id": "syntax-adduser-add-user-profile",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/adduser.htm"
         }
+      ],
+      "value_and_member_of_different_terms": [
+        "ALL",
+        "UID"
       ]
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [
         "ALD"
       ],
@@ -4617,6 +4738,7 @@
           ]
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0004",
       "source_aliases": [
         "ALD"
@@ -4754,26 +4876,10 @@
           "topic_id": "syntax-altdsd-alter-data-set-profile",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/altdsd.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [
-        "ADDROLES",
-        "AUTOGID",
-        "DATAAPPL",
-        "DATACLAS",
-        "DELROLES",
-        "GID",
-        "MGMTCLAS",
-        "NODATAAPPL",
-        "NODATACLAS",
-        "NOGID",
-        "NOMGMTCLAS",
-        "NOROLES",
-        "NOSTORCLAS",
-        "ROLES",
-        "STORCLAS"
-      ],
       "catalog_aliases": [
         "ALG"
       ],
@@ -5454,6 +5560,23 @@
           ]
         }
       ],
+      "restated_one_level_down": [
+        "ADDROLES",
+        "AUTOGID",
+        "DATAAPPL",
+        "DATACLAS",
+        "DELROLES",
+        "GID",
+        "MGMTCLAS",
+        "NODATAAPPL",
+        "NODATACLAS",
+        "NOGID",
+        "NOMGMTCLAS",
+        "NOROLES",
+        "NOSTORCLAS",
+        "ROLES",
+        "STORCLAS"
+      ],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0005",
       "source_aliases": [
         "ALG"
@@ -5557,180 +5680,10 @@
           "topic_id": "syntax-altgroup-alter-group-profile",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/altgrp.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [
-        "ACCTNUM",
-        "ACTIVE",
-        "ADDDOMAINS",
-        "ADDMSCOPE",
-        "ADDOPCLASS",
-        "ADDPOLICY",
-        "ALL",
-        "ALTGRP",
-        "ASSIZEMAX",
-        "AUTH",
-        "AUTO",
-        "AUTOUID",
-        "BINDDN",
-        "BINDPW",
-        "CMDSYS",
-        "COMMAND",
-        "CONSNAME",
-        "CPUTIMEMAX",
-        "CTL",
-        "DATAAPPL",
-        "DATACLAS",
-        "DCENAME",
-        "DELDOMAINS",
-        "DELFACTOR",
-        "DELMSCOPE",
-        "DELOPCLASS",
-        "DELPOLICY",
-        "DELTAGS",
-        "DEST",
-        "DOM",
-        "DOMAINS",
-        "ENCRYPT",
-        "FACTOR",
-        "FILEPROCMAX",
-        "FSROOT",
-        "HC",
-        "HOLDCLASS",
-        "HOME",
-        "HOMECELL",
-        "HOMEUUID",
-        "IC",
-        "INTIDS",
-        "JOBCLASS",
-        "KERBNAME",
-        "KEY",
-        "LDAPHOST",
-        "LEVEL",
-        "LOGCMDRESP",
-        "MAXSIZE",
-        "MAXTKTLFE",
-        "MEMLIMIT",
-        "MFORM",
-        "MGMTCLAS",
-        "MIGID",
-        "MMAPAREAMAX",
-        "MONITOR",
-        "MSCOPE",
-        "MSGCLASS",
-        "MSGRECVR",
-        "NGMFADMN",
-        "NGMFVSPN",
-        "NOACCTNUM",
-        "NOACTIVE",
-        "NOALTGRP",
-        "NOASSIZEMAX",
-        "NOAUTH",
-        "NOAUTO",
-        "NOBINDDN",
-        "NOBINDPW",
-        "NOCMDSYS",
-        "NOCOMMAND",
-        "NOCONSNAME",
-        "NOCPUTIMEMAX",
-        "NOCTL",
-        "NODATAAPPL",
-        "NODATACLAS",
-        "NODCENAME",
-        "NODEST",
-        "NODOM",
-        "NODOMAINS",
-        "NOENCRYPT",
-        "NOFILEPROCMAX",
-        "NOFSROOT",
-        "NOHC",
-        "NOHOLDCLASS",
-        "NOHOME",
-        "NOHOMECELL",
-        "NOHOMEUUID",
-        "NOIC",
-        "NOINTIDS",
-        "NOJOBCLASS",
-        "NOKERBNAME",
-        "NOKEY",
-        "NOLDAPHOST",
-        "NOLEVEL",
-        "NOLOGCMDRESP",
-        "NOMAXSIZE",
-        "NOMAXTKTLFE",
-        "NOMEMLIMIT",
-        "NOMFORM",
-        "NOMGMTCLAS",
-        "NOMIGID",
-        "NOMMAPAREAMAX",
-        "NOMONITOR",
-        "NOMSCOPE",
-        "NOMSGCLASS",
-        "NOMSGRECVR",
-        "NONGMFADMN",
-        "NONGMFVSPN",
-        "NOOPCLASS",
-        "NOOPIDENT",
-        "NOOPPRTY",
-        "NOPRIMARY",
-        "NOPROC",
-        "NOPROCUSERMAX",
-        "NOPROGRAM",
-        "NOPWFALLBACK",
-        "NOROUTCODE",
-        "NORSLKEY",
-        "NOSECLABEL",
-        "NOSECONDARY",
-        "NOSHMEMMAX",
-        "NOSIZE",
-        "NOSNAME",
-        "NOSTORAGE",
-        "NOSTORCLAS",
-        "NOSYS",
-        "NOTAGS",
-        "NOTHREADSMAX",
-        "NOTIMEOUT",
-        "NOTSLKEY",
-        "NOUD",
-        "NOUID",
-        "NOUNAME",
-        "NOUNIT",
-        "NOUNKNIDS",
-        "NOUSERDATA",
-        "NOUUID",
-        "NOXRFSOFF",
-        "OPCLASS",
-        "OPIDENT",
-        "OPPRTY",
-        "PRIMARY",
-        "PROC",
-        "PROCUSERMAX",
-        "PROGRAM",
-        "PWFALLBACK",
-        "ROUTCODE",
-        "RSLKEY",
-        "SECLABEL",
-        "SECONDARY",
-        "SHMEMMAX",
-        "SIZE",
-        "SNAME",
-        "STORAGE",
-        "STORCLAS",
-        "SYS",
-        "TAGS",
-        "THREADSMAX",
-        "TIMEOUT",
-        "TSLKEY",
-        "UD",
-        "UID",
-        "UNAME",
-        "UNIT",
-        "UNKNIDS",
-        "USERDATA",
-        "UUID",
-        "XRFSOFF"
-      ],
       "catalog_aliases": [
         "ALU"
       ],
@@ -10840,6 +10793,175 @@
           ]
         }
       ],
+      "restated_one_level_down": [
+        "ACCTNUM",
+        "ACTIVE",
+        "ADDDOMAINS",
+        "ADDMSCOPE",
+        "ADDOPCLASS",
+        "ADDPOLICY",
+        "ALTGRP",
+        "ASSIZEMAX",
+        "AUTH",
+        "AUTO",
+        "AUTOUID",
+        "BINDDN",
+        "BINDPW",
+        "CMDSYS",
+        "COMMAND",
+        "CONSNAME",
+        "CPUTIMEMAX",
+        "CTL",
+        "DATAAPPL",
+        "DATACLAS",
+        "DCENAME",
+        "DELDOMAINS",
+        "DELFACTOR",
+        "DELMSCOPE",
+        "DELOPCLASS",
+        "DELPOLICY",
+        "DELTAGS",
+        "DEST",
+        "DOM",
+        "DOMAINS",
+        "ENCRYPT",
+        "FACTOR",
+        "FILEPROCMAX",
+        "FSROOT",
+        "HC",
+        "HOLDCLASS",
+        "HOME",
+        "HOMECELL",
+        "HOMEUUID",
+        "IC",
+        "INTIDS",
+        "JOBCLASS",
+        "KERBNAME",
+        "KEY",
+        "LDAPHOST",
+        "LEVEL",
+        "LOGCMDRESP",
+        "MAXSIZE",
+        "MAXTKTLFE",
+        "MEMLIMIT",
+        "MFORM",
+        "MGMTCLAS",
+        "MIGID",
+        "MMAPAREAMAX",
+        "MONITOR",
+        "MSCOPE",
+        "MSGCLASS",
+        "MSGRECVR",
+        "NGMFADMN",
+        "NGMFVSPN",
+        "NOACCTNUM",
+        "NOACTIVE",
+        "NOALTGRP",
+        "NOASSIZEMAX",
+        "NOAUTH",
+        "NOAUTO",
+        "NOBINDDN",
+        "NOBINDPW",
+        "NOCMDSYS",
+        "NOCOMMAND",
+        "NOCONSNAME",
+        "NOCPUTIMEMAX",
+        "NOCTL",
+        "NODATAAPPL",
+        "NODATACLAS",
+        "NODCENAME",
+        "NODEST",
+        "NODOM",
+        "NODOMAINS",
+        "NOENCRYPT",
+        "NOFILEPROCMAX",
+        "NOFSROOT",
+        "NOHC",
+        "NOHOLDCLASS",
+        "NOHOME",
+        "NOHOMECELL",
+        "NOHOMEUUID",
+        "NOIC",
+        "NOINTIDS",
+        "NOJOBCLASS",
+        "NOKERBNAME",
+        "NOKEY",
+        "NOLDAPHOST",
+        "NOLEVEL",
+        "NOLOGCMDRESP",
+        "NOMAXSIZE",
+        "NOMAXTKTLFE",
+        "NOMEMLIMIT",
+        "NOMFORM",
+        "NOMGMTCLAS",
+        "NOMIGID",
+        "NOMMAPAREAMAX",
+        "NOMONITOR",
+        "NOMSCOPE",
+        "NOMSGCLASS",
+        "NOMSGRECVR",
+        "NONGMFADMN",
+        "NONGMFVSPN",
+        "NOOPCLASS",
+        "NOOPIDENT",
+        "NOOPPRTY",
+        "NOPRIMARY",
+        "NOPROC",
+        "NOPROCUSERMAX",
+        "NOPROGRAM",
+        "NOPWFALLBACK",
+        "NOROUTCODE",
+        "NORSLKEY",
+        "NOSECLABEL",
+        "NOSECONDARY",
+        "NOSHMEMMAX",
+        "NOSIZE",
+        "NOSNAME",
+        "NOSTORAGE",
+        "NOSTORCLAS",
+        "NOSYS",
+        "NOTAGS",
+        "NOTHREADSMAX",
+        "NOTIMEOUT",
+        "NOTSLKEY",
+        "NOUD",
+        "NOUID",
+        "NOUNAME",
+        "NOUNIT",
+        "NOUNKNIDS",
+        "NOUSERDATA",
+        "NOUUID",
+        "NOXRFSOFF",
+        "OPCLASS",
+        "OPIDENT",
+        "OPPRTY",
+        "PRIMARY",
+        "PROC",
+        "PROCUSERMAX",
+        "PROGRAM",
+        "PWFALLBACK",
+        "ROUTCODE",
+        "RSLKEY",
+        "SECLABEL",
+        "SECONDARY",
+        "SHMEMMAX",
+        "SIZE",
+        "SNAME",
+        "STORAGE",
+        "STORCLAS",
+        "TAGS",
+        "THREADSMAX",
+        "TIMEOUT",
+        "TSLKEY",
+        "UD",
+        "UID",
+        "UNAME",
+        "UNIT",
+        "UNKNIDS",
+        "USERDATA",
+        "UUID",
+        "XRFSOFF"
+      ],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0006",
       "source_aliases": [
         "ALU"
@@ -11484,10 +11606,13 @@
           "topic_id": "syntax-altuser-alter-user-profile",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/altuser.htm"
         }
+      ],
+      "value_and_member_of_different_terms": [
+        "ALL",
+        "SYS"
       ]
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [
         "CO"
       ],
@@ -11820,6 +11945,7 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0007",
       "source_aliases": [
         "CO"
@@ -11884,10 +12010,10 @@
           "topic_id": "syntax-connect-connect-user-group",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/connect.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [
         "DD"
       ],
@@ -12014,6 +12140,7 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0008",
       "source_aliases": [
         "DD"
@@ -12053,10 +12180,10 @@
           "topic_id": "syntax-deldsd-delete-data-set-profile",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/deldsd.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [
         "DG"
       ],
@@ -12112,6 +12239,7 @@
           ]
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0009",
       "source_aliases": [
         "DG"
@@ -12142,10 +12270,10 @@
           "topic_id": "syntax-delgroup-delete-group-profile",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/delgrp.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [
         "DU"
       ],
@@ -12201,6 +12329,7 @@
           ]
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0010",
       "source_aliases": [
         "DU"
@@ -12231,10 +12360,10 @@
           "topic_id": "syntax-deluser-delete-user-profile",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/deluser.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [],
       "catalog_only": [
         "ALL",
@@ -12313,6 +12442,7 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0011",
       "source_aliases": [],
       "source_members": [],
@@ -12344,10 +12474,10 @@
           "topic_id": "syntax-display-display-signed-from-list",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/display.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [
         "LD"
       ],
@@ -12575,6 +12705,7 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0012",
       "source_aliases": [
         "LD"
@@ -12632,10 +12763,10 @@
           "topic_id": "syntax-listdsd-list-data-set-profile",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/listdsd.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [
         "LG"
       ],
@@ -12774,6 +12905,7 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0013",
       "source_aliases": [
         "LG"
@@ -12810,10 +12942,10 @@
           "topic_id": "syntax-listgrp-list-group-profile",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/listgrp.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [
         "LU"
       ],
@@ -13072,6 +13204,7 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0014",
       "source_aliases": [
         "LU"
@@ -13120,10 +13253,10 @@
           "topic_id": "syntax-listuser-list-user-profile",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/listusr.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [
         "PW",
         "PHRASE"
@@ -13270,6 +13403,7 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0015",
       "source_aliases": [
         "PW",
@@ -13314,10 +13448,10 @@
           "topic_id": "syntax-password-phrase-specify-user-password-password-phrase",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/passwrd.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [
         "PE"
       ],
@@ -13645,6 +13779,7 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0016",
       "source_aliases": [
         "PE"
@@ -13708,13 +13843,10 @@
           "topic_id": "syntax-permit-maintain-resource-access-lists",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/permit.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [
-        "PKDS",
-        "TOKEN"
-      ],
       "catalog_aliases": [],
       "catalog_only": [
         "START",
@@ -15732,6 +15864,7 @@
       "keyword": "RACDCERT",
       "located": true,
       "operand_terms": [],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0017",
       "source_aliases": [],
       "source_members": [
@@ -16072,10 +16205,13 @@
           "topic_id": "certificates-racdcert-unbind-unbind-certificate-from-token",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/le-unbind.htm"
         }
+      ],
+      "value_and_member_of_different_terms": [
+        "PKDS",
+        "TOKEN"
       ]
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [],
       "catalog_only": [
         "NODE",
@@ -16177,6 +16313,7 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0018",
       "source_aliases": [],
       "source_members": [
@@ -16211,10 +16348,10 @@
           "topic_id": "syntax-raclink-administer-user-id-associations",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/raclnk.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [],
       "catalog_only": [
         "DELAPPLE",
@@ -16366,6 +16503,7 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0019",
       "source_aliases": [],
       "source_members": [
@@ -16401,10 +16539,10 @@
           "topic_id": "rcs-racmap-create-delete-list-query-distributed-identity-filter",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/racmap.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [],
       "catalog_only": [],
       "catalog_operands": [
@@ -16455,6 +16593,7 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0020",
       "source_aliases": [],
       "source_members": [
@@ -16480,10 +16619,10 @@
           "topic_id": "syntax-racpriv-set-write-down-privileges",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/racpriv.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [],
       "catalog_only": [],
       "catalog_operands": [
@@ -16502,6 +16641,7 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0021",
       "source_aliases": [],
       "source_members": [],
@@ -16523,154 +16663,10 @@
           "topic_id": "syntax-racprmck-validate-parmlib-member",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/racprmck.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [
-        "ADDCHILDREN",
-        "ADDFACTORS",
-        "ADDGROUPS",
-        "ADDJOBNAMES",
-        "ADDROLES",
-        "ASYMUSAGE",
-        "BINDDN",
-        "BINDPW",
-        "CASE",
-        "CHECKADDRS",
-        "CHILDREN",
-        "CONVSEC",
-        "DEFAULTRC",
-        "DEFAULTUACC",
-        "DEFTKTLFE",
-        "DELCHILDREN",
-        "DELFACTORS",
-        "DELGROUPS",
-        "DELJOBNAMES",
-        "DELROLES",
-        "DISABLE",
-        "DOMAINDN",
-        "ENABLE",
-        "ENCRYPT",
-        "EPTKEYLABEL",
-        "FACTORS",
-        "FAILLOAD",
-        "FIRST",
-        "GENERIC",
-        "GENLIST",
-        "GROUP",
-        "GROUPS",
-        "IDTTIMEOUT",
-        "INTERVAL",
-        "JOBNAMES",
-        "KERBNAME",
-        "KERBREGISTRY",
-        "KEYLABEL",
-        "KEYQUALIFIERS",
-        "LDAPHOST",
-        "LOCALREGISTRY",
-        "LOCK",
-        "MACPROCESSING",
-        "MAXLENGTH",
-        "MAXLENX",
-        "MAXTKTLFE",
-        "MAXVALUE",
-        "MEMBER",
-        "MINTKTLFE",
-        "MINVALUE",
-        "NO",
-        "NOASYMUSAGE",
-        "NOBINDPW",
-        "NOCASE",
-        "NOCHECKADDRS",
-        "NOCHILDREN",
-        "NOCONVSEC",
-        "NODEFAULTRC",
-        "NODEFAULTUACC",
-        "NODEFTKTLFE",
-        "NODOMAINDN",
-        "NOENCRYPT",
-        "NOEPTKEYLABEL",
-        "NOFACTORS",
-        "NOFAILLOAD",
-        "NOFIRST",
-        "NOGENERIC",
-        "NOGENLIST",
-        "NOGROUP",
-        "NOGROUPS",
-        "NOIDTTIMEOUT",
-        "NOINTERVAL",
-        "NOJOBNAMES",
-        "NOKERBNAME",
-        "NOKERBREGISTRY",
-        "NOKEYLABEL",
-        "NOKEYQUALIFIERS",
-        "NOLDAPHOST",
-        "NOLOCALREGISTRY",
-        "NOLOCK",
-        "NOMACPROCESSING",
-        "NOMAXLENGTH",
-        "NOMAXLENX",
-        "NOMAXTKTLFE",
-        "NOMAXVALUE",
-        "NOMEMBER",
-        "NOMINTKTLFE",
-        "NOMINVALUE",
-        "NOOPERATIONS",
-        "NOOPTIONS",
-        "NOOTHER",
-        "NOPARENT",
-        "NOPARMNAME",
-        "NOPASSWORD",
-        "NOPOSIT",
-        "NOPROFILESALLOWED",
-        "NORACLIST",
-        "NOROLES",
-        "NOSCRIPTNAME",
-        "NOSECLABELSREQUIRED",
-        "NOSESSKEY",
-        "NOSIGALG",
-        "NOSIGAUDIT",
-        "NOSIGCAT",
-        "NOSIGNAL",
-        "NOSIGREQUIRED",
-        "NOSIGSEQNUM",
-        "NOSIGTOKEN",
-        "NOSYMEXPORTABLE",
-        "NOSYMEXPORTCERTS",
-        "NOSYMEXPORTKEYS",
-        "NOTIMEOUT",
-        "NOTYPE",
-        "NOUSER",
-        "NOX509REGISTRY",
-        "OPERATIONS",
-        "OTHER",
-        "PARENT",
-        "PARMNAME",
-        "PASSWORD",
-        "POSIT",
-        "PROFILESALLOWED",
-        "RACLIST",
-        "RESOURCE",
-        "ROLES",
-        "SCRIPTNAME",
-        "SECLABELSREQUIRED",
-        "SESSKEY",
-        "SIGALG",
-        "SIGAUDIT",
-        "SIGCAT",
-        "SIGNAL",
-        "SIGREQUIRED",
-        "SIGSEQNUM",
-        "SIGTOKEN",
-        "SYMEXPORTABLE",
-        "SYMEXPORTCERTS",
-        "SYMEXPORTKEYS",
-        "TIMEOUT",
-        "TYPE",
-        "USER",
-        "X509REGISTRY",
-        "YES"
-      ],
       "catalog_aliases": [
         "RALT"
       ],
@@ -17816,15 +17812,15 @@
                       "values": []
                     }
                   ],
-                  "members": [
-                    "YES",
-                    "NO"
-                  ],
+                  "members": [],
                   "names": [
                     "ACEE"
                   ],
                   "term": "ACEE",
-                  "values": []
+                  "values": [
+                    "YES",
+                    "NO"
+                  ]
                 },
                 {
                   "children": [
@@ -18009,15 +18005,15 @@
                       "values": []
                     }
                   ],
-                  "members": [
-                    "YES",
-                    "NO"
-                  ],
+                  "members": [],
                   "names": [
                     "MIXED"
                   ],
                   "term": "MIXED",
-                  "values": []
+                  "values": [
+                    "YES",
+                    "NO"
+                  ]
                 },
                 {
                   "children": [
@@ -21802,6 +21798,145 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [
+        "ADDCHILDREN",
+        "ADDFACTORS",
+        "ADDGROUPS",
+        "ADDJOBNAMES",
+        "ADDROLES",
+        "ASYMUSAGE",
+        "BINDDN",
+        "BINDPW",
+        "CASE",
+        "CHECKADDRS",
+        "CHILDREN",
+        "CONVSEC",
+        "DEFAULTRC",
+        "DEFAULTUACC",
+        "DEFTKTLFE",
+        "DELCHILDREN",
+        "DELFACTORS",
+        "DELGROUPS",
+        "DELJOBNAMES",
+        "DELROLES",
+        "DISABLE",
+        "DOMAINDN",
+        "ENABLE",
+        "ENCRYPT",
+        "EPTKEYLABEL",
+        "FACTORS",
+        "FAILLOAD",
+        "GENERIC",
+        "GENLIST",
+        "GROUP",
+        "GROUPS",
+        "IDTTIMEOUT",
+        "INTERVAL",
+        "JOBNAMES",
+        "KERBNAME",
+        "KERBREGISTRY",
+        "KEYQUALIFIERS",
+        "LDAPHOST",
+        "LOCALREGISTRY",
+        "LOCK",
+        "MACPROCESSING",
+        "MAXLENX",
+        "MAXTKTLFE",
+        "MAXVALUE",
+        "MEMBER",
+        "MINTKTLFE",
+        "MINVALUE",
+        "NOASYMUSAGE",
+        "NOBINDPW",
+        "NOCASE",
+        "NOCHECKADDRS",
+        "NOCHILDREN",
+        "NOCONVSEC",
+        "NODEFAULTRC",
+        "NODEFAULTUACC",
+        "NODEFTKTLFE",
+        "NODOMAINDN",
+        "NOENCRYPT",
+        "NOEPTKEYLABEL",
+        "NOFACTORS",
+        "NOFAILLOAD",
+        "NOFIRST",
+        "NOGENERIC",
+        "NOGENLIST",
+        "NOGROUP",
+        "NOGROUPS",
+        "NOIDTTIMEOUT",
+        "NOINTERVAL",
+        "NOJOBNAMES",
+        "NOKERBNAME",
+        "NOKERBREGISTRY",
+        "NOKEYLABEL",
+        "NOKEYQUALIFIERS",
+        "NOLDAPHOST",
+        "NOLOCALREGISTRY",
+        "NOLOCK",
+        "NOMACPROCESSING",
+        "NOMAXLENGTH",
+        "NOMAXLENX",
+        "NOMAXTKTLFE",
+        "NOMAXVALUE",
+        "NOMEMBER",
+        "NOMINTKTLFE",
+        "NOMINVALUE",
+        "NOOPERATIONS",
+        "NOOPTIONS",
+        "NOOTHER",
+        "NOPARENT",
+        "NOPARMNAME",
+        "NOPASSWORD",
+        "NOPOSIT",
+        "NOPROFILESALLOWED",
+        "NORACLIST",
+        "NOROLES",
+        "NOSCRIPTNAME",
+        "NOSECLABELSREQUIRED",
+        "NOSESSKEY",
+        "NOSIGALG",
+        "NOSIGAUDIT",
+        "NOSIGCAT",
+        "NOSIGNAL",
+        "NOSIGREQUIRED",
+        "NOSIGSEQNUM",
+        "NOSIGTOKEN",
+        "NOSYMEXPORTABLE",
+        "NOSYMEXPORTCERTS",
+        "NOSYMEXPORTKEYS",
+        "NOTIMEOUT",
+        "NOTYPE",
+        "NOUSER",
+        "NOX509REGISTRY",
+        "OPERATIONS",
+        "PARENT",
+        "PARMNAME",
+        "PASSWORD",
+        "POSIT",
+        "PROFILESALLOWED",
+        "RACLIST",
+        "RESOURCE",
+        "ROLES",
+        "SCRIPTNAME",
+        "SECLABELSREQUIRED",
+        "SESSKEY",
+        "SIGALG",
+        "SIGAUDIT",
+        "SIGCAT",
+        "SIGNAL",
+        "SIGREQUIRED",
+        "SIGSEQNUM",
+        "SIGTOKEN",
+        "SYMEXPORTABLE",
+        "SYMEXPORTCERTS",
+        "SYMEXPORTKEYS",
+        "TIMEOUT",
+        "TYPE",
+        "USER",
+        "X509REGISTRY"
+      ],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0022",
       "source_aliases": [
         "RALT"
@@ -21865,8 +22000,6 @@
         "NOMINVALUE",
         "MIXED",
         "VALREXX",
-        "YES",
-        "NO",
         "ALPHA",
         "ALPHANUM",
         "ANY",
@@ -21912,6 +22045,8 @@
         "DELSYMEXPORTCERTS",
         "ADDSYMEXPORTKEYS",
         "DELSYMEXPORTKEYS",
+        "YES",
+        "NO",
         "USEMAP",
         "NOUSEMAP",
         "DOMAP",
@@ -22232,6 +22367,8 @@
         "NOSIGNAL",
         "CFDEF",
         "NOCFDEF",
+        "YES",
+        "NO",
         "MAXVALUE",
         "NOMAXVALUE",
         "MINVALUE",
@@ -22271,8 +22408,6 @@
         "NOSYMEXPORTKEYS",
         "ICTX",
         "NOICTX",
-        "YES",
-        "NO",
         "IDTPARMS",
         "NOIDTPARMS",
         "SIGTOKEN",
@@ -22411,18 +22546,17 @@
           "topic_id": "syntax-ralter-alter-general-resource-profile",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/ralter.htm"
         }
+      ],
+      "value_and_member_of_different_terms": [
+        "FIRST",
+        "KEYLABEL",
+        "MAXLENGTH",
+        "NO",
+        "OTHER",
+        "YES"
       ]
     },
     {
-      "both_value_and_member": [
-        "DEFAULTUACC",
-        "DISABLE",
-        "ENABLE",
-        "GROUP",
-        "NO",
-        "USER",
-        "YES"
-      ],
       "catalog_aliases": [
         "RDEF"
       ],
@@ -25212,6 +25346,12 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [
+        "DEFAULTUACC",
+        "DISABLE",
+        "ENABLE",
+        "USER"
+      ],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0023",
       "source_aliases": [
         "RDEF"
@@ -25490,10 +25630,14 @@
           "topic_id": "syntax-rdefine-define-general-resource-profile",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/rdefine.htm"
         }
+      ],
+      "value_and_member_of_different_terms": [
+        "GROUP",
+        "NO",
+        "YES"
       ]
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [
         "RDEL"
       ],
@@ -25565,6 +25709,7 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0024",
       "source_aliases": [
         "RDEL"
@@ -25597,10 +25742,10 @@
           "topic_id": "syntax-rdelete-delete-general-resource-profile",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/rdelete.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [
         "RE"
       ],
@@ -25677,6 +25822,7 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0025",
       "source_aliases": [
         "RE"
@@ -25709,10 +25855,10 @@
           "topic_id": "syntax-remove-remove-user-from-group",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/remove.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [],
       "catalog_only": [],
       "catalog_operands": [],
@@ -25766,6 +25912,7 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0026",
       "source_aliases": [],
       "source_members": [
@@ -25810,10 +25957,10 @@
           "topic_id": "syntax-restart-restart-racf-subsystem-functions",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/restart.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [
         "RL"
       ],
@@ -26176,6 +26323,7 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0027",
       "source_aliases": [
         "RL"
@@ -26260,10 +26408,10 @@
           "topic_id": "syntax-rlist-list-general-resource-profile",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/rlist.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [],
       "catalog_only": [
         "PASSWORD"
@@ -26422,6 +26570,7 @@
           ]
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0028",
       "source_aliases": [],
       "source_members": [],
@@ -26463,10 +26612,10 @@
           "topic_id": "syntax-rvary-change-status-racf-database",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/xrvary1.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [
         "SR"
       ],
@@ -26882,6 +27031,7 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0029",
       "source_aliases": [
         "SR"
@@ -26971,51 +27121,10 @@
           "topic_id": "syntax-search-search-racf-database",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/search.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [
-        "ALL",
-        "ALLASIDS",
-        "ALLCLASSES",
-        "ALLJOBNAMES",
-        "ALLUSERIDS",
-        "APPC",
-        "ASID",
-        "CALLABLE",
-        "CLASS",
-        "COUNT",
-        "DATABASE",
-        "GENERICANCHOR",
-        "IFCLASS",
-        "IFUSERID",
-        "IMAGE",
-        "JOBNAME",
-        "NEVERCLASS",
-        "NEVERUSERID",
-        "NOAPPC",
-        "NOASID",
-        "NOCALLABLE",
-        "NOCLASS",
-        "NODATABASE",
-        "NOGENERICANCHOR",
-        "NOIMAGE",
-        "NOJOBNAME",
-        "NONE",
-        "NOPDCALLABLE",
-        "NORACROUTE",
-        "NORRSF",
-        "NOSYSTEMSSL",
-        "NOUSERID",
-        "PDCALLABLE",
-        "RACROUTE",
-        "RESET",
-        "RRSF",
-        "SYSTEM",
-        "SYSTEMSSL",
-        "TYPE",
-        "USERID"
-      ],
       "catalog_aliases": [],
       "catalog_only": [
         "AUTOSIGNON",
@@ -28129,6 +28238,46 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [
+        "ALLASIDS",
+        "ALLCLASSES",
+        "ALLJOBNAMES",
+        "ALLUSERIDS",
+        "APPC",
+        "ASID",
+        "CALLABLE",
+        "CLASS",
+        "COUNT",
+        "DATABASE",
+        "GENERICANCHOR",
+        "IFCLASS",
+        "IFUSERID",
+        "IMAGE",
+        "JOBNAME",
+        "NEVERCLASS",
+        "NEVERUSERID",
+        "NOAPPC",
+        "NOASID",
+        "NOCALLABLE",
+        "NOCLASS",
+        "NODATABASE",
+        "NOGENERICANCHOR",
+        "NOIMAGE",
+        "NOJOBNAME",
+        "NOPDCALLABLE",
+        "NORACROUTE",
+        "NORRSF",
+        "NOSYSTEMSSL",
+        "NOUSERID",
+        "PDCALLABLE",
+        "RACROUTE",
+        "RESET",
+        "RRSF",
+        "SYSTEM",
+        "SYSTEMSSL",
+        "TYPE",
+        "USERID"
+      ],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0030",
       "source_aliases": [],
       "source_members": [
@@ -28273,29 +28422,13 @@
           "topic_id": "syntax-set",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/set.htm"
         }
+      ],
+      "value_and_member_of_different_terms": [
+        "ALL",
+        "NONE"
       ]
     },
     {
-      "both_value_and_member": [
-        "ALGORITHM",
-        "BATCHALLRACF",
-        "FAILURES",
-        "HISTORY",
-        "MIXEDCASE",
-        "NOALGORITHM",
-        "NOBATCHALLRACF",
-        "NOHISTORY",
-        "NOMIXEDCASE",
-        "NOREVOKE",
-        "NORULES",
-        "NOSPECIALCHARS",
-        "NOWARNING",
-        "NOXBMALLRACF",
-        "REVOKE",
-        "SPECIALCHARS",
-        "WARNING",
-        "XBMALLRACF"
-      ],
       "catalog_aliases": [
         "SETR"
       ],
@@ -30580,6 +30713,25 @@
           ]
         }
       ],
+      "restated_one_level_down": [
+        "ALGORITHM",
+        "BATCHALLRACF",
+        "HISTORY",
+        "MIXEDCASE",
+        "NOALGORITHM",
+        "NOBATCHALLRACF",
+        "NOHISTORY",
+        "NOMIXEDCASE",
+        "NOREVOKE",
+        "NORULES",
+        "NOSPECIALCHARS",
+        "NOWARNING",
+        "NOXBMALLRACF",
+        "REVOKE",
+        "SPECIALCHARS",
+        "WARNING",
+        "XBMALLRACF"
+      ],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0031",
       "source_aliases": [
         "SETR"
@@ -30923,10 +31075,12 @@
           "topic_id": "syntax-setropts-set-racf-options",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/setropts.htm"
         }
+      ],
+      "value_and_member_of_different_terms": [
+        "FAILURES"
       ]
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [],
       "catalog_only": [
         "AT",
@@ -30995,6 +31149,7 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0032",
       "source_aliases": [],
       "source_members": [],
@@ -31025,10 +31180,10 @@
           "topic_id": "syntax-signoff-sign-off-sessions",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/signoff.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [],
       "catalog_only": [],
       "catalog_operands": [],
@@ -31052,6 +31207,7 @@
           "values": []
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0033",
       "source_aliases": [],
       "source_members": [],
@@ -31075,10 +31231,10 @@
           "topic_id": "syntax-stop-stop-racf-subsystem",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/stop.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     },
     {
-      "both_value_and_member": [],
       "catalog_aliases": [],
       "catalog_only": [
         "REROUTE"
@@ -31687,6 +31843,7 @@
           ]
         }
       ],
+      "restated_one_level_down": [],
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0034",
       "source_aliases": [],
       "source_members": [
@@ -31772,10 +31929,11 @@
           "topic_id": "syntax-target-manage-rrsf-nodes",
           "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/target.htm"
         }
-      ]
+      ],
+      "value_and_member_of_different_terms": []
     }
   ],
-  "schema_version": "mainframe-env.racf-html-syntax-projection@2",
+  "schema_version": "mainframe-env.racf-html-syntax-projection@3",
   "source": {
     "book": "z/OS Security Server RACF Command Language Reference",
     "book_href": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/abstract.htm",
@@ -31793,16 +31951,17 @@
   },
   "totals": {
     "alias_lists_reproduced": 34,
-    "both_value_and_member": 405,
     "catalog_only": 62,
     "catalog_operands": 384,
     "families": 34,
     "located": 34,
     "max_nesting_depth": 6,
-    "source_members": 957,
+    "restated_one_level_down": 384,
+    "source_members": 950,
     "source_only": 429,
     "source_operands": 751,
-    "source_values": 844,
-    "syntax_only": 76
+    "source_values": 849,
+    "syntax_only": 76,
+    "value_and_member_of_different_terms": 19
   }
 }

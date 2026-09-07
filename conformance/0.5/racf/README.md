@@ -32,18 +32,46 @@ reviewer who writes a `role="presentation"` selector gets nothing for those five
 and has no way to tell that from the publication being silent.
 
 The nesting is read to whatever depth the topic uses — six levels in ALTUSER and
-ALTGROUP, five in ADDUSER, ADDGROUP, RALTER, SET and SETROPTS — and each term is
+ALTGROUP, five in ADDGROUP, ADDUSER, RALTER, SET and SETROPTS — and each term is
 classified against its own parent. A child name the parent term restates, either
 between keywords (`AT | ONLYAT`) or inside its own argument
 (`MSGRECVR(NO | YES)`), is a value; any other child name is a member. "Member"
-therefore covers both a segment's operands and an enumeration the publication
-does not restate in the term — ADDUSER writes a bare `CTL` over GENERAL, GLOBAL
-and SPECIFIC where ALTUSER writes `CTL(GENERAL | GLOBAL | SPECIFIC)` — so a
-member reported below the operand level is a question for the reviewer, not a
-claim that its parent is a segment. Because a name can be a value under one term
-and a member under another, `source_values` and `source_members` overlap; each
-row lists the overlap in `both_value_and_member` rather than leaving their sum
-to be read as a count of distinct names.
+therefore covers both a segment's operands and an enumeration nothing in the
+book restates in the term — `AUTH` over MASTER, ALL, INFO, CONS, IO and SYS — so
+a member reported below the operand level is a question for the reviewer, not a
+claim that its parent is a segment.
+
+**The restatement is read across topics, not down one page.** The reference
+writes the same operand two ways: ADDUSER hangs GENERAL, GLOBAL and SPECIFIC
+under a bare `CTL` where ALTUSER writes `CTL (GENERAL | GLOBAL | SPECIFIC)` over
+the same three terms, and RALTER writes bare `ACEE` and `MIXED` over YES and NO
+where RDEFINE writes `ACEE( YES | NO )` and `MIXED( YES | NO )`. Read a page at a
+time those come out as values in one topic and members in the other for markup
+that says the same thing, which is a fact about typesetting. So the tool reads
+all 60 topics for restatements before classifying any of them, and a term's
+alternatives are the ones any topic states for that operand name. 52 operand
+names are stated that way; the union changes the reading of 12 child names under
+five of them, and every one is listed in the projection's
+`cross_topic_restatements` with the term it was read from — CTL, DOM and
+LOGCMDRESP in ADDUSER, ACEE and MIXED in RALTER. It carries a restatement and
+nothing else: `LEVEL(message-level)` states no alternatives, so LEVEL's NB, ALL,
+CE and IN stay members wherever they are read.
+
+Because a name can still be a value under one term and a member under another,
+`source_values` and `source_members` overlap. That overlap is reported as two
+lists rather than one total, because the total said something it did not mean.
+384 of the 403 names in it are the list restating a name one level below where
+it introduces it — `OMVS` over `MEMLIMIT | NOMEMLIMIT` over
+`MEMLIMIT(nonshared-memory-size)` makes MEMLIMIT a member of OMVS and a value of
+the term between them, and both readings are true — so those are
+`restated_one_level_down` and are about the `dl`, not the reference. The 19 in
+`value_and_member_of_different_terms` are the ones worth a reviewer's attention:
+ADDUSER's ALL is a member of AUTH and LEVEL and a value of
+`ROUTCODE(ALL | NONE | routing-codes)`, and SET's ALL is a value of
+`ALL | NONE | TYPE` and a member of DATABASE. The split is by occurrence, so a
+name restated under one segment and written bare under another — ADDGROUP's GID,
+under OMVS and OVM — is in the second list. The two partition the overlap, so
+their sum is still recoverable and is not printed.
 
 Selection is by href and the predicate is written out in the fetcher's module
 docstring, because a reviewer has to be able to arrive at the same 60 topics
