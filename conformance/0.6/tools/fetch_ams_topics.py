@@ -34,6 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
 
 from browser_fetch import establish, fetch_binary, open_tab
 
+REPOSITORY = Path(__file__).resolve().parents[3]
 PRODUCT = "SSLTBW_3.2.0"
 BOOK = "z/OS DFSMS Access Method Services Commands"
 TOC = "https://www.ibm.com/docs/api/v1/toc/{product}?lang=en"
@@ -71,6 +72,22 @@ def parameter_topics(node: dict[str, Any]) -> list[tuple[str, str]]:
     return found
 
 
+def outside_repository(path: Path) -> Path:
+    """Refuse to write topic bodies into the tree.
+
+    The docstring above has always said topics land outside the repository, but
+    `--destination` took whatever it was given: pointing it at
+    `conformance/0.6/generated` wrote the whole parameter subtree into the tree.
+    The 0.2 gate now covers the whole `conformance/` subtree, so that is caught,
+    but a gate that fails after the bytes are already written is a worse place to
+    learn it than the tool that is about to write them.
+    """
+    resolved = path.resolve()
+    if resolved == REPOSITORY or REPOSITORY in resolved.parents:
+        raise ValueError(f"destination is inside the repository: {resolved}")
+    return resolved
+
+
 def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=9222)
@@ -84,6 +101,7 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
 def main(argv: Iterable[str] | None = None) -> int:
     args = parse_args(argv)
     catalog = json.loads(args.catalog.read_text(encoding="utf-8"))
+    args.destination = outside_repository(args.destination)
     args.destination.mkdir(parents=True, exist_ok=True)
 
     tab = open_tab(args.port)

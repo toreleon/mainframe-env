@@ -6,6 +6,7 @@ mod evidence_seal;
 mod jcl_catalog;
 mod jcl_conformance;
 mod racf_catalog;
+mod topic_manifests;
 mod work_package_seal;
 
 use clap::{Args, CommandFactory, Parser, Subcommand};
@@ -987,6 +988,7 @@ fn validate_conformance_projections(schema_directory: &Path, spec: &CompiledSpec
 
 fn check_cobol_language_catalog(root: &Path, path: &Path) -> TaskResult {
     let language = json(path)?;
+    let pinned_topics = cobol_language_pinned_topics(root, &language, path)?;
     let official_path = root.join("conformance/0.2/catalogs/cobol.json");
     let official = json(&official_path)?;
     let units = array(&official, "units", &official_path)?;
@@ -1044,6 +1046,7 @@ fn check_cobol_language_catalog(root: &Path, path: &Path) -> TaskResult {
                     && entry["source_locator"].as_str() == Some(locator),
                 &format!("COBOL catalog drifted from official row {row_id}"),
             )?;
+            require_pinned_topic(&pinned_topics, locator, &format!("row {row_id}"))?;
         }
     }
     let special_registers = array(&language, "special_registers", path)?;
@@ -1053,17 +1056,68 @@ fn check_cobol_language_catalog(root: &Path, path: &Path) -> TaskResult {
     )?;
     let mut register_names = BTreeSet::new();
     for register in special_registers {
+        let name = text(register, "name", path)?;
         require(
             ids.insert(format!("special-registers:{}", text(register, "id", path)?))
-                && register_names.insert(text(register, "name", path)?),
+                && register_names.insert(name),
             "COBOL special-register identities are duplicated",
         )?;
         require(
             register["runtime_supported"].is_boolean(),
             "COBOL special-register runtime support flag is not boolean",
         )?;
+        // A special register carries no row_id, so nothing above compares it to
+        // an official row. Its locator is the only claim it makes about the
+        // publication, and until it was checked against the pinned manifest the
+        // schema regex was the whole of the check: any well-formed nonsense
+        // passed.
+        let locator = text(register, "source_locator", path)?;
+        require_pinned_topic(&pinned_topics, locator, &format!("special register {name}"))?;
+        require(
+            locator
+                .split_once(";heading:")
+                .is_some_and(|(_, heading)| heading == name),
+            &format!("COBOL special register {name} cites another register's heading"),
+        )?;
     }
     Ok(())
+}
+
+/// The COBOL topics this repository actually read, for the file that cites them.
+///
+/// `conformance/0.3/cobol/language.json` names its manifest and the digest it
+/// was written against; both must be the ones the 0.2 receipt pins, or the 0.3
+/// catalog is describing a book the baselines never read.
+fn cobol_language_pinned_topics(
+    root: &Path,
+    language: &Value,
+    path: &Path,
+) -> TaskResult<BTreeSet<String>> {
+    let source = &language["source"];
+    let manifest = text(source, "manifest", path)?;
+    let digest = text(source, "sha256", path)?;
+    let index_path = root.join("conformance/0.2/catalogs/index.json");
+    let index = json(&index_path)?;
+    let baseline_id = text(language, "baseline_id", path)?;
+    let baseline = array(&index, "baselines", &index_path)?
+        .iter()
+        .find(|baseline| baseline["id"].as_str() == Some(baseline_id))
+        .ok_or_else(|| format!("COBOL catalog cites unknown baseline {baseline_id}"))?;
+    require(
+        text(&baseline["source"], "manifest", &index_path)? == manifest
+            && text(&baseline["source"], "sha256", &index_path)? == digest,
+        &format!("COBOL catalog source does not name the manifest baseline {baseline_id} pins"),
+    )?;
+    topic_manifests::pinned_topic_paths(root, manifest, "the COBOL catalog", digest)
+}
+
+fn require_pinned_topic(pinned: &BTreeSet<String>, locator: &str, owner: &str) -> TaskResult {
+    let topic = topic_manifests::locator_topic_path(locator)
+        .ok_or_else(|| format!("COBOL catalog {owner} has no topic component: {locator}"))?;
+    require(
+        pinned.contains(topic),
+        &format!("COBOL catalog {owner} cites topic {topic}, which is not in the pinned manifest"),
+    )
 }
 
 fn check_cobol_frontend_bindings(
@@ -8585,22 +8639,44 @@ fn check_coverage(root: &Path) -> TaskResult {
         "official catalog global denominator must remain 1506",
     )?;
     check_coverage_ledger(root, &index)?;
-    // Recursive: the manifests name every topic a baseline was read from, so a
-    // stray fragment is far likelier to land in a subdirectory than at the root.
-    let mut published = Vec::new();
-    collect_files(&root.join("conformance/0.2"), &mut published)?;
-    for path in published {
-        require(
-            !matches!(
-                path.extension().and_then(OsStr::to_str),
-                Some("pdf" | "html" | "htm")
-            ),
-            "official publication bytes must not be checked into conformance/0.2",
-        )?;
-    }
+    topic_manifests::check(root)?;
+    check_publication_bytes(root)?;
     check_coverage_work_package_evidence(root)?;
     check_coverage_program_status(root)?;
     check_workload_ledger_consistency(root)
+}
+
+/// No IBM publication bytes anywhere beneath `conformance/`.
+///
+/// The guard used to stop at `conformance/0.2`, which is where the baselines and
+/// their manifests live and so is where the bytes were imagined to arrive. They
+/// do not arrive by themselves: they arrive because a fetcher was pointed
+/// somewhere, and `conformance/0.3/tools/fetch_cobol_topics.py` and
+/// `conformance/0.6/tools/fetch_ams_topics.py` take a `--destination`. Pointing
+/// one at `conformance/0.3/generated` used to land hundreds of topic bodies in
+/// the tree with every gate still green. The whole subtree is covered now, and
+/// there is nothing to carve out: no tracked file under `conformance/` has any
+/// of these three extensions, and none should -- the tree records digests of
+/// publications, never publications.
+fn check_publication_bytes(root: &Path) -> TaskResult {
+    let directory = root.join("conformance");
+    let mut published = Vec::new();
+    collect_files(&directory, &mut published)?;
+    for path in published {
+        let extension = path
+            .extension()
+            .and_then(OsStr::to_str)
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        require(
+            !matches!(extension.as_str(), "pdf" | "html" | "htm"),
+            &format!(
+                "official publication bytes must not be checked into conformance/: {}",
+                path.strip_prefix(root).unwrap_or(&path).display()
+            ),
+        )?;
+    }
+    Ok(())
 }
 
 fn check_coverage_ledger(root: &Path, index: &Value) -> TaskResult {
