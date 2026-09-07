@@ -3,7 +3,7 @@
   "rows": [
     {
       "catalog_forms": [
-        "ACCEPT identifier [FROM source] [ON EXCEPTION statements] [NOT ON EXCEPTION statements] [END-ACCEPT]"
+        "ACCEPT identifier-1 [FROM mnemonic-name-1|environment-name]"
       ],
       "format_titles": [
         "Format 1: data transfer",
@@ -97,9 +97,9 @@
     },
     {
       "catalog_forms": [
-        "ADD operands TO targets [GIVING targets] [ROUNDED] [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-ADD]",
-        "ADD operands GIVING targets [ROUNDED] [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-ADD]",
-        "ADD CORRESPONDING group TO group [ROUNDED] [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-ADD]"
+        "ADD identifier-1|literal-1... TO identifier-2 [ROUNDED]... [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-ADD]",
+        "ADD identifier-1|literal-1... [TO] identifier-2|literal-2 GIVING identifier-3 [ROUNDED]... [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-ADD]",
+        "ADD CORRESPONDING|CORR identifier-1 TO identifier-2 [ROUNDED] [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-ADD]"
       ],
       "format_titles": [
         "Format 1: ADD statement",
@@ -354,7 +354,7 @@
     },
     {
       "catalog_forms": [
-        "ALLOCATE target [CHARACTERS] [INITIALIZED] [RETURNING pointer]"
+        "ALLOCATE arithmetic-expression-1 CHARACTERS|data-name-1 [INITIALIZED] [LOC integer-1] [RETURNING data-name-2]"
       ],
       "format_titles": [
         "Format"
@@ -417,7 +417,7 @@
     },
     {
       "catalog_forms": [
-        "ALTER procedure TO [PROCEED TO] procedure"
+        "ALTER procedure-name-1 TO [PROCEED TO] procedure-name-2"
       ],
       "format_titles": [
         "Format"
@@ -459,7 +459,7 @@
     },
     {
       "catalog_forms": [
-        "CALL target [USING arguments] [RETURNING item] [ON EXCEPTION statements] [END-CALL]"
+        "CALL identifier-1|literal-1|procedure-pointer-1|function-pointer-1 [USING [BY REFERENCE] identifier-2|file-name-1 [BY CONTENT identifier-3|literal-2] [BY VALUE identifier-4|literal-3] ...] [RETURNING identifier-5] [ON EXCEPTION imperative-statement-1] [NOT ON EXCEPTION imperative-statement-2] [ON OVERFLOW imperative-statement-3] [END-CALL]"
       ],
       "format_titles": [
         "Format"
@@ -696,7 +696,7 @@
     },
     {
       "catalog_forms": [
-        "CANCEL target..."
+        "CANCEL identifier-1|literal-1..."
       ],
       "format_titles": [
         "Format"
@@ -730,8 +730,9 @@
     },
     {
       "catalog_forms": [
-        "CLOSE file-name [REEL|UNIT] [WITH NO REWIND|FOR REMOVAL] ...",
-        "CLOSE file-name [WITH LOCK] ..."
+        "CLOSE file-name-1 [REEL|UNIT] [FOR REMOVAL|WITH NO REWIND] ...",
+        "CLOSE file-name-1 [WITH] [NO REWIND|LOCK] ...",
+        "CLOSE file-name-1 [WITH LOCK] ..."
       ],
       "format_titles": [
         "Format 1: CLOSE statement for sequential files",
@@ -884,7 +885,7 @@
     },
     {
       "catalog_forms": [
-        "COMPUTE target [ROUNDED] = expression [ON SIZE ERROR statements] [END-COMPUTE]"
+        "COMPUTE identifier-1 [ROUNDED]... =|EQUAL arithmetic-expression [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-COMPUTE]"
       ],
       "format_titles": [
         "Format"
@@ -995,7 +996,7 @@
     },
     {
       "catalog_forms": [
-        "DELETE file-name RECORD [INVALID KEY statements] [END-DELETE]"
+        "DELETE file-name-1 [RECORD] [INVALID KEY imperative-statement-1] [NOT INVALID KEY imperative-statement-2] [END-DELETE]"
       ],
       "format_titles": [
         "Format"
@@ -1064,7 +1065,7 @@
     },
     {
       "catalog_forms": [
-        "DISPLAY operands [UPON target] [WITH NO ADVANCING]"
+        "DISPLAY identifier-1|literal-1... [UPON mnemonic-name-1|environment-name-1] [WITH NO ADVANCING]"
       ],
       "format_titles": [
         "Format"
@@ -1123,7 +1124,11 @@
     },
     {
       "catalog_forms": [
-        "DIVIDE operand INTO|BY target [GIVING target] [REMAINDER target] [ROUNDED] [ON SIZE ERROR statements] [END-DIVIDE]"
+        "DIVIDE identifier-1|literal-1 INTO identifier-2 [ROUNDED]... [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-DIVIDE]",
+        "DIVIDE identifier-1|literal-1 INTO identifier-2|literal-2 GIVING identifier-3 [ROUNDED]... [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-DIVIDE]",
+        "DIVIDE identifier-1|literal-1 BY identifier-2|literal-2 GIVING identifier-3 [ROUNDED]... [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-DIVIDE]",
+        "DIVIDE identifier-1|literal-1 INTO identifier-2|literal-2 GIVING identifier-3 [ROUNDED] REMAINDER identifier-4 [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-DIVIDE]",
+        "DIVIDE identifier-1|literal-1 BY identifier-2|literal-2 GIVING identifier-3 [ROUNDED] REMAINDER identifier-4 [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-DIVIDE]"
       ],
       "format_titles": [
         "Format 1: DIVIDE statement",
@@ -1578,7 +1583,7 @@
     },
     {
       "catalog_forms": [
-        "ENTRY literal [USING arguments]"
+        "ENTRY literal-1 [USING [BY REFERENCE|BY VALUE] identifier-1...]"
       ],
       "format_titles": [
         "Format"
@@ -1641,7 +1646,7 @@
     },
     {
       "catalog_forms": [
-        "EVALUATE subjects WHEN objects statements [WHEN OTHER statements] END-EVALUATE"
+        "EVALUATE subjects [ALSO subjects]... WHEN ANY|[NOT] objects [THROUGH|THRU objects] [ALSO ANY|[NOT] objects]... statements [WHEN OTHER statements] [END-EVALUATE]"
       ],
       "format_titles": [
         "Format"
@@ -1885,7 +1890,11 @@
     },
     {
       "catalog_forms": [
-        "EXIT [PROGRAM|METHOD|FUNCTION|PERFORM|PARAGRAPH|SECTION]"
+        "EXIT",
+        "EXIT PROGRAM",
+        "EXIT METHOD",
+        "EXIT PERFORM [CYCLE]",
+        "EXIT PARAGRAPH|SECTION"
       ],
       "format_titles": [
         "Format 1",
@@ -1981,7 +1990,7 @@
     },
     {
       "catalog_forms": [
-        "FREE pointer..."
+        "FREE data-name-1..."
       ],
       "format_titles": [
         "Format"
@@ -2033,7 +2042,9 @@
     },
     {
       "catalog_forms": [
-        "GO TO procedure [DEPENDING ON identifier]"
+        "GO [TO] procedure-name-1",
+        "GO [TO] procedure-name-1... DEPENDING [ON] identifier-1",
+        "GO [TO]"
       ],
       "format_titles": [
         "Format 1: unconditional GO TO statement",
@@ -2132,7 +2143,7 @@
     },
     {
       "catalog_forms": [
-        "IF condition statements [ELSE statements] [END-IF]"
+        "IF condition-1 [THEN] statement-1|NEXT SENTENCE [ELSE statement-2|NEXT SENTENCE] [END-IF]"
       ],
       "format_titles": [
         "Format"
@@ -2195,7 +2206,7 @@
     },
     {
       "catalog_forms": [
-        "INITIALIZE targets [WITH FILLER] [REPLACING categories BY values] [THEN TO DEFAULT]"
+        "INITIALIZE identifier-1... [WITH FILLER] [ALL|category-name TO VALUE] [THEN REPLACING category-name [DATA] BY identifier-2|literal-1 ...] [THEN TO DEFAULT]"
       ],
       "format_titles": [
         "Format"
@@ -2304,7 +2315,10 @@
     },
     {
       "catalog_forms": [
-        "INSPECT identifier TALLYING|REPLACING|CONVERTING operands"
+        "INSPECT identifier-1 TALLYING identifier-2 FOR CHARACTERS|ALL|LEADING [identifier-3|literal-1] [BEFORE|AFTER INITIAL identifier-4|literal-2] ...",
+        "INSPECT identifier-1 REPLACING CHARACTERS|ALL|LEADING|FIRST [identifier-3|literal-1] BY identifier-5|literal-3 [BEFORE|AFTER INITIAL identifier-4|literal-2] ...",
+        "INSPECT identifier-1 TALLYING identifier-2 FOR CHARACTERS|ALL|LEADING [identifier-3|literal-1] [BEFORE|AFTER INITIAL identifier-4|literal-2] ... REPLACING CHARACTERS|ALL|LEADING|FIRST [identifier-3|literal-1] BY identifier-5|literal-3 [BEFORE|AFTER INITIAL identifier-4|literal-2] ...",
+        "INSPECT identifier-1 CONVERTING identifier-6|literal-4 TO identifier-7|literal-5 [BEFORE|AFTER INITIAL identifier-4|literal-2] ..."
       ],
       "format_titles": [
         "Format 1: INSPECT statement with TALLYING phrase",
@@ -2730,7 +2744,7 @@
     },
     {
       "catalog_forms": [
-        "INVOKE target method [USING arguments] [RETURNING item] [END-INVOKE]"
+        "INVOKE identifier-1|class-name-1 literal-1|identifier-2 [USING [BY VALUE] identifier-3|literal-2...] [RETURNING identifier-4] [ON EXCEPTION imperative-statement-1] [NOT ON EXCEPTION imperative-statement-2] [END-INVOKE]"
       ],
       "format_titles": [
         "Format"
@@ -2868,7 +2882,7 @@
     },
     {
       "catalog_forms": [
-        "JSON GENERATE receiver FROM source [COUNT IN item] [ON EXCEPTION statements] [END-JSON]"
+        "JSON GENERATE identifier-1 FROM identifier-2 [COUNT BYTES IN identifier-11] [COUNT [CHARACTERS] IN identifier-3] [INDICATING indicating-phrase-1 [ALSO indicating-phrase-1]...] [ENCODING identifier-6|literal-3|FROM CODEPAGE] [NAME identifier-4 IS literal-1] [SUPPRESS identifier-5 [WHEN fig-con-1 [OR fig-con-1]]|SUPPRESS EVERY [NUMERIC|NONNUMERIC] WHEN fig-con-1 [OR fig-con-1]] [CONVERTING converting-phrase [ALSO converting-phrase]...] [ON EXCEPTION imperative-statement-1] [NOT ON EXCEPTION imperative-statement-2] [END-JSON]"
       ],
       "format_titles": [
         "Format"
@@ -3353,7 +3367,7 @@
     },
     {
       "catalog_forms": [
-        "JSON PARSE source INTO target [WITH DETAIL] [ON EXCEPTION statements] [END-JSON]"
+        "JSON PARSE identifier-1 INTO identifier-2 [WITH DETAIL] [IGNORING ignoring-phrase-1 [ALSO ignoring-phrase-1]...] [INDICATING indicating-phrase-1 [ALSO indicating-phrase-1]...] [ENCODING identifier-6|literal-4|FROM CODEPAGE] [NAME identifier-3 IS literal-1] [SUPPRESS identifier-4] [CONVERTING converting-phrase-1 [ALSO converting-phrase-1]...] [ON EXCEPTION imperative-statement-1] [NOT ON EXCEPTION imperative-statement-2] [END-JSON]"
       ],
       "format_titles": [
         "Format"
@@ -3743,7 +3757,7 @@
     },
     {
       "catalog_forms": [
-        "MERGE file ON keys USING files GIVING files"
+        "MERGE file-name-1 [ON] ASCENDING|DESCENDING [KEY] data-name-1... [COLLATING SEQUENCE IS alphabet-name-1] USING file-name-2 file-name-3... OUTPUT PROCEDURE IS procedure-name-1 [THROUGH|THRU procedure-name-2]|GIVING file-name-4..."
       ],
       "format_titles": [
         "Format"
@@ -3865,7 +3879,8 @@
     },
     {
       "catalog_forms": [
-        "MOVE [CORRESPONDING] source TO targets"
+        "MOVE identifier-1|literal-1 TO identifier-2...",
+        "MOVE CORRESPONDING|CORR identifier-1 TO identifier-2"
       ],
       "format_titles": [
         "Format 1: MOVE statement",
@@ -3941,7 +3956,8 @@
     },
     {
       "catalog_forms": [
-        "MULTIPLY operand BY target [GIVING target] [ROUNDED] [ON SIZE ERROR statements] [END-MULTIPLY]"
+        "MULTIPLY identifier-1|literal-1 BY identifier-2 [ROUNDED]... [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-MULTIPLY]",
+        "MULTIPLY identifier-1|literal-1 BY identifier-2|literal-2 GIVING identifier-3 [ROUNDED]... [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-MULTIPLY]"
       ],
       "format_titles": [
         "Format 1: MULTIPLY statement",
@@ -4116,7 +4132,9 @@
     },
     {
       "catalog_forms": [
-        "OPEN INPUT|OUTPUT|I-O|EXTEND file..."
+        "OPEN INPUT file-name-1 [REVERSED|WITH NO REWIND]|OUTPUT file-name-2 [WITH NO REWIND]|I-O file-name-3|EXTEND file-name-4 ...",
+        "OPEN INPUT file-name-1|OUTPUT file-name-2|I-O file-name-3|EXTEND file-name-4 ...",
+        "OPEN INPUT file-name-1|OUTPUT file-name-2|EXTEND file-name-4 ..."
       ],
       "format_titles": [
         "Format 1: OPEN statement for sequential files",
@@ -4296,8 +4314,10 @@
     },
     {
       "catalog_forms": [
-        "PERFORM procedure [THROUGH procedure] [TIMES|UNTIL|VARYING]",
-        "PERFORM [WITH TEST] UNTIL|VARYING statements END-PERFORM"
+        "PERFORM [procedure-name-1 [THROUGH|THRU procedure-name-2]] [statements END-PERFORM]",
+        "PERFORM [procedure-name-1 [THROUGH|THRU procedure-name-2]] identifier-1|integer-1 TIMES [statements END-PERFORM]",
+        "PERFORM [procedure-name-1 [THROUGH|THRU procedure-name-2]] [WITH TEST BEFORE|AFTER] UNTIL condition-1|EXIT [statements END-PERFORM]",
+        "PERFORM [procedure-name-1 [THROUGH|THRU procedure-name-2]] [WITH TEST BEFORE|AFTER] VARYING identifier-2|index-name-1 FROM identifier-3|index-name-2|literal-1 BY identifier-4|literal-2 UNTIL condition-1 [AFTER identifier-5|index-name-3 FROM identifier-6|index-name-4|literal-3 BY identifier-7|literal-4 UNTIL condition-2]... [statements END-PERFORM]"
       ],
       "format_titles": [
         "Format 1: Basic PERFORM statement",
@@ -4688,8 +4708,8 @@
     },
     {
       "catalog_forms": [
-        "READ file [NEXT|PREVIOUS RECORD] [INTO item] [WITH LOCK|WITH KEPT LOCK|WITH NO LOCK|IGNORE LOCK] [WAIT|NO WAIT] [AT END statements] [NOT AT END statements] [END-READ]",
-        "READ file [RECORD] [INTO item] [KEY IS data] [WITH LOCK|WITH KEPT LOCK|WITH NO LOCK|IGNORE LOCK] [WAIT|NO WAIT] [INVALID KEY statements] [NOT INVALID KEY statements] [END-READ]"
+        "READ file-name-1 [NEXT|PREVIOUS RECORD] [INTO identifier-1] [WITH LOCK|WITH KEPT LOCK|WITH NO LOCK|IGNORE LOCK] [WAIT|NO WAIT] [AT END imperative-statement-1] [NOT AT END imperative-statement-2] [END-READ]",
+        "READ file-name-1 [RECORD] [INTO identifier-1] [KEY IS data-name-1] [WITH LOCK|WITH KEPT LOCK|WITH NO LOCK|IGNORE LOCK] [WAIT|NO WAIT] [INVALID KEY imperative-statement-3] [NOT INVALID KEY imperative-statement-4] [END-READ]"
       ],
       "format_titles": [
         "Format 1: READ statement for sequential retrieval",
@@ -4860,7 +4880,7 @@
     },
     {
       "catalog_forms": [
-        "RELEASE record [FROM identifier]"
+        "RELEASE record-name-1 [FROM identifier-1]"
       ],
       "format_titles": [
         "Format: RELEASE"
@@ -4899,7 +4919,7 @@
     },
     {
       "catalog_forms": [
-        "RETURN sort-file RECORD [INTO item] [AT END statements] [END-RETURN]"
+        "RETURN file-name-1 [RECORD] [INTO identifier-1] [AT END imperative-statement-1] [NOT AT END imperative-statement-2] [END-RETURN]"
       ],
       "format_titles": [
         "Format: RETURN statement"
@@ -4983,7 +5003,7 @@
     },
     {
       "catalog_forms": [
-        "REWRITE record [FROM identifier] [INVALID KEY statements] [END-REWRITE]"
+        "REWRITE record-name-1 [FROM identifier-1] [INVALID KEY imperative-statement-1] [NOT INVALID KEY imperative-statement-2] [END-REWRITE]"
       ],
       "format_titles": [
         "Format: REWRITE statement"
@@ -5057,7 +5077,8 @@
     },
     {
       "catalog_forms": [
-        "SEARCH [ALL] table [VARYING index] [AT END statements] WHEN condition statements END-SEARCH"
+        "SEARCH identifier-1 [VARYING identifier-2|index-name-1] [AT END imperative-statement-1] WHEN condition-1 imperative-statement-2|NEXT SENTENCE ... [END-SEARCH]",
+        "SEARCH ALL identifier-1 [AT END imperative-statement-1] WHEN condition-name-1|data-name-1 [IS] EQUAL|= [TO] identifier-3|literal-1|arithmetic-expression-1 [AND condition-name-2|data-name-2 [IS] EQUAL|= [TO] identifier-4|literal-2|arithmetic-expression-2] ... [imperative-statement-2|NEXT SENTENCE] [END-SEARCH]"
       ],
       "format_titles": [
         "Format 1: SEARCH statement for serial search",
@@ -5280,7 +5301,13 @@
     },
     {
       "catalog_forms": [
-        "SET targets TO|UP BY|DOWN BY value"
+        "SET index-name-1|identifier-1... TO index-name-2|identifier-2|integer-1",
+        "SET index-name-3... UP BY|DOWN BY identifier-3|integer-2",
+        "SET mnemonic-name-1... TO ON ...",
+        "SET identifier-4... TO identifier-6",
+        "SET procedure-pointer-data-item-1|function-pointer-data-item-1... TO procedure-pointer-data-item-2|function-pointer-data-item-2|pointer-data-item-3|ENTRY identifier-8|identifier-9|literal-1",
+        "SET object-reference-id-1 TO object-reference-id-2",
+        "SET identifier-1 TO identifier-2|integer-1"
       ],
       "format_titles": [
         "Format 1: SET statement for basic table handling",
@@ -5621,7 +5648,8 @@
     },
     {
       "catalog_forms": [
-        "SORT file ON keys USING|INPUT PROCEDURE GIVING|OUTPUT PROCEDURE files"
+        "SORT file-name-1 [ON] ASCENDING|DESCENDING [KEY] data-name-1... [WITH DUPLICATES IN ORDER] [COLLATING SEQUENCE IS alphabet-name-1] USING file-name-2...|INPUT PROCEDURE IS procedure-name-1 [THROUGH|THRU procedure-name-2] GIVING file-name-3...|OUTPUT PROCEDURE IS procedure-name-3 [THROUGH|THRU procedure-name-4]",
+        "SORT data-name-2 [ON ASCENDING|DESCENDING KEY data-name-1...] [WITH DUPLICATES IN ORDER] [COLLATING SEQUENCE IS alphabet-name-1]"
       ],
       "format_titles": [
         "Format 1: SORT statement",
@@ -5871,7 +5899,7 @@
     },
     {
       "catalog_forms": [
-        "START file [KEY IS relation data] [INVALID KEY statements] [END-START]"
+        "START file-name-1 [KEY IS EQUAL TO|=|GREATER THAN|>|NOT LESS THAN|NOT <|GREATER THAN OR EQUAL TO|>=] [PARTIAL] [data-name-1] [INVALID KEY imperative-statement-1] [NOT INVALID KEY imperative-statement-2] [END-START]"
       ],
       "format_titles": [
         "Format"
@@ -6025,7 +6053,7 @@
     },
     {
       "catalog_forms": [
-        "STOP RUN [RETURNING value]"
+        "STOP RUN|literal [RETURNING value]"
       ],
       "format_titles": [
         "Format"
@@ -6059,7 +6087,7 @@
     },
     {
       "catalog_forms": [
-        "STRING senders DELIMITED BY values INTO target [WITH POINTER item] [ON OVERFLOW statements] [END-STRING]"
+        "STRING identifier-1|literal-1... DELIMITED BY identifier-2|literal-2|SIZE ... INTO identifier-3 [WITH POINTER identifier-4] [ON OVERFLOW imperative-statement-1] [NOT ON OVERFLOW imperative-statement-2] [END-STRING]"
       ],
       "format_titles": [
         "Format"
@@ -6179,7 +6207,9 @@
     },
     {
       "catalog_forms": [
-        "SUBTRACT operands FROM target [GIVING target] [ROUNDED] [ON SIZE ERROR statements] [END-SUBTRACT]"
+        "SUBTRACT identifier-1|literal-1... FROM identifier-2 [ROUNDED]... [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-SUBTRACT]",
+        "SUBTRACT identifier-1|literal-1... FROM identifier-2|literal-2 GIVING identifier-3 [ROUNDED]... [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-SUBTRACT]",
+        "SUBTRACT CORRESPONDING|CORR identifier-1 FROM identifier-2 [ROUNDED] [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-SUBTRACT]"
       ],
       "format_titles": [
         "Format 1: SUBTRACT statement",
@@ -6433,7 +6463,7 @@
     },
     {
       "catalog_forms": [
-        "UNSTRING source DELIMITED BY values INTO targets [WITH POINTER item] [TALLYING IN item] [ON OVERFLOW statements] [END-UNSTRING]"
+        "UNSTRING identifier-1 [DELIMITED BY [ALL] identifier-2|literal-1 [OR [ALL] identifier-3|literal-2 ...]] INTO identifier-4 [DELIMITER IN identifier-5] [COUNT IN identifier-6] ... [WITH POINTER identifier-7] [TALLYING IN identifier-8] [ON OVERFLOW imperative-statement-1] [NOT ON OVERFLOW imperative-statement-2] [END-UNSTRING]"
       ],
       "format_titles": [
         "Format"
@@ -6615,7 +6645,9 @@
     },
     {
       "catalog_forms": [
-        "WRITE record [FROM identifier] [AFTER|BEFORE ADVANCING] [AT END-OF-PAGE statements] [INVALID KEY statements] [END-WRITE]"
+        "WRITE record-name-1 [FROM identifier-1] [BEFORE|AFTER ADVANCING identifier-2|integer-1 LINE|LINES|mnemonic-name-1] [AT END-OF-PAGE|EOP imperative-statement-3] [NOT AT END-OF-PAGE|EOP imperative-statement-4] [END-WRITE]",
+        "WRITE record-name-1 [FROM identifier-1] [INVALID KEY imperative-statement-1] [NOT INVALID KEY imperative-statement-2] [END-WRITE]",
+        "WRITE record-name-1 [FROM identifier-1] [AFTER ADVANCING identifier-2|integer-1 LINE|LINES] [END-WRITE]"
       ],
       "format_titles": [
         "Format 1: WRITE statement for sequential files",
@@ -6922,7 +6954,7 @@
     },
     {
       "catalog_forms": [
-        "XML GENERATE receiver FROM source [COUNT IN item] [ON EXCEPTION statements] [END-XML]"
+        "XML GENERATE identifier-1 FROM identifier-2 [COUNT IN identifier-3] [WITH ENCODING codepage] [WITH XML-DECLARATION] [WITH ATTRIBUTES] [NAMESPACE IS identifier-4|literal-4 [NAMESPACE-PREFIX IS identifier-5|literal-5]] [NAME identifier-6 IS literal-6] [TYPE identifier-7 IS ATTRIBUTE|ELEMENT|CONTENT] [SUPPRESS identifier-8 [WHEN fig-con-1 [OR fig-con-1]]|SUPPRESS EVERY [NUMERIC|NONNUMERIC] [ATTRIBUTE|CONTENT|ELEMENT] WHEN fig-con-1 [OR fig-con-1]] [ON EXCEPTION imperative-statement-1] [NOT ON EXCEPTION imperative-statement-2] [END-XML]"
       ],
       "format_titles": [
         "Format"
@@ -7347,7 +7379,7 @@
     },
     {
       "catalog_forms": [
-        "XML PARSE source PROCESSING PROCEDURE procedure [THROUGH procedure] [ON EXCEPTION statements] [END-XML]"
+        "XML PARSE identifier-1 [WITH ENCODING codepage] [RETURNING NATIONAL] [VALIDATING WITH identifier-2|FILE xml-schema-name-1] PROCESSING PROCEDURE IS procedure-name-1 [THROUGH|THRU procedure-name-2] [ON EXCEPTION imperative-statement-1] [NOT ON EXCEPTION imperative-statement-2] [END-XML]"
       ],
       "format_titles": [
         "Format"

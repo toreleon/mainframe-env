@@ -11,24 +11,15 @@
       "catalog_form_count": 1,
       "catalog_keywords": [
         "ACCEPT",
-        "END-ACCEPT",
-        "EXCEPTION",
-        "FROM",
-        "NOT",
-        "ON"
+        "FROM"
       ],
       "catalog_placeholders": [
-        "identifier",
-        "source",
-        "statements"
+        "environment-name",
+        "identifier-1",
+        "mnemonic-name-1"
       ],
       "id": "accept",
-      "keywords_absent_from_source": [
-        "END-ACCEPT",
-        "EXCEPTION",
-        "NOT",
-        "ON"
-      ],
+      "keywords_absent_from_source": [],
       "keywords_missing_from_catalog": [
         "DATE",
         "DAY",
@@ -78,6 +69,7 @@
       "catalog_form_count": 3,
       "catalog_keywords": [
         "ADD",
+        "CORR",
         "CORRESPONDING",
         "END-ADD",
         "ERROR",
@@ -89,10 +81,12 @@
         "TO"
       ],
       "catalog_placeholders": [
-        "group",
-        "operands",
-        "statements",
-        "targets"
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "literal-1",
+        "literal-2",
+        "statements"
       ],
       "id": "add",
       "keywords_absent_from_source": [
@@ -100,7 +94,6 @@
         "SIZE"
       ],
       "keywords_missing_from_catalog": [
-        "CORR",
         "SIZE ERROR"
       ],
       "optionals": [
@@ -154,17 +147,18 @@
         "ALLOCATE",
         "CHARACTERS",
         "INITIALIZED",
+        "LOC",
         "RETURNING"
       ],
       "catalog_placeholders": [
-        "pointer",
-        "target"
+        "arithmetic-expression-1",
+        "data-name-1",
+        "data-name-2",
+        "integer-1"
       ],
       "id": "allocate",
       "keywords_absent_from_source": [],
-      "keywords_missing_from_catalog": [
-        "LOC"
-      ],
+      "keywords_missing_from_catalog": [],
       "optionals": [
         "INITIALIZED",
         "LOC",
@@ -203,7 +197,8 @@
         "TO"
       ],
       "catalog_placeholders": [
-        "procedure"
+        "procedure-name-1",
+        "procedure-name-2"
       ],
       "id": "alter",
       "keywords_absent_from_source": [
@@ -241,32 +236,42 @@
       ],
       "catalog_form_count": 1,
       "catalog_keywords": [
+        "BY",
         "CALL",
+        "CONTENT",
         "END-CALL",
         "EXCEPTION",
+        "NOT",
         "ON",
+        "OVERFLOW",
+        "REFERENCE",
         "RETURNING",
-        "USING"
+        "USING",
+        "VALUE"
       ],
       "catalog_placeholders": [
-        "arguments",
-        "item",
-        "statements",
-        "target"
+        "file-name-1",
+        "function-pointer-1",
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "imperative-statement-3",
+        "literal-1",
+        "literal-2",
+        "literal-3",
+        "procedure-pointer-1"
       ],
       "id": "call",
       "keywords_absent_from_source": [],
       "keywords_missing_from_catalog": [
         "ADDRESS OF",
         "AS FIXED LENGTH",
-        "BY",
-        "CONTENT",
         "LENGTH OF",
-        "NOT",
         "OMITTED",
-        "OVERFLOW",
-        "REFERENCE",
-        "VALUE",
         "fixed-phrase"
       ],
       "optionals": [
@@ -352,7 +357,8 @@
         "CANCEL"
       ],
       "catalog_placeholders": [
-        "target"
+        "identifier-1",
+        "literal-1"
       ],
       "id": "cancel",
       "keywords_absent_from_source": [],
@@ -376,7 +382,7 @@
     },
     {
       "alternatives": [],
-      "catalog_form_count": 2,
+      "catalog_form_count": 3,
       "catalog_keywords": [
         "CLOSE",
         "FOR",
@@ -389,7 +395,7 @@
         "WITH"
       ],
       "catalog_placeholders": [
-        "file-name"
+        "file-name-1"
       ],
       "id": "close",
       "keywords_absent_from_source": [
@@ -443,15 +449,17 @@
       "catalog_keywords": [
         "COMPUTE",
         "END-COMPUTE",
+        "EQUAL",
         "ERROR",
+        "NOT",
         "ON",
         "ROUNDED",
         "SIZE"
       ],
       "catalog_placeholders": [
-        "expression",
-        "statements",
-        "target"
+        "arithmetic-expression",
+        "identifier-1",
+        "statements"
       ],
       "id": "compute",
       "keywords_absent_from_source": [
@@ -459,8 +467,6 @@
         "SIZE"
       ],
       "keywords_missing_from_catalog": [
-        "EQUAL",
-        "NOT",
         "SIZE ERROR"
       ],
       "optionals": [
@@ -528,14 +534,18 @@
         "END-DELETE",
         "INVALID",
         "KEY",
+        "NOT",
         "RECORD"
       ],
       "catalog_placeholders": [
-        "file-name",
-        "statements"
+        "file-name-1",
+        "imperative-statement-1",
+        "imperative-statement-2"
       ],
       "id": "delete",
-      "keywords_absent_from_source": [],
+      "keywords_absent_from_source": [
+        "NOT"
+      ],
       "keywords_missing_from_catalog": [
         "NOT INVALID"
       ],
@@ -583,8 +593,10 @@
         "WITH"
       ],
       "catalog_placeholders": [
-        "operands",
-        "target"
+        "environment-name-1",
+        "identifier-1",
+        "literal-1",
+        "mnemonic-name-1"
       ],
       "id": "display",
       "keywords_absent_from_source": [
@@ -627,7 +639,7 @@
         "literal-1",
         "literal-2"
       ],
-      "catalog_form_count": 1,
+      "catalog_form_count": 5,
       "catalog_keywords": [
         "BY",
         "DIVIDE",
@@ -635,15 +647,20 @@
         "ERROR",
         "GIVING",
         "INTO",
+        "NOT",
         "ON",
         "REMAINDER",
         "ROUNDED",
         "SIZE"
       ],
       "catalog_placeholders": [
-        "operand",
-        "statements",
-        "target"
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "literal-1",
+        "literal-2",
+        "statements"
       ],
       "id": "divide",
       "keywords_absent_from_source": [
@@ -651,7 +668,6 @@
         "SIZE"
       ],
       "keywords_missing_from_catalog": [
-        "NOT",
         "SIZE ERROR"
       ],
       "optionals": [
@@ -702,20 +718,19 @@
       "alternatives": [],
       "catalog_form_count": 1,
       "catalog_keywords": [
+        "BY",
         "ENTRY",
-        "USING"
+        "REFERENCE",
+        "USING",
+        "VALUE"
       ],
       "catalog_placeholders": [
-        "arguments",
-        "literal"
+        "identifier-1",
+        "literal-1"
       ],
       "id": "entry",
       "keywords_absent_from_source": [],
-      "keywords_missing_from_catalog": [
-        "BY",
-        "REFERENCE",
-        "VALUE"
-      ],
+      "keywords_missing_from_catalog": [],
       "optionals": [
         "BY",
         "REFERENCE",
@@ -769,9 +784,14 @@
       ],
       "catalog_form_count": 1,
       "catalog_keywords": [
+        "ALSO",
+        "ANY",
         "END-EVALUATE",
         "EVALUATE",
+        "NOT",
         "OTHER",
+        "THROUGH",
+        "THRU",
         "WHEN"
       ],
       "catalog_placeholders": [
@@ -784,12 +804,7 @@
         "OTHER"
       ],
       "keywords_missing_from_catalog": [
-        "ALSO",
-        "ANY",
         "FALSE",
-        "NOT",
-        "THROUGH",
-        "THRU",
         "TRUE",
         "WHEN OTHER"
       ],
@@ -855,10 +870,10 @@
       "alternatives": [
         "SECTION"
       ],
-      "catalog_form_count": 1,
+      "catalog_form_count": 5,
       "catalog_keywords": [
+        "CYCLE",
         "EXIT",
-        "FUNCTION",
         "METHOD",
         "PARAGRAPH",
         "PERFORM",
@@ -868,13 +883,11 @@
       "catalog_placeholders": [],
       "id": "exit",
       "keywords_absent_from_source": [
-        "FUNCTION",
         "METHOD",
         "PERFORM",
         "PROGRAM"
       ],
       "keywords_missing_from_catalog": [
-        "CYCLE",
         "EXIT METHOD",
         "EXIT PERFORM",
         "EXIT PROGRAM"
@@ -914,7 +927,7 @@
         "FREE"
       ],
       "catalog_placeholders": [
-        "pointer"
+        "data-name-1"
       ],
       "id": "free",
       "keywords_absent_from_source": [],
@@ -959,7 +972,7 @@
     },
     {
       "alternatives": [],
-      "catalog_form_count": 1,
+      "catalog_form_count": 3,
       "catalog_keywords": [
         "DEPENDING",
         "GO",
@@ -967,8 +980,8 @@
         "TO"
       ],
       "catalog_placeholders": [
-        "identifier",
-        "procedure"
+        "identifier-1",
+        "procedure-name-1"
       ],
       "id": "go-to",
       "keywords_absent_from_source": [],
@@ -1007,17 +1020,23 @@
       "catalog_keywords": [
         "ELSE",
         "END-IF",
-        "IF"
+        "IF",
+        "NEXT",
+        "SENTENCE",
+        "THEN"
       ],
       "catalog_placeholders": [
-        "condition",
-        "statements"
+        "condition-1",
+        "statement-1",
+        "statement-2"
       ],
       "id": "if",
-      "keywords_absent_from_source": [],
+      "keywords_absent_from_source": [
+        "NEXT",
+        "SENTENCE"
+      ],
       "keywords_missing_from_catalog": [
-        "NEXT SENTENCE",
-        "THEN"
+        "NEXT SENTENCE"
       ],
       "optionals": [
         "ELSE",
@@ -1051,27 +1070,27 @@
       "alternatives": [],
       "catalog_form_count": 1,
       "catalog_keywords": [
+        "ALL",
         "BY",
+        "DATA",
         "DEFAULT",
         "FILLER",
         "INITIALIZE",
         "REPLACING",
         "THEN",
         "TO",
+        "VALUE",
         "WITH"
       ],
       "catalog_placeholders": [
-        "categories",
-        "targets",
-        "values"
+        "category-name",
+        "identifier-1",
+        "identifier-2",
+        "literal-1"
       ],
       "id": "initialize",
       "keywords_absent_from_source": [],
-      "keywords_missing_from_catalog": [
-        "ALL",
-        "DATA",
-        "VALUE"
-      ],
+      "keywords_missing_from_catalog": [],
       "optionals": [
         "ALL",
         "BY",
@@ -1131,31 +1150,41 @@
         "literal-5",
         "phrase 1"
       ],
-      "catalog_form_count": 1,
+      "catalog_form_count": 4,
       "catalog_keywords": [
-        "CONVERTING",
-        "INSPECT",
-        "REPLACING",
-        "TALLYING"
-      ],
-      "catalog_placeholders": [
-        "identifier",
-        "operands"
-      ],
-      "id": "inspect",
-      "keywords_absent_from_source": [],
-      "keywords_missing_from_catalog": [
         "AFTER",
         "ALL",
         "BEFORE",
         "BY",
         "CHARACTERS",
-        "CHARACTERS BY",
+        "CONVERTING",
         "FIRST",
         "FOR",
         "INITIAL",
+        "INSPECT",
         "LEADING",
+        "REPLACING",
+        "TALLYING",
         "TO"
+      ],
+      "catalog_placeholders": [
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "identifier-6",
+        "identifier-7",
+        "literal-1",
+        "literal-2",
+        "literal-3",
+        "literal-4",
+        "literal-5"
+      ],
+      "id": "inspect",
+      "keywords_absent_from_source": [],
+      "keywords_missing_from_catalog": [
+        "CHARACTERS BY"
       ],
       "optionals": [
         "AFTER",
@@ -1218,29 +1247,34 @@
       ],
       "catalog_form_count": 1,
       "catalog_keywords": [
+        "BY",
         "END-INVOKE",
+        "EXCEPTION",
         "INVOKE",
+        "NOT",
+        "ON",
         "RETURNING",
-        "USING"
+        "USING",
+        "VALUE"
       ],
       "catalog_placeholders": [
-        "arguments",
-        "item",
-        "method",
-        "target"
+        "class-name-1",
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "literal-1",
+        "literal-2"
       ],
       "id": "invoke",
       "keywords_absent_from_source": [],
       "keywords_missing_from_catalog": [
-        "BY",
-        "EXCEPTION",
         "LENGTH OF",
         "NEW",
-        "NOT",
-        "ON",
         "SELF",
-        "SUPER",
-        "VALUE"
+        "SUPER"
       ],
       "optionals": [
         "BY",
@@ -1311,56 +1345,70 @@
       ],
       "catalog_form_count": 1,
       "catalog_keywords": [
+        "ALSO",
+        "BYTES",
+        "CHARACTERS",
+        "CODEPAGE",
+        "CONVERTING",
         "COUNT",
+        "ENCODING",
         "END-JSON",
+        "EVERY",
         "EXCEPTION",
         "FROM",
         "GENERATE",
         "IN",
-        "JSON",
-        "ON"
-      ],
-      "catalog_placeholders": [
-        "item",
-        "receiver",
-        "source",
-        "statements"
-      ],
-      "id": "json-generate",
-      "keywords_absent_from_source": [
-        "GENERATE"
-      ],
-      "keywords_missing_from_catalog": [
-        "ALSO",
-        "BOOL",
-        "BOOLEAN",
-        "CHARACTERS",
-        "CONVERTING",
-        "COUNT BYTES",
-        "ENCODING",
-        "EVERY",
-        "FROM CODEPAGE",
-        "HIGH-VALUE",
-        "HIGH-VALUES",
         "INDICATING",
         "IS",
-        "JSON GENERATE",
-        "LOW-VALUE",
-        "LOW-VALUES",
+        "JSON",
         "NAME",
         "NONNUMERIC",
         "NOT",
-        "NULL",
         "NUMERIC",
+        "ON",
+        "OR",
+        "SUPPRESS",
+        "WHEN"
+      ],
+      "catalog_placeholders": [
+        "converting-phrase",
+        "fig-con-1",
+        "identifier-1",
+        "identifier-11",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "identifier-6",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "indicating-phrase-1",
+        "literal-1",
+        "literal-3"
+      ],
+      "id": "json-generate",
+      "keywords_absent_from_source": [
+        "BYTES",
+        "CODEPAGE",
+        "GENERATE"
+      ],
+      "keywords_missing_from_catalog": [
+        "BOOL",
+        "BOOLEAN",
+        "COUNT BYTES",
+        "FROM CODEPAGE",
+        "HIGH-VALUE",
+        "HIGH-VALUES",
+        "JSON GENERATE",
+        "LOW-VALUE",
+        "LOW-VALUES",
+        "NULL",
         "OF",
         "OMITTED",
-        "OR",
         "SPACE",
         "SPACES",
-        "SUPPRESS",
         "TO",
         "USING",
-        "WHEN",
         "ZERO",
         "ZEROES",
         "ZEROS"
@@ -1502,46 +1550,57 @@
       ],
       "catalog_form_count": 1,
       "catalog_keywords": [
+        "ALSO",
+        "CODEPAGE",
+        "CONVERTING",
         "DETAIL",
+        "ENCODING",
         "END-JSON",
         "EXCEPTION",
+        "FROM",
+        "IGNORING",
+        "INDICATING",
         "INTO",
+        "IS",
         "JSON",
+        "NAME",
+        "NOT",
         "ON",
         "PARSE",
+        "SUPPRESS",
         "WITH"
       ],
       "catalog_placeholders": [
-        "source",
-        "statements",
-        "target"
+        "converting-phrase-1",
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-6",
+        "ignoring-phrase-1",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "indicating-phrase-1",
+        "literal-1",
+        "literal-4"
       ],
       "id": "json-parse",
       "keywords_absent_from_source": [
+        "CODEPAGE",
         "PARSE"
       ],
       "keywords_missing_from_catalog": [
         "ALL",
-        "ALSO",
         "AND",
         "BOOL",
         "BOOLEAN",
-        "CONVERTING",
-        "ENCODING",
-        "FROM",
         "FROM CODEPAGE",
-        "IGNORING",
         "IN",
-        "INDICATING",
-        "IS",
         "JSON PARSE",
-        "NAME",
-        "NOT",
         "NULL",
         "NULL FOR",
         "OF",
         "OMITTED",
-        "SUPPRESS",
         "USING"
       ],
       "optionals": [
@@ -1652,28 +1711,38 @@
       ],
       "catalog_form_count": 1,
       "catalog_keywords": [
-        "GIVING",
-        "MERGE",
-        "ON",
-        "USING"
-      ],
-      "catalog_placeholders": [
-        "file",
-        "files",
-        "keys"
-      ],
-      "id": "merge",
-      "keywords_absent_from_source": [],
-      "keywords_missing_from_catalog": [
         "ASCENDING",
         "COLLATING",
         "DESCENDING",
+        "GIVING",
         "IS",
         "KEY",
-        "OUTPUT PROCEDURE",
+        "MERGE",
+        "ON",
+        "OUTPUT",
+        "PROCEDURE",
         "SEQUENCE",
         "THROUGH",
-        "THRU"
+        "THRU",
+        "USING"
+      ],
+      "catalog_placeholders": [
+        "alphabet-name-1",
+        "data-name-1",
+        "file-name-1",
+        "file-name-2",
+        "file-name-3",
+        "file-name-4",
+        "procedure-name-1",
+        "procedure-name-2"
+      ],
+      "id": "merge",
+      "keywords_absent_from_source": [
+        "OUTPUT",
+        "PROCEDURE"
+      ],
+      "keywords_missing_from_catalog": [
+        "OUTPUT PROCEDURE"
       ],
       "optionals": [
         "COLLATING",
@@ -1725,21 +1794,21 @@
         "CORR",
         "literal-1"
       ],
-      "catalog_form_count": 1,
+      "catalog_form_count": 2,
       "catalog_keywords": [
+        "CORR",
         "CORRESPONDING",
         "MOVE",
         "TO"
       ],
       "catalog_placeholders": [
-        "source",
-        "targets"
+        "identifier-1",
+        "identifier-2",
+        "literal-1"
       ],
       "id": "move",
       "keywords_absent_from_source": [],
-      "keywords_missing_from_catalog": [
-        "CORR"
-      ],
+      "keywords_missing_from_catalog": [],
       "optionals": [],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0026",
       "source_diagram_count": 2,
@@ -1767,21 +1836,25 @@
         "literal-1",
         "literal-2"
       ],
-      "catalog_form_count": 1,
+      "catalog_form_count": 2,
       "catalog_keywords": [
         "BY",
         "END-MULTIPLY",
         "ERROR",
         "GIVING",
         "MULTIPLY",
+        "NOT",
         "ON",
         "ROUNDED",
         "SIZE"
       ],
       "catalog_placeholders": [
-        "operand",
-        "statements",
-        "target"
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "literal-1",
+        "literal-2",
+        "statements"
       ],
       "id": "multiply",
       "keywords_absent_from_source": [
@@ -1789,7 +1862,6 @@
         "SIZE"
       ],
       "keywords_missing_from_catalog": [
-        "NOT",
         "SIZE ERROR"
       ],
       "optionals": [
@@ -1841,23 +1913,31 @@
         "file-name-3",
         "file-name-4"
       ],
-      "catalog_form_count": 1,
+      "catalog_form_count": 3,
       "catalog_keywords": [
         "EXTEND",
         "I-O",
         "INPUT",
+        "NO",
         "OPEN",
-        "OUTPUT"
+        "OUTPUT",
+        "REVERSED",
+        "REWIND",
+        "WITH"
       ],
       "catalog_placeholders": [
-        "file"
+        "file-name-1",
+        "file-name-2",
+        "file-name-3",
+        "file-name-4"
       ],
       "id": "open",
-      "keywords_absent_from_source": [],
+      "keywords_absent_from_source": [
+        "NO",
+        "REWIND"
+      ],
       "keywords_missing_from_catalog": [
-        "NO REWIND",
-        "REVERSED",
-        "WITH"
+        "NO REWIND"
       ],
       "optionals": [
         "NO REWIND",
@@ -1909,31 +1989,49 @@
         "literal-4",
         "phrase 1"
       ],
-      "catalog_form_count": 2,
+      "catalog_form_count": 4,
       "catalog_keywords": [
+        "AFTER",
+        "BEFORE",
+        "BY",
         "END-PERFORM",
+        "EXIT",
+        "FROM",
         "PERFORM",
         "TEST",
         "THROUGH",
+        "THRU",
         "TIMES",
         "UNTIL",
         "VARYING",
         "WITH"
       ],
       "catalog_placeholders": [
-        "procedure",
+        "condition-1",
+        "condition-2",
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "identifier-6",
+        "identifier-7",
+        "index-name-1",
+        "index-name-2",
+        "index-name-3",
+        "index-name-4",
+        "integer-1",
+        "literal-1",
+        "literal-2",
+        "literal-3",
+        "literal-4",
+        "procedure-name-1",
+        "procedure-name-2",
         "statements"
       ],
       "id": "perform",
       "keywords_absent_from_source": [],
-      "keywords_missing_from_catalog": [
-        "AFTER",
-        "BEFORE",
-        "BY",
-        "EXIT",
-        "FROM",
-        "THRU"
-      ],
+      "keywords_missing_from_catalog": [],
       "optionals": [
         "AFTER",
         "BEFORE",
@@ -2018,10 +2116,13 @@
         "WITH"
       ],
       "catalog_placeholders": [
-        "data",
-        "file",
-        "item",
-        "statements"
+        "data-name-1",
+        "file-name-1",
+        "identifier-1",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "imperative-statement-3",
+        "imperative-statement-4"
       ],
       "id": "read",
       "keywords_absent_from_source": [
@@ -2096,8 +2197,8 @@
         "RELEASE"
       ],
       "catalog_placeholders": [
-        "identifier",
-        "record"
+        "identifier-1",
+        "record-name-1"
       ],
       "id": "release",
       "keywords_absent_from_source": [],
@@ -2131,19 +2232,19 @@
         "END",
         "END-RETURN",
         "INTO",
+        "NOT",
         "RECORD",
         "RETURN"
       ],
       "catalog_placeholders": [
-        "item",
-        "sort-file",
-        "statements"
+        "file-name-1",
+        "identifier-1",
+        "imperative-statement-1",
+        "imperative-statement-2"
       ],
       "id": "return",
       "keywords_absent_from_source": [],
-      "keywords_missing_from_catalog": [
-        "NOT"
-      ],
+      "keywords_missing_from_catalog": [],
       "optionals": [
         "AT",
         "END",
@@ -2187,15 +2288,19 @@
         "FROM",
         "INVALID",
         "KEY",
+        "NOT",
         "REWRITE"
       ],
       "catalog_placeholders": [
-        "identifier",
-        "record",
-        "statements"
+        "identifier-1",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "record-name-1"
       ],
       "id": "rewrite",
-      "keywords_absent_from_source": [],
+      "keywords_absent_from_source": [
+        "NOT"
+      ],
       "keywords_missing_from_catalog": [
         "NOT INVALID"
       ],
@@ -2240,34 +2345,50 @@
         "condition-name-1",
         "literal-1"
       ],
-      "catalog_form_count": 1,
+      "catalog_form_count": 2,
       "catalog_keywords": [
         "ALL",
+        "AND",
         "AT",
         "END",
         "END-SEARCH",
+        "EQUAL",
+        "IS",
+        "NEXT",
         "SEARCH",
+        "SENTENCE",
+        "TO",
         "VARYING",
         "WHEN"
       ],
       "catalog_placeholders": [
-        "condition",
-        "index",
-        "statements",
-        "table"
+        "arithmetic-expression-1",
+        "arithmetic-expression-2",
+        "condition-1",
+        "condition-name-1",
+        "condition-name-2",
+        "data-name-1",
+        "data-name-2",
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "index-name-1",
+        "literal-1",
+        "literal-2"
       ],
       "id": "search",
       "keywords_absent_from_source": [
-        "ALL"
+        "ALL",
+        "NEXT",
+        "SENTENCE"
       ],
       "keywords_missing_from_catalog": [
         "=",
-        "AND",
-        "EQUAL",
-        "IS",
         "NEXT SENTENCE",
-        "SEARCH ALL",
-        "TO"
+        "SEARCH ALL"
       ],
       "optionals": [
         "=",
@@ -2354,17 +2475,38 @@
         "literal-1",
         "pointer-data-item-3"
       ],
-      "catalog_form_count": 1,
+      "catalog_form_count": 7,
       "catalog_keywords": [
         "BY",
         "DOWN",
+        "ENTRY",
+        "ON",
         "SET",
         "TO",
         "UP"
       ],
       "catalog_placeholders": [
-        "targets",
-        "value"
+        "function-pointer-data-item-1",
+        "function-pointer-data-item-2",
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-6",
+        "identifier-8",
+        "identifier-9",
+        "index-name-1",
+        "index-name-2",
+        "index-name-3",
+        "integer-1",
+        "integer-2",
+        "literal-1",
+        "mnemonic-name-1",
+        "object-reference-id-1",
+        "object-reference-id-2",
+        "pointer-data-item-3",
+        "procedure-pointer-data-item-1",
+        "procedure-pointer-data-item-2"
       ],
       "id": "set",
       "keywords_absent_from_source": [
@@ -2375,13 +2517,11 @@
       "keywords_missing_from_catalog": [
         "ADDRESS OF",
         "DOWN BY",
-        "ENTRY",
         "FALSE",
         "LENGTH OF",
         "NULL",
         "NULLS",
         "OFF",
-        "ON",
         "SELF",
         "TRUE",
         "UP BY"
@@ -2458,20 +2598,39 @@
         "procedure-name-3",
         "procedure-name-4"
       ],
-      "catalog_form_count": 1,
+      "catalog_form_count": 2,
       "catalog_keywords": [
+        "ASCENDING",
+        "COLLATING",
+        "DESCENDING",
+        "DUPLICATES",
         "GIVING",
+        "IN",
         "INPUT",
+        "IS",
+        "KEY",
         "ON",
+        "ORDER",
         "OUTPUT",
         "PROCEDURE",
+        "SEQUENCE",
         "SORT",
-        "USING"
+        "THROUGH",
+        "THRU",
+        "USING",
+        "WITH"
       ],
       "catalog_placeholders": [
-        "file",
-        "files",
-        "keys"
+        "alphabet-name-1",
+        "data-name-1",
+        "data-name-2",
+        "file-name-1",
+        "file-name-2",
+        "file-name-3",
+        "procedure-name-1",
+        "procedure-name-2",
+        "procedure-name-3",
+        "procedure-name-4"
       ],
       "id": "sort",
       "keywords_absent_from_source": [
@@ -2480,20 +2639,8 @@
         "PROCEDURE"
       ],
       "keywords_missing_from_catalog": [
-        "ASCENDING",
-        "COLLATING",
-        "DESCENDING",
-        "DUPLICATES",
-        "IN",
         "INPUT PROCEDURE",
-        "IS",
-        "KEY",
-        "ORDER",
-        "OUTPUT PROCEDURE",
-        "SEQUENCE",
-        "THROUGH",
-        "THRU",
-        "WITH"
+        "OUTPUT PROCEDURE"
       ],
       "optionals": [
         "ASCENDING",
@@ -2557,32 +2704,39 @@
       "catalog_form_count": 1,
       "catalog_keywords": [
         "END-START",
+        "EQUAL",
+        "GREATER",
         "INVALID",
         "IS",
         "KEY",
-        "START"
+        "LESS",
+        "NOT",
+        "OR",
+        "PARTIAL",
+        "START",
+        "THAN",
+        "TO"
       ],
       "catalog_placeholders": [
-        "data",
-        "file",
-        "relation",
-        "statements"
+        "data-name-1",
+        "file-name-1",
+        "imperative-statement-1",
+        "imperative-statement-2"
       ],
       "id": "start",
-      "keywords_absent_from_source": [],
+      "keywords_absent_from_source": [
+        "LESS",
+        "NOT",
+        "OR"
+      ],
       "keywords_missing_from_catalog": [
         "=",
         ">",
         ">=",
-        "EQUAL",
-        "GREATER",
         "NOT <",
         "NOT INVALID",
         "NOT LESS",
-        "OR EQUAL",
-        "PARTIAL",
-        "THAN",
-        "TO"
+        "OR EQUAL"
       ],
       "optionals": [
         "=",
@@ -2650,6 +2804,7 @@
         "STOP"
       ],
       "catalog_placeholders": [
+        "literal",
         "value"
       ],
       "id": "stop",
@@ -2686,25 +2841,27 @@
         "DELIMITED",
         "END-STRING",
         "INTO",
+        "NOT",
         "ON",
         "OVERFLOW",
         "POINTER",
+        "SIZE",
         "STRING",
         "WITH"
       ],
       "catalog_placeholders": [
-        "item",
-        "senders",
-        "statements",
-        "target",
-        "values"
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "literal-1",
+        "literal-2"
       ],
       "id": "string",
       "keywords_absent_from_source": [],
-      "keywords_missing_from_catalog": [
-        "NOT",
-        "SIZE"
-      ],
+      "keywords_missing_from_catalog": [],
       "optionals": [
         "BY",
         "END-STRING",
@@ -2755,21 +2912,27 @@
         "literal-1",
         "literal-2"
       ],
-      "catalog_form_count": 1,
+      "catalog_form_count": 3,
       "catalog_keywords": [
+        "CORR",
+        "CORRESPONDING",
         "END-SUBTRACT",
         "ERROR",
         "FROM",
         "GIVING",
+        "NOT",
         "ON",
         "ROUNDED",
         "SIZE",
         "SUBTRACT"
       ],
       "catalog_placeholders": [
-        "operands",
-        "statements",
-        "target"
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "literal-1",
+        "literal-2",
+        "statements"
       ],
       "id": "subtract",
       "keywords_absent_from_source": [
@@ -2777,9 +2940,6 @@
         "SIZE"
       ],
       "keywords_missing_from_catalog": [
-        "CORR",
-        "CORRESPONDING",
-        "NOT",
         "SIZE ERROR"
       ],
       "optionals": [
@@ -2827,12 +2987,17 @@
       "alternatives": [],
       "catalog_form_count": 1,
       "catalog_keywords": [
+        "ALL",
         "BY",
+        "COUNT",
         "DELIMITED",
+        "DELIMITER",
         "END-UNSTRING",
         "IN",
         "INTO",
+        "NOT",
         "ON",
+        "OR",
         "OVERFLOW",
         "POINTER",
         "TALLYING",
@@ -2840,21 +3005,22 @@
         "WITH"
       ],
       "catalog_placeholders": [
-        "item",
-        "source",
-        "statements",
-        "targets",
-        "values"
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "identifier-6",
+        "identifier-7",
+        "identifier-8",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "literal-1",
+        "literal-2"
       ],
       "id": "unstring",
       "keywords_absent_from_source": [],
-      "keywords_missing_from_catalog": [
-        "ALL",
-        "COUNT",
-        "DELIMITER",
-        "NOT",
-        "OR"
-      ],
+      "keywords_missing_from_catalog": [],
       "optionals": [
         "ALL",
         "BY",
@@ -2927,7 +3093,7 @@
         "invalid_key",
         "not_invalid_key"
       ],
-      "catalog_form_count": 1,
+      "catalog_form_count": 3,
       "catalog_keywords": [
         "ADVANCING",
         "AFTER",
@@ -2935,23 +3101,29 @@
         "BEFORE",
         "END-OF-PAGE",
         "END-WRITE",
+        "EOP",
         "FROM",
         "INVALID",
         "KEY",
+        "LINE",
+        "LINES",
+        "NOT",
         "WRITE"
       ],
       "catalog_placeholders": [
-        "identifier",
-        "record",
-        "statements"
+        "identifier-1",
+        "identifier-2",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "imperative-statement-3",
+        "imperative-statement-4",
+        "integer-1",
+        "mnemonic-name-1",
+        "record-name-1"
       ],
       "id": "write",
       "keywords_absent_from_source": [],
       "keywords_missing_from_catalog": [
-        "EOP",
-        "LINE",
-        "LINES",
-        "NOT",
         "NOT INVALID",
         "PAGE"
       ],
@@ -3033,20 +3205,50 @@
       ],
       "catalog_form_count": 1,
       "catalog_keywords": [
+        "ATTRIBUTE",
+        "ATTRIBUTES",
+        "CONTENT",
         "COUNT",
+        "ELEMENT",
+        "ENCODING",
         "END-XML",
+        "EVERY",
         "EXCEPTION",
         "FROM",
         "GENERATE",
         "IN",
+        "IS",
+        "NAME",
+        "NAMESPACE",
+        "NAMESPACE-PREFIX",
+        "NONNUMERIC",
+        "NOT",
+        "NUMERIC",
         "ON",
-        "XML"
+        "OR",
+        "SUPPRESS",
+        "TYPE",
+        "WHEN",
+        "WITH",
+        "XML",
+        "XML-DECLARATION"
       ],
       "catalog_placeholders": [
-        "item",
-        "receiver",
-        "source",
-        "statements"
+        "codepage",
+        "fig-con-1",
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "identifier-6",
+        "identifier-7",
+        "identifier-8",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "literal-4",
+        "literal-5",
+        "literal-6"
       ],
       "id": "xml-generate",
       "keywords_absent_from_source": [
@@ -3054,33 +3256,14 @@
         "XML"
       ],
       "keywords_missing_from_catalog": [
-        "ATTRIBUTE",
-        "ATTRIBUTES",
-        "CONTENT",
-        "ELEMENT",
-        "ENCODING",
-        "EVERY",
         "HIGH-VALUE",
         "HIGH-VALUES",
-        "IS",
         "LOW-VALUE",
         "LOW-VALUES",
-        "NAME",
-        "NAMESPACE",
-        "NAMESPACE-PREFIX",
-        "NONNUMERIC",
-        "NOT",
-        "NUMERIC",
         "OF",
-        "OR",
         "SPACE",
         "SPACES",
-        "SUPPRESS",
-        "TYPE",
-        "WHEN",
-        "WITH",
         "XML GENERATE",
-        "XML-DECLARATION",
         "ZERO",
         "ZEROES",
         "ZEROS"
@@ -3203,37 +3386,46 @@
       "alternatives": [],
       "catalog_form_count": 1,
       "catalog_keywords": [
+        "ENCODING",
         "END-XML",
         "EXCEPTION",
+        "FILE",
+        "IS",
+        "NATIONAL",
+        "NOT",
         "ON",
         "PARSE",
         "PROCEDURE",
         "PROCESSING",
+        "RETURNING",
         "THROUGH",
-        "XML"
-      ],
-      "catalog_placeholders": [
-        "procedure",
-        "source",
-        "statements"
-      ],
-      "id": "xml-parse",
-      "keywords_absent_from_source": [
-        "PARSE",
-        "PROCEDURE",
-        "PROCESSING",
-        "XML"
-      ],
-      "keywords_missing_from_catalog": [
-        "ENCODING",
-        "FILE",
-        "IS",
-        "NOT",
-        "PROCESSING PROCEDURE",
-        "RETURNING NATIONAL",
         "THRU",
         "VALIDATING",
         "WITH",
+        "XML"
+      ],
+      "catalog_placeholders": [
+        "codepage",
+        "identifier-1",
+        "identifier-2",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "procedure-name-1",
+        "procedure-name-2",
+        "xml-schema-name-1"
+      ],
+      "id": "xml-parse",
+      "keywords_absent_from_source": [
+        "NATIONAL",
+        "PARSE",
+        "PROCEDURE",
+        "PROCESSING",
+        "RETURNING",
+        "XML"
+      ],
+      "keywords_missing_from_catalog": [
+        "PROCESSING PROCEDURE",
+        "RETURNING NATIONAL",
         "XML PARSE"
       ],
       "optionals": [
@@ -3299,13 +3491,13 @@
     "topics": 139
   },
   "totals": {
-    "catalog_forms": 49,
-    "distinct_catalog_placeholders": 33,
-    "distinct_keywords_missing": 137,
+    "catalog_forms": 81,
+    "distinct_catalog_placeholders": 73,
+    "distinct_keywords_missing": 69,
     "distinct_source_operands": 80,
     "rows": 44,
-    "rows_with_missing_keywords": 37,
-    "rows_with_more_source_formats": 15,
+    "rows_with_missing_keywords": 29,
+    "rows_with_more_source_formats": 2,
     "source_diagrams": 95,
     "source_format_titles": 83,
     "source_formats": 83,
