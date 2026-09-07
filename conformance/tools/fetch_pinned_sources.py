@@ -13,15 +13,35 @@ A pin is a whole book, not one file: the recorded digest is
 `topic_manifest_digest`, taken over every topic's own sha256. So a mismatch is
 localised rather than total, and the report says which topics moved.
 
-A mismatch is a REVIEW DECISION, not a failure to repair here. Three causes look
-identical from a digest alone and are separated by what else the report records:
+A mismatch is a REVIEW DECISION, not a failure to repair here, and the first
+question about one is whether the origin even served us the book it publishes. A
+fourth cause turned out to dominate the other three:
 
-  IBM edited the topic       the served `Last Updated` date moves
-  IBM changed the endpoint   the date holds and the bytes move
-  we changed what we ask for the URL template differs from the pinned one
+  the origin served an older build   the served `Last Updated` date moves BACK
+  IBM edited the topic               the date moves FORWARD
+  IBM changed the endpoint           the date holds and the bytes move
+  we changed what we ask for         the URL template differs from the pinned one
+
+Only the first is cheap and common, and it is the one a digest alone cannot tell
+from the others. Db2 is the case: four full re-reads of its 832 topics called 1,
+7, 1 and 6 topics changed and never named the same topic twice, every changed
+body was smaller than its pin, and every one carried an EARLIER date than the
+pin — 2026-01-07 or 2026-05-12 where 2026-09-03 is pinned. Publication moves that
+date forward, so an older stamp arriving where a newer one is pinned is an older
+build being served.
+
+So a mismatch is read twice before it is recorded. A re-read that reproduces the
+pin settles it outright; otherwise the dates decide, and `stale-read` is a
+verdict of its own that does NOT fail the run. `republished` does, because it is
+the case a reviewer must look at, and so does an equal date over different bytes,
+which is the one nothing here explains. A book that reports a red nobody can act
+on trains its readers to skip it, and this is the one baseline of the nine with
+832 chances per run to do that.
 
 Nothing may re-derive a pin: CI can only re-verify a recorded one, because a
-tool that repins on mismatch cannot tell drift from republication.
+tool that repins on mismatch cannot tell drift from republication. `stale-read`
+is emphatically not permission to repin — it says the origin is unreliable, not
+that the pin is.
 
 An unreachable endpoint is reported as `skipped`, never as a mismatch.
 
@@ -45,6 +65,15 @@ import docs_api
 REPOSITORY = Path(__file__).resolve().parents[2]
 INDEX = Path("conformance/0.2/catalogs/index.json")
 DEFAULT_CACHE = Path(tempfile.gettempdir()) / "cobolgrammar" / "topic-cache"
+
+STALE_READ = "stale-read"
+REPUBLISHED = "republished"
+SAME_DATE = "same-date-different-bytes"
+UNDATED = "undated-difference"
+
+#: The resolutions that a reviewer has to act on, and so the ones that fail a
+#: run. Everything not named here is reported and does not set the exit status.
+UNEXPLAINED = (REPUBLISHED, SAME_DATE, UNDATED)
 
 
 def outside_repository(path: Path) -> Path:
@@ -87,6 +116,71 @@ def self_consistency(manifest: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def resolve(
+    record: dict[str, Any], again: bytes | Exception | None
+) -> dict[str, Any]:
+    """Decide what a per-topic mismatch means, given a second read of it.
+
+    Reading twice is not belt and braces: it is the only evidence that separates
+    a body the origin served once from a body the publication now carries. When
+    the second read reproduces the pin, the first read was the anomaly and there
+    is nothing about the pin to review.
+
+    When it does not, the dates decide, and they are read from the SECOND read
+    where there is one, because that is the more recent measurement. Both are
+    recorded either way, so a reviewer can see whether the two reads agreed.
+    """
+    served = record["last_modified"]
+    if isinstance(again, (bytes, bytearray)):
+        text = bytes(again).decode("utf-8", "replace")
+        record["reread"] = {
+            "sha256": docs_api.digest(again),
+            "bytes": len(again),
+            "last_modified": docs_api.last_modified_of(text),
+        }
+        if (
+            record["reread"]["sha256"] == record["pinned_sha256"]
+            and record["reread"]["bytes"] == record["pinned_bytes"]
+        ):
+            record["resolution"] = STALE_READ
+            record["resolved_by"] = "the re-read reproduces the pin"
+            return record
+        served = record["reread"]["last_modified"]
+    elif again is not None:
+        record["reread"] = {"reason": getattr(again, "reason", "http-404")}
+
+    stands = docs_api.compare_dates(record["pinned_last_modified"], served)
+    record["resolution"], record["resolved_by"] = {
+        "older": (STALE_READ, "the served build is older than the pinned one"),
+        "newer": (REPUBLISHED, "the topic has been republished since it was pinned"),
+        "same": (SAME_DATE, "the same date over different bytes"),
+        "undated": (UNDATED, "no pair of dates to compare"),
+    }[stands]
+    return record
+
+
+def reread(path: str, template: str) -> bytes | Exception:
+    """Read one topic again, past any cache, to test a mismatch before recording it.
+
+    Deliberately uncached and deliberately uncapped: the cache is what the first
+    read may have come from, and a run with many mismatches is exactly the run
+    whose mismatches most need a second opinion. It costs one extra request per
+    changed topic and none at all for a book that matches.
+    """
+    try:
+        return docs_api.topic(path, template, None)
+    except (docs_api.NotFound, docs_api.Unreachable) as error:
+        return error
+
+
+def reread_url(url: str) -> bytes | Exception:
+    """The same second opinion for a supporting source, which is cited by URL."""
+    try:
+        return docs_api.fetch(url)
+    except (docs_api.NotFound, docs_api.Unreachable) as error:
+        return error
+
+
 def verify_topics(
     manifest: dict[str, Any], cache: Path | None, sample: int | None, workers: int
 ) -> dict[str, Any]:
@@ -111,38 +205,55 @@ def verify_topics(
             unreachable.append({"topic_path": path, "reason": getattr(data, "reason", "error")})
             continue
         served = docs_api.digest(data)
+        # The first read is what goes into the digest, even when a re-read
+        # reproduces the pin. `matches_pin` then says what this run actually
+        # retrieved, and the resolution beside it says what that meant.
         live.append({"topic_path": path, "sha256": served})
         if served != entry["sha256"] or len(data) != entry["bytes"]:
-            changed.append(
-                {
-                    "topic_path": path,
-                    "pinned_sha256": entry["sha256"],
-                    "sha256": served,
-                    "pinned_bytes": entry["bytes"],
-                    "bytes": len(data),
-                    "pinned_last_modified": entry.get("last_modified"),
-                    "last_modified": docs_api.last_modified_of(
-                        data.decode("utf-8", "replace")
-                    ),
-                }
-            )
+            record = {
+                "topic_path": path,
+                "pinned_sha256": entry["sha256"],
+                "sha256": served,
+                "pinned_bytes": entry["bytes"],
+                "bytes": len(data),
+                "pinned_last_modified": entry.get("last_modified"),
+                "last_modified": docs_api.last_modified_of(
+                    data.decode("utf-8", "replace")
+                ),
+            }
+            changed.append(resolve(record, reread(path, template)))
+
+    resolutions: dict[str, int] = {}
+    for record in changed:
+        resolutions[record["resolution"]] = resolutions.get(record["resolution"], 0) + 1
+    unexplained = sum(resolutions.get(name, 0) for name in UNEXPLAINED)
 
     state: dict[str, Any] = {
         "topics_pinned": len(entries),
         "topics_checked": len(live),
         "topics_changed": len(changed),
+        "topics_stale_read": resolutions.get(STALE_READ, 0),
+        "topics_unexplained": unexplained,
         "topics_unreachable": len(unreachable),
+        "resolutions": resolutions,
         "changed": changed,
         "unreachable": unreachable,
     }
     if sample is None and not unreachable:
         state["manifest_digest"] = docs_api.manifest_digest(live)
         state["matches_pin"] = state["manifest_digest"] == manifest["topic_manifest_digest"]
-        state["status"] = "match" if state["matches_pin"] else "differs"
+        if state["matches_pin"]:
+            state["status"] = "match"
+        elif unexplained or not changed:
+            # A digest that moved with no topic reporting a mismatch is the
+            # manifest disagreeing with itself, not the origin being slow.
+            state["status"] = "differs"
+        else:
+            state["status"] = STALE_READ
     elif unreachable and not changed:
         state["status"] = "skipped"
     elif changed:
-        state["status"] = "differs"
+        state["status"] = "differs" if unexplained else STALE_READ
     else:
         state["status"] = "sampled"
     return state
@@ -169,11 +280,30 @@ def verify_supporting(source: dict[str, Any], cache: Path | None) -> dict[str, A
     entry["sha256"] = "sha256:" + docs_api.digest(data)
     entry["bytes"] = len(data)
     entry["last_modified"] = docs_api.last_modified_of(data.decode("utf-8", "replace"))
-    entry["status"] = (
-        "match"
-        if entry["sha256"] == source["sha256"] and entry["bytes"] == source["bytes"]
-        else "differs"
+    if entry["sha256"] == source["sha256"] and entry["bytes"] == source["bytes"]:
+        entry["status"] = "match"
+        return entry
+    # Read twice and classify exactly as a manifest topic is. A supporting
+    # source is served by the same origin and can go stale the same way, and one
+    # topic reading `differs` fails its whole baseline. The index records no
+    # `last_modified` for this pin, only the date it was captured, so the date
+    # arm cannot fire and anything a second read does not settle still reads
+    # `undated-difference` and still fails — which is where it was before.
+    record = resolve(
+        {
+            "pinned_sha256": source["sha256"].removeprefix("sha256:"),
+            "sha256": entry["sha256"].removeprefix("sha256:"),
+            "pinned_bytes": source["bytes"],
+            "bytes": entry["bytes"],
+            "pinned_last_modified": source.get("last_modified"),
+            "last_modified": entry["last_modified"],
+        },
+        reread_url(source["url"]),
     )
+    entry["resolution"] = record["resolution"]
+    entry["resolved_by"] = record["resolved_by"]
+    entry["reread"] = record.get("reread")
+    entry["status"] = "differs" if record["resolution"] in UNEXPLAINED else STALE_READ
     return entry
 
 
@@ -220,7 +350,14 @@ def verify_baseline(
         or not entry["index_agrees_with_manifest"]
         or any(s["status"] == "differs" for s in supporting)
     )
-    entry["status"] = "differs" if disagrees else entry["topics"]["status"]
+    if disagrees:
+        entry["status"] = "differs"
+    elif entry["topics"]["status"] == "match" and any(
+        s["status"] == STALE_READ for s in supporting
+    ):
+        entry["status"] = STALE_READ
+    else:
+        entry["status"] = entry["topics"]["status"]
     return entry
 
 
@@ -263,9 +400,11 @@ def main(argv: Iterable[str] | None = None) -> int:
         # 4,488 topics takes the better part of an hour, and a run that says
         # nothing until it is over cannot be watched.
         print(
-            f"{entry['subsystem']:18} {entry['status']:8} "
+            f"{entry['subsystem']:18} {entry['status']:10} "
             f"topics={topics['topics_checked']}/{topics['topics_pinned']:>5} "
             f"changed={topics['topics_changed']:>4} "
+            f"stale={topics['topics_stale_read']:>4} "
+            f"unexplained={topics['topics_unexplained']:>4} "
             f"unreachable={topics['topics_unreachable']:>4} "
             f"toc={entry.get('toc_matches_pin')}",
             flush=True,
@@ -275,7 +414,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     report_path.write_text(
         json.dumps(
             {
-                "schema_version": "mainframe-env.pinned-source-retrieval@2",
+                "schema_version": "mainframe-env.pinned-source-retrieval@3",
                 "coverage_credit": 0,
                 "retained_in_repository": False,
                 "sources": results,
@@ -286,13 +425,18 @@ def main(argv: Iterable[str] | None = None) -> int:
         + "\n",
         encoding="utf-8",
     )
-    counts = {status: 0 for status in ("match", "differs", "skipped", "sampled")}
+    counts = {
+        status: 0 for status in ("match", "differs", STALE_READ, "skipped", "sampled")
+    }
     for entry in results:
         counts[entry["status"]] += 1
     print(
         f"pins={len(results)} matched={counts['match']} differs={counts['differs']} "
-        f"skipped={counts['skipped']} sampled={counts['sampled']} report={report_path}"
+        f"stale-read={counts[STALE_READ]} skipped={counts['skipped']} "
+        f"sampled={counts['sampled']} report={report_path}"
     )
+    # Only `differs` fails. A stale read is a fact about the origin, and a run
+    # that exits non-zero on it is a run whose red says nothing.
     return 1 if counts["differs"] else 0
 
 

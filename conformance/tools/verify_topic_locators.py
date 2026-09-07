@@ -23,9 +23,14 @@ Three things are compared, and all three have to agree for a row to read
              statement`, so requiring the heading alone would fail 158 rows that
              are correct
 
-A locator may carry a fourth `table:` component. The 20 JCL statement rows cite
-one row of a table inside a shared topic rather than a topic of their own, so
-for those the heading is looked for in that table's cells.
+A locator may carry a fourth `table:` component and a fifth `row:`. The 20 JCL
+statement rows cite one row of a table inside a shared topic rather than a topic
+of their own, and for those the heading is checked against THAT row's cells and
+no others. Scanning the whole table would accept any of the 20 labels for any of
+the 20 rows, which is to say it would check that the table still lists the
+statement and call it a check that the row cites the right one. When a table is
+cited the table decides: the served heading and the tree label are the topic's,
+and the topic is shared by all 20.
 
 Rows located some other way (`html-table:`, `html-link:`,
 `roadmap-normalization:`) are reported as skipped with a reason rather than
@@ -93,11 +98,54 @@ def tail_index(nodes: dict[str, list[dict[str, Any]]]) -> dict[str, list[str]]:
     return found
 
 
+def table_verdict(
+    heading: str, table: str, ordinal: str | None, body: str
+) -> tuple[bool, str, dict[str, Any]]:
+    """Whether the CITED row of the cited table names the reviewed heading.
+
+    The ordinal is what makes this a check of the row rather than of the table.
+    Without it the 20 JCL statement rows are all interchangeable: each names a
+    label the table carries somewhere, so any permutation of them passes. So a
+    `table:` with no `row:` is not resolved at all — it reads `table-row-uncited`
+    and fails, because a citation this tool cannot check should not read as one
+    it checked.
+
+    A row ordinal past the end of the table is `table-row-absent`, which is drift
+    in the publication rather than in the locator, and is reported separately for
+    that reason. A row that resolves but names something else carries the cells
+    it does name, and, when the label turns up in some other row, that row's
+    ordinal — the shape a swapped pair makes.
+    """
+    detail: dict[str, Any] = {"table": table}
+    if ordinal is None:
+        return False, "table-row-uncited", detail
+    if not ordinal.isdigit() or int(ordinal) < 1:
+        return False, "table-row-malformed", {**detail, "row": ordinal}
+    wanted = int(ordinal)
+    detail["row"] = wanted
+    rows = docs_api.table_rows(body, table)
+    if rows is None:
+        return False, "table-absent", detail
+    if wanted > len(rows):
+        return False, "table-row-absent", {**detail, "table_body_rows": len(rows)}
+    cited = rows[wanted - 1]
+    if docs_api.heading_in_cells(heading, cited):
+        return True, "table-row", detail
+    detail["row_cells"] = cited
+    elsewhere = [
+        i + 1 for i, cells in enumerate(rows) if docs_api.heading_in_cells(heading, cells)
+    ]
+    if elsewhere:
+        detail["heading_found_in_rows"] = elsewhere
+    return False, "table-row", detail
+
+
 def heading_verdict(
     heading: str,
     served: str | None,
     labels: list[str],
     table: str | None,
+    ordinal: str | None,
     body: str,
 ) -> tuple[bool, str, dict[str, Any]]:
     """Whether the reviewed heading is the one the publication serves.
@@ -110,12 +158,18 @@ def heading_verdict(
                                or drops a trailing word the tree does not carry
       *-without-chapter-number the same, after dropping a printed-book chapter
                                number the topic tree has no equivalent for
-      table-cell               the row cites one row of a table in a shared
-                               topic, so the label lives in a cell
+      table-row                the row cites one row of a table in a shared
+                               topic, so the label lives in a cell of that row
+
+    A cited table is decided by the table alone and never falls back to the
+    heading or the label, both of which belong to the shared topic and would
+    hand every row of the table the same answer.
     """
     wanted = docs_api.normalize(heading)
     if not wanted:
         return False, "no-heading", {"served_heading": served}
+    if table:
+        return table_verdict(wanted, table, ordinal, body)
     bare = docs_api.without_chapter_number(heading)
     candidates = [("h1", served)] + [("toc-label", label) for label in labels if label]
     for how, candidate in candidates:
@@ -125,15 +179,6 @@ def heading_verdict(
         for how, candidate in candidates:
             if candidate is not None and docs_api.normalize(candidate) == bare:
                 return True, f"{how}-without-chapter-number", {}
-    if table:
-        cells = docs_api.table_cells(body, table)
-        if cells is None:
-            return False, "table-absent", {"table": table, "served_heading": served}
-        folded = wanted.casefold()
-        for cell in cells:
-            if cell.casefold() == folded or folded in cell.casefold().split():
-                return True, "table-cell", {"table": table}
-        return False, "table-cell", {"table": table, "served_heading": served}
     return False, "none", {"served_heading": served}
 
 
@@ -175,7 +220,12 @@ def check(
     text = body.decode("utf-8", "replace")
     served = docs_api.heading_of(text)
     matched, how, detail = heading_verdict(
-        heading, served, [node.get("label") or "" for node in filed], parts.get("table"), text
+        heading,
+        served,
+        [node.get("label") or "" for node in filed],
+        parts.get("table"),
+        parts.get("row"),
+        text,
     )
     identifier = parts.get("topic-id")
     published = [node.get("topicId") for node in filed]

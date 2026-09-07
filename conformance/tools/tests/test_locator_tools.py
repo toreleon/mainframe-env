@@ -60,13 +60,54 @@ TOC = {
 }
 
 
-def body(heading: str, extra: str = "") -> bytes:
+#: The first three body rows of `idg6175__cjsts` in `iea3b6_JCL_statements.htm`,
+#: plus the two the finding turns on, transcribed from what IBM serves: a header
+#: row of `th`, a Statement column carrying the statement as the book prints it,
+#: a Name column, and a Purpose column of prose. The 20 JCL statement rows all
+#: cite this one table.
+JCL_STATEMENTS_TABLE = """
+<table summary="" id="idg6175__cjsts"><thead>
+<tr><th><strong>Statement</strong></th><th><strong>Name</strong></th>
+<th><strong>Purpose</strong></th></tr>
+</thead><tbody>
+<tr><td>//&nbsp;&nbsp;command</td><td>JCL command</td>
+<td>Enters an MVS system operator command through the input stream.</td></tr>
+<tr><td>//&nbsp;&nbsp;COMMAND</td><td>command</td>
+<td>Specifies an MVS or JES command that the system issues.</td></tr>
+<tr><td>//*&nbsp;&nbsp;comment</td><td>comment</td><td>Contains comments.</td></tr>
+<tr><td>//&nbsp;&nbsp;SCHEDULE</td><td>schedule</td>
+<td>Specifies scheduling attributes for a job such as the job group it is
+associated with.</td></tr>
+<tr><td>//&nbsp;&nbsp;SET</td><td>set</td>
+<td>Defines and assigns initial values to symbolic parameters.</td></tr>
+</tbody></table>
+"""
+
+#: The ordinals those five rows carry in the served table. SCHEDULE and SET sit
+#: at 18 and 19 in the real book; the fixture keeps them adjacent and keeps the
+#: swap available, which is the whole point of the pair.
+SCHEDULE_ROW, SET_ROW = 4, 5
+
+
+def body(heading: str, extra: str = "", updated: str = "2026-01-28") -> bytes:
     return (
         '<div><article role="article">\n'
         f'<h1 class="topictitle1" id="t__title__1">{heading}</h1>'
-        '<div id="lastModifiedDate"><span>Last Updated</span>: 2026-01-28</div>\n'
+        f'<div id="lastModifiedDate"><span>Last Updated</span>: {updated}</div>\n'
         f"<div class=\"body\">{extra}</div></article></div>"
     ).encode("utf-8")
+
+
+def statements(heading: str = "JCL statements") -> bytes:
+    return body(heading, JCL_STATEMENTS_TABLE)
+
+
+def jcl_locator(heading: str, ordinal: int | str | None, table: str = "idg6175__cjsts") -> str:
+    locator = (
+        "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm"
+        f";topic-id:statements-jcl;heading:{heading};table:{table}"
+    )
+    return locator if ordinal is None else f"{locator};row:{ordinal}"
 
 
 def row(identifier: str, locator: str) -> dict[str, str]:
@@ -171,6 +212,35 @@ class BodyReadingTests(unittest.TestCase):
         # None means "the topic no longer carries that table", which is drift.
         # An empty list would read as "the table is there and has no rows".
         self.assertIsNone(DOCS.table_cells(body("JCL statements").decode(), "cjsts"))
+
+
+class TableRowTests(unittest.TestCase):
+    """The table is read as rows, because a row ordinal is what a locator cites."""
+
+    def setUp(self) -> None:
+        self.rows = DOCS.table_rows(statements().decode(), "idg6175__cjsts")
+
+    def test_the_header_row_is_not_row_one(self) -> None:
+        # Row 1 of the locator is the first row of DATA. Counting the header
+        # would shift all 20 JCL statement rows by one and read as 20 findings.
+        self.assertEqual(self.rows[0], ["// command", "JCL command",
+                                        "Enters an MVS system operator command through the "
+                                        "input stream."])
+
+    def test_each_row_keeps_its_own_cells(self) -> None:
+        self.assertEqual(self.rows[SCHEDULE_ROW - 1][:2], ["// SCHEDULE", "schedule"])
+        self.assertEqual(self.rows[SET_ROW - 1][:2], ["// SET", "set"])
+
+    def test_a_statement_printed_with_its_slashes_still_names_its_row(self) -> None:
+        # The Statement column reads `//  SCHEDULE`, so a whole-cell comparison
+        # would reject every one of the 20 labels.
+        self.assertTrue(DOCS.heading_in_cells("SCHEDULE", self.rows[SCHEDULE_ROW - 1]))
+
+    def test_a_row_does_not_name_a_statement_it_merely_mentions(self) -> None:
+        self.assertFalse(DOCS.heading_in_cells("SET", self.rows[SCHEDULE_ROW - 1]))
+
+    def test_an_absent_table_is_none_rather_than_no_rows(self) -> None:
+        self.assertIsNone(DOCS.table_rows(body("JCL statements").decode(), "idg6175__cjsts"))
 
 
 class TocTests(unittest.TestCase):
@@ -290,23 +360,69 @@ class CheckTests(unittest.TestCase):
         self.assertEqual(result["served_heading"], "ALLOCATE CURSOR")
         self.assertEqual(result["last_modified"], "2026-01-28")
 
-    def test_a_row_citing_a_table_matches_a_cell_of_that_table(self) -> None:
-        result = self.check(
-            "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm"
-            ";topic-id:statements-jcl;heading:DD;table:cjsts",
-            body("JCL statements", '<table id="cjsts"><tr><td>// DD</td><td>DD</td></tr></table>'),
-        )
+    def test_a_row_citing_a_table_row_matches_a_cell_of_that_row(self) -> None:
+        result = self.check(jcl_locator("SCHEDULE", SCHEDULE_ROW), statements())
         self.assertEqual(result["verdict"], "exact")
-        self.assertEqual(result["matched_on"], "table-cell")
+        self.assertEqual(result["matched_on"], "table-row")
+
+    def test_swapping_two_statements_ordinals_is_caught(self) -> None:
+        # THE finding. SCHEDULE and SET each cite the other's body row. Every
+        # label is still somewhere in the table and every topic, topic-id and
+        # heading still resolves, so a scan of the whole table calls both rows
+        # exact and a full regeneration passes ten gates with the inventory
+        # citing the wrong evidence for two of its rows.
+        for heading, cited, truly in (
+            ("SCHEDULE", SET_ROW, SCHEDULE_ROW),
+            ("SET", SCHEDULE_ROW, SET_ROW),
+        ):
+            with self.subTest(heading=heading):
+                result = self.check(jcl_locator(heading, cited), statements())
+                self.assertEqual(result["verdict"], "retitled")
+                self.assertEqual(result["matched_on"], "table-row")
+                self.assertEqual(result["row"], cited)
+                self.assertEqual(result["heading_found_in_rows"], [truly])
+
+    def test_the_unswapped_pair_is_exact_against_the_same_table(self) -> None:
+        # The control for the test above: the fixture is not one that fails
+        # whatever ordinal it is given.
+        for heading, cited in (("SCHEDULE", SCHEDULE_ROW), ("SET", SET_ROW)):
+            with self.subTest(heading=heading):
+                self.assertEqual(
+                    self.check(jcl_locator(heading, cited), statements())["verdict"], "exact"
+                )
+
+    def test_a_table_citation_with_no_row_ordinal_is_not_resolved(self) -> None:
+        # Dropping the discriminator must not read as a pass. Without it the 20
+        # rows are interchangeable, and a check that cannot tell them apart
+        # should say so rather than answer the question it can still answer.
+        result = self.check(jcl_locator("SCHEDULE", None), statements())
+        self.assertEqual(result["verdict"], "retitled")
+        self.assertEqual(result["matched_on"], "table-row-uncited")
+
+    def test_a_row_ordinal_past_the_end_of_the_table_is_reported_as_such(self) -> None:
+        # Drift in the publication, not in the locator: the table lost rows.
+        result = self.check(jcl_locator("SCHEDULE", 99), statements())
+        self.assertEqual(result["verdict"], "retitled")
+        self.assertEqual(result["matched_on"], "table-row-absent")
+        self.assertEqual(result["table_body_rows"], 5)
+
+    def test_a_row_ordinal_that_is_not_a_row_number_is_refused(self) -> None:
+        for ordinal in ("0", "-1", "SCHEDULE"):
+            with self.subTest(ordinal=ordinal):
+                result = self.check(jcl_locator("SCHEDULE", ordinal), statements())
+                self.assertEqual(result["matched_on"], "table-row-malformed")
 
     def test_a_row_citing_a_table_the_topic_no_longer_has_is_retitled(self) -> None:
-        result = self.check(
-            "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm"
-            ";topic-id:statements-jcl;heading:DD;table:cjsts",
-            body("JCL statements"),
-        )
+        result = self.check(jcl_locator("SCHEDULE", SCHEDULE_ROW), body("JCL statements"))
         self.assertEqual(result["verdict"], "retitled")
         self.assertEqual(result["matched_on"], "table-absent")
+
+    def test_a_cited_table_is_never_settled_by_the_shared_topic_heading(self) -> None:
+        # All 20 rows share one topic, so a heading or label that agreed with
+        # the topic's own title would let any of them past the row check.
+        result = self.check(jcl_locator("JCL statements", SET_ROW), statements())
+        self.assertEqual(result["verdict"], "retitled")
+        self.assertEqual(result["matched_on"], "table-row")
 
     def test_a_topic_that_is_gone_and_whose_heading_is_nowhere_is_missing(self) -> None:
         result = self.check(
@@ -358,6 +474,40 @@ class CheckTests(unittest.TestCase):
         self.assertIn("locator", result)
 
 
+class CatalogLocatorTests(unittest.TestCase):
+    """What the committed catalogs actually cite, read offline from the tree."""
+
+    def locators(self) -> list[tuple[str, str, dict[str, str]]]:
+        found = []
+        for path in sorted((REPOSITORY / "conformance/0.2/catalogs").glob("*.json")):
+            document = json.loads(path.read_text(encoding="utf-8"))
+            for unit in document.get("units", []):
+                for entry in unit["rows"]:
+                    found.append(
+                        (document["subsystem"], unit["id"],
+                         LOCATORS.components(entry["source_locator"]))
+                    )
+        return found
+
+    def test_every_topic_locator_citing_a_table_cites_a_row_of_it(self) -> None:
+        # The verifier refuses to resolve a table with no ordinal, so a locator
+        # written without one would report `retitled` rather than pass quietly.
+        # This says the same thing where it is cheap to say: in the catalogs.
+        for subsystem, unit, parts in self.locators():
+            if "topic" in parts and "table" in parts:
+                with self.subTest(subsystem=subsystem, unit=unit, heading=parts.get("heading")):
+                    self.assertIn("row", parts)
+
+    def test_the_jcl_statement_rows_cite_twenty_distinct_ordinals(self) -> None:
+        cited = [
+            int(parts["row"])
+            for subsystem, unit, parts in self.locators()
+            if subsystem == "jcl-jes2" and unit == "jcl-statements"
+        ]
+        self.assertEqual(sorted(cited), list(range(1, 21)))
+        self.assertEqual(cited, sorted(cited))
+
+
 class DestinationTests(unittest.TestCase):
     def test_a_report_inside_the_repository_is_refused(self) -> None:
         # Unbound JSON under conformance/0.2 is what broke this branch once.
@@ -372,48 +522,170 @@ class DestinationTests(unittest.TestCase):
                 self.assertTrue(tool.outside_repository(Path("/tmp/audit.json")).is_absolute())
 
 
+#: The pinned body of the one topic the pin tests use. Pinned on 2026-09-03,
+#: which is the date the whole Db2 book carries.
+PINNED = body("CREATE VIEW", "the pinned text", updated="2026-09-03")
+
+
 class PinTests(unittest.TestCase):
     MANIFEST = {
         "content_url_template": DOCS.CONTENT_URL,
         "topic_manifest_digest": DOCS.manifest_digest(
-            [{"topic_path": "a/first.html", "sha256": DOCS.digest(b"one")}]
+            [{"topic_path": "a/first.html", "sha256": DOCS.digest(PINNED)}]
         ),
         "topic_count": 1,
-        "total_bytes": 3,
+        "total_bytes": len(PINNED),
         "topics": [
-            {"topic_path": "a/first.html", "sha256": DOCS.digest(b"one"), "bytes": 3}
+            {
+                "topic_path": "a/first.html",
+                "sha256": DOCS.digest(PINNED),
+                "bytes": len(PINNED),
+                "last_modified": "2026-09-03",
+            }
         ],
     }
 
-    def verify(self, retrieve, sample=None):
-        original = PINS.docs_api.topics
-        PINS.docs_api.topics = retrieve
+    def verify(self, served, again=None, sample=None):
+        """Run the whole book against one served body and one re-read body.
+
+        `again` is what the second read of a mismatching topic returns; None
+        means the test asserts no second read happens, and a second read that
+        does happen fails loudly rather than silently returning the first body.
+        """
+        reads = []
+
+        def reread(path, template, cache=None):
+            reads.append(path)
+            if again is None:
+                raise AssertionError(f"unexpected re-read of {path}")
+            if isinstance(again, Exception):
+                raise again
+            return again
+
+        original_topics, original_topic = PINS.docs_api.topics, PINS.docs_api.topic
+        PINS.docs_api.topics = lambda paths, *_: [(p, served) for p in paths]
+        PINS.docs_api.topic = reread
         try:
-            return PINS.verify_topics(self.MANIFEST, None, sample, 1)
+            state = PINS.verify_topics(self.MANIFEST, None, sample, 1)
         finally:
-            PINS.docs_api.topics = original
+            PINS.docs_api.topics = original_topics
+            PINS.docs_api.topic = original_topic
+        state["reads"] = reads
+        return state
 
     def test_the_pin_is_the_digest_over_the_whole_book(self) -> None:
-        state = self.verify(lambda paths, *_: [(p, b"one") for p in paths])
+        state = self.verify(PINNED)
         self.assertEqual(state["status"], "match")
         self.assertTrue(state["matches_pin"])
 
+    def test_a_book_that_matches_is_never_read_twice(self) -> None:
+        self.assertEqual(self.verify(PINNED)["reads"], [])
+
+    def test_a_mismatch_is_read_again_before_it_is_recorded(self) -> None:
+        # Measured, not assumed: four full re-reads of the 832 Db2 topics
+        # reported 1, 7, 1 and 6 changed and never named the same topic twice.
+        # A digest that does not survive a second look is not evidence.
+        state = self.verify(body("CREATE VIEW", "a stale build", updated="2026-01-07"), PINNED)
+        self.assertEqual(state["reads"], ["a/first.html"])
+        self.assertEqual(state["changed"][0]["resolution"], "stale-read")
+        self.assertEqual(state["changed"][0]["resolved_by"], "the re-read reproduces the pin")
+        self.assertEqual(state["status"], "stale-read")
+
+    def test_a_stale_read_that_does_not_go_away_is_still_a_stale_read(self) -> None:
+        # The state on 2026-09-07: db2z_sql_createview served the 2026-01-07
+        # build, 10 bytes short of its pin, on 13 consecutive reads. The
+        # re-read alone does not settle it, and the date does — republication
+        # moves that date forward, so a body older than the pin is an older
+        # build being served rather than a newer one being published.
+        stale = body("CREATE VIEW", "a stale build", updated="2026-01-07")
+        state = self.verify(stale, stale)
+        self.assertEqual(state["changed"][0]["resolution"], "stale-read")
+        self.assertEqual(state["changed"][0]["reread"]["last_modified"], "2026-01-07")
+        self.assertEqual(state["status"], "stale-read")
+        self.assertFalse(state["matches_pin"])
+
+    def test_a_stale_read_reports_the_digest_that_was_actually_served(self) -> None:
+        # The report says what this run retrieved. Substituting the pin because
+        # a second read produced it would make the digest a claim about the
+        # book rather than a record of the request.
+        stale = body("CREATE VIEW", "a stale build", updated="2026-01-07")
+        state = self.verify(stale, PINNED)
+        self.assertEqual(state["changed"][0]["sha256"], DOCS.digest(stale))
+        self.assertEqual(state["changed"][0]["reread"]["sha256"], DOCS.digest(PINNED))
+
     def test_a_republished_topic_is_reported_with_both_dates(self) -> None:
-        served = body("First", "changed")
-        state = self.verify(lambda paths, *_: [(p, served) for p in paths])
+        served = body("CREATE VIEW", "changed", updated="2026-10-01")
+        state = self.verify(served, served)
+        self.assertEqual(state["changed"][0]["resolution"], "republished")
+        self.assertEqual(state["changed"][0]["pinned_last_modified"], "2026-09-03")
+        self.assertEqual(state["changed"][0]["last_modified"], "2026-10-01")
         self.assertEqual(state["status"], "differs")
-        self.assertEqual(state["changed"][0]["last_modified"], "2026-01-28")
+
+    def test_the_same_date_over_different_bytes_gets_its_own_verdict(self) -> None:
+        # Neither staleness nor republication explains this one, so it must not
+        # be filed under either. It is the case that would mean the endpoint
+        # changed under a date that did not move.
+        served = body("CREATE VIEW", "different", updated="2026-09-03")
+        state = self.verify(served, served)
+        self.assertEqual(state["changed"][0]["resolution"], "same-date-different-bytes")
+        self.assertEqual(state["status"], "differs")
+
+    def test_a_difference_with_no_dates_to_compare_is_not_excused(self) -> None:
+        served = b"<h1 class='topictitle1'>CREATE VIEW</h1>"
+        state = self.verify(served, served)
+        self.assertEqual(state["changed"][0]["resolution"], "undated-difference")
+        self.assertEqual(state["status"], "differs")
+
+    def test_a_re_read_that_cannot_be_made_falls_back_to_the_dates(self) -> None:
+        stale = body("CREATE VIEW", "a stale build", updated="2026-01-07")
+        state = self.verify(stale, DOCS.Unreachable("https://www.ibm.com/x", "http-503"))
+        self.assertEqual(state["changed"][0]["reread"], {"reason": "http-503"})
+        self.assertEqual(state["changed"][0]["resolution"], "stale-read")
+
+    def test_only_an_unexplained_difference_counts_as_one(self) -> None:
+        stale = body("CREATE VIEW", "a stale build", updated="2026-01-07")
+        state = self.verify(stale, stale)
+        self.assertEqual(state["topics_stale_read"], 1)
+        self.assertEqual(state["topics_unexplained"], 0)
+        self.assertEqual(state["resolutions"], {"stale-read": 1})
 
     def test_an_unreachable_book_is_skipped_rather_than_reported_as_drift(self) -> None:
         error = DOCS.Unreachable("https://www.ibm.com/x", "URLError")
-        state = self.verify(lambda paths, *_: [(p, error) for p in paths])
+        state = self.verify(error)
         self.assertEqual(state["status"], "skipped")
         self.assertEqual(state["topics_unreachable"], 1)
 
     def test_a_sampled_run_never_claims_the_pin_matched(self) -> None:
-        state = self.verify(lambda paths, *_: [(p, b"one") for p in paths], sample=1)
+        state = self.verify(PINNED, sample=1)
         self.assertEqual(state["status"], "sampled")
         self.assertNotIn("matches_pin", state)
+
+
+class DateTests(unittest.TestCase):
+    def test_the_direction_of_the_date_is_what_separates_the_two_cases(self) -> None:
+        self.assertEqual(DOCS.compare_dates("2026-09-03", "2026-01-07"), "older")
+        self.assertEqual(DOCS.compare_dates("2026-09-03", "2026-10-01"), "newer")
+        self.assertEqual(DOCS.compare_dates("2026-09-03", "2026-09-03"), "same")
+
+    def test_anything_that_is_not_a_pair_of_dates_is_undated(self) -> None:
+        for pinned, served in (
+            (None, "2026-09-03"),
+            ("2026-09-03", None),
+            ("2026-09-03", "Last Updated"),
+            ("", ""),
+        ):
+            with self.subTest(pinned=pinned, served=served):
+                self.assertEqual(DOCS.compare_dates(pinned, served), "undated")
+
+
+class ExitStatusTests(unittest.TestCase):
+    """Which verdicts fail a run, stated once where a reader can find it."""
+
+    def test_a_stale_read_is_not_a_failure_and_a_republication_is(self) -> None:
+        self.assertNotIn(PINS.STALE_READ, PINS.UNEXPLAINED)
+        for name in (PINS.REPUBLISHED, PINS.SAME_DATE, PINS.UNDATED):
+            with self.subTest(name=name):
+                self.assertIn(name, PINS.UNEXPLAINED)
 
 
 if __name__ == "__main__":

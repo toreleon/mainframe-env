@@ -58,7 +58,10 @@ LAST_MODIFIED = re.compile(
 )
 TAG = re.compile(r"<[^>]+>")
 CELL = re.compile(r"<t[dh]\b[^>]*>(.*?)</t[dh]>", re.S)
+ROW = re.compile(r"<tr\b[^>]*>(.*?)</tr>", re.S)
+DATA_CELL = re.compile(r"<td\b", re.I)
 CHAPTER = re.compile(r"^Chapter [0-9]+\. ")
+ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 class Unreachable(Exception):
@@ -230,15 +233,67 @@ def last_modified_of(body: str) -> str | None:
     return date.group(0) if date else text or None
 
 
-def table_cells(body: str, table_id: str) -> list[str] | None:
-    """Every cell of the named table, or None when the table is absent."""
+def _table(body: str, table_id: str) -> str | None:
+    """The markup of the named table, or None when the topic has no such table."""
     opening = re.search(rf"<table\b[^>]*\bid=\"{re.escape(table_id)}\"", body)
     if not opening:
         return None
     end = body.find("</table>", opening.start())
-    if end < 0:
+    return None if end < 0 else body[opening.start() : end]
+
+
+def table_cells(body: str, table_id: str) -> list[str] | None:
+    """Every cell of the named table, or None when the table is absent."""
+    segment = _table(body, table_id)
+    return None if segment is None else [strip_markup(cell) for cell in CELL.findall(segment)]
+
+
+def table_rows(body: str, table_id: str) -> list[list[str]] | None:
+    """The named table's body rows, in order, each as its own list of cells.
+
+    Header rows are dropped, so row 1 is the first row of data — the ordinal a
+    locator's `row:` component counts in. A header row is recognised by carrying
+    no `td` at all rather than by sitting inside a `thead`, because the same
+    tables are also served with the header written as a plain `tr` of `th`.
+
+    None, not an empty list, when the table is absent: a table that is gone is
+    drift, and a table that is there and empty is a different finding.
+    """
+    segment = _table(body, table_id)
+    if segment is None:
         return None
-    return [strip_markup(cell) for cell in CELL.findall(body[opening.start() : end])]
+    return [
+        [strip_markup(cell) for cell in CELL.findall(markup)]
+        for markup in ROW.findall(segment)
+        if DATA_CELL.search(markup)
+    ]
+
+
+def heading_in_cells(heading: str, cells: Iterable[str]) -> bool:
+    """Whether any of these cells names this heading.
+
+    A cell may carry the statement as the book prints it — `// SCHEDULE` for
+    SCHEDULE — so a whitespace-separated token counts as well as the whole cell.
+    """
+    wanted = normalize(heading).casefold()
+    return any(
+        cell.casefold() == wanted or wanted in cell.casefold().split() for cell in cells
+    )
+
+
+def compare_dates(pinned: str | None, served: str | None) -> str:
+    """How a served `Last Updated` date stands to the pinned one.
+
+    `older`, `newer`, `same` or `undated`. The direction is the load-bearing
+    part: republication moves this date forward, so an older stamp arriving
+    where a newer one is pinned is an older build being served rather than a
+    new one being published.
+    """
+    if not (pinned and served and ISO_DATE.match(pinned) and ISO_DATE.match(served)):
+        return "undated"
+    if served < pinned:
+        return "older"
+    return "newer" if served > pinned else "same"
 
 
 def toc_index(document: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
