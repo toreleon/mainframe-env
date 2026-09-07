@@ -665,6 +665,83 @@ mod tests {
     }
 
     #[test]
+    fn every_documented_command_abbreviation_selects_its_family() {
+        // SA23-2292-70 gives each command an abbreviation in its syntax block
+        // (`{ADDSD | AD}`), and operators type them far more often than the
+        // full keyword.
+        let documented = [
+            ("AG", CommandFamily::AddGroup),
+            ("AD", CommandFamily::AddSd),
+            ("AU", CommandFamily::AddUser),
+            ("ALD", CommandFamily::AltSd),
+            ("ALG", CommandFamily::AltGroup),
+            ("ALU", CommandFamily::AltUser),
+            ("CO", CommandFamily::Connect),
+            ("DD", CommandFamily::DelSd),
+            ("DG", CommandFamily::DelGroup),
+            ("DU", CommandFamily::DelUser),
+            ("LD", CommandFamily::ListDsd),
+            ("LG", CommandFamily::ListGrp),
+            ("LU", CommandFamily::ListUser),
+            ("PW", CommandFamily::Password),
+            ("PE", CommandFamily::Permit),
+            ("RALT", CommandFamily::Ralter),
+            ("RDEF", CommandFamily::Rdefine),
+            ("RDEL", CommandFamily::Rdelete),
+            ("RE", CommandFamily::Remove),
+            ("RL", CommandFamily::Rlist),
+            ("SR", CommandFamily::Search),
+            ("SETR", CommandFamily::Setropts),
+        ];
+        for (abbreviation, family) in documented {
+            assert_eq!(
+                recognize_command(abbreviation, Default::default()).unwrap(),
+                family,
+                "{abbreviation} does not select its documented family"
+            );
+        }
+    }
+
+    #[test]
+    fn an_abbreviated_command_validates_exactly_like_its_full_keyword() {
+        for (short, long) in [
+            (
+                "AD 'USER1.**' GENERIC OWNER(USER1) UACC(READ)",
+                "ADDSD 'USER1.**' GENERIC OWNER(USER1) UACC(READ)",
+            ),
+            (
+                "PE 'USER1.**' CLASS(DATASET) ID(USER1) ACCESS(UPDATE)",
+                "PERMIT 'USER1.**' CLASS(DATASET) ID(USER1) ACCESS(UPDATE)",
+            ),
+            (
+                "CO USER1 GROUP(OPER) AUTHORITY(USE)",
+                "CONNECT USER1 GROUP(OPER) AUTHORITY(USE)",
+            ),
+        ] {
+            let abbreviated = validate_command(short, Default::default())
+                .unwrap_or_else(|problem| panic!("{short} failed with {problem}"));
+            let spelled = validate_command(long, Default::default())
+                .unwrap_or_else(|problem| panic!("{long} failed with {problem}"));
+            assert_eq!(abbreviated, spelled);
+        }
+    }
+
+    #[test]
+    fn command_selectors_stay_unambiguous_across_keywords_and_aliases() {
+        let mut selectors = BTreeSet::new();
+        for descriptor in command_descriptors() {
+            assert!(
+                selectors.insert(descriptor.keyword()),
+                "{} is claimed twice",
+                descriptor.keyword()
+            );
+            for alias in descriptor.aliases() {
+                assert!(selectors.insert(alias), "{alias} is claimed twice");
+            }
+        }
+    }
+
+    #[test]
     fn supplied_class_metadata_is_generated_and_unique() {
         let classes = supplied_class_descriptors();
         assert_eq!(classes.len(), 24);

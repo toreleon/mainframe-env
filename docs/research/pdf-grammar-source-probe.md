@@ -159,9 +159,13 @@ block without the brace group the opener required.
 | Shared | 244 |
 | Only in catalog | 89 |
 
-The alias finding is firm: **every located command carries a source alias**
-(`AD`, `AU`, `ALU`, `PE`, `RDEF`), and `aliases` is empty on every catalog row
-except `PASSWORD`. Five catalog rows carry no operands at all.
+The alias finding was firm — every located command carried a source alias
+(`AD`, `AU`, `ALU`, `PE`, `RDEF`) that the catalog did not record — and it is
+now **fixed**: 22 families carry their documented abbreviation, and `PASSWORD`
+gained `PW` beside the `PHRASE` it already had. `SET` was excluded because its
+match was unanchored and returned operand values (`SETONLY`, `NOSET`) rather
+than an alias; `RACLINK` and `RVARY` genuinely have none. Five catalog rows
+still carry no operands at all.
 
 The operand counts are better than the first run — only-in-catalog fell from
 142 to 89 — but they are still a reader-limited comparison rather than a clean
@@ -189,6 +193,34 @@ early.
   seen.
 - Locator audit: an outline title that appears more than once matches any of
   its pages, so a row pointing at the wrong occurrence still reads as exact.
+
+## What a probe finding may and may not become
+
+Only one gap found here was safe to close mechanically. The distinction is
+whether the projection is catalog-grade, not whether the gap is real:
+
+- **RACF aliases — fixed.** Each one is a single unambiguous token read from
+  the command's own syntax block, cross-checked against the abbreviations RACF
+  operators actually type. Adding them changes only which selectors the parser
+  accepts; `conformance/spec/v1/spec.json` is unchanged, so no obligation or
+  coverage claim moves.
+- **AMS parameters — not promoted.** The projection is review input. It reads
+  flush-left headings, so it also collects values that the typesetter did not
+  indent: `BLDINDEX` reports `ALL`, `CRITICAL` and `NONE`, which are values of
+  `SORTMESSAGELEVEL`, not parameters. Writing 889 machine-read names into a
+  contract artifact that drives the AMS parser would inject those errors into
+  the emulator. The publication has no cleaner machine source — Chapter 3 is a
+  prose summary table, and only `ALLOCATE` carries a bracket-notation syntax
+  table.
+- **RACF operands — not promoted.** Nine commands are still unlocated and some
+  blocks may close early, so the 89 catalog-only names cannot be separated from
+  reader failures. Accepting an operand the command processor does not
+  implement is also worse than rejecting it.
+- **COBOL forms — not promoted.** The catalog forms are authored prose
+  sketches, not a mechanical projection of the diagrams. Closing the
+  49-against-95 gap means writing 46 forms, which is review work.
+- **Db2 pin — not re-pinned.** Re-pinning means re-extracting and re-reviewing
+  174 rows against the new edition.
 
 ## Not yet covered
 
