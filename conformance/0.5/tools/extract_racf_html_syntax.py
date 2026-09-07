@@ -23,17 +23,24 @@ The rules, in the order they are applied:
 
 2. Aliases. Searched only inside `section.refsyn` — the Syntax section — and
    only for a brace group anchored on the command's own keyword. `SET` has no
-   brace group there and correctly returns none. All 34 catalog alias lists
-   reproduce.
+   brace group of its own there and correctly returns none. All 34 catalog alias
+   lists reproduce.
 
-3. Operands and what they contain. A depth-1 `dt` under `Parameters` is an
-   operand. Its subtree splits in two: a name that is one of the parent term's
-   own alternatives is a VALUE it accepts (`AT | ONLYAT` lists `AT(...)` and
-   `ONLYAT(...)` beneath itself), and a name that is not is a MEMBER of the
-   segment (`OMVS` owns `AUTOGID`, `GID` and `SHARED`). That is the separation
-   the AMS extractor does not make: it flattens every depth below the first into
-   one list and then drops any name that also appears at top level, which would
-   answer "which operand does this belong to" with silence.
+3. Operands and what they contain. A `dt` at the outermost `dl` depth under
+   `Parameters` is an operand, and every `dt` below it is kept where the topic
+   puts it: the tree is as deep as the list is, which in this book is six levels
+   for ALTUSER and ALTGROUP and five for four more topics. Each term is read
+   against ITS OWN parent, never against the operand at the root of its branch.
+   A child name the parent term already offers as an alternative — either
+   between keywords (`AT | ONLYAT` restates `AT(...)` and `ONLYAT(...)` beneath
+   itself) or inside its own argument (`DOM(NORMAL | ALL | NONE)` restates all
+   three) — is a VALUE it accepts. Any other child name is a MEMBER: the
+   segment operands `OMVS` owns, and equally the enumerated values of a term
+   the publication does not restate, which `syntax_only` cannot separate and
+   this reader does not pretend to — see `classify`. That per-parent reading is
+   the separation the AMS extractor does not make: it flattens every depth below
+   the first into one list and then drops any name that also appears at top
+   level, which would answer "which operand does this belong to" with silence.
 
 4. `syntax_only`. Uppercase tokens the Syntax table shows that the Parameters
    tree never reaches, minus the command's keyword and aliases. The reference's
@@ -167,9 +174,27 @@ def names(term: str) -> list[str]:
 def alias_pattern(keyword: str) -> re.Pattern[str]:
     """`{KEYWORD | ALIAS | ...}`, anchored on the keyword.
 
-    Anchoring is the whole fix. An unanchored brace search over the SET topic
-    matches the `{SETONLY | NOSET}` group that belongs to an operand and reports
-    two abbreviations that do not exist.
+    Anchoring is the whole fix, because the book puts a brace group around an
+    operand's alternatives as readily as around a command's abbreviations and
+    the two are the same shape. The example is `{SET | SETONLY | NOSET}`, and it
+    is in `addsd.htm`, not in `set.htm`: it is ADDSD's own
+    `SET | SETONLY | NOSET` operand, which the Parameters list defines with
+    `SET`, `SETONLY` and `NOSET` restated beneath it. An unanchored search over
+    that one Syntax section returns `SET | SETONLY | NOSET` and
+    `GENERIC | MODEL | TAPE` beside the real `{ADDSD | AD}`. `set.htm` contains
+    neither string anywhere in its body, and the three brace groups its Syntax
+    section does carry — `{SYSTEM | JOBNAME(jobname ...)}`,
+    `{COUNT(number) | RESET}` and `{[ALL | NONE] [ALTER | NOALTER] ...}` — are
+    likewise operands rather than abbreviations.
+
+    An earlier revision of this docstring said instead that an unanchored search
+    "over the SET topic" matches `{SETONLY | NOSET}`. No such group exists, in
+    that topic or in any other. The sentence carried over the SETONLY/NOSET
+    finding from the retired PDF reader, which matched a brace group anywhere in
+    the extracted text of the whole book and so had no topic to be attributed
+    to. The anchoring is unchanged and the SET regression still holds — this
+    reader returns no alias for SET — but it holds because the only group naming
+    SETONLY belongs to ADDSD, not because SET's own page carries one.
     """
     return re.compile(
         r"\{\s*" + re.escape(keyword) + r"((?:\s*\|\s*[A-Z][A-Z0-9]*)*)\s*\}"
@@ -187,49 +212,122 @@ def aliases(refsyn: str, keyword: str) -> list[str]:
     return found
 
 
-def operand_tree(parameters: str) -> list[tuple[str, list[str]]]:
-    """Depth-1 `dt` terms, each with the terms nested beneath it.
+def operand_tree(parameters: str) -> list[dict[str, Any]]:
+    """The `dt` terms of the Parameters list, nested as the topic nests them.
 
     Depth comes from `dl` nesting, which is what the topic publishes; the PDF
-    had only leading whitespace to go on.
+    had only leading whitespace to go on. Every level is kept. Collapsing the
+    ones below the first is the defect this replaces: ALTUSER's list runs six
+    levels deep, so `NETVIEW | NONETVIEW > NETVIEW > MSGRECVR | NOMSGRECVR >
+    MSGRECVR(YES | NO) > YES` reported `YES` as a member of the NETVIEW segment,
+    and `AUTH`'s MASTER, ALL, INFO, CONS, IO and SYS and `LEVEL`'s NB, ALL, CE
+    and IN arrived as contents of OPERPARM.
+
+    A term one level deeper than the previous one is that term's child; a term
+    at the outermost depth starts a new operand. A term more than one level
+    deeper than anything open above it has no parent in the list, which is a
+    finding about this reader rather than about the publication, so it stops the
+    run instead of being attached to the nearest available term. No topic of the
+    60 skips a level.
     """
     parser = Definitions()
     parser.feed(parameters)
     if not parser.terms:
         return []
     outermost = min(depth for depth, _ in parser.terms)
-    tree: list[tuple[str, list[str]]] = []
+    roots: list[dict[str, Any]] = []
+    ancestors: list[dict[str, Any]] = []
     for depth, term in parser.terms:
-        if depth == outermost:
-            tree.append((term, []))
-        elif tree:
-            tree[-1][1].append(term)
-    return tree
+        level = depth - outermost
+        node: dict[str, Any] = {"term": term, "children": []}
+        if level == 0:
+            roots.append(node)
+            ancestors = [node]
+            continue
+        if level > len(ancestors):
+            raise ValueError(
+                f"term {term!r} sits at nesting level {level} with no term open "
+                f"at level {level - 1}"
+            )
+        del ancestors[level:]
+        ancestors[-1]["children"].append(node)
+        ancestors.append(node)
+    return roots
+
+
+ALTERNATION = re.compile(r"\(([^()]*)\)")
+
+
+def alternatives(term: str) -> list[str]:
+    """Every name the term itself offers as one of its own alternatives.
+
+    Two spellings, and the publication uses both for the same operand. ALTUSER
+    writes `CTL(GENERAL | GLOBAL | SPECIFIC)` and ADDUSER writes a bare `CTL`
+    over the same three nested terms, so reading only `names()` — which strips
+    arguments to find the operand's name — makes GENERAL a value in one topic
+    and not in the other. The argument's own alternation is read as well, which
+    is what `MSGRECVR(NO | YES)`, `DOM(NORMAL | ALL | NONE)` and
+    `XRFSOFF(FORCE | NOFORCE)` state about themselves.
+
+    It reaches no further than that. Where the publication enumerates beneath a
+    term without restating the enumeration in the term — `AUTH` over MASTER,
+    ALL, INFO, CONS, IO and SYS, `LEVEL(message-level)` over NB, ALL, CE and IN
+    — those names are reported as members. That is the rule stating what it can
+    see, not a claim that AUTH is a segment.
+    """
+    offered = list(names(term))
+    for argument in ALTERNATION.findall(term):
+        if "|" not in argument:
+            continue
+        for part in argument.split("|"):
+            for name in names(part):
+                if name not in offered:
+                    offered.append(name)
+    return offered
+
+
+def classify(node: dict[str, Any]) -> dict[str, Any]:
+    """One term with the values and members of its DIRECT children, recursively.
+
+    `values` and `members` describe one level. They are the names the children
+    of this term introduce, split by whether this term offers them — not the
+    names of the whole subtree, which is what the collapsed reading reported and
+    why a segment appeared to own its members' values.
+    """
+    offered = alternatives(node["term"])
+    values: list[str] = []
+    members: list[str] = []
+    for child in node["children"]:
+        for name in names(child["term"]):
+            target = values if name in offered else members
+            if name not in target:
+                target.append(name)
+    return {
+        "term": node["term"],
+        "names": names(node["term"]),
+        "values": values,
+        "members": members,
+        "children": [classify(child) for child in node["children"]],
+    }
 
 
 def operands(parameters: str) -> list[dict[str, Any]]:
-    """Each operand term with the values it accepts and the members it owns.
+    """The operand terms, each carrying its own nested terms to full depth."""
+    return [classify(node) for node in operand_tree(parameters)]
 
-    A name nested beneath a term is a VALUE when the term already offers it as
-    an alternative and a MEMBER otherwise. `AT | ONLYAT` restates `AT(...)` and
-    `ONLYAT(...)` beneath itself, so those are values of one operand rather than
-    a segment's contents; `CICS` offers only itself, so `OPCLASS`, `OPIDENT` and
-    the rest are members and stay named against `CICS`.
-    """
-    entries: list[dict[str, Any]] = []
-    for term, children in operand_tree(parameters):
-        own = names(term)
-        values: list[str] = []
-        members: list[str] = []
-        for child in children:
-            for name in names(child):
-                target = values if name in own else members
-                if name not in target:
-                    target.append(name)
-        entries.append(
-            {"term": term, "names": own, "values": values, "members": members}
-        )
-    return entries
+
+def descendants(entries: Iterable[dict[str, Any]]) -> Iterable[dict[str, Any]]:
+    """Every classified term in the forest, parents before children."""
+    for entry in entries:
+        yield entry
+        yield from descendants(entry["children"])
+
+
+def nesting_depth(entries: list[dict[str, Any]]) -> int:
+    """How many levels the list runs, counting the operand level as 1."""
+    if not entries:
+        return 0
+    return 1 + max(nesting_depth(entry["children"]) for entry in entries)
 
 
 def syntax_tables(syntax: str) -> list[str]:
@@ -349,6 +447,9 @@ def project(
     members: list[str] = []
     for term in terms:
         merge(found, term["names"])
+    # Values and members are collected from every level, because every level
+    # now classifies its own children; `found` stays the operand level alone.
+    for term in descendants(terms):
         merge(values, term["values"])
         merge(members, term["members"])
 
@@ -366,6 +467,14 @@ def project(
             "source_operands": found,
             "source_values": values,
             "source_members": members,
+            # A name can be a value under one term and a member under another —
+            # in ADDUSER, `NO` is a value of `MSGRECVR(NO | YES)` and a member
+            # of `LOGCMDRESP`, which that topic writes bare and ALTUSER writes
+            # as `LOGCMDRESP(SYSTEM | NO)` — so the two lists overlap and this
+            # says by how much rather than leaving their sum to be read as a
+            # count of distinct names.
+            "both_value_and_member": sorted(set(values) & set(members)),
+            "source_nesting_depth": nesting_depth(terms),
             "operand_terms": own["terms"],
             "catalog_only": [
                 name for name in catalog_operands if name not in found
@@ -403,7 +512,11 @@ def main(argv: Iterable[str] | None = None) -> int:
 
     located = sum(1 for row in rows if row["located"])
     output = {
-        "schema_version": "mainframe-env.racf-html-syntax-projection@1",
+        # @2: `operand_terms` nests to the depth the topic nests, and an entry's
+        # `values` and `members` name its direct children instead of its whole
+        # subtree. A reader of @1 asking a segment what it contains got its
+        # members' values back as members of the segment.
+        "schema_version": "mainframe-env.racf-html-syntax-projection@2",
         "coverage_credit": 0,
         "source": {
             "product": manifest["product"],
@@ -420,6 +533,12 @@ def main(argv: Iterable[str] | None = None) -> int:
             "source_operands": sum(len(row.get("source_operands", [])) for row in rows),
             "source_values": sum(len(row.get("source_values", [])) for row in rows),
             "source_members": sum(len(row.get("source_members", [])) for row in rows),
+            "both_value_and_member": sum(
+                len(row.get("both_value_and_member", [])) for row in rows
+            ),
+            "max_nesting_depth": max(
+                (row.get("source_nesting_depth", 0) for row in rows), default=0
+            ),
             "catalog_operands": sum(len(row["catalog_operands"]) for row in rows),
             "catalog_only": sum(len(row.get("catalog_only", [])) for row in rows),
             "source_only": sum(len(row.get("source_only", [])) for row in rows),

@@ -12,13 +12,38 @@ syntax in, and `../tools/extract_racf_html_syntax.py` projects what they say
 into `../generated/racf-html-syntax-projection.json`.
 
 Both read documentation topics, never the PDF. The reference draws no railroad
-diagrams: a command's syntax is a `role="presentation"` table under a
-`<h2 class="sectiontitle">Syntax</h2>`, and its operands are a `<dl class="parml">`
-under `Parameters`, where an operand is a top-level `dt` and everything it
-accepts or contains is a `dt` of a `dl` nested inside its `dd`. Reading the
-typeset page instead meant recovering that nesting from indentation, which
-reached 25 of the 34 families and promoted a segment's members to top level
-whenever the segment opened inline.
+diagrams: a command's syntax is a table under a `<h2 class="sectiontitle">Syntax</h2>`,
+and its operands are a `<dl class="parml">` under `Parameters`, where an operand
+is a `dt` at the outermost `dl` depth and everything it accepts or contains is a
+`dt` of a `dl` nested inside its `dd`. Reading the typeset page instead meant
+recovering that nesting from indentation, which reached 25 of the 34 families
+and promoted a segment's members to top level whenever the segment opened
+inline.
+
+The rule for the syntax table is position, not an attribute, and the difference
+matters to anyone reproducing this by hand. The tool takes **every table in the
+Syntax section**, after dropping the section's two boilerplate paragraphs by
+their `data-hd-otherprops="nohelp"` attribute. 55 of the 60 selected topics do
+mark that table `role="presentation"`, but four — DELUSER, RACDCERT EXPORT,
+RACDCERT REKEY and RACPRMCK — give it `summary="Syntax of the ... command"` and
+no role at all, and the RACDCERT umbrella topic `radcertg.htm` has no table in
+its Syntax section, because that section says to read the function subtopics. A
+reviewer who writes a `role="presentation"` selector gets nothing for those five
+and has no way to tell that from the publication being silent.
+
+The nesting is read to whatever depth the topic uses — six levels in ALTUSER and
+ALTGROUP, five in ADDUSER, ADDGROUP, RALTER, SET and SETROPTS — and each term is
+classified against its own parent. A child name the parent term restates, either
+between keywords (`AT | ONLYAT`) or inside its own argument
+(`MSGRECVR(NO | YES)`), is a value; any other child name is a member. "Member"
+therefore covers both a segment's operands and an enumeration the publication
+does not restate in the term — ADDUSER writes a bare `CTL` over GENERAL, GLOBAL
+and SPECIFIC where ALTUSER writes `CTL(GENERAL | GLOBAL | SPECIFIC)` — so a
+member reported below the operand level is a question for the reviewer, not a
+claim that its parent is a segment. Because a name can be a value under one term
+and a member under another, `source_values` and `source_members` overlap; each
+row lists the overlap in `both_value_and_member` rather than leaving their sum
+to be read as a count of distinct names.
 
 Selection is by href and the predicate is written out in the fetcher's module
 docstring, because a reviewer has to be able to arrive at the same 60 topics

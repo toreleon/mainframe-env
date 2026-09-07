@@ -77,12 +77,142 @@ RACF TSO command, refer to <a href="trc.htm">RACF TSO commands</a>.</p>
 <dl class="parml"><dt class="pt dlterm">OPERATION</dt><dd>an example, not syntax.</dd></dl>
 """
 
-#: SET is the standing regression. Its command has no abbreviation, and the
-#: brace group in its Syntax section belongs to an operand.
+#: SET is the standing regression. Its command has no abbreviation, and no
+#: brace group in its Syntax section is anchored on its keyword. The groups the
+#: topic does carry — reproduced here — belong to the LIST and TRACE operands.
 SET = """
 <section class="section refsyn"><h2 class="sectiontitle">Syntax</h2>
-<table role="presentation"><tbody><tr><td>[<span>subsystem-prefix</span>]SET</td></tr>
-<tr><td>[ AUTOAPPL( {SETONLY | NOSET} ) ]</td></tr></tbody></table>
+<table role="presentation" class="defaultstyle"><tbody>
+<tr><td class="tdleft">[<span class="ph var">subsystem-prefix</span>]SET</td></tr>
+<tr><td class="tdleft"><div class="lines">[ LIST<span class="ph"
+data-hd-otherprops="nohelp">( {</span>SYSTEM | JOBNAME(<span class="ph var">jobname</span>
+...)<span class="ph" data-hd-otherprops="nohelp">} )</span> ]</div></td></tr>
+<tr><td class="tdleft"><div class="lines">[ TRACE<span class="ph"
+data-hd-otherprops="nohelp">( {</span>COUNT(<span class="ph var">number</span>) |
+RESET<span class="ph" data-hd-otherprops="nohelp">} )</span> ]</div></td></tr>
+</tbody></table>
+</section>
+<section class="section"><h2 class="sectiontitle">Parameters</h2>
+<dl class="parml"><dt class="pt dlterm">LIST</dt><dd class="pd">lists it.</dd></dl>
+</section>
+"""
+
+#: ADDSD carries the group the anchoring exists for. `{SET | SETONLY | NOSET}`
+#: is ADDSD's own operand, defined under Parameters with all three restated
+#: beneath it; `set.htm` contains neither SETONLY nor NOSET anywhere.
+ADDSD = """
+<section class="section refsyn"><h2 class="sectiontitle">Syntax</h2>
+<p data-hd-otherprops="nohelp">The complete syntax of the ADDSD command is:</p>
+<table summary="" role="presentation" class="defaultstyle cds--data-table"><tbody>
+<tr><td class="tdleft"><span class="ph" data-hd-otherprops="nohelp">[<span
+class="ph var">subsystem-prefix</span>]{ADDSD
+| AD}</span></td></tr>
+<tr><td class="tdleft"><div class="lines"><span class="ph"
+data-hd-otherprops="nohelp">[ {</span>GENERIC | MODEL | TAPE<span class="ph"
+data-hd-otherprops="nohelp">} ]</span></div></td></tr>
+<tr><td class="tdleft"><div class="lines"><span class="ph"
+data-hd-otherprops="nohelp">[ {</span><u>SET</u> | SETONLY | NOSET<span class="ph"
+data-hd-otherprops="nohelp">} ]</span></div></td></tr>
+</tbody></table></section>
+<section class="section"><h2 class="sectiontitle">Parameters</h2>
+<dl class="parml">
+<dt class="pt dlterm">SET | SETONLY | NOSET</dt>
+<dd class="pd">specifies whether the in-storage profiles are refreshed.
+  <dl class="parml">
+  <dt class="pt dlterm">SET</dt><dd class="pd">refreshes them.</dd>
+  <dt class="pt dlterm">SETONLY</dt><dd class="pd">refreshes them only.</dd>
+  <dt class="pt dlterm">NOSET</dt><dd class="pd">does not refresh them.</dd>
+  </dl>
+</dd>
+</dl></section>
+"""
+
+#: The RACDCERT umbrella topic: a Syntax section that points at the function
+#: subtopics, no table in it, and no Parameters section at all.
+UMBRELLA = """
+<section class="section refsyn"><h2 class="sectiontitle">Syntax</h2>
+<p>For details about syntax and parameters for each RACDCERT function, see the
+&ldquo;Syntax&rdquo; and &ldquo;Parameters&rdquo; subtopics of each RACDCERT
+function.</p>
+</section>
+"""
+
+#: ADDUSER's NETVIEW segment, three levels: the segment, its members, and the
+#: values two of those members restate. Under the collapsed reading GENERAL,
+#: GLOBAL, SPECIFIC, NO and YES were all reported as members of NETVIEW.
+NETVIEW = """
+<section class="section"><h2 class="sectiontitle">Parameters</h2>
+<dl class="parml">
+<dt class="pt dlterm">NETVIEW</dt>
+<dd class="pd">specifies the NETVIEW segment.
+  <dl class="parml">
+  <dt class="pt dlterm">CTL</dt>
+  <dd class="pd">whether a security check is performed.
+    <dl class="parml">
+    <dt class="pt dlterm">GENERAL</dt><dd class="pd">as for SPECIFIC, and more.</dd>
+    <dt class="pt dlterm">GLOBAL</dt><dd class="pd">no checking is done.</dd>
+    <dt class="pt dlterm"><span class="keyword kwd defkwd">SPECIFIC</span></dt>
+    <dd class="pd">only started spans.</dd>
+    </dl>
+  </dd>
+  <dt class="pt dlterm">MSGRECVR(NO | YES)</dt>
+  <dd class="pd">whether unsolicited messages are received.
+    <dl class="parml">
+    <dt class="pt dlterm">NO</dt><dd class="pd">they are not.</dd>
+    <dt class="pt dlterm">YES</dt><dd class="pd">they are.</dd>
+    </dl>
+  </dd>
+  <dt class="pt dlterm">OPCLASS(<em>class</em> ...)</dt><dd class="pd">the classes.</dd>
+  </dl>
+</dd>
+</dl>
+</section>
+"""
+
+#: ALTUSER's OPERPARM segment, five of the six levels that topic reaches. The
+#: alternation term at the top restates itself; AUTH enumerates beneath a term
+#: that does not restate the enumeration, and DOM restates it in its argument.
+OPERPARM = """
+<section class="section"><h2 class="sectiontitle">Parameters</h2>
+<dl class="parml">
+<dt class="pt dlterm">OPERPARM | NOOPERPARM</dt>
+<dd class="pd">the OPERPARM segment.
+  <dl class="parml">
+  <dt class="pt dlterm">OPERPARM</dt>
+  <dd class="pd">specifies it.
+    <dl class="parml">
+    <dt class="pt dlterm">AUTH | NOAUTH</dt>
+    <dd class="pd">the authority.
+      <dl class="parml">
+      <dt class="pt dlterm">AUTH</dt>
+      <dd class="pd">specifies it.
+        <dl class="parml">
+        <dt class="pt dlterm">MASTER</dt><dd class="pd">master authority.</dd>
+        <dt class="pt dlterm">ALL</dt><dd class="pd">all of them.</dd>
+        </dl>
+      </dd>
+      <dt class="pt dlterm">NOAUTH</dt><dd class="pd">removes it.</dd>
+      </dl>
+    </dd>
+    <dt class="pt dlterm">DOM | NODOM</dt>
+    <dd class="pd">the DOM authority.
+      <dl class="parml">
+      <dt class="pt dlterm">DOM(NORMAL | ALL | NONE)</dt>
+      <dd class="pd">specifies it.
+        <dl class="parml">
+        <dt class="pt dlterm">NORMAL</dt><dd class="pd">the default.</dd>
+        <dt class="pt dlterm">ALL</dt><dd class="pd">all of them.</dd>
+        <dt class="pt dlterm">NONE</dt><dd class="pd">none of them.</dd>
+        </dl>
+      </dd>
+      </dl>
+    </dd>
+    </dl>
+  </dd>
+  <dt class="pt dlterm">NOOPERPARM</dt><dd class="pd">removes it.</dd>
+  </dl>
+</dd>
+</dl>
 </section>
 """
 
@@ -116,7 +246,7 @@ class SectionScopeTests(unittest.TestCase):
         self.assertNotIn("OPERATION", parameters)
 
     def test_an_absent_section_is_reported_rather_than_guessed(self) -> None:
-        self.assertIsNone(RACF.section_named(SET, "Parameters"))
+        self.assertIsNone(RACF.section_named(UMBRELLA, "Parameters"))
 
     def test_a_repeated_heading_is_refused_not_resolved_by_taking_the_first(
         self,
@@ -147,10 +277,30 @@ class AliasTests(unittest.TestCase):
         )
 
     def test_a_brace_group_that_is_not_the_commands_own_is_not_an_alias(self) -> None:
-        # The regression: an unanchored search returns SETONLY and NOSET, which
-        # are values of the AUTOAPPL operand, not abbreviations of SET.
+        # The regression, and the group it is really about. `{SET | SETONLY |
+        # NOSET}` is in the ADDSD topic, where it is ADDSD's own operand; ADDSD
+        # abbreviates to AD and nothing else.
+        syntax = RACF.section_named(ADDSD, "Syntax")
+        self.assertIn("{ SET | SETONLY | NOSET }", RACF.text_of(syntax))
+        self.assertEqual(RACF.aliases(syntax, "ADDSD"), ["AD"])
+
+    def test_the_group_naming_setonly_is_an_operand_of_addsd(self) -> None:
+        # It is defined under ADDSD's Parameters with all three restated
+        # beneath it, which is what an operand alternation looks like and what
+        # an abbreviation list never does.
+        terms = RACF.operands(RACF.section_named(ADDSD, "Parameters"))
+        self.assertEqual(terms[0]["names"], ["SET", "SETONLY", "NOSET"])
+        self.assertEqual(terms[0]["values"], ["SET", "SETONLY", "NOSET"])
+
+    def test_the_set_command_has_no_group_of_its_own(self) -> None:
+        # SET returns no alias, and the reason is that its own Syntax section
+        # brace-groups two operands and never its keyword.
         syntax = RACF.section_named(SET, "Syntax")
         self.assertEqual(RACF.aliases(syntax, "SET"), [])
+        text = RACF.text_of(syntax)
+        self.assertIn("{ SYSTEM | JOBNAME( jobname ...) }", text)
+        self.assertIn("{ COUNT( number ) | RESET }", text)
+        self.assertNotIn("SETONLY", text)
 
     def test_several_alternatives_are_all_returned(self) -> None:
         syntax = '<h2 class="sectiontitle">Syntax</h2>{PASSWORD | PW | PHRASE}'
@@ -232,6 +382,81 @@ class OperandTests(unittest.TestCase):
         self.assertEqual(RACF.operands("<p>prose only</p>"), [])
 
 
+def find(entries: list[dict[str, object]], term: str) -> dict[str, object]:
+    for entry in RACF.descendants(entries):
+        if entry["term"] == term:
+            return entry
+    raise AssertionError(f"no term {term!r} in the tree")
+
+
+class NestingTests(unittest.TestCase):
+    """The depth below the operand, which the collapsed reading threw away."""
+
+    def setUp(self) -> None:
+        self.netview = RACF.operands(RACF.section_named(NETVIEW, "Parameters"))
+        self.operparm = RACF.operands(RACF.section_named(OPERPARM, "Parameters"))
+
+    def test_the_tree_is_as_deep_as_the_list(self) -> None:
+        self.assertEqual(RACF.nesting_depth(self.netview), 3)
+        self.assertEqual(RACF.nesting_depth(self.operparm), 5)
+
+    def test_a_grandchild_is_not_reported_against_the_operand(self) -> None:
+        # The defect. GENERAL, GLOBAL and SPECIFIC belong to CTL and NO and YES
+        # to MSGRECVR; all five were reported as members of the NETVIEW segment.
+        segment = self.netview[0]
+        self.assertEqual(segment["names"], ["NETVIEW"])
+        self.assertEqual(
+            segment["members"], ["CTL", "MSGRECVR", "OPCLASS"]
+        )
+        for name in ("GENERAL", "GLOBAL", "SPECIFIC", "NO", "YES"):
+            self.assertNotIn(name, segment["members"])
+
+    def test_a_term_below_the_operand_classifies_its_own_children(self) -> None:
+        self.assertEqual(
+            find(self.netview, "CTL")["members"], ["GENERAL", "GLOBAL", "SPECIFIC"]
+        )
+
+    def test_an_argument_that_states_its_alternatives_makes_them_values(self) -> None:
+        # ALTUSER writes `CTL(GENERAL | GLOBAL | SPECIFIC)` for the same three
+        # terms ADDUSER hangs under a bare `CTL`, so the argument is read too.
+        msgrecvr = find(self.netview, "MSGRECVR(NO | YES)")
+        self.assertEqual(msgrecvr["values"], ["NO", "YES"])
+        self.assertEqual(msgrecvr["members"], [])
+        self.assertEqual(
+            RACF.alternatives("DOM(NORMAL | ALL | NONE)"),
+            ["DOM", "NORMAL", "ALL", "NONE"],
+        )
+
+    def test_a_placeholder_argument_offers_nothing(self) -> None:
+        self.assertEqual(RACF.alternatives("OPCLASS(operator-class ...)"), ["OPCLASS"])
+        self.assertEqual(RACF.alternatives("MSCOPE(system-name ... | * | *ALL)"),
+                         ["MSCOPE"])
+
+    def test_an_enumeration_the_term_does_not_restate_reads_as_members(self) -> None:
+        # The rule stating what it can see. `AUTH` lists MASTER and ALL beneath
+        # itself without naming them in the term, so they are reported as
+        # members of AUTH — not as a claim that AUTH is a segment, and no
+        # longer as contents of OPERPARM.
+        self.assertEqual(find(self.operparm, "AUTH")["members"], ["MASTER", "ALL"])
+        self.assertEqual(self.operparm[0]["members"], [])
+        self.assertEqual(self.operparm[0]["values"], ["OPERPARM", "NOOPERPARM"])
+
+    def test_the_same_name_may_be_a_value_here_and_a_member_there(self) -> None:
+        self.assertIn("ALL", find(self.operparm, "AUTH")["members"])
+        self.assertIn("ALL", find(self.operparm, "DOM(NORMAL | ALL | NONE)")["values"])
+
+    def test_a_term_with_no_parent_at_the_level_above_stops_the_run(self) -> None:
+        # A `dl` that opens two levels at once leaves a term with no term to
+        # belong to. Attaching it to the nearest one available would report a
+        # reader defect as a fact about the publication. No topic of the 60
+        # does this.
+        skipped = (
+            '<dl><dt>OMVS</dt><dd><dl><dl><dt>UID</dt><dd>x</dd></dl></dl></dd></dl>'
+        )
+        with self.assertRaises(ValueError):
+            RACF.operand_tree(skipped)
+
+
 DELUSER = """
 <section class="section refsyn"><h2 class="sectiontitle">Syntax</h2>
 <p data-hd-otherprops="nohelp">The complete syntax of the DELUSER command is:</p>
@@ -279,14 +504,26 @@ class SurfaceTests(unittest.TestCase):
         surface = RACF.surface(ADDGROUP, "ADDGROUP")
         reachable = {
             name
-            for term in surface["terms"]
+            for term in RACF.descendants(surface["terms"])
             for name in term["names"] + term["values"] + term["members"]
         }
         self.assertNotIn("TERMUACC", reachable)
         self.assertIn("TERMUACC", surface["tokens"])
 
+    def test_every_level_is_reachable_from_the_surface(self) -> None:
+        # `reachable` above walks the tree, so a name the publication puts three
+        # levels down cannot be mistaken for one the syntax table alone draws.
+        surface = RACF.surface(NETVIEW, "ADDUSER")
+        reachable = {
+            name
+            for term in RACF.descendants(surface["terms"])
+            for name in term["names"] + term["values"] + term["members"]
+        }
+        self.assertIn("SPECIFIC", reachable)
+        self.assertIn("YES", reachable)
+
     def test_a_topic_with_no_parameters_section_says_so(self) -> None:
-        self.assertFalse(RACF.surface(SET, "SET")["has_parameters"])
+        self.assertFalse(RACF.surface(UMBRELLA, "RACDCERT")["has_parameters"])
 
 
 BOOK = "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/abstract.htm"
