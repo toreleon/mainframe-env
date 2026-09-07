@@ -12,121 +12,121 @@
         {
           "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0001",
           "label": "JCL command",
-          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:JCL command;table:idg6175__cjsts",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:JCL command;table:idg6175__cjsts;row:1",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0002",
           "label": "COMMAND",
-          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:COMMAND;table:idg6175__cjsts",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:COMMAND;table:idg6175__cjsts;row:2",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0003",
           "label": "comment",
-          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:comment;table:idg6175__cjsts",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:comment;table:idg6175__cjsts;row:3",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0004",
           "label": "CNTL",
-          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:CNTL;table:idg6175__cjsts",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:CNTL;table:idg6175__cjsts;row:4",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0005",
           "label": "DD",
-          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:DD;table:idg6175__cjsts",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:DD;table:idg6175__cjsts;row:5",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0006",
           "label": "delimiter",
-          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:delimiter;table:idg6175__cjsts",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:delimiter;table:idg6175__cjsts;row:6",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0007",
           "label": "ENDCNTL",
-          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:ENDCNTL;table:idg6175__cjsts",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:ENDCNTL;table:idg6175__cjsts;row:7",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0008",
           "label": "EXEC",
-          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:EXEC;table:idg6175__cjsts",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:EXEC;table:idg6175__cjsts;row:8",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0009",
           "label": "EXPORT",
-          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:EXPORT;table:idg6175__cjsts",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:EXPORT;table:idg6175__cjsts;row:9",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0010",
           "label": "IF/THEN/ELSE/ENDIF",
-          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:IF/THEN/ELSE/ENDIF;table:idg6175__cjsts",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:IF/THEN/ELSE/ENDIF;table:idg6175__cjsts;row:10",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0011",
           "label": "INCLUDE",
-          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:INCLUDE;table:idg6175__cjsts",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:INCLUDE;table:idg6175__cjsts;row:11",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0012",
           "label": "JCLLIB",
-          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:JCLLIB;table:idg6175__cjsts",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:JCLLIB;table:idg6175__cjsts;row:12",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0013",
           "label": "JOB",
-          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:JOB;table:idg6175__cjsts",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:JOB;table:idg6175__cjsts;row:13",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0014",
           "label": "null",
-          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:null;table:idg6175__cjsts",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:null;table:idg6175__cjsts;row:14",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0015",
           "label": "OUTPUT JCL",
-          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:OUTPUT JCL;table:idg6175__cjsts",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:OUTPUT JCL;table:idg6175__cjsts;row:15",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0016",
           "label": "PEND",
-          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:PEND;table:idg6175__cjsts",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:PEND;table:idg6175__cjsts;row:16",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0017",
           "label": "PROC",
-          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:PROC;table:idg6175__cjsts",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:PROC;table:idg6175__cjsts;row:17",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0018",
           "label": "SCHEDULE",
-          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:SCHEDULE;table:idg6175__cjsts",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:SCHEDULE;table:idg6175__cjsts;row:18",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0019",
           "label": "SET",
-          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:SET;table:idg6175__cjsts",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:SET;table:idg6175__cjsts;row:19",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0020",
           "label": "XMIT",
-          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:XMIT;table:idg6175__cjsts",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:XMIT;table:idg6175__cjsts;row:20",
           "mandatory": true
         }
       ]

@@ -14,7 +14,10 @@ table of contents -- the ordered children of a named anchor -- never by matching
 its heading text.  That is what keeps the three z/OSMF rows all labelled "Error
 reporting categories" attached to the three different topics they came from: they
 are the 75th, 141st and 153rd child of their subtree, and nothing about them is
-compared as text.
+compared as text.  The twenty rows that are body rows of a table rather than
+topics of their own are addressed the same way, by the table's id and the row's
+ordinal within it, so the locator this tool emits identifies every row without
+appealing to the heading beside it.
 
 Two retrieval endpoints back the cache:
 
@@ -199,24 +202,56 @@ class Toc:
 
 
 @dataclass(frozen=True)
+class Appendix:
+    """A second named anchor and the exact children taken from it, in order.
+
+    One reviewed unit ends with headings the review promoted from deeper in the
+    tree than the rest of the unit.  They are declared the same way everything
+    else here is -- one named parent href, then the child hrefs by name with the
+    label the tree carries beside each -- so that the unit's tail says which
+    topics it is and stops if the publication no longer agrees.  It replaces a
+    positional slice of the whole subtree, which named none of that and would
+    have taken six different topics without complaint.
+    """
+
+    anchor: str
+    take: tuple[tuple[str, str], ...] = ()
+
+    def select(self, toc: Toc) -> list[dict[str, Any]]:
+        children = {
+            node.get("href"): node for node in (toc.anchor(self.anchor).get("topics") or ())
+        }
+        chosen: list[dict[str, Any]] = []
+        for href, label in self.take:
+            require(href in children, f"appended {href} is not a child of {self.anchor}")
+            found = clean(children[href].get("label", ""))
+            require(
+                found == clean(label),
+                f"appended {href} is labelled {found!r}, declared {clean(label)!r}",
+            )
+            chosen.append(children[href])
+        return chosen
+
+
+@dataclass(frozen=True)
 class Selector:
     """An ordered table-of-contents subtree, minus a named exclusion set.
 
-    No field of this selector is a heading to be matched.  `anchor` and every
-    `exclude` entry is an exact href; the labels beside the excluded hrefs are
-    carried only so the declaration is readable, and both must agree or the tool
-    refuses to run.  Row order is document order, so a row's identity is its
-    position, which is the one thing a heading-driven rewrite cannot forge.
+    No field of this selector is a heading to be matched.  `anchor`, every
+    `exclude` entry and every `append` entry is an exact href; the labels beside
+    those hrefs are carried only so the declaration is readable, and both must
+    agree or the tool refuses to run.  Row order is document order, so a row's
+    identity is its position, which is the one thing a heading-driven rewrite
+    cannot forge.
     """
 
     product: str
     anchor: str
     depth: int = 1
     exclude: tuple[tuple[str, str], ...] = ()
-    # z/OSMF's reviewed unit ends with headings the review promoted from one
-    # level deeper; they are appended after the whole depth-`depth` sequence.
-    append_depth: int | None = None
-    append_take: int = 0
+    # Headings the review promoted from deeper in the tree, appended after the
+    # whole depth-`depth` sequence.  Named, never sliced.
+    append: Appendix | None = None
     # "toc-label": the label the table of contents carries.
     # "topic-h1":  the topic's own title, for units whose reviewed labels are the
     #              full topic titles rather than the shorter navigation labels.
@@ -238,8 +273,8 @@ class Selector:
             )
         dropped = {href for href, _ in self.exclude}
         kept = [node for node in nodes if node.get("href") not in dropped]
-        if self.append_depth is not None:
-            kept = kept + Toc.descend(anchor, self.append_depth)[: self.append_take]
+        if self.append is not None:
+            kept = kept + self.append.select(toc)
         return kept
 
 
@@ -348,6 +383,7 @@ JCL_BOOK = "SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600"
 AMS_BOOK = "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200"
 RACF_BOOK = "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400"
 ZOSMF_BOOK = "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700"
+ZOSMF_RESOURCE_POOL = f"{ZOSMF_BOOK}/izuprog_API_CloudResourcePoolServices.htm"
 
 SELECTORS: dict[tuple[str, str], Selector] = {
     ("cobol", "procedure-statements"): Selector("SS6SG3_6.5", f"{COBOL_LR}/rlpdst.html"),
@@ -457,8 +493,24 @@ SELECTORS: dict[tuple[str, str], Selector] = {
         "SSLTBW_3.2.0",
         f"{ZOSMF_BOOK}/IZUHPINFO_RESTServices.htm",
         depth=2,
-        append_depth=3,
-        append_take=6,
+        # The reviewed unit ends with six operations of the cloud provisioning
+        # resource pool service, which sit one level below the rest of it.  They
+        # are the first six of that parent's sixteen children, and the six are
+        # named here rather than sliced off the front of the whole depth-3
+        # sequence: the six IP, port and SNA application-name operations are the
+        # reviewed roster, and the ten LPAR-pool and classification-rule
+        # operations beside them are not.
+        append=Appendix(
+            ZOSMF_RESOURCE_POOL,
+            (
+                (f"{ZOSMF_BOOK}/izuprog_API_RPObtainIP.htm", "Obtain an IP address"),
+                (f"{ZOSMF_BOOK}/izuprog_API_RPReleaseIP.htm", "Release an IP address"),
+                (f"{ZOSMF_BOOK}/izuprog_API_RPObtainPort.htm", "Obtain a port"),
+                (f"{ZOSMF_BOOK}/izuprog_API_RPReleasePort.htm", "Release a port"),
+                (f"{ZOSMF_BOOK}/izuprog_API_RPObtainSNAAppl.htm", "Obtain a SNA application name"),
+                (f"{ZOSMF_BOOK}/izuprog_API_RPReleaseSNAAppl.htm", "Release a SNA application name"),
+            ),
+        ),
     ),
 }
 
@@ -470,15 +522,29 @@ JCL_STATEMENTS_TOPIC = f"{JCL_BOOK}/iea3b6_JCL_statements.htm"
 JCL_STATEMENTS_TABLE = "idg6175__cjsts"
 JCL_STATEMENTS_TOPIC_ID = "statements-jcl"
 
-# The reviewed JCL statement roster.  These twenty rows are body rows of one
-# table, not table-of-contents nodes, so their identity is the row's position in
-# that table and the roster is declared here rather than read out of prose that
-# spells half of them in lowercase.  Each entry is checked against the cell it
-# came from below; the roster cannot drift out of alignment silently.
+JCL_STATEMENTS_COLUMNS = ("Statement", "Name", "Purpose")
+
+# The reviewed JCL statement roster, each name beside the published column it is
+# spelled in: 1 is the table's "Statement" column, 2 is its "Name" column.  The
+# roster is declared here rather than read out of the table because the table
+# spells half of it in lowercase, and it is checked against the table below.
+#
+# These twenty rows are body rows of one table, not table-of-contents nodes, so
+# their discriminator has to come out of the table itself.  There is no cell
+# anchor to cite: the markup gives every HEADER cell an id
+# (idg6175__cjsts__entry__1 through __3) and gives the body cells none, and a
+# body cell carries only `headers=` naming its column, which is identical all
+# the way down a column and so separates no two rows.  What is left is the body
+# row's ordinal, and it is this roster that makes the ordinal mean something --
+# entry i is required to be body row i, in the column declared beside it, so a
+# reordered or reworded table stops the tool rather than quietly repointing a
+# row.  That is why the emitted locator can carry `row:N` and be believed.
 JCL_STATEMENTS = (
-    "JCL command", "COMMAND", "comment", "CNTL", "DD", "delimiter", "ENDCNTL",
-    "EXEC", "EXPORT", "IF/THEN/ELSE/ENDIF", "INCLUDE", "JCLLIB", "JOB", "null",
-    "OUTPUT JCL", "PEND", "PROC", "SCHEDULE", "SET", "XMIT",
+    ("JCL command", 2), ("COMMAND", 1), ("comment", 1), ("CNTL", 1), ("DD", 1),
+    ("delimiter", 2), ("ENDCNTL", 1), ("EXEC", 1), ("EXPORT", 1),
+    ("IF/THEN/ELSE/ENDIF", 1), ("INCLUDE", 1), ("JCLLIB", 1), ("JOB", 1),
+    ("null", 2), ("OUTPUT JCL", 2), ("PEND", 1), ("PROC", 1), ("SCHEDULE", 1),
+    ("SET", 1), ("XMIT", 1),
 )
 
 
@@ -544,25 +610,34 @@ def jcl(cache: Path, units: dict[tuple[str, str], list[tuple[str, str]]]) -> dic
     baseline = "ibm-zos-3.2-jcl-jes2-2026-06"
     table = html(cache, JCL_STATEMENTS_TOPIC).select_one(f"#{JCL_STATEMENTS_TABLE}")
     require(table is not None, f"missing JCL table {JCL_STATEMENTS_TABLE}")
-    body = table_rows(table)[1:]
+    rows = table_rows(table)
+    require(
+        tuple(rows[0]) == JCL_STATEMENTS_COLUMNS,
+        f"JCL statement table columns are {rows[0]}, declared {list(JCL_STATEMENTS_COLUMNS)}",
+    )
+    body = rows[1:]
     require(
         len(body) == len(JCL_STATEMENTS),
         f"JCL statement table has {len(body)} body rows, roster has {len(JCL_STATEMENTS)}",
     )
     statements: list[tuple[str, str]] = []
-    for index, (name, cells) in enumerate(zip(JCL_STATEMENTS, body), 1):
+    for index, ((name, column), cells) in enumerate(zip(JCL_STATEMENTS, body), 1):
         require(len(cells) == 3, f"malformed JCL statement row: {cells}")
-        coded, spelled, _purpose = cells
-        coded = re.sub(r"^//\*?\s*", "", coded)
+        # The Statement column codes each name the way it is punched, so the
+        # comment and delimiter markers come off before the comparison.  The
+        # Name column carries the name alone.
+        cell = re.sub(r"^//\*?\s*", "", cells[0]) if column == 1 else cells[column - 1]
         require(
-            name.casefold() in (coded.casefold(), spelled.casefold()),
-            f"JCL statement roster row {index} {name!r} matches neither cell of {cells[:2]}",
+            cell.casefold() == name.casefold(),
+            f"JCL statement roster row {index} declares {name!r} in the "
+            f"{JCL_STATEMENTS_COLUMNS[column - 1]} column, where the published "
+            f"table carries {cell!r}",
         )
         statements.append(
             (
                 name,
                 f"topic:{JCL_STATEMENTS_TOPIC};topic-id:{JCL_STATEMENTS_TOPIC_ID}"
-                f";heading:{name};table:{JCL_STATEMENTS_TABLE}",
+                f";heading:{name};table:{JCL_STATEMENTS_TABLE};row:{index}",
             )
         )
     return catalog(
@@ -688,8 +763,8 @@ def mq(cache: Path) -> dict[str, Any]:
 # --------------------------------------------------------------------------
 
 # The twenty JCL statement rows are body rows of one table in one topic, so they
-# share a topic href by construction and only the whole locator separates them.
-# Every other relocated row gets a topic of its own.
+# share a topic href by construction and are separated by the `row:` ordinal the
+# locator carries.  Every other relocated row gets a topic of its own.
 SHARED_TOPIC_UNITS = {("ibm-zos-3.2-jcl-jes2-2026-06", "jcl-statements")}
 
 

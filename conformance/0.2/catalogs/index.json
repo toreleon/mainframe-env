@@ -111,7 +111,7 @@
         "retained_in_repository": false
       },
       "catalog": "conformance/0.2/catalogs/jcl-jes2.json",
-      "catalog_sha256": "sha256:e46b8f5de846c0ba667ac0bcdf17d0d655286f851d440e858ffd465210c485d9",
+      "catalog_sha256": "sha256:73bca6535e497397595d09d3bdb4342ae076bf79d63603e17b4cd09e8f36f519",
       "immutable_denominators": {
         "jcl-statements": 20,
         "jes2-jecl-statements": 13,
