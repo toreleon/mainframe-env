@@ -37,10 +37,19 @@ def node(label: str, href: str, *topics: dict[str, object]) -> dict[str, object]
     return {"label": label, "href": href, "topicId": href.rsplit("/", 1)[-1], "topics": list(topics)}
 
 
+def labelled(node: dict[str, object], depth: int = 0):
+    """Every (depth, label) at or below a node, counted from that node."""
+    yield depth, JCL.label_of(node)
+    for child in JCL.children(node):
+        yield from labelled(child, depth + 1)
+
+
 # A table of contents shaped like the real one: a book node found by href, a
 # childless duplicate of that href beside it, chapters with parameter children,
-# and -- the trap -- `Syntax` and `Subparameter definition` GRANDCHILDREN that
-# a descendant walk would report as parameters.
+# `Syntax` and `Subparameter definition` grandchildren that no reader could
+# take for a parameter whatever depth it reads at, and -- the actual trap --
+# the deeper topics that DO end in the word `parameter`, which a descendant
+# walk would report as three more of them.
 BOOK_HREF = "P/c/abstract.htm"
 TOC = {
     "toc": node(
@@ -58,8 +67,13 @@ TOC = {
                     "ACCODE parameter",
                     "P/c/xddaccod.htm",
                     node("Syntax", "P/c/Syntax1.htm"),
-                    node("Subparameter definition", "P/c/Sub1.htm"),
+                    node(
+                        "Subparameter definition",
+                        "P/c/Sub1.htm",
+                        node("Effect of DCB=dsname parameter", "P/c/Eff1.htm"),
+                    ),
                     node("Overrides", "P/c/Over1.htm"),
+                    node("Relationship to other parameters", "P/c/Rel1.htm"),
                 ),
                 node(
                     "AMP parameter",
@@ -120,12 +134,6 @@ class ParameterTests(unittest.TestCase):
         names = [item["name"] for item in JCL.parameters(chapter)]
         self.assertEqual(names, ["ACCODE", "AMP"])
 
-    def test_syntax_and_subparameter_grandchildren_are_never_parameters(self) -> None:
-        chapter = JCL.chapters(BOOK)["DD statement"]
-        names = [item["name"] for item in JCL.parameters(chapter)]
-        for section in ("SYNTAX", "SUBPARAMETER DEFINITION", "OVERRIDES"):
-            self.assertNotIn(section, names)
-
     def test_plural_parameter_titles_are_accepted(self) -> None:
         chapter = JCL.chapters(BOOK)["EXEC statement"]
         names = [item["name"] for item in JCL.parameters(chapter)]
@@ -142,6 +150,54 @@ class ParameterTests(unittest.TestCase):
     def test_a_parameter_carries_the_topic_it_was_taken_from(self) -> None:
         chapter = JCL.chapters(BOOK)["DD statement"]
         self.assertEqual(JCL.parameters(chapter)[0]["topic_path"], "P/c/xddaccod.htm")
+
+
+class DepthTrapTests(unittest.TestCase):
+    r"""The depth rule, asserted with labels that can actually break it.
+
+    What stood here asserted that `SYNTAX`, `SUBPARAMETER DEFINITION` and
+    `OVERRIDES` are absent from `parameters()`. They are -- and they are absent
+    from a reader that walks the whole subtree too, because `PARAMETER` is
+    `^(.+?)\s+parameters?$` and no section heading in this book ends in the
+    word. The assertion could not fail under the regression it was named for,
+    so it read as protection and was none.
+
+    The topics a descendant walk really admits are the cross-references and the
+    examples, which do end in the word: 91 `Relationship to other parameters`
+    across the four chapters, `Examples of the AMP parameter`, and at level 3
+    `Effect of DCB=dsname parameter`. Against the served tree that reports 424
+    parameters rather than 204, of which 150 are DD -- not the 451 that is just
+    the DD subtree's level-2 node count. All three shapes are in the fixture,
+    and the second test below is what keeps them there.
+    """
+
+    def test_a_deeper_topic_ending_in_the_word_is_not_a_parameter(self) -> None:
+        chapter = JCL.chapters(BOOK)["DD statement"]
+        names = [item["name"] for item in JCL.parameters(chapter)]
+        self.assertNotIn("RELATIONSHIP TO OTHER", names)
+        self.assertNotIn("EXAMPLES OF THE AMP", names)
+        self.assertNotIn("EFFECT OF DCB=DSNAME", names)
+        self.assertEqual(len(names), 2)
+
+    def test_the_fixture_still_carries_what_makes_that_a_test(self) -> None:
+        chapter = JCL.chapters(BOOK)["DD statement"]
+        below = sorted(
+            (depth, label)
+            for depth, label in labelled(chapter)
+            if depth > 1 and JCL.PARAMETER.match(label)
+        )
+        self.assertEqual(
+            below,
+            [
+                (2, "Examples of the AMP parameter"),
+                (2, "Relationship to other parameters"),
+                (3, "Effect of DCB=dsname parameter"),
+            ],
+        )
+
+    def test_a_section_heading_could_not_have_matched_at_any_depth(self) -> None:
+        for heading in ("Syntax", "Subparameter definition", "Defaults", "Overrides"):
+            self.assertIsNone(JCL.PARAMETER.match(heading), heading)
 
 
 class SectionTests(unittest.TestCase):
@@ -250,7 +306,8 @@ class ManifestTests(unittest.TestCase):
 
     The table of contents is 45 MB of publication bytes and lives outside the
     repository, so these run against what the fetch tool recorded. A reader
-    that walked descendants would have written 451 DD parameter topics here.
+    that walked descendants would have written 150 DD parameter topics here,
+    and 424 in total against the 204 the catalog carries.
     """
 
     @classmethod

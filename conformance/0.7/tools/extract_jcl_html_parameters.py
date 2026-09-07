@@ -10,11 +10,19 @@ It replaces a reader that took the same inventory from the PDF outline, and the
 one thing that reader got right is the thing easiest to lose here. The outline
 was read at depth exactly 1 -- chapter, then its immediate entries. The topic
 tree is deeper: the DD statement subtree is 566 nodes over four levels
-(1 / 75 / 451 / 39), and 199 of those are called `Syntax`, 188 `Subparameter
-definition`, 124 `Defaults` and 109 `Overrides`. A reader that walks
-descendants would report hundreds of "parameters" that are sections of one.
-`parameters()` therefore takes a chapter's DIRECT CHILDREN and nothing below
-them, and the tests assert the four counts the catalog records.
+(1 / 75 / 451 / 39). Most of that depth is inert, and saying which part is not
+is the whole of the guard. A section heading cannot be taken for a parameter at
+any depth, because `PARAMETER` requires the label to end in the word: across the
+book's 204 parameter topics their children include 199 `Syntax`, 188
+`Subparameter definition`, 124 `Defaults` and 109 `Overrides`, and none of those
+can match at level 1 or at level 3. What a descendant walk would really admit is
+the cross-reference and example topics, which do end in the word -- 91
+`Relationship to other parameters`, `Examples of the AMP parameter`, and at
+level 3 `Effect of DCB=dsname parameter`. Deduplicated by name, that reports 424
+parameters instead of 204: 150 DD, 48 EXEC, 80 JOB and 146 OUTPUT. Not 451,
+which is only the DD subtree's level-2 node count and is what the number here
+used to say. `parameters()` therefore takes a chapter's DIRECT CHILDREN and
+nothing below them, and the tests assert the four counts the catalog records.
 
 Three levels are emitted under three separate keys:
 
@@ -188,9 +196,13 @@ def chapters(node: dict[str, Any]) -> dict[str, dict[str, Any]]:
 def parameters(chapter: dict[str, Any]) -> list[dict[str, Any]]:
     """The parameters a chapter documents: its DIRECT CHILDREN, in order.
 
-    Direct children only. `Syntax`, `Subparameter definition`, `Defaults` and
-    `Overrides` are children of a parameter, not of the chapter, and a reader
-    that descended into them would report 451 "DD parameters" instead of 74.
+    Direct children only -- though not because of the section headings, which
+    are the wrong thing to picture here. `Syntax`, `Subparameter definition`,
+    `Defaults` and `Overrides` do not end in the word and so cannot match
+    `PARAMETER` at any depth. What a descendant walk admits is the deeper
+    topics that do end in it, `Relationship to other parameters` and `Examples
+    of the AMP parameter` among them, and it reports 150 "DD parameters"
+    instead of 74.
     """
     found: list[dict[str, Any]] = []
     seen: set[str] = set()
