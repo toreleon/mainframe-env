@@ -128,6 +128,48 @@ class DocumentTests(unittest.TestCase):
         self.assertEqual(GRAMMAR.kind_of("converting-phrase Format 1"), "fragment")
 
 
+class ProjectionTests(unittest.TestCase):
+    ROW = {
+        "id": "json-parse",
+        "row_id": "row:0024",
+        "label": "JSON PARSE statement",
+        "forms": ["JSON PARSE identifier-1 INTO identifier-2"],
+    }
+
+    def test_format_titles_leaves_out_the_phrase_fragments(self) -> None:
+        document = (
+            '<h3 class="syntaxdiagram-title">Format</h3>'
+            + svg(KEYWORD)
+            + '<h3 class="syntaxdiagram-title">when-phrase Format</h3>'
+            + svg(boxed("kwd", "WHEN"))
+        )
+        excluded: dict[tuple[str, str], int] = {}
+        result = GRAMMAR.project(
+            self.ROW, [("JSON PARSE statement", "any.html", document)], excluded
+        )
+        self.assertEqual(
+            [item["title"] for item in result["forms"]], ["Format", "when-phrase Format"]
+        )
+        self.assertEqual(result["format_titles"], ["Format"])
+
+    def test_a_declared_non_syntax_diagram_is_dropped(self) -> None:
+        path, title = next(iter(GRAMMAR.NON_SYNTAX.items()))
+        excluded: dict[tuple[str, str], int] = {}
+        result = GRAMMAR.project(
+            self.ROW, [(title, path, svg(boxed("kwd", "[0-9]")))], excluded
+        )
+        self.assertEqual(result["forms"], [])
+        self.assertEqual(excluded, {(path, title): 1})
+
+    def test_a_non_syntax_exclusion_needs_the_title_as_well_as_the_path(self) -> None:
+        path = next(iter(GRAMMAR.NON_SYNTAX))
+        document = '<h3 class="syntaxdiagram-title">Format</h3>' + svg(KEYWORD)
+        excluded: dict[tuple[str, str], int] = {}
+        result = GRAMMAR.project(self.ROW, [("Format", path, document)], excluded)
+        self.assertEqual([item["title"] for item in result["forms"]], ["Format"])
+        self.assertEqual(excluded, {})
+
+
 class TopicTests(unittest.TestCase):
     LOCATOR = (
         "topic:SS6SG3_6.5/lr/ref/rlpsadd.html"
@@ -175,6 +217,8 @@ class TopicTests(unittest.TestCase):
 class ComparisonTests(unittest.TestCase):
     def row(self) -> dict[str, object]:
         form = {
+            "title": "Format 1: ADD statement",
+            "kind": "format",
             "main_line": [
                 {"kind": "keyword", "value": "ADD"},
                 {"kind": "operand", "value": "identifier-1"},
@@ -212,6 +256,24 @@ class ComparisonTests(unittest.TestCase):
         result = COMPARE.compare(self.row())
         self.assertEqual(result["alternatives"], ["literal-1"])
         self.assertEqual(result["optionals"], ["ROUNDED"])
+
+    def test_phrase_fragments_are_not_counted_against_the_catalog_forms(self) -> None:
+        row = self.row()
+        row["forms"].append(
+            {
+                "title": "when-phrase Format",
+                "kind": "fragment",
+                "main_line": [{"kind": "keyword", "value": "WHEN"}],
+                "branches": [],
+            }
+        )
+        result = COMPARE.compare(row)
+        self.assertEqual(result["source_diagram_count"], 2)
+        self.assertEqual(result["source_format_count"], 1)
+        self.assertEqual(result["source_fragment_count"], 1)
+        # A keyword the publication only reaches through a phrase fragment is
+        # still a keyword of the statement.
+        self.assertIn("WHEN", result["keywords_missing_from_catalog"])
 
     def test_fragment_placeholders_are_not_counted_as_keywords(self) -> None:
         row = self.row()

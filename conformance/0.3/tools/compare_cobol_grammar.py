@@ -6,6 +6,14 @@ sketches.  This tool reports where the source diagrams carry structure the
 sketch does not: extra formats, keywords absent from the sketch, and operands
 the sketch folds into an undefined placeholder.
 
+"Extra formats" counts statement formats against catalog forms. The projection
+also carries the reference's named phrase fragments -- `when-phrase Format`,
+`converting-phrase-1 Format 2` -- and those are diagrams of a phrase the
+statement may take, not further ways of writing the statement, so counting them
+here would report a row as under-describing a format family it does not have.
+Their keywords are still compared, because a keyword the publication only
+reaches through a phrase fragment is still a keyword of the statement.
+
 It reads the projection schema rather than any particular publication format,
 so it is indifferent to how the diagrams were recovered.
 
@@ -64,6 +72,15 @@ def compare(row: dict[str, Any]) -> dict[str, Any]:
         "title": row["title"],
         "catalog_form_count": len(catalog_forms),
         "source_diagram_count": len(row["forms"]),
+        # A catalog form is a way of writing the statement, so the count that
+        # can be compared against it is the statement formats, not every
+        # diagram the topic publishes.
+        "source_format_count": sum(
+            1 for form in row["forms"] if form["kind"] == "format"
+        ),
+        "source_fragment_count": sum(
+            1 for form in row["forms"] if form["kind"] != "format"
+        ),
         "source_format_titles": row.get("format_titles", []),
         "catalog_keywords": sorted(catalog_keywords),
         "source_keywords": sorted(source_keywords),
@@ -105,11 +122,13 @@ def main(argv: Iterable[str] | None = None) -> int:
         "rows": len(rows),
         "catalog_forms": sum(row["catalog_form_count"] for row in rows),
         "source_diagrams": sum(row["source_diagram_count"] for row in rows),
+        "source_formats": sum(row["source_format_count"] for row in rows),
+        "source_phrase_fragments": sum(row["source_fragment_count"] for row in rows),
         "source_format_titles": sum(len(row["source_format_titles"]) for row in rows),
         "rows_with_more_source_formats": sum(
             1
             for row in rows
-            if row["source_diagram_count"] > row["catalog_form_count"]
+            if row["source_format_count"] > row["catalog_form_count"]
         ),
         "rows_with_missing_keywords": sum(
             1 for row in rows if row["keywords_missing_from_catalog"]

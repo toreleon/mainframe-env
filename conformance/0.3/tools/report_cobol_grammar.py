@@ -28,7 +28,7 @@ def main() -> int:
         name = row["title"].replace(" statement", "")
         print(
             f"{name:20} {row['catalog_form_count']:7} "
-            f"{len(row['source_format_titles']):4} {row['source_diagram_count']:9} "
+            f"{row['source_format_count']:4} {row['source_diagram_count']:9} "
             f"{len(row['keywords_missing_from_catalog']):8}  "
             + ", ".join(row["keywords_missing_from_catalog"][:6])
         )
@@ -36,13 +36,13 @@ def main() -> int:
     print("\nformat inventory gaps")
     for row in sorted(
         comparison["rows"],
-        key=lambda row: -(row["source_diagram_count"] - row["catalog_form_count"]),
+        key=lambda row: -(row["source_format_count"] - row["catalog_form_count"]),
     )[:8]:
         name = row["title"].replace(" statement", "")
         print(
             f"  {name:20} catalog={row['catalog_form_count']} "
-            f"titles={len(row['source_format_titles'])} "
-            f"diagrams={row['source_diagram_count']}"
+            f"formats={row['source_format_count']} "
+            f"fragments={row['source_fragment_count']}"
         )
         for title in row["source_format_titles"][:4]:
             print(f"      - {title}")

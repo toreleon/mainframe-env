@@ -2871,12 +2871,7 @@
         "JSON GENERATE receiver FROM source [COUNT IN item] [ON EXCEPTION statements] [END-JSON]"
       ],
       "format_titles": [
-        "Format",
-        "when-phrase Format",
-        "generic-suppression-phrase Format",
-        "converting-phrase Format 1",
-        "converting-phrase Format 2",
-        "indicating-phrase-1 format"
+        "Format"
       ],
       "forms": [
         {
@@ -3361,13 +3356,7 @@
         "JSON PARSE source INTO target [WITH DETAIL] [ON EXCEPTION statements] [END-JSON]"
       ],
       "format_titles": [
-        "Format",
-        "ignoring-phrase-1 Format",
-        "indicating-phrase-1 Format",
-        "converting-phrase-1 Format 1",
-        "converting-phrase-1 Format 2",
-        "using-phrase-1 Format",
-        "Valid and invalid elementary moves"
+        "Format"
       ],
       "forms": [
         {
@@ -3746,66 +3735,6 @@
             }
           ],
           "title": "using-phrase-1 Format"
-        },
-        {
-          "branches": [
-            {
-              "kind": "keyword",
-              "relation": "optional",
-              "value": "space"
-            },
-            {
-              "kind": "fragment",
-              "relation": "optional",
-              "value": "'+'"
-            },
-            {
-              "kind": "fragment",
-              "relation": "optional",
-              "value": "'-'"
-            },
-            {
-              "kind": "fragment",
-              "relation": "optional",
-              "value": "'.'"
-            },
-            {
-              "kind": "keyword",
-              "relation": "optional",
-              "value": "[0-9]"
-            },
-            {
-              "kind": "fragment",
-              "relation": "alternative",
-              "value": "'.'"
-            },
-            {
-              "kind": "keyword",
-              "relation": "alternative",
-              "value": "[0-9]"
-            },
-            {
-              "kind": "keyword",
-              "relation": "optional",
-              "value": "space"
-            }
-          ],
-          "kind": "fragment",
-          "main_line": [
-            {
-              "kind": "fragment",
-              "value": "\""
-            },
-            {
-              "kind": "keyword",
-              "value": "[0-9]"
-            },
-            {
-              "kind": "fragment",
-              "value": "\""
-            }
-          ],
-          "title": "Valid and invalid elementary moves"
         }
       ],
       "id": "json-parse",
@@ -6996,9 +6925,7 @@
         "XML GENERATE receiver FROM source [COUNT IN item] [ON EXCEPTION statements] [END-XML]"
       ],
       "format_titles": [
-        "Format",
-        "when-phrase Format",
-        "generic-suppression-phrase Format"
+        "Format"
       ],
       "forms": [
         {

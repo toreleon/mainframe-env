@@ -45,10 +45,12 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0001",
       "source_diagram_count": 2,
+      "source_format_count": 2,
       "source_format_titles": [
         "Format 1: data transfer",
         "Format 2: system information transfer"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "ACCEPT",
         "DATE",
@@ -113,11 +115,13 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0002",
       "source_diagram_count": 3,
+      "source_format_count": 3,
       "source_format_titles": [
         "Format 1: ADD statement",
         "Format 2: ADD statement with GIVING phrase",
         "Format 3: ADD statement with CORRESPONDING phrase"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "ADD",
         "CORR",
@@ -170,9 +174,11 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0003",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "ALLOCATE",
         "CHARACTERS",
@@ -211,9 +217,11 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0004",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "ALTER",
         "PROCEED TO",
@@ -292,9 +300,11 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0005",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "ADDRESS OF",
         "AS FIXED LENGTH",
@@ -350,9 +360,11 @@
       "optionals": [],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0006",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "CANCEL"
       ],
@@ -400,11 +412,13 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0007",
       "source_diagram_count": 3,
+      "source_format_count": 3,
       "source_format_titles": [
         "Format 1: CLOSE statement for sequential files",
         "Format 2: CLOSE statement for indexed and relative files",
         "Format 3: CLOSE statement for line-sequential files"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "CLOSE",
         "FOR",
@@ -460,9 +474,11 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0008",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "COMPUTE",
         "END-COMPUTE",
@@ -493,9 +509,11 @@
       "optionals": [],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0009",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "CONTINUE"
       ],
@@ -532,9 +550,11 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0010",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "DELETE",
         "END-DELETE",
@@ -583,9 +603,11 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0011",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "DISPLAY",
         "NO ADVANCING",
@@ -643,6 +665,7 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0012",
       "source_diagram_count": 5,
+      "source_format_count": 5,
       "source_format_titles": [
         "Format 1: DIVIDE statement",
         "Format 2: DIVIDE statement with INTO and GIVING phrases",
@@ -650,6 +673,7 @@
         "Format 4: DIVIDE statement with INTO and REMAINDER phrases",
         "Format 5: DIVIDE statement with BY and REMAINDER phrases"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "BY",
         "DIVIDE",
@@ -701,9 +725,11 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0013",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "BY",
         "ENTRY",
@@ -781,9 +807,11 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0014",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "ALSO",
         "ANY",
@@ -856,6 +884,7 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0015",
       "source_diagram_count": 5,
+      "source_format_count": 5,
       "source_format_titles": [
         "Format 1",
         "Format 2",
@@ -863,6 +892,7 @@
         "Format 5",
         "Format 6"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "CYCLE",
         "EXIT",
@@ -892,9 +922,11 @@
       "optionals": [],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0016",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "FREE"
       ],
@@ -914,9 +946,11 @@
       "optionals": [],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0017",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "GOBACK"
       ],
@@ -945,11 +979,13 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0018",
       "source_diagram_count": 3,
+      "source_format_count": 3,
       "source_format_titles": [
         "Format 1: unconditional GO TO statement",
         "Format 2: conditional GO TO statement",
         "Format 3: altered GO TO statement"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "DEPENDING",
         "GO",
@@ -992,9 +1028,11 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0019",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "ELSE",
         "END-IF",
@@ -1051,9 +1089,11 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0020",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "ALL",
         "BY",
@@ -1127,12 +1167,14 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0021",
       "source_diagram_count": 4,
+      "source_format_count": 4,
       "source_format_titles": [
         "Format 1: INSPECT statement with TALLYING phrase",
         "Format 2: INSPECT statement with REPLACING phrase",
         "Format 3: INSPECT statement with TALLYING and REPLACING phrases",
         "Format 4: INSPECT statement with CONVERTING phrase"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "AFTER",
         "ALL",
@@ -1218,9 +1260,11 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0022",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "BY",
         "END-INVOKE",
@@ -1372,14 +1416,11 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0023",
       "source_diagram_count": 6,
+      "source_format_count": 1,
       "source_format_titles": [
-        "Format",
-        "when-phrase Format",
-        "generic-suppression-phrase Format",
-        "converting-phrase Format 1",
-        "converting-phrase Format 2",
-        "indicating-phrase-1 format"
+        "Format"
       ],
+      "source_fragment_count": 5,
       "source_keywords": [
         "ALSO",
         "BOOL",
@@ -1451,10 +1492,8 @@
     },
     {
       "alternatives": [
-        "'.'",
         "AND",
         "BOOL",
-        "[0-9]",
         "condition-name-2",
         "condition-name-3",
         "identifier-5",
@@ -1503,14 +1542,9 @@
         "OF",
         "OMITTED",
         "SUPPRESS",
-        "USING",
-        "[0-9]",
-        "space"
+        "USING"
       ],
       "optionals": [
-        "'+'",
-        "'-'",
-        "'.'",
         "ALSO",
         "CONVERTING",
         "DETAIL",
@@ -1532,7 +1566,6 @@
         "SUPPRESS",
         "USING",
         "WITH",
-        "[0-9]",
         "converting-phrase-1",
         "identifier-10",
         "identifier-3",
@@ -1543,20 +1576,15 @@
         "imperative-statement-2",
         "indicating-phrase-1",
         "literal-1",
-        "literal-4",
-        "space"
+        "literal-4"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
-      "source_diagram_count": 7,
+      "source_diagram_count": 6,
+      "source_format_count": 1,
       "source_format_titles": [
-        "Format",
-        "ignoring-phrase-1 Format",
-        "indicating-phrase-1 Format",
-        "converting-phrase-1 Format 1",
-        "converting-phrase-1 Format 2",
-        "using-phrase-1 Format",
-        "Valid and invalid elementary moves"
+        "Format"
       ],
+      "source_fragment_count": 5,
       "source_keywords": [
         "ALL",
         "ALSO",
@@ -1586,9 +1614,7 @@
         "ON",
         "SUPPRESS",
         "USING",
-        "WITH",
-        "[0-9]",
-        "space"
+        "WITH"
       ],
       "source_operands": [
         "condition-name-1",
@@ -1662,9 +1688,11 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0025",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "ASCENDING",
         "COLLATING",
@@ -1715,10 +1743,12 @@
       "optionals": [],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0026",
       "source_diagram_count": 2,
+      "source_format_count": 2,
       "source_format_titles": [
         "Format 1: MOVE statement",
         "Format 2: MOVE statement with CORRESPONDING phrase"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "CORR",
         "CORRESPONDING",
@@ -1773,10 +1803,12 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0027",
       "source_diagram_count": 2,
+      "source_format_count": 2,
       "source_format_titles": [
         "Format 1: MULTIPLY statement",
         "Format 2: MULTIPLY statement with GIVING phrase"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "BY",
         "END-MULTIPLY",
@@ -1834,11 +1866,13 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0028",
       "source_diagram_count": 3,
+      "source_format_count": 3,
       "source_format_titles": [
         "Format 1: OPEN statement for sequential files",
         "Format 2: OPEN statement for indexed and relative files",
         "Format 3: OPEN statement for line-sequential files"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "EXTEND",
         "I-O",
@@ -1911,12 +1945,14 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0029",
       "source_diagram_count": 4,
+      "source_format_count": 4,
       "source_format_titles": [
         "Format 1: Basic PERFORM statement",
         "Format 2: PERFORM statement with TIMES phrase",
         "Format 3: PERFORM statement with UNTIL phrase",
         "Format 4: PERFORM statement with VARYING phrase"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "AFTER",
         "BEFORE",
@@ -2021,10 +2057,12 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0030",
       "source_diagram_count": 2,
+      "source_format_count": 2,
       "source_format_titles": [
         "Format 1: READ statement for sequential retrieval",
         "Format 2: READ statement for random retrieval"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "AT",
         "END",
@@ -2070,9 +2108,11 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0031",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format: RELEASE"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "FROM",
         "RELEASE"
@@ -2117,9 +2157,11 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0032",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format: RETURN statement"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "AT",
         "END",
@@ -2169,9 +2211,11 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0033",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format: REWRITE statement"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "END-REWRITE",
         "FROM",
@@ -2246,10 +2290,12 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0034",
       "source_diagram_count": 2,
+      "source_format_count": 2,
       "source_format_titles": [
         "Format 1: SEARCH statement for serial search",
         "Format 2: SEARCH statement for binary search"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "=",
         "AND",
@@ -2343,6 +2389,7 @@
       "optionals": [],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0035",
       "source_diagram_count": 8,
+      "source_format_count": 8,
       "source_format_titles": [
         "Format 1: SET statement for basic table handling",
         "Format 2: SET statement for adjusting indexes",
@@ -2353,6 +2400,7 @@
         "Format 7: SET statement for object references",
         "Format 8: SET for length of dynamic-length elementary items"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "ADDRESS OF",
         "DOWN BY",
@@ -2464,10 +2512,12 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0036",
       "source_diagram_count": 2,
+      "source_format_count": 2,
       "source_format_titles": [
         "Format 1: SORT statement",
         "Format 2: Table SORT statement"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "ASCENDING",
         "COLLATING",
@@ -2557,9 +2607,11 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0037",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "=",
         ">",
@@ -2608,9 +2660,11 @@
       "optionals": [],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0038",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "RUN",
         "STOP"
@@ -2665,9 +2719,11 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0039",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "BY",
         "DELIMITED",
@@ -2737,11 +2793,13 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0040",
       "source_diagram_count": 3,
+      "source_format_count": 3,
       "source_format_titles": [
         "Format 1: SUBTRACT statement",
         "Format 2: SUBTRACT statement with GIVING phrase",
         "Format 3: SUBTRACT statement with CORRESPONDING phrase"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "CORR",
         "CORRESPONDING",
@@ -2825,9 +2883,11 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0041",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "ALL",
         "BY",
@@ -2922,11 +2982,13 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0042",
       "source_diagram_count": 3,
+      "source_format_count": 3,
       "source_format_titles": [
         "Format 1: WRITE statement for sequential files",
         "Format 2: WRITE statement for indexed and relative files",
         "Format 3: WRITE statement for line-sequential files"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "ADVANCING",
         "AFTER",
@@ -3074,11 +3136,11 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0043",
       "source_diagram_count": 3,
+      "source_format_count": 1,
       "source_format_titles": [
-        "Format",
-        "when-phrase Format",
-        "generic-suppression-phrase Format"
+        "Format"
       ],
+      "source_fragment_count": 2,
       "source_keywords": [
         "ATTRIBUTE",
         "ATTRIBUTES",
@@ -3196,9 +3258,11 @@
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044",
       "source_diagram_count": 1,
+      "source_format_count": 1,
       "source_format_titles": [
         "Format"
       ],
+      "source_fragment_count": 0,
       "source_keywords": [
         "ENCODING",
         "END-XML",
@@ -3237,12 +3301,14 @@
   "totals": {
     "catalog_forms": 49,
     "distinct_catalog_placeholders": 33,
-    "distinct_keywords_missing": 139,
+    "distinct_keywords_missing": 137,
     "distinct_source_operands": 80,
     "rows": 44,
     "rows_with_missing_keywords": 37,
-    "rows_with_more_source_formats": 18,
-    "source_diagrams": 96,
-    "source_format_titles": 96
+    "rows_with_more_source_formats": 15,
+    "source_diagrams": 95,
+    "source_format_titles": 83,
+    "source_formats": 83,
+    "source_phrase_fragments": 12
   }
 }
