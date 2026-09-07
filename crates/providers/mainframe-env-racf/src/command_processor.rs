@@ -10,9 +10,9 @@ use crate::model::{
     IdentityMapping, KeyReference, KeyRing, MfaFactor, MfaFactorKind, PrincipalKind,
     PrincipalProfile, PrincipalState, ProfileSegment, ProfileTemplate, RaclistCache,
     ResourceProfile, RrsfNode, RrsfNodeState, SafStatus, SecurityAuditRecord,
-    SecurityDatabaseSnapshot, SecurityTransaction, SegmentFieldKind, SegmentFieldSchema,
-    SegmentTemplate, SegmentValue, SignonSessionState, TransactionState, UserAssociation,
-    connection_key, keyring_key, profile_key,
+    SecurityDatabaseSnapshot, SecurityPolicyOptions, SecurityTransaction, SegmentFieldKind,
+    SegmentFieldSchema, SegmentTemplate, SegmentValue, SignonSessionState, TransactionState,
+    UserAssociation, connection_key, keyring_key, profile_key,
 };
 use argon2::Argon2;
 use argon2::password_hash::{PasswordVerifier, phc::PasswordHash};
@@ -1019,14 +1019,21 @@ fn racpriv(
     command: &ParsedCommand,
 ) -> Result<Vec<CommandRecord>, SemanticProblem> {
     require_special(snapshot, context)?;
-    if command.has_operand("ON") == command.has_operand("OFF") && !command.has_operand("LIST") {
-        return Err(SemanticProblem::Invalid(0));
-    }
-    if command.has_operand("ON") {
-        snapshot.policy.write_down = true;
-    }
-    if command.has_operand("OFF") {
-        snapshot.policy.write_down = false;
+    // The publication gives one operand: `RACPRIV [WRITEDOWN [(ACTIVE | INACTIVE | RESET)]]`.
+    // WRITEDOWN without a value, and RACPRIV without any keyword, list the current mode.
+    if let Some(operand) = command.operand("WRITEDOWN") {
+        let values = operand.values().collect::<Vec<_>>();
+        match values.as_slice() {
+            [] => {}
+            ["ACTIVE"] => snapshot.policy.write_down = true,
+            ["INACTIVE"] => snapshot.policy.write_down = false,
+            // "Reset to the user's installation defined default." This model carries exactly one
+            // such default, the initial PolicyState value.
+            ["RESET"] => {
+                snapshot.policy.write_down = SecurityPolicyOptions::default().write_down;
+            }
+            _ => return Err(SemanticProblem::Invalid(operand.offset)),
+        }
     }
     Ok(vec![policy_record(snapshot)])
 }
@@ -4359,7 +4366,7 @@ mod tests {
             SecurityDecision::Deny
         );
         let commands = [
-            "RACPRIV ON",
+            "RACPRIV WRITEDOWN(ACTIVE)",
             "RACPRMCK MEMBER(IRROPT01 IRROPT02)",
             "SET TRACE AUTOAPPL",
             "SETROPTS PROGRAM RULES",

@@ -50,7 +50,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         command_direction: true,
         min_positionals: 1,
         max_positionals: 1,
-        operands: &["CSDATA", "DATA", "DFP", "MODEL", "OMVS", "OVM", "OWNER", "SUPGROUP", "TERMINAL", "TME", "UNIVERSAL"],
+        operands: &["CSDATA", "DATA", "DFP", "MODEL", "OMVS", "OVM", "OWNER", "SUPGROUP", "TERMUACC", "TME", "UNIVERSAL"],
     },
     CommandDescriptor {
         family: CommandFamily::AddSd,
@@ -102,7 +102,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         command_direction: true,
         min_positionals: 1,
         max_positionals: 1,
-        operands: &["CSDATA", "DATA", "DFP", "MODEL", "NODATA", "NOMODEL", "NOTERMINAL", "NOUNIVERSAL", "OMVS", "OVM", "OWNER", "SUPGROUP", "TERMINAL", "TME", "UNIVERSAL"],
+        operands: &["CSDATA", "DATA", "DFP", "MODEL", "NODATA", "NOMODEL", "NOTERMUACC", "NOUNIVERSAL", "OMVS", "OVM", "OWNER", "SUPGROUP", "TERMUACC", "TME", "UNIVERSAL"],
     },
     CommandDescriptor {
         family: CommandFamily::AltUser,
@@ -297,7 +297,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         command_direction: false,
         min_positionals: 0,
         max_positionals: 0,
-        operands: &["LIST", "OFF", "ON"],
+        operands: &["WRITEDOWN"],
     },
     CommandDescriptor {
         family: CommandFamily::Racprmck,

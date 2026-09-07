@@ -9,9 +9,7 @@
       "catalog_aliases": [
         "AG"
       ],
-      "catalog_only": [
-        "TERMINAL"
-      ],
+      "catalog_only": [],
       "catalog_operands": [
         "CSDATA",
         "DATA",
@@ -21,7 +19,7 @@
         "OVM",
         "OWNER",
         "SUPGROUP",
-        "TERMINAL",
+        "TERMUACC",
         "TME",
         "UNIVERSAL"
       ],
@@ -352,7 +350,6 @@
       "source_only": [
         "AT",
         "ONLYAT",
-        "TERMUACC",
         "NOTERMUACC"
       ],
       "source_operands": [
@@ -4781,9 +4778,7 @@
         "ALG"
       ],
       "catalog_only": [
-        "NOTERMINAL",
         "NOUNIVERSAL",
-        "TERMINAL",
         "UNIVERSAL"
       ],
       "catalog_operands": [
@@ -4793,13 +4788,13 @@
         "MODEL",
         "NODATA",
         "NOMODEL",
-        "NOTERMINAL",
+        "NOTERMUACC",
         "NOUNIVERSAL",
         "OMVS",
         "OVM",
         "OWNER",
         "SUPGROUP",
-        "TERMINAL",
+        "TERMUACC",
         "TME",
         "UNIVERSAL"
       ],
@@ -5489,8 +5484,6 @@
         "NODFP",
         "NOOMVS",
         "NOOVM",
-        "TERMUACC",
-        "NOTERMUACC",
         "NOTME"
       ],
       "source_operands": [
@@ -16413,15 +16406,9 @@
     {
       "both_value_and_member": [],
       "catalog_aliases": [],
-      "catalog_only": [
-        "LIST",
-        "OFF",
-        "ON"
-      ],
+      "catalog_only": [],
       "catalog_operands": [
-        "LIST",
-        "OFF",
-        "ON"
+        "WRITEDOWN"
       ],
       "keyword": "RACPRIV",
       "located": true,
@@ -16476,9 +16463,7 @@
         "RESET"
       ],
       "source_nesting_depth": 2,
-      "source_only": [
-        "WRITEDOWN"
-      ],
+      "source_only": [],
       "source_operands": [
         "WRITEDOWN"
       ],
@@ -31809,13 +31794,13 @@
   "totals": {
     "alias_lists_reproduced": 34,
     "both_value_and_member": 405,
-    "catalog_only": 68,
-    "catalog_operands": 386,
+    "catalog_only": 62,
+    "catalog_operands": 384,
     "families": 34,
     "located": 34,
     "max_nesting_depth": 6,
     "source_members": 957,
-    "source_only": 433,
+    "source_only": 429,
     "source_operands": 751,
     "source_values": 844,
     "syntax_only": 76
