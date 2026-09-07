@@ -2762,3 +2762,253 @@ impl<'a> Cursor<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod reserved_word_scope {
+    //! What `grammar_keywords` may hold, and what a program may still name.
+    //!
+    //! `is_grammar_keyword` unions the `grammar_keywords` of all 44 rows and
+    //! `is_operand_atom` refuses any token in that union as an operand, so a
+    //! word one row's forms spell is refused as a data-name in every statement
+    //! of every program. The union is therefore a claim about the language, and
+    //! the reference makes exactly one such claim: the `Reserved words`
+    //! appendix. These tests hold the two apart -- a word the appendix
+    //! publishes stays unwritable, and a word it does not publish stays
+    //! writable however many syntax diagrams draw it.
+
+    use super::{PROCEDURE_STATEMENTS, parse};
+
+    /// The words the authored forms spell that the reserved-word appendix does
+    /// not publish in any of its three columns.
+    ///
+    /// `NAME`, `ENCODING` and `NAMESPACE` are drawn by `XML GENERATE`;
+    /// `IGNORING` by `JSON PARSE`; `LOC` and `INITIALIZED` by `ALLOCATE`;
+    /// `KEPT`, `WAIT`, `IGNORE` and `PREVIOUS` by `READ`. Seven of them --
+    /// `CODEPAGE`, `CYCLE`, `IGNORING`, `INITIALIZED`, `LOC`, `NAME` and
+    /// `PARAGRAPH` -- the `Context-sensitive words` appendix names outright as
+    /// reserved only inside one construct; the rest it does not mention at all,
+    /// which leaves the reserved-word appendix's silence as the only ruling
+    /// there is. Both readings say the same thing about a data-name.
+    ///
+    /// Seventeen of the twenty-four entered the union when 6223be2 authored the
+    /// forms. The other seven -- `IGNORE`, `INITIALIZED`, `KEPT`, `PARAGRAPH`,
+    /// `PARSE`, `PREVIOUS` and `WAIT` -- were already in the 144-word union
+    /// before it, so this is not only a repair of that commit.
+    const OMITTED_FROM_THE_APPENDIX: &[&str] = &[
+        "ATTRIBUTE",
+        "ATTRIBUTES",
+        "BYTES",
+        "CODEPAGE",
+        "CYCLE",
+        "ELEMENT",
+        "ENCODING",
+        "IGNORE",
+        "IGNORING",
+        "INDICATING",
+        "INITIALIZED",
+        "KEPT",
+        "LOC",
+        "NAME",
+        "NAMESPACE",
+        "NAMESPACE-PREFIX",
+        "NONNUMERIC",
+        "PARAGRAPH",
+        "PARSE",
+        "PARTIAL",
+        "PREVIOUS",
+        "VALIDATING",
+        "WAIT",
+        "XML-DECLARATION",
+    ];
+
+    #[test]
+    fn a_word_the_appendix_omits_is_not_a_grammar_keyword() {
+        for word in OMITTED_FROM_THE_APPENDIX {
+            let owner = PROCEDURE_STATEMENTS.iter().find(|descriptor| {
+                descriptor
+                    .grammar_keywords
+                    .iter()
+                    .any(|keyword| keyword.eq_ignore_ascii_case(word))
+            });
+            assert!(
+                owner.is_none(),
+                "{word} is not a reserved word of Enterprise COBOL, and {} claims it as one",
+                owner.map(|descriptor| descriptor.id).unwrap_or_default()
+            );
+        }
+    }
+
+    #[test]
+    fn a_word_the_appendix_omits_can_be_a_data_name() {
+        for word in OMITTED_FROM_THE_APPENDIX {
+            let statement = format!("MOVE {word} TO DEST.");
+            assert!(
+                parse(&statement, 32).is_ok(),
+                "{statement} is a legal MOVE: {word} is absent from the reserved-word appendix"
+            );
+        }
+        // The same word reached through the other operand paths: an arithmetic
+        // expression, a receiver, a sender list, a PERFORM VARYING subject, an
+        // argument, a reference-modification base. One union feeds all of them.
+        for statement in [
+            "COMPUTE TOTAL = NAME + 1.",
+            "MOVE A TO NAME.",
+            "ADD 1 TO ENCODING GIVING BYTES.",
+            "DISPLAY NAME UPON SYSOUT.",
+            "IF NAME = SPACES MOVE 1 TO A END-IF.",
+            "PERFORM VARYING ELEMENT FROM 1 BY 1 UNTIL ELEMENT > 10 CONTINUE END-PERFORM.",
+            "CALL 'SUB' USING NAME.",
+            "STRING NAME DELIMITED BY SIZE INTO DEST.",
+            "INSPECT NAME TALLYING C FOR ALL 'x'.",
+            "SET P TO ADDRESS OF NAME.",
+        ] {
+            assert!(parse(statement, 32).is_ok(), "{statement} should parse");
+        }
+    }
+
+    #[test]
+    fn a_word_the_appendix_publishes_is_still_refused_as_a_data_name() {
+        // Every one of these carries an X in the appendix's `Reserved` column
+        // and is spelled by some row's forms, so a program that names a data
+        // item with one is refused. Narrowing the union must not reach them.
+        for word in [
+            "ADD",
+            "ALSO",
+            "ANY",
+            "CONVERTING",
+            "DATA",
+            "DELIMITED",
+            "EVERY",
+            "FILE",
+            "GIVING",
+            "LINE",
+            "MOVE",
+            "NUMERIC",
+            "RETURNING",
+            "SUPPRESS",
+            "TALLYING",
+            "THRU",
+            "VALUE",
+        ] {
+            let statement = format!("MOVE {word} TO DEST.");
+            assert!(
+                parse(&statement, 32).is_err(),
+                "{statement} names a reserved word as a data item and must be refused"
+            );
+        }
+    }
+
+    #[test]
+    fn the_two_reserved_words_the_union_never_carried_are_still_writable() {
+        // `NULL` and `OMITTED` carry an X under `Reserved`, and neither is in
+        // the union -- not here and not at HEAD, because the union only ever
+        // held words some row's forms spell and 6223be2 took `OMITTED` out of
+        // CALL, JSON GENERATE and JSON PARSE and held `NULL` back to keep the
+        // figurative constants writable. Filtering the harvest cannot add a
+        // word, so this is unchanged by this commit; it is asserted because a
+        // reader who takes `grammar_keywords` for the reserved-word list would
+        // expect the opposite, and because the day a form spells either of them
+        // this test is what says the effect was intended.
+        for word in ["NULL", "OMITTED"] {
+            let statement = format!("MOVE {word} TO DEST.");
+            assert!(
+                parse(&statement, 32).is_ok(),
+                "{statement} is refused now, so the union has grown rather than shrunk"
+            );
+        }
+    }
+
+    #[test]
+    fn the_xml_and_json_statements_the_keywords_were_harvested_for_still_parse() {
+        // The 24 words left the union because they are not reserved, not
+        // because their statements stopped being described. Every phrase the
+        // validators implement is exercised here, including the ones spelled
+        // with a word that left: ENCODING, NAME, INDICATING, IGNORING,
+        // NONNUMERIC, BYTES, CODEPAGE, KEPT, PREVIOUS, INITIALIZED, PARAGRAPH.
+        for statement in [
+            "XML GENERATE OUT FROM SRC.",
+            "XML GENERATE OUT FROM SRC COUNT IN N.",
+            "XML GENERATE OUT FROM SRC ENCODING CP.",
+            "XML GENERATE OUT FROM SRC NAME OF A IS 'x'.",
+            "XML GENERATE OUT FROM SRC NAME A IS 'x' B IS 'y'.",
+            "XML GENERATE OUT FROM SRC SUPPRESS A.",
+            "XML PARSE DOC PROCESSING PROCEDURE P.",
+            "XML PARSE DOC PROCESSING PROCEDURE P THROUGH Q.",
+            "XML PARSE DOC PROCESSING PROCEDURE P THRU Q.",
+            "XML PARSE DOC INTO OUT.",
+            "JSON GENERATE OUT FROM SRC.",
+            "JSON GENERATE OUT FROM SRC COUNT IN N.",
+            "JSON GENERATE OUT FROM SRC COUNT BYTES IN N.",
+            "JSON GENERATE OUT FROM SRC COUNT CHARACTERS IN N.",
+            "JSON GENERATE OUT FROM SRC INDICATING A IS JSON NULL USING X IN B.",
+            "JSON GENERATE OUT FROM SRC INDICATING A IS JSON NULL USING X IN B ALSO C IS JSON NULL USING Y IN D.",
+            "JSON GENERATE OUT FROM SRC ENCODING CP.",
+            "JSON GENERATE OUT FROM SRC ENCODING FROM CODEPAGE.",
+            "JSON GENERATE OUT FROM SRC NAME OF A IS 'x'.",
+            "JSON GENERATE OUT FROM SRC NAME OF A IS OMITTED.",
+            "JSON GENERATE OUT FROM SRC SUPPRESS A.",
+            "JSON GENERATE OUT FROM SRC SUPPRESS A WHEN SPACES OR ZERO.",
+            "JSON GENERATE OUT FROM SRC SUPPRESS EVERY NUMERIC WHEN ZERO.",
+            "JSON GENERATE OUT FROM SRC SUPPRESS EVERY NONNUMERIC WHEN SPACES.",
+            "JSON GENERATE OUT FROM SRC CONVERTING A TO JSON NULL USING SPACE.",
+            "JSON GENERATE OUT FROM SRC CONVERTING A TO JSON BOOLEAN USING X.",
+            "JSON GENERATE OUT FROM SRC CONVERTING A TO JSON BOOL USING X.",
+            "JSON GENERATE OUT FROM SRC CONVERTING A TO JSON NULL USING SPACE ALSO B TO JSON BOOLEAN USING Y.",
+            "JSON GENERATE OUT FROM SRC COUNT IN N ENCODING CP NAME A IS 'x' SUPPRESS B CONVERTING C TO JSON NULL USING SPACE.",
+            "JSON PARSE SRCJ INTO OUT.",
+            "JSON PARSE SRCJ INTO OUT WITH DETAIL.",
+            "JSON PARSE SRCJ INTO OUT IGNORING JSON NULL FOR ALL.",
+            "JSON PARSE SRCJ INTO OUT IGNORING JSON NULL FOR A ALSO JSON NULL FOR B.",
+            "JSON PARSE SRCJ INTO OUT INDICATING A IS JSON NULL USING X AND Y IN B.",
+            "JSON PARSE SRCJ INTO OUT ENCODING CP.",
+            "JSON PARSE SRCJ INTO OUT ENCODING FROM CODEPAGE.",
+            "JSON PARSE SRCJ INTO OUT NAME OF A IS 'x'.",
+            "JSON PARSE SRCJ INTO OUT SUPPRESS A.",
+            "JSON PARSE SRCJ INTO OUT CONVERTING A FROM JSON NULL USING SPACE.",
+            "JSON PARSE SRCJ INTO OUT CONVERTING A FROM JSON BOOLEAN USING X AND Y.",
+            "JSON PARSE SRCJ INTO OUT WITH DETAIL ENCODING CP NAME A IS 'x' SUPPRESS B.",
+            "ALLOCATE 100 CHARACTERS INITIALIZED RETURNING P.",
+            "READ F PREVIOUS RECORD.",
+            "READ F WITH KEPT LOCK.",
+            "READ F IGNORE LOCK.",
+            "READ F NO WAIT.",
+            "EXIT PARAGRAPH.",
+        ] {
+            assert!(parse(statement, 32).is_ok(), "{statement} should parse");
+        }
+    }
+
+    #[test]
+    fn the_phrases_no_validator_implements_are_refused_before_and_after() {
+        // These are drawn by the catalog's forms and rejected by the parser,
+        // identically at HEAD and here. They are recorded because they are the
+        // reason the removal is free: the union never made any of them parse.
+        // A word in `grammar_keywords` is only ever read as a prohibition on
+        // data-names; every phrase the validators do accept, they accept by
+        // matching the word literally. So closing any of these is a change to
+        // `validate_generate`, `validate_xml_parse`, `validate_allocate`,
+        // `validate_read`, `validate_start` or `validate_exit`, and putting the
+        // word back in the union would not close one of them.
+        for statement in [
+            "XML GENERATE OUT FROM SRC WITH ENCODING CP.",
+            "XML GENERATE OUT FROM SRC WITH XML-DECLARATION.",
+            "XML GENERATE OUT FROM SRC WITH ATTRIBUTES.",
+            "XML GENERATE OUT FROM SRC NAMESPACE IS NSP.",
+            "XML GENERATE OUT FROM SRC TYPE T IS ATTRIBUTE.",
+            "XML PARSE DOC WITH ENCODING CP PROCESSING PROCEDURE P.",
+            "XML PARSE DOC RETURNING NATIONAL PROCESSING PROCEDURE P.",
+            "XML PARSE DOC VALIDATING WITH SCH PROCESSING PROCEDURE P.",
+            "ALLOCATE 100 CHARACTERS LOC 31 RETURNING P.",
+            "READ F WITH IGNORE LOCK.",
+            "READ F WITH NO WAIT.",
+            "START F PARTIAL.",
+            "START F FIRST.",
+            "PERFORM UNTIL A = B EXIT PERFORM CYCLE END-PERFORM.",
+        ] {
+            assert!(
+                parse(statement, 32).is_err(),
+                "{statement} parses now, so this test no longer records a gap"
+            );
+        }
+    }
+}
