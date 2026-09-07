@@ -36,8 +36,10 @@ downloaded file.
 contents, then every topic the manifest names, then recomputes the manifest
 digest from the bytes it got back. Before asking IBM anything it checks each
 manifest against itself, because a manifest whose digest no longer follows from
-its own topic list is a defect retrieval cannot detect. Re-reading all nine
-books returns those exact bytes:
+its own topic list is a defect retrieval cannot detect. Re-reading returns those
+exact bytes for eight of the nine books. The ninth, db2, does not re-read the
+same way twice, which is why its row below says **differs** and why "all nine
+reproduce" is not a sentence this record makes:
 
 | Baseline | Publication | Topics | Bytes | Pin |
 |---|---|---|---|---|
@@ -64,37 +66,47 @@ digests this record used to describe as "not reproducible this way" — cics, im
 and mq, plus the RACROUTE supporting pin — were never reproducible by any
 retrieval mode: they were captures of the DOM.
 
-### Db2 serves two revisions of the same topic
+### Db2 does not re-read deterministically
 
-Three consecutive full re-reads of the 832 Db2 topics reported 1, 1 and 6
-changed, and the second and third runs did not name the same topics. Every
-served body was *smaller* than its pin and carried an *earlier* Last Updated
-date — 2026-01-07, 2026-04-24, 2026-05-12, 2026-05-19 against a pinned
-2026-09-03 — which is the signature of a stale edge revision still in
-circulation, not of IBM editing anything. Sequential re-fetches of a named topic
-are stable in the moment, and it is the moment that changes:
-`db2z_sql_explain.html` was reported changed by two full runs and then returned
-the pinned bytes 40/40 under eight concurrent workers minutes later, while
-`db2z_sql_createview.html` returned the older revision 30/30 in the same
-window. Which revision a request gets depends on which edge node answers, and
-that is not something a digest can pin.
+Repeated full re-reads of the 832 Db2 topics do not agree with each other.
+Three runs reported 1, 1 and 6 topics changed and did not name the same topics
+twice; a fourth reported 5. What every run agrees on is the *direction* of the
+difference: every served body was *smaller* than its pin and carried an
+*earlier* Last Updated date — 2026-01-07, 2026-04-24, 2026-05-12, 2026-05-19
+against a pinned 2026-09-03. Sequential re-fetches of a named topic are stable
+in the moment, and it is the moment that changes: `db2z_sql_explain.html` was
+reported changed by two full runs and then returned the pinned bytes 40/40 under
+eight concurrent workers minutes later, while `db2z_sql_createview.html`
+returned the older revision 30/30 in the same window.
 
-The whole difference between the two revisions is typographic. Diffing the
-pinned `db2z_sql_createview.html` against the one served now gives two lines:
-the Last Updated date, and `SQL statements in Db2&nbsp;for&nbsp;z/OS` against
-`SQL statements in Db2 for z/OS` in a cross-reference title. Two `&nbsp;`
-entities are exactly the 10 bytes the report says are missing. The 2026-09-03
-republication of these topics inserted non-breaking spaces; no normative content
-moved.
+The whole difference between the pinned revision and the older one is
+typographic. Diffing the pinned `db2z_sql_createview.html` against the one
+served now gives two lines: the Last Updated date, and `SQL statements in
+Db2&nbsp;for&nbsp;z/OS` against `SQL statements in Db2 for z/OS` in a
+cross-reference title. Two `&nbsp;` entities are exactly the 10 bytes the report
+says are missing. The 2026-09-03 republication of these topics inserted
+non-breaking spaces; no normative content moved.
 
-So this is a review decision, not a failure, and it is the case the policy was
-written for. The report records each changed topic's served Last Updated date
-beside the pinned one, so "IBM edited a paragraph" stays separable from "an edge
-node is behind" from "the endpoint changed what it emits" from "we changed what
-we ask for". Nothing re-pins itself. What a reviewer should take from it is
-narrower than "the Db2 pin is wrong": a re-verification of this book will
+What the cause is remains unresolved. The pattern rules out the reading that
+would matter most — a book IBM had edited since the pin would not serve its
+newer revision to one run and its older one to the next, and its dates would
+move forwards rather than backwards — so this is not publication drift and
+nothing is re-pinned on the strength of it. Beyond that, nothing here identifies
+which component serves the older revision or when it will stop, and no
+re-verification run so far has been reproducible enough to say. The claim this
+record makes is therefore the narrow one: **one baseline of nine does not
+re-read deterministically, and the shape of the non-determinism is the one
+above.** Neither "the Db2 pin has drifted" nor "all nine reproduce" is
+supported.
+
+That makes it a review decision rather than a failure, which is the case the
+policy was written for. The report records each changed topic's served Last
+Updated date beside the pinned one, so "IBM edited a paragraph" stays separable
+from "something served us an older revision" from "the endpoint changed what it
+emits" from "we changed what we ask for". A re-verification of this book will
 sometimes go red for reasons no one in this repository controls, and the way to
-read that red is to check whether the served dates went backwards.
+read that red is to check whether the served dates went backwards before
+treating it as drift.
 
 An unreachable endpoint reports `skipped` and a partial run reports `sampled`;
 neither can be mistaken for a match.
@@ -411,7 +423,7 @@ whether the projection is catalog-grade, not whether the gap is real:
 | Db2 | 832 topics pinned and all 174 rows resolve. No syntax reader; statement syntax is published as the same DITA railroad markup COBOL uses, so the COBOL reader is the nearest starting point. |
 | z/OSMF | REST families rather than a command language. All 216 rows resolve; a syntax projection does not apply without a different comparison model. |
 | JCL, RACF | Rows resolve — 237 and 34 — but both syntax readers were PDF readers and are deleted. Their results above are provisional until topic readers land. |
-| CICS, IMS, MQ | All three pin topics and all three reproduce. Their rows are located by `html-table:` and `html-link:` rather than by topic, so the locator audit reports them as skipped with that reason. The 0.9 CICS DITA reader already covers CICS. |
+| CICS, IMS, MQ | All three pin topics and all three reproduce. Their rows are located by `html-table:` and `html-link:` rather than by topic, so the locator audit reports them as skipped with that reason. None of the three has a syntax reader. CICS is the largest of them and the one most often assumed to be done: its 571 rows are `html-table:` locators into a single pinned topic, the EIBFN function-code table in `dfha8mf.html`, which gives an inventory anchored to the publication and nothing that reads the publication's syntax — the same position JCL and RACF were in before this wave. There is no `conformance/0.9` directory and no CICS reader anywhere in the tree; 0.9.0, which owns the CICS API, is a proposed coverage version with no code behind it yet. |
 
 ## Corrections
 
