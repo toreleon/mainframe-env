@@ -17,85 +17,109 @@ def load_module(name: str) -> ModuleType:
     return module
 
 
-AMS = load_module("extract_ams_pdf_parameters")
+AMS = load_module("extract_ams_html_parameters")
+FETCH = load_module("fetch_ams_topics")
 
-CHAPTER_PAGE = [
-    "Table 4. ALTER Attributes That Can be Altered (continued)",
-    "ALT",
-    "INDEX",
-    "CLUS",
-    "TER",
-    "ALTER Parameters",
-    "The ALTER command takes the following required and optional parameters.",
-    "Required Parameters",
-    "entryname",
-    "    This names the entry to be altered.",
-    "Optional Parameters",
-    "ACCOUNT(account-info)",
-    "    Account is supported only for SMS-managed VSAM or non-VSAM data sets.",
-    "    account-info",
-    "        Use this to change accounting information.",
-    "    Abbreviation: ACCT",
-    "ADDVOLUMES(volser)",
-    "    Abbreviation: ADDVOL, AVOL",
-    "ALTER Examples",
-    "ACCOUNT",
-    "    This heading is past the section and must not be collected.",
-]
+BLDINDEX = """
+<dl class="parml">
+  <dt class="pt dlterm">INFILE(<span>ddname</span>)|INDATASET(<span>entryname</span>)</dt>
+  <dd>names the DD statement.
+    <dl class="parml">
+      <dt>INFILE(ddname)</dt><dd>is the DD statement.</dd>
+      <dt>INDATASET(entryname)</dt><dd>is the data set.</dd>
+    </dl>
+  </dd>
+  <dt class="pt dlterm">SORTMESSAGELEVEL(<span>option</span>)</dt>
+  <dd>controls messages.
+    <dl class="parml">
+      <dt>ALL</dt><dd>prints all.</dd>
+      <dt>CRITICAL</dt><dd>prints critical.</dd>
+      <dt>NONE</dt><dd>prints none.</dd>
+    </dl>
+  </dd>
+  <dt class="pt dlterm">ERASE|NOERASE</dt><dd>overwrites or not.</dd>
+</dl>
+"""
 
 
-class SectionTests(unittest.TestCase):
-    def test_the_table_tail_above_the_section_is_dropped(self) -> None:
-        body = AMS.section_lines(CHAPTER_PAGE)
-        self.assertNotIn("ALT", body)
-        self.assertEqual(body[0], "Required Parameters")
+class NameTests(unittest.TestCase):
+    def test_an_argument_is_stripped_from_a_term(self) -> None:
+        self.assertEqual(AMS.names("CATALOG(catname)"), ["CATALOG"])
 
-    def test_the_examples_heading_closes_the_section(self) -> None:
-        body = AMS.section_lines(CHAPTER_PAGE)
-        self.assertNotIn("ALTER Examples", body)
-        self.assertNotIn("    This heading is past the section and must not be collected.", body)
+    def test_an_alternation_yields_every_name(self) -> None:
+        self.assertEqual(AMS.names("ERASE|NOERASE"), ["ERASE", "NOERASE"])
 
-    def test_a_chapter_without_parameter_groups_yields_nothing(self) -> None:
-        self.assertEqual(AMS.section_lines(["Chapter 34. VERIFY", "prose"]), [])
+    def test_arguments_are_removed_before_the_alternation_is_split(self) -> None:
+        # Splitting first would stop at the paren and lose the second name.
+        self.assertEqual(
+            AMS.names("INFILE(ddname)|INDATASET(entryname)"), ["INFILE", "INDATASET"]
+        )
 
-    def test_the_singular_group_heading_is_recognized(self) -> None:
-        self.assertEqual(AMS.section_lines(["Required Parameter", "FILE(ddname)"])[0], "Required Parameter")
+    def test_an_alternation_inside_an_argument_is_not_a_parameter(self) -> None:
+        self.assertEqual(AMS.names("EXCLUDE(entryname|mask)"), ["EXCLUDE"])
 
+    def test_reference_brackets_are_discarded(self) -> None:
+        self.assertEqual(AMS.names("[EXCLUDE(entryname)"), ["EXCLUDE"])
 
-class HeadingTests(unittest.TestCase):
-    def test_flush_left_uppercase_headings_are_parameters(self) -> None:
-        names, _ = AMS.headings(AMS.section_lines(CHAPTER_PAGE), "ALTER")
-        self.assertEqual(names, ["ACCOUNT", "ADDVOLUMES"])
+    def test_a_lowercase_placeholder_is_not_a_parameter(self) -> None:
+        self.assertEqual(AMS.names("entryname"), [])
 
-    def test_indented_subparameters_and_prose_are_not_parameters(self) -> None:
-        names, _ = AMS.headings(AMS.section_lines(CHAPTER_PAGE), "ALTER")
-        self.assertNotIn("ACCT", names)
-
-    def test_abbreviations_are_collected_from_their_own_line(self) -> None:
-        _, abbreviations = AMS.headings(AMS.section_lines(CHAPTER_PAGE), "ALTER")
-        self.assertEqual(abbreviations, ["ACCT", "ADDVOL", "AVOL"])
-
-    def test_single_letter_values_are_not_parameters(self) -> None:
-        names, _ = AMS.headings(["Optional Parameters", "AVGREC(U|K|M)", "U", "K", "M"], "ALLOCATE")
-        self.assertEqual(names, ["AVGREC"])
-
-    def test_the_running_head_repeating_the_command_is_skipped(self) -> None:
-        names, _ = AMS.headings(["Optional Parameters", "ALTER", "OWNER(id)"], "ALTER")
-        self.assertEqual(names, ["OWNER"])
+    def test_a_single_letter_is_not_a_parameter(self) -> None:
+        self.assertEqual(AMS.names("U"), [])
 
 
-class ChapterTests(unittest.TestCase):
-    def test_only_command_named_chapters_are_taken(self) -> None:
-        entries = [
-            {"title": "Chapter 4. ALLOCATE", "depth": 0, "page": 62},
-            {"title": "Chapter 5. ALTER", "depth": 0, "page": 86},
-            {"title": "Chapter 1. Using Access Method Services", "depth": 0, "page": 33},
-        ]
-        self.assertEqual(sorted(AMS.chapters(entries)), ["ALLOCATE", "ALTER"])
+class NestingTests(unittest.TestCase):
+    def test_top_level_terms_are_parameters(self) -> None:
+        top, _ = AMS.parameters([BLDINDEX])
+        self.assertEqual(
+            top,
+            ["INFILE", "INDATASET", "SORTMESSAGELEVEL", "ERASE", "NOERASE"],
+        )
 
-    def test_a_two_word_command_chapter_is_kept(self) -> None:
-        entries = [{"title": "Chapter 6. ALTER LIBRARYENTRY", "depth": 0, "page": 110}]
-        self.assertIn("ALTER LIBRARYENTRY", AMS.chapters(entries))
+    def test_nested_terms_are_values_not_parameters(self) -> None:
+        _, nested = AMS.parameters([BLDINDEX])
+        self.assertEqual(nested, ["ALL", "CRITICAL", "NONE"])
+
+    def test_a_name_repeated_beneath_its_own_term_stays_a_parameter(self) -> None:
+        top, nested = AMS.parameters([BLDINDEX])
+        self.assertIn("INFILE", top)
+        self.assertNotIn("INFILE", nested)
+
+    def test_a_topic_without_definition_lists_contributes_nothing(self) -> None:
+        self.assertEqual(AMS.parameters(["<p>prose only</p>"]), ([], []))
+
+    def test_terms_from_several_topics_are_merged_without_duplicates(self) -> None:
+        top, _ = AMS.parameters([BLDINDEX, BLDINDEX])
+        self.assertEqual(len(top), len(set(top)))
+
+
+class TopicSelectionTests(unittest.TestCase):
+    def test_only_parameter_topics_are_collected(self) -> None:
+        chapter = {
+            "label": "DELETE",
+            "href": "delet.htm",
+            "topics": [
+                {"label": "DELETE Parameters", "href": "a.htm", "topics": [
+                    {"label": "Required Parameters", "href": "b.htm"},
+                    {"label": "Optional Parameters", "href": "c.htm"},
+                ]},
+                {"label": "DELETE Examples", "href": "d.htm", "topics": [
+                    {"label": "Delete a Page Space: Example 14", "href": "e.htm"}
+                ]},
+            ],
+        }
+        self.assertEqual(
+            [label for label, _ in FETCH.parameter_topics(chapter)],
+            ["DELETE Parameters", "Required Parameters", "Optional Parameters"],
+        )
+
+    def test_the_singular_heading_is_collected_too(self) -> None:
+        chapter = {"label": "VERIFY", "href": "v.htm", "topics": [
+            {"label": "Required Parameter", "href": "w.htm"}
+        ]}
+        self.assertEqual(
+            [label for label, _ in FETCH.parameter_topics(chapter)], ["Required Parameter"]
+        )
 
 
 if __name__ == "__main__":

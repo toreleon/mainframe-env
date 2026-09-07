@@ -69,30 +69,58 @@ catalogs, their inventories are anchored to the publications they cite.
 
 ## Each publication needs its own reader
 
-Syntax is where the books diverge, and one extractor does not carry over:
+The pinned PDF is the artifact of record: it is what the digests pin and what
+the `pdf-page;outline` locators point into, so pin verification and the locator
+audit read it and nothing else.
 
-- **COBOL** draws railroad diagrams as inline vector art. The reader replays
-  the page content stream for coordinates, decodes subset fonts through their
-  `/ToUnicode` CMaps, separates keywords from operands by font style, and uses
-  stroked rails to tell diagrams from equally sized code samples.
+Syntax is a different job. Where a publication also has web topics, they are
+the better source, because IBM generates them from the same DITA the PDF is
+typeset from — the structure is stated in markup instead of being inferred from
+where ink landed on a page. COBOL and AMS are read that way. Both readers
+replaced a PDF reader that inferred structure from layout, and both corrections
+went the same direction: the PDF reader had been merging or splitting levels
+that the markup states outright.
 
-  The PDF is not the only option. The 6.5 web topic, fetched through the
-  browser, carries the same DITA markup CICS uses — `class="syntaxdiagram"`,
-  `boxed syntaxkwd`, `boxed syntaxvar`, `groupchoice`, `groupseq` — so the
-  structure is available without any geometry work. The `c.gif` image on that
-  page is a fallback beside the SVG, not the diagram itself. The CICS reader
-  still does not transfer unchanged: it requires every operand to appear as
-  `OPTION(kind)` and rejects the bare `syntaxvar` operands COBOL uses.
+The remaining two readers stay on the PDF because they need no such inference:
+RACF's syntax is plain bracket notation in the text, and JCL's inventory is the
+outline itself. RACF is the one that would likely still gain from the topics.
+
+With that split, one extractor still does not carry over:
+
+- **COBOL** publishes its railroad diagrams twice. The PDF draws them as vector
+  art, and the web topics carry the DITA markup CICS uses. The reader takes the
+  markup, because the structure is stated there rather than inferred:
+
+      g class='groupseq'
+        g class='boxed syntaxvar'      -> identifier-2
+        g class=''                     <- optional wrapper
+          g class=''                   <- the bypass rail: no text beneath it
+          g class='boxed syntaxkwd'    -> ROUNDED
+
+  Nesting, alternation, optionality and the keyword/operand split are all
+  explicit. Two rules carry the reader: a group holding a text-free sibling
+  marks its remaining children optional, and diagram titles delimit diagrams,
+  so a wide diagram split into several `syntaxdiagram-piece` SVGs is joined
+  rather than counted twice.
+
+  Statements with several formats publish an overview topic and one child topic
+  per format, so the fetcher walks each statement's whole subtree — the `ACCEPT
+  statement` topic itself carries no diagram at all.
+
+  The CICS reader does not transfer unchanged: it requires every operand to
+  appear as `OPTION(kind)` and rejects the bare `syntaxvar` operands COBOL uses.
 - **RACF** has no diagrams. Each command carries a bracket-notation block
   (`[ AT([node].userid ...) | ONLYAT(...)]`). The reader locates the block by
   the reference's own introduction line, tolerates kerning that splits command
   names (`RV ARY`), and splits top-level operands from segment members by line
   shape, because the book contains unbalanced syntax lines that make a running
   parenthesis counter diverge.
-- **AMS** documents parameters as flush-left headings under `Required
-  Parameters` / `Optional Parameters`, with indented subparameters and prose
-  beneath them, so column position does the parsing. `Abbreviation:` lines are
-  collected alongside.
+- **AMS** puts its parameters in definition lists. A parameter is a top-level
+  `dt`; the values it accepts are `dt` entries of a `dl` nested inside its own
+  `dd`. Terms carry their argument and their alternation together
+  (`INFILE(ddname)|INDATASET(entryname)`), so the reader removes arguments
+  before splitting alternations — the other order stops at the first
+  parenthesis and loses the second name.
 - **JCL** publishes its inventory in the outline itself: one chapter per
   statement, one entry per parameter. The reader needs no syntax parsing.
 
@@ -113,37 +141,54 @@ differences the earlier V2R2 run reported — `DSKEYLBL`, `NULLOVRD`, `ROACCESS`
 `PROGRAMMER'S NAME` — were all edition skew. The JCL catalog is fully confirmed
 by its publication.
 
-### AMS — 889 parameters against a catalog that records none
+### AMS — 688 parameters against a catalog that records none
 
-All 31 functional commands are located. The publication documents **889
-parameters and 512 abbreviations**; `conformance/0.6/ams/grammar.json` records
-`keywords: ["ALLOCATE"]` and nothing else, so its parameter inventory is
-**zero for every command**.
+All 31 functional commands are located. The publication documents **688
+parameters**, plus **193 values** those parameters accept;
+`conformance/0.6/ams/grammar.json` records `keywords: ["ALLOCATE"]` and nothing
+else, so its parameter inventory is **zero for every command**. The spread is
+wide: `ALLOCATE` 56, `DELETE` 30, `BLDINDEX` 14, down to `VERIFY` 2.
 
-The spread is wide: `ALLOCATE` 80, `ALTER` 75, `DEFINE CLUSTER` 64, `DCOLLECT`
-60, `REPRO` 54, down to `VERIFY` 2. Abbreviations are a second surface the
-catalog does not carry at all — `DELETE` alone documents `AIX`, `CL`, `GDG`,
-`LIBENT`, `NVSAM`, `PGSPC`, `TNAME`, `UCAT`, `VOLENTRY`, `VOLENT`.
+**These numbers correct an earlier PDF-derived run**, which reported 889
+parameters. That reader took flush-left headings, and the reference sets values
+flush left too, so it counted `SORTMESSAGELEVEL`'s `ALL`, `CRITICAL` and `NONE`
+as parameters of `BLDINDEX` — 25 names where the command has 14. The totals
+were again close (889 against 688 + 193 = 881) because the PDF reader was
+merging two levels rather than inventing names, but the split it produced was
+wrong.
 
-This is the largest gap any probe has found, and unlike the others it needs no
+This remains the largest gap any probe has found, and it needs no
 interpretation: the field is empty.
 
 ### COBOL — 44 procedure statements
 
 | | catalog | source |
 |---|---|---|
-| Forms / diagrams | 49 | 95 |
-| Named formats | — | 59 |
-| Operand naming | 33 undefined placeholders | 75 named operands |
+| Forms / diagrams | 49 | 96 |
+| Statement formats | — | 83 |
+| Phrase fragments | — | 13 |
+| Operand naming | 33 undefined placeholders | 80 named operands |
 
-Moving from the 6.4 edition to the pinned 6.5 changed almost nothing (137
-missing keywords became 136), which settles the question the earlier run left
-open: this gap is not edition skew. 20 rows have more source diagrams than
-catalog forms; 36 rows use a keyword that appears in no catalog form. Only
-`CANCEL`, `CONTINUE`, `EVALUATE`, `GOBACK`, `RELEASE`, `STOP` and `UNSTRING`
-are keyword-complete. The gap concentrates where the sketch collapses a format
-family: `SET` has one form against 16 named source formats, `INSPECT` one
-against four, `DIVIDE` one against five.
+Every one of the 96 diagrams is titled, and 18 rows carry more source formats
+than the catalog has forms. 37 rows use a keyword that appears in no catalog
+form, 139 distinct keywords in total. The gap concentrates where the sketch
+collapses a format family: `JSON PARSE` has one form against seven source
+diagrams, `SET` one against eight, `INSPECT` one against four.
+
+The counts are read against the phrase split. `JSON GENERATE` publishes one
+statement format and five phrase diagrams (`when-phrase Format`,
+`converting-phrase Format 1`, ...); counting those as formats would overstate
+how many ways the statement can be written, so the projection marks each
+diagram `format` or `fragment`.
+
+**These numbers correct an earlier PDF-derived run**, which reported 95
+diagrams against only 59 titles. The totals were close by coincidence: the
+geometry reader over-split `INSPECT` into nine diagrams where the publication
+has four and `SORT` into four where it has two, missed `START`, `UNSTRING` and
+`GOBACK` entirely, and double-counted `SET` titles (16 against the true 7). Per
+row the two disagreed in 16 of 44 cases. The finding itself survives — the
+catalog forms substantially under-describe the publication — but the earlier
+per-row figures should not be quoted.
 
 ### RACF — 34 command families
 
@@ -174,10 +219,14 @@ early.
 
 ## Known limitations
 
-- COBOL: single-keyword diagrams such as `CONTINUE` are dropped by the
-  two-token guard that rejects figure callouts; alternation is inferred from
-  horizontal overlap, so a stacked group whose main line is a bare rail reports
-  its members as optional; fragments resolve to `PHRASE n` markers.
+- COBOL: the topics are the same product version as the pinned PDF but are not
+  the pinned artifact, so the projection is checked against a source the
+  baseline does not pin. `conformance/0.3/generated/cobol-topic-manifest.json`
+  records each topic's path and digest so a reviewer can see exactly what was
+  read. Inside an optional segment every branch is reported optional rather
+  than alternative, because none of them can be required; alternation is
+  therefore only visible on the main line. `EXIT` yields formats 1, 2, 3, 5 and
+  6, so a format the reference documents without a diagram is invisible here.
 - RACF: nine commands are not located. `RACDCERT`, `RACMAP`, `RACPRIV` and
   `RACPRMCK` publish one syntax block per function (`RACDCERT ALTMAP(...)`)
   rather than one per command, and `DISPLAY`, `RESTART`, `SIGNOFF`, `STOP` and
@@ -185,10 +234,12 @@ early.
   Segment nesting is recovered by line shape, so a segment opened inline rather
   than on its own line leaks its members to top level. Unanchored matches are
   flagged rather than dropped.
-- AMS: the reader takes flush-left headings, so a parameter the typesetter
-  indented is missed and a value the typesetter did not indent is counted.
-  Single-character names are excluded because the reference sets value letters
-  (`AVGREC(U|K|M)`) on their own lines.
+- AMS: like COBOL, the topics are the same version as the pinned PDF but are
+  not the pinned artifact; `conformance/0.6/generated/ams-topic-manifest.json`
+  records each topic's path and digest. A parameter nested under another
+  (`DEFINE PATH` documents `NAME` and `PATHENTRY` inside `PATH(...)`) is
+  reported as a value, which is faithful to the reference's own nesting but
+  means the parameter count is per level rather than per command.
 - JCL: parameters documented outside a `... parameter` outline entry are not
   seen.
 - Locator audit: an outline title that appears more than once matches any of
@@ -204,14 +255,18 @@ whether the projection is catalog-grade, not whether the gap is real:
   operators actually type. Adding them changes only which selectors the parser
   accepts; `conformance/spec/v1/spec.json` is unchanged, so no obligation or
   coverage claim moves.
-- **AMS parameters — not promoted.** The projection is review input. It reads
-  flush-left headings, so it also collects values that the typesetter did not
-  indent: `BLDINDEX` reports `ALL`, `CRITICAL` and `NONE`, which are values of
-  `SORTMESSAGELEVEL`, not parameters. Writing 889 machine-read names into a
-  contract artifact that drives the AMS parser would inject those errors into
-  the emulator. The publication has no cleaner machine source — Chapter 3 is a
-  prose summary table, and only `ALLOCATE` carries a bracket-notation syntax
-  table.
+- **AMS parameters — ready, pending a contract decision.** This was previously
+  recorded as unfixable because the projection conflated parameters with
+  values. That was a property of the PDF reader, not of the publication: the
+  web topics separate the two by `dl` nesting, and the projection now does too.
+  What is left is not a data question but a scope one. `ams/grammar.json` has
+  `additionalProperties: false` and no parameter field, so carrying parameters
+  means changing the schema, `AmsGrammarEntry`, the xtask renderer and the
+  generated digest. It would also be inert today: the AMS grammar is used only
+  to recognize a command from its leading keywords
+  (`crates/apps/mainframe-env-batch/src/ams.rs`), and nothing validates
+  parameters. Whether the AMS contract should grow that surface is a decision
+  for the owner, and the data is ready either way.
 - **RACF operands — not promoted.** Nine commands are still unlocated and some
   blocks may close early, so the 89 catalog-only names cannot be separated from
   reader failures. Accepting an operand the command processor does not

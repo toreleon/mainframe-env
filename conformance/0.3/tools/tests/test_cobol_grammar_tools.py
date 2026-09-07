@@ -17,112 +17,137 @@ def load_module(name: str) -> ModuleType:
     return module
 
 
-GRAMMAR = load_module("extract_cobol_pdf_grammar")
+GRAMMAR = load_module("extract_cobol_html_grammar")
 COMPARE = load_module("compare_cobol_grammar")
+FETCH = load_module("fetch_cobol_topics")
 
 
-class Stream:
-    """Minimal /ToUnicode stand-in for CMap parsing."""
-
-    def __init__(self, data: bytes) -> None:
-        self._data = data
-
-    def get_object(self) -> "Stream":
-        return self
-
-    def get_data(self) -> bytes:
-        return self._data
+def svg(body: str) -> str:
+    return (
+        '<svg class="syntaxdiagram" xmlns="http://www.w3.org/2000/svg">'
+        f"<g class='diagram'>{body}</g></svg>"
+    )
 
 
-def token(text: str, x: float, y: float, italic: bool = False) -> dict[str, object]:
-    return {
-        "text": text,
-        "x": x,
-        "y": y,
-        "x_end": x + 6.0 * len(text),
-        "size": GRAMMAR.DIAGRAM_SIZE,
-        "italic": italic,
-        "bold": False,
-    }
+def boxed(kind: str, value: str) -> str:
+    return f"<g class='boxed syntax{kind}'><g class='text'><text class='syntax{kind}'>{value}</text></g></g>"
 
 
-class CMapTests(unittest.TestCase):
-    def test_bfchar_entries_are_decoded(self) -> None:
-        data = (
-            b"begincmap 2 beginbfchar\n<0003><0041>\n<0004><0042>\nendbfchar\nendcmap"
-        )
-        table = GRAMMAR.to_unicode({"/ToUnicode": Stream(data)})
-        self.assertEqual(table, {3: "A", 4: "B"})
-
-    def test_bfrange_entries_expand_across_the_range(self) -> None:
-        data = b"beginbfrange\n<0010><0012><0041>\nendbfrange"
-        table = GRAMMAR.to_unicode({"/ToUnicode": Stream(data)})
-        self.assertEqual(table, {16: "A", 17: "B", 18: "C"})
-
-    def test_bfrange_arrays_map_each_code_separately(self) -> None:
-        data = b"beginbfrange\n<0020><0021>[<0058><005A>]\nendbfrange"
-        table = GRAMMAR.to_unicode({"/ToUnicode": Stream(data)})
-        self.assertEqual(table, {32: "X", 33: "Z"})
-
-    def test_a_font_without_a_cmap_yields_no_table(self) -> None:
-        self.assertEqual(GRAMMAR.to_unicode({}), {})
+KEYWORD = boxed("kwd", "ADD")
+OPERAND = boxed("var", "identifier-1")
 
 
-class LayoutTests(unittest.TestCase):
-    def test_rows_group_tokens_sharing_a_baseline(self) -> None:
-        rows = GRAMMAR.rows_of(
-            [token("ADD", 10, 100), token("TO", 60, 100), token("ROUNDED", 40, 85)]
-        )
-        self.assertEqual([[item["text"] for item in row] for row in rows],
-                         [["ADD", "TO"], ["ROUNDED"]])
-
-    def test_a_wide_vertical_gap_starts_a_new_rail_line(self) -> None:
-        rows = GRAMMAR.rows_of(
-            [token("ADD", 10, 200), token("ROUNDED", 10, 188), token("SIZE", 10, 150)]
-        )
-        lines = GRAMMAR.rail_lines(rows)
-        self.assertEqual(len(lines), 2)
-        self.assertEqual(lines[0][0][0]["text"], "ADD")
-        self.assertEqual(lines[1][0][0]["text"], "SIZE")
-
-    def test_a_token_under_a_main_item_is_an_alternative(self) -> None:
-        main = [token("CORRESPONDING", 50, 100)]
-        entry = GRAMMAR.attach(main, token("CORR", 52, 88))
-        self.assertEqual(entry["relation"], "alternative")
-        self.assertEqual(entry["alternative_to"], "CORRESPONDING")
-
-    def test_a_token_in_a_main_line_gap_is_optional(self) -> None:
-        main = [token("ADD", 10, 100)]
-        entry = GRAMMAR.attach(main, token("ROUNDED", 300, 88))
-        self.assertEqual(entry["relation"], "optional")
-        self.assertNotIn("alternative_to", entry)
-
-    def test_operand_style_selects_the_operand_kind(self) -> None:
+class StructureTests(unittest.TestCase):
+    def test_boxed_classes_split_keywords_from_operands(self) -> None:
+        item = GRAMMAR.form("Format 1", [svg(KEYWORD + OPERAND)])
         self.assertEqual(
-            GRAMMAR.node(token("identifier-1", 0, 0, italic=True)),
-            {"kind": "operand", "value": "identifier-1"},
+            item["main_line"],
+            [
+                {"kind": "keyword", "value": "ADD"},
+                {"kind": "operand", "value": "identifier-1"},
+            ],
         )
+
+    def test_a_choice_keeps_its_first_branch_on_the_main_line(self) -> None:
+        body = f"<g class='groupchoice'>{OPERAND}{boxed('var', 'literal-1')}</g>"
+        item = GRAMMAR.form("Format 1", [svg(body)])
+        self.assertEqual([entry["value"] for entry in item["main_line"]], ["identifier-1"])
         self.assertEqual(
-            GRAMMAR.node(token("to", 0, 0)), {"kind": "keyword", "value": "TO"}
+            item["branches"],
+            [{"kind": "operand", "value": "literal-1", "relation": "alternative"}],
         )
 
+    def test_a_text_free_sibling_marks_its_group_optional(self) -> None:
+        body = f"<g class=''><g class=''></g>{boxed('kwd', 'ROUNDED')}</g>"
+        item = GRAMMAR.form("Format 1", [svg(body)])
+        self.assertEqual(item["main_line"], [])
+        self.assertEqual(
+            item["branches"],
+            [{"kind": "keyword", "value": "ROUNDED", "relation": "optional"}],
+        )
 
-class DiagramSelectionTests(unittest.TestCase):
-    def test_a_band_without_rails_is_not_a_diagram(self) -> None:
-        tokens = [token("MOVE", 10, 100), token("A", 60, 100)]
-        self.assertEqual(GRAMMAR.split_diagrams(tokens, []), [])
+    def test_an_outer_optional_survives_a_nested_choice(self) -> None:
+        inner = f"<g class='groupchoice'>{boxed('kwd', 'ON')}{boxed('kwd', 'OFF')}</g>"
+        body = f"<g class=''><g class=''></g>{inner}</g>"
+        item = GRAMMAR.form("Format 1", [svg(body)])
+        self.assertTrue(all(entry["relation"] == "optional" for entry in item["branches"]))
 
-    def test_a_railed_band_is_kept(self) -> None:
-        tokens = [token("MOVE", 10, 100), token("A", 60, 100)]
-        rails = [{"x0": 5.0, "y0": 100.0, "x1": 200.0, "y1": 100.0}]
-        self.assertEqual(len(GRAMMAR.split_diagrams(tokens, rails)), 1)
+    def test_a_sequence_without_a_bypass_stays_on_the_main_line(self) -> None:
+        body = f"<g class='groupseq'>{KEYWORD}{OPERAND}</g>"
+        item = GRAMMAR.form("Format 1", [svg(body)])
+        self.assertEqual(item["branches"], [])
+        self.assertEqual(len(item["main_line"]), 2)
 
-    def test_a_figure_callout_without_vocabulary_is_rejected(self) -> None:
-        self.assertFalse(GRAMMAR.is_diagram([token("1", 0, 0), token("2", 20, 0)]))
-        self.assertTrue(GRAMMAR.is_diagram([token("MOVE", 0, 0), token("2", 20, 0)]))
+    def test_multi_line_labels_are_normalized(self) -> None:
+        item = GRAMMAR.form("Format 1", [svg(boxed("kwd", "SIZE\nERROR"))])
+        self.assertEqual(item["main_line"][0]["value"], "SIZE ERROR")
 
-    def test_a_single_token_band_is_rejected(self) -> None:
-        self.assertFalse(GRAMMAR.is_diagram([token("CONTINUE", 0, 0)]))
+    def test_a_fragment_reference_is_neither_keyword_nor_operand(self) -> None:
+        body = "<a class='boxed fragref'><g class='text'><text>when-phrase</text></g></a>"
+        item = GRAMMAR.form("Format 1", [svg(body)])
+        self.assertEqual(item["main_line"], [{"kind": "fragment", "value": "when-phrase"}])
+
+
+class DocumentTests(unittest.TestCase):
+    def test_a_title_delimits_its_diagram(self) -> None:
+        document = (
+            '<h3 class="syntaxdiagram-title">Format 1: ADD</h3>' + svg(KEYWORD)
+            + '<h3 class="syntaxdiagram-title">Format 2: ADD</h3>' + svg(OPERAND)
+        )
+        found = GRAMMAR.diagrams(document)
+        self.assertEqual([title for title, _ in found], ["Format 1: ADD", "Format 2: ADD"])
+        self.assertEqual([len(pieces) for _, pieces in found], [1, 1])
+
+    def test_a_wrapped_diagram_joins_its_pieces_instead_of_counting_them(self) -> None:
+        document = (
+            '<h3 class="syntaxdiagram-title">Format 1: SORT</h3>' + svg(KEYWORD) + svg(OPERAND)
+        )
+        found = GRAMMAR.diagrams(document)
+        self.assertEqual(len(found), 1)
+        item = GRAMMAR.form(*found[0])
+        self.assertEqual(len(item["main_line"]), 2)
+
+    def test_a_container_with_extra_attributes_is_still_found(self) -> None:
+        document = (
+            '<div class="syntaxdiagram" data-hd-platform="hst">'
+            '<h3 class="syntaxdiagram-title">Format 1: SORT</h3>' + svg(KEYWORD) + "</div>"
+        )
+        self.assertEqual(len(GRAMMAR.diagrams(document)), 1)
+
+    def test_an_unrelated_svg_is_not_a_diagram(self) -> None:
+        document = '<svg class="icon"><g class="boxed syntaxkwd"><text>NO</text></g></svg>'
+        self.assertEqual(GRAMMAR.diagrams(document), [])
+
+    def test_html_entities_do_not_defeat_the_parser(self) -> None:
+        item = GRAMMAR.form("Format 1", [svg(boxed("kwd", "A&nbsp;B"))])
+        self.assertEqual(item["main_line"][0]["value"], "A B")
+
+    def test_phrase_diagrams_are_separated_from_statement_formats(self) -> None:
+        self.assertEqual(GRAMMAR.kind_of("Format 1: ADD statement"), "format")
+        self.assertEqual(GRAMMAR.kind_of("when-phrase Format"), "fragment")
+        self.assertEqual(GRAMMAR.kind_of("converting-phrase Format 1"), "fragment")
+
+
+class TopicTests(unittest.TestCase):
+    def test_the_catalog_locator_supplies_the_publication_heading(self) -> None:
+        row = {"id": "add", "source_locator": "pdf-page:343;outline:ADD statement"}
+        self.assertEqual(FETCH.heading(row), "ADD statement")
+
+    def test_a_statement_subtree_includes_its_format_topics(self) -> None:
+        node = {
+            "label": "SET statement",
+            "href": "a.html",
+            "topics": [
+                {"label": "Format 1", "href": "b.html"},
+                {"label": "Format 2", "href": "c.html", "topics": [
+                    {"label": "Format 2 detail", "href": "d.html"}
+                ]},
+            ],
+        }
+        self.assertEqual(
+            [label for label, _ in FETCH.subtree(node)],
+            ["SET statement", "Format 1", "Format 2", "Format 2 detail"],
+        )
 
 
 class ComparisonTests(unittest.TestCase):

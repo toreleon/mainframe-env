@@ -1,0 +1,1473 @@
+{
+  "coverage_credit": 0,
+  "product": "SS6SG3_6.5",
+  "retained_in_repository": false,
+  "schema_version": "mainframe-env.cobol-topic-manifest@1",
+  "topics": [
+    {
+      "id": "accept",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0001",
+      "title": "ACCEPT statement",
+      "topics": [
+        {
+          "bytes": 2658,
+          "file": "accept-00.html",
+          "label": "ACCEPT statement",
+          "sha256": "sha256:db3c64a965d627aa99fa082a82cd5dd4feb5150b9575192298304b8204c95be6",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsacce.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsacce.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 15313,
+          "file": "accept-01.html",
+          "label": "Data transfer",
+          "sha256": "sha256:2818d614e39dd2dcf1214a64fc36da63cae42b862d0a78be51ad5491c885fa91",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsaccea.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsaccea.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 15829,
+          "file": "accept-02.html",
+          "label": "System date-related information transfer",
+          "sha256": "sha256:e8fad425ecece2bf7bc7d291c8a7b5189837d426228377f192918ec6d9be7c0b",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsacceb.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsacceb.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 5703,
+          "file": "accept-03.html",
+          "label": "DATE, DATE YYYYMMDD, DAY, DAY YYYYDDD, DAY-OF-WEEK, and TIME",
+          "sha256": "sha256:6583f7c2921a8860c5d729259d2f98fbcbd0eea8f1f0ec234a0c397af05922d1",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsaccec.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsaccec.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 3475,
+          "file": "accept-04.html",
+          "label": "Example of the ACCEPT statement",
+          "sha256": "sha256:9b87c5135d9b66ff227980ef963e692111686958e24705bcfdda42f7e9d293e4",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsacced.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsacced.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "add",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0002",
+      "title": "ADD statement",
+      "topics": [
+        {
+          "bytes": 70913,
+          "file": "add-00.html",
+          "label": "ADD statement",
+          "sha256": "sha256:0d41bb5458c78b6477731c50c532c36731f89a4a12e6ce88e1123c138b6b6e35",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsadd.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsadd.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "allocate",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0003",
+      "title": "ALLOCATE statement",
+      "topics": [
+        {
+          "bytes": 32584,
+          "file": "allocate-00.html",
+          "label": "ALLOCATE statement",
+          "sha256": "sha256:1565d391a5998bdb530070b72a5adaa610691805bad69c19e808204ac41c9da6",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsallo.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsallo.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 6163,
+          "file": "allocate-01.html",
+          "label": "Example: ALLOCATE and FREE storage for UNBOUNDED tables",
+          "sha256": "sha256:b4da9ae8839724ebabd28928dc352002f12ff8fe9ef508d2486db1f468034eb1",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsalloex.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsalloex.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "alter",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0004",
+      "title": "ALTER statement",
+      "topics": [
+        {
+          "bytes": 11711,
+          "file": "alter-00.html",
+          "label": "ALTER statement",
+          "sha256": "sha256:949c1fd1c304bc38b1dbf43460467661942015f273b11467f304725a23dbf882",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsalte.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsalte.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2107,
+          "file": "alter-01.html",
+          "label": "Segmentation considerations",
+          "sha256": "sha256:e544f688698faf316933eafeae4deff8d42048db886bfb67440c3bf76f9af979",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsaltea.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsaltea.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "call",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0005",
+      "title": "CALL statement",
+      "topics": [
+        {
+          "bytes": 106042,
+          "file": "call-00.html",
+          "label": "CALL statement",
+          "sha256": "sha256:fdf73c18a03049cd540efcfa652bfc7f842a16a1000c68a09a18938e2689cc4a",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpscall.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpscall.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 11615,
+          "file": "call-01.html",
+          "label": "Calling static Java methods from COBOL",
+          "sha256": "sha256:3d27e6e915b89f2e0d40dc8894c7cde3fa0496e7c6acb2fd6a688835a2316a3f",
+          "topic_path": "SS6SG3_6.5/lr/ref/calling-static-java-methods.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Fcalling-static-java-methods.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "cancel",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0006",
+      "title": "CANCEL statement",
+      "topics": [
+        {
+          "bytes": 13028,
+          "file": "cancel-00.html",
+          "label": "CANCEL statement",
+          "sha256": "sha256:ae971d313e081412dce3e6538086b0f8a93d886b354016054a1dd31d4913e707",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpscanc.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpscanc.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "close",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0007",
+      "title": "CLOSE statement",
+      "topics": [
+        {
+          "bytes": 45677,
+          "file": "close-00.html",
+          "label": "CLOSE statement",
+          "sha256": "sha256:43dc713c2f56ee6f4990bb27eba26ba0544827e9786b961c7bc7e5019c7d964b",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsclos.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsclos.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 12744,
+          "file": "close-01.html",
+          "label": "Effect of CLOSE statement on file types",
+          "sha256": "sha256:c3515cc2757012cd83961b1245c068a25d77a4ca9d524fbea7165b9bd60e22a0",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsclosa.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsclosa.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "compute",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0008",
+      "title": "COMPUTE statement",
+      "topics": [
+        {
+          "bytes": 24006,
+          "file": "compute-00.html",
+          "label": "COMPUTE statement",
+          "sha256": "sha256:16ca7118cdc5578407ee870f56a4a67c50f5b820d0f15e47715b1a3718f92705",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpscomp.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpscomp.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "continue",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0009",
+      "title": "CONTINUE statement",
+      "topics": [
+        {
+          "bytes": 4071,
+          "file": "continue-00.html",
+          "label": "CONTINUE statement",
+          "sha256": "sha256:8204f50e5635961aca55e62abd0cbfed6875e84d3c8f9cbfc8dbc547b556986c",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpscont.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpscont.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "delete",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0010",
+      "title": "DELETE statement",
+      "topics": [
+        {
+          "bytes": 20311,
+          "file": "delete-00.html",
+          "label": "DELETE statement",
+          "sha256": "sha256:32a4462fc18be7fb1d45fb61b85a8df2b5acee904655b43a308515edb5a129ad",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsdele.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsdele.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "display",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0011",
+      "title": "DISPLAY statement",
+      "topics": [
+        {
+          "bytes": 23703,
+          "file": "display-00.html",
+          "label": "DISPLAY statement",
+          "sha256": "sha256:79f9b8286d4206c8ad689023af87c4f18658dda0e4986c76139dcc8f952a5682",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsdisp.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsdisp.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "divide",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0012",
+      "title": "DIVIDE statement",
+      "topics": [
+        {
+          "bytes": 121178,
+          "file": "divide-00.html",
+          "label": "DIVIDE statement",
+          "sha256": "sha256:6a8db159e10a4dc37bead9ffb0d7e6b06ef113e41cd181d12d2bd3f3216a3db7",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsdivi.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsdivi.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "entry",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0013",
+      "title": "ENTRY statement",
+      "topics": [
+        {
+          "bytes": 19245,
+          "file": "entry-00.html",
+          "label": "ENTRY statement",
+          "sha256": "sha256:a718d0dab6632f3c843f0e68de7575ef29bd04a7a242d6d9060f0eba2cbc8f4a",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsentr.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsentr.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "evaluate",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0014",
+      "title": "EVALUATE statement",
+      "topics": [
+        {
+          "bytes": 71291,
+          "file": "evaluate-00.html",
+          "label": "EVALUATE statement",
+          "sha256": "sha256:c89b718ea04b66634f3a6443855527bf69f8311b339aef1b488e82af89e2e73c",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpseval.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpseval.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 5261,
+          "file": "evaluate-01.html",
+          "label": "Determining values",
+          "sha256": "sha256:67fb6446256741e3754c72deb93b8baf8af5126821548572aa4ad6516a416e97",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsevala.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsevala.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 3583,
+          "file": "evaluate-02.html",
+          "label": "Comparing selection subjects and objects",
+          "sha256": "sha256:02182fbf4f61d7243c9fd9be1b4ae1d99a2cb99047642a1d09ec0c5276dee940",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsevalb.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsevalb.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2364,
+          "file": "evaluate-03.html",
+          "label": "Executing the EVALUATE statement",
+          "sha256": "sha256:a1304f576cb703510c11fa0ceb5c31da61fe576ed655d9019df7ada7c90f620d",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsevalc.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsevalc.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "exit",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0015",
+      "title": "EXIT statement",
+      "topics": [
+        {
+          "bytes": 3760,
+          "file": "exit-00.html",
+          "label": "EXIT statement",
+          "sha256": "sha256:dc5879a64e5f63ec6e506264684d0980ccd6dc1e8b39c7da3ffd49539ca70eca",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsexit.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsexit.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 5713,
+          "file": "exit-01.html",
+          "label": "Format 1 (simple)",
+          "sha256": "sha256:5bd13378693108e12343f98452ac196f5c9012333f24a7cfe417dbe397760eba",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsexsi.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsexsi.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 6060,
+          "file": "exit-02.html",
+          "label": "Format 2 (program)",
+          "sha256": "sha256:c6c0927880a9e7a1afc7edd8ee64f697cc8d9b8e5de4c90b409536c843051068",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsexpr.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsexpr.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 5821,
+          "file": "exit-03.html",
+          "label": "Format 3 (method)",
+          "sha256": "sha256:0614e13cf463356862dd7d29a120f55ededacd7acd2232959fa803b8b3725faf",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsexme.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsexme.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 6957,
+          "file": "exit-04.html",
+          "label": "Format 5 (inline-perform)",
+          "sha256": "sha256:045e2312548f74797f2e973ba1502156d3acd6900b6a00fc0fcdaa9458da1ff3",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsexperf.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsexperf.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 7726,
+          "file": "exit-05.html",
+          "label": "Format 6 (procedure)",
+          "sha256": "sha256:831b0c65e79cbf7c0f693b220816de7e8731444a57ae6bc4ae239ee2653ced20",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsexpara.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsexpara.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "free",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0016",
+      "title": "FREE statement",
+      "topics": [
+        {
+          "bytes": 8368,
+          "file": "free-00.html",
+          "label": "FREE statement",
+          "sha256": "sha256:909f9ebe7f9a3f4435b77378d4397a378ee015c3287074e648c13f7f4227e291",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsfree.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsfree.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "goback",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0017",
+      "title": "GOBACK statement",
+      "topics": [
+        {
+          "bytes": 6494,
+          "file": "goback-00.html",
+          "label": "GOBACK statement",
+          "sha256": "sha256:172e44045f716e4e04b19d1653377edb7f6d684e69f12ebef2624bc7dee0fc39",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsgoba.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsgoba.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "go-to",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0018",
+      "title": "GO TO statement",
+      "topics": [
+        {
+          "bytes": 2334,
+          "file": "go-to-00.html",
+          "label": "GO TO statement",
+          "sha256": "sha256:1485a56de69e2492090f49c1142c37210ef6c3c93becfbd7b8eb6b564ba72fd6",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsgoto.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsgoto.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 7377,
+          "file": "go-to-01.html",
+          "label": "Unconditional GO TO",
+          "sha256": "sha256:d07bb131545904d2e92b922c9f447be2c4b599f19b66153515e028ee82283aa6",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsgotoa.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsgotoa.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 11094,
+          "file": "go-to-02.html",
+          "label": "Conditional GO TO",
+          "sha256": "sha256:e4231635bd6e9fa09379116f4ab794d28764877324f5c77c72a62459d3d3ce16",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsgotob.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsgotob.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 8484,
+          "file": "go-to-03.html",
+          "label": "Altered GO TO",
+          "sha256": "sha256:46c357f4ee347e26e01f1ecab803d90ec2e18782d58730c8a5aec40337cab57c",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsgotoc.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsgotoc.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "if",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0019",
+      "title": "IF statement",
+      "topics": [
+        {
+          "bytes": 19822,
+          "file": "if-00.html",
+          "label": "IF statement",
+          "sha256": "sha256:6d70401e4423bfb88459d5f6b3bf315d61e2f53931346f734297ca5cf2a98137",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsif.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsif.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 3479,
+          "file": "if-01.html",
+          "label": "Transferring control",
+          "sha256": "sha256:99f13fdb9b45f023fdf7e6ecf9f18345e3dfb0616ad3e15e59a0f6c8c60d875f",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsifa.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsifa.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2154,
+          "file": "if-02.html",
+          "label": "Nested IF statements",
+          "sha256": "sha256:0f56c11b901a813f7ee3372b172f549d1ae8ea3a0eff7cecfb8e269a6f798b19",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsifb.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsifb.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "initialize",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0020",
+      "title": "INITIALIZE statement",
+      "topics": [
+        {
+          "bytes": 38109,
+          "file": "initialize-00.html",
+          "label": "INITIALIZE statement",
+          "sha256": "sha256:698ccc0d4ed788656eb5173a59900d5532d5feda825072cea3f672bebc440bc4",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsinit.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsinit.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 6847,
+          "file": "initialize-01.html",
+          "label": "INITIALIZE statement rules",
+          "sha256": "sha256:6fe30f78cdf3269aaaddf90be9192b9967857bdddd5c7edc407f8b204ef52eb5",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsinita.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsinita.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "inspect",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0021",
+      "title": "INSPECT statement",
+      "topics": [
+        {
+          "bytes": 160960,
+          "file": "inspect-00.html",
+          "label": "INSPECT statement",
+          "sha256": "sha256:8070e006c1db043e40501c8c6fb46400080c1e7f1ed33c2972b9836335fd2e1e",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsinsp.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsinsp.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2377,
+          "file": "inspect-01.html",
+          "label": "Data flow",
+          "sha256": "sha256:32b894685c9f3efcf0818cafd5ad87283509f7fd5b666cc73ce6c0d07f07f779",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsinspa.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsinspa.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 3239,
+          "file": "inspect-02.html",
+          "label": "Comparison cycle",
+          "sha256": "sha256:8c645217a8c2ef8bd85d2a98eab5054862b15fd59f992e9f385cb42692014a29",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsinspb.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsinspb.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 1810,
+          "file": "inspect-03.html",
+          "label": "Example of the INSPECT statement",
+          "sha256": "sha256:6738f8a823d731e1d5332635b73d2be582a26f60fa8f2efe25ef9a26afabb736",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsinspc.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsinspc.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "invoke",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0022",
+      "title": "INVOKE statement",
+      "topics": [
+        {
+          "bytes": 55989,
+          "file": "invoke-00.html",
+          "label": "INVOKE statement",
+          "sha256": "sha256:d5e9830d1fdd5e4bfa0c022cb59ed90666bf7269a2147c882b33404cb8c3dfe3",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsinvo.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsinvo.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 13964,
+          "file": "invoke-01.html",
+          "label": "Interoperable data types for OO COBOL and Java",
+          "sha256": "sha256:f4185620937d8930b80dd2fa8e527d93e672b50928600d0f91e4ba43936b10fe",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsinvoa.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsinvoa.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 5334,
+          "file": "invoke-02.html",
+          "label": "Miscellaneous argument types for COBOL and Java",
+          "sha256": "sha256:179751e5d06dacbf6ed82b70333e64071e98e3adee8999f57595807671c3dc9e",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsinvob.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsinvob.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "json-generate",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0023",
+      "title": "JSON GENERATE statement",
+      "topics": [
+        {
+          "bytes": 175280,
+          "file": "json-generate-00.html",
+          "label": "JSON GENERATE statement",
+          "sha256": "sha256:23414cc9cfe19246de7bf30b95976ca919fabe4aca76495a4e7f5d55b58e802f",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsjsog.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsjsog.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2269,
+          "file": "json-generate-01.html",
+          "label": "Nested JSON GENERATE or JSON PARSE statements",
+          "sha256": "sha256:dccb45756f8d5c77d0539bfda60330d5bc5d119b8cb394e18aaed69fbc23503b",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsjsoga.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsjsoga.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 6520,
+          "file": "json-generate-02.html",
+          "label": "Operation of JSON GENERATE",
+          "sha256": "sha256:622274d9e64bc804537cee970a9f54dc98c8d1a74440e254cc12a6d9955ff027",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsjsogb.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsjsogb.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 6820,
+          "file": "json-generate-03.html",
+          "label": "Format conversion of elementary data",
+          "sha256": "sha256:d2937d4a1791ec015272e8262f98361cd7a0efbeeef819f5baffbdfa33dbf6f5",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsjsogc.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsjsogc.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2727,
+          "file": "json-generate-04.html",
+          "label": "Trimming of generated JSON data",
+          "sha256": "sha256:de4ad5e125b3099654e5b0d6b69da11a3a5c77fecaf2a35c5cf5e36158d78d92",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsjsogd.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsjsogd.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 1709,
+          "file": "json-generate-05.html",
+          "label": "JSON name formation",
+          "sha256": "sha256:86df466149afe36d659c00e3b9647e9274df1c2edc783ff9de2c9ad10e02c0f2",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsjsoge.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsjsoge.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "json-parse",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
+      "title": "JSON PARSE statement",
+      "topics": [
+        {
+          "bytes": 147240,
+          "file": "json-parse-00.html",
+          "label": "JSON PARSE statement",
+          "sha256": "sha256:929c31edcc6d62e7517f489c9a64610f5099e9118f1ce757162eae713c5e02f1",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsjsop.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsjsop.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 1872,
+          "file": "json-parse-01.html",
+          "label": "Nested JSON GENERATE or JSON PARSE statements",
+          "sha256": "sha256:0f35dd7b301624131a98c7575840ad55ca900ac394c730e6a51b1aea0feb4d75",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsjsopa.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsjsopa.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 5324,
+          "file": "json-parse-02.html",
+          "label": "Operation of JSON PARSE",
+          "sha256": "sha256:4e1ec7622fb7377b03606fe8e38e411e792609c43e4563da290ee6e746255cda",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsjsopb.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsjsopb.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 6275,
+          "file": "json-parse-03.html",
+          "label": "Examples of matched and mismatched data definitions and JSON text",
+          "sha256": "sha256:6d01a82ce8cde4871b12f998a1a0e75db3ff702732f7f8f536843d19ee4605b5",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsjsopc.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsjsopc.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 1622,
+          "file": "json-parse-04.html",
+          "label": "Count of table elements set by JSON PARSE",
+          "sha256": "sha256:2af9655658d1036212a450cdba29bf0839d8e33f6e431fb35be5b7034b1b25e5",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsjsopd.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsjsopd.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 41895,
+          "file": "json-parse-05.html",
+          "label": "Valid and invalid elementary moves",
+          "sha256": "sha256:3247d9f1f71b0eaeb19b7b8845ad067ebf27cdda279b9119d46c422861411b32",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsjsopj.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsjsopj.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 13770,
+          "file": "json-parse-06.html",
+          "label": "Control character mapping table between UTF-8 and EBCDIC",
+          "sha256": "sha256:bdfae37535b3e19c3e6d4aadacb80e6b8853f2eeee9c9ae87f0d6d3e5220c2ed",
+          "topic_path": "SS6SG3_6.5/lr/ref/ccmtUTF8.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2FccmtUTF8.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "merge",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0025",
+      "title": "MERGE statement",
+      "topics": [
+        {
+          "bytes": 48213,
+          "file": "merge-00.html",
+          "label": "MERGE statement",
+          "sha256": "sha256:43ab10379fc1f52d1c342e6dce2f3cbe022eb35b6d06b604cc9100765aadde8f",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsmerg.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsmerg.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2809,
+          "file": "merge-01.html",
+          "label": "MERGE special registers",
+          "sha256": "sha256:08f3c8b774fc166acd8b726c9cd8df752daaa121a311a705f32cd84ffc42db62",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsmerga.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsmerga.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 1779,
+          "file": "merge-02.html",
+          "label": "Segmentation considerations",
+          "sha256": "sha256:2744674a48ccbb8a467b81c8ae2d1221df7ff3e4264279184844b9b7d30da0ee",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsmergb.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsmergb.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "move",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0026",
+      "title": "MOVE statement",
+      "topics": [
+        {
+          "bytes": 22481,
+          "file": "move-00.html",
+          "label": "MOVE statement",
+          "sha256": "sha256:45dcbbfb431e9b0aa40c56e3fd2a38714aee1f096363ca08bbf703a3bff9f19e",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsmove.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsmove.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 5012,
+          "file": "move-01.html",
+          "label": "Elementary moves",
+          "sha256": "sha256:26c8f3342af770003c75a5197a7f9bdb807a854eef2cf5620b785338b8858b10",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsmovea.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsmovea.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 10353,
+          "file": "move-02.html",
+          "label": "Elementary move rules",
+          "sha256": "sha256:39df1a380e925ff72acde9f5e3cc90b0e5681107f8a275a5a587a734c1fb7829",
+          "topic_path": "SS6SG3_6.5/lr/rlpsmovea1.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Frlpsmovea1.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 14808,
+          "file": "move-03.html",
+          "label": "Valid and invalid elementary moves",
+          "sha256": "sha256:c62fe5d91391bcf0fe2c6a4d2e5f5763feffc80adfc55ca859c66db8eed7ec05",
+          "topic_path": "SS6SG3_6.5/lr/rlpsmovea2.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Frlpsmovea2.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 1512,
+          "file": "move-04.html",
+          "label": "Moves involving file record areas",
+          "sha256": "sha256:16f41c4d2b815d93b04893fae225e70d35078d4e85d2e8c455f537d9fccbf20e",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsmoveb.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsmoveb.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 3370,
+          "file": "move-05.html",
+          "label": "Group moves",
+          "sha256": "sha256:63631676d5b4e54fe21856ed9f6782e0c3fb01dfcbcc45cbe67929cbd74cc3af",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsmovec.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsmovec.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "multiply",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0027",
+      "title": "MULTIPLY statement",
+      "topics": [
+        {
+          "bytes": 47314,
+          "file": "multiply-00.html",
+          "label": "MULTIPLY statement",
+          "sha256": "sha256:6765ed8e7ad14eb1d525aab2a1056c5901fe4eafdb9fbdc9529655250966c8da",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsmult.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsmult.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "open",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0028",
+      "title": "OPEN statement",
+      "topics": [
+        {
+          "bytes": 55758,
+          "file": "open-00.html",
+          "label": "OPEN statement",
+          "sha256": "sha256:c60fffa3c0b6bb10bdeb2b03018e154f2bb8843ad58c09fa427c69f977558a5f",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsopen.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsopen.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 4301,
+          "file": "open-01.html",
+          "label": "General rules",
+          "sha256": "sha256:9d6d82400be38aedd914173001efb38600dfe4b29977905323a8a8f7d52c76d6",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsopena.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsopena.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 18711,
+          "file": "open-02.html",
+          "label": "OPEN statement notes",
+          "sha256": "sha256:a9132dc4dd8b952582fc6fcc01e5b047c6f8275f8a6e91f75269a9d70fb86e51",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsopenc.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsopenc.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "perform",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0029",
+      "title": "PERFORM statement",
+      "topics": [
+        {
+          "bytes": 17275,
+          "file": "perform-00.html",
+          "label": "PERFORM statement",
+          "sha256": "sha256:7e9c3da99feb6f1db9053046b409eb6b2f21537c9c2aae3ae4287c7a7287f443",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsperf.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsperf.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 9694,
+          "file": "perform-01.html",
+          "label": "Basic PERFORM statement",
+          "sha256": "sha256:7b8ad547d9439541e0fbd3bf5a03b07a2c0984b74a672048f4f1dd706ef7e49d",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsperf1.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsperf1.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 18960,
+          "file": "perform-02.html",
+          "label": "PERFORM with TIMES phrase",
+          "sha256": "sha256:60a01538e0c0576b37fce29f5679a3c5d1425347cf23661014a3cd3d663efc2f",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsperfa.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsperfa.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 28032,
+          "file": "perform-03.html",
+          "label": "PERFORM with UNTIL phrase",
+          "sha256": "sha256:add7959721c5ecab416522d522d3538e1a394ec345638f795dc79dcb88aff7e6",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsperfb.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsperfb.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 53358,
+          "file": "perform-04.html",
+          "label": "PERFORM with VARYING phrase",
+          "sha256": "sha256:7234d7e22d8ac34320e8d956810f67462b6739a1887e05dcb7774d87879dc454",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsperfc.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsperfc.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 4643,
+          "file": "perform-05.html",
+          "label": "Varying identifiers",
+          "sha256": "sha256:7ca8aa7027e48b225ec8feecc73dce3198aaa76b36bf591840d8e18202f89ad1",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsperfc1.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsperfc1.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 5635,
+          "file": "perform-06.html",
+          "label": "Varying two identifiers",
+          "sha256": "sha256:4c5654da60b0974e15855d6992bac3abc7e719b04fc05e43353387b49d92b4f7",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsperfc2.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsperfc2.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 3165,
+          "file": "perform-07.html",
+          "label": "Varying three identifiers",
+          "sha256": "sha256:43126e49384c6a5eb852e04b122ffcac947bbd4b398c0779c03bb3dcae6f091b",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsperfc3.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsperfc3.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 1358,
+          "file": "perform-08.html",
+          "label": "Varying more than three identifiers",
+          "sha256": "sha256:d504219dae70aaf93a665ef38948ecc424a77a6e1ecfde604f22ff9ff711a1af",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsperfc4.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsperfc4.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 3147,
+          "file": "perform-09.html",
+          "label": "Varying phrase rules",
+          "sha256": "sha256:3fadfbc0317791e790896f87c598e9b1176218d0a0454cb554a33fa05335c7bc",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsperfc5.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsperfc5.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "read",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0030",
+      "title": "READ statement",
+      "topics": [
+        {
+          "bytes": 51614,
+          "file": "read-00.html",
+          "label": "READ statement",
+          "sha256": "sha256:35a23dc85f1cb15d9b4d4bc4408974bcde913be78ad040355e631d0faef13ba0",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsread.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsread.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 4858,
+          "file": "read-01.html",
+          "label": "Processing files with variable-length records or multiple record descriptions",
+          "sha256": "sha256:1bba9c5bed74acb5c49a22737b8bbe242721d1a5ee4e5c0de45a4eec56a2bb22",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsreada.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsreada.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 8618,
+          "file": "read-02.html",
+          "label": "Sequential access mode",
+          "sha256": "sha256:89e3657168de20a49cb0672013cb28d1711cf6231d28f1f1f91485a56f140a5c",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsreadb.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsreadb.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 3701,
+          "file": "read-03.html",
+          "label": "Random access mode",
+          "sha256": "sha256:cf8b7e7d57bf62ee2b6267016e877b9678a3eac4e8395ed61c9725f2eeaf0bdf",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsreadc.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsreadc.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 1636,
+          "file": "read-04.html",
+          "label": "Dynamic access mode",
+          "sha256": "sha256:61cf38c0da77569a09e5dfb56eb9c96043e4f50433e3c48a978ae12430313373",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsreadd.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsreadd.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 3397,
+          "file": "read-05.html",
+          "label": "READ statement notes",
+          "sha256": "sha256:d2ccc0693f05417b0c7d4af247da61db70baee23ba3fe50792fccbded92b9b58",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsreade.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsreade.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "release",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0031",
+      "title": "RELEASE statement",
+      "topics": [
+        {
+          "bytes": 11752,
+          "file": "release-00.html",
+          "label": "RELEASE statement",
+          "sha256": "sha256:9833e54f4d6b34476491220827d9a0decc3324a4d23a0d6678e496bd91cbbfd8",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsrele.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsrele.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "return",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0032",
+      "title": "RETURN statement",
+      "topics": [
+        {
+          "bytes": 26268,
+          "file": "return-00.html",
+          "label": "RETURN statement",
+          "sha256": "sha256:f86fc40e0c2044b979ba3a47846ee97378e29d536a3b014ab6fed551ea4a5d89",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsretu.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsretu.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "rewrite",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0033",
+      "title": "REWRITE statement",
+      "topics": [
+        {
+          "bytes": 22862,
+          "file": "rewrite-00.html",
+          "label": "REWRITE statement",
+          "sha256": "sha256:7b61b6e50b05c00c9245d19abb75e51d9eacc8325457c5bfad5166c98028cd81",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsrewr.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsrewr.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2078,
+          "file": "rewrite-01.html",
+          "label": "Reusing a logical record",
+          "sha256": "sha256:786ab96bc2ebd13604a94dc1ddfe56c7343366524a13df67a91887c79ee31096",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsrewra.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsrewra.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 1797,
+          "file": "rewrite-02.html",
+          "label": "Sequential files",
+          "sha256": "sha256:1681d0064a310812f662d028499ec64826938025f49b8b029cf29a3b079dae5a",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsrewrb.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsrewrb.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2495,
+          "file": "rewrite-03.html",
+          "label": "Indexed files",
+          "sha256": "sha256:997db2bab691b328c469f251494ae6b04be5584c005c7be3b0c2fd2818d24ac4",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsrewrc.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsrewrc.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2214,
+          "file": "rewrite-04.html",
+          "label": "Relative files",
+          "sha256": "sha256:6569ba75e4d768142bab1c45077cee246999301b19b0252478c8beef0939c0aa",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsrewrd.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsrewrd.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "search",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0034",
+      "title": "SEARCH statement",
+      "topics": [
+        {
+          "bytes": 60554,
+          "file": "search-00.html",
+          "label": "SEARCH statement",
+          "sha256": "sha256:82d320b8d520f53ed8f1a9ae46d91844fdbe34b56b8f90a4952ca9ec4dff1035",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpssear.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpssear.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 10825,
+          "file": "search-01.html",
+          "label": "Serial search",
+          "sha256": "sha256:fe5d11ee9c6528c55899c46ffd49cea7d0b63e8c94d6fa950c0778b16dfa6119",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsseara.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsseara.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 9291,
+          "file": "search-02.html",
+          "label": "Binary search",
+          "sha256": "sha256:f8d2d5395056bda862c196f19d414f34849fa0d10ebc6607970d9de7c891dbe5",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpssearb.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpssearb.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2003,
+          "file": "search-03.html",
+          "label": "Search statement considerations",
+          "sha256": "sha256:6502049b4b3517a4657563c30430f1831cd9cf478e0c8f1d38b0b05091c26ff6",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpssearc.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpssearc.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "set",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0035",
+      "title": "SET statement",
+      "topics": [
+        {
+          "bytes": 5073,
+          "file": "set-00.html",
+          "label": "SET statement",
+          "sha256": "sha256:8ad466c4bac52bf6732b49a3787e4f93c4e0846b3bc9d2a342200f2a89f2fe7f",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsset.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsset.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 16211,
+          "file": "set-01.html",
+          "label": "Format 1: SET for basic table handling",
+          "sha256": "sha256:b95a5782fb1fd5975f496a648fb1b5b288d704e3ed9bc847d7a273353f10c996",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsseta.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsseta.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 11540,
+          "file": "set-02.html",
+          "label": "Format 2: SET for adjusting indexes",
+          "sha256": "sha256:52475e3ddfc731e6eb93670ff327d22e2ac2602f7b6fec9d7bd779b5929c42b6",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpssetb.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpssetb.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 9579,
+          "file": "set-03.html",
+          "label": "Format 3: SET for external switches",
+          "sha256": "sha256:e3006810c86361a6a1251373d02927c903f10e64d2824f9d85df6eac7e46a64b",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpssetc.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpssetc.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 9738,
+          "file": "set-04.html",
+          "label": "Format 4: SET for condition-names",
+          "sha256": "sha256:e1cc60b2fb83bfaab98ac314ff666b0dbb2dda7ddc1816bb9f07aea5e7324b32",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpssetd.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpssetd.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 17993,
+          "file": "set-05.html",
+          "label": "Format 5: SET for USAGE IS POINTER data items",
+          "sha256": "sha256:9c427b96e954ac86771fa244718f420d65375b37ebc8fce5fc5d7a3173803b32",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpssete.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpssete.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 22677,
+          "file": "set-06.html",
+          "label": "Format 6: SET for procedure-pointer and function-pointer data items",
+          "sha256": "sha256:a2b3a6f3fbb6b9c9782e706d1c1b84dce849649546a905bda0854ef8930aa973",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpssetf.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpssetf.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 9878,
+          "file": "set-07.html",
+          "label": "Format 7: SET for USAGE OBJECT REFERENCE data items",
+          "sha256": "sha256:60fb078515f47b6a7209db27b074cece13e7009eb0b0403981c626ec7a9eb4b1",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpssetg.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpssetg.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 9717,
+          "file": "set-08.html",
+          "label": "Format 8: SET for length of dynamic-length elementary items",
+          "sha256": "sha256:365492f4c1fc903daa7bac2c1416ca24ea4963fe62590cb32da517b1943e6635",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsset8.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsset8.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "sort",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0036",
+      "title": "SORT statement",
+      "topics": [
+        {
+          "bytes": 104643,
+          "file": "sort-00.html",
+          "label": "SORT statement",
+          "sha256": "sha256:7e3cd7558a77367c6f16cec614bfe197151e08a9a6c90eba5c62e504c21cbe01",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpssort.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpssort.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 3796,
+          "file": "sort-01.html",
+          "label": "SORT special registers",
+          "sha256": "sha256:a16bff9fcc23e93e8e6635f1d9ac831db4d78923c4e898879b33d588f23c4ef9",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpssorta.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpssorta.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 1688,
+          "file": "sort-02.html",
+          "label": "Segmentation considerations",
+          "sha256": "sha256:e1c5151942ba708490a5df1751df80d918e97f85b8518ca63ba1c5a4c60f420c",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpssortb.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpssortb.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "start",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0037",
+      "title": "START statement",
+      "topics": [
+        {
+          "bytes": 42758,
+          "file": "start-00.html",
+          "label": "START statement",
+          "sha256": "sha256:22af430266b86f9ff78ad274143cda15c136f8581b28552348bdcc0d89179b6f",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsstar.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsstar.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 4788,
+          "file": "start-01.html",
+          "label": "Indexed files",
+          "sha256": "sha256:a2d3326d86452f51f3c8152170e6434ccc5cc7ad29a07d3bdc4bcbe22b0b4705",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsstara.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsstara.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 1561,
+          "file": "start-02.html",
+          "label": "Relative files",
+          "sha256": "sha256:76378b93eebad04789534f1ecac0bf08cba85c7a98d0f585519cdfe88d83830c",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsstarb.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsstarb.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "stop",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0038",
+      "title": "STOP statement",
+      "topics": [
+        {
+          "bytes": 9202,
+          "file": "stop-00.html",
+          "label": "STOP statement",
+          "sha256": "sha256:0e6193726d0eb463bb86a57cc1faa6f737208050f005f6bdc8dd1a968ef2c280",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsstop.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsstop.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "string",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0039",
+      "title": "STRING statement",
+      "topics": [
+        {
+          "bytes": 43996,
+          "file": "string-00.html",
+          "label": "STRING statement",
+          "sha256": "sha256:39f55250d973ccfd5f34e5e9b2a0e3a1313b1040a90913372b5c6a1ae8ff5dec",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsstri.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsstri.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 5195,
+          "file": "string-01.html",
+          "label": "Data flow",
+          "sha256": "sha256:5d134fb32a9c4d2a67acbf6485b611cb110e354580c2f528f4e655f788c00bde",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsstria.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsstria.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2457,
+          "file": "string-02.html",
+          "label": "Example of the STRING statement",
+          "sha256": "sha256:bfa777f71e71375da47591a75b70aca907505af94d2d368e1425fe63fd865001",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsstrib.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsstrib.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "subtract",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0040",
+      "title": "SUBTRACT statement",
+      "topics": [
+        {
+          "bytes": 69888,
+          "file": "subtract-00.html",
+          "label": "SUBTRACT statement",
+          "sha256": "sha256:000a5e0ce96ece37c9b11919f83bd8e5e26c8a92d3571fab97964d7a9603de4b",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpssubt.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpssubt.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "unstring",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0041",
+      "title": "UNSTRING statement",
+      "topics": [
+        {
+          "bytes": 67339,
+          "file": "unstring-00.html",
+          "label": "UNSTRING statement",
+          "sha256": "sha256:b1664be0297f4050ceb9b2ce737f8dd61c1570cbda29b46b77aa73ec52720366",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsunst.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsunst.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 8774,
+          "file": "unstring-01.html",
+          "label": "Data flow",
+          "sha256": "sha256:1be29af334932486b04116f8b8a6fa21c39359fcfe24f1bcb3559b8d7cd55907",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsunsta.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsunsta.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2154,
+          "file": "unstring-02.html",
+          "label": "Values at the end of execution of the UNSTRING statement",
+          "sha256": "sha256:5af8a4a227da809578fe03bc575c5bc898c65335c93afed9f61c125275c63a6d",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsunstb.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsunstb.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 1941,
+          "file": "unstring-03.html",
+          "label": "Example of the UNSTRING statement",
+          "sha256": "sha256:366b4bd718d466cd1a26d4e059c7cadf901c30cf6a216bdadcfe6f0843b489ef",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsunstc.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsunstc.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "write",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0042",
+      "title": "WRITE statement",
+      "topics": [
+        {
+          "bytes": 101851,
+          "file": "write-00.html",
+          "label": "WRITE statement",
+          "sha256": "sha256:e5919139e02a45f1414e3e235b93266d661f75b88ae802ee1229c55d7535cb39",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpswrit.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpswrit.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 8803,
+          "file": "write-01.html",
+          "label": "WRITE for sequential files",
+          "sha256": "sha256:9e13956caebb427e45ba6ac67c8966a04ccb05a6bdd0b46a9f1a54b52cbb263d",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpswrita.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpswrita.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 3214,
+          "file": "write-02.html",
+          "label": "WRITE for indexed files",
+          "sha256": "sha256:e39576716c9439d0574c100311aedf8ccdc99ae6280f16d6e60c69629c5e315c",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpswritb.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpswritb.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2453,
+          "file": "write-03.html",
+          "label": "WRITE for relative files",
+          "sha256": "sha256:144aae9d720f6d78aa671f5a5130b91e29fe014dcdd419e2e3761c72d46eea61",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpswritc.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpswritc.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "xml-generate",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0043",
+      "title": "XML GENERATE statement",
+      "topics": [
+        {
+          "bytes": 148420,
+          "file": "xml-generate-00.html",
+          "label": "XML GENERATE statement",
+          "sha256": "sha256:5b8b9e9fd02c6d31ffb88458e002c303c46a03231bc4d59afbf63a9739c13fa4",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsxmlg.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsxmlg.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 1971,
+          "file": "xml-generate-01.html",
+          "label": "Nested XML GENERATE or XML PARSE statements",
+          "sha256": "sha256:9dbea7ca291fe85f098aae3a97355919c1f9e24cc89c80c4e5b2448827cf0d76",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsxmlga.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsxmlga.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 5912,
+          "file": "xml-generate-02.html",
+          "label": "Operation of XML GENERATE",
+          "sha256": "sha256:f1578372393904a51d04a9ac26e4fb46e0a91173dd0fe419d55bbf12035ce5aa",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsxmlgb.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsxmlgb.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 5581,
+          "file": "xml-generate-03.html",
+          "label": "Format conversion of elementary data",
+          "sha256": "sha256:df171375a2ef9d737076b2f1a85f3037179bc8ca072031a57c340e21ccc9f789",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsxmlgc.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsxmlgc.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2735,
+          "file": "xml-generate-04.html",
+          "label": "Trimming of generated XML data",
+          "sha256": "sha256:ddc507495b072801a5f8aeda1dbced2925e25423d26e8fe2304ed28574a49ed7",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsxmlgd.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsxmlgd.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2834,
+          "file": "xml-generate-05.html",
+          "label": "XML element name and attribute name formation",
+          "sha256": "sha256:a456223fc9e80f1bc20049ad01c2145645e1a53eb4f6e505b971d3286c95e4fd",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsxmlge.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsxmlge.html?parsebody=true&lang=en"
+        }
+      ]
+    },
+    {
+      "id": "xml-parse",
+      "located": true,
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044",
+      "title": "XML PARSE statement",
+      "topics": [
+        {
+          "bytes": 56290,
+          "file": "xml-parse-00.html",
+          "label": "XML PARSE statement",
+          "sha256": "sha256:73946b668cafbd76b5a84e5ae62bc52e7b43509bb7fbefe9185ae55e15d540ac",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsxmlp.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsxmlp.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 2060,
+          "file": "xml-parse-01.html",
+          "label": "Nested XML GENERATE or XML PARSE statements",
+          "sha256": "sha256:068f02795da6397c3ed0cbefd069c9cc2d20c0f89e95cc9f95b92665819aa177",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsxmlpa.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsxmlpa.html?parsebody=true&lang=en"
+        },
+        {
+          "bytes": 8901,
+          "file": "xml-parse-02.html",
+          "label": "Control flow",
+          "sha256": "sha256:d696cec7e01ef94fcc9f6b8304b92b33f275cfa569e5f4d5438f518989e0b236",
+          "topic_path": "SS6SG3_6.5/lr/ref/rlpsxmlpb.html",
+          "url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Flr%2Fref%2Frlpsxmlpb.html?parsebody=true&lang=en"
+        }
+      ]
+    }
+  ],
+  "unit": "procedure_statements"
+}
