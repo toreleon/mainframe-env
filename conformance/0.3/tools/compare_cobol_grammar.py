@@ -87,6 +87,12 @@ def compare(row: dict[str, Any]) -> dict[str, Any]:
         "keywords_missing_from_catalog": sorted(source_keywords - catalog_keywords),
         "keywords_absent_from_source": sorted(catalog_keywords - source_keywords),
         "catalog_placeholders": sorted(catalog_placeholders),
+        # A lowercase token is only a finding when the publication does not use
+        # that name. `identifier-1` and `fig-con-1` are the reference's own
+        # operand names, so a sketch that adopts them has closed the gap rather
+        # than widened it -- and naming operands raises the total token count,
+        # which reads as a regression unless the two are separated.
+        "undefined_placeholders": sorted(catalog_placeholders - source_operands),
         "source_operands": sorted(source_operands),
         "alternatives": sorted(
             {
@@ -145,6 +151,12 @@ def main(argv: Iterable[str] | None = None) -> int:
         ),
         "distinct_catalog_placeholders": len(
             {name for row in rows for name in row["catalog_placeholders"]}
+        ),
+        "distinct_undefined_placeholders": len(
+            {name for row in rows for name in row["undefined_placeholders"]}
+        ),
+        "rows_with_undefined_placeholders": sum(
+            1 for row in rows if row["undefined_placeholders"]
         ),
     }
     report = {

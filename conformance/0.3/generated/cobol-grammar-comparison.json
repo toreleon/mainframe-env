@@ -58,7 +58,8 @@
         "identifier-2",
         "mnemonic-name-1"
       ],
-      "title": "ACCEPT statement"
+      "title": "ACCEPT statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [
@@ -136,7 +137,10 @@
         "literal-1",
         "literal-2"
       ],
-      "title": "ADD statement"
+      "title": "ADD statement",
+      "undefined_placeholders": [
+        "statements"
+      ]
     },
     {
       "alternatives": [
@@ -186,7 +190,8 @@
         "data-name-2",
         "integer-1"
       ],
-      "title": "ALLOCATE statement"
+      "title": "ALLOCATE statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [],
@@ -226,7 +231,8 @@
         "procedure-name-1",
         "procedure-name-2"
       ],
-      "title": "ALTER statement"
+      "title": "ALTER statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [
@@ -346,7 +352,8 @@
         "literal-3",
         "procedure-pointer-1"
       ],
-      "title": "CALL statement"
+      "title": "CALL statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [
@@ -378,7 +385,8 @@
         "identifier-1",
         "literal-1"
       ],
-      "title": "CANCEL statement"
+      "title": "CANCEL statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [],
@@ -439,7 +447,8 @@
       "source_operands": [
         "file-name-1"
       ],
-      "title": "CLOSE statement"
+      "title": "CLOSE statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [
@@ -500,7 +509,10 @@
         "imperative-statement-1",
         "imperative-statement-2"
       ],
-      "title": "COMPUTE statement"
+      "title": "COMPUTE statement",
+      "undefined_placeholders": [
+        "statements"
+      ]
     },
     {
       "alternatives": [],
@@ -524,7 +536,8 @@
         "CONTINUE"
       ],
       "source_operands": [],
-      "title": "CONTINUE statement"
+      "title": "CONTINUE statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [],
@@ -578,7 +591,8 @@
         "imperative-statement-1",
         "imperative-statement-2"
       ],
-      "title": "DELETE statement"
+      "title": "DELETE statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [
@@ -632,7 +646,8 @@
         "literal-1",
         "mnemonic-name-1"
       ],
-      "title": "DISPLAY statement"
+      "title": "DISPLAY statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [
@@ -712,7 +727,10 @@
         "literal-1",
         "literal-2"
       ],
-      "title": "DIVIDE statement"
+      "title": "DIVIDE statement",
+      "undefined_placeholders": [
+        "statements"
+      ]
     },
     {
       "alternatives": [],
@@ -756,7 +774,8 @@
         "identifier-1",
         "literal-1"
       ],
-      "title": "ENTRY statement"
+      "title": "ENTRY statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [
@@ -864,7 +883,12 @@
         "literal-5",
         "literal-6"
       ],
-      "title": "EVALUATE statement"
+      "title": "EVALUATE statement",
+      "undefined_placeholders": [
+        "objects",
+        "statements",
+        "subjects"
+      ]
     },
     {
       "alternatives": [
@@ -918,7 +942,8 @@
       "source_operands": [
         "paragraph-name"
       ],
-      "title": "EXIT statement"
+      "title": "EXIT statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [],
@@ -944,7 +969,10 @@
         "FREE"
       ],
       "source_operands": [],
-      "title": "FREE statement"
+      "title": "FREE statement",
+      "undefined_placeholders": [
+        "data-name-1"
+      ]
     },
     {
       "alternatives": [],
@@ -968,7 +996,8 @@
         "GOBACK"
       ],
       "source_operands": [],
-      "title": "GOBACK statement"
+      "title": "GOBACK statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [],
@@ -1010,7 +1039,8 @@
         "paragraph-name",
         "procedure-name-1"
       ],
-      "title": "GO TO statement"
+      "title": "GO TO statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [
@@ -1064,7 +1094,8 @@
         "statement-1",
         "statement-2"
       ],
-      "title": "IF statement"
+      "title": "IF statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [],
@@ -1132,7 +1163,8 @@
         "identifier-2",
         "literal-1"
       ],
-      "title": "INITIALIZE statement"
+      "title": "INITIALIZE statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [
@@ -1235,7 +1267,8 @@
         "literal-4",
         "literal-5"
       ],
-      "title": "INSPECT statement"
+      "title": "INSPECT statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [
@@ -1325,7 +1358,8 @@
         "literal-1",
         "literal-2"
       ],
-      "title": "INVOKE statement"
+      "title": "INVOKE statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [
@@ -1536,7 +1570,8 @@
         "literal-3",
         "when-phrase"
       ],
-      "title": "JSON GENERATE statement"
+      "title": "JSON GENERATE statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [
@@ -1701,7 +1736,8 @@
         "literal-4",
         "using-phrase-1"
       ],
-      "title": "JSON PARSE statement"
+      "title": "JSON PARSE statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [
@@ -1787,7 +1823,8 @@
         "procedure-name-1",
         "procedure-name-2"
       ],
-      "title": "MERGE statement"
+      "title": "MERGE statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [
@@ -1829,7 +1866,8 @@
         "identifier-2",
         "literal-1"
       ],
-      "title": "MOVE statement"
+      "title": "MOVE statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [
@@ -1900,7 +1938,10 @@
         "literal-1",
         "literal-2"
       ],
-      "title": "MULTIPLY statement"
+      "title": "MULTIPLY statement",
+      "undefined_placeholders": [
+        "statements"
+      ]
     },
     {
       "alternatives": [
@@ -1969,7 +2010,8 @@
         "file-name-3",
         "file-name-4"
       ],
-      "title": "OPEN statement"
+      "title": "OPEN statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [
@@ -2090,7 +2132,10 @@
         "procedure-name-1",
         "procedure-name-2"
       ],
-      "title": "PERFORM statement"
+      "title": "PERFORM statement",
+      "undefined_placeholders": [
+        "statements"
+      ]
     },
     {
       "alternatives": [],
@@ -2187,7 +2232,8 @@
         "imperative-statement-3",
         "imperative-statement-4"
       ],
-      "title": "READ statement"
+      "title": "READ statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [],
@@ -2222,7 +2268,8 @@
         "identifier-1",
         "record-name-1"
       ],
-      "title": "RELEASE statement"
+      "title": "RELEASE statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [],
@@ -2278,7 +2325,8 @@
         "imperative-statement-1",
         "imperative-statement-2"
       ],
-      "title": "RETURN statement"
+      "title": "RETURN statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [],
@@ -2335,7 +2383,8 @@
         "imperative-statement-2",
         "record-name-1"
       ],
-      "title": "REWRITE statement"
+      "title": "REWRITE statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [
@@ -2450,7 +2499,8 @@
         "literal-1",
         "literal-2"
       ],
-      "title": "SEARCH statement"
+      "title": "SEARCH statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [
@@ -2583,7 +2633,8 @@
         "procedure-pointer-data-item-1",
         "procedure-pointer-data-item-2"
       ],
-      "title": "SET statement"
+      "title": "SET statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [
@@ -2697,7 +2748,8 @@
         "procedure-name-3",
         "procedure-name-4"
       ],
-      "title": "SORT statement"
+      "title": "SORT statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [],
@@ -2791,7 +2843,8 @@
         "imperative-statement-1",
         "imperative-statement-2"
       ],
-      "title": "START statement"
+      "title": "START statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [
@@ -2827,7 +2880,10 @@
       "source_operands": [
         "literal"
       ],
-      "title": "STOP statement"
+      "title": "STOP statement",
+      "undefined_placeholders": [
+        "value"
+      ]
     },
     {
       "alternatives": [
@@ -2904,7 +2960,8 @@
         "literal-1",
         "literal-2"
       ],
-      "title": "STRING statement"
+      "title": "STRING statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [
@@ -2981,7 +3038,10 @@
         "literal-1",
         "literal-2"
       ],
-      "title": "SUBTRACT statement"
+      "title": "SUBTRACT statement",
+      "undefined_placeholders": [
+        "statements"
+      ]
     },
     {
       "alternatives": [],
@@ -3086,7 +3146,8 @@
         "literal-1",
         "literal-2"
       ],
-      "title": "UNSTRING statement"
+      "title": "UNSTRING statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [
@@ -3190,7 +3251,8 @@
         "mnemonic-name-1",
         "record-name-1"
       ],
-      "title": "WRITE statement"
+      "title": "WRITE statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [
@@ -3380,7 +3442,10 @@
         "literal-6",
         "when-phrase"
       ],
-      "title": "XML GENERATE statement"
+      "title": "XML GENERATE statement",
+      "undefined_placeholders": [
+        "fig-con-1"
+      ]
     },
     {
       "alternatives": [],
@@ -3481,7 +3546,8 @@
         "procedure-name-2",
         "xml-schema-name-1"
       ],
-      "title": "XML PARSE statement"
+      "title": "XML PARSE statement",
+      "undefined_placeholders": []
     }
   ],
   "schema_version": "mainframe-env.cobol-grammar-comparison@1",
@@ -3495,9 +3561,11 @@
     "distinct_catalog_placeholders": 73,
     "distinct_keywords_missing": 69,
     "distinct_source_operands": 80,
+    "distinct_undefined_placeholders": 6,
     "rows": 44,
     "rows_with_missing_keywords": 29,
     "rows_with_more_source_formats": 2,
+    "rows_with_undefined_placeholders": 10,
     "source_diagrams": 95,
     "source_format_titles": 83,
     "source_formats": 83,
