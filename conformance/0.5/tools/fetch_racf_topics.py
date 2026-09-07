@@ -35,6 +35,14 @@ probe counted 110 topics in a 109-topic book.
 
 Topic bodies land outside the repository. IBM publication bytes are never
 written into the tree, and the manifest this emits carries zero coverage credit.
+`--destination`, `--cache` and `--toc` all carry retrieved bytes and all three
+are `docs_api.retrieval_path`, so the refusal happens while the command line is
+parsed. `--toc` was the one that was not checked, and of the four unguarded
+paths this change closes it was the worst: a table of contents is IBM's
+navigation JSON, not markup, so the content backstop in `cargo xtask coverage`
+cannot recognise it at all, and this one is 45 MB. Only
+`--manifest` is written inside the tree, and it holds digests and labels this
+tool composes, never a served byte.
 """
 
 from __future__ import annotations
@@ -156,12 +164,10 @@ def keyword_of_function(node: dict[str, Any]) -> str:
     return (node.get("label") or "").strip().split()[1]
 
 
-def outside_repository(path: Path) -> Path:
-    """Refuse to write publication bytes into the tree."""
-    resolved = path.resolve()
-    if resolved == REPOSITORY or REPOSITORY in resolved.parents:
-        raise ValueError(f"topic destination is inside the repository: {resolved}")
-    return resolved
+#: The rule is `docs_api`'s, not this tool's. Re-exported under its old name
+#: because that is what this tool's tests call it, and because a reader looking
+#: for the check in the file that writes should find it.
+outside_repository = docs_api.outside_repository
 
 
 def file_name(topic_path: str) -> str:
@@ -170,12 +176,13 @@ def file_name(topic_path: str) -> str:
 
 def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--destination", type=Path, required=True,
+    parser.add_argument("--destination", type=docs_api.retrieval_path, required=True,
                         help="where topic bodies are written, outside the tree")
     parser.add_argument("--manifest", type=Path, required=True)
-    parser.add_argument("--cache", type=Path,
+    parser.add_argument("--cache", type=docs_api.retrieval_path,
                         help="reuse retrieved bodies from this directory")
-    parser.add_argument("--toc", type=Path, help="reuse a saved table of contents")
+    parser.add_argument("--toc", type=docs_api.retrieval_path,
+                        help="reuse a saved table of contents, outside the tree")
     parser.add_argument("--pin", type=Path, default=DEFAULT_PIN,
                         help="the baseline manifest each topic is checked against")
     parser.add_argument("--workers", type=int, default=6)
@@ -184,9 +191,9 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
 
 def main(argv: Iterable[str] | None = None) -> int:
     args = parse_args(argv)
-    destination = outside_repository(args.destination)
+    destination = args.destination
     destination.mkdir(parents=True, exist_ok=True)
-    cache = outside_repository(args.cache) if args.cache else None
+    cache = args.cache
 
     toc_url = docs_api.TOC_URL.format(product=PRODUCT)
     if args.toc and args.toc.is_file():
@@ -194,7 +201,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     else:
         toc_body = docs_api.toc_bytes(toc_url, cache)
         if args.toc:
-            args.toc.write_bytes(toc_body)
+            docs_api.write_retrieved(args.toc, toc_body)
     document = json.loads(toc_body.decode("utf-8"))
 
     selected = families(document)
@@ -218,7 +225,7 @@ def main(argv: Iterable[str] | None = None) -> int:
             failed.append(f"{path}: {result}")
             continue
         retrieved[path] = result
-        (destination / file_name(path)).write_bytes(result)
+        docs_api.write_retrieved(destination / file_name(path), result)
     for failure in failed:
         print(f"unreachable {failure}")
 

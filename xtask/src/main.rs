@@ -8789,15 +8789,47 @@ const SERVED_TOPIC_MARKERS: [&str; 2] = ["topictitle1", "id=\"lastModifiedDate\"
 ///
 /// So the rule reads the bytes. A file is refused when it is a PDF -- `%PDF-`
 /// magic, whatever it is called, and this repository reads no PDFs at all -- or
-/// when it is markup carrying both markers IBM stamps into a served body.
-/// "Markup" is the file's first non-whitespace byte being `<`, which is the
-/// clause that makes the check safe to apply to source: `docs_api.py` and
-/// `conformance/tools/tests/test_locator_tools.py` both quote both markers,
-/// because one defines them and the other tests them, and neither is markup.
-/// A body renamed, re-extensioned or dropped in a new directory still opens with
-/// its `<div><article>` and still carries its own heading and `Last Updated`
-/// stamp, so it is still caught; defeating this needs editing IBM's bytes, which
-/// is no longer keeping a publication.
+/// when it carries a served topic, by either of two tests.
+///
+/// The first test is the original one: the file's first non-whitespace byte is
+/// `<` and it carries both markers. That clause is what made the check safe to
+/// apply to source -- `docs_api.py` and `conformance/tools/tests/
+/// test_locator_tools.py` both quote both markers, because one defines them and
+/// the other tests them, and neither is markup -- but it also meant position
+/// decided the answer. One line of prose in front of a verbatim body, or the
+/// same body as the value of a JSON field, and the file no longer opens with
+/// `<`. The docstring here used to claim that defeating the check needed editing
+/// IBM's bytes. It needed a text editor and no understanding at all, and a guard
+/// that overstates itself is worse than a narrow one because it stops people
+/// looking.
+///
+/// The second test closes both of those and does not care where in the file the
+/// body sits. It looks for the seam IBM's own renderer emits, the topic heading
+/// closing directly onto the `Last Updated` stamp: `</h1>` followed by the
+/// `<div>` that carries `id="lastModifiedDate"`. Every one of the 6,775 topic
+/// bodies cached across the baselines carries that seam, and every one of them
+/// carries it with no whitespace at all between the two elements; whitespace is
+/// tolerated here anyway, against a reflow. Source that quotes the markers does
+/// not carry it: 6,782 cached files hold both markers and the seven that are not
+/// bodies are the wave-1 fetch scripts, where `docs_api.py`'s two patterns sit
+/// 55 bytes apart with a `re.compile(` between them. This file's own tests
+/// assemble their sample body from two halves for the same reason, so that no
+/// file in this repository holds a served body verbatim -- there is no exception
+/// for the tests that exist to look for served bodies.
+///
+/// `\"` is unescaped before the seam is looked for, which is what catches the
+/// JSON envelope: a body embedded in a JSON string has every quote escaped, so
+/// `id=\"lastModifiedDate\"` would otherwise not match the marker at all.
+///
+/// What still gets past, stated plainly rather than left to be discovered:
+/// re-serialising the body so the heading and the stamp are no longer adjacent
+/// -- pretty-printing the markup, or JSON-encoding it with a literal `\n`
+/// between the two elements -- and any transformation that drops the stamp.
+/// That is a real gap and this is a backstop, not the control. The control is
+/// `conformance/tools/docs_api.py`: retrieved bytes are written by one function,
+/// which refuses any path inside the tree, and `python3
+/// conformance/tools/docs_api.py --audit` names every write every
+/// retrieval-capable tool makes and why it is allowed.
 fn check_publication_bytes(root: &Path) -> TaskResult {
     let mut files = Vec::new();
     collect_files(root, &mut files)?;
@@ -8819,6 +8851,10 @@ fn publication_body(data: &[u8]) -> Option<&'static str> {
         return Some("a PDF document");
     }
     let body = data.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(data);
+    let served = "a topic body served by IBM Documentation";
+    if carries_the_served_seam(body) {
+        return Some(served);
+    }
     if body.iter().find(|byte| !byte.is_ascii_whitespace()) != Some(&b'<') {
         return None;
     }
@@ -8826,7 +8862,33 @@ fn publication_body(data: &[u8]) -> Option<&'static str> {
     SERVED_TOPIC_MARKERS
         .iter()
         .all(|marker| text.contains(marker))
-        .then_some("a topic body served by IBM Documentation")
+        .then_some(served)
+}
+
+/// Whether the topic heading closes directly onto the `Last Updated` stamp.
+///
+/// Anywhere in the file, so prose in front of the body or a JSON envelope around
+/// it changes nothing. The cheap gate first: nearly every file in the tree does
+/// not contain the string at all, and only the handful that do pay for the
+/// unescaping pass.
+fn carries_the_served_seam(body: &[u8]) -> bool {
+    if !body.windows(16).any(|window| window == b"lastModifiedDate") {
+        return false;
+    }
+    let plain = String::from_utf8_lossy(body).replace("\\\"", "\"");
+    let mut rest = plain.as_str();
+    while let Some(at) = rest.find("id=\"lastModifiedDate\"") {
+        let (before, after) = rest.split_at(at);
+        if let Some(open) = before.rfind('<') {
+            let opens_a_div = before[open..].starts_with("<div");
+            let heading = before[..open].trim_end_matches(|c: char| c.is_ascii_whitespace());
+            if opens_a_div && heading.ends_with("</h1>") {
+                return true;
+            }
+        }
+        rest = &after[1..];
+    }
+    false
 }
 
 fn check_coverage_ledger(root: &Path, index: &Value) -> TaskResult {
@@ -11960,20 +12022,33 @@ mod tests {
         assert!(check_dataset_oracle_receipt(&root, Some(local_certification)).is_err());
     }
 
+    /// The two halves of a served topic, joined only at run time.
+    ///
+    /// `check_publication_bytes` walks this file too, and the seam test would
+    /// refuse it if the sample below were written out whole. Assembling it is
+    /// not a workaround for the guard, it is the guard's rule applied to the
+    /// guard: this repository holds no verbatim publication bytes, and there is
+    /// no exception for the test that looks for them.
+    const HEADING_HALF: &str = "<div><article role=\"article\" aria-labelledby=\"t__1\">\n\
+                                <h1 class=\"topictitle1\" id=\"t__1\">DD statement</h1>";
+    const STAMP_HALF: &str = "<div id=\"lastModifiedDate\"><span>Last Updated</span>: 2026-01-28\
+                              </div>\n<div class=\"body\"><p class=\"p\">The DD statement \
+                              describes a data set.</p></div></article></div>\n";
+
+    fn served_topic() -> String {
+        format!("{HEADING_HALF}{STAMP_HALF}")
+    }
+
     #[test]
     fn a_publication_body_is_recognised_by_its_bytes_and_not_by_its_name() {
-        // The opening of an IBM-served topic, in the shape every one of them has.
-        let served = br#"<div><article role="article" aria-labelledby="t__1">
-<h1 class="topictitle1" id="t__1">DD statement</h1><div id="lastModifiedDate"><span>Last Updated</span>: 2026-01-28</div>
-<div class="body"><p class="p">The DD statement describes a data set.</p></div></article></div>
-"#;
+        let served = served_topic();
         assert_eq!(
-            publication_body(served),
+            publication_body(served.as_bytes()),
             Some("a topic body served by IBM Documentation")
         );
         // Renaming is what the extension rule could not survive, so the bytes
         // decide: the same body called anything at all is the same body.
-        assert!(publication_body(b"\xef\xbb\xbf  \n<div><article role=\"article\"><h1 class=\"topictitle1\">X</h1><div id=\"lastModifiedDate\">1</div></div>").is_some());
+        assert!(publication_body(format!("\u{feff}  \n{served}").as_bytes()).is_some());
         assert_eq!(
             publication_body(b"%PDF-1.7\n1 0 obj"),
             Some("a PDF document")
@@ -12004,6 +12079,57 @@ mod tests {
         // And the tree this test runs in holds none.
         check_publication_bytes(&repository_root().expect("repository root"))
             .expect("the repository holds no publication bytes");
+    }
+
+    /// The two evasions the leading-`<` clause allowed, and one it never did.
+    ///
+    /// Both of these printed nothing at HEAD: `publication_body` returned `None`
+    /// for a body with a sentence in front of it and for the same body as a JSON
+    /// field, because neither file opens with `<`. The guard's own docstring
+    /// said defeating it required editing IBM's bytes.
+    #[test]
+    fn a_served_body_is_caught_wherever_in_the_file_it_sits() {
+        let served = served_topic();
+
+        // One line of prose, and at HEAD the whole file was exempt.
+        let with_a_note = format!("Kept for reference while the reader is written.\n\n{served}");
+        assert_eq!(
+            publication_body(with_a_note.as_bytes()),
+            Some("a topic body served by IBM Documentation")
+        );
+
+        // A JSON envelope, which also escapes every quote in the body -- so the
+        // markers themselves stop matching until `\"` is undone.
+        let envelope = format!(
+            "{{\n  \"topic_path\": \"SSLTBW_3.2.0/.../iea3b6_dd.htm\",\n  \"body\": {}\n}}\n",
+            serde_json::to_string(&served).expect("encode")
+        );
+        assert!(!envelope.contains("id=\"lastModifiedDate\""));
+        assert_eq!(
+            publication_body(envelope.as_bytes()),
+            Some("a topic body served by IBM Documentation")
+        );
+
+        // What still gets past, asserted so the docstring cannot drift from it:
+        // prose in front to lose the first test, and the heading separated from
+        // the stamp to lose the second. Reflowing alone is not enough -- the
+        // file still opens with `<` and still carries both markers.
+        let reflowed = format!("{HEADING_HALF}\n<p>reformatted</p>\n{STAMP_HALF}");
+        assert_eq!(
+            publication_body(reflowed.as_bytes()),
+            Some("a topic body served by IBM Documentation")
+        );
+        assert_eq!(
+            publication_body(format!("note\n{reflowed}").as_bytes()),
+            None
+        );
+
+        // Prose in front of a `<h1>` that is not a served heading stays legal,
+        // which is the false positive the seam has to avoid.
+        assert_eq!(
+            publication_body(b"notes\n<h1 class=\"topictitle1\">ours</h1>\n<p>no stamp</p>\n"),
+            None
+        );
     }
 
     /// The guard reads bytes; this is about which bytes it is ever given.

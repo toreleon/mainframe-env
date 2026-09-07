@@ -29,6 +29,14 @@ and curl's DEFAULT User-Agent is load-bearing too, because Akamai answers 403 to
 browser User-Agent and to urllib.  `--fetch` populates the cache through curl and
 is the only code path that talks to ibm.com; extraction itself is offline.
 
+The `cache` argument is where those bytes land, so it is a
+`docs_api.retrieval_path` and cannot name the tree.  curl no longer writes the
+file either: it prints the body and `docs_api.write_retrieved` writes it, which
+is the same guarded writer every other retrieval tool uses, so `-o` cannot be
+pointed somewhere the check never saw.  `output` and `--assertions` are written
+inside the tree and are meant to be -- they are the normalized catalogs and the
+assertion report this tool derives, and no served byte survives into either.
+
 Requires beautifulsoup4.  It is not used by the Rust build.
 """
 
@@ -39,11 +47,16 @@ import hashlib
 import json
 import re
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
 
 from bs4 import BeautifulSoup
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "conformance" / "tools"))
+
+import docs_api  # noqa: E402
 
 
 SCHEMA = "mainframe-env.official-catalog@1"
@@ -142,13 +155,21 @@ def fetch(url: str, destination: Path) -> None:
 
     Akamai rejects a browser User-Agent and rejects urllib; plain curl is what
     gets through.  Nothing else in this tool touches the network.
+
+    curl writes to stdout rather than to `-o <destination>`, so the bytes come
+    back into Python and are written by `docs_api.write_retrieved`.  That is the
+    point: with `-o` the destination is a string handed to another process and
+    no check in this repository is on that path, and a cache directory is
+    assembled here from a caller-supplied root.  Bodies are a few megabytes at
+    most, so holding one in memory costs nothing.
     """
-    destination.parent.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
-        ["curl", "-sS", "--fail", "--compressed", "-o", str(destination), url],
+        ["curl", "-sS", "--fail", "--compressed", url],
         check=False,
+        capture_output=True,
     )
     require(result.returncode == 0, f"fetch failed for {url}")
+    docs_api.write_retrieved(destination, result.stdout)
 
 
 def populate(cache: Path) -> None:
@@ -902,7 +923,8 @@ def write_catalog(path: Path, value: dict[str, Any]) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("cache", type=Path, help="directory holding toc/ and content/ bytes")
+    parser.add_argument("cache", type=docs_api.retrieval_path,
+                        help="directory holding toc/ and content/ bytes, outside the tree")
     parser.add_argument("output", type=Path, help="directory the catalogs are written to")
     parser.add_argument(
         "--oracle",

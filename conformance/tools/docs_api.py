@@ -21,12 +21,21 @@ The edge rejects clients by User-Agent, and it is a browser string that fails â€
 `Python-urllib/3.13` is refused too, so the User-Agent is sent explicitly. It is
 declared here once rather than being rediscovered by each tool.
 
-Nothing here writes into the repository. Callers that cache pass a directory
-outside the tree; IBM publication bytes are never retained.
+Nothing here writes into the repository, and that is now enforced rather than
+asserted. `outside_repository` is the one definition of the rule, `write_retrieved`
+is the one writer, and `retrieval_path` is the one `argparse` type; `_cached`
+applies the rule to every cache directory it is handed. A tool that retrieves
+through this module and writes through it cannot aim publication bytes at the
+tree even if its author never thinks about the question, which is the property
+four waves of one-at-a-time fixes did not have. `audit_write_paths` states which
+writes each retrieval-capable tool makes and why each is allowed; run it with
+`python3 conformance/tools/docs_api.py --audit`.
 """
 
 from __future__ import annotations
 
+import argparse
+import ast
 import hashlib
 import html as html_module
 import json
@@ -37,6 +46,9 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable, Iterable
+
+#: The tree these tools live in. `conformance/tools/docs_api.py` -> the root.
+REPOSITORY = Path(__file__).resolve().parents[2]
 
 USER_AGENT = "curl/8.7.1"
 TOC_URL = "https://www.ibm.com/docs/api/v1/toc/{product}?lang=en"
@@ -132,11 +144,73 @@ def fetch_cached(url: str, cache: Path | None = None) -> bytes:
     return _cached(cache, _key(url), lambda: fetch(url))
 
 
+class InsideRepository(ValueError):
+    """A retrieval path aimed at the tree.
+
+    A `ValueError` because that is what the six tools that grew their own copy
+    of this rule raised, and their tests assert on it.
+    """
+
+
+def outside_repository(path: Path | str) -> Path:
+    """Resolve a path for retrieved bytes, refusing any inside the repository.
+
+    The rule is one line and was copied into six tools, which is exactly why
+    four of the paths that needed it never got it: a rule you have to remember
+    to call is a rule someone will not call. It lives here now because this is
+    the module every retrieval goes through, and the two callers that matter
+    are `retrieval_path` (which applies it when the argument is parsed) and
+    `write_retrieved` (which applies it again at the moment of writing, so a
+    path that never passed through `argparse` is still caught).
+
+    Resolved, not compared textually: `--cache ../../conformance/x` and a
+    symlink into the tree both name the tree.
+    """
+    resolved = Path(path).expanduser().resolve()
+    if resolved == REPOSITORY or REPOSITORY in resolved.parents:
+        raise InsideRepository(
+            f"retrieved bytes may not be written inside the repository: {resolved}"
+        )
+    return resolved
+
+
+def retrieval_path(value: str) -> Path:
+    """`argparse` type for an argument a tool writes retrieved bytes to.
+
+    `type=docs_api.retrieval_path` is the whole of what a new tool has to do,
+    and the refusal is reported by `argparse` as a usage error naming the path
+    rather than as a traceback. `ArgumentTypeError` and not `InsideRepository`
+    because `argparse` discards the message of a plain `ValueError`.
+    """
+    try:
+        return outside_repository(value)
+    except InsideRepository as error:
+        raise argparse.ArgumentTypeError(str(error)) from error
+
+
+def write_retrieved(path: Path | str, data: bytes | str) -> Path:
+    """Write bytes that came from the publication, anywhere but the tree.
+
+    Every retrieval-capable tool writes through this. That is what makes the
+    guard structural: `audit_write_paths` can then require that any *other*
+    write in such a tool be declared, so bytes cannot leak through a path
+    nobody reviewed.
+    """
+    target = outside_repository(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if isinstance(data, str):
+        target.write_text(data, encoding="utf-8")
+    else:
+        target.write_bytes(data)
+    return target
+
+
 def _cached(cache: Path | None, key: str, produce: Callable[[], bytes]) -> bytes:
     if cache is None:
         return produce()
-    cache.mkdir(parents=True, exist_ok=True)
-    target = cache / key
+    directory = outside_repository(cache)
+    directory.mkdir(parents=True, exist_ok=True)
+    target = directory / key
     if target.exists():
         return target.read_bytes()
     data = produce()
@@ -321,6 +395,187 @@ def toc_index(document: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
     return found
 
 
+# --------------------------------------------------------------------------
+# the audit
+# --------------------------------------------------------------------------
+
+#: What makes a tool able to put publication bytes on disk.
+#:
+#: Retrieval *calls*, not `import docs_api`: five extractors import this module
+#: for its digest and markup helpers and never fetch anything, and auditing them
+#: as retrieval tools would have meant declaring their in-tree outputs as
+#: exceptions, which is how an exception list stops meaning anything. The list
+#: is a list of ways to reach the network and is as complete as the ways this
+#: repository actually uses; a tool that invented a sixth would not be found.
+RETRIEVAL_MARKERS = (
+    "docs_api.fetch",
+    "docs_api.topic",
+    "docs_api.toc_bytes",
+    "from browser_fetch import",
+    "urlopen(",
+    "requests.",
+    '"curl"',
+    "'curl'",
+)
+
+#: Writes a retrieval-capable tool makes that are NOT `write_retrieved`, and why
+#: each is allowed. Keyed by repository-relative path, then by the source of the
+#: expression being written to. Anything not in here fails the audit, so a new
+#: tool cannot write bytes without someone writing down what they are.
+#:
+#: Two verdict kinds, and the distinction is the whole point:
+#:   `retrieved:` the file holds bytes as served, so the path must be outside
+#:                the tree and the audit checks that it is.
+#:   `derived:`   the file holds something this project composed. Those may be
+#:                inside the tree, and several must be.
+DECLARED_WRITES: dict[str, dict[str, str]] = {
+    "conformance/tools/docs_api.py": {
+        "target": "retrieved: the guarded writer itself, and `_cached`",
+    },
+    "conformance/0.2/tools/extract_official_catalogs.py": {
+        "path": "derived: `write_catalog` emits a normalized catalog, in the tree by design",
+        "args.assertions": "derived: the assertion report, in the tree by design",
+    },
+    "conformance/0.3/tools/extract_cobol_reserved_words.py": {
+        "args.output": "derived: the reserved-word list, in the tree by design",
+    },
+    "conformance/0.3/tools/fetch_cobol_topics.py": {
+        "args.destination / name": "retrieved: topic bodies",
+        "args.manifest": "derived: digests and headings this tool composes",
+    },
+    "conformance/0.5/tools/fetch_racf_topics.py": {
+        "args.manifest": "derived: digests and headings this tool composes",
+    },
+    "conformance/0.6/tools/fetch_ams_topics.py": {
+        "args.toc": "retrieved: IBM navigation JSON",
+        "args.destination / name": "retrieved: topic bodies",
+        "args.manifest": "derived: digests and headings this tool composes",
+    },
+    "conformance/0.7/tools/fetch_jcl_topics.py": {
+        "args.toc": "retrieved: IBM navigation JSON",
+        "target": "retrieved: a topic body copied out of a --reuse directory",
+        "args.destination / file_name(path)": "retrieved: topic bodies",
+        "args.manifest": "derived: digests and headings this tool composes",
+    },
+    "conformance/tools/fetch_pinned_sources.py": {
+        "report_path": "derived: the re-verification report",
+    },
+    "conformance/tools/verify_topic_locators.py": {
+        "report_path": "derived: the locator report",
+    },
+}
+
+_WRITE_METHODS = ("write_bytes", "write_text")
+
+
+def retrieval_tools(root: Path = REPOSITORY) -> list[Path]:
+    """Every tool that can put retrieved bytes on disk, discovered, not listed.
+
+    Discovered so that a seventh tool is audited the day it is written. A tool
+    counts if it retrieves at all -- through this module, through the CDP
+    driver, through `urlopen` or through curl.
+    """
+    found = [
+        path
+        for path in sorted(root.glob("conformance/**/tools/*.py"))
+        if "tests" not in path.parts
+        and any(marker in path.read_text(encoding="utf-8") for marker in RETRIEVAL_MARKERS)
+    ]
+    return found
+
+
+def _guarded_names(tree: ast.Module) -> set[str]:
+    """Expressions in this module that have been through the check.
+
+    Seeded from two places -- an `argparse` argument declared
+    `type=...retrieval_path`, and any assignment from a call to
+    `outside_repository` -- and then propagated to anything assigned from a
+    guarded expression, so `target = args.destination / name` is guarded.
+
+    Textual, and deliberately so: it recognises the two shapes the tools
+    actually use and refuses to guess about any third, which is what a check
+    that can be wrong quietly must not do.
+    """
+    guarded: set[str] = set()
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "add_argument"
+        ):
+            declared = {keyword.arg: ast.unparse(keyword.value) for keyword in node.keywords}
+            if "retrieval_path" not in declared.get("type", ""):
+                continue
+            name = node.args[0].value if node.args and isinstance(node.args[0], ast.Constant) else ""
+            dest = declared.get("dest", "").strip("'\"") or name.lstrip("-").replace("-", "_")
+            if dest:
+                guarded.add(f"args.{dest}")
+    for _ in range(4):  # a fixpoint; nothing here chains more than twice
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+                continue
+            value = ast.unparse(node.value)
+            if "outside_repository(" in value or any(name in value for name in guarded):
+                guarded.add(ast.unparse(node.targets[0]))
+    return guarded
+
+
+def audit_write_paths(root: Path = REPOSITORY) -> tuple[list[str], list[str]]:
+    """Every write every retrieval-capable tool makes, and whether it is covered.
+
+    Returns the report and the failures. A failure is a write nobody declared,
+    or a write declared `retrieved:` on a path the module never checked.
+    """
+    report: list[str] = []
+    failures: list[str] = []
+    for path in retrieval_tools(root):
+        relative = str(path.relative_to(root))
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        guarded = _guarded_names(tree)
+        declared = DECLARED_WRITES.get(relative, {})
+        report.append(relative)
+        writes = sorted(
+            {
+                ast.unparse(node.func.value)
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr in _WRITE_METHODS
+            }
+        )
+        if not writes:
+            report.append("    every write goes through docs_api.write_retrieved")
+        for written in writes:
+            verdict = declared.get(written)
+            if verdict is None:
+                failures.append(f"{relative}: undeclared write to {written}")
+                report.append(f"    UNDECLARED  {written}")
+                continue
+            if verdict.startswith("retrieved:") and not any(
+                name in written for name in guarded
+            ):
+                failures.append(f"{relative}: {written} holds retrieved bytes and is unchecked")
+                report.append(f"    UNCHECKED   {written}  {verdict}")
+                continue
+            report.append(f"    ok          {written}  {verdict}")
+        for stale in sorted(set(declared) - set(writes)):
+            failures.append(f"{relative}: declares a write to {stale} that no longer exists")
+            report.append(f"    STALE       {stale}")
+    return report, failures
+
+
+def _main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="audit where retrieved bytes are written")
+    parser.add_argument("--audit", action="store_true", required=True)
+    parser.parse_args(argv)
+    report, failures = audit_write_paths()
+    print("\n".join(report))
+    for failure in failures:
+        print(f"FAIL {failure}")
+    print(f"tools={len(retrieval_tools())} failures={len(failures)}")
+    return 1 if failures else 0
+
+
 def without_product(topic_path: str) -> str:
     """A topic path with its leading product key removed.
 
@@ -331,3 +586,7 @@ def without_product(topic_path: str) -> str:
     """
     _, _, tail = topic_path.split("?", 1)[0].partition("/")
     return tail or topic_path
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())

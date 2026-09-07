@@ -26,7 +26,11 @@ distinction is drawn here rather than collapsed into one list.
 
 Nothing publication-shaped is written: the output is a word list with the two
 topics and their pinned digests beside it, `coverage_credit` 0, and no topic
-body is retained.
+body is retained. `--cache` is the one argument that carries retrieved bytes --
+`docs_api.topic` writes each fetched body into it -- so it is a
+`docs_api.retrieval_path` and cannot name the tree. `--output` is written inside
+the tree on purpose: it is the word list this tool composes, and the topics
+behind it appear in it only as a path and a digest.
 """
 
 from __future__ import annotations
@@ -138,7 +142,8 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--baseline", default="ibm-enterprise-cobol-6.5-2026-05-31")
-    parser.add_argument("--cache", type=Path, default=None)
+    parser.add_argument("--cache", type=docs_api.retrieval_path, default=None,
+                        help="reuse retrieved bodies from this directory, outside the tree")
     return parser.parse_args(list(argv) if argv is not None else None)
 
 

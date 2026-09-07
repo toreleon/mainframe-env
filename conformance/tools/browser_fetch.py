@@ -7,8 +7,13 @@ passes. This driver attaches to a Chrome already listening on a debugging port,
 navigates once to establish the origin, and then issues same-origin `fetch`
 calls from inside the page so downloads reuse the browser's own session.
 
-Nothing here is written to the repository: callers pass an output path outside
-the tree. Requires websocket-client.
+Nothing here is written to the repository, and `--output` is the only thing
+this driver writes at all: it is a `docs_api.retrieval_path`, so an output
+inside the tree is refused while the command line is parsed, and both the DOM
+and the binary mode hand their bytes to `docs_api.write_retrieved` rather than
+writing them directly. This file used to say "callers pass an output path
+outside the tree", which is a description of a convention and not of a check.
+Requires websocket-client.
 """
 
 from __future__ import annotations
@@ -17,11 +22,16 @@ import argparse
 import base64
 import hashlib
 import json
+import sys
 import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any, Iterable
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import docs_api  # noqa: E402
 
 ORIGIN = "https://www.ibm.com/docs/en/"
 
@@ -128,7 +138,8 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=9222)
     parser.add_argument("--url", required=True)
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--output", type=docs_api.retrieval_path, required=True,
+                        help="where the retrieved bytes are written, outside the tree")
     parser.add_argument("--mode", choices=("dom", "binary"), default="binary")
     return parser.parse_args(list(argv) if argv is not None else None)
 
@@ -140,14 +151,14 @@ def main(argv: Iterable[str] | None = None) -> int:
         establish(tab)
         if args.mode == "dom":
             payload = fetch_dom(tab, args.url)
-            args.output.write_text(payload, encoding="utf-8")
+            docs_api.write_retrieved(args.output, payload)
             print(f"status=200 bytes={len(payload)} {args.output}")
             return 0
         status, data = fetch_binary(tab, args.url)
         if data is None:
             print(f"status={status or 'none'} no body")
             return 1
-        args.output.write_bytes(data)
+        docs_api.write_retrieved(args.output, data)
         print(
             f"status={status} bytes={len(data)} "
             f"sha256:{hashlib.sha256(data).hexdigest()} {args.output}"
