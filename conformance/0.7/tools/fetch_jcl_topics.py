@@ -26,7 +26,8 @@ Four kinds of topic are collected, and the manifest records which is which:
 Retrieval goes through `conformance/tools/docs_api.py`, which declares the one
 User-Agent the edge accepts, the two endpoint templates and the `parsebody=true`
 that belongs to the pin. Topics land outside the repository; IBM publication
-bytes are never written into the tree.
+bytes are never written into the tree, and `--destination` and `--toc` refuse a
+path inside it rather than leaving that to the reader of this sentence.
 """
 
 from __future__ import annotations
@@ -39,6 +40,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 CONFORMANCE = Path(__file__).resolve().parents[2]
+REPOSITORY = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(CONFORMANCE / "tools"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -103,6 +105,28 @@ def wanted(node: dict[str, Any], catalog: dict[str, Any]) -> list[tuple[str, str
     return found
 
 
+def outside_repository(path: Path) -> Path:
+    """Refuse to write publication bytes into the tree.
+
+    The docstring above has always said topics land outside the repository, but
+    `--destination` took whatever it was given, and this was the one fetcher
+    that never checked: `--destination docs/generated/leak` wrote all 626 topic
+    bodies, 2.9 MB, into the tree as untracked files that `git add -A` stages.
+    The 0.2 gate is the backstop and now covers the whole tree, but a gate that
+    fails after the bytes are already written is a worse place to learn it than
+    the tool that is about to write them.
+
+    `--toc` is held to the same rule for the same reason. It caches the served
+    table of contents, 45 MB of IBM navigation JSON, which is a publication
+    body that happens not to be markup -- so it is the one write here the
+    content-shaped backstop would not recognise on its way in.
+    """
+    resolved = path.resolve()
+    if resolved == REPOSITORY or REPOSITORY in resolved.parents:
+        raise ValueError(f"destination is inside the repository: {resolved}")
+    return resolved
+
+
 def file_name(topic_path: str) -> str:
     """The file a topic body is stored under.
 
@@ -136,7 +160,10 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
 def main(argv: Iterable[str] | None = None) -> int:
     args = parse_args(argv)
     catalog = json.loads(args.catalog.read_text(encoding="utf-8"))
+    args.destination = outside_repository(args.destination)
     args.destination.mkdir(parents=True, exist_ok=True)
+    if args.toc:
+        args.toc = outside_repository(args.toc)
 
     if args.toc and args.toc.is_file():
         toc_bytes = args.toc.read_bytes()

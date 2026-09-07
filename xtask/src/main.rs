@@ -8646,37 +8646,78 @@ fn check_coverage(root: &Path) -> TaskResult {
     check_workload_ledger_consistency(root)
 }
 
-/// No IBM publication bytes anywhere beneath `conformance/`.
+/// The two markers IBM's content endpoint stamps into every body it serves.
 ///
-/// The guard used to stop at `conformance/0.2`, which is where the baselines and
-/// their manifests live and so is where the bytes were imagined to arrive. They
-/// do not arrive by themselves: they arrive because a fetcher was pointed
-/// somewhere, and `conformance/0.3/tools/fetch_cobol_topics.py` and
-/// `conformance/0.6/tools/fetch_ams_topics.py` take a `--destination`. Pointing
-/// one at `conformance/0.3/generated` used to land hundreds of topic bodies in
-/// the tree with every gate still green. The whole subtree is covered now, and
-/// there is nothing to carve out: no tracked file under `conformance/` has any
-/// of these three extensions, and none should -- the tree records digests of
-/// publications, never publications.
+/// They are not chosen for being distinctive strings; they are the two fields
+/// this project's own reader takes out of a topic. `HEADING` and `LAST_MODIFIED`
+/// in `conformance/tools/docs_api.py` match exactly these; the nine manifests
+/// under `conformance/0.2/manifests/` record the `last_modified` the second
+/// yields for all 4,488 pinned topics and
+/// `conformance/0.7/generated/jcl-topic-manifest.json` records the `heading` the
+/// first yields for its 626; and both markers appear in every one of the 6,598
+/// bodies cached across the nine baselines -- 100%, where `role="article"`
+/// misses three. A file the readers could read as a topic is a file this
+/// repository must not hold.
+const SERVED_TOPIC_MARKERS: [&str; 2] = ["topictitle1", "id=\"lastModifiedDate\""];
+
+/// No IBM publication bytes anywhere in the repository, by content and not by name.
+///
+/// The guard used to walk `conformance/` only, on the reasoning that bytes
+/// arrive where the fetchers are pointed and the fetchers live there. They
+/// arrive wherever they are pointed: `fetch_jcl_topics.py --destination
+/// docs/generated/leak` wrote 626 topic bodies into `docs/` with this gate, and
+/// eight others, still green. A backstop that covers one subdirectory is not a
+/// backstop, so this walks the whole tree.
+///
+/// Widening it means the extension rule has to go, because it was only ever
+/// tenable while nothing legitimate could carry those extensions. Something can:
+/// `conformance/experiments/docs-semantics/fixtures/cics-pilot.html` on
+/// `codex/docs-semantic-experiment` is 2,294 bytes of markup this project wrote
+/// to exercise a reader, and refusing it would teach the next author to rename
+/// their fixture rather than to keep publications out. Extensions are the wrong
+/// evidence in both directions anyway -- `cp topic.htm docs/notes.md` renames a
+/// publication out of reach of a rule that reads names.
+///
+/// So the rule reads the bytes. A file is refused when it is a PDF -- `%PDF-`
+/// magic, whatever it is called, and this repository reads no PDFs at all -- or
+/// when it is markup carrying both markers IBM stamps into a served body.
+/// "Markup" is the file's first non-whitespace byte being `<`, which is the
+/// clause that makes the check safe to apply to source: `docs_api.py` and
+/// `conformance/tools/tests/test_locator_tools.py` both quote both markers,
+/// because one defines them and the other tests them, and neither is markup.
+/// A body renamed, re-extensioned or dropped in a new directory still opens with
+/// its `<div><article>` and still carries its own heading and `Last Updated`
+/// stamp, so it is still caught; defeating this needs editing IBM's bytes, which
+/// is no longer keeping a publication.
 fn check_publication_bytes(root: &Path) -> TaskResult {
-    let directory = root.join("conformance");
-    let mut published = Vec::new();
-    collect_files(&directory, &mut published)?;
-    for path in published {
-        let extension = path
-            .extension()
-            .and_then(OsStr::to_str)
-            .unwrap_or_default()
-            .to_ascii_lowercase();
-        require(
-            !matches!(extension.as_str(), "pdf" | "html" | "htm"),
-            &format!(
-                "official publication bytes must not be checked into conformance/: {}",
+    let mut files = Vec::new();
+    collect_files(root, &mut files)?;
+    for path in files {
+        let data = fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?;
+        if let Some(reason) = publication_body(&data) {
+            return Err(format!(
+                "publication bytes must not be checked into the repository: {} is {reason}",
                 path.strip_prefix(root).unwrap_or(&path).display()
-            ),
-        )?;
+            ));
+        }
     }
     Ok(())
+}
+
+/// Why these bytes are a publication, or `None` if this project could have written them.
+fn publication_body(data: &[u8]) -> Option<&'static str> {
+    if data.starts_with(b"%PDF-") {
+        return Some("a PDF document");
+    }
+    let body = data.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(data);
+    if body.iter().find(|byte| !byte.is_ascii_whitespace()) != Some(&b'<') {
+        return None;
+    }
+    let text = String::from_utf8_lossy(body);
+    SERVED_TOPIC_MARKERS
+        .iter()
+        .all(|marker| text.contains(marker))
+        .then_some("a topic body served by IBM Documentation")
 }
 
 fn check_coverage_ledger(root: &Path, index: &Value) -> TaskResult {
@@ -11770,6 +11811,52 @@ mod tests {
         assert!(check_dataset_oracle_receipt(&root, Some(simulation)).is_err());
         let local_certification = root.join("conformance/0.6/evidence/dataset-certification.json");
         assert!(check_dataset_oracle_receipt(&root, Some(local_certification)).is_err());
+    }
+
+    #[test]
+    fn a_publication_body_is_recognised_by_its_bytes_and_not_by_its_name() {
+        // The opening of an IBM-served topic, in the shape every one of them has.
+        let served = br#"<div><article role="article" aria-labelledby="t__1">
+<h1 class="topictitle1" id="t__1">DD statement</h1><div id="lastModifiedDate"><span>Last Updated</span>: 2026-01-28</div>
+<div class="body"><p class="p">The DD statement describes a data set.</p></div></article></div>
+"#;
+        assert_eq!(
+            publication_body(served),
+            Some("a topic body served by IBM Documentation")
+        );
+        // Renaming is what the extension rule could not survive, so the bytes
+        // decide: the same body called anything at all is the same body.
+        assert!(publication_body(b"\xef\xbb\xbf  \n<div><article role=\"article\"><h1 class=\"topictitle1\">X</h1><div id=\"lastModifiedDate\">1</div></div>").is_some());
+        assert_eq!(
+            publication_body(b"%PDF-1.7\n1 0 obj"),
+            Some("a PDF document")
+        );
+
+        // Markup this project wrote: the fixture on codex/docs-semantic-experiment
+        // is markup with no served stamp on it, and it stays legal.
+        assert_eq!(
+            publication_body(
+                b"<main data-product=\"CICS\">\n<article data-topic-id=\"cics-rewrite\"><h1 id=\"rewrite\">REWRITE</h1></article>\n</main>\n"
+            ),
+            None
+        );
+        // Source that quotes both markers, which is why the markup clause exists:
+        // docs_api.py defines them and test_locator_tools.py tests them.
+        assert_eq!(
+            publication_body(
+                b"#!/usr/bin/env python3\nHEADING = '<h1 class=\"topictitle1\">'\nLAST = '<div id=\"lastModifiedDate\">'\n"
+            ),
+            None
+        );
+        // Markup that carries only one of the two is not a served body.
+        assert_eq!(
+            publication_body(b"<div><h1 class=\"topictitle1\">hand written</h1></div>"),
+            None
+        );
+
+        // And the tree this test runs in holds none.
+        check_publication_bytes(&repository_root().expect("repository root"))
+            .expect("the repository holds no publication bytes");
     }
 
     #[test]
