@@ -1107,7 +1107,9 @@
         "ALSO",
         "BOOL",
         "BOOLEAN",
+        "CHARACTERS",
         "CONVERTING",
+        "COUNT BYTES",
         "ENCODING",
         "EVERY",
         "FROM CODEPAGE",
@@ -1138,6 +1140,7 @@
       ],
       "optionals": [
         "ALSO",
+        "CHARACTERS",
         "EVERY",
         "FROM CODEPAGE",
         "HIGH-VALUE",
@@ -1173,8 +1176,10 @@
         "ALSO",
         "BOOL",
         "BOOLEAN",
+        "CHARACTERS",
         "CONVERTING",
         "COUNT",
+        "COUNT BYTES",
         "ENCODING",
         "END-JSON",
         "EVERY",
@@ -1217,6 +1222,7 @@
         "generic-suppression-phrase",
         "identifier-1",
         "identifier-10",
+        "identifier-11",
         "identifier-2",
         "identifier-3",
         "identifier-4",
@@ -1240,7 +1246,6 @@
         "AND",
         "BOOL",
         "OMITTED",
-        "condition-name-1",
         "condition-name-3",
         "literal-3",
         "literal-4"
@@ -1266,6 +1271,10 @@
         "PARSE"
       ],
       "keywords_missing_from_catalog": [
+        "\"",
+        "'+'",
+        "'-'",
+        "'.'",
         "ALL",
         "ALSO",
         "AND",
@@ -1286,10 +1295,16 @@
         "NULL FOR",
         "OF",
         "OMITTED",
+        "SPACE",
         "SUPPRESS",
-        "USING"
+        "USING",
+        "[0-9]"
       ],
       "optionals": [
+        "\"",
+        "'+'",
+        "'-'",
+        "'.'",
         "ALSO",
         "DETAIL",
         "FROM",
@@ -1299,22 +1314,26 @@
         "JSON",
         "OF",
         "ON",
+        "SPACE",
         "USING",
         "WITH",
+        "[0-9]",
         "condition-name-2",
-        "condition-name-3",
         "converting-phrase-1",
         "identifier-10",
         "identifier-5",
         "ignoring-phrase-1",
         "indicating-phrase-1",
-        "literal-2",
-        "literal-3"
+        "literal-2"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
-      "source_diagram_count": 5,
+      "source_diagram_count": 6,
       "source_format_titles": [],
       "source_keywords": [
+        "\"",
+        "'+'",
+        "'-'",
+        "'.'",
         "ALL",
         "ALSO",
         "AND",
@@ -1341,9 +1360,11 @@
         "OF",
         "OMITTED",
         "ON",
+        "SPACE",
         "SUPPRESS",
         "USING",
-        "WITH"
+        "WITH",
+        "[0-9]"
       ],
       "source_operands": [
         "condition-name-1",
@@ -1369,8 +1390,7 @@
         "literal-2",
         "literal-3",
         "literal-4",
-        "using-phrase-1",
-        "using-phrase-2"
+        "using-phrase-1"
       ],
       "title": "JSON PARSE statement"
     },
@@ -2196,9 +2216,7 @@
       "title": "SORT statement"
     },
     {
-      "alternatives": [
-        "THAN"
-      ],
+      "alternatives": [],
       "catalog_form_count": 1,
       "catalog_keywords": [
         "END-START",
@@ -2214,60 +2232,20 @@
         "statements"
       ],
       "id": "start",
-      "keywords_absent_from_source": [],
-      "keywords_missing_from_catalog": [
-        "=",
-        ">",
-        ">=",
-        "EQUAL",
-        "GREATER",
-        "NOT <",
-        "NOT INVALID",
-        "NOT LESS",
-        "OR EQUAL",
-        "THAN",
-        "TO"
-      ],
-      "optionals": [
-        "=",
-        ">",
-        ">=",
-        "GREATER",
-        "IS",
-        "KEY",
-        "NOT <",
-        "NOT LESS",
-        "OR EQUAL",
-        "THAN",
-        "TO"
-      ],
-      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0037",
-      "source_diagram_count": 1,
-      "source_format_titles": [],
-      "source_keywords": [
-        "=",
-        ">",
-        ">=",
+      "keywords_absent_from_source": [
         "END-START",
-        "EQUAL",
-        "GREATER",
         "INVALID",
         "IS",
         "KEY",
-        "NOT <",
-        "NOT INVALID",
-        "NOT LESS",
-        "OR EQUAL",
-        "START",
-        "THAN",
-        "TO"
+        "START"
       ],
-      "source_operands": [
-        "data-name-1",
-        "file-name-1",
-        "imperative-statement-1",
-        "imperative-statement-2"
-      ],
+      "keywords_missing_from_catalog": [],
+      "optionals": [],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0037",
+      "source_diagram_count": 0,
+      "source_format_titles": [],
+      "source_keywords": [],
+      "source_operands": [],
       "title": "START statement"
     },
     {
@@ -2813,18 +2791,18 @@
   ],
   "schema_version": "mainframe-env.cobol-grammar-comparison@1",
   "source": {
-    "pages": 906,
-    "path": "igy6lr40.pdf",
+    "pages": 916,
+    "path": "cobol.pdf",
     "retained_in_repository": false,
-    "sha256": "sha256:eef69c81ab8bcd569eaa2a47f430ff70c5518d4929cff26e7ab1ed6170f5c0bc"
+    "sha256": "sha256:8b86cbd2d838d8f460dcbe8d1e74d2266799ce1534f4cfdbc08469c36748e85e"
   },
   "totals": {
     "catalog_forms": 49,
     "distinct_catalog_placeholders": 33,
-    "distinct_keywords_missing": 137,
+    "distinct_keywords_missing": 136,
     "distinct_source_operands": 75,
     "rows": 44,
-    "rows_with_missing_keywords": 37,
+    "rows_with_missing_keywords": 36,
     "rows_with_more_source_formats": 20,
     "source_diagrams": 95,
     "source_format_titles": 59

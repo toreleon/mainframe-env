@@ -1,0 +1,62 @@
+{
+  "baseline_id": "ibm-zos-3.2-jcl-jes2-2026-06",
+  "coverage_credit": 0,
+  "schema_version": "mainframe-env.outline-locator-audit@1",
+  "source": {
+    "outline_titles": 884,
+    "pages": 758,
+    "path": "jcl-jes2.pdf",
+    "retained_in_repository": false,
+    "sha256": "sha256:8bc97add9d69609f303ee96a1fa094d755c8bca254fcf574c15c3380fe877c9b"
+  },
+  "units": [
+    {
+      "counts": {
+        "skipped": 20
+      },
+      "rows": 20,
+      "unit": "jcl-statements",
+      "unresolved": []
+    },
+    {
+      "counts": {
+        "exact": 13
+      },
+      "rows": 13,
+      "unit": "jes2-jecl-statements",
+      "unresolved": []
+    },
+    {
+      "counts": {
+        "exact": 74
+      },
+      "rows": 74,
+      "unit": "dd-parameters",
+      "unresolved": []
+    },
+    {
+      "counts": {
+        "exact": 19
+      },
+      "rows": 19,
+      "unit": "exec-parameters",
+      "unresolved": []
+    },
+    {
+      "counts": {
+        "exact": 35
+      },
+      "rows": 35,
+      "unit": "job-parameters",
+      "unresolved": []
+    },
+    {
+      "counts": {
+        "exact": 76
+      },
+      "rows": 76,
+      "unit": "output-parameters",
+      "unresolved": []
+    }
+  ]
+}

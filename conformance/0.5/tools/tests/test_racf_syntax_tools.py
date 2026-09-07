@@ -72,13 +72,51 @@ class OperandTests(unittest.TestCase):
         self.assertFalse(RACF.SEGMENT_OPEN.match("[ MODEL( dsname)]"))
 
 
+FOOTNOTED = [
+    "[subsystem-prefix]{ADDSD | AD}",
+    "        [ ADDCATEGORY(category-name ...) ]",
+    "2 More information about ALTER authority and how to limit it can be found in",
+    "in discrete profiles in z/OS Security Server RACF Security Administrator's Guide.",
+    "        [ ERASE ]",
+    "Parameters",
+    "        [ NOTAPARAMETER ]",
+]
+
+
+class BlockBoundaryTests(unittest.TestCase):
+    def test_a_footnote_at_a_page_break_does_not_truncate_the_block(self) -> None:
+        block, _, _ = RACF.find_block(["\n".join(FOOTNOTED)], "ADDSD")
+        top, _ = RACF.operands_of(block)
+        self.assertEqual(top, ["ADDCATEGORY", "ERASE"])
+
+    def test_the_next_section_heading_still_ends_the_block(self) -> None:
+        block, _, _ = RACF.find_block(["\n".join(FOOTNOTED)], "ADDSD")
+        top, _ = RACF.operands_of(block)
+        self.assertNotIn("NOTAPARAMETER", top)
+
+    def test_sustained_prose_ends_the_block(self) -> None:
+        page = "\n".join(
+            ["[subsystem-prefix]{ADDSD | AD}", "        [ ERASE ]"]
+            + ["RACF denies access to the data set entirely" for _ in range(20)]
+            + ["        [ TOOLATE ]"]
+        )
+        block, _, _ = RACF.find_block([page], "ADDSD")
+        top, _ = RACF.operands_of(block)
+        self.assertEqual(top, ["ERASE"])
+
+
 class TextShapeTests(unittest.TestCase):
     def test_kerned_command_names_still_match(self) -> None:
-        import re
+        page = "[subsystem-prefix]{RV ARY | RV}\n        [ ACTIVE ]"
+        block, _, _ = RACF.find_block([page], "RVARY")
+        self.assertEqual(RACF.aliases_of(block[0], "RVARY"), ["RV"])
 
-        pattern = re.compile(r"\{\s*" + RACF.spaced("RVARY") + r"\s*(\||\})")
-        self.assertTrue(pattern.search("[subsystem-prefix]{RV ARY | RV}"))
-        self.assertTrue(pattern.search("[subsystem-prefix]{RVARY}"))
+    def test_a_command_with_no_alias_brace_is_still_located(self) -> None:
+        page = "[subsystem-prefix]RACLINK\n        [ ID(userid) ]"
+        found = RACF.find_block([page], "RACLINK")
+        self.assertIsNotNone(found)
+        top, _ = RACF.operands_of(found[0])
+        self.assertEqual(top, ["ID"])
 
     def test_a_running_sentence_ends_the_block(self) -> None:
         self.assertTrue(RACF.is_prose("RACF denies access to the data set entirely"))

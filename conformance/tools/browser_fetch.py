@@ -61,7 +61,7 @@ class Tab:
         self._socket.close()
 
 
-def open_tab(port: int, url: str) -> Tab:
+def open_tab(port: int, url: str = ORIGIN) -> Tab:
     request = urllib.request.Request(
         f"http://127.0.0.1:{port}/json/new?{urllib.parse.quote(url, safe='')}",
         method="PUT",
@@ -97,6 +97,29 @@ FETCH = """
 """
 
 
+def establish(tab: Tab) -> None:
+    """Load the documentation origin so later `fetch` calls are same-origin."""
+    settle(tab)
+    tab.call("Page.navigate", url=ORIGIN)
+    settle(tab)
+    time.sleep(2)
+
+
+def fetch_binary(tab: Tab, url: str) -> tuple[int, bytes | None]:
+    result = tab.evaluate(FETCH % json.dumps(url))
+    if not result:
+        return 0, None
+    body = result.get("body")
+    return int(result.get("status") or 0), base64.b64decode(body) if body else None
+
+
+def fetch_dom(tab: Tab, url: str) -> str:
+    tab.call("Page.navigate", url=url)
+    settle(tab)
+    time.sleep(3)
+    return tab.evaluate("document.documentElement.outerHTML") or ""
+
+
 def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=9222)
@@ -108,28 +131,21 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
 
 def main(argv: Iterable[str] | None = None) -> int:
     args = parse_args(argv)
-    tab = open_tab(args.port, ORIGIN)
+    tab = open_tab(args.port)
     try:
-        settle(tab)
-        tab.call("Page.navigate", url=ORIGIN)
-        settle(tab)
-        time.sleep(2)
+        establish(tab)
         if args.mode == "dom":
-            tab.call("Page.navigate", url=args.url)
-            settle(tab)
-            time.sleep(3)
-            payload = tab.evaluate("document.documentElement.outerHTML")
-            args.output.write_text(payload or "", encoding="utf-8")
-            print(f"status=200 bytes={len(payload or '')} {args.output}")
+            payload = fetch_dom(tab, args.url)
+            args.output.write_text(payload, encoding="utf-8")
+            print(f"status=200 bytes={len(payload)} {args.output}")
             return 0
-        result = tab.evaluate(FETCH % json.dumps(args.url))
-        if not result or result.get("body") is None:
-            print(f"status={result.get('status') if result else 'none'} no body")
+        status, data = fetch_binary(tab, args.url)
+        if data is None:
+            print(f"status={status or 'none'} no body")
             return 1
-        data = base64.b64decode(result["body"])
         args.output.write_bytes(data)
         print(
-            f"status={result['status']} bytes={len(data)} "
+            f"status={status} bytes={len(data)} "
             f"sha256:{hashlib.sha256(data).hexdigest()} {args.output}"
         )
         return 0
