@@ -19,6 +19,13 @@ Optionality is the one rule worth naming: DITA renders an optional segment as a
 group holding both the segment and an empty bypass sibling, so a group with a
 text-free child marks its remaining children optional.
 
+The other is where the walk stops. A leaf is a node that says what it is --
+`syntaxkwd`, `syntaxvar` or a fragment reference -- and not simply a node the
+renderer boxed. `groupcomp`, the box drawn around a repeatable segment, is
+boxed and is a container; `FREE` draws its one operand as an `unboxed
+syntaxvar` inside such a box, and a reader that stops at the box reports the
+statement as taking no operand at all.
+
 Two things are counted rather than assumed. A diagram is a statement format or
 a named phrase fragment, and only the formats go into `format_titles`, because
 `JSON PARSE` publishes one format beside five phrase diagrams and reporting six
@@ -138,6 +145,17 @@ def classes(node: ElementTree.Element) -> set[str]:
     return set((node.get("class") or "").split())
 
 
+# The classes that name a diagram token outright. A node carrying one of
+# these is a leaf whether or not the renderer drew a box around it: `FREE`
+# publishes its operand as `unboxed syntaxvar` inside a repeat-group box, and
+# a leaf test that asks only about the box misses it.
+TOKEN = {"syntaxkwd", "syntaxvar", "fragref", "syntaxfragref"}
+# DITA's three group classes. `groupseq` and `groupchoice` arrive unboxed, but
+# `groupcomp` -- the box drawn around a repeatable segment -- carries `boxed`,
+# so `boxed` alone cannot tell a container from a token.
+GROUP = {"groupseq", "groupchoice", "groupcomp"}
+
+
 def collect(
     node: ElementTree.Element,
     relation: str | None,
@@ -145,7 +163,7 @@ def collect(
     branches: list[dict[str, Any]],
 ) -> None:
     names = classes(node)
-    if "boxed" in names or names & {"fragref", "syntaxfragref"}:
+    if names & TOKEN or ("boxed" in names and not names & GROUP):
         kind = (
             "keyword"
             if "syntaxkwd" in names

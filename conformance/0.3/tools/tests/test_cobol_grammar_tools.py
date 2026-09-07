@@ -87,6 +87,33 @@ class StructureTests(unittest.TestCase):
         item = GRAMMAR.form("Format 1", [svg(body)])
         self.assertEqual(item["main_line"], [{"kind": "fragment", "value": "when-phrase"}])
 
+    def test_a_repeat_group_box_is_walked_into_rather_than_read_as_a_leaf(self) -> None:
+        """`FREE` draws its only operand this way, and it is the only diagram
+        in the reference that does. The `boxed groupcomp` is the box around a
+        repeatable segment; the operand beneath it is `unboxed`, so a leaf test
+        that asks about the box reports a statement with no operands."""
+        inner = (
+            "<g class='unboxed syntaxvar'><g class='text'>"
+            "<text class='syntaxvar'> data-name-1</text></g></g>"
+        )
+        body = f"<g class='groupseq'><g class='boxed groupcomp'>{inner}</g></g>"
+        item = GRAMMAR.form("Format", [svg(body)])
+        self.assertEqual(item["main_line"], [{"kind": "operand", "value": "data-name-1"}])
+        self.assertEqual(item["branches"], [])
+
+    def test_an_operand_is_recognised_by_its_class_and_not_by_its_box(self) -> None:
+        body = "<g class='syntaxvar unboxed'><g class='text'><text>literal-2</text></g></g>"
+        item = GRAMMAR.form("Format 1", [svg(body)])
+        self.assertEqual(item["main_line"], [{"kind": "operand", "value": "literal-2"}])
+
+    def test_a_boxed_operator_still_reads_as_a_leaf(self) -> None:
+        """`COMPUTE` boxes its `=` as `syntaxoper`, and `ENTRY` its period as
+        `syntaxdelim`. Neither names a keyword or an operand, so the box is
+        the only thing that stops the walk on them."""
+        body = "<g class='boxed syntaxoper'><g class='text'><text>=</text></g></g>"
+        item = GRAMMAR.form("Format 1", [svg(body)])
+        self.assertEqual(item["main_line"], [{"kind": "fragment", "value": "="}])
+
 
 class DocumentTests(unittest.TestCase):
     def test_a_title_delimits_its_diagram(self) -> None:

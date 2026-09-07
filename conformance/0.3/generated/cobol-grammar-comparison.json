@@ -814,9 +814,27 @@
         "WHEN"
       ],
       "catalog_placeholders": [
-        "objects",
-        "statements",
-        "subjects"
+        "arithmetic-expression-1",
+        "arithmetic-expression-2",
+        "arithmetic-expression-3",
+        "arithmetic-expression-4",
+        "condition-1",
+        "condition-2",
+        "expression-1",
+        "expression-2",
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "identifier-6",
+        "literal-1",
+        "literal-2",
+        "literal-3",
+        "literal-4",
+        "literal-5",
+        "literal-6",
+        "statements"
       ],
       "id": "evaluate",
       "keywords_absent_from_source": [
@@ -885,9 +903,7 @@
       ],
       "title": "EVALUATE statement",
       "undefined_placeholders": [
-        "objects",
-        "statements",
-        "subjects"
+        "statements"
       ]
     },
     {
@@ -968,11 +984,11 @@
       "source_keywords": [
         "FREE"
       ],
-      "source_operands": [],
-      "title": "FREE statement",
-      "undefined_placeholders": [
+      "source_operands": [
         "data-name-1"
-      ]
+      ],
+      "title": "FREE statement",
+      "undefined_placeholders": []
     },
     {
       "alternatives": [],
@@ -2525,12 +2541,11 @@
         "literal-1",
         "pointer-data-item-3"
       ],
-      "catalog_form_count": 7,
+      "catalog_form_count": 6,
       "catalog_keywords": [
         "BY",
         "DOWN",
         "ENTRY",
-        "ON",
         "SET",
         "TO",
         "UP"
@@ -2551,7 +2566,6 @@
         "integer-1",
         "integer-2",
         "literal-1",
-        "mnemonic-name-1",
         "object-reference-id-1",
         "object-reference-id-2",
         "pointer-data-item-3",
@@ -2572,6 +2586,7 @@
         "NULL",
         "NULLS",
         "OFF",
+        "ON",
         "SELF",
         "TRUE",
         "UP BY"
@@ -3274,7 +3289,6 @@
         "ELEMENT",
         "ENCODING",
         "END-XML",
-        "EVERY",
         "EXCEPTION",
         "FROM",
         "GENERATE",
@@ -3283,21 +3297,17 @@
         "NAME",
         "NAMESPACE",
         "NAMESPACE-PREFIX",
-        "NONNUMERIC",
         "NOT",
-        "NUMERIC",
         "ON",
-        "OR",
         "SUPPRESS",
         "TYPE",
-        "WHEN",
         "WITH",
         "XML",
         "XML-DECLARATION"
       ],
       "catalog_placeholders": [
         "codepage",
-        "fig-con-1",
+        "generic-suppression-phrase",
         "identifier-1",
         "identifier-2",
         "identifier-3",
@@ -3310,7 +3320,8 @@
         "imperative-statement-2",
         "literal-4",
         "literal-5",
-        "literal-6"
+        "literal-6",
+        "when-phrase"
       ],
       "id": "xml-generate",
       "keywords_absent_from_source": [
@@ -3318,13 +3329,18 @@
         "XML"
       ],
       "keywords_missing_from_catalog": [
+        "EVERY",
         "HIGH-VALUE",
         "HIGH-VALUES",
         "LOW-VALUE",
         "LOW-VALUES",
+        "NONNUMERIC",
+        "NUMERIC",
         "OF",
+        "OR",
         "SPACE",
         "SPACES",
+        "WHEN",
         "XML GENERATE",
         "ZERO",
         "ZEROES",
@@ -3443,9 +3459,7 @@
         "when-phrase"
       ],
       "title": "XML GENERATE statement",
-      "undefined_placeholders": [
-        "fig-con-1"
-      ]
+      "undefined_placeholders": []
     },
     {
       "alternatives": [],
@@ -3557,15 +3571,15 @@
     "topics": 139
   },
   "totals": {
-    "catalog_forms": 81,
-    "distinct_catalog_placeholders": 73,
-    "distinct_keywords_missing": 69,
+    "catalog_forms": 80,
+    "distinct_catalog_placeholders": 77,
+    "distinct_keywords_missing": 75,
     "distinct_source_operands": 80,
-    "distinct_undefined_placeholders": 6,
+    "distinct_undefined_placeholders": 2,
     "rows": 44,
     "rows_with_missing_keywords": 29,
     "rows_with_more_source_formats": 2,
-    "rows_with_undefined_placeholders": 10,
+    "rows_with_undefined_placeholders": 8,
     "source_diagrams": 95,
     "source_format_titles": 83,
     "source_formats": 83,

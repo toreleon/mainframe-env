@@ -2718,11 +2718,11 @@
     },
     {
       "disposition": {
-        "rationale": "The reference draws one EVALUATE format; TRUE and FALSE are omitted from the form because harvesting them would reserve the words globally and break SET condition-name TO TRUE.",
+        "rationale": "The reference draws one EVALUATE format, and the form now spells its subjects and objects with the publication's own operand names rather than the collectives subjects and objects, which named nothing in the diagram. TRUE and FALSE are omitted from both positions because harvesting them would reserve the words globally and break SET condition-name TO TRUE.",
         "source_formats": 1
       },
       "forms": [
-        "EVALUATE subjects [ALSO subjects]... WHEN ANY|[NOT] objects [THROUGH|THRU objects] [ALSO ANY|[NOT] objects]... statements [WHEN OTHER statements] [END-EVALUATE]"
+        "EVALUATE identifier-1|literal-1|expression-1 [ALSO identifier-2|literal-2|expression-2]... WHEN ANY|condition-1|[NOT] identifier-3|literal-3|arithmetic-expression-1 [THROUGH|THRU identifier-4|literal-4|arithmetic-expression-2] [ALSO ANY|condition-2|[NOT] identifier-5|literal-5|arithmetic-expression-3 [THROUGH|THRU identifier-6|literal-6|arithmetic-expression-4]]... statements [WHEN OTHER statements] [END-EVALUATE]"
       ],
       "id": "evaluate",
       "label": "EVALUATE statement",
@@ -2795,10 +2795,10 @@
     },
     {
       "forms": [
-        "INSPECT identifier-1 TALLYING identifier-2 FOR CHARACTERS|ALL|LEADING [identifier-3|literal-1] [BEFORE|AFTER INITIAL identifier-4|literal-2] ...",
-        "INSPECT identifier-1 REPLACING CHARACTERS|ALL|LEADING|FIRST [identifier-3|literal-1] BY identifier-5|literal-3 [BEFORE|AFTER INITIAL identifier-4|literal-2] ...",
-        "INSPECT identifier-1 TALLYING identifier-2 FOR CHARACTERS|ALL|LEADING [identifier-3|literal-1] [BEFORE|AFTER INITIAL identifier-4|literal-2] ... REPLACING CHARACTERS|ALL|LEADING|FIRST [identifier-3|literal-1] BY identifier-5|literal-3 [BEFORE|AFTER INITIAL identifier-4|literal-2] ...",
-        "INSPECT identifier-1 CONVERTING identifier-6|literal-4 TO identifier-7|literal-5 [BEFORE|AFTER INITIAL identifier-4|literal-2] ..."
+        "INSPECT identifier-1 TALLYING identifier-2 FOR CHARACTERS|ALL|LEADING [identifier-3|literal-1] [BEFORE|AFTER [INITIAL] identifier-4|literal-2] ...",
+        "INSPECT identifier-1 REPLACING CHARACTERS|ALL|LEADING|FIRST [identifier-3|literal-1] BY identifier-5|literal-3 [BEFORE|AFTER [INITIAL] identifier-4|literal-2] ...",
+        "INSPECT identifier-1 TALLYING identifier-2 FOR CHARACTERS|ALL|LEADING [identifier-3|literal-1] [BEFORE|AFTER [INITIAL] identifier-4|literal-2] ... REPLACING CHARACTERS|ALL|LEADING|FIRST [identifier-3|literal-1] BY identifier-5|literal-3 [BEFORE|AFTER [INITIAL] identifier-4|literal-2] ...",
+        "INSPECT identifier-1 CONVERTING identifier-6|literal-4 TO identifier-7|literal-5 [BEFORE|AFTER [INITIAL] identifier-4|literal-2] ..."
       ],
       "id": "inspect",
       "label": "INSPECT statement",
@@ -2833,7 +2833,7 @@
     },
     {
       "disposition": {
-        "rationale": "One form is sufficient: the topic publishes one Format plus five phrase fragments, so the seven diagrams issue #77 counts are six fragments and one format. ALL, AND, BOOL, BOOLEAN, IN, USING and NULL are reached only through the fragments; NULL cannot be written at all and using-phrase-1 is never referenced from the Format. OF and OMITTED are omitted by measurement, for the COMPUTE ... LENGTH OF and CALL ... USING OMITTED regressions recorded on JSON GENERATE.",
+        "rationale": "One form is sufficient: the topic publishes one Format plus five phrase fragments, which is six diagrams and not the seven issue #77 counts. The seventh, in rlpsjsopj.html, draws the lexical shape of a JSON number inside a table footnote and is declared in the reader's NON_SYNTAX. ALL, AND, BOOL, BOOLEAN, IN, USING and NULL are reached only through the fragments; NULL cannot be written and using-phrase-1 is never referenced from the Format. OF and OMITTED are omitted by measurement, per JSON GENERATE.",
         "source_formats": 1
       },
       "forms": [
@@ -2949,13 +2949,12 @@
     },
     {
       "disposition": {
-        "rationale": "Seven of the eight published formats are carried, one form each; Format 4 is not, and Formats 3, 5, 6, 7 and 8 are reduced. Every all-uppercase word in a form joins the reserved set that is_operand_atom rejects, and SET's own senders are keywords, so writing OFF, TRUE, FALSE, SELF, NULL, NULLS, ADDRESS OF or LENGTH OF breaks the very statements being described - SET F TO TRUE and COMPUTE L = LENGTH OF D are both measured red. Format 4's only senders are TRUE and FALSE, so it has no writable form at all.",
+        "rationale": "Six of the eight published formats are carried, one each; 3 and 4 are not, and 5 to 8 are reduced. Every uppercase word in a form joins the set is_operand_atom rejects, so TRUE, FALSE, SELF, NULL, NULLS, ADDRESS OF and LENGTH OF break what they describe. Format 4's only senders are TRUE and FALSE. Format 3's are ON and OFF: OFF breaks the same way, measured; ON is already reserved by other rows, so SET SW TO ON on a UPSI mnemonic is MECOB0102 today while SET SW TO OFF is accepted. The dropped form wrote ON.",
         "source_formats": 8
       },
       "forms": [
         "SET index-name-1|identifier-1... TO index-name-2|identifier-2|integer-1",
         "SET index-name-3... UP BY|DOWN BY identifier-3|integer-2",
-        "SET mnemonic-name-1... TO ON ...",
         "SET identifier-4... TO identifier-6",
         "SET procedure-pointer-data-item-1|function-pointer-data-item-1... TO procedure-pointer-data-item-2|function-pointer-data-item-2|pointer-data-item-3|ENTRY identifier-8|identifier-9|literal-1",
         "SET object-reference-id-1 TO object-reference-id-2",
@@ -2987,7 +2986,7 @@
     },
     {
       "disposition": {
-        "rationale": "One published format, STOP followed by RUN or a literal. RETURNING is retained although the 6.5 diagram does not draw it, because row 0038 statement and runtime fixtures exercise STOP RUN RETURNING.",
+        "rationale": "One published format: STOP followed by RUN or the operand the diagram names literal. RETURNING is retained although the 6.5 diagram does not draw it, because row 0038 fixtures exercise STOP RUN RETURNING. Its operand is written value, which is this catalog's name and not the publication's: no RETURNING phrase is drawn for STOP, so none is named, and borrowing one from a statement that draws it would cite the wrong diagram. It is the last such name: undefined_placeholders is now value and statements only.",
         "source_formats": 1
       },
       "forms": [
@@ -3044,11 +3043,11 @@
     },
     {
       "disposition": {
-        "rationale": "One form against one published Format; the other two diagrams are the when-phrase and generic-suppression-phrase fragments, both of which this form inlines. The only keywords left outside are the nine figurative constants, which the binding rule forbids writing and which appear here as fig-con-1, plus OF, which is measured to break COMPUTE LEN-X = LENGTH OF DYN-X once it enters the reserved-word union.",
+        "rationale": "One form against one published Format. The other two diagrams are the when-phrase and generic-suppression-phrase fragments, and the form cites them by the names XML GENERATE's own Format boxes, instead of inlining them. That keeps the nine figurative constants out, with EVERY, NUMERIC, NONNUMERIC, WHEN and OR. An earlier form inlined it and wrote them as fig-con-1, which XML GENERATE never publishes: it is the JSON converting-phrase name. OF is held back by measurement: it breaks COMPUTE L = LENGTH OF D.",
         "source_formats": 1
       },
       "forms": [
-        "XML GENERATE identifier-1 FROM identifier-2 [COUNT IN identifier-3] [WITH ENCODING codepage] [WITH XML-DECLARATION] [WITH ATTRIBUTES] [NAMESPACE IS identifier-4|literal-4 [NAMESPACE-PREFIX IS identifier-5|literal-5]] [NAME identifier-6 IS literal-6] [TYPE identifier-7 IS ATTRIBUTE|ELEMENT|CONTENT] [SUPPRESS identifier-8 [WHEN fig-con-1 [OR fig-con-1]]|SUPPRESS EVERY [NUMERIC|NONNUMERIC] [ATTRIBUTE|CONTENT|ELEMENT] WHEN fig-con-1 [OR fig-con-1]] [ON EXCEPTION imperative-statement-1] [NOT ON EXCEPTION imperative-statement-2] [END-XML]"
+        "XML GENERATE identifier-1 FROM identifier-2 [COUNT IN identifier-3] [WITH ENCODING codepage] [WITH XML-DECLARATION] [WITH ATTRIBUTES] [NAMESPACE IS identifier-4|literal-4 [NAMESPACE-PREFIX IS identifier-5|literal-5]] [NAME identifier-6 IS literal-6] [TYPE identifier-7 IS ATTRIBUTE|ELEMENT|CONTENT] [SUPPRESS identifier-8 [when-phrase]|generic-suppression-phrase] [ON EXCEPTION imperative-statement-1] [NOT ON EXCEPTION imperative-statement-2] [END-XML]"
       ],
       "id": "xml-generate",
       "label": "XML GENERATE statement",
