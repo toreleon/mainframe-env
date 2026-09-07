@@ -19,10 +19,12 @@ Optionality is the one rule worth naming: DITA renders an optional segment as a
 group holding both the segment and an empty bypass sibling, so a group with a
 text-free child marks its remaining children optional.
 
-The emitted projection matches the PDF projection's schema, so
-`compare_cobol_grammar.py` consumes either. It is a review input: it grants no
-coverage credit, is not a normative catalog, and IBM publication bytes are
-never written to the repository.
+This is the only producer of that projection. The schema it emits is the one
+the deleted PDF projection used, so `compare_cobol_grammar.py` and the
+comparison committed under `conformance/0.3/generated/` did not have to change
+when the source did. It is a review input: it grants no coverage credit, is not
+a normative catalog, and IBM publication bytes are never written to the
+repository.
 """
 
 from __future__ import annotations

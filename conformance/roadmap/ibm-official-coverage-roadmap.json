@@ -1,7 +1,8 @@
 {
   "schema_version": "mainframe-env.ibm-official-coverage-roadmap@1",
   "status": "research-baseline",
-  "snapshot_date": "2026-08-31",
+  "snapshot_date": "2026-09-07",
+  "snapshot_note": "Row inventories, denominators and numerators are the 2026-08-31 analysis and are unchanged. The date is bumped because every baseline source was re-pointed from a PDF to its IBM Documentation topic set on 2026-09-07; see docs/research/publication-source-probe.md.",
   "repository": {
     "product_version": "0.1.1",
     "base_commit": "857115b907ce7098c965a51117a079048ea8182e",

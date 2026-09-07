@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Fetch the Access Method Services parameter topics for each command.
 
-The reference is published as both the pinned PDF and web topics. In the PDF a
-parameter is a flush-left heading, which is a typographic accident: values the
-typesetter did not indent read as parameters too. The web topics put the same
-material in definition lists, where a parameter is a `dt` and the values it
-accepts are `dt` entries of a nested `dl`. Nesting states what indentation only
-implied.
+The topics fetched here are what the baseline pins:
+`conformance/0.2/manifests/dataset-vsam-ams-topics.json` names all 516 topics of
+this book, and the 89 this tool reads are a subset of them at identical digests.
+The reference is also typeset as a PDF, which this repository no longer reads.
+That is not a style preference. In the PDF a parameter is a flush-left heading,
+which is a typographic accident: values the typesetter did not indent read as
+parameters too. The topics put the same material in definition lists, where a
+parameter is a `dt` and the values it accepts are `dt` entries of a nested `dl`.
+Nesting states what indentation only implied.
 
 Each command owns a chapter whose children include a `<CMD> Parameters` section
 splitting into `Required Parameters` and `Optional Parameters`. Only those
