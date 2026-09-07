@@ -1,63 +1,419 @@
+"""Offline tests for the topic-locator tools.
+
+Nothing here touches the network. Every retrieval is handed in as bytes or as
+the exception the retrieval would have raised, which is what makes the one
+distinction these tools exist to preserve testable: a topic that 404s is a
+finding, and a topic we could not reach is not.
+"""
+
 from __future__ import annotations
 
-import importlib.util
+import json
+import sys
 import unittest
 from pathlib import Path
-from types import ModuleType
 
 TOOLS = Path(__file__).resolve().parents[1]
+REPOSITORY = TOOLS.parents[1]
 
+sys.path.insert(0, str(TOOLS))
 
-def load_module(name: str) -> ModuleType:
-    path = TOOLS / f"{name}.py"
-    spec = importlib.util.spec_from_file_location(name, path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+# Imported by name rather than loaded from a path, so that the `docs_api` the
+# tools import is the same module object the tests hold. Two copies would give
+# two `Unreachable` classes, and `isinstance` would quietly stop matching.
+import docs_api as DOCS  # noqa: E402
+import fetch_pinned_sources as PINS  # noqa: E402
+import verify_topic_locators as LOCATORS  # noqa: E402
 
-
-LOCATORS = load_module("verify_outline_locators")
-
-PAGES = {
-    "ALLOCATE CURSOR": [1169],
-    "ADD statement": [343],
-    "DELETE": [40, 273],
+TOC = {
+    "toc": {
+        "label": "book",
+        "href": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_book.html",
+        "topics": [
+            {
+                "label": "ALLOCATE CURSOR",
+                "href": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_allocatecursor.html",
+                "topicId": "statements-allocate-cursor",
+            },
+            {
+                "label": "SET CURRENT ACCELERATOR",
+                "href": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setaccel.html",
+                "topicId": "statements-set-current-accelerator",
+            },
+            {
+                "label": "SET CURRENT ACCELERATOR",
+                "href": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setaccel.html",
+                "topicId": "accelerators-set-current-accelerator",
+            },
+            {
+                "label": "ALLOCATE",
+                "href": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/dalloc.htm",
+                "topicId": "commands-allocate",
+            },
+            {
+                "label": "JCL statements",
+                "href": "SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm",
+                "topicId": "statements-jcl",
+            },
+        ],
+    }
 }
+
+
+def body(heading: str, extra: str = "") -> bytes:
+    return (
+        '<div><article role="article">\n'
+        f'<h1 class="topictitle1" id="t__title__1">{heading}</h1>'
+        '<div id="lastModifiedDate"><span>Last Updated</span>: 2026-01-28</div>\n'
+        f"<div class=\"body\">{extra}</div></article></div>"
+    ).encode("utf-8")
 
 
 def row(identifier: str, locator: str) -> dict[str, str]:
     return {"id": identifier, "source_locator": locator}
 
 
-class LocatorTests(unittest.TestCase):
-    def test_a_heading_on_its_recorded_page_is_exact(self) -> None:
-        result = LOCATORS.check(row("r1", "pdf-page:1169;outline:ALLOCATE CURSOR"), PAGES)
+class RetrievalContractTests(unittest.TestCase):
+    def test_the_whole_topic_path_is_one_encoded_segment(self) -> None:
+        self.assertEqual(
+            DOCS.content_url("SSFKSJ_9.4.0/refdev/q101650_.html"),
+            "https://www.ibm.com/docs/api/v1/content/"
+            "SSFKSJ_9.4.0%2Frefdev%2Fq101650_.html?parsebody=true&lang=en",
+        )
+
+    def test_a_navigation_position_suffix_is_dropped_before_retrieval(self) -> None:
+        # ?pos=2 disambiguates a repeated navigation node, not a second
+        # document, and the content endpoint redirects it while losing
+        # parsebody=true on the way.
+        self.assertEqual(
+            DOCS.content_url("SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/abstract.htm?pos=2"),
+            DOCS.content_url("SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/abstract.htm"),
+        )
+
+    def test_parsebody_is_part_of_the_pin(self) -> None:
+        self.assertIn("parsebody=true", DOCS.CONTENT_URL)
+
+    def test_the_user_agent_is_not_a_browser_string(self) -> None:
+        # The edge rejects browser user agents and accepts curl's; a Mozilla
+        # string here would turn every retrieval into a 403.
+        self.assertNotIn("Mozilla", DOCS.USER_AGENT)
+
+
+class DigestTests(unittest.TestCase):
+    def test_the_digest_follows_the_definition_the_schema_states(self) -> None:
+        topics = [
+            {"topic_path": "b/second.html", "sha256": "b" * 64},
+            {"topic_path": "a/first.html", "sha256": "a" * 64},
+        ]
+        import hashlib
+
+        expected = hashlib.sha256(
+            (f"a/first.html {'a' * 64}\n" f"b/second.html {'b' * 64}\n").encode("utf-8")
+        ).hexdigest()
+        self.assertEqual(DOCS.manifest_digest(topics), expected)
+
+    def test_the_digest_does_not_depend_on_the_order_topics_are_listed_in(self) -> None:
+        topics = [
+            {"topic_path": "a/first.html", "sha256": "a" * 64},
+            {"topic_path": "b/second.html", "sha256": "b" * 64},
+        ]
+        self.assertEqual(DOCS.manifest_digest(topics), DOCS.manifest_digest(topics[::-1]))
+
+    def test_every_committed_manifest_still_hashes_to_its_recorded_digest(self) -> None:
+        manifests = sorted((REPOSITORY / "conformance/0.2/manifests").glob("*.json"))
+        self.assertEqual(len(manifests), 9)
+        for path in manifests:
+            manifest = json.loads(path.read_text(encoding="utf-8"))
+            with self.subTest(manifest=path.name):
+                state = PINS.self_consistency(manifest)
+                self.assertTrue(state["agrees"], state["recomputed_digest"])
+
+    def test_the_schema_states_the_same_definition_the_code_uses(self) -> None:
+        schema = json.loads(
+            (REPOSITORY / "conformance/0.2/schemas/topic-manifest.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(
+            schema["properties"]["topic_manifest_digest_definition"]["const"],
+            DOCS.DIGEST_DEFINITION,
+        )
+
+    def test_a_manifest_whose_digest_no_longer_follows_is_caught_offline(self) -> None:
+        manifest = {
+            "topics": [{"topic_path": "a/first.html", "sha256": "a" * 64, "bytes": 10}],
+            "topic_manifest_digest": "0" * 64,
+            "topic_count": 1,
+            "total_bytes": 10,
+        }
+        self.assertFalse(PINS.self_consistency(manifest)["agrees"])
+
+
+class BodyReadingTests(unittest.TestCase):
+    def test_a_heading_broken_across_lines_compares_equal(self) -> None:
+        # RACF sets several command headings across a line break inside the h1.
+        self.assertEqual(
+            DOCS.heading_of(body("RACLINK\n  (Administer user ID\xa0associations)").decode()),
+            "RACLINK (Administer user ID associations)",
+        )
+
+    def test_the_last_updated_date_is_read_so_republication_is_distinguishable(self) -> None:
+        self.assertEqual(DOCS.last_modified_of(body("ADDGROUP").decode()), "2026-01-28")
+
+    def test_a_topic_without_a_date_reports_none_rather_than_guessing(self) -> None:
+        self.assertIsNone(DOCS.last_modified_of("<h1 class='topictitle1'>x</h1>"))
+
+    def test_a_named_table_yields_its_cells(self) -> None:
+        page = body("JCL statements", '<table id="cjsts"><tr><td>// DD</td><td>DD</td></tr></table>')
+        self.assertEqual(DOCS.table_cells(page.decode(), "cjsts"), ["// DD", "DD"])
+
+    def test_an_absent_table_is_none_rather_than_an_empty_cell_list(self) -> None:
+        # None means "the topic no longer carries that table", which is drift.
+        # An empty list would read as "the table is there and has no rows".
+        self.assertIsNone(DOCS.table_cells(body("JCL statements").decode(), "cjsts"))
+
+
+class TocTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.nodes = DOCS.toc_index(TOC)
+
+    def test_the_tree_is_keyed_by_path_not_by_label(self) -> None:
+        self.assertIn("SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_allocatecursor.html", self.nodes)
+
+    def test_a_topic_filed_under_two_branches_keeps_both_identifiers(self) -> None:
+        filed = self.nodes["SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setaccel.html"]
+        self.assertEqual(
+            [node["topicId"] for node in filed],
+            ["statements-set-current-accelerator", "accelerators-set-current-accelerator"],
+        )
+
+    def test_the_product_key_is_separable_from_the_rest_of_the_path(self) -> None:
+        self.assertEqual(
+            DOCS.without_product("SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/dalloc.htm"),
+            "com.ibm.zos.v3r2.idai200/dalloc.htm",
+        )
+
+    def test_a_printed_book_chapter_number_is_separable_from_a_heading(self) -> None:
+        self.assertEqual(DOCS.without_chapter_number("Chapter 4. ALLOCATE"), "ALLOCATE")
+        self.assertEqual(DOCS.without_chapter_number("Chapter 31. ABS"), "ABS")
+
+    def test_no_other_leading_word_is_stripped(self) -> None:
+        # The relaxation is exactly as wide as the labels need and no wider.
+        for heading in ("Chapter heading", "Appendix B. Codes", "PART parameter"):
+            with self.subTest(heading=heading):
+                self.assertEqual(DOCS.without_chapter_number(heading), heading)
+
+
+class ComponentTests(unittest.TestCase):
+    def test_every_component_of_a_locator_is_read(self) -> None:
+        parts = LOCATORS.components(
+            "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm"
+            ";topic-id:statements-jcl;heading:JCL command;table:idg6175__cjsts"
+        )
+        self.assertEqual(parts["topic-id"], "statements-jcl")
+        self.assertEqual(parts["heading"], "JCL command")
+        self.assertEqual(parts["table"], "idg6175__cjsts")
+
+    def test_a_semicolon_inside_a_heading_does_not_truncate_it(self) -> None:
+        parts = LOCATORS.components("topic:a/b.html;topic-id:x;heading:DECLARE; THEN")
+        self.assertEqual(parts["heading"], "DECLARE; THEN")
+
+    def test_a_locator_that_names_no_topic_carries_no_topic_component(self) -> None:
+        self.assertNotIn("topic", LOCATORS.components("html-table:dfha8mf__eibfn_table"))
+
+
+class CheckTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.nodes = DOCS.toc_index(TOC)
+        self.labels = LOCATORS.label_index(self.nodes)
+        self.tails = LOCATORS.tail_index(self.nodes)
+
+    def check(self, locator: str, retrieved: object) -> dict:
+        return LOCATORS.check(row("r", locator), self.nodes, self.labels, self.tails, retrieved)
+
+    def test_the_served_heading_and_the_published_identifier_agreeing_is_exact(self) -> None:
+        result = self.check(
+            "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_allocatecursor.html"
+            ";topic-id:statements-allocate-cursor;heading:ALLOCATE CURSOR",
+            body("ALLOCATE CURSOR"),
+        )
+        self.assertEqual(result["verdict"], "exact")
+        self.assertEqual(result["matched_on"], "h1")
+
+    def test_a_heading_the_tree_carries_but_the_topic_extends_is_exact(self) -> None:
+        # Db2 labels the statement `ALLOCATE CURSOR` and heads the topic
+        # `ALLOCATE CURSOR statement`; 154 rows rest on the table-of-contents
+        # label rather than on the h1.
+        result = self.check(
+            "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_allocatecursor.html"
+            ";topic-id:statements-allocate-cursor;heading:ALLOCATE CURSOR",
+            body("ALLOCATE CURSOR statement"),
+        )
+        self.assertEqual(result["verdict"], "exact")
+        self.assertEqual(result["matched_on"], "toc-label")
+
+    def test_a_chapter_number_the_topic_tree_does_not_carry_is_reported_as_such(self) -> None:
+        result = self.check(
+            "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/dalloc.htm"
+            ";topic-id:commands-allocate;heading:Chapter 4. ALLOCATE",
+            body("ALLOCATE"),
+        )
+        self.assertEqual(result["verdict"], "exact")
+        self.assertEqual(result["matched_on"], "h1-without-chapter-number")
+
+    def test_a_second_branch_publishing_the_identifier_is_accepted(self) -> None:
+        result = self.check(
+            "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setaccel.html"
+            ";topic-id:statements-set-current-accelerator;heading:SET CURRENT ACCELERATOR",
+            body("SET CURRENT ACCELERATOR"),
+        )
         self.assertEqual(result["verdict"], "exact")
 
-    def test_a_heading_on_a_different_page_is_moved(self) -> None:
-        result = LOCATORS.check(row("r2", "pdf-page:900;outline:ADD statement"), PAGES)
-        self.assertEqual(result["verdict"], "moved")
-        self.assertEqual(result["found_pages"], [343])
+    def test_an_identifier_the_tree_does_not_publish_is_retitled(self) -> None:
+        result = self.check(
+            "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_allocatecursor.html"
+            ";topic-id:statements-invented;heading:ALLOCATE CURSOR",
+            body("ALLOCATE CURSOR"),
+        )
+        self.assertEqual(result["verdict"], "retitled")
+        self.assertEqual(result["published_topic_id"], ["statements-allocate-cursor"])
 
-    def test_a_heading_the_publication_does_not_carry_is_missing(self) -> None:
-        result = LOCATORS.check(row("r3", "pdf-page:12;outline:INVENTED statement"), PAGES)
+    def test_a_heading_neither_the_topic_nor_the_tree_carries_is_retitled(self) -> None:
+        # Retitled means the path still resolves. It is not `missing`, because
+        # the row's topic is there — what changed is what it is called.
+        result = self.check(
+            "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_allocatecursor.html"
+            ";topic-id:statements-allocate-cursor;heading:ALLOCATE CURSOR (old name)",
+            body("ALLOCATE CURSOR"),
+        )
+        self.assertEqual(result["verdict"], "retitled")
+        self.assertEqual(result["served_heading"], "ALLOCATE CURSOR")
+        self.assertEqual(result["last_modified"], "2026-01-28")
+
+    def test_a_row_citing_a_table_matches_a_cell_of_that_table(self) -> None:
+        result = self.check(
+            "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm"
+            ";topic-id:statements-jcl;heading:DD;table:cjsts",
+            body("JCL statements", '<table id="cjsts"><tr><td>// DD</td><td>DD</td></tr></table>'),
+        )
+        self.assertEqual(result["verdict"], "exact")
+        self.assertEqual(result["matched_on"], "table-cell")
+
+    def test_a_row_citing_a_table_the_topic_no_longer_has_is_retitled(self) -> None:
+        result = self.check(
+            "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm"
+            ";topic-id:statements-jcl;heading:DD;table:cjsts",
+            body("JCL statements"),
+        )
+        self.assertEqual(result["verdict"], "retitled")
+        self.assertEqual(result["matched_on"], "table-absent")
+
+    def test_a_topic_that_is_gone_and_whose_heading_is_nowhere_is_missing(self) -> None:
+        result = self.check(
+            "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_invented.html"
+            ";topic-id:statements-invented;heading:INVENTED STATEMENT",
+            DOCS.NotFound("https://www.ibm.com/x"),
+        )
         self.assertEqual(result["verdict"], "missing")
 
-    def test_a_repeated_heading_matches_any_of_its_pages(self) -> None:
-        for page in (40, 273):
-            result = LOCATORS.check(row("r4", f"pdf-page:{page};outline:DELETE"), PAGES)
-            self.assertEqual(result["verdict"], "exact")
+    def test_a_topic_that_is_gone_but_whose_heading_is_unique_elsewhere_moved(self) -> None:
+        result = self.check(
+            "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_oldpath.html"
+            ";topic-id:statements-allocate-cursor;heading:ALLOCATE CURSOR",
+            DOCS.NotFound("https://www.ibm.com/x"),
+        )
+        self.assertEqual(result["verdict"], "moved")
+        self.assertEqual(
+            result["found_topic_path"],
+            "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_allocatecursor.html",
+        )
 
-    def test_a_non_pdf_locator_is_reported_as_skipped_not_dropped(self) -> None:
-        result = LOCATORS.check(row("r5", "html-table:dfha8mf__eibfn_table;eibfn:0602"), PAGES)
+    def test_a_product_key_bump_reads_as_moved_rather_than_as_missing(self) -> None:
+        # The z/OS 3.3 baseline republishes the same book under a new product
+        # key. 573 rows reading `missing` would look like an inventory that had
+        # rotted rather than a publication that had been renumbered.
+        result = self.check(
+            "topic:SSLTBW_3.3.0/com.ibm.zos.v3r2.idai200/dalloc.htm"
+            ";topic-id:commands-allocate;heading:Chapter 4. ALLOCATE",
+            DOCS.NotFound("https://www.ibm.com/x"),
+        )
+        self.assertEqual(result["verdict"], "moved")
+        self.assertEqual(result["reason"], "product-key")
+
+    def test_an_unreachable_endpoint_is_skipped_and_never_missing(self) -> None:
+        # This is the distinction the whole tool turns on: an endpoint we could
+        # not reach has told us nothing about the row.
+        result = self.check(
+            "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_allocatecursor.html"
+            ";topic-id:statements-allocate-cursor;heading:ALLOCATE CURSOR",
+            DOCS.Unreachable("https://www.ibm.com/x", "http-503"),
+        )
         self.assertEqual(result["verdict"], "skipped")
+        self.assertEqual(result["reason"], "endpoint-unreachable")
+
+    def test_a_row_located_some_other_way_is_skipped_with_its_reason(self) -> None:
+        result = self.check("html-table:dfha8mf__eibfn_table;eibfn:0602", None)
+        self.assertEqual(result["verdict"], "skipped")
+        self.assertEqual(result["reason"], "not-a-topic-locator")
         self.assertIn("locator", result)
 
-    def test_non_breaking_spaces_in_a_title_do_not_defeat_the_match(self) -> None:
-        pages = LOCATORS.index([{"title": LOCATORS.clean("Chapter\xa04.\xa0 ALLOCATE"), "page": 63, "depth": 0}])
-        result = LOCATORS.check(row("r6", "pdf-page:63;outline:Chapter 4. ALLOCATE"), pages)
-        self.assertEqual(result["verdict"], "exact")
+
+class DestinationTests(unittest.TestCase):
+    def test_a_report_inside_the_repository_is_refused(self) -> None:
+        # Unbound JSON under conformance/0.2 is what broke this branch once.
+        for tool in (LOCATORS, PINS):
+            with self.subTest(tool=tool.__name__):
+                with self.assertRaises(ValueError):
+                    tool.outside_repository(REPOSITORY / "conformance/0.2/audit.json")
+
+    def test_a_report_outside_the_repository_is_allowed(self) -> None:
+        for tool in (LOCATORS, PINS):
+            with self.subTest(tool=tool.__name__):
+                self.assertTrue(tool.outside_repository(Path("/tmp/audit.json")).is_absolute())
+
+
+class PinTests(unittest.TestCase):
+    MANIFEST = {
+        "content_url_template": DOCS.CONTENT_URL,
+        "topic_manifest_digest": DOCS.manifest_digest(
+            [{"topic_path": "a/first.html", "sha256": DOCS.digest(b"one")}]
+        ),
+        "topic_count": 1,
+        "total_bytes": 3,
+        "topics": [
+            {"topic_path": "a/first.html", "sha256": DOCS.digest(b"one"), "bytes": 3}
+        ],
+    }
+
+    def verify(self, retrieve, sample=None):
+        original = PINS.docs_api.topics
+        PINS.docs_api.topics = retrieve
+        try:
+            return PINS.verify_topics(self.MANIFEST, None, sample, 1)
+        finally:
+            PINS.docs_api.topics = original
+
+    def test_the_pin_is_the_digest_over_the_whole_book(self) -> None:
+        state = self.verify(lambda paths, *_: [(p, b"one") for p in paths])
+        self.assertEqual(state["status"], "match")
+        self.assertTrue(state["matches_pin"])
+
+    def test_a_republished_topic_is_reported_with_both_dates(self) -> None:
+        served = body("First", "changed")
+        state = self.verify(lambda paths, *_: [(p, served) for p in paths])
+        self.assertEqual(state["status"], "differs")
+        self.assertEqual(state["changed"][0]["last_modified"], "2026-01-28")
+
+    def test_an_unreachable_book_is_skipped_rather_than_reported_as_drift(self) -> None:
+        error = DOCS.Unreachable("https://www.ibm.com/x", "URLError")
+        state = self.verify(lambda paths, *_: [(p, error) for p in paths])
+        self.assertEqual(state["status"], "skipped")
+        self.assertEqual(state["topics_unreachable"], 1)
+
+    def test_a_sampled_run_never_claims_the_pin_matched(self) -> None:
+        state = self.verify(lambda paths, *_: [(p, b"one") for p in paths], sample=1)
+        self.assertEqual(state["status"], "sampled")
+        self.assertNotIn("matches_pin", state)
 
 
 if __name__ == "__main__":

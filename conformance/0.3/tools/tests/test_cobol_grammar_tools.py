@@ -140,7 +140,7 @@ class TopicTests(unittest.TestCase):
         self.assertEqual(FETCH.heading(row), "ADD statement")
 
     def test_a_retired_page_locator_is_refused_rather_than_guessed(self) -> None:
-        row = {"id": "add", "source_locator": "pdf-page:343;outline:ADD statement"}
+        row = {"id": "add", "source_locator": "page:343;outline:ADD statement"}
         with self.assertRaises(ValueError):
             FETCH.topic_path(row)
 

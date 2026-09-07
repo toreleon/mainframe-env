@@ -23,8 +23,6 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Iterable
 
-import websocket
-
 ORIGIN = "https://www.ibm.com/docs/en/"
 
 
@@ -32,6 +30,12 @@ class Tab:
     """One CDP target with a synchronous request/response loop."""
 
     def __init__(self, endpoint: str, timeout: float = 120.0) -> None:
+        # Imported here rather than at module scope: this driver is the fallback
+        # retrieval path now that the documentation API answers a plain HTTP
+        # client, and the unit tests of the tools that import this module should
+        # not need websocket-client installed to run.
+        import websocket
+
         self._socket = websocket.create_connection(endpoint, timeout=timeout)
         self._id = 0
 

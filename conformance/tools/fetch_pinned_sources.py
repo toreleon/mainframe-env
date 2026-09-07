@@ -1,79 +1,246 @@
 #!/usr/bin/env python3
-"""Retrieve every pinned IBM publication and verify it against its baseline.
+"""Re-verify every pinned IBM publication against the baseline that cites it.
 
-`conformance/0.2/catalogs/index.json` already names, for each baseline, the
-publication URL and the sha256 the catalog was extracted from. This tool walks
-that list, pulls each source through a real browser, and reports whether the
-bytes still hash to the pinned digest.
+`conformance/0.2/catalogs/index.json` names, for each baseline, the table of
+contents it was read from and the digest of the topic manifest extracted from
+it. This tool walks that list, re-retrieves the table of contents and every
+topic the manifest records, and reports whether the book still hashes to its
+pin. `supporting_sources` are verified too — the RACROUTE router-interface topic
+is a pinned source like any other, and until now no tool in this repository ever
+re-read it.
 
-A match means the probes can run on exactly the edition the catalog cites
-instead of whatever older edition happens to be reachable. A mismatch means IBM
-has republished the file at the same URL, and the baseline needs a review
-decision rather than a silent re-pin.
+A pin is a whole book, not one file: the recorded digest is
+`topic_manifest_digest`, taken over every topic's own sha256. So a mismatch is
+localised rather than total, and the report says which topics moved.
 
-Sources land in a destination directory outside the repository; IBM publication
-bytes are never written into the tree.
+A mismatch is a REVIEW DECISION, not a failure to repair here. Three causes look
+identical from a digest alone and are separated by what else the report records:
+
+  IBM edited the topic       the served `Last Updated` date moves
+  IBM changed the endpoint   the date holds and the bytes move
+  we changed what we ask for the URL template differs from the pinned one
+
+Nothing may re-derive a pin: CI can only re-verify a recorded one, because a
+tool that repins on mismatch cannot tell drift from republication.
+
+An unreachable endpoint is reported as `skipped`, never as a mismatch.
+
+Topic bodies land in a cache outside the repository; IBM publication bytes are
+never written into the tree.
 """
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any, Iterable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from browser_fetch import establish, fetch_binary, fetch_dom, open_tab
+import docs_api
 
+REPOSITORY = Path(__file__).resolve().parents[2]
 INDEX = Path("conformance/0.2/catalogs/index.json")
+DEFAULT_CACHE = Path(tempfile.gettempdir()) / "cobolgrammar" / "topic-cache"
 
 
-def digest(data: bytes) -> str:
-    return "sha256:" + hashlib.sha256(data).hexdigest()
+def outside_repository(path: Path) -> Path:
+    """Refuse to cache or report inside the tree.
 
-
-def suffix(media_type: str) -> str:
-    return ".pdf" if media_type == "application/pdf" else ".html"
+    The one rule that outranks everything else here is that IBM publication
+    bytes never enter the repository, and the 0.2 gate now fails on any `.pdf`,
+    `.html` or `.htm` found anywhere beneath `conformance/0.2`. Enforcing it at
+    the tool as well means the gate is a backstop rather than the only guard.
+    """
+    resolved = path.resolve()
+    if resolved == REPOSITORY or REPOSITORY in resolved.parents:
+        raise ValueError(f"path is inside the repository: {resolved}")
+    return resolved
 
 
 def baselines(index: Path, wanted: set[str]) -> list[dict[str, Any]]:
     document = json.loads(index.read_text(encoding="utf-8"))
-    rows = [
-        row
-        for row in document["baselines"]
-        if not wanted or row["subsystem"] in wanted
-    ]
-    unknown = wanted - {row["subsystem"] for row in document["baselines"]}
+    known = {row["subsystem"] for row in document["baselines"]}
+    unknown = wanted - known
     if unknown:
         raise ValueError(f"unknown subsystem: {', '.join(sorted(unknown))}")
-    return rows
+    return [row for row in document["baselines"] if not wanted or row["subsystem"] in wanted]
 
 
-def retrieve(tab: Any, source: dict[str, Any], target: Path) -> tuple[str, bytes | None]:
-    """Return the retrieval status and the bytes, reusing a cached download."""
-    if target.exists():
-        return "cached", target.read_bytes()
-    if source["media_type"] == "application/pdf":
-        status, data = fetch_binary(tab, source["url"])
-        if data is None:
-            return f"http-{status or 'error'}", None
-        return "fetched", data
-    return "fetched", fetch_dom(tab, source["url"]).encode("utf-8")
+def self_consistency(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Check the manifest against itself before asking IBM anything.
+
+    Offline and free, and it catches the failure live retrieval cannot: a
+    manifest whose recorded digest no longer follows from its own topic list.
+    """
+    recomputed = docs_api.manifest_digest(manifest["topics"])
+    return {
+        "recomputed_digest": recomputed,
+        "agrees": (
+            recomputed == manifest["topic_manifest_digest"]
+            and len(manifest["topics"]) == manifest["topic_count"]
+            and sum(t["bytes"] for t in manifest["topics"]) == manifest["total_bytes"]
+        ),
+    }
+
+
+def verify_topics(
+    manifest: dict[str, Any], cache: Path | None, sample: int | None, workers: int
+) -> dict[str, Any]:
+    """Re-retrieve the manifest's topics and compare each against its pin."""
+    template = manifest["content_url_template"]
+    entries = manifest["topics"]
+    selected = entries if sample is None else entries[:sample]
+    live: list[dict[str, Any]] = []
+    changed: list[dict[str, Any]] = []
+    unreachable: list[dict[str, Any]] = []
+
+    retrieved = dict(
+        docs_api.topics([e["topic_path"] for e in selected], template, cache, workers)
+    )
+    for entry in selected:
+        path = entry["topic_path"]
+        data = retrieved[path]
+        if isinstance(data, docs_api.NotFound):
+            unreachable.append({"topic_path": path, "reason": "http-404"})
+            continue
+        if isinstance(data, Exception):
+            unreachable.append({"topic_path": path, "reason": getattr(data, "reason", "error")})
+            continue
+        served = docs_api.digest(data)
+        live.append({"topic_path": path, "sha256": served})
+        if served != entry["sha256"] or len(data) != entry["bytes"]:
+            changed.append(
+                {
+                    "topic_path": path,
+                    "pinned_sha256": entry["sha256"],
+                    "sha256": served,
+                    "pinned_bytes": entry["bytes"],
+                    "bytes": len(data),
+                    "pinned_last_modified": entry.get("last_modified"),
+                    "last_modified": docs_api.last_modified_of(
+                        data.decode("utf-8", "replace")
+                    ),
+                }
+            )
+
+    state: dict[str, Any] = {
+        "topics_pinned": len(entries),
+        "topics_checked": len(live),
+        "topics_changed": len(changed),
+        "topics_unreachable": len(unreachable),
+        "changed": changed,
+        "unreachable": unreachable,
+    }
+    if sample is None and not unreachable:
+        state["manifest_digest"] = docs_api.manifest_digest(live)
+        state["matches_pin"] = state["manifest_digest"] == manifest["topic_manifest_digest"]
+        state["status"] = "match" if state["matches_pin"] else "differs"
+    elif unreachable and not changed:
+        state["status"] = "skipped"
+    elif changed:
+        state["status"] = "differs"
+    else:
+        state["status"] = "sampled"
+    return state
+
+
+def verify_supporting(source: dict[str, Any], cache: Path | None) -> dict[str, Any]:
+    """Re-read one pinned supporting topic.
+
+    Verified here because nothing else ever has: the RACROUTE router-interface
+    pin has been carried in the index since the baseline was written and no tool
+    in this repository's history has re-read it.
+    """
+    entry: dict[str, Any] = {
+        "url": source["url"],
+        "topic_path": source.get("topic_path"),
+        "pinned_sha256": source["sha256"],
+        "pinned_bytes": source["bytes"],
+    }
+    try:
+        data = docs_api.fetch_cached(source["url"], cache)
+    except (docs_api.NotFound, docs_api.Unreachable) as error:
+        reason = "http-404" if isinstance(error, docs_api.NotFound) else error.reason
+        return {**entry, "status": "skipped", "reason": reason}
+    entry["sha256"] = "sha256:" + docs_api.digest(data)
+    entry["bytes"] = len(data)
+    entry["last_modified"] = docs_api.last_modified_of(data.decode("utf-8", "replace"))
+    entry["status"] = (
+        "match"
+        if entry["sha256"] == source["sha256"] and entry["bytes"] == source["bytes"]
+        else "differs"
+    )
+    return entry
+
+
+def verify_baseline(
+    row: dict[str, Any],
+    root: Path,
+    cache: Path | None,
+    sample: int | None,
+    workers: int,
+) -> dict[str, Any]:
+    source = row["source"]
+    manifest = json.loads((root / source["manifest"]).read_text(encoding="utf-8"))
+    entry: dict[str, Any] = {
+        "subsystem": row["subsystem"],
+        "baseline_id": row["id"],
+        "publication_identity": row["publication_identity"],
+        "manifest": source["manifest"],
+        "toc_url": source["url"],
+        "pinned_manifest_digest": source["sha256"],
+        "self_consistency": self_consistency(manifest),
+    }
+    entry["index_agrees_with_manifest"] = (
+        source["sha256"] == "sha256:" + manifest["topic_manifest_digest"]
+        and source["bytes"] == manifest["total_bytes"]
+        and source["topic_count"] == manifest["topic_count"]
+        and source["toc_sha256"] == "sha256:" + manifest["toc_sha256"]
+    )
+
+    try:
+        raw = docs_api.toc_bytes(source["url"], cache)
+        entry["toc_sha256"] = "sha256:" + docs_api.digest(raw)
+        entry["toc_matches_pin"] = entry["toc_sha256"] == source["toc_sha256"]
+    except (docs_api.NotFound, docs_api.Unreachable) as error:
+        entry["toc_matches_pin"] = None
+        entry["toc_reason"] = getattr(error, "reason", "http-404")
+
+    entry["topics"] = verify_topics(manifest, cache, sample, workers)
+    supporting = [verify_supporting(s, cache) for s in row.get("supporting_sources", [])]
+    if supporting:
+        entry["supporting_sources"] = supporting
+
+    disagrees = (
+        not entry["self_consistency"]["agrees"]
+        or not entry["index_agrees_with_manifest"]
+        or any(s["status"] == "differs" for s in supporting)
+    )
+    entry["status"] = "differs" if disagrees else entry["topics"]["status"]
+    return entry
 
 
 def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=9222)
-    parser.add_argument("--destination", type=Path, required=True)
     parser.add_argument("--index", type=Path, default=INDEX)
     parser.add_argument(
-        "--subsystem",
-        action="append",
-        default=[],
+        "--subsystem", action="append", default=[],
         help="restrict to these baselines; repeatable",
+    )
+    parser.add_argument(
+        "--cache", type=Path, default=DEFAULT_CACHE,
+        help="reuse retrieved topic bodies from this directory, outside the tree",
+    )
+    parser.add_argument("--no-cache", action="store_true")
+    parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument(
+        "--sample", type=int,
+        help="re-read only the first N topics of each book; reports `sampled`, "
+             "never `match`, because a partial read cannot reproduce the digest",
     )
     parser.add_argument("--report", type=Path)
     return parser.parse_args(list(argv) if argv is not None else None)
@@ -82,61 +249,51 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
 def main(argv: Iterable[str] | None = None) -> int:
     args = parse_args(argv)
     rows = baselines(args.index, set(args.subsystem))
-    args.destination.mkdir(parents=True, exist_ok=True)
+    cache = None if args.no_cache else outside_repository(args.cache)
+    report_path = outside_repository(
+        args.report or DEFAULT_CACHE.parent / "pinned-source-retrieval.json"
+    )
 
-    tab = open_tab(args.port)
     results: list[dict[str, Any]] = []
-    try:
-        establish(tab)
-        for row in rows:
-            source = row["source"]
-            target = args.destination / (row["subsystem"] + suffix(source["media_type"]))
-            status, data = retrieve(tab, source, target)
-            entry: dict[str, Any] = {
-                "subsystem": row["subsystem"],
-                "baseline_id": row["id"],
-                "publication_identity": row["publication_identity"],
-                "url": source["url"],
-                "status": status,
-                "pinned_sha256": source["sha256"],
-            }
-            if data is None:
-                entry["matches_pin"] = False
-            else:
-                if status == "fetched":
-                    target.write_bytes(data)
-                entry["path"] = str(target)
-                entry["bytes"] = len(data)
-                entry["sha256"] = digest(data)
-                entry["matches_pin"] = entry["sha256"] == source["sha256"]
-            results.append(entry)
-            mark = "match" if entry["matches_pin"] else "DIFFERS"
-            print(
-                f"{row['subsystem']:18} {status:9} "
-                f"{entry.get('bytes', 0):>9} bytes  {mark}"
-            )
-    finally:
-        tab.close()
-
-    if args.report:
-        args.report.write_text(
-            json.dumps(
-                {
-                    "schema_version": "mainframe-env.pinned-source-retrieval@1",
-                    "coverage_credit": 0,
-                    "retained_in_repository": False,
-                    "sources": results,
-                },
-                indent=2,
-                sort_keys=True,
-            )
-            + "\n",
-            encoding="utf-8",
+    for row in rows:
+        entry = verify_baseline(row, REPOSITORY, cache, args.sample, args.workers)
+        results.append(entry)
+        topics = entry["topics"]
+        # Printed as each book finishes rather than at the end: re-reading all
+        # 4,488 topics takes the better part of an hour, and a run that says
+        # nothing until it is over cannot be watched.
+        print(
+            f"{entry['subsystem']:18} {entry['status']:8} "
+            f"topics={topics['topics_checked']}/{topics['topics_pinned']:>5} "
+            f"changed={topics['topics_changed']:>4} "
+            f"unreachable={topics['topics_unreachable']:>4} "
+            f"toc={entry.get('toc_matches_pin')}",
+            flush=True,
         )
 
-    matched = sum(1 for entry in results if entry["matches_pin"])
-    print(f"pins={len(results)} matched={matched}")
-    return 0 if matched == len(results) else 1
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "mainframe-env.pinned-source-retrieval@2",
+                "coverage_credit": 0,
+                "retained_in_repository": False,
+                "sources": results,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    counts = {status: 0 for status in ("match", "differs", "skipped", "sampled")}
+    for entry in results:
+        counts[entry["status"]] += 1
+    print(
+        f"pins={len(results)} matched={counts['match']} differs={counts['differs']} "
+        f"skipped={counts['skipped']} sampled={counts['sampled']} report={report_path}"
+    )
+    return 1 if counts["differs"] else 0
 
 
 if __name__ == "__main__":

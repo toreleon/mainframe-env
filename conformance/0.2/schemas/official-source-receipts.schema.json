@@ -24,7 +24,7 @@
       "required": ["url", "media_type", "sha256", "bytes", "snapshot_date", "retained_in_repository"],
       "properties": {
         "url": {"type": "string", "pattern": "^https://www\\.ibm\\.com/"},
-        "media_type": {"enum": ["application/pdf", "text/html"]},
+        "media_type": {"const": "text/html"},
         "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
         "bytes": {"type": "integer", "minimum": 1},
         "snapshot_date": {"type": "string", "minLength": 4},

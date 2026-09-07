@@ -284,3 +284,38 @@ whether the projection is catalog-grade, not whether the gap is real:
 | Db2 | Retrieved and its 174 rows resolve against the outline, but the SQL Reference has been republished since the pin. No syntax reader; statement syntax is drawn as railroad diagrams like COBOL's. |
 | z/OSMF | REST families rather than a command language. Its 216 rows resolve against the outline; a syntax projection does not apply without a different comparison model. |
 | CICS, IMS, MQ | HTML baselines. The 0.9 CICS DITA reader already covers CICS; IMS and MQ pin small HTML snapshots whose retrieval method is not recorded, so their digests cannot be re-verified yet. |
+
+## Corrections
+
+**2026-09-07 — every PDF this record describes has been retired as a source, and
+two of the four results below no longer have a producer.** The sections above
+are left standing as the dated record of what the PDF probes found. What has
+changed since:
+
+- **The pins are not PDFs.** All nine baselines now pin a manifest of IBM
+  Documentation topics under `conformance/0.2/manifests/`, read from the content
+  endpoint (`?parsebody=true&lang=en`). The "The pins are reproducible" table
+  above describes six PDF downloads that no baseline cites any more, and the
+  paragraph after it — that the four HTML pins "need a recorded retrieval method
+  before they can be re-verified" — is answered: they have one, and
+  `conformance/tools/fetch_pinned_sources.py` re-reads all 4,488 topics through
+  it.
+- **The locator audit is a different tool.**
+  `conformance/tools/verify_outline_locators.py` is deleted;
+  `conformance/tools/verify_topic_locators.py` resolves the
+  `topic:PATH;topic-id:SLUG;heading:TITLE` locators the rows carry now. It
+  covers 865 rows rather than 845, because the 20 JCL table rows it used to
+  report as "not an outline locator" now cite a topic and a table together. The
+  known limitation recorded above — that a repeated outline title matches any of
+  its pages, so a row pointing at the wrong occurrence still reads exact — is
+  gone with the page numbers.
+- **The JCL and RACF results are provisional until a topic reader replaces
+  them.** `extract_jcl_pdf_parameters.py` and `extract_racf_pdf_syntax.py` are
+  deleted with no replacement in this wave, so the JCL "204 statement
+  parameters, all confirmed" table and the RACF "25 of 34 commands located, 534
+  source operands" table can no longer be re-derived from anything in the tree.
+  Neither was ever gated. Nothing downstream depends on them: the RACF alias fix
+  they motivated is already committed and stands on the abbreviations RACF
+  operators type, and the JCL comparison confirmed a catalog it did not change.
+  Read both tables as findings from a source we have stopped reading, not as
+  claims this repository can still stand behind.
